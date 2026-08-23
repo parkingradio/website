@@ -20,3 +20,38 @@ Deployment is done via Terraform.
 
 See [docs/design.md](docs/design.md) for the page-by-page design of the site.
 
+## Development
+
+The app is an npm-workspaces monorepo: `client` (Vite + React) and `server` (Fastify, talking to
+Postgres via Drizzle).
+
+### Prerequisites
+
+- Node.js, matching the version in `.nvmrc` (use `nvm use` if you have nvm installed)
+- Docker, for running Postgres locally
+
+### Setup
+
+```sh
+npm install
+cp .env.example .env
+npm run db:up      # starts a local Postgres container
+```
+
+### Running
+
+```sh
+npm run dev
+```
+
+This starts the Vite dev server at http://localhost:5173 and the Fastify server at http://localhost:3000.
+
+### Testing and building
+
+```sh
+npm test    # runs both workspaces' test suites
+npm run build
+```
+
+Stop the local database with `npm run db:down` when you're done.
+
