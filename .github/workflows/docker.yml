@@ -1,0 +1,58 @@
+#
+# Build the Docker container and perform basic sanity checks on it.
+#
+
+name: Docker
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: parking_radio
+          POSTGRES_PASSWORD: parking_radio
+          POSTGRES_DB: parking_radio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U parking_radio"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t parking-radio .
+
+      - name: Run container
+        run: |
+          docker run -d --init --name parking-radio --network host \
+            --env-file .env.example \
+            parking-radio
+
+      - name: Wait for /healthz
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/healthz | grep -q '"ok":true'; then
+              echo "Server is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server never became healthy"
+          exit 1
+
+      - name: Check homepage is served
+        run: curl -sf http://localhost:3000/ | grep -qi '<title>Parking Radio</title>'
+
+      - name: Container logs
+        if: always()
+        run: docker logs parking-radio
