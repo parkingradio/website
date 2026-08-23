@@ -55,3 +55,20 @@ npm run build
 
 Stop the local database with `npm run db:down` when you're done.
 
+### Docker
+
+The `Dockerfile` builds the production image (client build + server, no dev tooling). It's not used for
+day-to-day development, use `npm run dev` instead. To build the production environment, use:
+
+```sh
+docker build -t parking-radio .
+npm run db:up   # if not already running
+docker run --init --rm -p 3000:3000 --network radio_default \
+  -e DATABASE_URL="postgres://parking_radio:parking_radio@postgres:5432/parking_radio" \
+  -e PORT=3000 \
+  parking-radio
+npm run db:down # when you're done
+```
+
+Then `curl localhost:3000/healthz` should return `{"ok":true}`, and `http://localhost:3000` should serve
+the built client.
