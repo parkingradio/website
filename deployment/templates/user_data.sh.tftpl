@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y docker jq
+systemctl enable --now docker
+
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+mkdir -p /opt/app/certs
+
+cat > /opt/app/docker-compose.yml <<'COMPOSE_EOF'
+${compose_file}
+COMPOSE_EOF
+
+cat > /opt/app/nginx.conf <<'NGINX_EOF'
+${nginx_conf}
+NGINX_EOF
+
+DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --region us-east-1 \
+  --query SecretString --output text | jq -r '.password')
+cat > /opt/app/.env <<EOF
+DATABASE_URL=postgres://${db_username}:$DB_PASSWORD@${db_endpoint}/${db_name}
+PORT=3000
+EOF
+chmod 600 /opt/app/.env
+
+ORIGIN_JSON=$(aws secretsmanager get-secret-value --secret-id "${origin_secret_arn}" --region us-east-1 \
+  --query SecretString --output text)
+echo "$ORIGIN_JSON" | jq -r '.certificate' > /opt/app/certs/origin.pem
+echo "$ORIGIN_JSON" | jq -r '.private_key' > /opt/app/certs/origin.key
+chmod 600 /opt/app/certs/origin.key
+
+cd /opt/app
+docker compose pull
+docker compose up -d

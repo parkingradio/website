@@ -14,7 +14,8 @@ reverse proxy on top of the server container.
 
 The Postgres database is hosted on Amazon RDS.
 
-Deployment is done via Terraform.
+Deployment is done via Terraform. See [docs/deployment.md](docs/deployment.md) for how to bootstrap,
+apply, and deploy new versions.
 
 ## Site Design
 

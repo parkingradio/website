@@ -5,3 +5,9 @@ dist/
 
 # Drizzle
 server/drizzle/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
