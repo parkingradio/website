@@ -22,4 +22,6 @@ RUN npm ci --omit=dev -w server
 COPY --from=server-build /app/server/dist server/dist
 COPY --from=client-build /app/client/dist client/dist
 EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 --start-period=5s \
+  CMD wget --quiet -O - http://127.0.0.1:3000/healthz || exit 1
 CMD ["node", "server/dist/index.js"]
