@@ -53,12 +53,14 @@ jobs:
         run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker image
-        run: docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
-                          --tag ghcr.io/parkingradio/radio:latest .
+        run: |
+          docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
+                       --tag ghcr.io/parkingradio/radio:latest .
 
       - name: Run container
-        run: docker run --detach --init --name parking-radio --network host --env-file .env.example \
-                        ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
+        run: |
+          docker run --detach --init --name parking-radio --network host --env-file .env.example \
+                     ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
 
       - name: Wait for /healthz
         run: |
