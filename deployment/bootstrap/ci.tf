@@ -10,8 +10,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   # fetches it itself rather than needing it hand-specified.
 }
 
-# Only a push to `main` in this exact repo can ever assume this role: not PRs, not forks, not other
-# branches or repos.
+# Only the `production` environment in the `deploy.yml` workflow in this repo can assume this role.
 resource "aws_iam_role" "github_actions_deploy" {
   name = "parking-radio-github-actions-deploy"
 
@@ -24,7 +23,7 @@ resource "aws_iam_role" "github_actions_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:parkingradio/radio:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = "repo:parkingradio/radio:environment:production"
         }
       }
     }]
