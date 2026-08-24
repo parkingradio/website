@@ -19,3 +19,9 @@ variable "ghcr_image" {
   type        = string
   default     = "ghcr.io/parkingradio/radio"
 }
+
+variable "app_image_tag" {
+  description = "Tag of the app image (in the ghcr_image repository) to deploy. Bump this manually to deploy the web app."
+  type        = string
+  default     = "TODO"
+}

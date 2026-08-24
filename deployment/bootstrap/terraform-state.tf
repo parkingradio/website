@@ -1,18 +1,5 @@
-terraform {
-  required_version = ">= 1.10"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = "us-east-1"
-}
-
+# Creates the S3 bucket that deployment/main uses as its remote state backend.
+# This is a one-time setup to run on a new AWS account.
 locals {
   # This needs to be a unique name across all S3 buckets. Just pick anything that's available.
   state_bucket_name = "parking-radio-terraform-state"
