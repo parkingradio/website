@@ -52,9 +52,15 @@ jobs:
       - id: tag
         run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
+      # The app runs on arm64 in production, so we need QEMU to build and run the image
+      # from Github runners which are amd64 by default.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
         run: |
-          docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
+          docker buildx build --platform linux/arm64 --load                           \
+                       --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}  \
                        --tag ghcr.io/parkingradio/radio:latest .
 
       - name: Run container
