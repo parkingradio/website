@@ -6,10 +6,8 @@ Origin CA certificate so traffic between Cloudflare and the origin is encrypted 
 provisioned with Terraform, split into two modules under `deployment/`:
 
 - `deployment/bootstrap`: creates the S3 bucket that `deployment/main` uses as its remote state backend,
-  and the OIDC provider + IAM role the automatic deploy pipeline (below) uses to authenticate from GitHub
-  Actions. Used exactly once on a new AWS deployment — deliberately kept separate from `deployment/main`
-  so the CI role it creates can never see or modify its own trust policy/permissions through the pipeline
-  it drives.
+  and the OIDC provider + IAM role the `Deploy` GitHub Actions workflow uses to authenticate to AWS. This
+  is used once on a new AWS deployment.
 - `deployment/main`: the actual stack configuring networking, RDS, the EC2 instance, and the Cloudflare DNS
   record + Origin CA certificate.
 
@@ -33,23 +31,24 @@ repository:
   the CI deployment pipeline to perform operations in the AWS account (e.g. deploy EC2) based on the OIDC trust
   chain established by the one-time bootstrap. This is not sensitive.
 
+## Building and pushing the app image
+
+A workflow builds the image on all PRs and branch pushes, after running tests. On pushes to `main` (exclusively),
+the built Docker image is pushed to `ghcr.io/parkingradio/radio` and tagged with the commit's short SHA.
+
 ## Deploying the web app
 
-This is done by running `terraform apply`:
+Deploying is done manually by triggering the `deploy.yml` Github workflow. Select the web app image to use and
+launch the workflow, which will run `terraform apply` in `deployment/main` with that tag. The EC2 instance gets
+re-created automatically whenever required.
+
+Alternatively, deployment can be triggered locally without going through the workflow:
 
 ```sh
 export AWS_PROFILE=your-aws-profile
 terraform -chdir=deployment/main init
-terraform -chdir=deployment/main apply -var="app_image_tag=..."    \
+terraform -chdir=deployment/main apply -var="app_image_tag=..."         \
                                        -var="cloudflare_api_token=..."  \
                                        -var="cloudflare_zone_id=..."    \
                                        -var="domain=parking.radio"
 ```
-
-The EC2 instance gets re-created automatically whenever required.
-
-Note that this is also done automatically on every push to `main` by the `deploy.yml` workflow:
-- The image is built, pushed to `ghcr.io/parkingradio/radio` and tagged with the commit's short SHA (and `:latest`).
-- The workflow runs `terraform apply` in `deployment/main` with whatever web app version is configured in
-  `deployment/main/variables.tf`. Actually updating the web app that is deployed requires manually bumping
-  the image version and pushing to `main`.
