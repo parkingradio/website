@@ -21,7 +21,6 @@ variable "ghcr_image" {
 }
 
 variable "app_image_tag" {
-  description = "Tag of the app image (in the ghcr_image repository) to deploy. Bump this manually to deploy the web app."
+  description = "Tag of the app image (in the ghcr_image repository) to deploy."
   type        = string
-  default     = "TODO"
 }

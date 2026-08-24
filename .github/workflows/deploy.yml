@@ -1,42 +1,19 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app_image_tag:
+        description: "Tag of the ghcr.io/parkingradio/radio image to deploy"
+        required: true
+        type: string
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: tag
-        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        run: |
-          docker build \
-            -t ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
-            -t ghcr.io/parkingradio/radio:latest \
-            .
-          docker push ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
-          docker push ghcr.io/parkingradio/radio:latest
-
   deploy:
-    needs: build-and-push
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -58,7 +35,8 @@ jobs:
       - name: Terraform apply
         working-directory: deployment/main
         run: |
-          terraform apply -auto-approve \
+          terraform apply -auto-approve                                     \
             -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -var="cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}" \
-            -var="domain=${{ vars.DOMAIN }}"
+            -var="cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}"        \
+            -var="domain=${{ vars.DOMAIN }}"                                \
+            -var="app_image_tag=${{ inputs.app_image_tag }}"
