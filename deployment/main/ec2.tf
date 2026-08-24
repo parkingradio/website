@@ -89,6 +89,11 @@ resource "aws_instance" "app" {
   })
   user_data_replace_on_change = true
 
+  # Make sure the origin cert has been obtained before proceeding with the EC2 instance. Otherwise,
+  # on failure to obtain the cert, the EC2 instance would be brought up and it would fail at boot
+  # time when failing to retrieve the cert from Secrets Manager.
+  depends_on = [aws_secretsmanager_secret_version.origin_cert]
+
   tags = {
     Name = "parking-radio"
   }
