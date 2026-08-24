@@ -28,7 +28,9 @@ jobs:
 
   build-docker:
     needs: [test-npm]
-    runs-on: ubuntu-latest
+    # The app runs on arm64 in EC2, so we use native arm64 Github runners since that simplifies
+    # building and testing the Docker image.
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -52,15 +54,9 @@ jobs:
       - id: tag
         run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      # The app runs on arm64 in production, so we need QEMU to build and run the image
-      # from Github runners which are amd64 by default.
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-
       - name: Build Docker image
         run: |
-          docker buildx build --platform linux/arm64 --load                           \
-                       --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}  \
+          docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
                        --tag ghcr.io/parkingradio/radio:latest .
 
       - name: Run container
