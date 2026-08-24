@@ -16,6 +16,9 @@ jobs:
   deploy:
     name: Deploy ${{ inputs.app_image_tag }}
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.DOMAIN }}
     permissions:
       id-token: write
       contents: read
