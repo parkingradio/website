@@ -24,8 +24,10 @@ NGINX_EOF
 
 DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --region us-east-1 \
   --query SecretString --output text | jq -r '.password')
+# URL-encode the password since generated passwords may contain special characters.
+DB_PASSWORD_URLENC=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
 cat > /opt/app/.env <<EOF
-DATABASE_URL=postgres://${db_username}:$DB_PASSWORD@${db_endpoint}/${db_name}
+DATABASE_URL=postgres://${db_username}:$DB_PASSWORD_URLENC@${db_endpoint}/${db_name}
 DATABASE_SSL_CA=/app/certs/rds-global-bundle.pem
 PORT=3000
 EOF
