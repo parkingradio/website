@@ -79,7 +79,6 @@ resource "aws_instance" "app" {
     db_username       = aws_db_instance.main.username
     db_endpoint       = aws_db_instance.main.endpoint
     db_name           = aws_db_instance.main.db_name
-    rds_ca_bundle     = data.http.rds_ca_bundle.response_body
     origin_secret_arn = aws_secretsmanager_secret.origin_cert.arn
     compose_file = templatefile("${path.module}/../templates/docker-compose.prod.yml.tftpl", {
       image = "${var.ghcr_image}:${var.app_image_tag}"

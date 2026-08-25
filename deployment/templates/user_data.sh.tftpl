@@ -11,9 +11,8 @@ chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
 mkdir -p /opt/app/certs
 
-cat > /opt/app/certs/rds-global-bundle.pem <<'RDS_CA_EOF'
-${rds_ca_bundle}
-RDS_CA_EOF
+# Fetch the RDS Postgres certificate so we can talk to the DB using TLS.
+curl -sSL -o /opt/app/certs/rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
 cat > /opt/app/docker-compose.yml <<'COMPOSE_EOF'
 ${compose_file}
