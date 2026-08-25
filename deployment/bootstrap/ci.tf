@@ -7,6 +7,10 @@ data "aws_kms_alias" "rds" {
   name = "alias/aws/rds"
 }
 
+data "aws_kms_alias" "secretsmanager" {
+  name = "alias/aws/secretsmanager"
+}
+
 resource "aws_iam_openid_connect_provider" "github_actions" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -81,7 +85,8 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Action   = "rds:*"
         Resource = "*"
       },
-      # Needed for RDS storage encryption with the default aws/rds key.
+      # Needed for RDS storage encryption (aws/rds) and the auto-generated master
+      # password secret (aws/secretsmanager).
       {
         Sid    = "Kms"
         Effect = "Allow"
@@ -89,9 +94,13 @@ resource "aws_iam_role_policy" "deploy_scoped" {
           "kms:CreateGrant",
           "kms:DescribeKey",
           "kms:Decrypt",
+          "kms:Encrypt",
           "kms:GenerateDataKey*",
         ]
-        Resource = data.aws_kms_alias.rds.target_key_arn
+        Resource = [
+          data.aws_kms_alias.rds.target_key_arn,
+          data.aws_kms_alias.secretsmanager.target_key_arn,
+        ]
       },
     ]
   })
