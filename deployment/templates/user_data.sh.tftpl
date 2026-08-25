@@ -11,6 +11,10 @@ chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
 mkdir -p /opt/app/certs
 
+cat > /opt/app/certs/rds-global-bundle.pem <<'RDS_CA_EOF'
+${rds_ca_bundle}
+RDS_CA_EOF
+
 cat > /opt/app/docker-compose.yml <<'COMPOSE_EOF'
 ${compose_file}
 COMPOSE_EOF
@@ -23,6 +27,7 @@ DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}"
   --query SecretString --output text | jq -r '.password')
 cat > /opt/app/.env <<EOF
 DATABASE_URL=postgres://${db_username}:$DB_PASSWORD@${db_endpoint}/${db_name}
+DATABASE_SSL_CA=/app/certs/rds-global-bundle.pem
 PORT=3000
 EOF
 chmod 600 /opt/app/.env

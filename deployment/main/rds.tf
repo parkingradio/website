@@ -31,3 +31,8 @@ resource "aws_db_instance" "main" {
 
   backup_retention_period = 7
 }
+
+# RDS enforces SSL by default. This is the URL to download the certificates onto the EC2 instance.
+data "http" "rds_ca_bundle" {
+  url = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
+}
