@@ -3,6 +3,10 @@
 
 data "aws_caller_identity" "current" {}
 
+data "aws_kms_alias" "rds" {
+  name = "alias/aws/rds"
+}
+
 resource "aws_iam_openid_connect_provider" "github_actions" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -76,6 +80,18 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Effect   = "Allow"
         Action   = "rds:*"
         Resource = "*"
+      },
+      # Needed for RDS storage encryption with the default aws/rds key.
+      {
+        Sid    = "Kms"
+        Effect = "Allow"
+        Action = [
+          "kms:CreateGrant",
+          "kms:DescribeKey",
+          "kms:Decrypt",
+          "kms:GenerateDataKey*",
+        ]
+        Resource = data.aws_kms_alias.rds.target_key_arn
       },
     ]
   })
