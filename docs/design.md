@@ -70,6 +70,8 @@ that Parking Radio has about an artist. The fields of the form are (* means mand
 When an artist submits this form, an entry is created in the database with that form's information. The form is protected
 from bots by a Cloudflare Turnstile.
 
+For now we use the original Google Forms link.
+
 ## Contribuer
 
 This page lets visitors make a donation to Parking Radio. It embeds Zeffy's donation form
