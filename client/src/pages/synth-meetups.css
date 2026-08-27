@@ -1,0 +1,70 @@
+.synth-meetups {
+  padding: 2rem 1.5rem;
+}
+
+.synth-meetups .banner {
+  display: block;
+  max-width: 700px;
+  width: 100%;
+  margin: 0 auto 2rem;
+}
+
+.synth-meetups .content {
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.synth-meetups h2 {
+  margin-top: 2rem;
+  text-transform: uppercase;
+}
+
+.synth-meetups ul {
+  padding-left: 1.25rem;
+}
+
+.synth-meetups a {
+  color: #1c1c1c;
+}
+
+.synth-meetups .gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+  max-width: 700px;
+  margin: 1.5rem auto 0;
+}
+
+.synth-meetups .poster-thumb {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+}
+
+.synth-meetups .poster-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  cursor: default;
+}
