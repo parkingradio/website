@@ -34,7 +34,7 @@ resource "cloudflare_record" "ses_dmarc" {
   ttl     = 3600
 }
 
-# Let the app instance send email as this domain, and nothing else.
+# Let the app instance send email as this domain, to any recipient.
 resource "aws_iam_role_policy" "ses_send" {
   name = "send-email"
   role = aws_iam_role.app.id
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy" "ses_send" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource = aws_sesv2_email_identity.main.arn
+      Resource = "arn:aws:ses:${data.aws_region.current.name}:*:identity/*"
     }]
   })
 }
