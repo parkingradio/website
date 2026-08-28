@@ -8,7 +8,7 @@ resource "cloudflare_record" "ses_dkim" {
   count = 3
 
   zone_id = var.cloudflare_zone_id
-  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey"
+  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey${local.record_suffix}"
   type    = "CNAME"
   content = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
   proxied = false
@@ -17,7 +17,7 @@ resource "cloudflare_record" "ses_dkim" {
 
 resource "cloudflare_record" "ses_spf" {
   zone_id = var.cloudflare_zone_id
-  name    = "@"
+  name    = local.record_name
   type    = "TXT"
   content = "v=spf1 include:amazonses.com ~all"
   proxied = false
@@ -27,7 +27,7 @@ resource "cloudflare_record" "ses_spf" {
 # Monitoring-only for now (no `rua`): there's no mailbox on this domain to receive aggregated reports.
 resource "cloudflare_record" "ses_dmarc" {
   zone_id = var.cloudflare_zone_id
-  name    = "_dmarc"
+  name    = "_dmarc${local.record_suffix}"
   type    = "TXT"
   content = "v=DMARC1; p=none;"
   proxied = false

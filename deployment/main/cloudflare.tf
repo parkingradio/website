@@ -13,6 +13,11 @@ locals {
   # of `@` for a top-level domain (e.g. parking.radio), and the subdomain otherwise (e.g.
   # `parking.proof-of-concept.com`)
   record_name = var.domain == data.cloudflare_zone.this.name ? "@" : trimsuffix(var.domain, ".${data.cloudflare_zone.this.name}")
+
+  # Suffix to append when building a record name that needs a label prepended (e.g. "_dmarc"): empty at
+  # the zone apex, or ".<subdomain>" otherwise. This makes "${label}${record_suffix}" the correct zone-relative
+  # name in all cases.
+  record_suffix = local.record_name == "@" ? "" : ".${local.record_name}"
 }
 
 resource "tls_private_key" "origin" {
