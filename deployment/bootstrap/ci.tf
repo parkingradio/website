@@ -85,6 +85,12 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Action   = "rds:*"
         Resource = "*"
       },
+      {
+        Sid      = "Ses"
+        Effect   = "Allow"
+        Action   = "ses:*"
+        Resource = "*"
+      },
       # Needed for RDS storage encryption (aws/rds) and the auto-generated master
       # password secret (aws/secretsmanager).
       {

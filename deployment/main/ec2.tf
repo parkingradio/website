@@ -3,6 +3,8 @@
 #
 # Its IAM role grants just enough to allow shell access via SSM and fetch the secrets it needs
 # from the AWS Secrets Manager.
+data "aws_region" "current" {}
+
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -74,7 +76,18 @@ resource "aws_instance" "app" {
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.app.name
 
+  # The app runs in a container on Docker's default bridge network, which adds a hop between the
+  # container and the host's NIC. The default hop limit of 1 isn't enough for the AWS SDK running
+  # inside the container to complete the IMDSv2 token exchange, so credentials silently fail to
+  # load unless we raise it.
+  metadata_options {
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   user_data = templatefile("${path.module}/../templates/user_data.sh.tftpl", {
+    aws_region        = data.aws_region.current.name
+    domain            = var.domain
     db_secret_arn     = aws_db_instance.main.master_user_secret[0].secret_arn
     db_username       = aws_db_instance.main.username
     db_endpoint       = aws_db_instance.main.endpoint

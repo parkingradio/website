@@ -3,10 +3,12 @@ import path from 'node:path'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import { healthRoutes } from './routes/health.js'
+import { adminRoutes } from './routes/admin.js'
 
 const app = Fastify({ logger: true })
 
 await app.register(healthRoutes)
+await app.register(adminRoutes)
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')
 
