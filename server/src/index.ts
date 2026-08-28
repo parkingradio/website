@@ -4,6 +4,7 @@ import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import { healthRoutes } from './routes/health.js'
 import { adminRoutes } from './routes/admin.js'
+import { config } from './config.js'
 
 const app = Fastify({ logger: true })
 
@@ -23,7 +24,7 @@ if (existsSync(clientDist)) {
   })
 }
 
-const port = Number(process.env.PORT ?? 3000)
+const port = config.port
 
 try {
   await app.listen({ port, host: '0.0.0.0' })
