@@ -22,20 +22,27 @@ cat > /opt/app/nginx.conf <<'NGINX_EOF'
 ${nginx_conf}
 NGINX_EOF
 
-DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --region us-east-1 \
+DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --region ${aws_region} \
   --query SecretString --output text | jq -r '.password')
 # URL-encode the password since generated passwords may contain special characters.
 DB_PASSWORD_URLENC=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
+
+AUTH_JSON=$(aws secretsmanager get-secret-value --secret-id "${auth_secret_arn}" --region ${aws_region} \
+  --query SecretString --output text)
+BOOTSTRAP_ADMIN_PASSWORD=$(echo "$AUTH_JSON" | jq -r '.bootstrap_admin_password')
+
 cat > /opt/app/.env <<EOF
 DATABASE_URL=postgres://${db_username}:$DB_PASSWORD_URLENC@${db_endpoint}/${db_name}
 DATABASE_SSL_CA=/app/certs/rds-global-bundle.pem
 PORT=3000
 AWS_REGION=${aws_region}
 MAIL_DOMAIN=${domain}
+BOOTSTRAP_ADMIN_EMAIL=${bootstrap_admin_email}
+BOOTSTRAP_ADMIN_PASSWORD=$BOOTSTRAP_ADMIN_PASSWORD
 EOF
 chmod 600 /opt/app/.env
 
-ORIGIN_JSON=$(aws secretsmanager get-secret-value --secret-id "${origin_secret_arn}" --region us-east-1 \
+ORIGIN_JSON=$(aws secretsmanager get-secret-value --secret-id "${origin_secret_arn}" --region ${aws_region} \
   --query SecretString --output text)
 echo "$ORIGIN_JSON" | jq -r '.certificate' > /opt/app/certs/origin.pem
 echo "$ORIGIN_JSON" | jq -r '.private_key' > /opt/app/certs/origin.key
