@@ -65,11 +65,15 @@ day-to-day development, use `npm run dev` instead. To build the production envir
 docker build -t parking-radio .
 npm run db:up   # if not already running
 docker run --init --rm -p 3000:3000 --network radio_default \
+  --env-file .env.example \
   -e DATABASE_URL="postgres://parking_radio:parking_radio@postgres:5432/parking_radio" \
-  -e PORT=3000 \
   parking-radio
 npm run db:down # when you're done
 ```
+
+Note that `DATABASE_URL` is overridden because `.env.example` points at `localhost` (for running the
+server directly on the host), but this container reaches Postgres over the `radio_default` Docker
+network instead, where it's addressable as `postgres`.
 
 Then `curl localhost:3000/healthz` should return `{"ok":true}`, and `http://localhost:3000` should serve
 the built client.
