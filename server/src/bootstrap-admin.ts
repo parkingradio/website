@@ -16,4 +16,3 @@ export async function ensureBootstrapAdmin(db: typeof Database): Promise<void> {
   const passwordHash = await hashPassword(config.bootstrapAdminPassword)
   await db.insert(users).values({ email, passwordHash })
 }
-
