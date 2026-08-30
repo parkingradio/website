@@ -41,7 +41,8 @@ describe('ensureBootstrapAdmin', () => {
 
     expect(usersTable).toHaveLength(1)
     expect(usersTable[0].email).toBe('admin@example.com')
-    expect(usersTable[0].passwordHash).toBe('bootstrap-password-123')
+    expect(usersTable[0].passwordHash).toBeTypeOf('string')
+    expect(usersTable[0].passwordHash).not.toBe('bootstrap-password-123')
   })
 
   it('does nothing when a user with that email already exists', async () => {

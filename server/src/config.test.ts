@@ -31,4 +31,16 @@ describe('config', () => {
       expect(config.databaseUrl).toBe('postgres://localhost/test')
     })
   })
+
+  describe('jwtSecret', () => {
+    it('throws a clear error when JWT_SECRET is unset', () => {
+      delete process.env.JWT_SECRET
+      expect(() => config.jwtSecret).toThrow('Missing required environment variable: JWT_SECRET')
+    })
+
+    it('returns JWT_SECRET when set', () => {
+      process.env.JWT_SECRET = 'test-secret'
+      expect(config.jwtSecret).toBe('test-secret')
+    })
+  })
 })

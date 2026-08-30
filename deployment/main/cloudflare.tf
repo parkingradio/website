@@ -1,7 +1,7 @@
 # This file has two jobs:
-# 1. Generate a private key + CSR locally, get it signed by Cloudflare's Origin CA, and store
-#    the resulting certificate + private key together in Secrets Manager for the EC2 instance
-#    to read at boot.
+# 1. Generate a private key + CSR locally and get it signed by Cloudflare's Origin CA. The
+#    resulting certificate and private key are stored in Secrets Manager (see secrets.tf),
+#    for the EC2 instance to read at boot.
 # 2. Point the domain at the instance: an A record, proxied through Cloudflare so TLS terminates
 #    at their edge.
 data "cloudflare_zone" "this" {
@@ -38,18 +38,6 @@ resource "cloudflare_origin_ca_certificate" "origin" {
   hostnames          = [var.domain]
   request_type       = "origin-rsa"
   requested_validity = 5475
-}
-
-resource "aws_secretsmanager_secret" "origin_cert" {
-  name = "parking-radio/origin-cert"
-}
-
-resource "aws_secretsmanager_secret_version" "origin_cert" {
-  secret_id = aws_secretsmanager_secret.origin_cert.id
-  secret_string = jsonencode({
-    certificate = cloudflare_origin_ca_certificate.origin.certificate
-    private_key = tls_private_key.origin.private_key_pem
-  })
 }
 
 resource "cloudflare_record" "app" {

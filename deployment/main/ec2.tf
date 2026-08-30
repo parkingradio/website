@@ -58,7 +58,7 @@ resource "aws_iam_role_policy" "secrets" {
       Action = "secretsmanager:GetSecretValue"
       Resource = [
         aws_db_instance.main.master_user_secret[0].secret_arn,
-        aws_secretsmanager_secret.origin_cert.arn,
+        aws_secretsmanager_secret.app.arn,
       ]
     }]
   })
@@ -92,8 +92,7 @@ resource "aws_instance" "app" {
     db_username           = aws_db_instance.main.username
     db_endpoint           = aws_db_instance.main.endpoint
     db_name               = aws_db_instance.main.db_name
-    origin_secret_arn     = aws_secretsmanager_secret.origin_cert.arn
-    auth_secret_arn       = aws_secretsmanager_secret.auth.arn
+    secret_arn            = aws_secretsmanager_secret.app.arn
     bootstrap_admin_email = "admin@${var.domain}"
     compose_file = templatefile("${path.module}/../templates/docker-compose.prod.yml.tftpl", {
       image = "${var.ghcr_image}:${var.app_image_tag}"
@@ -104,10 +103,10 @@ resource "aws_instance" "app" {
   })
   user_data_replace_on_change = true
 
-  # Make sure the origin cert and auth secret have been created before proceeding with the EC2
-  # instance. Otherwise, on failure to obtain them, the EC2 instance would be brought up and it
-  # would fail at boot time when failing to retrieve them from Secrets Manager.
-  depends_on = [aws_secretsmanager_secret_version.origin_cert, aws_secretsmanager_secret_version.auth]
+  # Make sure the secret has been created before proceeding with the EC2 instance. Otherwise, on
+  # failure to obtain it, the EC2 instance would be brought up and it would fail at boot time when
+  # failing to retrieve it from Secrets Manager.
+  depends_on = [aws_secretsmanager_secret_version.app]
 
   tags = {
     Name = "parking-radio"

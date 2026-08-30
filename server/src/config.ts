@@ -14,6 +14,9 @@ export const config = {
   get databaseSslCa() {
     return process.env.DATABASE_SSL_CA
   },
+  get jwtSecret() {
+    return required('JWT_SECRET')
+  },
   get bootstrapAdminEmail() {
     return required('BOOTSTRAP_ADMIN_EMAIL')
   },
