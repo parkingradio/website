@@ -7,11 +7,13 @@ import { healthRoutes } from './routes/health.js'
 import { adminRoutes } from './routes/admin.js'
 import { config } from './config.js'
 import { db } from './db.js'
+import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 
 const app = Fastify({ logger: true })
 
 try {
   await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
+  await ensureBootstrapAdmin(db)
 } catch (error) {
   app.log.error(error)
   process.exit(1)

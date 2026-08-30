@@ -14,6 +14,12 @@ export const config = {
   get databaseSslCa() {
     return process.env.DATABASE_SSL_CA
   },
+  get bootstrapAdminEmail() {
+    return required('BOOTSTRAP_ADMIN_EMAIL')
+  },
+  get bootstrapAdminPassword() {
+    return required('BOOTSTRAP_ADMIN_PASSWORD')
+  },
   get awsRegion() {
     return process.env.AWS_REGION
   },
