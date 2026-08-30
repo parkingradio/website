@@ -3,9 +3,6 @@ dist/
 .env
 *.local
 
-# Drizzle
-server/drizzle/
-
 # Terraform
 .terraform/
 *.tfstate

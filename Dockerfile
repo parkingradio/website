@@ -20,6 +20,7 @@ COPY package.json package-lock.json ./
 COPY server/package.json server/package.json
 RUN npm ci --omit=dev -w server
 COPY --from=server-build /app/server/dist server/dist
+COPY server/drizzle server/drizzle
 COPY --from=client-build /app/client/dist client/dist
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 --start-period=5s \

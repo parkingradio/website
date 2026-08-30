@@ -2,11 +2,20 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { healthRoutes } from './routes/health.js'
 import { adminRoutes } from './routes/admin.js'
 import { config } from './config.js'
+import { db } from './db.js'
 
 const app = Fastify({ logger: true })
+
+try {
+  await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
+} catch (error) {
+  app.log.error(error)
+  process.exit(1)
+}
 
 await app.register(healthRoutes)
 await app.register(adminRoutes)
