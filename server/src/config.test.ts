@@ -8,6 +8,18 @@ describe('config', () => {
     process.env = { ...originalEnv }
   })
 
+  describe('isProduction', () => {
+    it('is false when NODE_ENV is not production', () => {
+      delete process.env.NODE_ENV
+      expect(config.isProduction).toBe(false)
+    })
+
+    it('is true when NODE_ENV is production', () => {
+      process.env.NODE_ENV = 'production'
+      expect(config.isProduction).toBe(true)
+    })
+  })
+
   describe('port', () => {
     it('defaults to 3000 when PORT is unset', () => {
       delete process.env.PORT

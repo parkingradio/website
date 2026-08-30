@@ -5,6 +5,9 @@ function required(name: string): string {
 }
 
 export const config = {
+  get isProduction() {
+    return process.env.NODE_ENV === 'production'
+  },
   get port() {
     return Number(process.env.PORT ?? 3000)
   },
