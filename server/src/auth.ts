@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
 import type { FastifyReply, FastifyRequest } from 'fastify'
@@ -67,4 +68,13 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     return
   }
   request.user = user
+}
+
+export function generateInviteToken(): { token: string; tokenHash: string } {
+  const token = randomBytes(32).toString('hex')
+  return { token, tokenHash: hashInviteToken(token) }
+}
+
+export function hashInviteToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
 }

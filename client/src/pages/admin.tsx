@@ -9,9 +9,9 @@ export function Admin() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
   const [email, setEmail] = useState<string | null>(null)
 
-  const [recipient, setRecipient] = useState('')
-  const [status, setStatus] = useState<Status>('idle')
-  const [detail, setDetail] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteStatus, setInviteStatus] = useState<Status>('idle')
+  const [inviteError, setInviteError] = useState<string | null>(null)
 
   const navigate = useNavigate()
 
@@ -25,29 +25,29 @@ export function Admin() {
       .catch(() => setAuthStatus('unauthenticated'))
   }, [])
 
-  const sendTestEmail = async (event: FormEvent) => {
-    event.preventDefault()
-    setStatus('sending')
-    setDetail(null)
-    try {
-      const response = await fetch('/api/admin/send-test-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient }),
-      })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error ?? 'Unknown error')
-      setStatus('success')
-      setDetail(body.messageId)
-    } catch (error) {
-      setStatus('error')
-      setDetail(error instanceof Error ? error.message : String(error))
-    }
-  }
-
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     navigate('/login')
+  }
+
+  const inviteAdmin = async (event: FormEvent) => {
+    event.preventDefault()
+    setInviteStatus('sending')
+    setInviteError(null)
+    try {
+      const response = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail }),
+      })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.error ?? 'Unknown error')
+      setInviteStatus('success')
+      setInviteEmail('')
+    } catch (error) {
+      setInviteStatus('error')
+      setInviteError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   if (authStatus === 'checking') return null
@@ -60,22 +60,23 @@ export function Admin() {
         Logged in as {email}. <button onClick={logout}>Log out</button>
       </p>
 
-      <form onSubmit={sendTestEmail}>
+      <h2>Invite a new admin</h2>
+      <form onSubmit={inviteAdmin}>
         <label>
-          Recipient email
+          Email
           <input
             type="email"
-            value={recipient}
-            onChange={(event) => setRecipient(event.target.value)}
+            value={inviteEmail}
+            onChange={(event) => setInviteEmail(event.target.value)}
             required
           />
         </label>
-        <button type="submit" disabled={status === 'sending'}>
-          Send test email
+        <button type="submit" disabled={inviteStatus === 'sending'}>
+          Send invite
         </button>
       </form>
-      {status === 'success' && <p>Email sent (id: {detail}).</p>}
-      {status === 'error' && <p>Failed to send email: {detail}</p>}
+      {inviteStatus === 'success' && <p>Invite sent.</p>}
+      {inviteStatus === 'error' && <p>Failed to send invite: {inviteError}</p>}
     </div>
   )
 }

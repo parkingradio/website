@@ -42,34 +42,36 @@ describe('Admin', () => {
     renderAdmin()
 
     await waitFor(() => expect(screen.getByText(/Logged in as admin@example.com/)).toBeInTheDocument())
-    expect(screen.getByLabelText('Recipient email')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toBeInTheDocument()
   })
 
-  it('shows the message id after a successful send', async () => {
+  it('shows a confirmation after successfully inviting a new admin', async () => {
     mockFetch({
       '/api/admin/me': () => Promise.resolve({ ok: true, email: 'admin@example.com' }),
-      '/api/admin/send-test-email': () => Promise.resolve({ ok: true, messageId: 'abc-123' }),
+      '/api/admin/invite': () => Promise.resolve({ ok: true }),
     })
     renderAdmin()
-    await waitFor(() => expect(screen.getByLabelText('Recipient email')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeInTheDocument())
 
-    fireEvent.change(screen.getByLabelText('Recipient email'), { target: { value: 'you@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send test email' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new-admin@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invite' }))
 
-    await waitFor(() => expect(screen.getByText(/Email sent \(id: abc-123\)/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Invite sent.')).toBeInTheDocument())
   })
 
-  it('shows the error after a failed send', async () => {
+  it('shows the error after a failed invite', async () => {
     mockFetch({
       '/api/admin/me': () => Promise.resolve({ ok: true, email: 'admin@example.com' }),
-      '/api/admin/send-test-email': () => Promise.resolve({ ok: false, error: 'MessageRejected' }),
+      '/api/admin/invite': () => Promise.resolve({ ok: false, error: 'This email address is already an activated admin' }),
     })
     renderAdmin()
-    await waitFor(() => expect(screen.getByLabelText('Recipient email')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeInTheDocument())
 
-    fireEvent.change(screen.getByLabelText('Recipient email'), { target: { value: 'you@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send test email' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'already-admin@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invite' }))
 
-    await waitFor(() => expect(screen.getByText(/Failed to send email: MessageRejected/)).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to send invite: This email address is already an activated admin/)).toBeInTheDocument(),
+    )
   })
 })

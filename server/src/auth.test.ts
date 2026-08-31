@@ -9,6 +9,8 @@ import {
   setSessionCookie,
   clearSessionCookie,
   requireAuth,
+  generateInviteToken,
+  hashInviteToken,
   SESSION_COOKIE,
   SESSION_DURATION_SECONDS,
 } from './auth.js'
@@ -67,6 +69,19 @@ describe('session tokens', () => {
     const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
     vi.advanceTimersByTime((SESSION_DURATION_SECONDS + 1) * 1000)
     expect(await verifySessionToken(token)).toBeNull()
+  })
+})
+
+describe('invite tokens', () => {
+  it('produces a hash that hashInviteToken can reproduce from the raw token', () => {
+    const { token, tokenHash } = generateInviteToken()
+    expect(hashInviteToken(token)).toBe(tokenHash)
+  })
+
+  it('generates different tokens on each call', () => {
+    const a = generateInviteToken()
+    const b = generateInviteToken()
+    expect(a.token).not.toBe(b.token)
   })
 })
 
