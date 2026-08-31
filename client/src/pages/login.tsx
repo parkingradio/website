@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 
 type Status = 'idle' | 'sending' | 'error'
 
@@ -10,6 +10,8 @@ export function Login() {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
+  const message = (location.state as { message?: string } | null)?.message
 
   const login = async (event: FormEvent) => {
     event.preventDefault()
@@ -33,6 +35,7 @@ export function Login() {
   return (
     <div>
       <h1>Log in</h1>
+      {message && <p>{message}</p>}
       <form onSubmit={login}>
         <label>
           Email

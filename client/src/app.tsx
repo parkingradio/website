@@ -7,6 +7,7 @@ import { SynthMeetups } from './pages/synth-meetups'
 import { Appliquer } from './pages/appliquer'
 import { Contribuer } from './pages/contribuer'
 import { Login } from './pages/login'
+import { AcceptInvite } from './pages/accept-invite'
 import { Admin } from './pages/admin'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Route path="appliquer" element={<Appliquer />} />
         <Route path="contribuer" element={<Contribuer />} />
         <Route path="login" element={<Login />} />
+        <Route path="accept-invite" element={<AcceptInvite />} />
         <Route path="admin" element={<Admin />} />
       </Route>
     </Routes>

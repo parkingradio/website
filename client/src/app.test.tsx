@@ -35,4 +35,13 @@ describe('App', () => {
       'https://parkingdotradio.bigcartel.com',
     )
   })
+
+  it('renders /accept-invite without crashing', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/accept-invite?token=abc']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(container).not.toBeEmptyDOMElement()
+  })
 })
