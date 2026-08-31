@@ -57,7 +57,10 @@ describe('session tokens', () => {
 
   it('rejects a tampered token', async () => {
     const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
-    expect(await verifySessionToken(token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a'))).toBeNull()
+    const [header, payload, signature] = token.split('.')
+    const tamperedChar = signature[0] === 'a' ? 'b' : 'a'
+    const tamperedSignature = tamperedChar + signature.slice(1)
+    expect(await verifySessionToken(`${header}.${payload}.${tamperedSignature}`)).toBeNull()
   })
 
   it('rejects garbage input', async () => {
