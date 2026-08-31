@@ -2,7 +2,12 @@ import { sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { db } from '../db.js'
 import { users } from '../schema.js'
-import { verifyPassword, signSessionToken, setSessionCookie } from '../auth.js'
+import {
+  verifyPassword,
+  signSessionToken,
+  setSessionCookie,
+  clearSessionCookie,
+} from '../auth.js'
 
 type LoginBody = {
   email?: string
@@ -28,5 +33,10 @@ export async function authRoutes(app: FastifyInstance) {
     const token = await signSessionToken({ id: user.id, email: user.email })
     setSessionCookie(reply, token)
     return { ok: true, email: user.email }
+  })
+
+  app.post('/api/auth/logout', async (_request, reply) => {
+    clearSessionCookie(reply)
+    return { ok: true }
   })
 }

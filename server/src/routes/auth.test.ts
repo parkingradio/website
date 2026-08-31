@@ -108,4 +108,17 @@ describe('auth routes', () => {
       expect(response.statusCode).toBe(400)
     })
   })
+
+  describe('POST /api/auth/logout', () => {
+    it('clears the session cookie', async () => {
+      const app = await buildApp()
+
+      const response = await app.inject({ method: 'POST', url: '/api/auth/logout' })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({ ok: true })
+      const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+      expect(cookie?.value).toBe('')
+    })
+  })
 })

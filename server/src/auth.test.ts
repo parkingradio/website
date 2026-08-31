@@ -7,6 +7,7 @@ import {
   signSessionToken,
   verifySessionToken,
   setSessionCookie,
+  clearSessionCookie,
   SESSION_COOKIE,
   SESSION_DURATION_SECONDS,
 } from './auth.js'
@@ -105,5 +106,18 @@ describe('session cookie helpers', () => {
     process.env.NODE_ENV = 'production'
     const prodResponse = await app.inject({ method: 'GET', url: '/set' })
     expect(prodResponse.cookies.find((c) => c.name === SESSION_COOKIE)?.secure).toBe(true)
+  })
+
+  it('clearCookie clears the session cookie', async () => {
+    const app = Fastify()
+    app.register(fastifyCookie)
+    app.get('/clear', async (_request, reply) => {
+      clearSessionCookie(reply)
+      return { ok: true }
+    })
+    const response = await app.inject({ method: 'GET', url: '/clear' })
+    const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+    expect(cookie).toBeDefined()
+    expect(cookie?.value).toBe('')
   })
 })

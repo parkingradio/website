@@ -48,3 +48,7 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
     maxAge: SESSION_DURATION_SECONDS,
   })
 }
+
+export function clearSessionCookie(reply: FastifyReply): void {
+  reply.clearCookie(SESSION_COOKIE, { path: '/' })
+}
