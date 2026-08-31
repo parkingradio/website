@@ -7,6 +7,7 @@ import {
   signSessionToken,
   setSessionCookie,
   clearSessionCookie,
+  requireAuth,
 } from '../auth.js'
 
 type LoginBody = {
@@ -38,5 +39,9 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/logout', async (_request, reply) => {
     clearSessionCookie(reply)
     return { ok: true }
+  })
+
+  app.get('/api/admin/me', { preHandler: requireAuth }, async (request) => {
+    return { ok: true, email: request.user!.email }
   })
 }

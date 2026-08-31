@@ -8,6 +8,7 @@ import {
   verifySessionToken,
   setSessionCookie,
   clearSessionCookie,
+  requireAuth,
   SESSION_COOKIE,
   SESSION_DURATION_SECONDS,
 } from './auth.js'
@@ -66,6 +67,53 @@ describe('session tokens', () => {
     const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
     vi.advanceTimersByTime((SESSION_DURATION_SECONDS + 1) * 1000)
     expect(await verifySessionToken(token)).toBeNull()
+  })
+})
+
+describe('requireAuth', () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    process.env.JWT_SECRET = 'test-secret'
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+  })
+
+  function buildApp() {
+    const app = Fastify()
+    app.register(fastifyCookie)
+    app.get('/protected', { preHandler: requireAuth }, async (request) => ({ user: request.user }))
+    return app
+  }
+
+  it('returns 401 when there is no session cookie', async () => {
+    const app = buildApp()
+    const response = await app.inject({ method: 'GET', url: '/protected' })
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('returns 401 when the session cookie is garbage', async () => {
+    const app = buildApp()
+    const response = await app.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { cookie: `${SESSION_COOKIE}=garbage` },
+    })
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('calls the handler with request.user set when the session cookie is valid', async () => {
+    const app = buildApp()
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
+    const response = await app.inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ user: { id: 'user-1', email: 'admin@example.com' } })
   })
 })
 

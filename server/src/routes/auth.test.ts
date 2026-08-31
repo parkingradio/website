@@ -17,7 +17,7 @@ vi.mock('../db.js', () => ({
 }))
 
 import { authRoutes } from './auth.js'
-import { hashPassword, SESSION_COOKIE } from '../auth.js'
+import { hashPassword, signSessionToken, SESSION_COOKIE } from '../auth.js'
 
 describe('auth routes', () => {
   const originalEnv = { ...process.env }
@@ -119,6 +119,30 @@ describe('auth routes', () => {
       expect(response.json()).toEqual({ ok: true })
       const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
       expect(cookie?.value).toBe('')
+    })
+  })
+
+  describe('GET /api/admin/me', () => {
+    it('returns 401 when there is no session cookie', async () => {
+      const app = await buildApp()
+
+      const response = await app.inject({ method: 'GET', url: '/api/admin/me' })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('returns the current user when the session cookie is valid', async () => {
+      const app = await buildApp()
+      const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/admin/me',
+        headers: { cookie: `${SESSION_COOKIE}=${token}` },
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
     })
   })
 })

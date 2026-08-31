@@ -1,8 +1,14 @@
 import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
-import type { FastifyReply } from 'fastify'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import type {} from '@fastify/cookie'
 import { config } from './config.js'
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: { id: string; email: string }
+  }
+}
 
 export const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60
 
@@ -51,4 +57,14 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
 
 export function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(SESSION_COOKIE, { path: '/' })
+}
+
+export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const token = request.cookies[SESSION_COOKIE]
+  const user = token ? await verifySessionToken(token) : null
+  if (!user) {
+    reply.code(401).send({ ok: false, error: 'Unauthorized' })
+    return
+  }
+  request.user = user
 }
