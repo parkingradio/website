@@ -4,7 +4,7 @@ Parking Radio an independent non-profit radio whose goal is to promote undergrou
 music, and to provide a professional grade diffusion platform for their performances.
 
 This web app implements both the user-visible web site for the radio and also provides tools to administer
-various aspects of the project, such as uploading sets, helping schedule upcoming diffusion sessions, etc.
+various aspects of the project, such as managing bookings, helping schedule upcoming diffusion sessions, etc.
 
 ## General Technological Choices and Deployment
 

@@ -63,9 +63,8 @@ that Parking Radio has about an artist. The fields of the form are (* means mand
 - "Type de prestation" (*): choice between "DJ", "Performance Live", "Rap", "Full Band", "Other:" (with free form text input)
 - "Adresse e-mail" (*): free form text with format validation
 - "Numéro de téléphone" (*): free form text with format validation
-- "Disponibilités" (*): date picker that allows selecting multiple days
+- "Disponibilités" (*): date picker that allows selecting multiple days. Mention that it may or may not be respected.
 - "Questions ou détails": free form text
-- "Entente de collaboration" (*): a form to sign in order to submit an application
 
 When an artist submits this form, an entry is created in the database with that form's information. The form is protected
 from bots by a Cloudflare Turnstile.
@@ -87,5 +86,5 @@ payment entirely on its own.
 
 ## Admin
 
-This page requires authentication. It provides various tools to manage the project like uploading sets, managing
-artist information, scheduling diffusion sessions, etc.
+This page requires authentication. It provides various tools to manage the project like managing artist
+information, scheduling diffusion sessions, etc.
