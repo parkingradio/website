@@ -87,7 +87,7 @@ jobs:
           exit 1
 
       - name: Check homepage is served
-        run: curl --silent --fail http://localhost:3000/ | grep -qi '<title>Parking Radio</title>'
+        run: curl --silent --fail http://localhost:3000/ | grep -qi '<title>parking.radio</title>'
 
       - name: Container logs
         if: always()
