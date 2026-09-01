@@ -13,11 +13,19 @@
   max-width: 700px;
   margin: 0 auto;
   line-height: 1.6;
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+}
+
+.synth-meetups .content strong {
+  font-weight: 700;
 }
 
 .synth-meetups h2 {
   margin-top: 2rem;
   text-transform: uppercase;
+  font-family: Impact, 'Franklin Gothic Bold', 'Arial Narrow Bold', sans-serif;
+  letter-spacing: 0.03em;
 }
 
 .synth-meetups ul {

@@ -1,23 +1,42 @@
 import { useEffect, useState } from 'react'
 import './synth-meetups.css'
 
-// TODO: these are placeholders. Replace with real assets: upload with `tools/manage-assets add <file>`
+// TODO: this is a placeholder. Replace with a real asset: upload with `tools/manage-assets add <file>`
 // and paste the printed CloudFront URL below.
 const BANNER_URL = 'https://placehold.co/1456x619?text=Synth+Meetups'
+
+// Most recent first, so the gallery shows newer posters higher up.
 const POSTERS = [
-  'https://placehold.co/561x998?text=Poster+1',
-  'https://placehold.co/561x998?text=Poster+2',
-  'https://placehold.co/561x998?text=Poster+3',
-  'https://placehold.co/561x998?text=Poster+4',
-  'https://placehold.co/561x998?text=Poster+5',
-  'https://placehold.co/561x998?text=Poster+6',
-  'https://placehold.co/561x998?text=Poster+7',
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_aout.jpg',
+    alt: 'Affiche des synth meetups des 12 et 26 août 2026',
+  },
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_juillet.jpg',
+    alt: 'Affiche des synth meetups des 8, 22 et 29 juillet 2026',
+  },
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/2026.05.30_droneDayFlyer.jpeg',
+    alt: 'Affiche du Drone Day du 30 mai 2026',
+  },
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_mai.jpg',
+    alt: 'Affiche des synth meetups des 6, 13 et 28 mai 2026',
+  },
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_avril.jpg',
+    alt: 'Affiche des synth meetups des 8, 15 et 22 avril 2026',
+  },
+  {
+    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_avril_01.jpg',
+    alt: 'Affiche du synth meetup du 1er avril 2026',
+  },
 ]
 
 const NDI_URL = 'https://ndi.video/tools/'
 
 export function SynthMeetups() {
-  const [expandedPoster, setExpandedPoster] = useState<string | null>(null)
+  const [expandedPoster, setExpandedPoster] = useState<(typeof POSTERS)[number] | null>(null)
 
   useEffect(() => {
     if (!expandedPoster) return
@@ -33,16 +52,12 @@ export function SynthMeetups() {
       <img className="banner" src={BANNER_URL} alt="Synth Meetups" />
 
       <div className="content">
-        <p>les synth meetups c'est des rencontres hebdomadaires de création sonore et audiovisuelle.</p>
+        <p>les <i>synth meetups</i> c'est des rencontres hebdomadaires de création sonore et audiovisuelle.</p>
         <p>c'est l'occasion de soulever le capot du parking pour apprendre la technique derrière notre studio.</p>
         <p>vous êtes invité.es à tester des idées, brainstormer, rencontrer des collaborateurs.</p>
 
         <h2>dates à venir</h2>
         <ul>
-          <li>mercredi 22 juillet 2026</li>
-          <li>mercredi 29 juillet 2026</li>
-          <li>mercredi 12 août 2026</li>
-          <li>mercredi 26 août 2026</li>
           <li>mercredi 2 septembre 2026</li>
         </ul>
 
@@ -62,8 +77,10 @@ export function SynthMeetups() {
           création de contenu est simplifié; nul besoin de savoir programmer.
         </p>
         <p>
-          une approche temps-réel est priorisée afin de rapprocher les artistes de leur médium et de sa
-          diffusion.
+          <strong>
+            une approche temps-réel est priorisée afin de rapprocher les artistes de leur médium et de sa
+            diffusion.
+          </strong>
         </p>
         <p>
           en gros, l'artiste se pointe au parking avec son laptop et shoot ses visuels direct dans le
@@ -73,31 +90,37 @@ export function SynthMeetups() {
           </a>
           . la vidéo sera automatiquement redimensionnée pour couvrir la surface.
         </p>
-        <p>spécifications</p>
+        <p>
+          <strong>spécifications</strong>
+        </p>
         <ul>
-          <li>résolution réel: 240x20px, (aspect ratio 4x3.8)</li>
-          <li>équivalent en pixel carrés: 240x228, frame rate fixe, à votre choix.</li>
+          <li>
+            résolution réel: <strong>240x20px</strong>, (aspect ratio 4x3.8)
+          </li>
+          <li>
+            équivalent en pixel carrés: <strong>240x228</strong>, frame rate fixe, à votre choix.
+          </li>
         </ul>
 
         <h2>évènements passés</h2>
       </div>
 
       <div className="gallery">
-        {POSTERS.map((url, index) => (
+        {POSTERS.map((poster) => (
           <button
-            key={url}
+            key={poster.url}
             className="poster-thumb"
-            onClick={() => setExpandedPoster(url)}
-            aria-label={`Voir l'affiche de l'évènement ${index + 1}`}
+            onClick={() => setExpandedPoster(poster)}
+            aria-label={`Voir en grand: ${poster.alt}`}
           >
-            <img src={url} alt={`Affiche de l'évènement ${index + 1}`} />
+            <img src={poster.url} alt={poster.alt} />
           </button>
         ))}
       </div>
 
       {expandedPoster && (
         <div className="lightbox" onClick={() => setExpandedPoster(null)}>
-          <img src={expandedPoster} alt="Affiche de l'évènement, en grand" />
+          <img src={expandedPoster.url} alt={expandedPoster.alt} />
         </div>
       )}
     </div>
