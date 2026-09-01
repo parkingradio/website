@@ -65,6 +65,21 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         ]
       },
       {
+        Sid    = "Assets"
+        Effect = "Allow"
+        Action = "s3:*"
+        Resource = [
+          "arn:aws:s3:::parking-radio-assets-*",
+          "arn:aws:s3:::parking-radio-assets-*/*",
+        ]
+      },
+      {
+        Sid      = "Cloudfront"
+        Effect   = "Allow"
+        Action   = "cloudfront:*"
+        Resource = "*"
+      },
+      {
         Sid    = "IamResources"
         Effect = "Allow"
         Action = "iam:*"
