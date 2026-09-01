@@ -8,10 +8,11 @@ describe('Programmation', () => {
     expect(container).not.toBeEmptyDOMElement()
   })
 
-  it('links out to the Resident Advisor promoter page', () => {
+  it('embeds the Resident Advisor events widget for the Parking Radio promoter', () => {
     render(<Programmation />)
-    expect(
-      screen.getByRole('link', { name: 'Voir la programmation sur Resident Advisor' }),
-    ).toHaveAttribute('href', 'https://ra.co/promoters/183980')
+    expect(screen.getByTitle('Parking Radio Programmation')).toHaveAttribute(
+      'src',
+      'https://ra.co/promoters/183980/widget/events?theme=light&transparentBackground=true&customBackgroundColor=&customTextColor=%23000000',
+    )
   })
 })

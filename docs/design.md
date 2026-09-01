@@ -37,9 +37,9 @@ SoundCloud handles playback and hosting entirely; this page is just a thin wrapp
 
 ## Programmation
 
-This page lists Parking Radio's upcoming events. For the time being, show a short blurb and a link out to
-the RA promoter profile (`https://ra.co/promoters/183980`). In the future, a proper list of events would be
-better, but RA's promoter embeds don't seem to work.
+This page lists Parking Radio's upcoming events. It embeds Resident Advisor's promoter events widget
+(`https://ra.co/promoters/183980/widget/events`) as an iframe, which lists upcoming events directly from RA.
+RA handles the event data entirely; this page is just a thin wrapper around the embed.
 
 ## Synth Meetups
 
