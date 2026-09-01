@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import './synth-meetups.css'
 
-// TODO: these are placeholders. Replace with real assets once we decide where poster images are hosted.
+// TODO: these are placeholders. Replace with real assets: upload with `tools/manage-assets add <file>`
+// and paste the printed CloudFront URL below.
 const BANNER_URL = 'https://placehold.co/1456x619?text=Synth+Meetups'
 const POSTERS = [
   'https://placehold.co/561x998?text=Poster+1',

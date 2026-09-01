@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""
+Manages image assets in the Parking Radio assets bucket provisioned by Terraform (see
+deployment/main/assets.tf), served through CloudFront. This is a "poor man's CMS" for images used by
+the site until something more automated is worth building.
+
+There is no versioning or cache invalidation: give each upload a unique filename, since re-uploading
+using an existing file name may keep serving the old, cached version for a while.
+
+This script requires the AWS CLI to be configured with credentials that can list/read/write the bucket
+and read CloudFront distributions.
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Optional
+
+# The bucket name is derived from var.domain in deployment/main/assets.tf (so it doesn't collide
+# with other deployments), so it's discovered here instead of being hardcoded.
+BUCKET_PREFIX = "parking-radio-assets-"
+
+
+def aws_json(*args: str) -> Any:
+    result = subprocess.run(["aws", *args, "--output", "json"], stdout=subprocess.PIPE, text=True, check=True)
+    return json.loads(result.stdout)
+
+
+def find_bucket() -> Optional[str]:
+    """Finds the single bucket whose name starts with BUCKET_PREFIX, if there is exactly one."""
+    buckets = [
+        bucket["Name"]
+        for bucket in aws_json("s3api", "list-buckets").get("Buckets", [])
+        if bucket["Name"].startswith(BUCKET_PREFIX)
+    ]
+
+    if len(buckets) == 0:
+        print(f"error: no bucket found starting with '{BUCKET_PREFIX}'", file=sys.stderr)
+        return None
+    if len(buckets) > 1:
+        print(f"error: multiple buckets found starting with '{BUCKET_PREFIX}', pass one explicitly:", file=sys.stderr)
+        for bucket in buckets:
+            print(bucket, file=sys.stderr)
+        return None
+
+    return buckets[0]
+
+
+def find_cdn_domain(bucket: str) -> Optional[str]:
+    """Finds the CloudFront distribution domain that serves the given S3 bucket as its origin."""
+    origin_prefix = f"{bucket}.s3."
+    distributions = aws_json("cloudfront", "list-distributions").get("DistributionList", {}).get("Items") or []
+    for distribution in distributions:
+        origins = distribution.get("Origins", {}).get("Items") or []
+        if any(origin.get("DomainName", "").startswith(origin_prefix) for origin in origins):
+            return distribution["DomainName"]
+    return None
+
+
+def object_exists(bucket: str, key: str) -> bool:
+    try:
+        subprocess.run(
+            ["aws", "s3api", "head-object", "--bucket", bucket, "--key", key],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def cmd_list(_args: argparse.Namespace) -> int:
+    bucket = find_bucket()
+    if not bucket:
+        return 1
+
+    domain = find_cdn_domain(bucket)
+    if not domain:
+        print(f"error: couldn't find the CloudFront distribution for bucket '{bucket}'", file=sys.stderr)
+        return 1
+
+    objects = aws_json("s3api", "list-objects-v2", "--bucket", bucket).get("Contents") or []
+    for obj in objects:
+        key = obj["Key"]
+        print(f"{key}\thttps://{domain}/{key}")
+    return 0
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    file: Path = args.file
+    key: str = args.key or file.name
+
+    if not file.is_file():
+        print(f"error: no such file: {file}", file=sys.stderr)
+        return 1
+
+    bucket = find_bucket()
+    if not bucket:
+        return 1
+
+    subprocess.run(["aws", "s3", "cp", str(file), f"s3://{bucket}/{key}"], check=True)
+
+    domain = find_cdn_domain(bucket)
+    if not domain:
+        print(
+            f"warning: upload succeeded, but couldn't find the CloudFront distribution for bucket '{bucket}' to report a URL",
+            file=sys.stderr,
+        )
+        return 0
+
+    print(f"https://{domain}/{key}")
+    return 0
+
+
+def cmd_remove(args: argparse.Namespace) -> int:
+    key: str = args.key
+
+    bucket = find_bucket()
+    if not bucket:
+        return 1
+
+    if not object_exists(bucket, key):
+        print(f"error: no such key in bucket '{bucket}': {key}", file=sys.stderr)
+        return 1
+
+    subprocess.run(["aws", "s3", "rm", f"s3://{bucket}/{key}"], check=True)
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("list", help="List the assets currently in the bucket, as their public URLs.")
+
+    add_parser = subparsers.add_parser("add", help="Upload a file to the bucket and print its public URL.")
+    add_parser.add_argument("file", type=Path, help="Local path of the file to upload.")
+    add_parser.add_argument("key", nargs="?", help="Destination path within the bucket. Defaults to the file's basename.")
+
+    remove_parser = subparsers.add_parser("remove", help="Delete an asset from the bucket.")
+    remove_parser.add_argument("key", help="Path of the asset within the bucket, as printed by 'list' or 'add'.")
+
+    args = parser.parse_args()
+
+    command = {"list": cmd_list, "add": cmd_add, "remove": cmd_remove}[args.command]
+    return command(args)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError:
+        sys.exit(1)

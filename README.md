@@ -56,6 +56,21 @@ npm run build
 
 Stop the local database with `npm run db:down` when you're done.
 
+### Assets
+
+Static image assets (e.g. Synth Meetups poster images) are hosted in an S3 bucket provisioned by
+`deployment/main/assets.tf` and served through CloudFront rather than from the app itself. Manage them
+with:
+
+```sh
+tools/manage-assets list             # print every asset's public URL
+tools/manage-assets add <file> [key] # upload a file and print its public URL
+tools/manage-assets remove <key>     # delete an asset (key as printed by list/add)
+```
+
+This requires the AWS CLI to be configured with credentials that can list/read/write the bucket and read
+CloudFront distributions. This is a temporary solution until we have a proper CMS set up.
+
 ### Docker
 
 The `Dockerfile` builds the production image (client build + server, no dev tooling). It's not used for
