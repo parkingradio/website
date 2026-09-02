@@ -23,8 +23,11 @@ This creates the `parking-radio-terraform-state` S3 bucket to contain the Terraf
 role for the deployment pipeline. After applying, four things need to be configured once in the GitHub
 repository:
 
-- Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured. The
-  token needs `Zone:DNS:Edit`, `Zone:SSL` and `Certificates:Edit` permissions scoped to the domain name zone.
+- Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
+  The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
+  `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, and `Zone:Zone Settings:Edit`.
+  It also needs `Account:Email Routing Addresses:Edit`, scoped to the account (this one is an account-level
+  permission since mailboxes are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
 - Variable `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap. This allows
@@ -52,3 +55,23 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."         \
                                        -var="cloudflare_zone_id=..."    \
                                        -var="domain=parking.radio"
 ```
+
+## Mail aliases
+
+`deployment/main/mail-aliases.tf` is a table of `name@<domain>` aliases (e.g. `contact`, or a team member's
+first name) and the mailbox each one forwards to. To add or remove an alias, edit that table and re-apply
+Terraform. Each entry gets:
+
+- A Cloudflare Email Routing rule forwarding `name@<domain>` to its mailbox. The first time a given
+  destination mailbox is used, Cloudflare emails it a confirmation link that someone has to click before
+  forwarding actually works.
+- Its own SMTP credentials (via a dedicated IAM user), restricted so it can only send as that one address,
+  stored in the `parking-radio/mail-smtp-credentials` Secrets Manager secret.
+
+Note that running `terraform apply` twice may be required: the first time will fail if the destination
+mailbox is not already approved (for Cloudflare) and the `apply` will stop partway. Then, verify the mailbox
+and re-run `apply`, which should succeed. Another way to do this without running `apply` twice is to add the
+destination mailbox manually in Cloudflare and get the mailbox verified *before* running `apply`.
+
+To let someone send as their alias from their own mail client (e.g. Gmail), get their SMTP username and password
+from Secrets Manager and hand it over to them, so they can set it up using e.g. "send-as" in Gmail.
