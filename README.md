@@ -65,6 +65,7 @@ with:
 ```sh
 tools/manage-assets list             # print every asset's public URL
 tools/manage-assets add <file> [key] # upload a file and print its public URL
+tools/manage-assets download <key> [--out <path>] # download an asset
 tools/manage-assets remove <key>     # delete an asset (key as printed by list/add)
 ```
 
