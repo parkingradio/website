@@ -36,6 +36,16 @@ describe('App', () => {
     )
   })
 
+  it('renders the rotating logo, linking back to the home page', () => {
+    render(
+      <MemoryRouter initialEntries={['/archives']}>
+        <App />
+      </MemoryRouter>,
+    )
+    const logo = screen.getByAltText('parking.radio')
+    expect(logo.closest('a')).toHaveAttribute('href', '/')
+  })
+
   it('renders /accept-invite without crashing', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/accept-invite?token=abc']}>

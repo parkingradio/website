@@ -27,6 +27,21 @@
   color: #f9f9f9;
 }
 
+/* The logo sits at the far left; the auto margin keeps the other links hugging the right. */
+.navbar .logo {
+  margin-right: auto;
+  padding: 0;
+}
+
+/* The logo points at "/" too, so it goes active on the home page. It isn't a pill though. */
+.navbar .logo.active {
+  background: none;
+}
+
+.navbar .logo img {
+  display: block;
+}
+
 .page {
   flex: 1;
   display: flex;
