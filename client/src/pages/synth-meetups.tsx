@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react'
 import { useAssetUrl } from '../config-context'
 import './synth-meetups.css'
 
-// TODO: this is a placeholder. Replace with a real asset: upload with `tools/manage-assets add <file>`
-// and pass the printed key to assetUrl() below.
-const BANNER_URL = 'https://placehold.co/1456x619?text=Synth+Meetups'
-
 // Most recent first, so the gallery shows newer posters higher up.
 const POSTERS = [
   {
@@ -51,7 +47,7 @@ export function SynthMeetups() {
 
   return (
     <div className="synth-meetups">
-      <img className="banner" src={BANNER_URL} alt="Synth Meetups" />
+      <img className="banner" src={assetUrl('synth_meetups_banner.gif')} alt="Synth Meetups" />
 
       <div className="content">
         <p>les <i>synth meetups</i> c'est des rencontres hebdomadaires de création sonore et audiovisuelle.</p>
