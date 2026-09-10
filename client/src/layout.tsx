@@ -11,7 +11,7 @@ export function Layout() {
     <div className="layout">
       <nav className="navbar">
         <NavLink to="/" end className="logo">
-          <img src={assetUrl('p_3d_spin.gif')} alt="parking.radio" width={28} height={28} />
+          <img src={assetUrl('p_3d_spin.gif')} alt="parking.radio" width={36} height={36} />
         </NavLink>
         <NavLink to="/" end>
           parking.radio

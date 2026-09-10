@@ -4,12 +4,13 @@
   min-height: 100vh;
 }
 
+/* The logo is the tallest thing in the bar, so its 36px plus this padding sets the bar's height. */
 .navbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 15px;
-  padding: 1rem 1.5rem;
+  padding: 9px 1.5rem;
   border-bottom: 1px solid #ddd;
   background: #fff;
   font-family: 'Overpass Mono', ui-monospace, monospace;
