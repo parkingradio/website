@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import App from './app'
@@ -36,7 +36,7 @@ describe('App', () => {
     )
   })
 
-  it('renders the rotating logo, linking back to the home page', () => {
+  it('renders the rotating logo, linking back to the home page', async () => {
     render(
       <MemoryRouter initialEntries={['/archives']}>
         <App />
@@ -44,6 +44,12 @@ describe('App', () => {
     )
     const logo = screen.getByAltText('parking.radio')
     expect(logo.closest('a')).toHaveAttribute('href', '/')
+
+    // The logo renders before /api/config resolves, so its src only appears once it has.
+    expect(logo).not.toHaveAttribute('src')
+    await waitFor(() =>
+      expect(logo).toHaveAttribute('src', 'https://assets.example.test/p_3d_spin.gif'),
+    )
   })
 
   it('renders /accept-invite without crashing', () => {

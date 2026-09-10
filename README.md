@@ -59,8 +59,8 @@ Stop the local database with `npm run db:down` when you're done.
 ### Assets
 
 Static image assets (e.g. Synth Meetups poster images) are hosted in an S3 bucket provisioned by
-`deployment/main/assets.tf` and served through CloudFront rather than from the app itself. Manage them
-with:
+`deployment/main/assets.tf` and served through CloudFront at `assets.<domain>` rather than from the app
+itself. Manage them with:
 
 ```sh
 tools/manage-assets list             # print every asset's public URL
@@ -71,6 +71,10 @@ tools/manage-assets remove <key>     # delete an asset (key as printed by list/a
 
 This requires the AWS CLI to be configured with credentials that can list/read/write the bucket and read
 CloudFront distributions. This is a temporary solution until we have a proper CMS set up.
+
+The client doesn't hardcode the asset domain: it builds URLs from a key using the domain injected in the
+server's configuration by the deployment process. Adding an asset to a page only takes the key printed by
+`manage-assets`, not a full URL. Set `ASSETS_DOMAIN` in your `.env` for `npm run dev` to resolve assets too.
 
 ### Docker
 

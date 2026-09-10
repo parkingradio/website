@@ -7,6 +7,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { healthRoutes } from './routes/health.js'
 import { adminRoutes } from './routes/admin.js'
 import { authRoutes } from './routes/auth.js'
+import { configRoutes } from './routes/config.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { ensureBootstrapAdmin } from './bootstrap-admin.js'
@@ -23,6 +24,7 @@ try {
 
 await app.register(fastifyCookie)
 await app.register(healthRoutes)
+await app.register(configRoutes)
 await app.register(authRoutes)
 await app.register(adminRoutes)
 

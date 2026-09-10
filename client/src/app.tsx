@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router'
+import { ConfigProvider } from './config'
 import { Layout } from './layout'
 import { Home } from './pages/home'
 import { Archive } from './pages/archive'
@@ -12,19 +13,21 @@ import { Admin } from './pages/admin'
 
 function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<Home />} />
-        <Route path="archives" element={<Archive />} />
-        <Route path="programmation" element={<Programmation />} />
-        <Route path="synth-meetups" element={<SynthMeetups />} />
-        <Route path="appliquer" element={<Appliquer />} />
-        <Route path="contribuer" element={<Contribuer />} />
-        <Route path="login" element={<Login />} />
-        <Route path="accept-invite" element={<AcceptInvite />} />
-        <Route path="admin" element={<Admin />} />
-      </Route>
-    </Routes>
+    <ConfigProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Home />} />
+          <Route path="archives" element={<Archive />} />
+          <Route path="programmation" element={<Programmation />} />
+          <Route path="synth-meetups" element={<SynthMeetups />} />
+          <Route path="appliquer" element={<Appliquer />} />
+          <Route path="contribuer" element={<Contribuer />} />
+          <Route path="login" element={<Login />} />
+          <Route path="accept-invite" element={<AcceptInvite />} />
+          <Route path="admin" element={<Admin />} />
+        </Route>
+      </Routes>
+    </ConfigProvider>
   )
 }
 

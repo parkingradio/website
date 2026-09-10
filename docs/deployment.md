@@ -56,6 +56,17 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."         \
                                        -var="domain=parking.radio"
 ```
 
+## Static assets
+
+Assets are served from a CloudFront distribution in front of a private S3 bucket, at `assets.<domain>`.
+That name is an alias to the underlying `<id>.cloudfront.net` name assigned by AWS. The purpose of the
+alias is to avoid hardcoding the CloudFront URL in the app.
+
+The alias needs a certificate, so `terraform apply` provisions an ACM certificate and validates it with a
+DNS record in Cloudflare. The apply blocks while ACM waits for that record to propagate — usually a couple
+of minutes. Both that validation record and the `assets` CNAME are intentionally *not* proxied through
+Cloudflare: ACM has to resolve the former directly, and there's no point putting a proxy in front of a CDN.
+
 ## Mail aliases
 
 `deployment/main/mail-aliases.tf` is a table of `name@<domain>` aliases (e.g. `contact`, or a team member's

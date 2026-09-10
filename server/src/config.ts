@@ -32,4 +32,9 @@ export const config = {
   get mailDomain() {
     return process.env.MAIL_DOMAIN
   },
+  // Required: without it the client builds asset URLs against `undefined` and every image on the
+  // site breaks, which is much harder to diagnose than failing at startup.
+  get assetsDomain() {
+    return required('ASSETS_DOMAIN')
+  },
 }

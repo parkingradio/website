@@ -1,15 +1,17 @@
 import { NavLink, Outlet } from 'react-router'
+import { useAssetUrl } from './config-context'
 import './layout.css'
 
 const MERCH_URL = 'https://parkingdotradio.bigcartel.com'
-const LOGO_URL = 'https://d2eyop6ws0g6xr.cloudfront.net/p_3d_spin.gif'
 
 export function Layout() {
+  const assetUrl = useAssetUrl()
+
   return (
     <div className="layout">
       <nav className="navbar">
         <NavLink to="/" end className="logo">
-          <img src={LOGO_URL} alt="parking.radio" width={28} height={28} />
+          <img src={assetUrl('p_3d_spin.gif')} alt="parking.radio" width={28} height={28} />
         </NavLink>
         <NavLink to="/" end>
           parking.radio

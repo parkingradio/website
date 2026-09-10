@@ -1,34 +1,35 @@
 import { useEffect, useState } from 'react'
+import { useAssetUrl } from '../config-context'
 import './synth-meetups.css'
 
 // TODO: this is a placeholder. Replace with a real asset: upload with `tools/manage-assets add <file>`
-// and paste the printed CloudFront URL below.
+// and pass the printed key to assetUrl() below.
 const BANNER_URL = 'https://placehold.co/1456x619?text=Synth+Meetups'
 
 // Most recent first, so the gallery shows newer posters higher up.
 const POSTERS = [
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_aout.jpg',
+    key: 'synth_meetups_2026_aout.jpg',
     alt: 'Affiche des synth meetups des 12 et 26 août 2026',
   },
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_juillet.jpg',
+    key: 'synth_meetups_2026_juillet.jpg',
     alt: 'Affiche des synth meetups des 8, 22 et 29 juillet 2026',
   },
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/2026.05.30_droneDayFlyer.jpeg',
+    key: '2026.05.30_droneDayFlyer.jpeg',
     alt: 'Affiche du Drone Day du 30 mai 2026',
   },
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_mai.jpg',
+    key: 'synth_meetups_2026_mai.jpg',
     alt: 'Affiche des synth meetups des 6, 13 et 28 mai 2026',
   },
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_avril.jpg',
+    key: 'synth_meetups_2026_avril.jpg',
     alt: 'Affiche des synth meetups des 8, 15 et 22 avril 2026',
   },
   {
-    url: 'https://d2eyop6ws0g6xr.cloudfront.net/synth_meetups_2026_avril_01.jpg',
+    key: 'synth_meetups_2026_avril_01.jpg',
     alt: 'Affiche du synth meetup du 1er avril 2026',
   },
 ]
@@ -36,6 +37,7 @@ const POSTERS = [
 const NDI_URL = 'https://ndi.video/tools/'
 
 export function SynthMeetups() {
+  const assetUrl = useAssetUrl()
   const [expandedPoster, setExpandedPoster] = useState<(typeof POSTERS)[number] | null>(null)
 
   useEffect(() => {
@@ -108,19 +110,19 @@ export function SynthMeetups() {
       <div className="gallery">
         {POSTERS.map((poster) => (
           <button
-            key={poster.url}
+            key={poster.key}
             className="poster-thumb"
             onClick={() => setExpandedPoster(poster)}
             aria-label={`Voir en grand: ${poster.alt}`}
           >
-            <img src={poster.url} alt={poster.alt} />
+            <img src={assetUrl(poster.key)} alt={poster.alt} />
           </button>
         ))}
       </div>
 
       {expandedPoster && (
         <div className="lightbox" onClick={() => setExpandedPoster(null)}>
-          <img src={expandedPoster.url} alt={expandedPoster.alt} />
+          <img src={assetUrl(expandedPoster.key)} alt={expandedPoster.alt} />
         </div>
       )}
     </div>

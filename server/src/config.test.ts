@@ -55,4 +55,18 @@ describe('config', () => {
       expect(config.jwtSecret).toBe('test-secret')
     })
   })
+
+  describe('assetsDomain', () => {
+    it('throws a clear error when ASSETS_DOMAIN is unset', () => {
+      delete process.env.ASSETS_DOMAIN
+      expect(() => config.assetsDomain).toThrow(
+        'Missing required environment variable: ASSETS_DOMAIN',
+      )
+    })
+
+    it('returns ASSETS_DOMAIN when set', () => {
+      process.env.ASSETS_DOMAIN = 'assets.example.test'
+      expect(config.assetsDomain).toBe('assets.example.test')
+    })
+  })
 })

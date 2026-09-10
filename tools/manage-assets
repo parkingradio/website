@@ -49,13 +49,16 @@ def find_bucket() -> Optional[str]:
 
 
 def find_cdn_domain(bucket: str) -> Optional[str]:
-    """Finds the CloudFront distribution domain that serves the given S3 bucket as its origin."""
+    """Finds the domain serving the given S3 bucket: the distribution's alias if it has one, and its
+    CloudFront-assigned name otherwise. The alias is preferred because the CloudFront-assigned name
+    changes if the distribution is ever re-created, and these URLs get baked into the client."""
     origin_prefix = f"{bucket}.s3."
     distributions = aws_json("cloudfront", "list-distributions").get("DistributionList", {}).get("Items") or []
     for distribution in distributions:
         origins = distribution.get("Origins", {}).get("Items") or []
         if any(origin.get("DomainName", "").startswith(origin_prefix) for origin in origins):
-            return distribution["DomainName"]
+            aliases = distribution.get("Aliases", {}).get("Items") or []
+            return aliases[0] if aliases else distribution["DomainName"]
     return None
 
 
