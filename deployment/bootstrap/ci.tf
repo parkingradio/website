@@ -79,6 +79,14 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Action   = "cloudfront:*"
         Resource = "*"
       },
+      # The certificate for the assets.<domain> alias on the CloudFront distribution. Certificate
+      # ARNs contain a generated ID, so there's nothing stable to scope this to.
+      {
+        Sid      = "Acm"
+        Effect   = "Allow"
+        Action   = "acm:*"
+        Resource = "*"
+      },
       {
         Sid    = "IamResources"
         Effect = "Allow"
@@ -86,6 +94,9 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Resource = [
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/parking-radio-*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/parking-radio-*",
+          # The per-alias SMTP users created in mail.tf, along with their access keys and inline
+          # policies: those all authorize against the user's ARN.
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/parking-radio-*",
         ]
       },
       {
