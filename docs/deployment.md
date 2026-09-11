@@ -20,8 +20,16 @@ terraform -chdir=deployment/bootstrap apply
 ```
 
 This creates the `parking-radio-terraform-state` S3 bucket to contain the Terraform state, and an IAM
-role for the deployment pipeline. After applying, four things need to be configured once in the GitHub
-repository:
+role for the deployment pipeline. That role is assumed via a GitHub Actions OIDC provider, which is
+account-wide: AWS allows only one per URL per AWS account. By default the bootstrap assumes one already
+exists and reuses it, failing the apply if it doesn't. On an AWS account that has never been used with
+GitHub Actions, create it as part of the bootstrap instead:
+
+```sh
+terraform -chdir=deployment/bootstrap apply -var="manage_github_oidc_provider=true"
+```
+
+After applying, four things need to be configured once in the GitHub repository:
 
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
