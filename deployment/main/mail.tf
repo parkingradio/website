@@ -10,11 +10,11 @@ resource "aws_sesv2_email_identity" "main" {
 data "aws_caller_identity" "current" {}
 
 # One CNAME per Easy DKIM token, so SES can sign outgoing mail as this domain.
-resource "cloudflare_record" "ses_dkim" {
+resource "cloudflare_dns_record" "ses_dkim" {
   count = 3
 
   zone_id = var.cloudflare_zone_id
-  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey${local.record_suffix}"
+  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
   type    = "CNAME"
   content = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
   proxied = false
@@ -23,9 +23,9 @@ resource "cloudflare_record" "ses_dkim" {
 
 # A domain can only have one SPF record, so SES (outbound app email) and Cloudflare Email
 # Routing (which re-sends bounces/forwards as this domain) both need to be authorized here.
-resource "cloudflare_record" "ses_spf" {
+resource "cloudflare_dns_record" "ses_spf" {
   zone_id = var.cloudflare_zone_id
-  name    = local.record_name
+  name    = var.domain
   type    = "TXT"
   content = "v=spf1 include:amazonses.com include:_spf.mx.cloudflare.net ~all"
   proxied = false
@@ -33,9 +33,9 @@ resource "cloudflare_record" "ses_spf" {
 }
 
 # Monitoring-only for now (no `rua`): there's no mailbox on this domain to receive aggregated reports.
-resource "cloudflare_record" "ses_dmarc" {
+resource "cloudflare_dns_record" "ses_dmarc" {
   zone_id = var.cloudflare_zone_id
-  name    = "_dmarc${local.record_suffix}"
+  name    = "_dmarc.${var.domain}"
   type    = "TXT"
   content = "v=DMARC1; p=none;"
   proxied = false
@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "ses_send" {
     Statement = [{
       Effect    = "Allow"
       Action    = ["ses:SendEmail", "ses:SendRawEmail"]
-      Resource  = "arn:aws:ses:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:identity/*"
+      Resource  = "arn:aws:ses:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:identity/*"
       Condition = { StringEquals = { "ses:FromAddress" = "noreply@${var.domain}" } }
     }]
   })
@@ -62,14 +62,13 @@ resource "aws_iam_role_policy" "ses_send" {
 # Cloudflare Email Routing.
 resource "cloudflare_email_routing_settings" "main" {
   zone_id = var.cloudflare_zone_id
-  enabled = true
 }
 
-resource "cloudflare_record" "routing_mx" {
+resource "cloudflare_dns_record" "routing_mx" {
   count = 3
 
   zone_id  = var.cloudflare_zone_id
-  name     = local.record_name
+  name     = var.domain
   type     = "MX"
   content  = "route${count.index + 1}.mx.cloudflare.net"
   priority = (count.index + 1) * 10
@@ -82,7 +81,7 @@ resource "cloudflare_record" "routing_mx" {
 resource "cloudflare_email_routing_address" "destination" {
   for_each = toset(values(local.mail_aliases))
 
-  account_id = data.cloudflare_zone.this.account_id
+  account_id = data.cloudflare_zone.this.account.id
   email      = each.value
 }
 
@@ -93,16 +92,16 @@ resource "cloudflare_email_routing_rule" "alias" {
   name    = "forward ${each.key}@${var.domain}"
   enabled = true
 
-  matcher {
+  matchers = [{
     type  = "literal"
     field = "to"
     value = "${each.key}@${var.domain}"
-  }
+  }]
 
-  action {
+  actions = [{
     type  = "forward"
     value = [cloudflare_email_routing_address.destination[each.value].email]
-  }
+  }]
 }
 
 # Outbound: give each alias its own SMTP credentials, restricted to sending as exactly that
@@ -130,7 +129,7 @@ resource "aws_iam_user_policy" "mail_alias" {
     Statement = [{
       Effect    = "Allow"
       Action    = "ses:SendRawEmail"
-      Resource  = "arn:aws:ses:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:identity/*"
+      Resource  = "arn:aws:ses:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:identity/*"
       Condition = { StringEquals = { "ses:FromAddress" = "${each.key}@${var.domain}" } }
     }]
   })

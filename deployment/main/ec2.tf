@@ -86,7 +86,7 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/../templates/user_data.sh.tftpl", {
-    aws_region            = data.aws_region.current.name
+    aws_region            = data.aws_region.current.region
     domain                = var.domain
     assets_domain         = local.assets_domain
     db_secret_arn         = aws_db_instance.main.master_user_secret[0].secret_arn

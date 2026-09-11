@@ -72,7 +72,7 @@ resource "aws_acm_certificate" "assets" {
   }
 }
 
-resource "cloudflare_record" "assets_certificate_validation" {
+resource "cloudflare_dns_record" "assets_certificate_validation" {
   for_each = {
     for option in aws_acm_certificate.assets.domain_validation_options : option.domain_name => option
   }
@@ -87,12 +87,12 @@ resource "cloudflare_record" "assets_certificate_validation" {
 
 resource "aws_acm_certificate_validation" "assets" {
   certificate_arn         = aws_acm_certificate.assets.arn
-  validation_record_fqdns = [for record in cloudflare_record.assets_certificate_validation : record.hostname]
+  validation_record_fqdns = [for record in cloudflare_dns_record.assets_certificate_validation : record.name]
 }
 
-resource "cloudflare_record" "assets" {
+resource "cloudflare_dns_record" "assets" {
   zone_id = var.cloudflare_zone_id
-  name    = "assets${local.record_suffix}"
+  name    = local.assets_domain
   type    = "CNAME"
   content = aws_cloudfront_distribution.assets.domain_name
   proxied = false # CloudFront serves this directly; there's no point proxying a CDN through another one

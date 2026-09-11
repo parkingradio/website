@@ -10,20 +10,10 @@ data "cloudflare_zone" "this" {
 }
 
 locals {
-  # Derive the record name used with Cloudflare from `var.domain`. We use the Cloudflare convention
-  # of `@` for a top-level domain (e.g. parking.radio), and the subdomain otherwise (e.g.
-  # `parking.proof-of-concept.com`)
-  record_name = var.domain == data.cloudflare_zone.this.name ? "@" : trimsuffix(var.domain, ".${data.cloudflare_zone.this.name}")
-
-  # Suffix to append when building a record name that needs a label prepended (e.g. "_dmarc"): empty at
-  # the zone apex, or ".<subdomain>" otherwise. This makes "${label}${record_suffix}" the correct zone-relative
-  # name in all cases.
-  record_suffix = local.record_name == "@" ? "" : ".${local.record_name}"
-
   # Whether to serve a `www.<domain>` redirect. Only when the site is at the zone apex: a `www.` name
   # in front of a subdomain deployment (e.g. www.parking.example.com) is meaningless, and it wouldn't
   # work anyway.
-  www_redirect = local.record_name == "@"
+  www_redirect = var.domain == data.cloudflare_zone.this.name
 }
 
 resource "tls_private_key" "origin" {
@@ -46,9 +36,9 @@ resource "cloudflare_origin_ca_certificate" "origin" {
   requested_validity = 5475
 }
 
-resource "cloudflare_record" "app" {
+resource "cloudflare_dns_record" "app" {
   zone_id = var.cloudflare_zone_id
-  name    = local.record_name
+  name    = var.domain
   type    = "A"
   content = aws_eip.app.public_ip
   proxied = true
@@ -56,11 +46,11 @@ resource "cloudflare_record" "app" {
 }
 
 # Set up the `www` redirect.
-resource "cloudflare_record" "www" {
+resource "cloudflare_dns_record" "www" {
   count = local.www_redirect ? 1 : 0
 
   zone_id = var.cloudflare_zone_id
-  name    = "www"
+  name    = "www.${var.domain}"
   type    = "CNAME"
   content = var.domain
   proxied = true
@@ -75,16 +65,16 @@ resource "cloudflare_ruleset" "www_redirect" {
   kind    = "zone"
   phase   = "http_request_dynamic_redirect"
 
-  rules {
+  rules = [{
     description = "Redirect www.${var.domain} to ${var.domain}"
     expression  = "http.host eq \"www.${var.domain}\""
     action      = "redirect"
     enabled     = true
 
-    action_parameters {
-      from_value {
+    action_parameters = {
+      from_value = {
         status_code = 301
-        target_url {
+        target_url = {
           # Keep the path, so a link to www.<domain>/synth-meetups lands on the right page rather
           # than dumping the visitor on the home page.
           expression = "concat(\"https://${var.domain}\", http.request.uri.path)"
@@ -92,5 +82,5 @@ resource "cloudflare_ruleset" "www_redirect" {
         preserve_query_string = true
       }
     }
-  }
+  }]
 }
