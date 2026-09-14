@@ -29,7 +29,7 @@ GitHub Actions, create it as part of the bootstrap instead:
 terraform -chdir=deployment/bootstrap apply -var="manage_github_oidc_provider=true"
 ```
 
-After applying, four things need to be configured once in the GitHub repository:
+After applying, five things need to be configured once in the GitHub repository:
 
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
@@ -38,6 +38,7 @@ After applying, four things need to be configured once in the GitHub repository:
   permission since mailboxes are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
+- Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain.
 - Variable `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap. This allows
   the CI deployment pipeline to perform operations in the AWS account (e.g. deploy EC2) based on the OIDC trust
   chain established by the one-time bootstrap. This is not sensitive.
@@ -76,6 +77,10 @@ of minutes. Both that validation record and the `assets` CNAME are intentionally
 Cloudflare: ACM has to resolve the former directly, and there's no point putting a proxy in front of a CDN.
 
 ## Mail aliases
+
+Terraform only manages mail when `manage_mail` is `true`. It defaults to `false`, so nothing in this
+section applies unless you turn it on. The rest of this section assumes Terraform is managing the mail
+setup.
 
 `deployment/main/mail-aliases.tf` is a table of `name@<domain>` aliases (e.g. `contact`, or a team member's
 first name) and the mailbox each one forwards to. To add or remove an alias, edit that table and re-apply

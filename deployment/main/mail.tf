@@ -2,8 +2,19 @@
 # - SES for outbound, since the app itself sends emails as noreply@<domain>
 # - individual mail aliases (see mail-aliases.tf), which get their own restricted sending credentials
 #   and Cloudflare Email Routing for inbound (each alias is forwarded to a real mailbox).
+#
+# All of it is gated on var.manage_mail, so the app can be deployed to a domain whose mail is already
+# handled by someone else without Terraform fighting the existing setup. See that variable for why.
+
+locals {
+  # Empty when Terraform isn't managing mail, which is what switches off every per-alias resource
+  # below without having to repeat the conditional on each one.
+  mail_aliases_managed = var.manage_mail ? local.mail_aliases : {}
+}
 
 resource "aws_sesv2_email_identity" "main" {
+  count = var.manage_mail ? 1 : 0
+
   email_identity = var.domain
 }
 
@@ -11,12 +22,12 @@ data "aws_caller_identity" "current" {}
 
 # One CNAME per Easy DKIM token, so SES can sign outgoing mail as this domain.
 resource "cloudflare_dns_record" "ses_dkim" {
-  count = 3
+  count = var.manage_mail ? 3 : 0
 
   zone_id = var.cloudflare_zone_id
-  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
+  name    = "${aws_sesv2_email_identity.main[0].dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
   type    = "CNAME"
-  content = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
+  content = "${aws_sesv2_email_identity.main[0].dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
   proxied = false
   ttl     = 3600
 }
@@ -24,6 +35,8 @@ resource "cloudflare_dns_record" "ses_dkim" {
 # A domain can only have one SPF record, so SES (outbound app email) and Cloudflare Email
 # Routing (which re-sends bounces/forwards as this domain) both need to be authorized here.
 resource "cloudflare_dns_record" "ses_spf" {
+  count = var.manage_mail ? 1 : 0
+
   zone_id = var.cloudflare_zone_id
   name    = var.domain
   type    = "TXT"
@@ -34,6 +47,8 @@ resource "cloudflare_dns_record" "ses_spf" {
 
 # Monitoring-only for now (no `rua`): there's no mailbox on this domain to receive aggregated reports.
 resource "cloudflare_dns_record" "ses_dmarc" {
+  count = var.manage_mail ? 1 : 0
+
   zone_id = var.cloudflare_zone_id
   name    = "_dmarc.${var.domain}"
   type    = "TXT"
@@ -44,6 +59,8 @@ resource "cloudflare_dns_record" "ses_dmarc" {
 
 # Let the app instance send email as noreply@<domain> (and only as that).
 resource "aws_iam_role_policy" "ses_send" {
+  count = var.manage_mail ? 1 : 0
+
   name = "send-email"
   role = aws_iam_role.app.id
 
@@ -61,11 +78,13 @@ resource "aws_iam_role_policy" "ses_send" {
 # Inbound: forward each alias in local.mail_aliases (e.g. contact@<domain>) to its mailbox via
 # Cloudflare Email Routing.
 resource "cloudflare_email_routing_settings" "main" {
+  count = var.manage_mail ? 1 : 0
+
   zone_id = var.cloudflare_zone_id
 }
 
 resource "cloudflare_dns_record" "routing_mx" {
-  count = 3
+  count = var.manage_mail ? 3 : 0
 
   zone_id  = var.cloudflare_zone_id
   name     = var.domain
@@ -79,14 +98,14 @@ resource "cloudflare_dns_record" "routing_mx" {
 # Requires a one-time manual step per mailbox: Cloudflare emails it a confirmation link, and the owner
 # of the mailbox has to validate ownership by clicking the link before routing will actually deliver there.
 resource "cloudflare_email_routing_address" "destination" {
-  for_each = toset(values(local.mail_aliases))
+  for_each = toset(values(local.mail_aliases_managed))
 
   account_id = data.cloudflare_zone.this.account.id
   email      = each.value
 }
 
 resource "cloudflare_email_routing_rule" "alias" {
-  for_each = local.mail_aliases
+  for_each = local.mail_aliases_managed
 
   zone_id = var.cloudflare_zone_id
   name    = "forward ${each.key}@${var.domain}"
@@ -107,19 +126,19 @@ resource "cloudflare_email_routing_rule" "alias" {
 # Outbound: give each alias its own SMTP credentials, restricted to sending as exactly that
 # address, so e.g. owner@<domain>'s credentials can't be used to send as contact@<domain>.
 resource "aws_iam_user" "mail_alias" {
-  for_each = local.mail_aliases
+  for_each = local.mail_aliases_managed
 
   name = "parking-radio-mail-${each.key}"
 }
 
 resource "aws_iam_access_key" "mail_alias" {
-  for_each = local.mail_aliases
+  for_each = local.mail_aliases_managed
 
   user = aws_iam_user.mail_alias[each.key].name
 }
 
 resource "aws_iam_user_policy" "mail_alias" {
-  for_each = local.mail_aliases
+  for_each = local.mail_aliases_managed
 
   name = "send-as-${each.key}"
   user = aws_iam_user.mail_alias[each.key].name
@@ -139,13 +158,17 @@ resource "aws_iam_user_policy" "mail_alias" {
 # be handed out manually by someone with AWS access to the person owning the destination
 # mailbox.
 resource "aws_secretsmanager_secret" "mail_smtp" {
+  count = var.manage_mail ? 1 : 0
+
   name = "parking-radio/mail-smtp-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "mail_smtp" {
-  secret_id = aws_secretsmanager_secret.mail_smtp.id
+  count = var.manage_mail ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.mail_smtp[0].id
   secret_string = jsonencode({
-    for name, _ in local.mail_aliases : name => {
+    for name, _ in local.mail_aliases_managed : name => {
       smtp_username = aws_iam_access_key.mail_alias[name].id
       smtp_password = aws_iam_access_key.mail_alias[name].ses_smtp_password_v4
     }

@@ -24,3 +24,20 @@ variable "app_image_tag" {
   description = "Tag of the app image (in the ghcr_image repository) to deploy."
   type        = string
 }
+
+variable "manage_mail" {
+  description = <<-EOT
+    Whether Terraform owns mail for var.domain: SES for outbound, Cloudflare Email Routing for
+    inbound, and the SPF/DKIM/DMARC records that go with them.
+
+    Leave this off for a domain whose mail is already handled elsewhere. Turning it on there would
+    publish a second apex SPF record and add Cloudflare's MX records alongside the existing ones,
+    splitting inbound delivery between two providers.
+
+    Defaults to off because enabling this on a domain that already has a mail setup can break the
+    existing mail setup. The Deploy workflow requires MANAGE_MAIL to be set explicitly rather than
+    relying on this default.
+  EOT
+  type        = bool
+  default     = false
+}
