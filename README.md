@@ -63,11 +63,13 @@ Static image assets (e.g. Synth Meetups poster images) are hosted in an S3 bucke
 itself. Manage them with:
 
 ```sh
-tools/manage-assets list             # print every asset's public URL
-tools/manage-assets add <file> [key] # upload a file and print its public URL
-tools/manage-assets download <key> [--out <path>] # download an asset
-tools/manage-assets remove <key>     # delete an asset (key as printed by list/add)
+tools/manage-assets list --environment <name>             # print every asset's public URL
+tools/manage-assets add <file> [key] --environment <name> # upload a file and print its public URL
+tools/manage-assets download <key> [--out <path>] --environment <name> # download an asset
+tools/manage-assets remove <key> --environment <name>     # delete an asset (key as printed by list/add)
 ```
+
+`--environment` names the deployment to act on, i.e. the Terraform workspace (e.g. `test`, `production`).
 
 This requires the AWS CLI to be configured with credentials that can list/read/write the bucket and read
 CloudFront distributions. This is a temporary solution until we have a proper CMS set up.

@@ -30,7 +30,7 @@ resource "aws_eip_association" "app" {
 }
 
 resource "aws_iam_role" "app" {
-  name = "parking-radio-app"
+  name = "${local.stack_name}-app"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -65,7 +65,7 @@ resource "aws_iam_role_policy" "secrets" {
 }
 
 resource "aws_iam_instance_profile" "app" {
-  name = "parking-radio-app"
+  name = "${local.stack_name}-app"
   role = aws_iam_role.app.name
 }
 
@@ -113,6 +113,6 @@ resource "aws_instance" "app" {
   depends_on = [aws_secretsmanager_secret_version.app]
 
   tags = {
-    Name = "parking-radio"
+    Name = local.stack_name
   }
 }

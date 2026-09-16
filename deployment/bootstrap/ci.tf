@@ -42,7 +42,8 @@ data "aws_iam_openid_connect_provider" "existing" {
   }
 }
 
-# Only the `production` environment in the `deploy.yml` workflow in this repo can assume this role.
+# Only the environments in var.deploy_environments, running the `deploy.yml` workflow in this repo,
+# can assume this role. A `sub` claim listing several values matches if any one of them does.
 resource "aws_iam_role" "github_actions_deploy" {
   name = "parking-radio-github-actions-deploy"
 
@@ -55,7 +56,10 @@ resource "aws_iam_role" "github_actions_deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:parkingradio/radio:environment:production"
+          "token.actions.githubusercontent.com:sub" = [
+            for environment in var.deploy_environments :
+            "repo:parkingradio/radio:environment:${environment}"
+          ]
         }
       }
     }]
@@ -77,7 +81,7 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Effect = "Allow"
         Action = "secretsmanager:*"
         Resource = [
-          "arn:aws:secretsmanager:us-east-1:${data.aws_caller_identity.current.account_id}:secret:parking-radio/*",
+          "arn:aws:secretsmanager:us-east-1:${data.aws_caller_identity.current.account_id}:secret:parking-radio-*",
           "arn:aws:secretsmanager:us-east-1:${data.aws_caller_identity.current.account_id}:secret:rds!db-*",
         ]
       },
@@ -86,8 +90,8 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Effect = "Allow"
         Action = "s3:*"
         Resource = [
-          "arn:aws:s3:::parking-radio-terraform-state",
-          "arn:aws:s3:::parking-radio-terraform-state/*",
+          "arn:aws:s3:::${local.state_bucket_name}",
+          "arn:aws:s3:::${local.state_bucket_name}/*",
         ]
       },
       {
@@ -95,8 +99,8 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Effect = "Allow"
         Action = "s3:*"
         Resource = [
-          "arn:aws:s3:::parking-radio-assets-*",
-          "arn:aws:s3:::parking-radio-assets-*/*",
+          "arn:aws:s3:::parking-radio-*-assets",
+          "arn:aws:s3:::parking-radio-*-assets/*",
         ]
       },
       {

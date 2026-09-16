@@ -29,7 +29,15 @@ GitHub Actions, create it as part of the bootstrap instead:
 terraform -chdir=deployment/bootstrap apply -var="manage_github_oidc_provider=true"
 ```
 
-After applying, five things need to be configured once in the GitHub repository:
+After applying, the GitHub repository needs to be configured once. We use two GitHub environments
+(`test` and `production`) which allows two different deployments to coexist at once. `AWS_DEPLOY_ROLE_ARN`
+is the same for every environment and belongs at the repository level:
+
+- Variable `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap. This allows
+  the CI deployment pipeline to perform operations in the AWS account (e.g. deploy EC2) based on the OIDC trust
+  chain established by the one-time bootstrap. This is not sensitive.
+
+Other variables differ per deployment and belong on each deployment's GitHub environment:
 
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
@@ -39,9 +47,6 @@ After applying, five things need to be configured once in the GitHub repository:
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
 - Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain.
-- Variable `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap. This allows
-  the CI deployment pipeline to perform operations in the AWS account (e.g. deploy EC2) based on the OIDC trust
-  chain established by the one-time bootstrap. This is not sensitive.
 
 ## Building and pushing the app image
 
@@ -50,19 +55,22 @@ the built Docker image is pushed to `ghcr.io/parkingradio/radio` and tagged with
 
 ## Deploying the web app
 
-Deploying is done manually by triggering the `deploy.yml` Github workflow. Select the web app image to use and
-launch the workflow, which will run `terraform apply` in `deployment/main` with that tag. The EC2 instance gets
-re-created automatically whenever required.
+Deploying is done manually by triggering the `deploy.yml` Github workflow. Select the environment and the
+web app image to use, then launch the workflow, which will run `terraform apply` in `deployment/main`
+against that environment's state with that tag. The EC2 instance gets re-created automatically whenever
+required.
 
-Alternatively, deployment can be triggered locally without going through the workflow:
+Alternatively, deployment can be triggered locally without going through the workflow. Note the workspace
+selection.
 
 ```sh
 export AWS_PROFILE=your-aws-profile
 terraform -chdir=deployment/main init
-terraform -chdir=deployment/main apply -var="app_image_tag=..."         \
-                                       -var="cloudflare_api_token=..."  \
-                                       -var="cloudflare_zone_id=..."    \
-                                       -var="domain=parking.radio"
+terraform -chdir=deployment/main workspace select -or-create test
+terraform -chdir=deployment/main apply -var="app_image_tag=..."          \
+                                       -var="cloudflare_api_token=..."   \
+                                       -var="cloudflare_zone_id=..."     \
+                                       -var="domain=parking.example.com"
 ```
 
 ## Static assets
@@ -90,7 +98,7 @@ Terraform. Each entry gets:
   destination mailbox is used, Cloudflare emails it a confirmation link that someone has to click before
   forwarding actually works.
 - Its own SMTP credentials (via a dedicated IAM user), restricted so it can only send as that one address,
-  stored in the `parking-radio/mail-smtp-credentials` Secrets Manager secret.
+  stored in Secrets Manager.
 
 Note that running `terraform apply` twice may be required: the first time will fail if the destination
 mailbox is not already approved (for Cloudflare) and the `apply` will stop partway. Then, verify the mailbox

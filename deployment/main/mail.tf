@@ -128,7 +128,7 @@ resource "cloudflare_email_routing_rule" "alias" {
 resource "aws_iam_user" "mail_alias" {
   for_each = local.mail_aliases_managed
 
-  name = "parking-radio-mail-${each.key}"
+  name = "${local.stack_name}-mail-${each.key}"
 }
 
 resource "aws_iam_access_key" "mail_alias" {
@@ -160,7 +160,7 @@ resource "aws_iam_user_policy" "mail_alias" {
 resource "aws_secretsmanager_secret" "mail_smtp" {
   count = var.manage_mail ? 1 : 0
 
-  name = "parking-radio/mail-smtp-credentials"
+  name = "${local.stack_name}-mail-smtp-credentials"
 }
 
 resource "aws_secretsmanager_secret_version" "mail_smtp" {

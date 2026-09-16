@@ -3,12 +3,12 @@
 #
 # It is automatically backed up every day and backups are kept for 7 days.
 resource "aws_db_subnet_group" "main" {
-  name       = "parking-radio"
+  name       = local.stack_name
   subnet_ids = data.aws_subnets.default.ids
 }
 
 resource "aws_db_instance" "main" {
-  identifier     = "parking-radio"
+  identifier     = local.stack_name
   engine         = "postgres"
   engine_version = "16"
   instance_class = "db.t4g.micro"

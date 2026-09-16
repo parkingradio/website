@@ -1,14 +1,14 @@
 # This file provisions hosting for static image assets: a private S3 bucket served through CloudFront,
 # reachable at a stable `assets.<domain>` name.
 #
-# S3 bucket names are unique across all of AWS, so generate a S3 bucket name that should be unique
-# based on var.domain.
-locals {
-  assets_domain = "assets.${var.domain}"
+# S3 bucket names are unique across all of AWS, so generate a S3 bucket name that should be unique based
+# on the stack name.
+resource "aws_s3_bucket" "assets" {
+  bucket = "${local.stack_name}-assets"
 }
 
-resource "aws_s3_bucket" "assets" {
-  bucket = "parking-radio-assets-${replace(var.domain, ".", "-")}"
+locals {
+  assets_domain = "assets.${var.domain}"
 }
 
 resource "aws_s3_bucket_public_access_block" "assets" {
@@ -21,7 +21,7 @@ resource "aws_s3_bucket_public_access_block" "assets" {
 }
 
 resource "aws_cloudfront_origin_access_control" "assets" {
-  name                              = "parking-radio-assets"
+  name                              = "${local.stack_name}-assets"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"

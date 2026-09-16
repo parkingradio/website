@@ -11,7 +11,7 @@ resource "random_password" "bootstrap_admin" {
 }
 
 resource "aws_secretsmanager_secret" "app" {
-  name = "parking-radio/secrets"
+  name = "${local.stack_name}-secrets"
 }
 
 resource "aws_secretsmanager_secret_version" "app" {
