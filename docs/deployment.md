@@ -73,6 +73,15 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."          \
                                        -var="domain=parking.example.com"
 ```
 
+## Tearing down a deployment
+
+The `teardown.yml` workflow destroys everything Terraform manages in an environment. Note that this includes
+the assets buckets, the database, the DNS entries, etc. In practice this is for cleaning up the `test` environment
+after a round of testing. **DO NOT RUN THIS UNLESS YOU KNOW EXACTLY WHAT YOU ARE DOING.**
+
+Note that this can take a while since the CloudFront distribution has to be deleted and Terraform will wait for
+that to propagate.
+
 ## Static assets
 
 Assets are served from a CloudFront distribution in front of a private S3 bucket, at `assets.<domain>`.

@@ -161,6 +161,9 @@ resource "aws_secretsmanager_secret" "mail_smtp" {
   count = var.manage_mail ? 1 : 0
 
   name = "${local.stack_name}-mail-smtp-credentials"
+
+  # These are automaticallky generated, purge to allow tearing down without a manual step.
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "mail_smtp" {

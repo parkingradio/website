@@ -1,0 +1,123 @@
+#
+# Tear down a deployment environment: destroy everything Terraform manages in that environment's
+# workspace, then delete the empty workspace.
+#
+# The plan is saved and rendered into the run summary before being applied, so a run leaves behind a
+# record of exactly what it destroyed.
+#
+
+name: Teardown
+run-name: "Teardown ${{ inputs.environment }} by @${{ github.actor }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to tear down"
+        required: true
+        type: choice
+        options:
+          - test
+          - production
+      confirm:
+        description: "Type the environment's name again to confirm"
+        required: true
+        type: string
+
+# Deliberately the same group the Deploy workflow uses, so a teardown can never interleave with an
+# apply against the same state.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    # Deleting the CloudFront distribution dominates the runtime (it has to be disabled and propagated
+    # first), so this takes 20-30 minutes.
+    timeout-minutes: 60
+    environment:
+      name: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check the confirmation matches the selected environment
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "$ENVIRONMENT" ]; then
+            echo "::error::Confirmation does not match the selected environment '$ENVIRONMENT'."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: Enforce MANAGE_MAIL is set
+        env:
+          MANAGE_MAIL: ${{ vars.MANAGE_MAIL }}
+        run: |
+          if [ "$MANAGE_MAIL" != "true" ] && [ "$MANAGE_MAIL" != "false" ]; then
+            echo "::error::MANAGE_MAIL must be set to 'true' or 'false', got '$MANAGE_MAIL'"
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v4
+
+      - name: Terraform init
+        working-directory: deployment/main
+        run: terraform init
+
+      # Deliberately not `-or-create` so we fail loudly when tearing down a non-existing environment.
+      - name: Select the environment's workspace
+        working-directory: deployment/main
+        run: terraform workspace select "${{ inputs.environment }}"
+
+      - name: Plan the destroy
+        working-directory: deployment/main
+        run: |
+          set -o pipefail
+          terraform plan -destroy -no-color -input=false -out=tfplan          \
+            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}"   \
+            -var="cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}"          \
+            -var="domain=${{ vars.DOMAIN }}"                                  \
+            -var="manage_mail=${{ vars.MANAGE_MAIL }}"                        \
+            -var="app_image_tag=unused-by-destroy"                            \
+            | tee "$RUNNER_TEMP/destroy-plan.txt"
+
+      - name: Publish the plan to the run summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: |
+          summary=$(grep -E '^Plan: ' "$RUNNER_TEMP/destroy-plan.txt" || echo "Plan summary not found")
+          {
+            echo "## Destroy plan for \`$ENVIRONMENT\` ($DOMAIN)"
+            echo
+            echo "**$summary**"
+            echo
+            echo "<details><summary>Full plan</summary>"
+            echo
+            echo '```terraform'
+            cat "$RUNNER_TEMP/destroy-plan.txt"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply the destroy plan
+        working-directory: deployment/main
+        run: terraform apply -input=false tfplan
+
+      # The workspace is empty now, so drop it instead of leaving a stale state object in the bucket.
+      - name: Delete the now-empty workspace
+        working-directory: deployment/main
+        run: |
+          terraform workspace select default
+          terraform workspace delete "${{ inputs.environment }}"

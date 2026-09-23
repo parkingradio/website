@@ -5,6 +5,10 @@
 # on the stack name.
 resource "aws_s3_bucket" "assets" {
   bucket = "${local.stack_name}-assets"
+
+  # Allow tearing down without a manual step. Otherwise, teardown fails with BucketNotEmpty as soon as a
+  # single asset has been uploaded.
+  force_destroy = true
 }
 
 locals {

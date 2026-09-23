@@ -12,6 +12,9 @@ resource "random_password" "bootstrap_admin" {
 
 resource "aws_secretsmanager_secret" "app" {
   name = "${local.stack_name}-secrets"
+
+  # This is auto-generated, so purge to allow tearing down without a manual step.
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "app" {
