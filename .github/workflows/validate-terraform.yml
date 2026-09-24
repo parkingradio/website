@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  terraform:
+  validate-terraform:
     runs-on: ubuntu-latest
     strategy:
       matrix:
