@@ -1,5 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
+import rateLimit, { normalizeIP } from '@fastify/rate-limit'
+import type { RateLimitOptions } from '@fastify/rate-limit'
 import { db } from '../db.js'
 import { users, invites } from '../schema.js'
 import {
@@ -14,6 +16,21 @@ import {
 
 const MIN_PASSWORD_LENGTH = 8
 
+// Throttle password guessing: each client gets this many login attempts per window.
+export const LOGIN_ATTEMPTS_PER_WINDOW = 10
+const LOGIN_WINDOW = '15 minutes'
+
+// In production, requests reach the app through Cloudflare and then nginx, so `request.ip` is nginx's
+// address and would put every visitor in the same bucket. Cloudflare sets CF-Connecting-IP to the
+// visitor's actual address (overwriting any value sent by the client), and the origin only accepts
+// traffic from Cloudflare. Outside of that setup (e.g. in development), fall back to `request.ip`.
+// Like the plugin's default key, IPv6 addresses are grouped by subnet so a client can't dodge the
+// limit by cycling through the addresses it's been allocated.
+function clientAddress(request: FastifyRequest): string {
+  const cloudflareAddress = request.headers['cf-connecting-ip']
+  return normalizeIP(typeof cloudflareAddress === 'string' ? cloudflareAddress : request.ip)
+}
+
 type LoginBody = {
   email?: string
   password?: string
@@ -25,7 +42,21 @@ type AcceptInviteBody = {
 }
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post<{ Body: LoginBody }>('/api/auth/login', async (request, reply) => {
+  // Only routes that opt in through `config.rateLimit` are limited.
+  await app.register(rateLimit, { global: false })
+
+  const loginRateLimit: RateLimitOptions = {
+    max: LOGIN_ATTEMPTS_PER_WINDOW,
+    timeWindow: LOGIN_WINDOW,
+    keyGenerator: clientAddress,
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      ok: false,
+      error: `Too many login attempts, try again in ${context.after}`,
+    }),
+  }
+
+  app.post<{ Body: LoginBody }>('/api/auth/login', { config: { rateLimit: loginRateLimit } }, async (request, reply) => {
     const { email, password } = request.body ?? {}
     if (!email || !password) {
       return reply.status(400).send({ ok: false, error: 'Missing email or password' })

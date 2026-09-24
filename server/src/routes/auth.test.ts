@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import type { FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 
 const { selectResult, dbState } = vi.hoisted(() => ({
@@ -44,7 +45,7 @@ vi.mock('../db.js', () => ({
 }))
 
 import { eq } from 'drizzle-orm'
-import { authRoutes } from './auth.js'
+import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth.js'
 import { hashPassword, generateInviteToken, hashInviteToken, signSessionToken, SESSION_COOKIE } from '../auth.js'
 import { invites } from '../schema.js'
 
@@ -138,6 +139,53 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+    })
+
+    describe('rate limiting', () => {
+      async function attemptLogin(app: FastifyInstance, clientAddress?: string) {
+        return app.inject({
+          method: 'POST',
+          url: '/api/auth/login',
+          headers: clientAddress ? { 'cf-connecting-ip': clientAddress } : {},
+          payload: { email: 'nobody@example.com', password: 'guess' },
+        })
+      }
+
+      async function exhaustLoginAttempts(app: FastifyInstance, clientAddress?: string) {
+        for (let i = 0; i < LOGIN_ATTEMPTS_PER_WINDOW; ++i) {
+          await attemptLogin(app, clientAddress)
+        }
+      }
+
+      it('returns 429 once a client exceeds the allowed number of attempts', async () => {
+        const app = await buildApp()
+
+        for (let i = 0; i < LOGIN_ATTEMPTS_PER_WINDOW; ++i) {
+          expect((await attemptLogin(app)).statusCode).toBe(401)
+        }
+
+        const response = await attemptLogin(app)
+        expect(response.statusCode).toBe(429)
+        expect(response.json()).toMatchObject({ ok: false, error: expect.stringContaining('Too many login attempts') })
+      })
+
+      it('limits each client address reported by Cloudflare separately', async () => {
+        const app = await buildApp()
+
+        await exhaustLoginAttempts(app, '203.0.113.1')
+
+        expect((await attemptLogin(app, '203.0.113.1')).statusCode).toBe(429)
+        expect((await attemptLogin(app, '203.0.113.2')).statusCode).toBe(401)
+      })
+
+      it('does not limit other auth routes', async () => {
+        const app = await buildApp()
+
+        await exhaustLoginAttempts(app)
+
+        const response = await app.inject({ method: 'POST', url: '/api/auth/logout' })
+        expect(response.statusCode).toBe(200)
+      })
     })
   })
 
