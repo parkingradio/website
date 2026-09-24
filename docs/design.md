@@ -2,6 +2,8 @@
 
 All pages share a common navigation bar at the top, from which all pages can be reached. The web app is
 a single-page application: changing to another page does not require reloading the whole app.
+On narrow screens like phones, the navigation links move into a drawer that slides in from the left,
+opened by a menu button to the left of the logo.
 
 ## Main page
 

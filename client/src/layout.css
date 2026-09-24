@@ -17,10 +17,16 @@
   font-size: 13px;
 }
 
+.nav-links {
+  display: flex;
+  gap: 15px;
+}
+
 .navbar a {
   color: #1c1c1c;
   text-decoration: none;
   padding: 4.5px 10px;
+  white-space: nowrap;
 }
 
 .navbar a.active {
@@ -41,6 +47,90 @@
 
 .navbar .logo img {
   display: block;
+}
+
+.menu-button {
+  display: none;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: #1c1c1c;
+  cursor: pointer;
+}
+
+.menu-button svg {
+  display: block;
+}
+
+.menu-backdrop {
+  display: none;
+}
+
+/* The links need about 880px on a single line. Below that they move into a drawer that slides in from
+   the left over the whole page, toggled by the menu button. While the menu is open, the button stays on
+   top of the drawer and turns into its close button. */
+@media (max-width: 900px) {
+  .navbar {
+    padding-inline: 0.5rem;
+  }
+
+  .menu-button {
+    display: block;
+  }
+
+  .nav-links,
+  .menu-backdrop {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    visibility: hidden;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease,
+      visibility 0.2s;
+  }
+
+  /* Links start just below the bar, indented from the close button. */
+  .nav-links {
+    z-index: 2;
+    width: min(58vw, 320px);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 54px 0 0 36px;
+    box-sizing: border-box;
+    background: #fff;
+    transform: translateX(-100%);
+  }
+
+  .menu-backdrop {
+    display: block;
+    z-index: 1;
+    right: 0;
+    background: rgb(0 0 0 / 55%);
+    opacity: 0;
+  }
+
+  .menu-open :is(.nav-links, .menu-backdrop) {
+    visibility: visible;
+    transform: none;
+    opacity: 1;
+  }
+
+  /* Only raised while the menu is open, so the button doesn't cover the page's own overlays (like the
+     synth meetups lightbox) otherwise. */
+  .menu-open .menu-button {
+    position: relative;
+    z-index: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-links,
+  .menu-backdrop {
+    transition: none;
+  }
 }
 
 .page {
