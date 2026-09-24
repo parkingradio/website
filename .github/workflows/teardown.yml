@@ -5,6 +5,9 @@
 # The plan is saved and rendered into the run summary before being applied, so a run leaves behind a
 # record of exactly what it destroyed.
 #
+# Production is deliberately not offered here. Its database has deletion protection, so a destroy
+# would end up failing anyway. Tearing down production is a manual procedure, see docs/deployment.md.
+#
 
 name: Teardown
 run-name: "Teardown ${{ inputs.environment }} by @${{ github.actor }}"
@@ -18,7 +21,6 @@ on:
         type: choice
         options:
           - test
-          - production
       confirm:
         description: "Type the environment's name again to confirm"
         required: true

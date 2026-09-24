@@ -6,9 +6,38 @@
 resource "aws_s3_bucket" "assets" {
   bucket = "${local.stack_name}-assets"
 
-  # Allow tearing down without a manual step. Otherwise, teardown fails with BucketNotEmpty as soon as a
-  # single asset has been uploaded.
-  force_destroy = true
+  # Outside production, allow tearing down without a manual step. In production, refuse to delete a
+  # non-empty bucket.
+  force_destroy = !local.is_production
+}
+
+# Keep previous versions so that an asset removed or overwritten by mistake can be restored.
+resource "aws_s3_bucket_versioning" "assets" {
+  bucket = aws_s3_bucket.assets.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Don't accumulate versions endlessly: keep the current version of each asset plus the one before it.
+resource "aws_s3_bucket_lifecycle_configuration" "assets" {
+  bucket = aws_s3_bucket.assets.id
+
+  rule {
+    id     = "keep-last-two-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days           = 1
+      newer_noncurrent_versions = 1
+    }
+  }
+
+  # A noncurrent-version rule only means something once versioning is on, so apply it afterwards.
+  depends_on = [aws_s3_bucket_versioning.assets]
 }
 
 locals {

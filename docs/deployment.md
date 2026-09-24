@@ -78,10 +78,12 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."          \
 
 The `teardown.yml` workflow destroys everything Terraform manages in an environment. Note that this includes
 the assets buckets, the database, the DNS entries, etc. In practice this is for cleaning up the `test` environment
-after a round of testing. **DO NOT RUN THIS UNLESS YOU KNOW EXACTLY WHAT YOU ARE DOING.**
+after a round of testing. Note that this can take a while since the CloudFront distribution has to be deleted and
+Terraform will wait for that to propagate.
 
-Note that this can take a while since the CloudFront distribution has to be deleted and Terraform will wait for
-that to propagate.
+The workflow doesn't allow tearing down the `production` environment, since that should not be done regularly,
+should be done by hand and by someone who knows exactly what they are doing. Tearing down production requires
+manually turning off the database's deletion protection, emptying the assets bucket and running `terraform destroy`.
 
 ## Static assets
 
@@ -93,6 +95,8 @@ The alias needs a certificate, so `terraform apply` provisions an ACM certificat
 DNS record in Cloudflare. The apply blocks while ACM waits for that record to propagate — usually a couple
 of minutes. Both that validation record and the `assets` CNAME are intentionally *not* proxied through
 Cloudflare: ACM has to resolve the former directly, and there's no point putting a proxy in front of a CDN.
+
+Note that the S3 bucket containing assets is versionned, so older versions can be retrieved if needed.
 
 ## Mail aliases
 

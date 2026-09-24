@@ -8,6 +8,9 @@ locals {
   # takes a single name. Resources where var.domain is the subject rather than a uniquifier (like DNS
   # records, certificates, the SES identity) use the domain.
   stack_name = "parking-radio-${terraform.workspace}"
+
+  # Production holds important data (the database, uploaded assets, etc), so it gets additional protections.
+  is_production = terraform.workspace == "production"
 }
 
 # Force explicit selection of a workspace.
