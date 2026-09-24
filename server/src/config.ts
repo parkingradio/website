@@ -14,6 +14,11 @@ export const config = {
   get databaseUrl() {
     return required('DATABASE_URL')
   },
+  // When set, the database password is read from this Secrets Manager secret (and re-read whenever
+  // it gets rotated).
+  get databasePasswordSecretId() {
+    return process.env.DATABASE_PASSWORD_SECRET_ID
+  },
   get databaseSslCa() {
     return process.env.DATABASE_SSL_CA
   },

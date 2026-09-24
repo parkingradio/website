@@ -22,18 +22,14 @@ cat > /opt/app/nginx.conf <<'NGINX_EOF'
 ${nginx_conf}
 NGINX_EOF
 
-DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --region ${aws_region} \
-  --query SecretString --output text | jq -r '.password')
-# URL-encode the password since generated passwords may contain special characters.
-DB_PASSWORD_URLENC=$(printf '%s' "$DB_PASSWORD" | jq -sRr @uri)
-
 SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "${secret_arn}" --region ${aws_region} \
   --query SecretString --output text)
 JWT_SECRET=$(echo "$SECRET_JSON" | jq -r '.jwt_secret')
 BOOTSTRAP_ADMIN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.bootstrap_admin_password')
 
 cat > /opt/app/.env <<EOF
-DATABASE_URL=postgres://${db_username}:$DB_PASSWORD_URLENC@${db_endpoint}/${db_name}
+DATABASE_URL=postgres://${db_username}@${db_endpoint}/${db_name}
+DATABASE_PASSWORD_SECRET_ID=${db_secret_arn}
 DATABASE_SSL_CA=/app/certs/rds-global-bundle.pem
 PORT=3000
 AWS_REGION=${aws_region}

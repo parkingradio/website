@@ -10,9 +10,10 @@ import { authRoutes } from './routes/auth.js'
 import { configRoutes } from './routes/config.js'
 import { config } from './config.js'
 import { db } from './db.js'
+import { logger } from './logger.js'
 import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 
-const app = Fastify({ logger: true })
+const app = Fastify({ loggerInstance: logger })
 
 try {
   await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
