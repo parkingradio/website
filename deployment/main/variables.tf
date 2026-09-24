@@ -38,6 +38,9 @@ variable "manage_mail" {
 
     Defaults to off because enabling this on a domain that already has a mail setup can break the
     existing mail setup.
+
+    This can only be turned on when var.domain is the zone apex, since Email Routing is a zone-wide
+    setting that environments on subdomains of the same zone would otherwise fight over.
   EOT
   type        = bool
   default     = false

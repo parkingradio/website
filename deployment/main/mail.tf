@@ -74,10 +74,22 @@ resource "aws_iam_role_policy" "ses_send" {
 
 # Inbound: forward each alias in local.mail_aliases (e.g. contact@<domain>) to its mailbox via
 # Cloudflare Email Routing.
+#
+# Email Routing is enabled for the whole zone, not just var.domain. Several environments can share a
+# zone (e.g. parking.example.com and parking-beta.example.com), so only the one at the zone apex is
+# allowed to manage mail. Otherwise, tearing down e.g. the beta environment would disable Email
+# Routing for the whole zone.
 resource "cloudflare_email_routing_settings" "main" {
   count = var.manage_mail ? 1 : 0
 
   zone_id = var.cloudflare_zone_id
+
+  lifecycle {
+    precondition {
+      condition     = var.domain == data.cloudflare_zone.this.name
+      error_message = "manage_mail can only be enabled for a domain at the zone apex (${data.cloudflare_zone.this.name}), not ${var.domain}."
+    }
+  }
 }
 
 resource "cloudflare_dns_record" "routing_mx" {

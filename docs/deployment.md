@@ -46,7 +46,8 @@ Other variables differ per deployment and belong on each deployment's GitHub env
   permission since mailboxes are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
-- Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain.
+- Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain. This can only be
+  `true` for a domain at the zone apex.
 
 ## Building and pushing the app image
 
@@ -98,6 +99,10 @@ Cloudflare: ACM has to resolve the former directly, and there's no point putting
 Terraform only manages mail when `manage_mail` is `true`. It defaults to `false`, so nothing in this
 section applies unless you turn it on. The rest of this section assumes Terraform is managing the mail
 setup.
+
+Note that only an environment deployed at the zone apex can manage mail. Cloudflare Email Routing is
+enabled for the whole zone, so letting a subdomain environment manage it would mean that tearing that
+environment down disables mail for every domain in the zone.
 
 `deployment/main/mail-aliases.tf` is a table of `name@<domain>` aliases (e.g. `contact`, or a team member's
 first name) and the mailbox each one forwards to. To add or remove an alias, edit that table and re-apply
