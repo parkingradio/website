@@ -1,17 +1,18 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import Fastify from 'fastify'
-import fastifyStatic from '@fastify/static'
 import fastifyCookie from '@fastify/cookie'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { healthRoutes } from './routes/health.js'
 import { adminRoutes } from './routes/admin.js'
 import { authRoutes } from './routes/auth.js'
 import { configRoutes } from './routes/config.js'
+import { notFoundRoutes } from './routes/not-found.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
 import { ensureBootstrapAdmin } from './bootstrap-admin.js'
+import { spaRoutes } from './spa.js'
 
 const app = Fastify({ loggerInstance: logger })
 
@@ -28,18 +29,12 @@ await app.register(healthRoutes)
 await app.register(configRoutes)
 await app.register(authRoutes)
 await app.register(adminRoutes)
+await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')
 
 if (existsSync(clientDist)) {
-  await app.register(fastifyStatic, { root: clientDist })
-
-  app.setNotFoundHandler((request, reply) => {
-    if (request.method === 'GET') {
-      return reply.sendFile('index.html')
-    }
-    return reply.code(404).send()
-  })
+  await app.register(spaRoutes, { root: clientDist })
 }
 
 const port = config.port
