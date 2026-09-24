@@ -22,6 +22,8 @@ RUN npm ci --omit=dev -w server
 COPY --from=server-build /app/server/dist server/dist
 COPY server/drizzle server/drizzle
 COPY --from=client-build /app/client/dist client/dist
+# Drop root privileges. The app can read its files (which are owned by root), but not modify them.
+USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 --start-period=5s \
   CMD wget --quiet -O - http://127.0.0.1:3000/healthz || exit 1
