@@ -1,6 +1,6 @@
 # This file sets up the mail aliases at var.domain.
 #
-#   name@<domain> => some-addresss@some-domain
+#   name@<domain> => some-address@some-domain
 #
 # Adding an entry like `foo = bar@gmail.com` will result in a setup allowing
 # `foo@domain` to be mirrored to `bar@gmail.com`. Removing an entry will result

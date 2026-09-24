@@ -162,7 +162,7 @@ resource "aws_secretsmanager_secret" "mail_smtp" {
 
   name = "${local.stack_name}-mail-smtp-credentials"
 
-  # These are automaticallky generated, purge to allow tearing down without a manual step.
+  # These are automatically generated, purge to allow tearing down without a manual step.
   recovery_window_in_days = 0
 }
 
