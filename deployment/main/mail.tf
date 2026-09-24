@@ -3,8 +3,9 @@
 # - individual mail aliases (see mail-aliases.tf), which get their own restricted sending credentials
 #   and Cloudflare Email Routing for inbound (each alias is forwarded to a real mailbox).
 #
-# All of it is gated on var.manage_mail, so the app can be deployed to a domain whose mail is already
-# handled by someone else without Terraform fighting the existing setup. See that variable for why.
+# The outbound SES setup for noreply@<domain> is always provisioned, since the app needs it to send
+# admin invites. Setting up mail aliases is gated on var.manage_mail, so the app can be deployed to
+# a domain whose mail is already handled by someone else without Terraform fighting the existing setup.
 
 locals {
   # Empty when Terraform isn't managing mail, which is what switches off every per-alias resource
@@ -13,8 +14,6 @@ locals {
 }
 
 resource "aws_sesv2_email_identity" "main" {
-  count = var.manage_mail ? 1 : 0
-
   email_identity = var.domain
 }
 
@@ -22,12 +21,12 @@ data "aws_caller_identity" "current" {}
 
 # One CNAME per Easy DKIM token, so SES can sign outgoing mail as this domain.
 resource "cloudflare_dns_record" "ses_dkim" {
-  count = var.manage_mail ? 3 : 0
+  count = 3
 
   zone_id = var.cloudflare_zone_id
-  name    = "${aws_sesv2_email_identity.main[0].dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
+  name    = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}._domainkey.${var.domain}"
   type    = "CNAME"
-  content = "${aws_sesv2_email_identity.main[0].dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
+  content = "${aws_sesv2_email_identity.main.dkim_signing_attributes[0].tokens[count.index]}.dkim.amazonses.com"
   proxied = false
   ttl     = 3600
 }
@@ -59,8 +58,6 @@ resource "cloudflare_dns_record" "ses_dmarc" {
 
 # Let the app instance send email as noreply@<domain> (and only as that).
 resource "aws_iam_role_policy" "ses_send" {
-  count = var.manage_mail ? 1 : 0
-
   name = "send-email"
   role = aws_iam_role.app.id
 

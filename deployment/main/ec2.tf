@@ -86,12 +86,9 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/../templates/user_data.sh.tftpl", {
-    aws_region    = data.aws_region.current.region
-    domain        = var.domain
-    assets_domain = local.assets_domain
-    # Empty unless Terraform manages mail, so the app reports "not configured to send email" rather
-    # than accepting an admin invite and silently dropping it when there's no SES identity to send from.
-    mail_domain           = var.manage_mail ? var.domain : ""
+    aws_region            = data.aws_region.current.region
+    domain                = var.domain
+    assets_domain         = local.assets_domain
     db_secret_arn         = aws_db_instance.main.master_user_secret[0].secret_arn
     db_username           = aws_db_instance.main.username
     db_endpoint           = aws_db_instance.main.endpoint

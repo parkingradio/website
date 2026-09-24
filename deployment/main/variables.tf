@@ -27,16 +27,17 @@ variable "app_image_tag" {
 
 variable "manage_mail" {
   description = <<-EOT
-    Whether Terraform owns mail for var.domain: SES for outbound, Cloudflare Email Routing for
-    inbound, and the SPF/DKIM/DMARC records that go with them.
+    Whether Terraform owns mail for var.domain: Cloudflare Email Routing for inbound, the mail
+    aliases, and the apex SPF/DMARC records that go with them. The SES identity the app uses to send
+    as noreply@<domain> is always provisioned since that is required to send admin invitations, and
+    does not conflict with other mail setups.
 
     Leave this off for a domain whose mail is already handled elsewhere. Turning it on there would
     publish a second apex SPF record and add Cloudflare's MX records alongside the existing ones,
     splitting inbound delivery between two providers.
 
     Defaults to off because enabling this on a domain that already has a mail setup can break the
-    existing mail setup. The Deploy workflow requires MANAGE_MAIL to be set explicitly rather than
-    relying on this default.
+    existing mail setup.
   EOT
   type        = bool
   default     = false
