@@ -5,6 +5,10 @@ import './synth-meetups.css'
 // Most recent first, so the gallery shows newer posters higher up.
 const POSTERS = [
   {
+    key: 'synth_meetups_2026_septembre.jpg',
+    alt: 'Affiche du synth meetup du 23 septembre 2026',
+  },
+  {
     key: 'synth_meetups_2026_aout.jpg',
     alt: 'Affiche des synth meetups des 12 et 26 août 2026',
   },
@@ -27,6 +31,10 @@ const POSTERS = [
   {
     key: 'synth_meetups_2026_avril_01.jpg',
     alt: 'Affiche du synth meetup du 1er avril 2026',
+  },
+  {
+    key: 'synth_meetups_2026_general.jpeg',
+    alt: 'Affiche des synth meetups, les mercredis à 18h',
   },
 ]
 
@@ -56,7 +64,11 @@ export function SynthMeetups() {
 
         <h2>dates à venir</h2>
         <ul>
-          <li>mercredi 2 septembre 2026</li>
+          <li>mercredi 23 septembre 2026</li>
+          <li>mercredi 7 octobre 2026</li>
+          <li>mercredi 14 octobre 2026</li>
+          <li>mercredi 21 octobre 2026</li>
+          <li>mercredi 28 octobre 2026</li>
         </ul>
 
         <h2>mandat</h2>
