@@ -39,9 +39,25 @@ SoundCloud handles playback and hosting entirely; this page is just a thin wrapp
 
 ## Programmation
 
-This page lists Parking Radio's upcoming events. It embeds Resident Advisor's promoter events widget
-(`https://ra.co/promoters/183980/widget/events`) as an iframe, which lists upcoming events directly from RA.
-RA handles the event data entirely; this page is just a thin wrapper around the embed.
+This page lists Parking Radio's events. Events are managed on Resident Advisor, under the Parking Radio
+promoter page (`https://ra.co/promoters/183980`), and the page shows them in the site's own style, linking
+back to RA.
+
+The server fetches the events from RA through `GET /api/events`. RA has no public API, so this uses the
+GraphQL endpoint ra.co itself calls (`https://ra.co/graphql`), which is undocumented and could change. The
+server checks RA's answer against a schema and keeps the outcome for 2 minutes, so RA is asked at most that
+often. If the fetch fails for any reason, the page says the events couldn't be loaded and links to RA. In
+case the private GraphQL API changes, this should make it possible to quickly notice the problem and get it
+fixed.
+
+The page has two tabs, "à venir" (upcoming, soonest first) and "passés" (the 20 most recent past events, most
+recent first). Events are grouped by month. Each one shows its date, flyer, title, venue, city, start and end
+time, and lineup (from the "Line-up" text on the RA event, or its tagged artists if that's empty). Its
+flyer, title and a "voir sur RA" button all link to the event's RA page. Flyers show as
+small square thumbnails cropped from the middle, loaded through RA's image resizer (`imgproxy.ra.co`) rather
+than full size. Events without a flyer get a plain placeholder. The name "parking.radio" is always shown in lowercase, even where RA
+capitalizes it (the venue is "Parking.Radio" there). The header links to the
+promoter page. If the events can't be loaded, the page says so and links to the promoter page instead.
 
 ## Synth Meetups
 

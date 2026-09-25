@@ -8,6 +8,7 @@ import { adminRoutes } from './routes/admin.js'
 import { authRoutes } from './routes/auth.js'
 import { configRoutes } from './routes/config.js'
 import { notFoundRoutes } from './routes/not-found.js'
+import { eventsRoutes } from './routes/events.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -29,6 +30,7 @@ await app.register(healthRoutes)
 await app.register(configRoutes)
 await app.register(authRoutes)
 await app.register(adminRoutes)
+await app.register(eventsRoutes)
 await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')
