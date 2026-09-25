@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router'
+import type { InviteRequest, InviteResponse } from 'shared/admin'
+import type { MeResponse } from 'shared/auth'
+import type { ApiError } from 'shared/error'
 
 type Status = 'idle' | 'sending' | 'success' | 'error'
 type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated'
@@ -18,7 +21,7 @@ export function Admin() {
   useEffect(() => {
     fetch('/api/admin/me')
       .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body) => {
+      .then((body: MeResponse) => {
         setEmail(body.email)
         setAuthStatus('authenticated')
       })
@@ -38,10 +41,10 @@ export function Admin() {
       const response = await fetch('/api/admin/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail }),
+        body: JSON.stringify({ email: inviteEmail } satisfies InviteRequest),
       })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error ?? 'Unknown error')
+      const body: InviteResponse | ApiError = await response.json()
+      if (!body.ok) throw new Error(body.error ?? 'Unknown error')
       setInviteStatus('success')
       setInviteEmail('')
     } catch (error) {

@@ -2,6 +2,15 @@ import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import rateLimit, { normalizeIP } from '@fastify/rate-limit'
 import type { RateLimitOptions } from '@fastify/rate-limit'
+import type {
+  AcceptInviteRequest,
+  AcceptInviteResponse,
+  LoginRequest,
+  LoginResponse,
+  LogoutResponse,
+  MeResponse,
+} from 'shared/auth'
+import type { ApiError } from 'shared/error'
 import { db } from '../db.js'
 import { users, invites } from '../schema.js'
 import {
@@ -31,16 +40,6 @@ function clientAddress(request: FastifyRequest): string {
   return normalizeIP(typeof cloudflareAddress === 'string' ? cloudflareAddress : request.ip)
 }
 
-type LoginBody = {
-  email?: string
-  password?: string
-}
-
-type AcceptInviteBody = {
-  token?: string
-  password?: string
-}
-
 export async function authRoutes(app: FastifyInstance) {
   // Only routes that opt in through `config.rateLimit` are limited.
   await app.register(rateLimit, { global: false })
@@ -56,7 +55,7 @@ export async function authRoutes(app: FastifyInstance) {
     }),
   }
 
-  app.post<{ Body: LoginBody }>('/api/auth/login', { config: { rateLimit: loginRateLimit } }, async (request, reply) => {
+  app.post<{ Body: Partial<LoginRequest>; Reply: LoginResponse | ApiError }>('/api/auth/login', { config: { rateLimit: loginRateLimit } }, async (request, reply) => {
     const { email, password } = request.body ?? {}
     if (!email || !password) {
       return reply.status(400).send({ ok: false, error: 'Missing email or password' })
@@ -76,12 +75,12 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true, email: user.email }
   })
 
-  app.post('/api/auth/logout', async (_request, reply) => {
+  app.post<{ Reply: LogoutResponse }>('/api/auth/logout', async (_request, reply) => {
     clearSessionCookie(reply)
     return { ok: true }
   })
 
-  app.post<{ Body: AcceptInviteBody }>('/api/auth/accept-invite', async (request, reply) => {
+  app.post<{ Body: Partial<AcceptInviteRequest>; Reply: AcceptInviteResponse | ApiError }>('/api/auth/accept-invite', async (request, reply) => {
     const { token, password } = request.body ?? {}
     if (typeof token !== 'string' || typeof password !== 'string' || !token || !password) {
       return reply.status(400).send({ ok: false, error: 'Missing token or password' })
@@ -114,7 +113,7 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  app.get('/api/admin/me', { preHandler: requireAuth }, async (request) => {
+  app.get<{ Reply: MeResponse }>('/api/admin/me', { preHandler: requireAuth }, async (request) => {
     return { ok: true, email: request.user!.email }
   })
 }

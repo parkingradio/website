@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { ConfigResponse } from 'shared/config'
 import { ConfigContext } from './config-context'
 import type { AppConfig } from './config-context'
 
@@ -11,7 +12,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     fetch('/api/config')
       .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body) => {
+      .then((body: ConfigResponse) => {
         if (!cancelled) setConfig({ assetsDomain: body.assetsDomain })
       })
       .catch(() => console.error('Failed to load /api/config: asset URLs will not resolve'))

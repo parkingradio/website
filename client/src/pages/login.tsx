@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import type { LoginRequest, LoginResponse } from 'shared/auth'
+import type { ApiError } from 'shared/error'
 
 type Status = 'idle' | 'sending' | 'error'
 
@@ -21,10 +23,10 @@ export function Login() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password } satisfies LoginRequest),
       })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error ?? 'Unknown error')
+      const body: LoginResponse | ApiError = await response.json()
+      if (!body.ok) throw new Error(body.error ?? 'Unknown error')
       navigate('/admin')
     } catch (error) {
       setStatus('error')

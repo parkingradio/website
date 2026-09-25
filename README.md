@@ -23,8 +23,9 @@ See [docs/design.md](docs/design.md) for the page-by-page design of the site.
 
 ## Development
 
-The app is an npm-workspaces monorepo: `client` (Vite + React) and `server` (Fastify, talking to
-Postgres via Drizzle).
+The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to
+Postgres via Drizzle) and `shared`, which holds the types of the API's requests and responses
+shared by both sides.
 
 ### Prerequisites
 

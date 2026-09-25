@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2'
 import { eq, lt, sql } from 'drizzle-orm'
+import type { InviteRequest, InviteResponse } from 'shared/admin'
+import type { ApiError } from 'shared/error'
 import { config } from '../config.js'
 import { requireAuth, generateInviteToken } from '../auth.js'
 import { db } from '../db.js'
@@ -10,12 +12,8 @@ const ses = new SESv2Client({ region: config.awsRegion })
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000
 
-type InviteBody = {
-  email?: string
-}
-
 export async function adminRoutes(app: FastifyInstance) {
-  app.post<{ Body: InviteBody }>(
+  app.post<{ Body: Partial<InviteRequest>; Reply: InviteResponse | ApiError }>(
     '/api/admin/invite',
     { preHandler: requireAuth },
     async (request, reply) => {

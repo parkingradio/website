@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
+import type { AcceptInviteRequest, AcceptInviteResponse } from 'shared/auth'
+import type { ApiError } from 'shared/error'
 
 type Status = 'idle' | 'sending' | 'error'
 
@@ -35,10 +37,10 @@ export function AcceptInvite() {
       const response = await fetch('/api/auth/accept-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, password } satisfies AcceptInviteRequest),
       })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error ?? 'Unknown error')
+      const body: AcceptInviteResponse | ApiError = await response.json()
+      if (!body.ok) throw new Error(body.error ?? 'Unknown error')
       navigate('/login', { state: { message: 'Password set, please log in.' } })
     } catch (error) {
       setStatus('error')
