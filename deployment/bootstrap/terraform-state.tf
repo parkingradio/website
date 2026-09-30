@@ -1,7 +1,9 @@
-# Creates the S3 bucket that deployment/main uses as its remote state backend.
+# Creates the S3 bucket that holds the Terraform state of both deployment/main and this module.
 # This is a one-time setup to run on a new AWS account.
 locals {
   # This needs to be a unique name across all S3 buckets. Just pick anything that's available.
+  # Whatever is chosen here must also be set in the backend.tf of both modules, which cannot read
+  # locals or variables.
   state_bucket_name = "parking-radio-terraform-state"
 }
 

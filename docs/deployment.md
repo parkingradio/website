@@ -7,27 +7,43 @@ provisioned with Terraform, split into two modules under `deployment/`:
 
 - `deployment/bootstrap`: creates the S3 bucket that `deployment/main` uses as its remote state backend,
   and the OIDC provider + IAM role the `Deploy` GitHub Actions workflow uses to authenticate to AWS. This
-  is used once on a new AWS deployment.
+  is used once on a new AWS deployment. Its own state is kept in the same S3 bucket, next to `main`'s.
 - `deployment/main`: the actual stack configuring networking, RDS, the EC2 instance, and the Cloudflare DNS
   record + Origin CA certificate.
 
 ## One-time bootstrap
 
+The bootstrap creates the `parking-radio-terraform-state` S3 bucket to contain the Terraform state, and
+an IAM role for the deployment pipeline. That role is assumed via a GitHub Actions OIDC provider, which
+is account-wide: AWS allows only one per URL per AWS account. By default the bootstrap assumes one
+already exists and reuses it, failing the apply if it doesn't. On an AWS account that has never been
+used with GitHub Actions, create it as part of the bootstrap instead by passing
+`-var="manage_github_oidc_provider=true"` to `apply` below.
+
+The `bootstrap` module keeps its state in the S3 bucket that it creates, so the very first apply on a
+new AWS account has to start from local state, which is then moved into the bucket:
+
 ```sh
 export AWS_PROFILE=your-aws-profile
+
+# The state bucket doesn't exist yet, so temporarily override the backend to use local state.
+cat > deployment/bootstrap/backend_override.tf <<'EOF'
+terraform {
+  backend "local" {}
+}
+EOF
 terraform -chdir=deployment/bootstrap init
-terraform -chdir=deployment/bootstrap apply
+terraform -chdir=deployment/bootstrap apply # add -var="manage_github_oidc_provider=true" if needed, see above
+
+# Once the apply has succeeded and the bucket exists, move the state into it.
+rm deployment/bootstrap/backend_override.tf
+terraform -chdir=deployment/bootstrap init -migrate-state
 ```
 
-This creates the `parking-radio-terraform-state` S3 bucket to contain the Terraform state, and an IAM
-role for the deployment pipeline. That role is assumed via a GitHub Actions OIDC provider, which is
-account-wide: AWS allows only one per URL per AWS account. By default the bootstrap assumes one already
-exists and reuses it, failing the apply if it doesn't. On an AWS account that has never been used with
-GitHub Actions, create it as part of the bootstrap instead:
-
-```sh
-terraform -chdir=deployment/bootstrap apply -var="manage_github_oidc_provider=true"
-```
+After migrating, the bootstrap state is stored in S3 alongside the `main` state that will be created
+on the first deployment. From then on, `bootstrap` is used like any other module (`init`, then `apply`)
+from any machine with credentials for the account. However, `manage_github_oidc_provider` isn't stored
+anywhere, so every later apply (from `deployment/bootstrap`) must pass the same value as the first one.
 
 After applying, the GitHub repository needs to be configured once. We use two GitHub environments
 (`test` and `production`) which allows two different deployments to coexist at once. `AWS_DEPLOY_ROLE_ARN`

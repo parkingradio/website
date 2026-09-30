@@ -8,3 +8,4 @@ dist/
 *.tfstate
 *.tfstate.*
 *.tfvars
+*_override.tf

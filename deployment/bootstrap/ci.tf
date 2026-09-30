@@ -24,6 +24,12 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   client_id_list = ["sts.amazonaws.com"]
   # thumbprint_list intentionally omitted: optional/computed in the current AWS provider version, which
   # fetches it itself rather than needing it hand-specified.
+
+  # The provider is account-wide and other projects may rely on it. Applying with the wrong value of
+  # var.manage_github_oidc_provider must not delete it.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # When reusing a provider we did not create, check that it accepts the audience the trust policy
@@ -85,13 +91,25 @@ resource "aws_iam_role_policy" "deploy_scoped" {
           "arn:aws:secretsmanager:us-east-1:${data.aws_caller_identity.current.account_id}:secret:rds!db-*",
         ]
       },
+      # Only deployment/main's state: its default workspace and the other workspaces, along with their
+      # lock files. The bucket also holds the bootstrap state, which CI has no business touching.
+      {
+        Sid      = "TerraformStateList"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = "arn:aws:s3:::${local.state_bucket_name}"
+      },
       {
         Sid    = "TerraformState"
         Effect = "Allow"
-        Action = "s3:*"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+        ]
         Resource = [
-          "arn:aws:s3:::${local.state_bucket_name}",
-          "arn:aws:s3:::${local.state_bucket_name}/*",
+          "arn:aws:s3:::${local.state_bucket_name}/main.tfstate*",
+          "arn:aws:s3:::${local.state_bucket_name}/env:/*/main.tfstate*",
         ]
       },
       {
