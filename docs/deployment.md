@@ -76,9 +76,9 @@ Other variables differ per deployment and belong on each deployment's GitHub env
 
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
-  `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, and `Zone:Zone Settings:Edit`.
-  It also needs `Account:Email Routing Addresses:Edit`, scoped to the account (this one is an account-level
-  permission since mailboxes are an account-level concept in Cloudflare).
+  `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, `Zone:Zone Settings:Edit`, and
+  `Zone:Single Redirect:Edit`. It also needs `Account:Email Routing Addresses:Edit`, scoped to the
+  account (this one is an account-level permission since mailboxes are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
 - Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain. This can only be
