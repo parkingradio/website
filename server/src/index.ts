@@ -16,6 +16,7 @@ import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 import { spaRoutes } from './spa.js'
 
 const app = Fastify({ loggerInstance: logger })
+app.addHook('onClose', () => db.$client.end())
 
 try {
   await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
@@ -46,4 +47,32 @@ try {
 } catch (error) {
   app.log.error(error)
   process.exit(1)
+}
+
+// Shut down gracefully when asked to: closing the app lets in-flight requests finish first. This is
+// only set up once the server is listening, since closing the app while it's still starting would
+// end the database pool under the startup code. Until then, signals keep their default handling.
+// Signals received while already shutting down (e.g. Ctrl-C after a SIGTERM) are ignored.
+//
+// Requests that don't finish within SHUTDOWN_TIMEOUT_MS are cut short. This is kept under the 10s that
+// `docker stop` waits before killing the server, so that the server still exits on its own terms.
+const SHUTDOWN_TIMEOUT_MS = 8_000
+let shuttingDown = false
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    app.log.info(`Received ${signal}, shutting down`)
+    setTimeout(() => {
+      app.log.error(`Shutdown did not complete within ${SHUTDOWN_TIMEOUT_MS}ms, exiting anyway`)
+      process.exit(1)
+    }, SHUTDOWN_TIMEOUT_MS).unref()
+    app.close().then(
+      () => process.exit(0),
+      (error: unknown) => {
+        app.log.error(error)
+        process.exit(1)
+      },
+    )
+  })
 }
