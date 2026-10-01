@@ -24,6 +24,8 @@ COPY server/package.json server/package.json
 COPY shared/package.json shared/package.json
 RUN npm ci --omit=dev -w server
 COPY --from=server-build /app/server/dist server/dist
+# The server runs shared's sources (see shared/README.md).
+COPY shared/src shared/src
 COPY server/drizzle server/drizzle
 COPY --from=client-build /app/client/dist client/dist
 # Drop root privileges. The app can read its files (which are owned by root), but not modify them.

@@ -4,6 +4,8 @@
     "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    // Lets it check `shared`'s sources, whose imports spell out `.ts` (see shared/README.md).
+    "rewriteRelativeImportExtensions": true,
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,

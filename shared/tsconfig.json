@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    // Neither the DOM's nor Node's APIs, since this code runs on both sides.
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    // Only type-checks: everything runs the sources (see README.md), so they may only use the syntax that
+    // Node can strip the types from.
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

@@ -11,7 +11,7 @@
 #
 # Checks source lib.sh for strict mode and test helpers. They run in filename order and are
 # independent, with one exception: anything that stops the server has to sort last, which is
-# what the numeric prefixes are for.
+# what the numeric prefixes are for. Such checks use the 9xx range, which is reserved for them.
 
 set -euo pipefail
 
