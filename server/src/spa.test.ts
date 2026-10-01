@@ -15,6 +15,7 @@ describe('SPA fallback', () => {
   beforeAll(() => {
     root = mkdtempSync(path.join(tmpdir(), 'spa-test-'))
     writeFileSync(path.join(root, 'index.html'), INDEX_HTML)
+    writeFileSync(path.join(root, 'favicon.ico'), 'icon')
     mkdirSync(path.join(root, 'assets'))
     writeFileSync(path.join(root, 'assets', 'app.js'), 'console.log(1)')
   })
@@ -39,6 +40,23 @@ describe('SPA fallback', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.body).toBe('console.log(1)')
+  })
+
+  it('lets the content-hashed build files be cached forever', async () => {
+    const app = await buildApp()
+
+    const response = await app.inject({ method: 'GET', url: '/assets/app.js' })
+
+    expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable')
+  })
+
+  it.each(['/', '/archives', '/favicon.ico'])('has %s revalidated on every request', async (url) => {
+    const app = await buildApp()
+
+    const response = await app.inject({ method: 'GET', url })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('public, max-age=0')
   })
 
   it('still serves existing API routes', async () => {
