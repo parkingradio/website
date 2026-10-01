@@ -14,15 +14,31 @@ provisioned with Terraform, split into two modules under `deployment/`:
 ## One-time bootstrap
 
 The bootstrap creates the `parking-radio-terraform-state` S3 bucket to contain the Terraform state, and
-an IAM role for the deployment pipeline. That role is assumed via a GitHub Actions OIDC provider, which
-is account-wide: AWS allows only one per URL per AWS account, and it isn't specific to this project.
-It is therefore not managed by Terraform: the bootstrap only looks it up, and fails if it doesn't exist.
-On an AWS account that has never been used with GitHub Actions, create it once beforehand:
+an IAM role for the deployment pipeline.
+
+### Account prerequisites
+
+A few things are account-wide singletons which must be created in the account before performing the
+bootstrap. They are not managed by Terraform since they are not tied to this project.
 
 ```sh
+export AWS_PROFILE=your-aws-profile
+
+# The GitHub Actions OIDC provider, which the deployment role is assumed through. AWS allows only one
+# per URL per AWS account.
 aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com \
                                         --client-id-list sts.amazonaws.com
+
+# The AWS managed KMS keys for RDS and Secrets Manager, used by the deployment role. Describing
+# their alias creates them.
+aws kms describe-key --region us-east-1 --key-id alias/aws/rds
+aws kms describe-key --region us-east-1 --key-id alias/aws/secretsmanager
 ```
+
+On an account that is already used with GitHub Actions for something else, the OIDC provider already
+exists, so creating it fails harmlessly and can be skipped. Describing the KMS keys is harmless to repeat.
+
+### Bootstrapping
 
 The `bootstrap` module keeps its state in the S3 bucket that it creates, so the very first apply on a
 new AWS account has to start from local state, which is then moved into the bucket:
