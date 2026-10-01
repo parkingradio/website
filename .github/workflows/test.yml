@@ -1,6 +1,6 @@
 #
 # Build the app, lint and run tests.
-# Then, build the Docker image and push it (if this is a push to main).
+# Then, build the Docker image, run the integration tests against it, and push it (if this is a push to main).
 #
 
 name: Test
@@ -44,20 +44,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: parking_radio
-          POSTGRES_PASSWORD: parking_radio
-          POSTGRES_DB: parking_radio
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U parking_radio"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
     steps:
       - uses: actions/checkout@v7
 
@@ -69,29 +55,8 @@ jobs:
           docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
                        --tag ghcr.io/parkingradio/radio:latest .
 
-      - name: Run container
-        run: |
-          docker run --detach --init --name parking-radio --network host --env-file .env.example \
-                     ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
-
-      - name: Wait for /healthz
-        run: |
-          for i in $(seq 1 30); do
-            if curl --silent --fail http://localhost:3000/healthz | grep -q '"ok":true'; then
-              echo "Server is healthy"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Server never became healthy"
-          exit 1
-
-      - name: Check homepage is served
-        run: curl --silent --fail http://localhost:3000/ | grep -qi '<title>parking.radio</title>'
-
-      - name: Container logs
-        if: always()
-        run: docker logs parking-radio
+      - name: Integration tests
+        run: npm run test:integration -- ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
 
       # Only done when pushing to main
       - name: Login to GHCR

@@ -51,8 +51,9 @@ This starts the Vite dev server at http://localhost:5173 and the Fastify server 
 ### Testing and building
 
 ```sh
-npm test    # runs both workspaces' test suites
 npm run build
+npm run test                # runs client and server test suites
+npm run test:integration    # integration tests on the Docker image
 ```
 
 Stop the local database with `npm run db:down` when you're done.
