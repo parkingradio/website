@@ -9,6 +9,7 @@ const data: EventsResponse = {
     {
       id: 'later',
       title: 'Later Party',
+      category: 'other',
       start: '2026-11-07T21:00',
       end: null,
       venue: 'Venue B',
@@ -20,6 +21,7 @@ const data: EventsResponse = {
     {
       id: 'soon',
       title: 'Soon Party',
+      category: 'other',
       start: '2026-10-03T22:00',
       end: '2026-10-04T03:00',
       venue: 'Venue A',
@@ -33,6 +35,7 @@ const data: EventsResponse = {
     {
       id: 'older',
       title: 'Older Party',
+      category: 'other',
       start: '2026-08-16T19:00',
       end: null,
       venue: null,
@@ -44,6 +47,7 @@ const data: EventsResponse = {
     {
       id: 'recent',
       title: 'Recent Party',
+      category: 'other',
       start: '2026-09-05T22:00',
       end: null,
       venue: 'Venue A',

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAssetUrl } from '../config-context'
+import { RA_PROMOTER_URL, useEvents } from '../events'
 import './synth-meetups.css'
 
 // Most recent first, so the gallery shows newer posters higher up.
@@ -40,6 +41,42 @@ const POSTERS = [
 
 const NDI_URL = 'https://ndi.video/tools/'
 
+const dateFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+function UpcomingDates() {
+  const { data, failed } = useEvents()
+
+  if (failed) {
+    return (
+      <p>
+        les dates n'ont pas pu être chargées.{' '}
+        <a href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
+          {/* A non-breaking space keeps the arrow from wrapping onto a line of its own. */}
+          voir nos événements sur Resident Advisor&nbsp;→
+        </a>
+      </p>
+    )
+  }
+  if (!data) return <p>chargement…</p>
+
+  const meetups = data.upcoming
+    .filter((event) => event.category === 'synth-meetup')
+    .sort((a, b) => a.start.localeCompare(b.start))
+  if (meetups.length === 0) return <p>aucune date annoncée pour le moment. revenez bientôt.</p>
+
+  return (
+    <ul>
+      {meetups.map((meetup) => (
+        <li key={meetup.id}>
+          <a href={meetup.url} target="_blank" rel="noreferrer">
+            <time dateTime={meetup.start}>{dateFormat.format(new Date(meetup.start))}</time>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function SynthMeetups() {
   const assetUrl = useAssetUrl()
   const [expandedPoster, setExpandedPoster] = useState<(typeof POSTERS)[number] | null>(null)
@@ -63,13 +100,7 @@ export function SynthMeetups() {
         <p>vous êtes invité.es à tester des idées, brainstormer, rencontrer des collaborateurs.</p>
 
         <h2>dates à venir</h2>
-        <ul>
-          <li>mercredi 23 septembre 2026</li>
-          <li>mercredi 7 octobre 2026</li>
-          <li>mercredi 14 octobre 2026</li>
-          <li>mercredi 21 octobre 2026</li>
-          <li>mercredi 28 octobre 2026</li>
-        </ul>
+        <UpcomingDates />
 
         <h2>mandat</h2>
         <ul>

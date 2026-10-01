@@ -61,6 +61,7 @@ describe('GET /api/events', () => {
         {
           id: '2512073',
           title: 'PLEINE LUNE TAKEOVER',
+          category: 'other',
           start: '2026-09-25T18:00',
           end: '2026-09-25T22:00',
           venue: 'Parking.Radio',
@@ -74,6 +75,7 @@ describe('GET /api/events', () => {
         {
           id: '1',
           title: 'PLEINE LUNE TAKEOVER',
+          category: 'other',
           start: '2026-09-25T18:00',
           end: null,
           venue: null,
@@ -87,6 +89,35 @@ describe('GET /api/events', () => {
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://ra.co/graphql')
     expect(JSON.parse(init.body).variables.id).toBe('183980')
+  })
+
+  it('asks RA for more upcoming events than the 10 it returns by default', async () => {
+    fetchMock.mockResolvedValue(Response.json(raResponse))
+    const app = await buildApp()
+
+    await app.inject({ method: 'GET', url: '/api/events' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const { query, variables } = JSON.parse(init.body)
+    expect(query).toContain('events(type: LATEST, limit: $upcomingLimit)')
+    expect(variables.upcomingLimit).toBeGreaterThan(10)
+  })
+
+  it.each([
+    ['SYNTH MEETUPS', 'synth-meetup'],
+    ['Synth Meetup', 'synth-meetup'],
+    ['SYNTH MEETUPS - parking.radio - 2026.07.29', 'synth-meetup'],
+    ['GUEST MIXES', 'other'],
+    ['WORKSHOP', 'other'],
+    ['SYNTHWAVE MEETUP', 'other'],
+  ])('categorizes an event titled "%s" as %s', async (title, category) => {
+    const promoter = { ...raResponse.data.promoter, upcoming: [{ ...raEvent, title }] }
+    fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
+    const app = await buildApp()
+
+    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+
+    expect(upcoming[0].category).toBe(category)
   })
 
   it("reads the lineup from the event's Line-up text, falling back to its tagged artists", async () => {
@@ -137,6 +168,18 @@ describe('GET /api/events', () => {
       () =>
         Response.json({
           data: { promoter: { ...raResponse.data.promoter, upcoming: [raEvent, { ...raEvent, startTime: null }] } },
+        }),
+    ],
+    [
+      'RA returns as many upcoming events as were asked for',
+      () =>
+        Response.json({
+          data: {
+            promoter: {
+              ...raResponse.data.promoter,
+              upcoming: Array.from({ length: 100 }, (_, i) => ({ ...raEvent, id: String(i) })),
+            },
+          },
         }),
     ],
     [

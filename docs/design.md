@@ -50,6 +50,10 @@ often. If the fetch fails for any reason, the page says the events couldn't be l
 case the private GraphQL API changes, this should make it possible to quickly notice the problem and get it
 fixed.
 
+RA has no notion of event categories, so the server derives one for each event from its title and includes it
+in the response, so that the client doesn't have to guess from titles itself. For now, the only category is
+synth meetups (events titled "SYNTH MEETUPS" on RA); every other event is categorized as "other".
+
 The page has two tabs, "à venir" (upcoming, soonest first) and "passés" (the 20 most recent past events, most
 recent first). Events are grouped by month. Each one shows its date, flyer, title, venue, city, start and end
 time, and lineup (from the "Line-up" text on the RA event, or its tagged artists if that's empty). Its
@@ -61,7 +65,23 @@ promoter page. If the events can't be loaded, the page says so and links to the 
 
 ## Synth Meetups
 
-TODO
+This page presents the Synth Meetups, Parking Radio's weekly gatherings for sound and audiovisual creation
+(Wednesdays at 18h), where people can learn about the studio's technical setup, try out ideas and meet
+collaborators. From top to bottom, it shows:
+
+- The Synth Meetups animated banner.
+- A short introduction to the meetups.
+- "dates à venir": the upcoming meetup dates (e.g. "mercredi 7 octobre 2026"), soonest first, each linking
+  to its event on Resident Advisor. They come from `GET /api/events` so a meetup shows up here once it's
+  created on RA.
+- "mandat": the goals of the meetups.
+- "le plafond": how to show visuals on the studio's LED ceiling
+- "évènements passés": a gallery of past meetup posters, most recent first, as cropped portrait thumbnails.
+  Clicking one shows it full size in a lightbox over the page.
+
+The banner and posters are static assets served from `assets.<domain>` (see "Assets" in the README). The
+list of posters is written in the page's code, so adding a poster means uploading it with
+`tools/manage-assets` and adding its key to that list.
 
 ## Appliquer
 

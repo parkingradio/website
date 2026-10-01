@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { EventListing, EventsResponse } from 'shared/events'
+import { RA_PROMOTER_URL, useEvents } from '../events'
 import './programmation.css'
-
-// Shown when the events can't be loaded, so visitors can still find them.
-const RA_PROMOTER_URL = 'https://ra.co/promoters/183980'
 
 type Filter = 'upcoming' | 'past'
 
@@ -26,23 +24,7 @@ function flyerThumbnail(flyer: string) {
 }
 
 export function Programmation() {
-  const [data, setData] = useState<EventsResponse | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/events')
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body: EventsResponse) => {
-        if (!cancelled) setData(body)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { data, failed } = useEvents()
 
   if (data) return <ProgrammationList data={data} />
 

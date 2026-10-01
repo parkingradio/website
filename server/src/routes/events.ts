@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { decodeHTML } from 'entities'
 import { z } from 'zod'
 import type { ApiError } from 'shared/error'
-import type { EventListing, EventsResponse } from 'shared/events'
+import type { EventCategory, EventListing, EventsResponse } from 'shared/events'
 
 // Events are managed on Resident Advisor, under Parking Radio's promoter page. RA has no public API, so
 // this uses the GraphQL endpoint that ra.co itself calls. It isn't documented and could change. We don't
@@ -12,13 +12,16 @@ import type { EventListing, EventsResponse } from 'shared/events'
 const RA_ORIGIN = 'https://ra.co'
 const RA_PROMOTER_ID = '183980'
 const PAST_EVENTS_LIMIT = 20
+// RA only returns 10 upcoming events unless asked for more, so ask for far more than we ever schedule at once.
+// Getting that many back fails the fetch, since the list is then probably cut short.
+const UPCOMING_EVENTS_LIMIT = 100
 const CACHE_TTL_MS = 2 * 60 * 1000
 
 const RA_QUERY = `
-  query ($id: ID!, $pastLimit: Int) {
+  query ($id: ID!, $upcomingLimit: Int, $pastLimit: Int) {
     promoter(id: $id) {
       contentUrl
-      upcoming: events(type: LATEST) { ...event }
+      upcoming: events(type: LATEST, limit: $upcomingLimit) { ...event }
       past: events(type: PREVIOUS, limit: $pastLimit) { ...event }
     }
   }
@@ -74,7 +77,10 @@ async function fetchFromRa(): Promise<EventsResponse> {
       'Content-Type': 'application/json',
       Referer: `${RA_ORIGIN}/promoters/${RA_PROMOTER_ID}`,
     },
-    body: JSON.stringify({ query: RA_QUERY, variables: { id: RA_PROMOTER_ID, pastLimit: PAST_EVENTS_LIMIT } }),
+    body: JSON.stringify({
+      query: RA_QUERY,
+      variables: { id: RA_PROMOTER_ID, upcomingLimit: UPCOMING_EVENTS_LIMIT, pastLimit: PAST_EVENTS_LIMIT },
+    }),
     signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok) throw new Error(`RA responded with ${response.status}`)
@@ -85,6 +91,9 @@ async function fetchFromRa(): Promise<EventsResponse> {
     throw new Error(`Unexpected RA response: ${z.prettifyError(parsed.error)}\n${JSON.stringify(body).slice(0, 500)}`)
   }
   const { promoter } = parsed.data.data
+  if (promoter.upcoming.length >= UPCOMING_EVENTS_LIMIT) {
+    throw new Error(`RA returned ${promoter.upcoming.length} upcoming events, some are probably missing`)
+  }
 
   return {
     promoterUrl: RA_ORIGIN + promoter.contentUrl,
@@ -97,6 +106,7 @@ function toEventListing(event: RaEvent): EventListing {
   return {
     id: event.id,
     title: event.title,
+    category: categorize(event.title),
     start: event.startTime.slice(0, 16),
     end: event.endTime?.slice(0, 16) ?? null,
     venue: event.venue?.name ?? null,
@@ -105,6 +115,12 @@ function toEventListing(event: RaEvent): EventListing {
     url: RA_ORIGIN + event.contentUrl,
     flyer: event.images.find((image) => image.type === 'FLYERFRONT')?.filename ?? null,
   }
+}
+
+// RA has no notion of event categories, so they're derived from the titles Parking Radio gives its events
+// on RA (e.g. "SYNTH MEETUPS").
+function categorize(title: string): EventCategory {
+  return /\bsynth meetups?\b/i.test(title) ? 'synth-meetup' : 'other'
 }
 
 function parseLineup(event: RaEvent): string[] {
