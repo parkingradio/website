@@ -5,7 +5,7 @@
 
 source "$(dirname "$0")/lib.sh"
 
-for path in /synth-meetups /programmation /admin '/accept-invite?token=abc'; do
+for path in /synth-meetups /programmation /admin /admin/rotation '/accept-invite?token=abc'; do
     request "${BASE_URL}${path}"
     expect_status 200
     expect_body '<title>parking.radio</title>'

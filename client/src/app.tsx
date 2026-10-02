@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 import { ConfigProvider } from './config'
 import { Layout } from './layout'
 import { Home } from './pages/home'
@@ -7,9 +7,13 @@ import { Programmation } from './pages/programmation'
 import { SynthMeetups } from './pages/synth-meetups'
 import { Appliquer } from './pages/appliquer'
 import { Contribuer } from './pages/contribuer'
-import { Login } from './pages/login'
-import { AcceptInvite } from './pages/accept-invite'
-import { Admin } from './pages/admin'
+import { AdminShell } from './pages/admin/shell'
+import { AcceptInvite } from './pages/admin/accept-invite'
+import { AdminLayout } from './pages/admin/layout'
+import { Admins } from './pages/admin/admins'
+import { Calendrier } from './pages/admin/calendrier'
+import { Rotation } from './pages/admin/rotation'
+import { Candidatures } from './pages/admin/candidatures'
 
 function App() {
   return (
@@ -22,9 +26,18 @@ function App() {
           <Route path="synth-meetups" element={<SynthMeetups />} />
           <Route path="appliquer" element={<Appliquer />} />
           <Route path="contribuer" element={<Contribuer />} />
-          <Route path="login" element={<Login />} />
-          <Route path="accept-invite" element={<AcceptInvite />} />
-          <Route path="admin" element={<Admin />} />
+          {/* Logging in happens on the admin pages themselves. This keeps older links working. */}
+          <Route path="login" element={<Navigate to="/admin" replace />} />
+          <Route element={<AdminShell />}>
+            <Route path="accept-invite" element={<AcceptInvite />} />
+            <Route path="admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/admins" replace />} />
+              <Route path="admins" element={<Admins />} />
+              <Route path="calendrier" element={<Calendrier />} />
+              <Route path="rotation" element={<Rotation />} />
+              <Route path="candidatures" element={<Candidatures />} />
+            </Route>
+          </Route>
         </Route>
       </Routes>
     </ConfigProvider>

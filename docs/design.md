@@ -133,5 +133,37 @@ payment entirely on its own.
 
 ## Admin
 
-This page requires authentication. It provides various tools to manage the project like managing artist
-information, scheduling diffusion sessions, etc.
+This part of the site provides the tools Parking Radio's team uses to run the project. It lives under
+`/admin`, which isn't linked from the navigation bar.
+
+Every admin page requires being logged in. Logged out, a page shows a login form in its place, and once
+logged in it shows the page that was asked for.
+
+The admin pages keep the site's navigation bar. Under it, a menu lists the sections below, followed by the
+logged-in admin's email and a "se déconnecter" button. The section itself is shown to the right of the menu.
+On narrow screens like phones, the menu becomes a row above the section instead. `/admin` shows the first
+section.
+
+### Admins
+
+At `/admin/admins`: manages who can access the admin pages.
+
+- "Inviter un admin": emails an invite to a given address. The invite links to `/accept-invite`, where the
+  new admin chooses their password, after which they can log in.
+- "Admins existants": lists the existing admins, and lets an admin revoke another one. Not designed yet.
+
+### Calendrier
+
+At `/admin/calendrier`: the internal calendar of bookings. Not designed yet.
+
+### Rotation radio
+
+At `/admin/rotation`: manages the radio's rotation (see "Radio rotation" above). In the future, this will
+allow choosing which SoundCloud account or playlist the rotation is read from, which is currently set in the
+server's code. Not designed yet.
+
+### Candidatures
+
+At `/admin/candidatures`: lists the artist applications submitted through the "Appliquer" form. Not designed
+yet. This depends on that form being implemented first, since applications currently go through the original
+Google Form.

@@ -1,0 +1,195 @@
+/* The admin pages, and the forms that lead to them (logging in, setting a password from an invite). They
+   follow the programmation page: monospace text, bold uppercase headings, black pills. */
+.admin {
+  flex: 1;
+  padding: 2rem 1.5rem 4rem;
+  background: #fff;
+  color: #1c1c1c;
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+  font-size: 13px;
+}
+
+.admin h1,
+.admin h2 {
+  margin: 0;
+  text-transform: uppercase;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+}
+
+.admin h1 {
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #000;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.admin h2 {
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #ddd;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+}
+
+.admin p {
+  line-height: 1.5;
+}
+
+/* Pills, like the navbar's links and the programmation page's buttons. Menu links are black when selected,
+   and buttons when hovered. A form's submit button is always black, since it's the main thing to do on the
+   page. */
+.admin button,
+.admin-links a {
+  padding: 4.5px 10px;
+  color: #1c1c1c;
+}
+
+.admin button {
+  border: 1px solid #000;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin button:hover,
+.admin-form button[type='submit'],
+.admin-links a.active {
+  background: #000;
+  color: #f9f9f9;
+}
+
+.admin button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The menu on the left, the section on the right. */
+.admin-inner {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 3rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.admin-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.admin-links a {
+  text-decoration: none;
+}
+
+.admin-session {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-left: 10px;
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
+/* The login and password forms stand alone in the middle of the page. */
+.admin-auth {
+  max-width: 360px;
+  margin: 2rem auto 0;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  max-width: 360px;
+  margin-top: 1.5rem;
+}
+
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-self: stretch;
+}
+
+/* At least 16px, or iOS zooms into the page when an input gets focus. */
+.admin-form input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+}
+
+.admin-form input:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 1px;
+}
+
+/* Tucked under the input it's about, closer than the form's gap. */
+.admin-form .admin-hint {
+  margin: -0.5rem 0 0;
+  color: #666;
+  font-size: 12px;
+}
+
+.admin-notice {
+  padding-left: 0.75rem;
+  border-left: 2px solid #000;
+}
+
+.admin-error {
+  color: #b3261e;
+}
+
+.admin-placeholder {
+  margin-top: 1.5rem;
+  color: #666;
+}
+
+/* On phones the menu goes above the section, as a row of pills with the session at its end. */
+@media (max-width: 700px) {
+  .admin {
+    padding-inline: 1rem;
+  }
+
+  .admin-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+
+  .admin-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .admin-links {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .admin-session {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 0;
+  }
+}
