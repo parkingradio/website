@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, smallint, check } from 'drizzle-orm/pg-core'
 
 export const users = pgTable(
   'users',
@@ -20,3 +20,16 @@ export const invites = pgTable('invites', {
   tokenHash: text('token_hash').notNull().unique(), // sha256 hex; raw token is never stored
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 })
+
+// The track on air on the radio, and when it started. There is only ever one row, which the server
+// moves along the rotation as tracks end.
+export const radioOnAir = pgTable(
+  'radio_on_air',
+  {
+    id: smallint('id').primaryKey().default(1),
+    trackId: text('track_id').notNull(), // the SoundCloud id of the track
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    nextTrackIds: text('next_track_ids').array().notNull(), // the tracks after it in the rotation, in order
+  },
+  (table) => [check('radio_on_air_single_row', sql`${table.id} = 1`)],
+)

@@ -42,4 +42,11 @@ export const config = {
   get assetsDomain() {
     return required('ASSETS_DOMAIN')
   },
+  // Credentials of the SoundCloud app the radio's rotation is read through.
+  get soundcloudClientId() {
+    return required('SOUNDCLOUD_CLIENT_ID')
+  },
+  get soundcloudClientSecret() {
+    return required('SOUNDCLOUD_CLIENT_SECRET')
+  },
 }

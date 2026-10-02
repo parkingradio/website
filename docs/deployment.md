@@ -81,6 +81,8 @@ Other variables differ per deployment and belong on each deployment's GitHub env
   account (this one is an account-level permission since mailboxes are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
+- Variable `SOUNDCLOUD_CLIENT_ID` and secret `SOUNDCLOUD_CLIENT_SECRET`: The credentials of the SoundCloud
+  app the server reads the radio's rotation through.
 - Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain. This can only be
   `true` for a domain at the zone apex.
 

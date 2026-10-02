@@ -3,6 +3,7 @@ import { decodeHTML } from 'entities'
 import { z } from 'zod'
 import type { ApiError } from 'shared/error'
 import type { EventCategory, EventListing, EventsResponse } from 'shared/events'
+import { cached } from '../cache.js'
 
 // Events are managed on Resident Advisor, under Parking Radio's promoter page. RA has no public API, so
 // this uses the GraphQL endpoint that ra.co itself calls. It isn't documented and could change. We don't
@@ -138,18 +139,14 @@ export async function eventsRoutes(app: FastifyInstance) {
   // The outcome of the last fetch from RA, successful or not, kept for CACHE_TTL_MS so that RA is asked at
   // most that often. Failures are kept too, so that a broken RA isn't retried on every request. A failure
   // is never papered over with an older list: the page must show that something is wrong.
-  let cached: { result: Promise<EventsResponse | null>; fetchedAt: number } | null = null
-
-  function fetchEvents(): Promise<EventsResponse | null> {
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.result
-    // Requests that arrive while the fetch is in flight share it rather than starting their own.
-    const result = fetchFromRa().catch((error: unknown) => {
-      app.log.error(error, 'Failed to fetch events from Resident Advisor')
-      return null
-    })
-    cached = { result, fetchedAt: Date.now() }
-    return result
-  }
+  const fetchEvents = cached(
+    () =>
+      fetchFromRa().catch((error: unknown) => {
+        app.log.error(error, 'Failed to fetch events from Resident Advisor')
+        return null
+      }),
+    (_outcome, startedAt) => startedAt + CACHE_TTL_MS,
+  )
 
   app.get<{ Reply: EventsResponse | ApiError }>('/api/events', async (_request, reply) => {
     const events = await fetchEvents()

@@ -95,6 +95,7 @@ resource "aws_instance" "app" {
     db_name               = aws_db_instance.main.db_name
     secret_arn            = aws_secretsmanager_secret.app.arn
     bootstrap_admin_email = "admin@${var.domain}"
+    soundcloud_client_id  = var.soundcloud_client_id
     compose_file = templatefile("${path.module}/../templates/docker-compose.prod.yml.tftpl", {
       image = "${var.ghcr_image}:${var.app_image_tag}"
     })
@@ -103,6 +104,11 @@ resource "aws_instance" "app" {
     })
   })
   user_data_replace_on_change = true
+
+  # Replace the instance whenever secrets change, since secrets are read when the instance boots.
+  lifecycle {
+    replace_triggered_by = [aws_secretsmanager_secret_version.app]
+  }
 
   # Make sure the secret has been created before proceeding with the EC2 instance. Otherwise, on
   # failure to obtain it, the EC2 instance would be brought up and it would fail at boot time when

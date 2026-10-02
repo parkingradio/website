@@ -29,6 +29,15 @@ externally, on Cloudflare R2) as an iframe, combining three pieces:
 Playback of the radio player and the video widget is mutually exclusive: starting one pauses the other, so
 visitors aren't listening to two audio sources at once.
 
+### Radio rotation
+
+The rotation playing on the radio is read from the public tracks of a configured SoundCloud account by the
+server. The server decides what's on air: it keeps the track on air and when it started in the database, and
+moves along the rotation as tracks end. This is provided to the client via an API:
+
+- `GET /api/radio` returns the track on air, when it started, and the tracks after it.
+- `GET /api/radio/tracks/:id/stream` returns where to play a track of the rotation from.
+
 ## Archives
 
 This page lets visitors browse and listen to past diffusion sessions. It embeds the SoundCloud player widget

@@ -9,11 +9,14 @@ import { authRoutes } from './routes/auth.js'
 import { configRoutes } from './routes/config.js'
 import { notFoundRoutes } from './routes/not-found.js'
 import { eventsRoutes } from './routes/events.js'
+import { radioRoutes } from './routes/radio.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
 import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 import { spaRoutes } from './spa.js'
+import { soundCloudClient } from './soundcloud.js'
+import { onAirStore } from './on-air.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -32,6 +35,10 @@ await app.register(configRoutes)
 await app.register(authRoutes)
 await app.register(adminRoutes)
 await app.register(eventsRoutes)
+await app.register(radioRoutes, {
+  soundcloud: soundCloudClient({ clientId: config.soundcloudClientId, clientSecret: config.soundcloudClientSecret }),
+  onAir: onAirStore(db),
+})
 await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')
