@@ -83,15 +83,15 @@ jobs:
 
       - name: Plan the destroy
         working-directory: deployment/main
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_domain: ${{ vars.DOMAIN }}
+          TF_VAR_manage_mail: ${{ vars.MANAGE_MAIL }}
+          TF_VAR_app_image_tag: unused-by-destroy
         run: |
           set -o pipefail
-          terraform plan -destroy -no-color -input=false -out=tfplan          \
-            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}"   \
-            -var="cloudflare_zone_id=${{ vars.CLOUDFLARE_ZONE_ID }}"          \
-            -var="domain=${{ vars.DOMAIN }}"                                  \
-            -var="manage_mail=${{ vars.MANAGE_MAIL }}"                        \
-            -var="app_image_tag=unused-by-destroy"                            \
-            | tee "$RUNNER_TEMP/destroy-plan.txt"
+          terraform plan -destroy -no-color -input=false -out=tfplan | tee "$RUNNER_TEMP/destroy-plan.txt"
 
       - name: Publish the plan to the run summary
         env:
