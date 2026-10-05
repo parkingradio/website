@@ -19,7 +19,8 @@ apply, and deploy new versions.
 
 ## Site Design
 
-See [docs/design.md](docs/design.md) for the page-by-page design of the site.
+See [docs/design.md](docs/design.md) for the page-by-page design of the site, and [docs/api.md](docs/api.md) for
+the server's API.
 
 ## Development
 
