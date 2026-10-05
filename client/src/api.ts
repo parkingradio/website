@@ -1,23 +1,34 @@
 import type { ApiError } from 'shared/error'
 
 /**
- * POSTs `body` to `url` as JSON and returns the server's response. Failures, including those that never
- * reach the server, come back as an `ApiError` rather than being thrown, so that callers only have to
- * check `ok`.
+ * Sends a request to the API and returns the server's response, with `ok: true` if it succeeded. Failures,
+ * including those that never reach the server, come back as an `ApiError` rather than being thrown, so that
+ * callers only have to check `ok`.
  */
-export async function postJson<Request, Response extends { ok: true }>(
-  url: string,
-  body: Request,
-): Promise<Response | ApiError> {
+async function requestJson<Response>(url: string, init?: RequestInit): Promise<(Response & { ok: true }) | ApiError> {
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+    const response = await fetch(url, init)
     const result: Response | ApiError = await response.json()
-    return result.ok ? result : { ok: false, error: result.error ?? 'Erreur inconnue' }
+    if (response.ok) return { ...result, ok: true } as Response & { ok: true }
+    return { ok: false, error: (result as ApiError).error ?? 'Erreur inconnue' }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
+}
+
+/** GETs `url`, like `postJson`. */
+export async function getJson<Response>(url: string): Promise<(Response & { ok: true }) | ApiError> {
+  return requestJson(url)
+}
+
+/** POSTs `body` to `url` as JSON and returns the server's response, or an `ApiError` if anything fails. */
+export async function postJson<Request, Response>(
+  url: string,
+  body: Request,
+): Promise<(Response & { ok: true }) | ApiError> {
+  return requestJson(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }

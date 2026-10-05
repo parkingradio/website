@@ -1,18 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import fastifyCookie from '@fastify/cookie'
 
 import type { RadioResponse } from 'shared/radio'
+import { SESSION_COOKIE, signSessionToken } from '../auth.js'
 import type { OnAir } from '../on-air.js'
-import type { HlsStream, SoundCloudTrack, UserTracks } from '../soundcloud.js'
+import type { RadioSettings } from '../radio-settings.js'
+import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudTrack } from '../soundcloud.js'
 import { radioRoutes } from './radio.js'
 
-const userTracks = vi.fn<(userId: string) => Promise<UserTracks>>()
-const hlsStream = vi.fn<(trackId: string) => Promise<HlsStream>>()
+const playlist = vi.fn<SoundCloudClient['playlist']>()
+const resolvePlaylist = vi.fn<SoundCloudClient['resolvePlaylist']>()
+const hlsStream = vi.fn<SoundCloudClient['hlsStream']>()
 
 // The track on air, as the database would keep it.
 let stored: OnAir | null = null
 const load = vi.fn<() => Promise<OnAir | null>>()
 const save = vi.fn<(onAir: OnAir) => Promise<void>>()
+
+// The playlist chosen for the rotation, as the database would keep it.
+let chosen: RadioSettings | null = null
+const loadSettings = vi.fn<() => Promise<RadioSettings | null>>()
+const saveSettings = vi.fn<(settings: RadioSettings) => Promise<void>>()
 
 function track(id: number, title: string, overrides: Partial<SoundCloudTrack> = {}): SoundCloudTrack {
   return {
@@ -20,18 +29,34 @@ function track(id: number, title: string, overrides: Partial<SoundCloudTrack> = 
     title,
     durationMs: 3_600_000,
     url: `https://soundcloud.com/parkingdotradio/track-${id}`,
-    playable: true,
+    unplayable: null,
     ...overrides,
   }
 }
 
-// What the client returns for these tracks, all of which SoundCloud described as expected.
-function soundCloudTracks(...tracks: SoundCloudTrack[]): UserTracks {
-  return { tracks, invalid: [] }
+const ROTATION = {
+  title: 'Rotation',
+  url: 'https://soundcloud.com/parkingdotradio/sets/rotation',
+  private: false,
+  account: { name: 'parking.radio', url: 'https://soundcloud.com/parkingdotradio' },
+}
+
+// What the client returns for a playlist of these tracks, all of which SoundCloud described as expected.
+function soundCloudTracks(...tracks: SoundCloudTrack[]): PlaylistTracks {
+  return { playlist: ROTATION, tracks }
 }
 
 const NOW = new Date('2026-10-01T12:00:00Z').getTime()
 const MINUTE = 60 * 1000
+
+const CHOSEN: RadioSettings = {
+  playlistId: '7',
+  secretToken: null,
+  url: ROTATION.url,
+  title: 'Rotation',
+  updatedBy: 'someone@example.com',
+  updatedAt: NOW - 24 * 60 * MINUTE,
+}
 
 function streamFor(id: number, expiresAt = NOW + 62 * MINUTE): HlsStream {
   return { url: `https://cdn.test/${id}/playlist.m3u8?n=${hlsStream.mock.calls.length}`, expiresAt }
@@ -39,7 +64,12 @@ function streamFor(id: number, expiresAt = NOW + 62 * MINUTE): HlsStream {
 
 async function buildApp() {
   const app = Fastify({ logger: false })
-  await app.register(radioRoutes, { soundcloud: { userTracks, hlsStream }, onAir: { load, save } })
+  await app.register(fastifyCookie)
+  await app.register(radioRoutes, {
+    soundcloud: { playlist, resolvePlaylist, hlsStream },
+    onAir: { load, save },
+    settings: { load: loadSettings, save: saveSettings },
+  })
   return app
 }
 
@@ -59,28 +89,40 @@ async function streamUrl(app: App) {
   return (await app.inject({ method: 'GET', url: '/api/radio/tracks/1/stream' })).json().url
 }
 
+async function streamStatus(app: App, id: string) {
+  return (await app.inject({ method: 'GET', url: `/api/radio/tracks/${id}/stream` })).statusCode
+}
+
 describe('radio routes', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW)
-    userTracks.mockReset()
+    process.env.JWT_SECRET = 'test-secret'
+    playlist.mockReset()
+    resolvePlaylist.mockReset()
     hlsStream.mockReset()
-    userTracks.mockResolvedValue(soundCloudTracks(track(1, 'NIM K | parking.radio | 2026.03.14')))
+    playlist.mockResolvedValue(soundCloudTracks(track(1, 'NIM K | parking.radio | 2026.03.14')))
     hlsStream.mockImplementation(async (id: string) => streamFor(Number(id)))
     stored = null
     load.mockReset().mockImplementation(async () => stored)
     save.mockReset().mockImplementation(async (onAir) => {
       stored = onAir
     })
+    chosen = CHOSEN
+    loadSettings.mockReset().mockImplementation(async () => chosen)
+    saveSettings.mockReset().mockImplementation(async (settings) => {
+      chosen = settings
+    })
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    delete process.env.JWT_SECRET
   })
 
   describe('GET /api/radio', () => {
     it("returns what's on air and what comes next, parsed from the tracks' titles", async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(
+      playlist.mockResolvedValue(soundCloudTracks(
         track(1, 'NIM K | parking.radio | 2026.03.14', { durationMs: 3_420_000 }),
         track(2, 'ZEFRA | HAUTE RIVE TAKEOVER @ parking.radio | 2026.09.13'),
         track(3, '  Lumo | QRTZ TAKEOVER @ PARKING.RADIO | 2026.04.19 '),
@@ -119,11 +161,11 @@ describe('radio routes', () => {
           },
         ],
       })
-      expect(userTracks).toHaveBeenCalledWith('1677037676')
+      expect(playlist).toHaveBeenCalledWith('7', null)
     })
 
     it('uses a title that does not follow the usual pattern whole', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(track(1, 'Special broadcast')))
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'Special broadcast')))
       const app = await buildApp()
 
       const { current } = await radio(app)
@@ -131,8 +173,17 @@ describe('radio routes', () => {
       expect(current.track).toMatchObject({ artist: 'Special broadcast', event: null, date: null })
     })
 
-    it('keeps the order SoundCloud lists the tracks in, e.g. newest first', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(
+    it('reads a private playlist with its secret', async () => {
+      chosen = { ...CHOSEN, secretToken: 's-AbC123' }
+      const app = await buildApp()
+
+      await radio(app)
+
+      expect(playlist).toHaveBeenCalledWith('7', 's-AbC123')
+    })
+
+    it("keeps the playlist's order", async () => {
+      playlist.mockResolvedValue(soundCloudTracks(
         track(1, 'NEW | parking.radio | 2026.09.27'),
         track(2, 'OLD | parking.radio | 2026.03.14'),
         track(3, 'MIDDLE | parking.radio | 2026.06.07'),
@@ -145,9 +196,12 @@ describe('radio routes', () => {
     })
 
     it('leaves out tracks that SoundCloud describes unexpectedly', async () => {
-      userTracks.mockResolvedValue({
-        tracks: [track(1, 'A | parking.radio | 2026.09.10')],
-        invalid: ['"B | parking.radio | 2026.09.11": ✖ Invalid input: expected number, received null → at duration'],
+      playlist.mockResolvedValue({
+        playlist: ROTATION,
+        tracks: [
+          { invalid: true, name: 'B | parking.radio | 2026.09.11', problem: '✖ Invalid input: expected number, received null → at duration' },
+          track(1, 'A | parking.radio | 2026.09.10'),
+        ],
       })
       const app = await buildApp()
 
@@ -157,9 +211,9 @@ describe('radio routes', () => {
     })
 
     it('leaves out tracks that cannot be played in full', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(
+      playlist.mockResolvedValue(soundCloudTracks(
         track(1, 'A | parking.radio | 2026.09.10'),
-        track(2, 'B | parking.radio | 2026.09.11', { playable: false }),
+        track(2, 'B | parking.radio | 2026.09.11', { unplayable: 'preview' }),
       ))
       const app = await buildApp()
 
@@ -169,10 +223,11 @@ describe('radio routes', () => {
     })
 
     it.each([
-      ['SoundCloud fails', () => userTracks.mockRejectedValue(new Error('SoundCloud responded with 500'))],
-      ['no track can be played', () => userTracks.mockResolvedValue(soundCloudTracks(track(1, 'A', { playable: false })))],
-      ['the account has no tracks', () => userTracks.mockResolvedValue(soundCloudTracks())],
+      ['SoundCloud fails', () => playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))],
+      ['no track can be played', () => playlist.mockResolvedValue(soundCloudTracks(track(1, 'A', { unplayable: 'preview' })))],
+      ['the playlist has no tracks', () => playlist.mockResolvedValue(soundCloudTracks())],
       ['the track on air cannot be loaded', () => load.mockRejectedValue(new Error('Connection terminated'))],
+      ['the chosen playlist cannot be loaded', () => loadSettings.mockRejectedValue(new Error('Connection terminated'))],
     ])('responds 502 when %s', async (_, setUp) => {
       setUp()
       const app = await buildApp()
@@ -183,17 +238,28 @@ describe('radio routes', () => {
       expect(response.json()).toEqual({ ok: false, error: 'The radio is unavailable right now' })
     })
 
+    it('responds 503 when no playlist has been chosen yet', async () => {
+      chosen = null
+      const app = await buildApp()
+
+      const response = await app.inject({ method: 'GET', url: '/api/radio' })
+
+      expect(response.statusCode).toBe(503)
+      expect(response.json()).toEqual({ ok: false, error: 'No playlist has been chosen for the radio yet' })
+      expect(playlist).not.toHaveBeenCalled()
+    })
+
     it('asks SoundCloud at most once every 5 minutes', async () => {
       const app = await buildApp()
 
       await app.inject({ method: 'GET', url: '/api/radio' })
       vi.advanceTimersByTime(4 * MINUTE)
       await app.inject({ method: 'GET', url: '/api/radio' })
-      expect(userTracks).toHaveBeenCalledTimes(1)
+      expect(playlist).toHaveBeenCalledTimes(1)
 
       vi.advanceTimersByTime(2 * MINUTE)
       await app.inject({ method: 'GET', url: '/api/radio' })
-      expect(userTracks).toHaveBeenCalledTimes(2)
+      expect(playlist).toHaveBeenCalledTimes(2)
     })
 
     it('shares a fetch that is in flight between requests', async () => {
@@ -202,22 +268,44 @@ describe('radio routes', () => {
       const responses = await Promise.all([1, 2, 3].map(() => app.inject({ method: 'GET', url: '/api/radio' })))
 
       expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200])
-      expect(userTracks).toHaveBeenCalledTimes(1)
+      expect(playlist).toHaveBeenCalledTimes(1)
     })
 
-    it('does not fall back on the last good rotation when SoundCloud fails, and recovers 5 minutes later', async () => {
+    it('goes on with the rotation it read before when SoundCloud fails, and tries again a minute later', async () => {
       const app = await buildApp()
       await app.inject({ method: 'GET', url: '/api/radio' })
 
-      userTracks.mockRejectedValueOnce(new Error('SoundCloud responded with 500'))
+      playlist.mockRejectedValueOnce(new Error('SoundCloud responded with 500'))
       vi.advanceTimersByTime(6 * MINUTE)
+      expect((await radio(app)).current.track.id).toBe('1')
+      expect(playlist).toHaveBeenCalledTimes(2)
+
+      playlist.mockResolvedValue(soundCloudTracks(track(2, 'A | parking.radio | 2026.09.10')))
+      vi.advanceTimersByTime(59 * 1000)
+      expect((await radio(app)).current.track.id).toBe('1')
+      vi.advanceTimersByTime(1000)
+      expect((await radio(app)).current.track.id).toBe('2')
+      expect(playlist).toHaveBeenCalledTimes(3)
+    })
+
+    it('tries again a minute later when SoundCloud fails before the rotation could ever be read', async () => {
+      playlist.mockRejectedValueOnce(new Error('SoundCloud responded with 500'))
+      const app = await buildApp()
       expect((await app.inject({ method: 'GET', url: '/api/radio' })).statusCode).toBe(502)
 
-      vi.advanceTimersByTime(4 * MINUTE)
-      expect((await app.inject({ method: 'GET', url: '/api/radio' })).statusCode).toBe(502)
-      vi.advanceTimersByTime(2 * MINUTE)
+      vi.advanceTimersByTime(MINUTE)
       expect((await app.inject({ method: 'GET', url: '/api/radio' })).statusCode).toBe(200)
-      expect(userTracks).toHaveBeenCalledTimes(3)
+    })
+
+    it('reads the rotation anew from another playlist chosen elsewhere, e.g. by another server', async () => {
+      const app = await buildApp()
+      await radio(app)
+
+      chosen = { ...CHOSEN, playlistId: '8' }
+      playlist.mockResolvedValue(soundCloudTracks(track(2, 'A | parking.radio | 2026.09.10')))
+
+      expect((await radio(app)).current.track.id).toBe('2')
+      expect(playlist).toHaveBeenLastCalledWith('8', null)
     })
   })
 
@@ -231,15 +319,24 @@ describe('radio routes', () => {
     }
 
     it('puts the first track of the rotation on air the first time, and saves it', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
       const app = await buildApp()
 
       expect(await onAir(app)).toEqual({ id: '1', startedAt: NOW, upcoming: ['2'] })
-      expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ trackId: '1', startedAt: NOW }))
+      expect(save).toHaveBeenCalledExactlyOnceWith({ playlistId: '7', trackId: '1', startedAt: NOW, nextTrackIds: ['2'] })
+    })
+
+    it('puts the first track of the rotation on air when the track on air is from another playlist', async () => {
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
+      stored = { playlistId: '6', trackId: '2', startedAt: NOW - 10 * MINUTE, nextTrackIds: ['1'] }
+      const app = await buildApp()
+
+      expect(await onAir(app)).toEqual({ id: '1', startedAt: NOW, upcoming: ['2'] })
+      expect(stored).toEqual({ playlistId: '7', trackId: '1', startedAt: NOW, nextTrackIds: ['2'] })
     })
 
     it('keeps a track on air until it ends, then moves on to the next one', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
       const app = await buildApp()
       await onAir(app)
 
@@ -253,7 +350,7 @@ describe('radio routes', () => {
     })
 
     it('picks up where the radio was after the server restarts', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60)))
       const before = await buildApp()
       await onAir(before)
       vi.advanceTimersByTime(70 * MINUTE)
@@ -268,14 +365,14 @@ describe('radio routes', () => {
     })
 
     it('only changes what comes after the track on air when the rotation changes', async () => {
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(3, 3, 60)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(3, 3, 60)))
       const app = await buildApp()
       await onAir(app)
       vi.advanceTimersByTime(70 * MINUTE)
       expect(await onAir(app)).toMatchObject({ id: '3', startedAt: NOW + 60 * MINUTE })
 
       // A set recorded before the one on air and one recorded after it get uploaded.
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60), set(3, 3, 60), set(4, 4, 60)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 60), set(3, 3, 60), set(4, 4, 60)))
       vi.advanceTimersByTime(6 * MINUTE)
 
       expect(await onAir(app)).toEqual({ id: '3', startedAt: NOW + 60 * MINUTE, upcoming: ['4', '1', '2'] })
@@ -283,7 +380,7 @@ describe('radio routes', () => {
 
     it('catches up after nobody listened for a long time', async () => {
       // 90 minutes a round, so 10 days is 160 rounds, and 70 minutes more is 10 minutes into the second set.
-      userTracks.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 30)))
+      playlist.mockResolvedValue(soundCloudTracks(set(1, 1, 60), set(2, 2, 30)))
       const app = await buildApp()
       await onAir(app)
 
@@ -298,13 +395,13 @@ describe('radio routes', () => {
       ['goes on with the first track when it was the last one', 4, [4], 1],
     ])('takes a track that left the rotation off air right away, and %s', async (_, left, removed, next) => {
       const ids = [1, 2, 3, 4]
-      userTracks.mockResolvedValue(soundCloudTracks(...ids.map((id) => set(id, id, 60))))
+      playlist.mockResolvedValue(soundCloudTracks(...ids.map((id) => set(id, id, 60))))
       const app = await buildApp()
       await onAir(app)
       vi.advanceTimersByTime((left - 1) * 60 * MINUTE + 10 * MINUTE)
       expect(await onAir(app)).toMatchObject({ id: String(left) })
 
-      userTracks.mockResolvedValue(soundCloudTracks(...ids.filter((id) => !removed.includes(id)).map((id) => set(id, id, 60))))
+      playlist.mockResolvedValue(soundCloudTracks(...ids.filter((id) => !removed.includes(id)).map((id) => set(id, id, 60))))
       vi.advanceTimersByTime(6 * MINUTE)
 
       expect(await onAir(app)).toMatchObject({ id: String(next), startedAt: Date.now() })
@@ -314,7 +411,7 @@ describe('radio routes', () => {
     describe('what comes after the track on air', () => {
       // With the third of four sets on air.
       async function buildAppOnTrack3() {
-        userTracks.mockResolvedValue(soundCloudTracks(...[1, 2, 3, 4].map((id) => set(id, id, 60))))
+        playlist.mockResolvedValue(soundCloudTracks(...[1, 2, 3, 4].map((id) => set(id, id, 60))))
         const app = await buildApp()
         await onAir(app)
         vi.advanceTimersByTime(120 * MINUTE)
@@ -345,7 +442,7 @@ describe('radio routes', () => {
 
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'upcoming must be a whole number' })
-      expect(userTracks).not.toHaveBeenCalled()
+      expect(playlist).not.toHaveBeenCalled()
     })
 
     it('still answers when the track on air cannot be saved', async () => {
@@ -383,8 +480,30 @@ describe('radio routes', () => {
       expect(hlsStream).not.toHaveBeenCalled()
     })
 
+    it('responds 404 when no playlist has been chosen yet', async () => {
+      chosen = null
+      const app = await buildApp()
+
+      expect(await streamStatus(app, '1')).toBe(404)
+    })
+
+    it('still streams a track that left the playlist for as long as it lasts, so that its listeners can finish it', async () => {
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'A', { durationMs: 30 * MINUTE }), track(2, 'B')))
+      const app = await buildApp()
+      await radio(app)
+
+      playlist.mockResolvedValue(soundCloudTracks(track(2, 'B')))
+      vi.advanceTimersByTime(6 * MINUTE)
+      await radio(app)
+
+      vi.advanceTimersByTime(30 * MINUTE - 1)
+      expect(await streamStatus(app, '1')).toBe(200)
+      vi.advanceTimersByTime(1)
+      expect(await streamStatus(app, '1')).toBe(404)
+    })
+
     it('responds 502 when the rotation is unavailable', async () => {
-      userTracks.mockRejectedValue(new Error('SoundCloud responded with 500'))
+      playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))
       const app = await buildApp()
 
       const response = await app.inject({ method: 'GET', url: '/api/radio/tracks/1/stream' })
@@ -445,6 +564,306 @@ describe('radio routes', () => {
 
       expect(new Set(responses.map((response) => response.json().url)).size).toBe(1)
       expect(hlsStream).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('admin', () => {
+    // A session for an admin, as the admin pages would send it.
+    async function asAdmin() {
+      return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
+    }
+
+    async function settings(app: App) {
+      return (await app.inject({ method: 'GET', url: '/api/admin/radio', cookies: await asAdmin() })).json()
+    }
+
+    async function post(app: App, url: string, body: unknown) {
+      return app.inject({ method: 'POST', url, payload: body as object, cookies: await asAdmin() })
+    }
+
+    // Another playlist, at LINK, with two sets.
+    const LINK = 'https://soundcloud.com/parkingdotradio/sets/other/s-AbC123'
+    const other = (...tracks: SoundCloudTrack[]): PlaylistTracks => ({
+      playlist: { ...ROTATION, title: 'Other', url: LINK, private: true },
+      tracks,
+    })
+    function otherPlaylistAtLink(tracks = [track(8, 'H | parking.radio | 2026.09.08'), track(9, 'I | parking.radio | 2026.09.09')]) {
+      resolvePlaylist.mockResolvedValue({ id: '9', secretToken: 's-AbC123' })
+      playlist.mockImplementation(async (id) => (id === '9' ? other(...tracks) : soundCloudTracks(track(1, 'A'), track(2, 'B'))))
+    }
+
+    it.each([
+      ['GET', '/api/admin/radio'],
+      ['POST', '/api/admin/radio/preview'],
+      ['POST', '/api/admin/radio/playlist'],
+    ] as const)('responds 401 to %s %s without a session', async (method, url) => {
+      const app = await buildApp()
+
+      const response = await app.inject({ method, url, payload: method === 'POST' ? { link: LINK } : undefined })
+
+      expect(response.statusCode).toBe(401)
+      expect(saveSettings).not.toHaveBeenCalled()
+    })
+
+    describe('GET /api/admin/radio', () => {
+      it('returns null until a playlist has been chosen', async () => {
+        chosen = null
+        const app = await buildApp()
+
+        expect(await settings(app)).toEqual({ ok: true, current: null })
+      })
+
+      it('returns the chosen playlist, with every track in it, in order, and whether it is on the radio', async () => {
+        playlist.mockResolvedValue({
+          playlist: ROTATION,
+          tracks: [
+            track(1, 'A | parking.radio | 2026.09.01'),
+            track(3, 'PREVIEW | parking.radio | 2026.09.03', { unplayable: 'preview' }),
+            track(4, 'Blocked', { unplayable: 'blocked' }),
+            { invalid: true, name: 'Broken', problem: '✖ Invalid input' },
+            track(2, 'B', { durationMs: 20 * MINUTE }),
+          ],
+        })
+        const app = await buildApp()
+
+        expect(await settings(app)).toEqual({
+          ok: true,
+          current: {
+            url: ROTATION.url,
+            title: 'Rotation',
+            chosenBy: 'someone@example.com',
+            chosenAt: '2026-09-30T12:00:00.000Z',
+            playlist: {
+              url: ROTATION.url,
+              title: 'Rotation',
+              private: false,
+              account: ROTATION.account,
+              tracks: [
+                {
+                  kind: 'rotation',
+                  track: { id: '1', artist: 'A', event: null, date: '2026-09-01', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-1' },
+                },
+                {
+                  kind: 'left-out',
+                  track: { id: '3', artist: 'PREVIEW', event: null, date: '2026-09-03', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-3' },
+                  reason: 'preview',
+                },
+                {
+                  kind: 'left-out',
+                  track: { id: '4', artist: 'Blocked', event: null, date: null, durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-4' },
+                  reason: 'blocked',
+                },
+                { kind: 'unexpected', title: 'Broken' },
+                {
+                  kind: 'rotation',
+                  track: { id: '2', artist: 'B', event: null, date: null, durationMs: 20 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-2' },
+                },
+              ],
+            },
+            error: null,
+          },
+        })
+      })
+
+      it('says why the playlist could not be read, while the radio goes on with what it read before', async () => {
+        const app = await buildApp()
+        await radio(app)
+
+        playlist.mockRejectedValue(new Error('SoundCloud shows no such playlist'))
+        vi.advanceTimersByTime(6 * MINUTE)
+
+        const { current } = await settings(app)
+        expect(current.error).toBe('SoundCloud shows no such playlist')
+        expect(current.playlist).toMatchObject({ title: 'Rotation', tracks: [{ kind: 'rotation', track: { id: '1' } }] })
+        expect((await radio(app)).current.track.id).toBe('1')
+      })
+
+      it('says why the playlist could not be read when it never could be', async () => {
+        playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))
+        const app = await buildApp()
+
+        const { current } = await settings(app)
+        expect(current).toMatchObject({ title: 'Rotation', playlist: null, error: 'SoundCloud responded with 500' })
+      })
+    })
+
+    describe.each(['/api/admin/radio/preview', '/api/admin/radio/playlist'])('POST %s', (url) => {
+      it.each([
+        ['an account', 'https://soundcloud.com/parkingdotradio'],
+        ['a track', 'https://soundcloud.com/parkingdotradio/3tons'],
+        ['another site', 'https://example.com/parkingdotradio/sets/rotation'],
+        ['not a link', 'rotation'],
+        ['not a string', 42],
+        ['missing', undefined],
+      ])('responds 400 when the link is %s', async (_, link) => {
+        const app = await buildApp()
+
+        const response = await post(app, url, { link })
+
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'Not a link to a SoundCloud playlist' })
+        expect(resolvePlaylist).not.toHaveBeenCalled()
+      })
+
+      it('resolves the link without what does not identify the playlist', async () => {
+        otherPlaylistAtLink()
+        const app = await buildApp()
+
+        await post(app, url, { link: ` https://www.soundcloud.com/parkingdotradio/sets/other/s-AbC123/?si=abc&utm_source=clipboard ` })
+
+        expect(resolvePlaylist).toHaveBeenCalledWith(LINK)
+        expect(playlist).toHaveBeenCalledWith('9', 's-AbC123')
+      })
+
+      it('responds 404 when SoundCloud shows no playlist at the link', async () => {
+        resolvePlaylist.mockResolvedValue(null)
+        const app = await buildApp()
+
+        const response = await post(app, url, { link: LINK })
+
+        expect(response.statusCode).toBe(404)
+        expect(response.json()).toEqual({ ok: false, error: 'SoundCloud shows no playlist at this link' })
+      })
+
+      it.each([
+        ['resolving the link', () => resolvePlaylist.mockRejectedValue(new Error('SoundCloud responded to /resolve with 500'))],
+        ['reading the playlist', () => {
+          resolvePlaylist.mockResolvedValue({ id: '9', secretToken: null })
+          playlist.mockRejectedValue(new Error('SoundCloud responded to /playlists with 500'))
+        }],
+      ])('responds 502 when SoundCloud fails %s', async (_, setUp) => {
+        setUp()
+        const app = await buildApp()
+
+        const response = await post(app, url, { link: LINK })
+
+        expect(response.statusCode).toBe(502)
+        expect(response.json().error).toMatch(/^The playlist cannot be read from SoundCloud: SoundCloud responded to/)
+        expect(saveSettings).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('POST /api/admin/radio/preview', () => {
+      it('returns what the radio would read from the playlist, without choosing it', async () => {
+        otherPlaylistAtLink()
+        const app = await buildApp()
+
+        const response = await post(app, '/api/admin/radio/preview', { link: LINK })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json()).toEqual({
+          ok: true,
+          playlist: {
+            url: LINK,
+            title: 'Other',
+            private: true,
+            account: ROTATION.account,
+            tracks: [
+              {
+                kind: 'rotation',
+                track: { id: '8', artist: 'H', event: null, date: '2026-09-08', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-8' },
+              },
+              {
+                kind: 'rotation',
+                track: { id: '9', artist: 'I', event: null, date: '2026-09-09', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-9' },
+              },
+            ],
+          },
+        })
+        expect(saveSettings).not.toHaveBeenCalled()
+        expect((await radio(app)).current.track.id).toBe('1')
+      })
+
+      it('previews a playlist none of whose tracks can be played', async () => {
+        otherPlaylistAtLink([track(8, 'H', { unplayable: 'preview' })])
+        const app = await buildApp()
+
+        const response = await post(app, '/api/admin/radio/preview', { link: LINK })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json().playlist.tracks).toEqual([{ kind: 'left-out', track: expect.objectContaining({ id: '8', artist: 'H' }), reason: 'preview' }])
+      })
+    })
+
+    describe('POST /api/admin/radio/playlist', () => {
+      it('chooses the playlist', async () => {
+        otherPlaylistAtLink()
+        const app = await buildApp()
+
+        const response = await post(app, '/api/admin/radio/playlist', { link: LINK })
+
+        expect(response.statusCode).toBe(200)
+        expect(chosen).toEqual({
+          playlistId: '9',
+          secretToken: 's-AbC123',
+          url: LINK,
+          title: 'Other',
+          updatedBy: 'admin@example.com',
+          updatedAt: NOW,
+        })
+        expect(response.json()).toEqual({ ok: true })
+        expect((await settings(app)).current).toMatchObject({ url: LINK, chosenBy: 'admin@example.com', chosenAt: '2026-10-01T12:00:00.000Z', error: null })
+      })
+
+      it('responds 400 when none of the tracks of the playlist can be played', async () => {
+        otherPlaylistAtLink([track(8, 'H', { unplayable: 'preview' })])
+        const app = await buildApp()
+
+        const response = await post(app, '/api/admin/radio/playlist', { link: LINK })
+
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'None of the tracks of this playlist can be played in full' })
+        expect(saveSettings).not.toHaveBeenCalled()
+      })
+
+      it('puts the first track of the playlist on air right away, without reading it again', async () => {
+        otherPlaylistAtLink()
+        const app = await buildApp()
+        await radio(app)
+        vi.advanceTimersByTime(10 * MINUTE)
+
+        await post(app, '/api/admin/radio/playlist', { link: LINK })
+        vi.advanceTimersByTime(MINUTE)
+
+        expect(await inOrder(app)).toMatchObject([{ id: '8' }, { id: '9' }])
+        expect((await radio(app)).current.startedAt).toBe(new Date(NOW + 11 * MINUTE).toISOString())
+        expect(playlist.mock.calls).toEqual([['7', null], ['9', 's-AbC123']])
+      })
+
+      it('keeps the track on air when the same playlist is chosen again', async () => {
+        resolvePlaylist.mockResolvedValue({ id: '7', secretToken: null })
+        playlist.mockResolvedValue(soundCloudTracks(track(1, 'A'), track(2, 'B')))
+        const app = await buildApp()
+        await radio(app)
+        vi.advanceTimersByTime(70 * MINUTE)
+        expect((await radio(app)).current.track.id).toBe('2')
+
+        await post(app, '/api/admin/radio/playlist', { link: ROTATION.url })
+
+        expect((await radio(app)).current).toMatchObject({ track: { id: '2' }, startedAt: new Date(NOW + 60 * MINUTE).toISOString() })
+      })
+
+      it('still streams the tracks of the previous playlist for as long as they last, so that their listeners can finish them', async () => {
+        otherPlaylistAtLink()
+        playlist.mockImplementation(async (id) =>
+          id === '9'
+            ? other(track(8, 'H'), track(9, 'I'))
+            : soundCloudTracks(track(1, 'A', { durationMs: 30 * MINUTE }), track(2, 'B', { durationMs: 60 * MINUTE })),
+        )
+        const app = await buildApp()
+        await radio(app)
+
+        await post(app, '/api/admin/radio/playlist', { link: LINK })
+
+        expect(await streamStatus(app, '8')).toBe(200)
+        vi.advanceTimersByTime(30 * MINUTE - 1)
+        expect(await streamStatus(app, '1')).toBe(200)
+        vi.advanceTimersByTime(1)
+        expect(await streamStatus(app, '1')).toBe(404)
+        expect(await streamStatus(app, '2')).toBe(200)
+        vi.advanceTimersByTime(30 * MINUTE)
+        expect(await streamStatus(app, '2')).toBe(404)
+      })
     })
   })
 })

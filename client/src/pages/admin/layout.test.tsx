@@ -49,7 +49,6 @@ describe('Admin pages', () => {
 
   it.each([
     ['/admin/calendrier', 'Calendrier'],
-    ['/admin/rotation', 'Rotation radio'],
     ['/admin/candidatures', 'Candidatures'],
   ])('shows a placeholder at %s', async (path, heading) => {
     mockFetch(LOGGED_IN)
@@ -60,8 +59,8 @@ describe('Admin pages', () => {
   })
 
   it('shows the login form in place of the page while logged out, then the page once logged in', async () => {
-    mockFetch({ ...LOGGED_OUT, '/api/auth/login': { ok: true, email: 'admin@example.com' } })
-    renderAt('/admin/rotation')
+    mockFetch({ ...LOGGED_OUT, '/api/auth/login': { ok: true, email: 'admin@example.com' }, '/api/admin/invite': { ok: true } })
+    renderAt('/admin/admins')
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
     expect(screen.queryByRole('navigation', { name: 'admin' })).not.toBeInTheDocument()
@@ -70,8 +69,8 @@ describe('Admin pages', () => {
     fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: 'correct-password' } })
     fireEvent.click(screen.getByRole('button', { name: 'se connecter' }))
 
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Rotation radio' })).toBeInTheDocument())
-    expect(screen.getByTestId('path')).toHaveTextContent('/admin/rotation')
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Admins' })).toBeInTheDocument())
+    expect(screen.getByTestId('path')).toHaveTextContent('/admin/admins')
   })
 
   it('shows the login form again after logging out', async () => {

@@ -56,6 +56,8 @@
 
 .admin button:hover,
 .admin-form button[type='submit'],
+.admin .radio-choose,
+.radio-track-tag,
 .admin-links a.active {
   background: #000;
   color: #f9f9f9;
@@ -152,13 +154,105 @@
   border-left: 2px solid #000;
 }
 
-.admin-error {
+.admin-error,
+.radio-track-left-out {
   color: #b3261e;
 }
 
 .admin-placeholder {
   margin-top: 1.5rem;
   color: #666;
+}
+
+/* Who did what and when, under what it's about. */
+.admin-meta {
+  margin: 0.5rem 0 0;
+  color: #666;
+}
+
+/* A playlist of the radio rotation: its title, then the account it belongs to. */
+.radio-playlist {
+  margin-top: 1.5rem;
+}
+
+.radio-playlist p {
+  margin: 0.25rem 0 0;
+}
+
+.radio-playlist-title {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* The tracks of a playlist, as a schedule: when each one begins, then what it is. A track that begins on
+   another day is introduced by that day. */
+.radio-tracks {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.6;
+}
+
+.radio-tracks li {
+  display: flex;
+  gap: 1rem;
+}
+
+.radio-tracks .radio-tracks-day {
+  margin-top: 0.75rem;
+  font-weight: 700;
+}
+
+.radio-track-time {
+  flex: none;
+  width: 4.5rem;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.radio-track-current {
+  font-weight: 700;
+}
+
+.radio-track-tag {
+  margin-left: 0.5rem;
+  padding: 0 6px;
+  font-weight: 300;
+}
+
+/* Tracks left out of the rotation are in red (see .admin-error), and say why when hovered, or clicked on
+   phones. */
+.admin .radio-track-left-out button,
+.admin .radio-track-left-out button:hover {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: help;
+}
+
+.radio-track-reason {
+  margin-left: 1rem;
+  font-size: 12px;
+}
+
+.radio-tracks-more {
+  margin-top: 0.75rem;
+}
+
+/* The playlist about to be chosen, boxed apart from the current one. Choosing it is the main thing to do
+   then, so its button is black like a form's (see above). */
+.radio-preview {
+  max-width: 600px;
+  margin-top: 1.5rem;
+  padding: 0 1rem 1rem;
+  border: 1px solid #000;
+}
+
+.radio-choose {
+  margin-top: 0.5rem;
 }
 
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */

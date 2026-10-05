@@ -8,6 +8,9 @@ import { cached } from './cache.js'
 // SoundCloud's responses are checked against these schemas rather than trusted, and anything unexpected
 // fails the request with an error that says what was wrong. The exception is a track that's unexpected,
 // which is only reported, so that the others can still be used.
+//
+// Private playlists can be read too, with the secret of their private link: that's all it takes, whichever
+// account they belong to.
 const API_ORIGIN = 'https://api.soundcloud.com'
 const TOKEN_URL = 'https://secure.soundcloud.com/oauth/token'
 const REQUEST_TIMEOUT_MS = 10_000
@@ -41,23 +44,39 @@ const Track = z
     // In milliseconds.
     duration: z.number().int().positive(),
     permalink_url: z.string().startsWith('https://soundcloud.com/'),
-    // Whether the track can be streamed in full ("playable"), or only a preview or not at all.
-    access: z.string(),
+    // Whether apps can stream the track in full ("playable"), only a preview of it ("preview"), which is
+    // 30 seconds long, or not at all ("blocked"). SoundCloud doesn't say why.
+    access: z.enum(['playable', 'preview', 'blocked']),
     streamable: z.boolean(),
   })
-  .transform((track) => {
-    // SoundCloud adds tracking parameters to the URL.
-    const url = new URL(track.permalink_url)
-    url.search = ''
-    return {
-      id: TRACK_URN.exec(track.urn)![1],
-      title: track.title,
-      durationMs: track.duration,
-      url: url.href,
-      playable: track.streamable && track.access === 'playable',
-    }
-  })
+  .transform((track) => ({
+    id: TRACK_URN.exec(track.urn)![1],
+    title: track.title,
+    durationMs: track.duration,
+    url: withoutParameters(track.permalink_url),
+    // Why the track can't be streamed in full, or null if it can.
+    unplayable: track.access !== 'playable' ? track.access : track.streamable ? null : ('not-streamable' as const),
+  }))
 export type SoundCloudTrack = z.output<typeof Track>
+
+const Playlist = z
+  .object({
+    title: z.string(),
+    // For a private playlist, that's its private link, with its secret.
+    permalink_url: z.string().startsWith('https://soundcloud.com/'),
+    sharing: z.string(),
+    user: z.object({ username: z.string(), permalink_url: z.string().startsWith('https://soundcloud.com/') }),
+  })
+  .transform((playlist) => ({
+    title: playlist.title,
+    url: withoutParameters(playlist.permalink_url),
+    private: playlist.sharing !== 'public',
+    account: { name: playlist.user.username, url: withoutParameters(playlist.user.permalink_url) },
+  }))
+export type SoundCloudPlaylist = z.output<typeof Playlist>
+
+// Where `/resolve` redirects for a playlist.
+const PLAYLIST_PATH = /^\/playlists\/soundcloud:playlists:(\d+)$/
 
 const TracksPage = z.object({
   // Each track is checked on its own, so that one SoundCloud describes unexpectedly (e.g. one it's still
@@ -80,10 +99,19 @@ const CloudFrontPolicy = z.object({
     .min(1),
 })
 
-export type UserTracks = {
-  tracks: SoundCloudTrack[]
-  // The tracks that didn't match the schema, each with what was wrong with it.
-  invalid: string[]
+export type PlaylistTracks = {
+  playlist: SoundCloudPlaylist
+  // In the playlist's order, including the tracks that didn't match the schema.
+  tracks: (SoundCloudTrack | InvalidTrack)[]
+}
+
+// A track that didn't match the schema, by title (or URN, without one), with what was wrong with it.
+export type InvalidTrack = { invalid: true; name: string; problem: string }
+
+// What `resolvePlaylist` finds at a link: the playlist, and the secret of its private link if it's private.
+export type PlaylistLink = {
+  id: string
+  secretToken: string | null
 }
 
 export type HlsStream = {
@@ -150,28 +178,59 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     const { pathname } = new URL(url)
     if (!response.ok) {
       await response.body?.cancel()
-      throw new Error(`SoundCloud responded to ${pathname} with ${response.status}`)
+      throw new SoundCloudStatusError(`SoundCloud responded to ${pathname} with ${response.status}`, response.status)
     }
     return parse(schema, await response.json(), pathname)
   }
 
   return {
-    /** All of a user's tracks that the app can see, i.e. their public ones, in the order SoundCloud lists them. */
-    async userTracks(userId: string): Promise<UserTracks> {
-      const tracks: SoundCloudTrack[] = []
-      const invalid: string[] = []
-      let url: string | null | undefined = `${API_ORIGIN}/users/soundcloud:users:${userId}/tracks?linked_partitioning=true&limit=${PAGE_SIZE}`
-      for (let pages = 0; url; pages++) {
-        if (pages === MAX_PAGES) throw new Error(`SoundCloud returned more than ${MAX_PAGES} pages of tracks`)
-        const page: z.infer<typeof TracksPage> = await getJson(url, TracksPage)
+    /**
+     * The playlist a link to it on soundcloud.com leads to, e.g. "https://soundcloud.com/user/sets/name", or
+     * "https://soundcloud.com/user/sets/name/s-secret" for a private one. Null when SoundCloud shows no
+     * playlist there, e.g. because the link is to a user or a track, or the private link was reset.
+     */
+    async resolvePlaylist(link: string): Promise<PlaylistLink | null> {
+      // SoundCloud redirects to what's at the link on the API, with the secret of a private playlist.
+      // Following the redirect would download the playlist with every track in it.
+      const response = await get(`${API_ORIGIN}/resolve?url=${encodeURIComponent(link)}`, 'manual')
+      await response.body?.cancel()
+      if (response.status === 404) return null
+      const location = response.headers.get('location')
+      if (response.status < 300 || response.status >= 400 || !location) {
+        throw new Error(`SoundCloud responded to /resolve with ${response.status}`)
+      }
+      const resolved = new URL(location, API_ORIGIN)
+      const id = PLAYLIST_PATH.exec(resolved.pathname)?.[1]
+      if (resolved.origin !== API_ORIGIN || !id) return null
+      return { id, secretToken: resolved.searchParams.get('secret_token') }
+    },
+
+    /** A playlist, and the tracks in it that the app can see, in the playlist's order. */
+    async playlist(id: string, secretToken: string | null): Promise<PlaylistTracks> {
+      const urn = `soundcloud:playlists:${id}`
+      const secret = secretToken ? `&secret_token=${encodeURIComponent(secretToken)}` : ''
+      // The playlist and its first page of tracks are independent, so they're requested together.
+      const [playlist, firstPage] = await Promise.all([
+        getJson(`${API_ORIGIN}/playlists/${urn}?show_tracks=false${secret}`, Playlist),
+        getJson(`${API_ORIGIN}/playlists/${urn}/tracks?linked_partitioning=true&limit=${PAGE_SIZE}${secret}`, TracksPage),
+      ]).catch((error: unknown) => {
+        if (error instanceof SoundCloudStatusError && error.status === 404) {
+          throw new Error('SoundCloud shows no such playlist: it may have been deleted, made private, or had its private link reset')
+        }
+        throw error
+      })
+      const tracks: PlaylistTracks['tracks'] = []
+      // The secret is carried over to the next pages by SoundCloud.
+      for (let page: z.infer<typeof TracksPage> = firstPage, pages = 1; ; pages++) {
         for (const item of page.collection) {
           const parsed = Track.safeParse(item)
-          if (parsed.success) tracks.push(parsed.data)
-          else invalid.push(`${trackName(item)}: ${z.prettifyError(parsed.error)}`)
+          tracks.push(parsed.success ? parsed.data : { invalid: true, name: trackName(item), problem: z.prettifyError(parsed.error) })
         }
-        url = page.next_href
+        if (!page.next_href) break
+        if (pages === MAX_PAGES) throw new Error(`SoundCloud returned more than ${MAX_PAGES} pages of tracks`)
+        page = await getJson(page.next_href, TracksPage)
       }
-      return { tracks, invalid }
+      return { playlist, tracks }
     },
 
     /** Where a track can be streamed from, without credentials. */
@@ -203,11 +262,28 @@ function signedUrlExpiry(url: string): number {
   return Math.min(...policy.Statement.map((statement) => statement.Condition.DateLessThan['AWS:EpochTime'])) * 1000
 }
 
+// SoundCloud responded with an error status.
+class SoundCloudStatusError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 // What to call a track that may not have the expected shape.
 function trackName(track: unknown): string {
   const { title, urn } = (track ?? {}) as { title?: unknown; urn?: unknown }
-  if (typeof title === 'string') return JSON.stringify(title)
+  if (typeof title === 'string') return title
   return typeof urn === 'string' ? urn : 'A track with no title'
+}
+
+// SoundCloud adds tracking parameters to the URLs of pages.
+function withoutParameters(url: string): string {
+  const parsed = new URL(url)
+  parsed.search = ''
+  return parsed.href
 }
 
 function parse<T>(schema: z.ZodType<T>, value: unknown, what: string): T {

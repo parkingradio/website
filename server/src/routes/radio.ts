@@ -1,15 +1,33 @@
 import type { FastifyInstance } from 'fastify'
 import type { ApiError } from 'shared/error'
-import type { RadioResponse, RadioStreamResponse, RadioTrack } from 'shared/radio'
+import { playlistLink } from 'shared/radio'
+import type {
+  RadioLeftOutReason,
+  RadioPlaylist,
+  RadioPlaylistRequest,
+  RadioPlaylistTrack,
+  RadioPlaylistResponse,
+  RadioPreviewRequest,
+  RadioPreviewResponse,
+  RadioResponse,
+  RadioSettingsResponse,
+  RadioStreamResponse,
+  RadioTrack,
+} from 'shared/radio'
+import { requireAuth } from '../auth.js'
 import { cached } from '../cache.js'
 import type { OnAir, OnAirStore } from '../on-air.js'
-import type { HlsStream, SoundCloudClient, SoundCloudTrack } from '../soundcloud.js'
+import type { RadioSettings, RadioSettingsStore } from '../radio-settings.js'
+import type { HlsStream, InvalidTrack, PlaylistLink, SoundCloudClient, SoundCloudTrack } from '../soundcloud.js'
 
-// The rotation is every public track of Parking Radio's SoundCloud account, in the order SoundCloud lists
-// them, so that a set goes on the radio as soon as it's uploaded there.
-const SOUNDCLOUD_USER_ID = '1677037676' // https://soundcloud.com/parkingdotradio
+// The rotation is the tracks of a SoundCloud playlist chosen on the admin pages, in the playlist's order. It's
+// read again every ROTATION_CACHE_TTL_MS, so that changes to the playlist get on the radio. When reading it
+// fails, the radio goes on with what it read before, and it's tried again after ROTATION_RETRY_MS.
 const ROTATION_CACHE_TTL_MS = 5 * 60 * 1000
+const ROTATION_RETRY_MS = 60 * 1000
 const RADIO_UNAVAILABLE: ApiError = { ok: false, error: 'The radio is unavailable right now' }
+const NO_PLAYLIST: ApiError = { ok: false, error: 'No playlist has been chosen for the radio yet' }
+const NOT_IN_ROTATION: ApiError = { ok: false, error: 'Not a track of the radio rotation' }
 
 // A track's stream URL is shared by the listeners who start it around the same time, which in a radio is
 // most of them. A URL's playlist has to be loaded before it expires, about 2 minutes later than the
@@ -62,37 +80,154 @@ function onAirAt(rotation: RadioTrack[], saved: OnAir | null, now: number): { in
   return { index, startedAt }
 }
 
+// A playlist as the radio reads it: what the admin pages show of it, and the tracks that go in the rotation.
+type Rotation = {
+  playlist: RadioPlaylist
+  tracks: RadioTrack[]
+}
+
+// What the radio knows of the playlist chosen for the rotation: the rotation as it was last read successfully,
+// if it was, and why it couldn't be read the last time it was tried, if it couldn't.
+type Radio = {
+  settings: RadioSettings
+  rotation: Rotation | null
+  error: string | null
+}
+
+// The rotation read from the playlist of `settings`.
+type Source = {
+  settings: RadioSettings
+  read(): Promise<Pick<Radio, 'rotation' | 'error'>>
+}
+
 type RadioOptions = {
   soundcloud: SoundCloudClient
   onAir: OnAirStore
+  settings: RadioSettingsStore
 }
 
-export async function radioRoutes(app: FastifyInstance, { soundcloud, onAir }: RadioOptions) {
-  // The outcome of the last fetch of the rotation, successful or not, kept for ROTATION_CACHE_TTL_MS. Like
-  // for events, failures are kept too, and never papered over with an older rotation.
-  const rotation = cached(
-    () =>
-      fetchRotation().catch((error: unknown) => {
-        app.log.error(error, 'Failed to fetch the radio rotation from SoundCloud')
-        return null
-      }),
-    (_outcome, startedAt) => startedAt + ROTATION_CACHE_TTL_MS,
-  )
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
-  async function fetchRotation(): Promise<RadioTrack[]> {
-    const { tracks, invalid } = await soundcloud.userTracks(SOUNDCLOUD_USER_ID)
+function settingsResponse({ settings, rotation, error }: Radio): RadioSettingsResponse {
+  return {
+    ok: true,
+    current: {
+      url: settings.url,
+      title: settings.title,
+      chosenBy: settings.updatedBy,
+      chosenAt: new Date(settings.updatedAt).toISOString(),
+      playlist: rotation?.playlist ?? null,
+      error,
+    },
+  }
+}
+
+export async function radioRoutes(app: FastifyInstance, { soundcloud, onAir, settings: settingsStore }: RadioOptions) {
+  async function readPlaylist(id: string, secretToken: string | null): Promise<Rotation> {
+    const { playlist, tracks } = await soundcloud.playlist(id, secretToken)
+    const playlistTracks: RadioPlaylistTrack[] = []
+    // The tracks that are left out, for the logs.
+    const invalid: InvalidTrack[] = []
+    const skipped: { title: string; reason: RadioLeftOutReason }[] = []
+    for (const track of tracks) {
+      if ('invalid' in track) {
+        playlistTracks.push({ kind: 'unexpected', title: track.name })
+        invalid.push(track)
+      } else if (track.unplayable) {
+        // Tracks that can't be played in full would leave silence in the rotation.
+        playlistTracks.push({ kind: 'left-out', track: toRadioTrack(track), reason: track.unplayable })
+        skipped.push({ title: track.title, reason: track.unplayable })
+      } else {
+        playlistTracks.push({ kind: 'rotation', track: toRadioTrack(track) })
+      }
+    }
     if (invalid.length > 0) {
       app.log.warn({ invalid }, 'Leaving tracks that SoundCloud describes unexpectedly out of the radio rotation')
     }
-    // Tracks that can't be played in full would leave silence in the rotation.
-    const skipped = tracks.filter((track) => !track.playable)
     if (skipped.length > 0) {
-      app.log.warn({ skipped: skipped.map((track) => track.title) }, 'Leaving tracks that cannot be played in full out of the radio rotation')
+      app.log.warn({ skipped }, 'Leaving tracks that cannot be played in full out of the radio rotation')
     }
-    const playable = tracks.filter((track) => track.playable)
-    // There would be nothing to put on air.
-    if (playable.length === 0) throw new Error('SoundCloud returned no playable tracks')
-    return playable.map(toRadioTrack)
+    return {
+      playlist: {
+        url: playlist.url,
+        title: playlist.title,
+        private: playlist.private,
+        account: playlist.account,
+        tracks: playlistTracks,
+      },
+      tracks: playlistTracks.flatMap((track) => (track.kind === 'rotation' ? [track.track] : [])),
+    }
+  }
+
+  // The tracks that left the rotation, by id, with until when they can still be streamed: for as long as
+  // they last from when that was noticed, so that listeners who were playing one when it left can get a new
+  // stream to finish it if they need one. This is only kept in memory, so it's lost when the server restarts.
+  const departed = new Map<string, number>()
+  // The tracks of the rotation as it was last read, from whichever playlist.
+  let lastTracks: RadioTrack[] = []
+
+  // Notes which tracks left the rotation since it was last read.
+  function rotationRead(tracks: RadioTrack[]) {
+    const now = Date.now()
+    const ids = new Set(tracks.map(({ id }) => id))
+    for (const track of lastTracks) {
+      if (!ids.has(track.id)) departed.set(track.id, now + track.durationMs)
+    }
+    for (const [id, until] of departed) {
+      if (ids.has(id) || until <= now) departed.delete(id)
+    }
+    lastTracks = tracks
+  }
+
+  // The source the rotation is read from, replaced whenever another playlist is chosen.
+  let source: Source | null = null
+
+  // `initial` is the rotation, if it was just read, so that it isn't read again right away.
+  function sourceFor(settings: RadioSettings, initial?: Rotation): Source {
+    const refresh = cached(
+      async () => {
+        try {
+          const rotation = await readPlaylist(settings.playlistId, settings.secretToken)
+          // There would be nothing to put on air.
+          if (rotation.tracks.length === 0) throw new Error('None of the tracks of the playlist can be played in full')
+          return rotation
+        } catch (error) {
+          app.log.error(error, 'Failed to read the radio rotation from SoundCloud')
+          throw error
+        }
+      },
+      (outcome, startedAt) => startedAt + (outcome.status === 'fulfilled' ? ROTATION_CACHE_TTL_MS : ROTATION_RETRY_MS),
+      initial && { value: initial },
+    )
+    let rotation = initial ?? null
+    let error: string | null = null
+    return {
+      settings,
+      async read() {
+        try {
+          rotation = await refresh()
+          error = null
+        } catch (reason) {
+          error = errorMessage(reason)
+        }
+        return { rotation, error }
+      },
+    }
+  }
+
+  // What the radio knows of the playlist chosen for the rotation, or null until one is chosen. The choice is
+  // loaded every time, rather than kept in memory, so that every server picks it up.
+  async function current(): Promise<Radio | null> {
+    const settings = await settingsStore.load()
+    if (!settings) return null
+    if (source?.settings.playlistId !== settings.playlistId || source.settings.secretToken !== settings.secretToken) {
+      source = sourceFor(settings)
+    }
+    const { rotation, error } = await source.read()
+    if (rotation && rotation.tracks !== lastTracks) rotationRead(rotation.tracks)
+    return { settings, rotation, error }
   }
 
   // By track id.
@@ -119,32 +254,37 @@ export async function radioRoutes(app: FastifyInstance, { soundcloud, onAir }: R
       return reply.status(400).send({ ok: false, error: 'upcoming must be a whole number' })
     }
 
-    const tracks = await rotation()
-    if (!tracks) return reply.status(502).send(RADIO_UNAVAILABLE)
-
+    let radio: Radio | null
     let saved: OnAir | null
     try {
-      saved = await onAir.load()
+      ;[radio, saved] = await Promise.all([current(), onAir.load()])
     } catch (error) {
-      request.log.error(error, 'Failed to load the track on air on the radio')
+      request.log.error(error, 'Failed to load the radio from the database')
       return reply.status(502).send(RADIO_UNAVAILABLE)
     }
+    if (!radio) return reply.status(503).send(NO_PLAYLIST)
+
+    const { rotation } = radio
+    if (!rotation) return reply.status(502).send(RADIO_UNAVAILABLE)
+    const { playlistId } = radio.settings
+    // When another playlist was chosen, it goes on air from its first track.
+    const previous = saved?.playlistId === playlistId ? saved : null
     const now = Date.now()
-    const { index, startedAt } = onAirAt(tracks, saved, now)
-    const track = tracks[index]
+    const { index, startedAt } = onAirAt(rotation.tracks, previous, now)
+    const track = rotation.tracks[index]
     // The rest of the rotation, in the order it comes after the track on air.
-    const after = [...tracks.slice(index + 1), ...tracks.slice(0, index)]
+    const after = [...rotation.tracks.slice(index + 1), ...rotation.tracks.slice(0, index)]
     const nextTrackIds = after.map(({ id }) => id)
     if (
-      track.id !== saved?.trackId ||
-      startedAt !== saved.startedAt ||
-      nextTrackIds.length !== saved.nextTrackIds.length ||
-      nextTrackIds.some((id, i) => id !== saved.nextTrackIds[i])
+      track.id !== previous?.trackId ||
+      startedAt !== previous.startedAt ||
+      nextTrackIds.length !== previous.nextTrackIds.length ||
+      nextTrackIds.some((id, i) => id !== previous.nextTrackIds[i])
     ) {
       // Moving along from an older save comes to the same outcome, so failing to save that only costs the
       // next request some work. A track put on air anew, the first time or in place of one that left the
       // rotation, is only kept if it's saved, but the radio can go on anyway.
-      await onAir.save({ trackId: track.id, startedAt, nextTrackIds }).catch((error: unknown) => {
+      await onAir.save({ playlistId, trackId: track.id, startedAt, nextTrackIds }).catch((error: unknown) => {
         request.log.error(error, 'Failed to save the track on air on the radio')
       })
     }
@@ -158,20 +298,86 @@ export async function radioRoutes(app: FastifyInstance, { soundcloud, onAir }: R
   app.get<{ Params: { id: string }; Reply: RadioStreamResponse | ApiError }>(
     '/api/radio/tracks/:id/stream',
     async (request, reply) => {
-      const tracks = await rotation()
-      if (!tracks) return reply.status(502).send(RADIO_UNAVAILABLE)
-      // Only tracks of the rotation can be streamed, so that this doesn't hand out any track on SoundCloud.
-      if (!tracks.some((track) => track.id === request.params.id)) {
-        return reply.status(404).send({ ok: false, error: 'Not a track of the radio rotation' })
+      const { id } = request.params
+      let radio: Radio | null
+      try {
+        radio = await current()
+      } catch (error) {
+        request.log.error(error, 'Failed to load the radio from the database')
+        return reply.status(502).send(RADIO_UNAVAILABLE)
+      }
+      // Only tracks of the rotation, or that just left it, can be streamed, so that this doesn't hand out any
+      // track on SoundCloud.
+      if (!radio?.rotation?.tracks.some((track) => track.id === id) && (departed.get(id) ?? 0) <= Date.now()) {
+        if (radio && !radio.rotation) return reply.status(502).send(RADIO_UNAVAILABLE)
+        return reply.status(404).send(NOT_IN_ROTATION)
       }
 
       try {
-        const { url, expiresAt } = await stream(request.params.id)
+        const { url, expiresAt } = await stream(id)
         return { url, expiresAt: new Date(expiresAt).toISOString() }
       } catch (error) {
         request.log.error(error, 'Failed to get a stream from SoundCloud')
         return reply.status(502).send({ ok: false, error: 'This track cannot be played right now' })
       }
+    },
+  )
+
+  app.get<{ Reply: RadioSettingsResponse }>('/api/admin/radio', { preHandler: requireAuth }, async () => {
+    const radio = await current()
+    return radio ? settingsResponse(radio) : { ok: true, current: null }
+  })
+
+  // The playlist that `link` leads to, read like the rotation is, or the error to respond with.
+  async function readLink(link: unknown): Promise<{ playlist: PlaylistLink; rotation: Rotation } | { status: number; error: string }> {
+    const normalized = typeof link === 'string' ? playlistLink(link) : null
+    if (!normalized) return { status: 400, error: 'Not a link to a SoundCloud playlist' }
+    try {
+      const playlist = await soundcloud.resolvePlaylist(normalized)
+      if (!playlist) return { status: 404, error: 'SoundCloud shows no playlist at this link' }
+      return { playlist, rotation: await readPlaylist(playlist.id, playlist.secretToken) }
+    } catch (error) {
+      app.log.error(error, 'Failed to read a playlist from SoundCloud')
+      return { status: 502, error: `The playlist cannot be read from SoundCloud: ${errorMessage(error)}` }
+    }
+  }
+
+  app.post<{ Body: Partial<RadioPreviewRequest>; Reply: RadioPreviewResponse | ApiError }>(
+    '/api/admin/radio/preview',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const read = await readLink(request.body?.link)
+      if ('error' in read) return reply.status(read.status).send({ ok: false, error: read.error })
+      return { ok: true, playlist: read.rotation.playlist }
+    },
+  )
+
+  app.post<{ Body: Partial<RadioPlaylistRequest>; Reply: RadioPlaylistResponse | ApiError }>(
+    '/api/admin/radio/playlist',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const read = await readLink(request.body?.link)
+      if ('error' in read) return reply.status(read.status).send({ ok: false, error: read.error })
+      const { playlist, rotation } = read
+      if (rotation.tracks.length === 0) {
+        return reply.status(400).send({ ok: false, error: 'None of the tracks of this playlist can be played in full' })
+      }
+
+      const settings: RadioSettings = {
+        playlistId: playlist.id,
+        secretToken: playlist.secretToken,
+        url: rotation.playlist.url,
+        title: rotation.playlist.title,
+        updatedBy: request.user!.email,
+        updatedAt: Date.now(),
+      }
+      await settingsStore.save(settings)
+      // The playlist was just read, so it goes on air without being read again. Its first track goes on air
+      // with the next request, since the track on air is from another playlist (unless the same playlist was
+      // chosen again), and the tracks of the previous playlist can still be streamed for a while.
+      source = sourceFor(settings, rotation)
+      request.log.info({ playlistId: playlist.id, title: settings.title, by: settings.updatedBy }, 'Chose the playlist of the radio rotation')
+      return { ok: true }
     },
   )
 }

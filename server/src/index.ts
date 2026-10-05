@@ -17,6 +17,7 @@ import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 import { spaRoutes } from './spa.js'
 import { soundCloudClient } from './soundcloud.js'
 import { onAirStore } from './on-air.js'
+import { radioSettingsStore } from './radio-settings.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -38,6 +39,7 @@ await app.register(eventsRoutes)
 await app.register(radioRoutes, {
   soundcloud: soundCloudClient({ clientId: config.soundcloudClientId, clientSecret: config.soundcloudClientSecret }),
   onAir: onAirStore(db),
+  settings: radioSettingsStore(db),
 })
 await app.register(notFoundRoutes, { prefix: '/api' })
 
