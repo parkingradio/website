@@ -1,0 +1,29 @@
+.not-found {
+  padding: 2rem 1.5rem 4rem;
+  color: #1c1c1c;
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+  text-align: center;
+}
+
+/* Same heading as the other pages. */
+.not-found h1 {
+  margin: 2rem 0 1rem;
+  text-transform: uppercase;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.25rem, 7vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Same pill as the navbar's active link. */
+.not-found a {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 4.5px 10px;
+  background: #000;
+  color: #f9f9f9;
+  font-size: 13px;
+  text-decoration: none;
+}

@@ -60,4 +60,14 @@ describe('App', () => {
     )
     expect(container).not.toBeEmptyDOMElement()
   })
+
+  it.each(['/foo', '/admin/foo'])('renders a not found page, with the navbar, at %s', (path) => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { name: 'Page introuvable' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'archives' })).toBeInTheDocument()
+  })
 })

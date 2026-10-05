@@ -7,6 +7,7 @@ import { Programmation } from './pages/programmation'
 import { SynthMeetups } from './pages/synth-meetups'
 import { Appliquer } from './pages/appliquer'
 import { Contribuer } from './pages/contribuer'
+import { NotFound } from './pages/not-found'
 import { AdminShell } from './pages/admin/shell'
 import { AcceptInvite } from './pages/admin/accept-invite'
 import { AdminLayout } from './pages/admin/layout'
@@ -38,6 +39,8 @@ function App() {
               <Route path="candidatures" element={<Candidatures />} />
             </Route>
           </Route>
+          {/* Also catches unknown paths under /admin, which are shown like any other unknown URL. */}
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </ConfigProvider>

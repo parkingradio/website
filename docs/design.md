@@ -140,6 +140,12 @@ This isn't a page within the app. The "merch" navbar entry is a direct external 
 Bigcartel store (`https://parkingdotradio.bigcartel.com`), which handles the merch catalog, checkout, and
 payment entirely on its own.
 
+## Page introuvable
+
+Any URL that isn't one of the site's pages, including unknown paths under `/admin`, shows a "page
+introuvable" page under the navigation bar, with a link back to the main page. The server still answers
+these URLs with the app and a 200 status (a "soft 404"), since it doesn't know which pages the app has.
+
 ## Admin
 
 This part of the site provides the tools Parking Radio's team uses to run the project. It lives under
