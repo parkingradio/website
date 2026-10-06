@@ -77,8 +77,8 @@ Other variables differ per deployment and belong on each deployment's GitHub env
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
   `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, `Zone:Zone Settings:Edit`, and
-  `Zone:Single Redirect:Edit`. It also needs `Account:Email Routing Addresses:Edit`, scoped to the
-  account (this one is an account-level permission since mailboxes are an account-level concept in Cloudflare).
+  `Zone:Single Redirect:Edit`. It also needs `Account:Email Routing Addresses:Edit` and `Account:Turnstile:Edit`,
+  scoped to the account (these are account-level concepts in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
 - Variable `SOUNDCLOUD_CLIENT_ID` and secret `SOUNDCLOUD_CLIENT_SECRET`: The credentials of the SoundCloud
@@ -120,7 +120,8 @@ Terraform will wait for that to propagate.
 
 The workflow doesn't allow tearing down the `production` environment, since that should not be done regularly,
 should be done by hand and by someone who knows exactly what they are doing. Tearing down production requires
-manually turning off the database's deletion protection, emptying the assets bucket and running `terraform destroy`.
+manually turning off the database's deletion protection, emptying the assets and private buckets and running
+`terraform destroy`.
 
 ## Static assets
 
@@ -134,6 +135,12 @@ of minutes. Both that validation record and the `assets` CNAME are intentionally
 Cloudflare: ACM has to resolve the former directly, and there's no point putting a proxy in front of a CDN.
 
 Note that the S3 bucket containing assets is versionned, so older versions can be retrieved if needed.
+
+## Private files
+
+Each deployment gets a private S3 bucket for the files only the app reads and writes, as opposed to the public
+assets. The bucket is versioned and keeps the previous versions of files for as long as the database's backups
+are kept.
 
 ## Mail aliases
 

@@ -11,6 +11,9 @@ server {
     ssl_certificate     /etc/nginx/certs/origin.pem;
     ssl_certificate_key /etc/nginx/certs/origin.key;
 
+    # Artist applications come with a photo of up to 10 MB, while the default limit is 1 MB.
+    client_max_body_size 12m;
+
     location / {
         proxy_pass http://app:3000;
         proxy_set_header Host $host;

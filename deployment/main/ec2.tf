@@ -89,6 +89,8 @@ resource "aws_instance" "app" {
     aws_region            = data.aws_region.current.region
     domain                = var.domain
     assets_domain         = local.assets_domain
+    private_bucket        = aws_s3_bucket.private.id
+    turnstile_site_key    = cloudflare_turnstile_widget.applications.sitekey
     db_secret_arn         = aws_db_instance.main.master_user_secret[0].secret_arn
     db_username           = aws_db_instance.main.username
     db_endpoint           = aws_db_instance.main.endpoint

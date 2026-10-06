@@ -1,10 +1,13 @@
-# This file has three jobs:
+# This file has the following jobs:
 # 1. Generate a private key + CSR locally and get it signed by Cloudflare's Origin CA. The
 #    resulting certificate and private key are stored in Secrets Manager (see secrets.tf),
 #    for the EC2 instance to read at boot.
 # 2. Point the domain at the instance: an A record, proxied through Cloudflare so TLS terminates
 #    at their edge.
 # 3. Redirect `www.<domain>` to `<domain>`, when the site is served at the zone apex.
+# 4. Create the Turnstile widget that keeps bots from sending artist applications. Its site key
+#    is public, and handed to the client through /api/config. Its secret key goes to the server
+#    through Secrets Manager.
 data "cloudflare_zone" "this" {
   zone_id = var.cloudflare_zone_id
 }
@@ -83,4 +86,12 @@ resource "cloudflare_ruleset" "www_redirect" {
       }
     }
   }]
+}
+
+resource "cloudflare_turnstile_widget" "applications" {
+  account_id = data.cloudflare_zone.this.account.id
+  name       = "${local.stack_name} applications"
+  domains    = [var.domain]
+  # Cloudflare decides whether a visitor has to click the checkbox, rather than always asking.
+  mode = "managed"
 }

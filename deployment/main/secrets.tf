@@ -1,6 +1,5 @@
 # This file sets up the app's runtime secrets in Secrets Manager: the Cloudflare origin
-# certificate and private key, the JWT signing secret, the bootstrap admin's password, and the
-# SoundCloud app's client secret.
+# certificate and private key, the JWT signing secret, etc.
 resource "random_password" "jwt_secret" {
   length  = 64
   special = false
@@ -26,5 +25,6 @@ resource "aws_secretsmanager_secret_version" "app" {
     jwt_secret               = random_password.jwt_secret.result
     bootstrap_admin_password = random_password.bootstrap_admin.result
     soundcloud_client_secret = var.soundcloud_client_secret
+    turnstile_secret_key     = cloudflare_turnstile_widget.applications.secret
   })
 }

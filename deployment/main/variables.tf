@@ -1,5 +1,5 @@
 variable "cloudflare_api_token" {
-  description = "Cloudflare API token (Zone:DNS:Edit + Zone:SSL and Certificates:Edit for the zone containing var.domain)"
+  description = "Cloudflare API token (see docs/deployment.md for the permissions it needs)"
   type        = string
   sensitive   = true
 }

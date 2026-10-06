@@ -99,6 +99,16 @@ resource "aws_iam_role_policy" "deploy_scoped" {
           "arn:aws:s3:::parking-radio-*-assets/*",
         ]
       },
+      # The app's private bucket for any private data (e.g. artist applications).
+      {
+        Sid    = "PrivateBucket"
+        Effect = "Allow"
+        Action = "s3:*"
+        Resource = [
+          "arn:aws:s3:::parking-radio-*-private",
+          "arn:aws:s3:::parking-radio-*-private/*",
+        ]
+      },
       {
         Sid      = "Cloudfront"
         Effect   = "Allow"
