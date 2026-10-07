@@ -3,6 +3,9 @@ dist/
 .env
 *.local
 
+# Artists' photos, when running without an S3 bucket
+private-bucket/
+
 # Terraform
 .terraform/
 *.tfstate

@@ -10,6 +10,7 @@ import { configRoutes } from './routes/config.js'
 import { notFoundRoutes } from './routes/not-found.js'
 import { eventsRoutes } from './routes/events.js'
 import { radioRoutes } from './routes/radio.js'
+import { artistsRoutes } from './routes/artists.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -18,6 +19,8 @@ import { spaRoutes } from './spa.js'
 import { soundCloudClient } from './soundcloud.js'
 import { onAirStore } from './on-air.js'
 import { radioSettingsStore } from './radio-settings.js'
+import { artistPhotos, artistsStore } from './artists.js'
+import { privateBucket } from './private-bucket.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -40,6 +43,10 @@ await app.register(radioRoutes, {
   soundcloud: soundCloudClient({ clientId: config.soundcloudClientId, clientSecret: config.soundcloudClientSecret }),
   onAir: onAirStore(db),
   settings: radioSettingsStore(db),
+})
+await app.register(artistsRoutes, {
+  store: artistsStore(db),
+  photos: artistPhotos(privateBucket(config.privateFiles)),
 })
 await app.register(notFoundRoutes, { prefix: '/api' })
 

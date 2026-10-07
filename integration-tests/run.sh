@@ -84,6 +84,8 @@ echo "Starting ${IMAGE}..."
 #
 # It's published on a port picked by Docker, so that it can't clash with a dev server or another
 # run, and only on the loopback interface, since the bootstrap admin's password is no secret.
+#
+# Without a private bucket, it keeps artists' photos in a directory it can write to.
 docker run --detach --name "$CONTAINER" --label "$LABEL" --network "$NETWORK" \
     --publish 127.0.0.1::3000 \
     --env-file "${HERE}/../.env.example" \
@@ -91,6 +93,7 @@ docker run --detach --name "$CONTAINER" --label "$LABEL" --network "$NETWORK" \
     --env BOOTSTRAP_ADMIN_EMAIL="$ADMIN_EMAIL" \
     --env BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
     --env ASSETS_DOMAIN="$ASSETS_DOMAIN" \
+    --env PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
     "$IMAGE" >/dev/null
 BASE_URL="http://$(docker port "$CONTAINER" 3000/tcp)"
 export BASE_URL

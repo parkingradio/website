@@ -92,13 +92,16 @@ npm run db:up   # if not already running
 docker run --init --rm -p 3000:3000 --network radio_default \
   --env-file .env.example \
   -e DATABASE_URL="postgres://parking_radio:parking_radio@postgres:5432/parking_radio" \
+  -e PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
   parking-radio
 npm run db:down # when you're done
 ```
 
 Note that `DATABASE_URL` is overridden because `.env.example` points at `localhost` (for running the
 server directly on the host), but this container reaches Postgres over the `radio_default` Docker
-network instead, where it's addressable as `postgres`.
+network instead, where it's addressable as `postgres`. `PRIVATE_BUCKET_DIRECTORY`, the local directory that stands in
+for the private S3 bucket, is overridden too: the server runs as a user who can't write to the app's own directory,
+where `.env.example` puts it, but can write to `/tmp`.
 
 Then `curl localhost:3000/healthz` should return `{"ok":true}`, and `http://localhost:3000` should serve
 the built client.

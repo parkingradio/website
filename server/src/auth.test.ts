@@ -133,6 +133,32 @@ describe('requireAuth', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ user: { id: 'user-1', email: 'admin@example.com' } })
   })
+
+  it("refuses requests that change something from another origin's page, even with a valid session", async () => {
+    const app = buildApp()
+    app.post('/protected', { preHandler: requireAuth }, async () => ({ ok: true }))
+    const cookie = `${SESSION_COOKIE}=${await signSessionToken({ id: 'user-1', email: 'admin@example.com' })}`
+    const post = (headers: Record<string, string>) =>
+      app.inject({ method: 'POST', url: '/protected', headers: { cookie, host: 'parking.radio', ...headers } })
+
+    // E.g. a form on another subdomain, which SameSite=Lax sends the cookie from.
+    for (const site of ['same-site', 'cross-site']) {
+      const response = await post({ 'sec-fetch-site': site })
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
+    }
+    // Browsers that don't send Sec-Fetch-Site are told apart by Origin.
+    expect((await post({ origin: 'https://beta.parking.radio' })).statusCode).toBe(403)
+    expect((await post({ origin: 'null' })).statusCode).toBe(403)
+
+    expect((await post({ 'sec-fetch-site': 'same-origin' })).statusCode).toBe(200)
+    expect((await post({ origin: 'https://parking.radio' })).statusCode).toBe(200)
+    // Not from a browser's page, e.g. curl.
+    expect((await post({})).statusCode).toBe(200)
+    // Reading is fine, e.g. an image on another page.
+    const read = await app.inject({ method: 'GET', url: '/protected', headers: { cookie, 'sec-fetch-site': 'cross-site' } })
+    expect(read.statusCode).toBe(200)
+  })
 })
 
 describe('session cookie helpers', () => {

@@ -19,8 +19,7 @@ expect_status 200
 expect_body_contains "\"email\":\"${ADMIN_EMAIL}\""
 expect_header Set-Cookie 'session=[^;]+;.*HttpOnly'
 
-# The cookie is marked Secure, which curl won't send back over http://, so it is replayed by hand.
-cookie="$(printf '%s' "$HEADERS" | sed -n 's/^[Ss]et-[Cc]ookie: *\(session=[^;]*\).*/\1/p')"
+cookie="$(session_cookie)"
 
 echo "  the session authenticates admin requests"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/me"

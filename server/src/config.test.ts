@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { config } from './config.js'
 
 describe('config', () => {
@@ -91,6 +91,31 @@ describe('config', () => {
     it('returns SOUNDCLOUD_CLIENT_SECRET when set', () => {
       process.env.SOUNDCLOUD_CLIENT_SECRET = 'client-secret'
       expect(config.soundcloudClientSecret).toBe('client-secret')
+    })
+  })
+
+  describe('privateFiles', () => {
+    beforeEach(() => {
+      delete process.env.PRIVATE_BUCKET
+      delete process.env.PRIVATE_BUCKET_DIRECTORY
+    })
+
+    it('is the bucket when PRIVATE_BUCKET is set', () => {
+      process.env.PRIVATE_BUCKET = 'parking-radio-test-private'
+      process.env.PRIVATE_BUCKET_DIRECTORY = '/tmp/private-bucket'
+      expect(config.privateFiles).toEqual({ bucket: 'parking-radio-test-private' })
+    })
+
+    it('is PRIVATE_BUCKET_DIRECTORY otherwise', () => {
+      process.env.PRIVATE_BUCKET_DIRECTORY = '/tmp/private-bucket'
+      expect(config.privateFiles).toEqual({ directory: '/tmp/private-bucket' })
+    })
+
+    it('throws a clear error when neither is set, in development as in production', () => {
+      delete process.env.NODE_ENV
+      expect(() => config.privateFiles).toThrow('Missing required environment variable: PRIVATE_BUCKET (or PRIVATE_BUCKET_DIRECTORY)')
+      process.env.NODE_ENV = 'production'
+      expect(() => config.privateFiles).toThrow('Missing required environment variable: PRIVATE_BUCKET (or PRIVATE_BUCKET_DIRECTORY)')
     })
   })
 })

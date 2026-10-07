@@ -37,6 +37,16 @@ export const config = {
   get mailDomain() {
     return process.env.MAIL_DOMAIN
   },
+  // Where the app keeps its private files, e.g. artists' photos: the private S3 bucket, or else a local directory that
+  // stands in for it (e.g. in development). One of the two is required, so that a missing bucket doesn't go unnoticed
+  // until the first file.
+  get privateFiles(): { bucket: string } | { directory: string } {
+    const bucket = process.env.PRIVATE_BUCKET
+    if (bucket) return { bucket }
+    const directory = process.env.PRIVATE_BUCKET_DIRECTORY
+    if (directory) return { directory }
+    throw new Error('Missing required environment variable: PRIVATE_BUCKET (or PRIVATE_BUCKET_DIRECTORY)')
+  },
   // Required: without it the client builds asset URLs against `undefined` and every image on the
   // site breaks, which is much harder to diagnose than failing at startup.
   get assetsDomain() {

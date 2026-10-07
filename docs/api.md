@@ -9,7 +9,7 @@ or change an endpoint, update both.
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`.
+  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`.
 - **Errors.** A request that fails gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and
   `error`, a message meant for people, in English unless it's shown to the public (`ApiError` in
   `shared/src/error.ts`). Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
@@ -18,6 +18,8 @@ or change an endpoint, update both.
 - **Sessions.** Logging in sets a `session` cookie: a JWT signed by the server, HTTP-only, `SameSite=Lax`, `Secure` in
   production, which lasts 7 days. Endpoints marked "admin" require it, and fail with 401
   (`{"ok": false, "error": "Unauthorized"}`) without a valid one. Every admin can do everything: there are no roles.
+  Since `SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET` that a
+  browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail with 403.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
   address: the one Cloudflare puts in `CF-Connecting-IP` in production, since requests reach the server through
   Cloudflare and nginx. Over the limit, they get a 429 error.
@@ -42,6 +44,12 @@ can be `null`.
 | `GET /api/admin/radio` | admin | The playlist the radio's rotation is read from | `radio.ts` |
 | `POST /api/admin/radio/preview` | admin | What the radio would read from a playlist | `radio.ts` |
 | `POST /api/admin/radio/playlist` | admin | Choosing the playlist the rotation is read from | `radio.ts` |
+| `GET /api/admin/artists` | admin | Every artist | `artists.ts` |
+| `POST /api/admin/artists` | admin | Adding an artist, with their photo | `artists.ts` |
+| `GET /api/admin/artists/:id` | admin | An artist | `artists.ts` |
+| `GET /api/admin/artists/:id/photo` | admin | An artist's photo | — |
+| `PUT /api/admin/artists/:id` | admin | Changing an artist's profile or photo | `artists.ts` |
+| `DELETE /api/admin/artists/:id` | admin | Deleting an artist and their photo | `artists.ts` |
 
 ## Health and configuration
 
@@ -230,3 +238,92 @@ there) or 502 (SoundCloud can't be reached).
 
 Reads the rotation from the playlist at `link` from now on, and responds `{"ok": true}`: its first track goes on air
 right away. Fails like the preview, and with 400 when none of the playlist's tracks can be played in full.
+
+## Artists
+
+The artists Parking Radio knows, each with their profile and a photo, are rows of the `artists` table
+(`server/src/schema.ts`). An artist is known by their email: two artists can't have the same one, whatever its case.
+The rules a profile has to follow are in `shared/src/artists.ts`, and the server checks every profile it's sent
+against them. The server explains what's wrong with a profile or a photo in French, unlike its other admin errors,
+because artists will see the same messages when they apply.
+
+The photo is a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents. It's kept in the app's
+private S3 bucket, or in a local directory in development, and only the server reads it.
+
+A profile has:
+
+| Field | Type | |
+|---|---|---|
+| `kind` | `"artist"` or `"collective"` | An artist usually gets an hour of a time slot, a collective a whole slot |
+| `name` | string | The artist's name, or the collective's. Up to 100 characters |
+| `members` | list of strings | For a collective, the names of its artists, at least one, each up to 100 characters. Empty for an artist |
+| `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` |
+| `city` | string | As the artist wrote it. Up to 100 characters |
+| `genres` | list of strings | The ids of at least one of `GENRES` (e.g. `"drum-and-bass"`), most important first |
+| `bio` | string | Up to 1500 characters |
+| `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one: see below |
+| `email` | string | What the artist is known by. Up to 200 characters |
+| `phone` | string | At least 7 digits. Up to 40 characters |
+
+Links are stored as profile names, which the server reduces what was typed or pasted to: e.g.
+`https://soundcloud.com/parkingdotradio/sets/x` is stored as `parkingdotradio`. For `web`, it's the address itself.
+Either is up to 200 characters.
+`linkSite(id).url(value)` turns a profile name back into an address.
+
+An artist, as the endpoints below return them, is their profile with:
+
+| Field | Type | |
+|---|---|---|
+| `id` | string | |
+| `createdAt` | string | When the artist was added |
+| `createdBy` | string or null | The email of the admin who added the artist, or null when they added themselves, by applying |
+| `updatedBy` | string or null | The email of the admin who last changed the artist |
+| `updatedAt` | string or null | When |
+
+### `GET /api/admin/artists` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `artists` | list of artists | By name, whatever its case |
+
+### `GET /api/admin/artists/:id` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `artist` | artist | |
+
+Fails with 404 when there's no such artist.
+
+### `GET /api/admin/artists/:id/photo` (admin)
+
+Responds with the photo itself, with the type it was checked to have, rather than JSON. Browsers are told not to
+guess another type (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`). Fails with
+404 when there's no such artist, or when their photo is missing.
+
+### `POST /api/admin/artists` (admin)
+
+Adds an artist. It's `multipart/form-data`, with two parts: `artist`, the profile as JSON, in a field rather than a
+file, and `photo`, the artist's photo. A few other fields or files, e.g. a form's submit button, are ignored.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `artist` | artist | As they were added |
+
+Fails with 400 (an invalid profile or photo, or a malformed request), 409 (another artist has that email) or 413 (a
+photo larger than 10 MB).
+
+### `PUT /api/admin/artists/:id` (admin)
+
+Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`, except that `photo` is optional:
+without one, the artist keeps theirs. With one, it replaces theirs, which is deleted. Responds like
+`POST /api/admin/artists`, with the artist as they are then, and fails like it, and with 404 when there's no such
+artist.
+
+### `DELETE /api/admin/artists/:id` (admin)
+
+Deletes an artist and their photo, and responds `{"ok": true}`. The photo stays in the bucket's previous versions for
+as long as the database's backups are kept, like the artist's row, and is gone for good after that. Fails with 404 when
+there's no such artist.

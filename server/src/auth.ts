@@ -61,7 +61,28 @@ export function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(SESSION_COOKIE, { path: '/' })
 }
 
+// Whether a request that changes something was sent by another origin's page, e.g. a form on another subdomain
+// posting to the admin endpoints, which SameSite=Lax still sends the session cookie with. Browsers say where requests
+// come from in Sec-Fetch-Site, or else in Origin. Requests with neither don't come from a page, so they only have the
+// cookie if whoever sends them has it.
+function isCrossOrigin(request: FastifyRequest): boolean {
+  if (request.method === 'GET' || request.method === 'HEAD') return false
+  const site = request.headers['sec-fetch-site']
+  if (site) return site !== 'same-origin' && site !== 'none'
+  const origin = request.headers.origin
+  if (!origin) return false
+  try {
+    return new URL(origin).host !== request.headers.host
+  } catch {
+    return true // e.g. "null", from a sandboxed page
+  }
+}
+
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (isCrossOrigin(request)) {
+    reply.code(403).send({ ok: false, error: 'Cross-origin request refused' } satisfies ApiError)
+    return
+  }
   const token = request.cookies[SESSION_COOKIE]
   const user = token ? await verifySessionToken(token) : null
   if (!user) {

@@ -49,6 +49,13 @@ login() {
         --data "{\"email\":\"$2\",\"password\":\"$3\"}" "${BASE_URL}/api/auth/login"
 }
 
+# session_cookie -- the session cookie set by the last request, e.g. a login, as a Cookie header's value.
+#
+# The cookie is marked Secure, which curl won't send back over http://, so checks replay it by hand.
+session_cookie() {
+    printf '%s' "$HEADERS" | sed -n 's/^[Ss]et-[Cc]ookie: *\(session=[^;]*\).*/\1/p'
+}
+
 # expect_status <code>
 expect_status() {
     if [ "$STATUS" != "$1" ]; then
