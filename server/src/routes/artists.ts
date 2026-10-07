@@ -1,12 +1,12 @@
-import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
-import { DrizzleQueryError } from 'drizzle-orm'
 import { PHOTO_MAX_BYTES } from 'shared/artists'
 import type { Artist, ArtistProfile, ArtistResponse, ArtistsResponse, DeleteArtistResponse } from 'shared/artists'
 import type { ApiError } from 'shared/error'
 import { EmailTaken, InvalidProfile, validatePhoto, validateProfile } from '../artists.js'
 import type { ArtistsStore, Photos, StoredArtist } from '../artists.js'
 import { requireAuth } from '../auth.js'
+import { keepQueryValuesPrivate } from '../query-errors.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them.
 
@@ -89,28 +89,12 @@ type ArtistsOptions = {
 
 type ById = { Params: { id: string } }
 
-// What's worth logging of an error, without the values of a query that failed (see `setErrorHandler` below).
-function withoutValues(error: Error): object {
-  if (!(error instanceof DrizzleQueryError)) return error
-  const cause: { message?: string; code?: string } | undefined = error.cause
-  return { type: 'DrizzleQueryError', query: error.query, cause: { message: cause?.message, code: cause?.code } }
-}
-
 export async function artistsRoutes(app: FastifyInstance, { store, photos }: ArtistsOptions) {
   // Fields and files other than the profile and the photo, e.g. a form's submit button, are ignored, as long as there
   // are only a few.
   await app.register(multipart, { limits: { files: 5, fileSize: PHOTO_MAX_BYTES, fields: 10, fieldSize: 64 * 1024 } })
 
-  // Drizzle's errors list the values of the query that failed, i.e. an artist's personal data, which mustn't end up
-  // in the logs, or in the response, where Fastify would put the message. Only the query and what Postgres said are
-  // logged, and the response says nothing more than that something went wrong.
-  app.setErrorHandler<FastifyError>((error, request, reply) => {
-    if (error.statusCode && error.statusCode < 500) {
-      return reply.status(error.statusCode).send({ ok: false, error: error.message } satisfies ApiError)
-    }
-    request.log.error({ err: withoutValues(error) }, 'Failed to handle a request about artists')
-    return reply.status(500).send({ ok: false, error: 'Internal server error' } satisfies ApiError)
-  })
+  keepQueryValuesPrivate(app, 'Failed to handle a request about artists')
 
   // A photo that was stored but isn't the photo of any artist (anymore) is only worth knowing about if it can't be
   // deleted.

@@ -49,7 +49,13 @@ can be `null`.
 | `GET /api/admin/artists/:id` | admin | An artist | `artists.ts` |
 | `GET /api/admin/artists/:id/photo` | admin | An artist's photo | — |
 | `PUT /api/admin/artists/:id` | admin | Changing an artist's profile or photo | `artists.ts` |
-| `DELETE /api/admin/artists/:id` | admin | Deleting an artist and their photo | `artists.ts` |
+| `DELETE /api/admin/artists/:id` | admin | Deleting an artist, their photo and their applications | `artists.ts` |
+| `GET /api/admin/applications` | admin | Every application, or an artist's | `applications.ts` |
+| `POST /api/admin/applications` | admin | Creating an application for an artist | `applications.ts` |
+| `GET /api/admin/applications/:id` | admin | An application | `applications.ts` |
+| `PUT /api/admin/applications/:id` | admin | Changing an application | `applications.ts` |
+| `PUT /api/admin/applications/:id/status` | admin | Accepting or rejecting an application | `applications.ts` |
+| `DELETE /api/admin/applications/:id` | admin | Deleting an application | `applications.ts` |
 
 ## Health and configuration
 
@@ -324,6 +330,85 @@ artist.
 
 ### `DELETE /api/admin/artists/:id` (admin)
 
-Deletes an artist and their photo, and responds `{"ok": true}`. The photo stays in the bucket's previous versions for
+Deletes an artist, their photo and their applications, and responds `{"ok": true}`. The photo stays in the bucket's previous versions for
 as long as the database's backups are kept, like the artist's row, and is gone for good after that. Fails with 404 when
 there's no such artist.
+
+## Applications
+
+Artists apply for a set at Parking Radio by sending an application. It says when they'd like to play and what they'd
+do. Applications are stored in the `applications` table (`server/src/schema.ts`). Each one belongs to an artist, and is
+deleted when the artist is deleted.
+
+The server checks every application against the rules in `shared/src/applications.ts`. These rules only make sure the
+data is valid. Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are
+in French, like for profiles, because artists will see them.
+
+For now, only admins can create applications, and only for artists who already exist.
+
+An application has these fields:
+
+| Field | Type | |
+|---|---|---|
+| `dates` | list of strings | The days the artist would like to play, sorted. At least one. Past days are allowed, e.g. to import old applications |
+| `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end` in Québec time, e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
+| `prestations` | list of strings | What the artist would do, e.g. `"DJ"` or `"Performance live"`, as they wrote it. Each one is up to 60 characters. Can be empty |
+| `details` | string | The artist's questions or other details. Up to 2000 characters. Can be empty |
+
+The endpoints below also return these fields:
+
+| Field | Type | |
+|---|---|---|
+| `id` | string | |
+| `artistId` | string | The artist who applied |
+| `createdAt`, `createdBy` | string | When the application was created, and the email of the admin who created it |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count |
+| `status` | `"new"`, `"accepted"` or `"rejected"` | Every application starts as `"new"` |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+
+### `GET /api/admin/applications[?artist=<id>]` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `applications` | list of applications | Newest first. With `artist`, only that artist's applications. An unknown artist has none |
+
+### `GET /api/admin/applications/:id` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `application` | application | |
+
+Fails with 404 if the application doesn't exist.
+
+### `POST /api/admin/applications` (admin)
+
+Creates an application. The request has the application's fields, plus `artistId`: the id of the artist who's
+applying.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `application` | application | The new application |
+
+Fails with 400 if the application isn't valid or the artist doesn't exist.
+
+### `PUT /api/admin/applications/:id` (admin)
+
+Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`.
+The artist and the status don't change. The response is the same as for `POST /api/admin/applications`, with the
+updated application. Fails with 400 if the application isn't valid, or 404 if it doesn't exist.
+
+### `PUT /api/admin/applications/:id/status` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `status` | `"new"`, `"accepted"` or `"rejected"` | |
+
+Changes an application's status. The response is the same as for `POST /api/admin/applications`. Fails with 400 if
+`status` isn't one of these values, or 404 if the application doesn't exist.
+
+### `DELETE /api/admin/applications/:id` (admin)
+
+Deletes an application, and responds `{"ok": true}`. Fails with 404 if the application doesn't exist.

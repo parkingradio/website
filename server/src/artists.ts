@@ -18,6 +18,8 @@ import type { ArtistProfile, LinkSiteId } from 'shared/artists'
 import type { db as Database } from './db.js'
 import type { PrivateFiles } from './private-bucket.js'
 import { artists } from './schema.js'
+import { violatesConstraint } from './query-errors.js'
+import { isUuid } from './uuid.js'
 
 // Checks the profiles and photos sent for artists against the rules in shared/src/artists.ts, keeps artists in the
 // database, and keeps their photos in the private bucket.
@@ -26,18 +28,18 @@ import { artists } from './schema.js'
 export class InvalidProfile extends Error {}
 
 // The text in `value`, trimmed. `field` names it in the error when it's too long, e.g. "La bio", and `missing` is
-// the error when there's none, if it's required.
-function text(value: unknown, field: string, maxLength: number, missing: string | null): string {
+// the error when there's none, if it's required. The error is an `Invalid`, an InvalidProfile unless said otherwise.
+export function text(value: unknown, field: string, maxLength: number, missing: string | null, Invalid = InvalidProfile): string {
   const trimmed = typeof value === 'string' ? value.trim() : ''
-  if (!trimmed && missing) throw new InvalidProfile(missing)
-  if (trimmed.length > maxLength) throw new InvalidProfile(`${field} dépasse ${maxLength} caractères.`)
+  if (!trimmed && missing) throw new Invalid(missing)
+  if (trimmed.length > maxLength) throw new Invalid(`${field} dépasse ${maxLength} caractères.`)
   return trimmed
 }
 
 // Like `text`, for a field that's a single line, e.g. a name: each run of spaces, tabs or line breaks in it becomes a
 // single space.
-function line(value: unknown, field: string, maxLength: number, missing: string | null): string {
-  return text(typeof value === 'string' ? value.replace(/\s+/g, ' ') : value, field, maxLength, missing)
+export function line(value: unknown, field: string, maxLength: number, missing: string | null, Invalid = InvalidProfile): string {
+  return text(typeof value === 'string' ? value.replace(/\s+/g, ' ') : value, field, maxLength, missing, Invalid)
 }
 
 // Checks a profile, and returns what's saved of it: trimmed, without blank entries, and with links reduced to
@@ -136,15 +138,6 @@ export type ArtistsStore = {
   delete(id: string): Promise<StoredArtist | null>
 }
 
-// Postgres refuses to look up an id that isn't a UUID, rather than find nothing.
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-// Drizzle wraps the database's errors, which say which constraint a row breaks.
-function isEmailTaken(error: unknown): boolean {
-  const cause: unknown = error instanceof Error ? error.cause : undefined
-  return cause instanceof Error && 'constraint' in cause && cause.constraint === 'artists_email_lower_idx'
-}
-
 export function artistsStore(db: typeof Database): ArtistsStore {
   return {
     async list() {
@@ -152,7 +145,7 @@ export function artistsStore(db: typeof Database): ArtistsStore {
     },
 
     async get(id) {
-      if (!UUID.test(id)) return null
+      if (!isUuid(id)) return null
       const [row] = await db.select().from(artists).where(eq(artists.id, id))
       return row ?? null
     },
@@ -162,13 +155,13 @@ export function artistsStore(db: typeof Database): ArtistsStore {
         const [row] = await db.insert(artists).values(artist).returning()
         return row
       } catch (error) {
-        if (isEmailTaken(error)) throw new EmailTaken()
+        if (violatesConstraint(error, 'artists_email_lower_idx')) throw new EmailTaken()
         throw error
       }
     },
 
     async update(id, changes) {
-      if (!UUID.test(id)) return null
+      if (!isUuid(id)) return null
       try {
         return await db.transaction(async (tx) => {
           const [before] = await tx.select().from(artists).where(eq(artists.id, id)).for('update')
@@ -177,13 +170,13 @@ export function artistsStore(db: typeof Database): ArtistsStore {
           return { before, after }
         })
       } catch (error) {
-        if (isEmailTaken(error)) throw new EmailTaken()
+        if (violatesConstraint(error, 'artists_email_lower_idx')) throw new EmailTaken()
         throw error
       }
     },
 
     async delete(id) {
-      if (!UUID.test(id)) return null
+      if (!isUuid(id)) return null
       const [row] = await db.delete(artists).where(eq(artists.id, id)).returning()
       return row ?? null
     },

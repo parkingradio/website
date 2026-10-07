@@ -11,6 +11,7 @@ import { notFoundRoutes } from './routes/not-found.js'
 import { eventsRoutes } from './routes/events.js'
 import { radioRoutes } from './routes/radio.js'
 import { artistsRoutes } from './routes/artists.js'
+import { applicationsRoutes } from './routes/applications.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -21,6 +22,7 @@ import { onAirStore } from './on-air.js'
 import { radioSettingsStore } from './radio-settings.js'
 import { artistPhotos, artistsStore } from './artists.js'
 import { privateBucket } from './private-bucket.js'
+import { applicationsStore } from './applications.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -48,6 +50,7 @@ await app.register(artistsRoutes, {
   store: artistsStore(db),
   photos: artistPhotos(privateBucket(config.privateFiles)),
 })
+await app.register(applicationsRoutes, { store: applicationsStore(db) })
 await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')

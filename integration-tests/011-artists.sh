@@ -52,7 +52,7 @@ expect_body_contains 'Choisis ton pays.'
 echo "  an artist is added, and read back as they were sent"
 artist POST "${BASE_URL}/api/admin/artists" "$PROFILE" "${PHOTOS}/photo.jpg"
 expect_status 200
-id="$(printf '%s' "$BODY" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+id="$(body_id)"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
 expect_body_contains '"genres":["techno","acid"]'

@@ -1,7 +1,15 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex, smallint, check, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, check, jsonb, date } from 'drizzle-orm/pg-core'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
+import { APPLICATION_STATUSES } from 'shared/applications'
+import type { ApplicationStatus, TimeSlot } from 'shared/applications'
 import { ARTIST_KINDS } from 'shared/artists'
 import type { ArtistKind, GenreId, LinkSiteId } from 'shared/artists'
+
+// A check that `column` is one of `values`.
+function oneOf(column: AnyPgColumn, values: readonly string[]) {
+  return sql`${column} in (${sql.raw(values.map((value) => `'${value}'`).join(', '))})`
+}
 
 export const users = pgTable(
   'users',
@@ -81,6 +89,36 @@ export const artists = pgTable(
   },
   (table) => [
     uniqueIndex('artists_email_lower_idx').on(sql`lower(${table.email})`),
-    check('artists_kind', sql`${table.kind} in (${sql.raw(ARTIST_KINDS.map((kind) => `'${kind}'`).join(', '))})`),
+    check('artists_kind', oneOf(table.kind, ARTIST_KINDS)),
+  ],
+)
+
+// Artists' applications for a set. Each one belongs to an artist, and is deleted with them. See `ApplicationFields` in
+// shared/src/applications.ts for what each field can contain.
+export const applications = pgTable(
+  'applications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text('created_by').notNull(), // the email of the admin who created the application
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    dates: date('dates').array().notNull(), // sorted
+    timeSlots: jsonb('time_slots').$type<TimeSlot[]>().notNull(), // sorted; empty means any time
+    prestations: text('prestations').array().notNull(),
+    details: text('details').notNull(),
+    // The email of the admin who last changed the application, and when (null until then).
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+    // The status admins gave the application, and the email of the admin who last changed it, and when (null until
+    // then).
+    status: text('status').$type<ApplicationStatus>().notNull().default('new'),
+    statusUpdatedBy: text('status_updated_by'),
+    statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('applications_artist_id_idx').on(table.artistId),
+    check('applications_status', oneOf(table.status, APPLICATION_STATUSES)),
   ],
 )

@@ -56,6 +56,11 @@ session_cookie() {
     printf '%s' "$HEADERS" | sed -n 's/^[Ss]et-[Cc]ookie: *\(session=[^;]*\).*/\1/p'
 }
 
+# body_id -- the "id" in the body of the last request, e.g. of what it created.
+body_id() {
+    printf '%s' "$BODY" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'
+}
+
 # expect_status <code>
 expect_status() {
     if [ "$STATUS" != "$1" ]; then

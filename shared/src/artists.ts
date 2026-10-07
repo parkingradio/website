@@ -70,8 +70,8 @@ export type ArtistResponse = { ok: true; artist: Artist }
 // artist).
 export type ArtistRequest = ArtistProfile
 
-// `DELETE /api/admin/artists/:id`: deletes an artist and their photo. Requires a session. Fails with 401 (no valid
-// session) or 404 (no such artist).
+// `DELETE /api/admin/artists/:id`: deletes an artist, their photo and their applications. Requires a session. Fails
+// with 401 (no valid session) or 404 (no such artist).
 export type DeleteArtistResponse = { ok: true }
 
 // ISO 3166-1 alpha-2 codes, and XK, which ISO hasn't assigned but is used for Kosovo. `Intl.DisplayNames` gives
