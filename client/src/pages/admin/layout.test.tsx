@@ -48,14 +48,6 @@ describe('Admin pages', () => {
     }
   })
 
-  it('shows a placeholder at /admin/calendrier', async () => {
-    mockFetch(LOGGED_IN)
-    renderAt('/admin/calendrier')
-
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Calendrier' })).toBeInTheDocument())
-    expect(screen.getByText('Pas encore implémenté !')).toBeInTheDocument()
-  })
-
   it('shows the login form in place of the page while logged out, then the page once logged in', async () => {
     mockFetch({ ...LOGGED_OUT, '/api/auth/login': { ok: true, email: 'admin@example.com' }, '/api/admin/invite': { ok: true } })
     renderAt('/admin/admins')

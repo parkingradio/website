@@ -170,6 +170,16 @@
   color: #666;
 }
 
+/* The calendar we use for now, embedded from elsewhere. It's as tall as most of the screen, since the section
+   doesn't stretch to fill it. */
+.admin-calendar {
+  display: block;
+  width: 100%;
+  height: 80vh;
+  margin-top: 1.5rem;
+  border: none;
+}
+
 /* Who did what and when, under what it's about. */
 .admin-meta {
   margin: 0.5rem 0 0;
