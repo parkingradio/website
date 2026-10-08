@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDay, isTime } from 'shared/applications'
+import { checkApplication, isDay, isTime } from 'shared/applications'
 import type { ApplicationFields } from 'shared/applications'
 import { validateApplication } from './applications.js'
 
@@ -85,5 +85,24 @@ describe('validateApplication', () => {
     for (const sent of [null, undefined, 'application', 42]) {
       expect(() => validateApplication(sent)).toThrow('Choisis au moins une date.')
     }
+  })
+})
+
+describe('checkApplication', () => {
+  it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
+    expect(checkApplication({ dates: [''], timeSlots: [{ start: '18:00', end: '' }], prestations: ['x'.repeat(61)], details: 'x'.repeat(2001) })).toEqual({
+      errors: {
+        dates: 'Une des dates est invalide.',
+        timeSlots: 'Une des plages horaires est invalide.',
+        prestations: 'Une prestation dépasse 60 caractères.',
+        details: 'Le champ « Questions ou détails » dépasse 2000 caractères.',
+      },
+    })
+  })
+
+  it('returns the application without errors when it is valid', () => {
+    const { application, errors } = checkApplication(fields())
+    expect(errors).toBeUndefined()
+    expect(application?.dates).toEqual(['2026-12-10', '2027-01-15'])
   })
 })

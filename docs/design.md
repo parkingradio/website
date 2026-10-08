@@ -181,6 +181,47 @@ above). From top to bottom, it shows:
 
 ### Candidatures
 
-At `/admin/candidatures`: lists the artist applications submitted through the "Appliquer" form. Not designed
-yet. This depends on that form being implemented first, since applications currently go through the original
-Google Form.
+At `/admin/candidatures`: the artists' applications for a set, for the team to go through. An application belongs
+to an artist (see "Artistes" below), and says when they'd like to play (days, and times of day if they have a
+preference), what they'd do (e.g. DJ, live performance) and anything else they'd like to say. Each one has a
+status: "nouvelle" when it's created, then "retenue" or "refusée" as an admin decides.
+
+The section lists every application, most recent first, with when it was created, the artist, their first few
+dates, the prestations and the status. Buttons above the list show only the applications with a status, with how
+many there are of each.
+
+Clicking an application opens it at `/admin/candidatures/<id>`. From top to bottom, it shows:
+
+- "Statut": the status, as buttons that change it, and which admin last changed it, and when.
+- "Artiste": who the artist is and how to reach them, linking to their page.
+- "Candidature": everything in the application, and a button that changes it in a form in its place.
+- "Supprimer": deletes the application for good, after confirming. The artist stays.
+
+"nouvelle candidature" creates an application by hand, e.g. to bring in one that came through the original Google
+Form: a form with the artist, picked from those in the "Artistes" section, then the application itself. An
+artist's page leads to it with that artist picked already.
+
+Applications will mostly come from the "Appliquer" form once it's implemented. Until then, they go through the
+original Google Form.
+
+### Artistes
+
+At `/admin/artistes`: the artists Parking Radio knows of, which are the artists who applied. An artist is an
+artist or a collective, with their name (and for a collective, the names of its artists), country and city,
+genres (most important first), bio, links, email address, phone number and photo.
+
+The section lists every artist, by name, with which of the two they are, their city, genres and how many
+applications they have.
+
+Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo, their links
+rebuilt from the profile names, who added them (or that they applied by themselves) and who last changed them. A
+button changes the artist in a form in its place, where the photo is only replaced if another one is chosen. Under
+it, their applications are listed like in "Candidatures", with a button to create another one. At the bottom, the
+artist can be deleted for good, with their photo and applications, after confirming.
+
+"ajouter un artiste" adds an artist by hand, with the same form. In it, a collective's artists are typed one by one
+and pinned with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left
+typed without being pinned. Genres are tags to click, which pins them in order of importance, and the country is
+typed, with the matching countries suggested, of which one has to be picked.
+Each field says what's wrong with it once it's left, with the same rules and messages as the server (see
+`checkProfile` in shared/src/artists.ts), and so does the application form (see `checkApplication`).

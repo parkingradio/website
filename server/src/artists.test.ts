@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { linkSite, parseLink } from 'shared/artists'
+import { checkProfile, linkSite, parseLink, photoError } from 'shared/artists'
 import type { ArtistProfile, LinkSiteId } from 'shared/artists'
 import { artistPhotos, validatePhoto, validateProfile } from './artists.js'
 import type { PrivateFiles } from './private-bucket.js'
@@ -182,6 +182,50 @@ describe('validateProfile', () => {
     expect(error({ phone: '123' })).toBe('Indique un numéro de téléphone valide.')
     expect(error({ email: `${'a'.repeat(190)}@example.com` })).toBe("L'adresse e-mail dépasse 200 caractères.")
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
+  })
+})
+
+describe('checkProfile', () => {
+  it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
+    expect(checkProfile({ kind: 'collective', members: ['  '], country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' })).toEqual({
+      errors: {
+        name: 'Indique le nom du collectif.',
+        members: 'Indique au moins un artiste du collectif.',
+        country: 'Choisis ton pays.',
+        city: 'Indique ta ville.',
+        genres: 'Choisis au moins un genre.',
+        bio: 'Écris quelques lignes de bio.',
+        links: 'SoundCloud : il manque ton nom de profil.',
+        email: 'Indique une adresse e-mail valide.',
+        phone: 'Indique ton numéro de téléphone.',
+      },
+    })
+  })
+
+  it('returns the profile without errors when it is valid', () => {
+    const { profile, errors } = checkProfile({
+      kind: 'artist',
+      name: 'DJ Test',
+      members: ['ignored'],
+      country: 'CA',
+      city: 'Québec',
+      genres: ['techno'],
+      bio: 'Une bio.',
+      links: { instagram: '@parking.radio', web: '' },
+      email: 'artiste@example.com',
+      phone: '418 555-0123',
+    })
+    expect(errors).toBeUndefined()
+    expect(profile).toMatchObject({ members: [], links: { instagram: 'parking.radio' } })
+  })
+})
+
+describe('photoError', () => {
+  it('takes a JPEG, PNG or WebP photo up to the size limit', () => {
+    for (const type of ['image/jpeg', 'image/png', 'image/webp']) expect(photoError({ type, size: 10 * 1024 * 1024 })).toBeNull()
+    expect(photoError({ type: 'image/gif', size: 1 })).toBe('Ajoute une photo en JPEG, PNG ou WebP.')
+    expect(photoError(null)).toBe('Ajoute une photo en JPEG, PNG ou WebP.')
+    expect(photoError({ type: 'image/png', size: 10 * 1024 * 1024 + 1 })).toBe('La photo dépasse 10 Mo.')
   })
 })
 

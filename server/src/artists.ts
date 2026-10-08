@@ -1,20 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
-import {
-  ARTIST_KINDS,
-  BIO_MAX_LENGTH,
-  CITY_MAX_LENGTH,
-  COUNTRIES,
-  EMAIL_MAX_LENGTH,
-  GENRES,
-  NAME_MAX_LENGTH,
-  PHONE_MAX_LENGTH,
-  isEmailAddress,
-  isPhoneNumber,
-  linkSite,
-  parseLink,
-} from 'shared/artists'
-import type { ArtistProfile, LinkSiteId } from 'shared/artists'
+import { checkProfile, photoError } from 'shared/artists'
+import type { ArtistProfile } from 'shared/artists'
+import { firstError } from 'shared/checks'
 import type { db as Database } from './db.js'
 import type { PrivateFiles } from './private-bucket.js'
 import { artists } from './schema.js'
@@ -27,89 +15,33 @@ import { isUuid } from './uuid.js'
 // Thrown when a profile or photo is invalid. Its message tells the artist what's wrong, in French.
 export class InvalidProfile extends Error {}
 
-// The text in `value`, trimmed. `field` names it in the error when it's too long, e.g. "La bio", and `missing` is
-// the error when there's none, if it's required. The error is an `Invalid`, an InvalidProfile unless said otherwise.
-export function text(value: unknown, field: string, maxLength: number, missing: string | null, Invalid = InvalidProfile): string {
-  const trimmed = typeof value === 'string' ? value.trim() : ''
-  if (!trimmed && missing) throw new Invalid(missing)
-  if (trimmed.length > maxLength) throw new Invalid(`${field} dépasse ${maxLength} caractères.`)
-  return trimmed
-}
-
-// Like `text`, for a field that's a single line, e.g. a name: each run of spaces, tabs or line breaks in it becomes a
-// single space.
-export function line(value: unknown, field: string, maxLength: number, missing: string | null, Invalid = InvalidProfile): string {
-  return text(typeof value === 'string' ? value.replace(/\s+/g, ' ') : value, field, maxLength, missing, Invalid)
-}
-
-// Checks a profile, and returns what's saved of it: trimmed, without blank entries, and with links reduced to
-// profile names. Throws an InvalidProfile otherwise.
+// Checks a profile with `checkProfile`, and returns what's saved of it. Throws an InvalidProfile, saying what's wrong
+// with the first field that's wrong, otherwise.
 export function validateProfile(sent: unknown): ArtistProfile {
-  const artist: Partial<ArtistProfile> = sent !== null && typeof sent === 'object' ? sent : {}
-
-  const kind = artist.kind
-  if (!kind || !ARTIST_KINDS.includes(kind)) {
-    throw new InvalidProfile('Indique si tu postules comme artiste ou comme collectif.')
-  }
-  const collective = kind === 'collective'
-  const name = line(
-    artist.name,
-    collective ? 'Le nom du collectif' : "Le nom d'artiste",
-    NAME_MAX_LENGTH,
-    collective ? 'Indique le nom du collectif.' : "Indique ton nom d'artiste.",
-  )
-
-  // Only a collective lists its artists. Blank entries and duplicates, whatever their case, are dropped.
-  const members: string[] = []
-  const seen = new Set<string>()
-  for (const member of collective && Array.isArray(artist.members) ? artist.members : []) {
-    const memberName = line(member, "Le nom d'un artiste du collectif", NAME_MAX_LENGTH, null)
-    if (!memberName || seen.has(memberName.toLowerCase())) continue
-    seen.add(memberName.toLowerCase())
-    members.push(memberName)
-  }
-  if (collective && members.length === 0) throw new InvalidProfile('Indique au moins un artiste du collectif.')
-
-  const country = typeof artist.country === 'string' ? artist.country : ''
-  if (!COUNTRIES.includes(country)) throw new InvalidProfile('Choisis ton pays.')
-  const city = line(artist.city, 'La ville', CITY_MAX_LENGTH, 'Indique ta ville.')
-
-  // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
-  const genres = Array.isArray(artist.genres) ? [...new Set(artist.genres)] : []
-  if (genres.length === 0) throw new InvalidProfile('Choisis au moins un genre.')
-  if (!genres.every((genre) => GENRES.some(({ id }) => id === genre))) throw new InvalidProfile("Un des genres n'est pas dans la liste.")
-
-  const bio = text(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écris quelques lignes de bio.')
-
-  const links: Partial<Record<LinkSiteId, string>> = {}
-  for (const [id, raw] of Object.entries(artist.links ?? {})) {
-    const site = linkSite(id)
-    if (!site || typeof raw !== 'string') throw new InvalidProfile('Un des liens est invalide.')
-    const { value, error } = parseLink(site, raw)
-    if (error) throw new InvalidProfile(`${site.name} : ${error}.`)
-    if (value) links[site.id] = value
-  }
-  if (Object.keys(links).length === 0) throw new InvalidProfile('Ajoute au moins un lien.')
-
-  const email = line(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indique ton adresse e-mail.')
-  if (!isEmailAddress(email)) throw new InvalidProfile('Indique une adresse e-mail valide.')
-  const phone = line(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indique ton numéro de téléphone.')
-  if (!isPhoneNumber(phone)) throw new InvalidProfile('Indique un numéro de téléphone valide.')
-
-  return { email, kind, name, members, country, city, genres, bio, links, phone }
+  const { profile, errors } = checkProfile(sent)
+  if (errors) throw new InvalidProfile(firstError(errors))
+  return profile
 }
 
 // A photo that was sent, and its MIME type, as checked from its contents.
 export type SentPhoto = { body: Buffer; type: string }
 
-// Checks that the photo is a JPEG, PNG or WebP image, from its first bytes rather than trusting what the browser
-// says, and returns it with its MIME type. Throws an InvalidProfile otherwise, including when there's no photo. Its
-// size is limited when it's received.
+// The type of a photo, told from its first bytes rather than trusting what the browser says: JPEG, PNG or WebP, or
+// null for anything else.
+function photoType(body: Buffer): string | null {
+  if (body.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return 'image/jpeg'
+  if (body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
+  if (body.subarray(0, 4).toString('latin1') === 'RIFF' && body.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp'
+  return null
+}
+
+// Checks the photo with `photoError`, from its type as told from its contents, and returns it with that type. Throws an
+// InvalidProfile otherwise, including when there's no photo.
 export function validatePhoto(body: Buffer | undefined): SentPhoto {
-  if (body?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return { body, type: 'image/jpeg' }
-  if (body?.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { body, type: 'image/png' }
-  if (body?.subarray(0, 4).toString('latin1') === 'RIFF' && body.subarray(8, 12).toString('latin1') === 'WEBP') return { body, type: 'image/webp' }
-  throw new InvalidProfile('Ajoute une photo en JPEG, PNG ou WebP.')
+  const type = body ? photoType(body) : null
+  const error = photoError(body && type ? { type, size: body.length } : null)
+  if (error !== null) throw new InvalidProfile(error)
+  return { body: body!, type: type! }
 }
 
 export type StoredArtist = typeof artists.$inferSelect

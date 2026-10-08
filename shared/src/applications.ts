@@ -5,6 +5,9 @@
 // Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are in French,
 // like for profiles, because artists will see them.
 
+import { checkLine, checkText } from './checks.ts'
+import type { FieldErrors } from './checks.ts'
+
 export type ApplicationFields = {
   // The days the artist would like to play, as "YYYY-MM-DD", sorted. At least one. Past days are allowed.
   dates: string[]
@@ -79,4 +82,54 @@ export function isDay(value: string): boolean {
 // Whether `value` is a "HH:MM" time of day, from 00:00 to 23:59.
 export function isTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+}
+
+// Checks an application's fields, as they were sent or as they're being filled in a form, and returns the cleaned-up
+// version to store:
+// - dates and time slots are sorted, without duplicates
+// - text is trimmed
+// - blank prestations are dropped, and so are duplicates, ignoring case
+// If they aren't valid, returns what's wrong with each field instead.
+export function checkApplication(
+  sent: unknown,
+): { application: ApplicationFields; errors?: undefined } | { application?: undefined; errors: FieldErrors<ApplicationFields> } {
+  const application: Partial<Record<keyof ApplicationFields, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
+  const errors: FieldErrors<ApplicationFields> = {}
+
+  const dates: string[] = []
+  for (const date of Array.isArray(application.dates) ? application.dates : []) {
+    if (typeof date !== 'string' || !isDay(date)) errors.dates = 'Une des dates est invalide.'
+    else if (!dates.includes(date)) dates.push(date)
+  }
+  if (dates.length === 0) errors.dates ??= 'Choisis au moins une date.'
+
+  const timeSlots = new Map<string, TimeSlot>()
+  for (const slot of Array.isArray(application.timeSlots) ? application.timeSlots : []) {
+    const { start, end }: Partial<Record<keyof TimeSlot, unknown>> = slot !== null && typeof slot === 'object' ? slot : {}
+    if (typeof start !== 'string' || typeof end !== 'string' || !isTime(start) || !isTime(end) || start >= end) {
+      errors.timeSlots = 'Une des plages horaires est invalide.'
+    } else {
+      timeSlots.set(`${start}-${end}`, { start, end })
+    }
+  }
+
+  const prestations: string[] = []
+  for (const sentPrestation of Array.isArray(application.prestations) ? application.prestations : []) {
+    const prestation = checkLine(sentPrestation, 'Une prestation', PRESTATION_MAX_LENGTH, null)
+    if (prestation.error !== undefined) errors.prestations ??= prestation.error
+    else if (prestation.value && !prestations.some((other) => other.toLowerCase() === prestation.value.toLowerCase())) prestations.push(prestation.value)
+  }
+
+  const details = checkText(application.details, 'Le champ « Questions ou détails »', DETAILS_MAX_LENGTH, null)
+  if (details.error !== undefined) errors.details = details.error
+
+  if (Object.keys(errors).length > 0) return { errors }
+  return {
+    application: {
+      dates: dates.sort(),
+      timeSlots: [...timeSlots.keys()].sort().map((key) => timeSlots.get(key)!),
+      prestations,
+      details: details.value ?? '',
+    },
+  }
 }

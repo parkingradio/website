@@ -14,7 +14,8 @@ import { AdminLayout } from './pages/admin/layout'
 import { Admins } from './pages/admin/admins'
 import { Calendrier } from './pages/admin/calendrier'
 import { Rotation } from './pages/admin/rotation'
-import { Candidatures } from './pages/admin/candidatures'
+import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
+import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
 
 function App() {
   return (
@@ -36,7 +37,12 @@ function App() {
               <Route path="admins" element={<Admins />} />
               <Route path="calendrier" element={<Calendrier />} />
               <Route path="rotation" element={<Rotation />} />
-              <Route path="candidatures" element={<Candidatures />} />
+              <Route path="candidatures" element={<ApplicationsPage />} />
+              <Route path="candidatures/nouvelle" element={<NewApplicationPage />} />
+              <Route path="candidatures/:id" element={<ApplicationPage />} />
+              <Route path="artistes" element={<ArtistsPage />} />
+              <Route path="artistes/nouveau" element={<NewArtistPage />} />
+              <Route path="artistes/:id" element={<ArtistPage />} />
             </Route>
           </Route>
           {/* Also catches unknown paths under /admin, which are shown like any other unknown URL. */}

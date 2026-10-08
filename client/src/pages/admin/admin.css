@@ -55,7 +55,9 @@
 }
 
 .admin button:hover,
+.admin button[aria-pressed='true'],
 .admin-form button[type='submit'],
+.admin a.admin-button:hover,
 .admin .radio-choose,
 .radio-track-tag,
 .admin-links a.active {
@@ -127,7 +129,9 @@
 }
 
 /* At least 16px, or iOS zooms into the page when an input gets focus. */
-.admin-form input {
+.admin-form input:not([type='radio'], [type='checkbox']),
+.admin-form select,
+.admin-form textarea {
   padding: 0.5rem 0.6rem;
   border: 1px solid #000;
   border-radius: 0;
@@ -137,7 +141,9 @@
   font-size: 16px;
 }
 
-.admin-form input:focus-visible {
+.admin-form input:focus-visible,
+.admin-form select:focus-visible,
+.admin-form textarea:focus-visible {
   outline: 2px solid #000;
   outline-offset: 1px;
 }
@@ -255,6 +261,237 @@
   margin-top: 0.5rem;
 }
 
+/* A link that's a pill, like the buttons: to add something, from a list. */
+.admin a.admin-button {
+  padding: 4.5px 10px;
+  border: 1px solid #000;
+  color: #1c1c1c;
+  text-decoration: none;
+}
+
+/* Under the heading, what to do with what's below: add to it, filter it, change it. */
+.admin-toolbar,
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 1.5rem;
+}
+
+.admin-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #666;
+}
+
+/* Lists of artists and applications. */
+.admin-table {
+  width: 100%;
+  margin-top: 1.5rem;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: #666;
+  font-weight: 300;
+}
+
+.admin-table td:first-child {
+  white-space: nowrap;
+}
+
+.admin-status-new {
+  font-weight: 700;
+}
+
+.admin-status-rejected {
+  color: #666;
+}
+
+/* An artist or an application: the photo, if there's one, then everything about them, as label and value side by
+   side. */
+.admin-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.admin-record img {
+  width: 200px;
+  max-width: 100%;
+  border: 1px solid #ddd;
+}
+
+.admin-record dl,
+dl.admin-record {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.5rem 1.5rem;
+  flex: 1;
+  min-width: min(100%, 20rem);
+  margin: 1.5rem 0 0;
+  line-height: 1.5;
+}
+
+.admin-record dl {
+  margin: 0;
+}
+
+.admin-record dt {
+  color: #666;
+}
+
+.admin-record dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-record dd ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Kept as it was written, line breaks included. */
+.admin-text {
+  white-space: pre-wrap;
+}
+
+/* The forms for artists and applications have more to them than the login form, and longer text. */
+.admin-form-wide {
+  max-width: 600px;
+}
+
+.admin-form fieldset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.admin-form legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.admin-form fieldset .admin-hint {
+  margin: -0.25rem 0 0;
+}
+
+/* Radio buttons and checkboxes, side by side, each with its label to its right. */
+.admin-form .admin-choices {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.admin-form .admin-choices label {
+  flex-direction: row;
+  align-items: center;
+  align-self: auto;
+  gap: 0.4rem;
+}
+
+/* A field, with what's wrong with it under it. */
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-self: stretch;
+}
+
+.admin-form .admin-field-error {
+  margin: 0;
+  color: #b3261e;
+  font-size: 12px;
+}
+
+.admin-form [aria-invalid='true'] {
+  border-color: #b3261e;
+}
+
+.admin-form input[aria-invalid='true'],
+.admin-form select[aria-invalid='true'],
+.admin-form textarea[aria-invalid='true'] {
+  outline: 1px solid #b3261e;
+}
+
+/* What a link that's been read leads to, to check that it's the right one. */
+.admin-link-check {
+  align-self: flex-start;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Every genre, as tags to pin. Those pinned are black, like pressed buttons. */
+.admin-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-tags:focus {
+  outline: none;
+}
+
+.admin-tags[aria-invalid='true'] button {
+  border-color: #b3261e;
+}
+
+.admin-chosen b {
+  margin-right: 0.4rem;
+}
+
+/* A field that's one of a list, e.g. a date, with the button that removes it. */
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Chosen genres, in order, each with the button that removes it. */
+.admin-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-chosen li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-left: 10px;
+  border: 1px solid #000;
+}
+
+.admin .admin-chosen button {
+  padding: 2px 8px;
+  border: none;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 6px;
+}
+
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */
 @media (max-width: 700px) {
   .admin {
@@ -285,5 +522,21 @@
     flex-direction: row;
     align-items: center;
     padding-left: 0;
+  }
+
+  /* Too wide for phones, tables scroll sideways rather than squeezing their columns. */
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .admin-record dl,
+  dl.admin-record {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .admin-record dd {
+    margin-bottom: 0.5rem;
   }
 }

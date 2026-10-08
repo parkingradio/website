@@ -3,6 +3,9 @@
 // below are the ones every profile has to follow, and the server checks each profile against them. The server explains
 // what's wrong with a profile in French, because artists will see its messages.
 
+import { checkLine, checkText } from './checks.ts'
+import type { Checked, FieldErrors } from './checks.ts'
+
 export type ArtistProfile = {
   kind: ArtistKind
   // The artist's name, or the collective's, up to NAME_MAX_LENGTH characters.
@@ -333,4 +336,79 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
 
   if (!value) return { error: 'il manque ton nom de profil' }
   return profile.test(value) && !isReserved(site, value) ? { value } : { error: `ce nom de profil ${site.name} n'est pas valide` }
+}
+
+// Checks a profile, as it was sent or as it's being filled in a form, and returns what's saved of it: trimmed, without
+// blank entries, and with links reduced to profile names. If it isn't valid, returns what's wrong with each field
+// instead. For links, that's the first link that's wrong, or that there's none.
+export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: undefined } | { profile?: undefined; errors: FieldErrors<ArtistProfile> } {
+  const artist: Partial<Record<keyof ArtistProfile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
+  const errors: FieldErrors<ArtistProfile> = {}
+  // The value of a field, or an empty one if it's wrong, after noting why.
+  const check = (field: keyof ArtistProfile, checked: Checked<string>): string => {
+    if (checked.error !== undefined) errors[field] ??= checked.error
+    return checked.value ?? ''
+  }
+
+  const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
+  if (!kind) errors.kind = 'Indique si tu postules comme artiste ou comme collectif.'
+  const collective = kind === 'collective'
+  const name = check(
+    'name',
+    checkLine(artist.name, collective ? 'Le nom du collectif' : "Le nom d'artiste", NAME_MAX_LENGTH, collective ? 'Indique le nom du collectif.' : "Indique ton nom d'artiste."),
+  )
+
+  // Only a collective lists its artists. Blank entries and duplicates, whatever their case, are dropped.
+  const members: string[] = []
+  for (const member of collective && Array.isArray(artist.members) ? artist.members : []) {
+    const memberName = check('members', checkLine(member, "Le nom d'un artiste du collectif", NAME_MAX_LENGTH, null))
+    if (memberName && !members.some((other) => other.toLowerCase() === memberName.toLowerCase())) members.push(memberName)
+  }
+  if (collective && members.length === 0) errors.members ??= 'Indique au moins un artiste du collectif.'
+
+  const country = COUNTRIES.find((code) => code === artist.country)
+  if (!country) errors.country = 'Choisis ton pays.'
+  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, 'Indique ta ville.'))
+
+  // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
+  const genres: GenreId[] = []
+  for (const sentGenre of Array.isArray(artist.genres) ? artist.genres : []) {
+    const genre = GENRES.find(({ id }) => id === sentGenre)
+    if (!genre) errors.genres ??= "Un des genres n'est pas dans la liste."
+    else if (!genres.includes(genre.id)) genres.push(genre.id)
+  }
+  if (genres.length === 0) errors.genres ??= 'Choisis au moins un genre.'
+
+  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écris quelques lignes de bio.'))
+
+  const links: Partial<Record<LinkSiteId, string>> = {}
+  for (const [id, raw] of Object.entries(artist.links !== null && typeof artist.links === 'object' ? artist.links : {})) {
+    const site = linkSite(id)
+    if (!site || typeof raw !== 'string') {
+      errors.links ??= 'Un des liens est invalide.'
+      continue
+    }
+    const { value, error } = parseLink(site, raw)
+    if (error) errors.links ??= `${site.name} : ${error}.`
+    else if (value) links[site.id] = value
+  }
+  if (Object.keys(links).length === 0) errors.links ??= 'Ajoute au moins un lien.'
+
+  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indique ton adresse e-mail.'))
+  if (email && !isEmailAddress(email)) errors.email = 'Indique une adresse e-mail valide.'
+  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indique ton numéro de téléphone.'))
+  if (phone && !isPhoneNumber(phone)) errors.phone = 'Indique un numéro de téléphone valide.'
+
+  if (!kind || !country || Object.keys(errors).length > 0) return { errors }
+  return { profile: { email, kind, name, members, country, city, genres, bio, links, phone } }
+}
+
+// The photo's types, as the server tells them from its contents.
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+// What's wrong with a photo of this type and size (in bytes), or with there being none, if anything.
+export function photoError(photo: { type: string; size: number } | null): string | null {
+  if (!photo || !PHOTO_TYPES.includes(photo.type)) return 'Ajoute une photo en JPEG, PNG ou WebP.'
+  if (photo.size > PHOTO_MAX_BYTES) return `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+  return null
 }

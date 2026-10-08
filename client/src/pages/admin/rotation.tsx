@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
 import { playlistLink } from 'shared/radio'
 import type {
@@ -13,9 +13,9 @@ import type {
   RadioSettingsResponse,
   RadioTrack,
 } from 'shared/radio'
-import { getJson, postJson } from '../../api'
-
-type Loaded<T> = { kind: 'loading' } | { kind: 'loaded'; value: T } | { kind: 'error'; message: string }
+import { postJson } from '../../api'
+import { useApi } from './use-api'
+import type { Loaded } from './use-api'
 
 const chosenAtFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short' })
 const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit' })
@@ -35,24 +35,6 @@ const MORE_TRACKS = 25
 
 function describeTrack({ artist, event, date }: RadioTrack): string {
   return [artist, event, date].filter(Boolean).join(' · ')
-}
-
-// GETs `url`, and again whenever `version` changes.
-function useApi<T>(url: string, version: number): Loaded<T> {
-  const [loaded, setLoaded] = useState<Loaded<T>>({ kind: 'loading' })
-
-  useEffect(() => {
-    let cancelled = false
-    getJson<T>(url).then((result) => {
-      if (cancelled) return
-      setLoaded(result.ok ? { kind: 'loaded', value: result } : { kind: 'error', message: result.error })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [url, version])
-
-  return loaded
 }
 
 export function Rotation() {

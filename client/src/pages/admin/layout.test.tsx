@@ -42,19 +42,17 @@ describe('Admin pages', () => {
       ['calendrier', '/admin/calendrier'],
       ['rotation radio', '/admin/rotation'],
       ['candidatures', '/admin/candidatures'],
+      ['artistes', '/admin/artistes'],
     ]) {
       expect(within(adminMenu()).getByRole('link', { name })).toHaveAttribute('href', path)
     }
   })
 
-  it.each([
-    ['/admin/calendrier', 'Calendrier'],
-    ['/admin/candidatures', 'Candidatures'],
-  ])('shows a placeholder at %s', async (path, heading) => {
+  it('shows a placeholder at /admin/calendrier', async () => {
     mockFetch(LOGGED_IN)
-    renderAt(path)
+    renderAt('/admin/calendrier')
 
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Calendrier' })).toBeInTheDocument())
     expect(screen.getByText('Pas encore implémenté !')).toBeInTheDocument()
   })
 
