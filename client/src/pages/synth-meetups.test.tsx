@@ -49,20 +49,20 @@ describe('SynthMeetups', () => {
   it('renders the banner and one thumbnail button per poster', () => {
     render(<SynthMeetups />)
     expect(screen.getByAltText('Synth Meetups')).toBeInTheDocument()
-    expect(screen.getAllByRole('button')).toHaveLength(8)
+    expect(screen.getAllByRole('button')).toHaveLength(9)
   })
 
   it('expands a poster into a lightbox on click, and closes it on a second click', () => {
     render(<SynthMeetups />)
-    expect(screen.getAllByRole('img')).toHaveLength(9) // banner + 8 thumbnails
+    expect(screen.getAllByRole('img')).toHaveLength(10) // banner + 9 thumbnails
 
     fireEvent.click(screen.getAllByRole('button')[0])
     const lightboxImage = screen.getAllByRole('img').at(-1)
     expect(lightboxImage).toBeVisible()
-    expect(screen.getAllByRole('img')).toHaveLength(10) // + the lightbox image
+    expect(screen.getAllByRole('img')).toHaveLength(11) // + the lightbox image
 
     fireEvent.click(lightboxImage!)
-    expect(screen.getAllByRole('img')).toHaveLength(9) // back to banner + 8 thumbnails
+    expect(screen.getAllByRole('img')).toHaveLength(10) // back to banner + 9 thumbnails
   })
 
   it('lists the upcoming synth meetups from the server, soonest first, linking to RA', async () => {
