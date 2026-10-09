@@ -146,6 +146,14 @@ describe('An application’s page', () => {
     '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
   }
 
+  it('says when the artist sent the application themselves', async () => {
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, createdBy: null } } })
+    renderAt('/admin/candidatures/application-1')
+
+    await waitFor(() => expect(screen.getByText(/^Envoyée par/)).toBeInTheDocument())
+    expect(screen.getByText(/^Envoyée par/)).toHaveTextContent('Envoyée par le formulaire « appliquer » le 5 octobre 2026.')
+  })
+
   it('shows the application, and who the artist is', async () => {
     mockFetch(PAGE)
     renderAt('/admin/candidatures/application-1')

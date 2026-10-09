@@ -231,6 +231,23 @@ describe('artists routes', () => {
       expect(response.statusCode).toBe(200)
     })
 
+    it('refuses more than one photo, without storing any', async () => {
+      const app = await buildApp()
+      const { payload, headers } = multipart(profile())
+      const second = Buffer.from('--test-boundary\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/png\r\n\r\n')
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/admin/artists',
+        payload: Buffer.concat([second, PNG, Buffer.from('\r\n'), payload]),
+        headers,
+        cookies: await asAdmin(),
+      })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Invalid request' })
+      expect(photos.store).not.toHaveBeenCalled()
+      expect(rows).toHaveLength(0)
+    })
+
     it('treats an empty photo, as a form sends when no file was chosen, as no photo', async () => {
       const app = await buildApp()
       const response = await create(app, profile(), Buffer.alloc(0))

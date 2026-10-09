@@ -12,6 +12,7 @@ import { eventsRoutes } from './routes/events.js'
 import { radioRoutes } from './routes/radio.js'
 import { artistsRoutes } from './routes/artists.js'
 import { applicationsRoutes } from './routes/applications.js'
+import { applyRoutes } from './routes/apply.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -23,6 +24,8 @@ import { radioSettingsStore } from './radio-settings.js'
 import { artistPhotos, artistsStore } from './artists.js'
 import { privateBucket } from './private-bucket.js'
 import { applicationsStore } from './applications.js'
+import { applyStore } from './apply.js'
+import { turnstileVerifier } from './turnstile.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -46,11 +49,14 @@ await app.register(radioRoutes, {
   onAir: onAirStore(db),
   settings: radioSettingsStore(db),
 })
-await app.register(artistsRoutes, {
-  store: artistsStore(db),
-  photos: artistPhotos(privateBucket(config.privateFiles)),
-})
+const photos = artistPhotos(privateBucket(config.privateFiles))
+await app.register(artistsRoutes, { store: artistsStore(db), photos })
 await app.register(applicationsRoutes, { store: applicationsStore(db) })
+await app.register(applyRoutes, {
+  store: applyStore(db),
+  photos,
+  verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
+})
 await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')

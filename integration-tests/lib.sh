@@ -56,6 +56,11 @@ session_cookie() {
     printf '%s' "$HEADERS" | sed -n 's/^[Ss]et-[Cc]ookie: *\(session=[^;]*\).*/\1/p'
 }
 
+# photos_on_disk -- how many photos the server keeps, in the directory that stands in for the private bucket.
+photos_on_disk() {
+    docker exec "$CONTAINER" find /tmp/private-bucket/artists -type f | wc -l | tr -d ' '
+}
+
 # body_id -- the "id" in the body of the last request, e.g. of what it created.
 body_id() {
     printf '%s' "$BODY" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'

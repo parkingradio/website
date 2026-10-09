@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { checkApplication } from 'shared/applications'
 import type { ApplicationFields, ApplicationStatus } from 'shared/applications'
 import { firstError } from 'shared/checks'
-import type { db as Database } from './db.js'
+import type { Queryable } from './db.js'
 import { violatesConstraint } from './query-errors.js'
 import { applications } from './schema.js'
 import { isUuid } from './uuid.js'
@@ -31,8 +31,9 @@ export type ApplicationsStore = {
   // Newest first. With `artistId`, only that artist's applications.
   list(artistId?: string): Promise<StoredApplication[]>
   get(id: string): Promise<StoredApplication | null>
+  // `createdBy` is the email of the admin who creates the application, or null if the artist sends it themselves.
   // Throws a NoSuchArtist.
-  create(application: ApplicationFields & { artistId: string; createdBy: string }): Promise<StoredApplication>
+  create(application: ApplicationFields & { artistId: string; createdBy: string | null }): Promise<StoredApplication>
   // Replaces the application's fields, and returns the updated application.
   update(id: string, changes: ApplicationFields & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
   // Changes the application's status, and returns the updated application.
@@ -41,7 +42,7 @@ export type ApplicationsStore = {
   delete(id: string): Promise<boolean>
 }
 
-export function applicationsStore(db: typeof Database): ApplicationsStore {
+export function applicationsStore(db: Queryable): ApplicationsStore {
   async function change(id: string, changes: Partial<typeof applications.$inferInsert>) {
     if (!isUuid(id)) return null
     const [row] = await db.update(applications).set(changes).where(eq(applications.id, id)).returning()

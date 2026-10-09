@@ -59,4 +59,12 @@ export const config = {
   get soundcloudClientSecret() {
     return required('SOUNDCLOUD_CLIENT_SECRET')
   },
+  // The keys of the Cloudflare Turnstile widget that keeps bots from sending applications (see turnstile.ts). Required,
+  // so that applications are never accepted without it.
+  get turnstileSiteKey() {
+    return required('TURNSTILE_SITE_KEY')
+  },
+  get turnstileSecretKey() {
+    return required('TURNSTILE_SECRET_KEY')
+  },
 }

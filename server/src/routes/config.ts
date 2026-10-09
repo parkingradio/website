@@ -6,6 +6,6 @@ import { config } from '../config.js'
 // the client has to be able to read it before it has a session.
 export async function configRoutes(app: FastifyInstance) {
   app.get<{ Reply: ConfigResponse }>('/api/config', async () => {
-    return { assetsDomain: config.assetsDomain }
+    return { assetsDomain: config.assetsDomain, turnstileSiteKey: config.turnstileSiteKey }
   })
 }

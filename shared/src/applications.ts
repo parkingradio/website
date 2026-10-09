@@ -33,9 +33,10 @@ export type Application = ApplicationFields & {
   id: string
   // The artist who applied.
   artistId: string
-  // When the application was created (ISO 8601), and the email of the admin who created it.
+  // When the application was created (ISO 8601), and the email of the admin who created it. `createdBy` is null if the
+  // artist sent the application themselves (see `POST /api/applications`).
   createdAt: string
-  createdBy: string
+  createdBy: string | null
   // Who last changed the application (an admin's email), and when (ISO 8601). Null until then. Status changes don't
   // count.
   updatedBy: string | null
@@ -45,6 +46,26 @@ export type Application = ApplicationFields & {
   statusUpdatedBy: string | null
   statusUpdatedAt: string | null
 }
+
+// `POST /api/applications`: a new artist applies. This creates the artist and their application, both with a null
+// `createdBy`. Anyone can call it, so Cloudflare Turnstile checks that a person sent it, and each address can only send
+// a few requests per hour. It's a multipart/form-data request with four parts:
+// - "artist": the artist's `ArtistProfile` (see artists.ts), as JSON, in a field rather than a file
+// - "application": the application's `ApplicationFields`, as JSON, the same way
+// - "photo": the artist's photo (see PHOTO_MAX_BYTES in artists.ts)
+// - "turnstileToken": the token the Turnstile widget gave the page, using the site key from `GET /api/config`
+//
+// Only new artists can apply this way: if an artist with the same email already exists, ignoring case, the request
+// fails with 409.
+//
+// Cloudflare only accepts each token once. The server checks the profile, the application and the photo first, so if
+// one of them isn't valid, the page can fix it and send the same token again. After any other error, the page needs a
+// new token.
+//
+// Fails with 400 (an invalid profile, application or photo, a malformed request, or a token Turnstile refused), 409 (an
+// artist with that email already exists), 413 (the photo or the request is too large), 429 (too many requests from the
+// same address) or 502 (Cloudflare couldn't be reached, or couldn't check the token). Error messages are in French.
+export type ApplyResponse = { ok: true }
 
 // All the endpoints below require an admin session, and fail with 401 without one.
 

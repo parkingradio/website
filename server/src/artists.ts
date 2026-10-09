@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
+import type { FastifyBaseLogger } from 'fastify'
 import { checkProfile, photoError } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
 import { firstError } from 'shared/checks'
-import type { db as Database } from './db.js'
+import type { Queryable } from './db.js'
 import type { PrivateFiles } from './private-bucket.js'
 import { artists } from './schema.js'
 import { violatesConstraint } from './query-errors.js'
@@ -58,8 +59,9 @@ export type ArtistsStore = {
   // By name, whatever its case.
   list(): Promise<StoredArtist[]>
   get(id: string): Promise<StoredArtist | null>
+  // `createdBy` is the email of the admin who adds the artist, or null if the artist adds themselves by applying.
   // Throws an EmailTaken.
-  create(artist: ArtistProfile & StoredPhoto & { createdBy: string }): Promise<StoredArtist>
+  create(artist: ArtistProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
   // Replaces the artist's profile, and their photo when there's a new one. Returns the artist as they were, so that
   // a photo that was replaced can be deleted, and as they are then. Throws an EmailTaken.
   update(
@@ -70,7 +72,7 @@ export type ArtistsStore = {
   delete(id: string): Promise<StoredArtist | null>
 }
 
-export function artistsStore(db: typeof Database): ArtistsStore {
+export function artistsStore(db: Queryable): ArtistsStore {
   return {
     async list() {
       return db.select().from(artists).orderBy(asc(sql`lower(${artists.name})`))
@@ -134,4 +136,12 @@ export function artistPhotos(files: PrivateFiles): Photos {
     read: files.read,
     delete: files.delete,
   }
+}
+
+// Deletes a photo that was stored but that no artist uses, or uses anymore. If that fails, the error is only logged, so
+// that the request it's part of can still succeed.
+export async function forgetPhoto(photos: Pick<Photos, 'delete'>, log: FastifyBaseLogger, key: string) {
+  await photos.delete(key).catch((error: unknown) => {
+    log.error({ err: error, key }, 'Failed to delete a photo that is not used anymore')
+  })
 }

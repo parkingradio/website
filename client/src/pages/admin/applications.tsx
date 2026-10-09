@@ -221,7 +221,10 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
     <>
       <BackToApplications />
       {title}
-      <p className="admin-meta">{byWhom('Créée', application.createdBy, application.createdAt)}</p>
+      <p className="admin-meta">
+        {byWhom('Créée', application.createdBy, application.createdAt) ??
+          `Envoyée par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(application.createdAt))}.`}
+      </p>
       {application.updatedBy && <p className="admin-meta">{byWhom('Modifiée', application.updatedBy, application.updatedAt)}</p>}
 
       <h2>Statut</h2>

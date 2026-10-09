@@ -10,14 +10,15 @@ describe('GET /api/config', () => {
     process.env = { ...originalEnv }
   })
 
-  it('returns the assets domain', async () => {
+  it('returns the assets domain and the Turnstile site key', async () => {
     process.env.ASSETS_DOMAIN = 'assets.example.test'
+    process.env.TURNSTILE_SITE_KEY = 'site-key'
     const app = Fastify()
     await app.register(configRoutes)
 
     const response = await app.inject({ method: 'GET', url: '/api/config' })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ assetsDomain: 'assets.example.test' })
+    expect(response.json()).toEqual({ assetsDomain: 'assets.example.test', turnstileSiteKey: 'site-key' })
   })
 })

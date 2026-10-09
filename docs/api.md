@@ -9,7 +9,8 @@ or change an endpoint, update both.
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`.
+  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. One
+  exception: in production, nginx itself refuses requests whose body is over 12 MB, with a 413 that isn't JSON.
 - **Errors.** A request that fails gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and
   `error`, a message meant for people, in English unless it's shown to the public (`ApiError` in
   `shared/src/error.ts`). Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
@@ -50,6 +51,7 @@ can be `null`.
 | `GET /api/admin/artists/:id/photo` | admin | An artist's photo | — |
 | `PUT /api/admin/artists/:id` | admin | Changing an artist's profile or photo | `artists.ts` |
 | `DELETE /api/admin/artists/:id` | admin | Deleting an artist, their photo and their applications | `artists.ts` |
+| `POST /api/applications` | public | A new artist applying, with their profile and photo | `applications.ts` |
 | `GET /api/admin/applications` | admin | Every application, or an artist's | `applications.ts` |
 | `POST /api/admin/applications` | admin | Creating an application for an artist | `applications.ts` |
 | `GET /api/admin/applications/:id` | admin | An application | `applications.ts` |
@@ -71,6 +73,7 @@ Values that depend on the environment, which the client reads before anything el
 | Response field | Type | |
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
+| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget. Pages need it to show the widget, which gives them the token `POST /api/applications` asks for |
 
 ## Admins and sessions
 
@@ -311,7 +314,8 @@ guess another type (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Con
 ### `POST /api/admin/artists` (admin)
 
 Adds an artist. It's `multipart/form-data`, with two parts: `artist`, the profile as JSON, in a field rather than a
-file, and `photo`, the artist's photo. A few other fields or files, e.g. a form's submit button, are ignored.
+file, and `photo`, the artist's photo. A few other fields or files, e.g. a form's submit button, are ignored. A second
+photo isn't: the request fails.
 
 | Response field | Type | |
 |---|---|---|
@@ -344,7 +348,10 @@ The server checks every application against the rules in `shared/src/application
 data is valid. Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are
 in French, like for profiles, because artists will see them.
 
-For now, only admins can create applications, and only for artists who already exist.
+Applications are created in two ways:
+
+- A new artist applies with `POST /api/applications`, which creates the artist and their application together.
+- An admin creates an application on the admin pages, for an artist who already exists.
 
 An application has these fields:
 
@@ -361,10 +368,55 @@ The endpoints below also return these fields:
 |---|---|---|
 | `id` | string | |
 | `artistId` | string | The artist who applied |
-| `createdAt`, `createdBy` | string | When the application was created, and the email of the admin who created it |
+| `createdAt` | string | When the application was created |
+| `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count |
 | `status` | `"new"`, `"accepted"` or `"rejected"` | Every application starts as `"new"` |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+
+### `POST /api/applications`
+
+A new artist applies. This creates the artist, with their profile and photo, and their application. The artist's
+`createdBy` and the application's are both null, since nobody on the team created them.
+
+Anyone can call this endpoint, so it has two protections against bots and floods:
+
+- **Cloudflare Turnstile.** The page shows Turnstile's widget, using the site key from `GET /api/config`. Once the
+  visitor passes Turnstile's check, the widget gives the page a token, which the page sends with the application. The
+  server then asks Cloudflare whether the token is valid.
+- **A rate limit.** Each client can send 5 requests per hour. Requests that fail count too.
+
+The request is `multipart/form-data`, with four parts:
+
+| Part | |
+|---|---|
+| `artist` | The artist's profile (see "Artists"), as JSON, in a field rather than a file |
+| `application` | The application's fields, as JSON, the same way |
+| `photo` | The artist's photo (see "Artists") |
+| `turnstileToken` | The token Turnstile gave the page |
+
+A few other fields or files, e.g. a form's submit button, are ignored. A second photo isn't: the request fails. On
+success, the response is `{"ok": true}`.
+
+**Only new artists can apply this way.** If an artist with the same email already exists (ignoring upper and lower
+case), the request fails with 409 and nothing is created. Otherwise, anyone could take over an artist's profile just by
+typing their email. The downside is that the 409 tells whoever sent the request that this email belongs to an artist.
+To make that harder to abuse, the server only checks the email after Turnstile has accepted the token.
+
+**Errors** are in French, since artists see them:
+
+| Status | When |
+|---|---|
+| 400 | The profile, application or photo isn't valid, the request is malformed, or Turnstile refused the token |
+| 409 | An artist with that email already exists |
+| 413 | The photo is larger than 10 MB, or the request is too large to be an application |
+| 429 | The client sent too many requests |
+| 502 | Cloudflare couldn't be reached, or couldn't check the token |
+
+**When the page needs a new token.** Cloudflare only accepts each token once. To let artists fix their mistakes, the
+server checks the profile, the application and the photo before it sends the token to Cloudflare. So if the request
+fails because one of those isn't valid, the page can send it again with the same token. After any other error, the
+token may already be used up, and the page needs to get a new one from the widget.
 
 ### `GET /api/admin/applications[?artist=<id>]` (admin)
 

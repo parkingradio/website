@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/node-postgres'
+import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres'
+import type { PgDatabase } from 'drizzle-orm/pg-core'
 import { Pool } from 'pg'
 import type { PoolConfig } from 'pg'
 import { parseIntoClientConfig } from 'pg-connection-string'
@@ -47,3 +49,7 @@ const pool = new Pool(poolConfig())
 pool.on('error', (error) => logger.error(error, 'Idle database connection closed unexpectedly'))
 
 export const db = drizzle(pool)
+
+// The database, or a transaction on it. Both run queries the same way, so a store built on a transaction works like one
+// built on the database, except that its queries are part of the transaction.
+export type Queryable = PgDatabase<NodePgQueryResultHKT>

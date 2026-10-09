@@ -64,9 +64,10 @@ export type ArtistsResponse = { ok: true; artists: Artist[] }
 export type ArtistResponse = { ok: true; artist: Artist }
 
 // `POST /api/admin/artists`: adds an artist, and returns them. A multipart/form-data request with two parts,
-// "artist" (an `ArtistProfile`, as JSON, in a field rather than a file) and "photo" (see PHOTO_MAX_BYTES). Requires
-// a session. Fails with 400 (an invalid profile or photo, with a message in French), 401 (no valid session), 409 (an
-// artist with that email already exists) or 413 (photo too large).
+// "artist" (an `ArtistProfile`, as JSON, in a field rather than a file) and "photo" (see PHOTO_MAX_BYTES). A few other
+// parts are ignored, but a second photo makes the request fail. Requires a session. Fails with 400 (an invalid profile
+// or photo, with a message in French, or a malformed request), 401 (no valid session), 409 (an artist with that email
+// already exists) or 413 (photo too large).
 //
 // `PUT /api/admin/artists/:id`: replaces an artist's profile, and returns them. The same request, where the photo
 // is optional: without one, the artist keeps theirs. Fails like `POST /api/admin/artists`, and with 404 (no such
@@ -406,9 +407,12 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
 // The photo's types, as the server tells them from its contents.
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
+// The error for a photo larger than PHOTO_MAX_BYTES.
+export const PHOTO_TOO_LARGE = `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+
 // What's wrong with a photo of this type and size (in bytes), or with there being none, if anything.
 export function photoError(photo: { type: string; size: number } | null): string | null {
   if (!photo || !PHOTO_TYPES.includes(photo.type)) return 'Ajoute une photo en JPEG, PNG ou WebP.'
-  if (photo.size > PHOTO_MAX_BYTES) return `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+  if (photo.size > PHOTO_MAX_BYTES) return PHOTO_TOO_LARGE
   return null
 }

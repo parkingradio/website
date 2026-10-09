@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
-import { PHOTO_MAX_BYTES } from 'shared/artists'
+import { PHOTO_TOO_LARGE } from 'shared/artists'
 import type { Artist, ArtistProfile, ArtistResponse, ArtistsResponse, DeleteArtistResponse } from 'shared/artists'
 import type { ApiError } from 'shared/error'
-import { EmailTaken, InvalidProfile, validatePhoto, validateProfile } from '../artists.js'
+import { EmailTaken, InvalidProfile, forgetPhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { ArtistsStore, Photos, StoredArtist } from '../artists.js'
 import { requireAuth } from '../auth.js'
+import { jsonField, readPhotoForm } from '../photo-form.js'
 import { keepQueryValuesPrivate } from '../query-errors.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them.
@@ -38,44 +39,16 @@ function artist(row: StoredArtist): Artist {
 // `checkPhoto`, which gets undefined when there's none. Returns the checked profile and photo, or the error to reply
 // with when the request is malformed or invalid.
 async function readArtist<Photo>(
-  app: FastifyInstance,
   request: FastifyRequest,
   checkPhoto: (body: Buffer | undefined) => Photo,
 ): Promise<{ profile: ArtistProfile; photo: Photo } | { status: number; error: string }> {
-  if (!request.isMultipart()) return { status: 400, error: 'Expected a multipart/form-data request' }
-
-  let artist: unknown
-  let photo: Buffer | undefined
+  const form = await readPhotoForm(request)
+  if (form === 'too-large') return { status: 413, error: PHOTO_TOO_LARGE }
+  if (form === 'malformed') return INVALID_REQUEST
+  const sent = jsonField(form.fields.artist)
+  if (sent === undefined) return INVALID_REQUEST
   try {
-    for await (const part of request.parts()) {
-      if (part.type === 'file' && part.fieldname === 'photo') {
-        // A form whose file input was left empty still sends the part, without any content.
-        const body = await part.toBuffer()
-        if (body.length > 0) photo = body
-      } else if (part.type === 'file') {
-        part.file.resume() // drain anything unexpected
-      } else if (part.fieldname === 'artist') {
-        artist = part.value
-      }
-    }
-  } catch (error) {
-    if (error instanceof app.multipartErrors.RequestFileTooLargeError) {
-      return { status: 413, error: `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.` }
-    }
-    // A body that isn't multipart/form-data after all, or that has more fields or files than the limits allow.
-    request.log.info({ err: error }, 'Malformed multipart request')
-    return INVALID_REQUEST
-  }
-
-  // The profile is JSON, which the multipart parser has already read when its part says it's application/json.
-  let sent = artist
-  try {
-    if (typeof artist !== 'object') sent = JSON.parse(typeof artist === 'string' ? artist : '')
-  } catch {
-    return INVALID_REQUEST
-  }
-  try {
-    return { profile: validateProfile(sent), photo: checkPhoto(photo) }
+    return { profile: validateProfile(sent), photo: checkPhoto(form.photo) }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message }
@@ -90,19 +63,10 @@ type ArtistsOptions = {
 type ById = { Params: { id: string } }
 
 export async function artistsRoutes(app: FastifyInstance, { store, photos }: ArtistsOptions) {
-  // Fields and files other than the profile and the photo, e.g. a form's submit button, are ignored, as long as there
-  // are only a few.
-  await app.register(multipart, { limits: { files: 5, fileSize: PHOTO_MAX_BYTES, fields: 10, fieldSize: 64 * 1024 } })
+  // Needed by `readPhotoForm`, which sets its own limits.
+  await app.register(multipart)
 
   keepQueryValuesPrivate(app, 'Failed to handle a request about artists')
-
-  // A photo that was stored but isn't the photo of any artist (anymore) is only worth knowing about if it can't be
-  // deleted.
-  async function forgetPhoto(request: FastifyRequest, key: string) {
-    await photos.delete(key).catch((error: unknown) => {
-      request.log.error({ err: error, key }, 'Failed to delete the photo of an artist')
-    })
-  }
 
   app.get<{ Reply: ArtistsResponse }>('/api/admin/artists', { preHandler: requireAuth }, async () => {
     return { ok: true, artists: (await store.list()).map(artist) }
@@ -131,7 +95,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   })
 
   app.post<{ Reply: ArtistResponse | ApiError }>('/api/admin/artists', { preHandler: requireAuth }, async (request, reply) => {
-    const sent = await readArtist(app, request, validatePhoto)
+    const sent = await readArtist(request, validatePhoto)
     if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
 
     const photoKey = await photos.store(sent.photo)
@@ -139,7 +103,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       const row = await store.create({ ...sent.profile, photoKey, photoType: sent.photo.type, createdBy: request.user!.email })
       return { ok: true, artist: artist(row) }
     } catch (error) {
-      await forgetPhoto(request, photoKey)
+      await forgetPhoto(photos, request.log, photoKey)
       if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
       throw error
     }
@@ -147,7 +111,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
 
   app.put<ById & { Reply: ArtistResponse | ApiError }>('/api/admin/artists/:id', { preHandler: requireAuth }, async (request, reply) => {
     // Without a photo, the artist keeps theirs.
-    const sent = await readArtist(app, request, (body) => (body ? validatePhoto(body) : null))
+    const sent = await readArtist(request, (body) => (body ? validatePhoto(body) : null))
     if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
 
     const photo = sent.photo ? { photoKey: await photos.store(sent.photo), photoType: sent.photo.type } : {}
@@ -155,16 +119,16 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     try {
       changed = await store.update(request.params.id, { ...sent.profile, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
     } catch (error) {
-      if (photo.photoKey) await forgetPhoto(request, photo.photoKey)
+      if (photo.photoKey) await forgetPhoto(photos, request.log, photo.photoKey)
       if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
       throw error
     }
     if (!changed) {
-      if (photo.photoKey) await forgetPhoto(request, photo.photoKey)
+      if (photo.photoKey) await forgetPhoto(photos, request.log, photo.photoKey)
       return reply.status(404).send(NO_SUCH_ARTIST)
     }
 
-    if (photo.photoKey) await forgetPhoto(request, changed.before.photoKey)
+    if (photo.photoKey) await forgetPhoto(photos, request.log, changed.before.photoKey)
     return { ok: true, artist: artist(changed.after) }
   })
 
@@ -172,7 +136,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     const row = await store.delete(request.params.id)
     if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
     // The artist is gone either way.
-    await forgetPhoto(request, row.photoKey)
+    await forgetPhoto(photos, request.log, row.photoKey)
     return { ok: true }
   })
 }

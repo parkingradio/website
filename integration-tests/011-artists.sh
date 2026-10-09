@@ -23,11 +23,6 @@ login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
 cookie="$(session_cookie)"
 
-# photos_on_disk -- how many photos the server keeps, in the directory that stands in for the private bucket.
-photos_on_disk() {
-    docker exec "$CONTAINER" find /tmp/private-bucket/artists -type f | wc -l | tr -d ' '
-}
-
 # artist <method> <url> <profile> [<photo file>] -- add or change an artist.
 artist() {
     local photo=()

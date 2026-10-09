@@ -204,8 +204,16 @@ Clicking an application opens it at `/admin/candidatures/<id>`. From top to bott
 Form: a form with the artist, picked from those in the "Artistes" section, then the application itself. An
 artist's page leads to it with that artist picked already.
 
-Applications will mostly come from the "Appliquer" form once it's implemented. Until then, they go through the
-original Google Form.
+For now, artists still apply through the original Google Form. Once the "Appliquer" form is implemented, most
+applications will come from it.
+
+The server is already ready for that form: when a new artist applies (`POST /api/applications`), it creates both the
+artist and their application. On the application's page, admins see that it was sent through the form, where they'd
+otherwise see which admin created it.
+
+The form is only for new artists. If someone applies with the email of an artist we already know, the application is
+refused. Otherwise, anyone could take over an artist's profile just by typing their email. Artists we already know will
+apply again from a different page, which isn't designed yet.
 
 ### Artistes
 

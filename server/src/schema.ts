@@ -100,7 +100,8 @@ export const applications = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: text('created_by').notNull(), // the email of the admin who created the application
+    // The email of the admin who created the application, or null if the artist sent it themselves.
+    createdBy: text('created_by'),
     artistId: uuid('artist_id')
       .notNull()
       .references(() => artists.id, { onDelete: 'cascade' }),

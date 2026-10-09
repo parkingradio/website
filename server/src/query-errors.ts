@@ -13,10 +13,13 @@ function withoutValues(error: Error): object {
 // not end up in the logs, or in the response, where Fastify would put the error's message. This error handler, for the
 // routes of `app`, logs only the query and Postgres's error, along with `message`. The response only says that
 // something went wrong.
-export function keepQueryValuesPrivate(app: FastifyInstance, message: string) {
+//
+// When Fastify or a plugin rejects a request with a 4xx status, e.g. because its body is too large, the response uses
+// the error's message. Routes whose errors must be in French can pass `clientError` to choose the message instead.
+export function keepQueryValuesPrivate(app: FastifyInstance, message: string, clientError = (error: FastifyError) => error.message) {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     if (error.statusCode && error.statusCode < 500) {
-      return reply.status(error.statusCode).send({ ok: false, error: error.message } satisfies ApiError)
+      return reply.status(error.statusCode).send({ ok: false, error: clientError(error) } satisfies ApiError)
     }
     request.log.error({ err: withoutValues(error) }, message)
     return reply.status(500).send({ ok: false, error: 'Internal server error' } satisfies ApiError)

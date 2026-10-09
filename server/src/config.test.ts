@@ -94,6 +94,22 @@ describe('config', () => {
     })
   })
 
+  describe('Turnstile keys', () => {
+    it('throw a clear error when unset', () => {
+      delete process.env.TURNSTILE_SITE_KEY
+      delete process.env.TURNSTILE_SECRET_KEY
+      expect(() => config.turnstileSiteKey).toThrow('Missing required environment variable: TURNSTILE_SITE_KEY')
+      expect(() => config.turnstileSecretKey).toThrow('Missing required environment variable: TURNSTILE_SECRET_KEY')
+    })
+
+    it('are read from the environment when set', () => {
+      process.env.TURNSTILE_SITE_KEY = 'site-key'
+      process.env.TURNSTILE_SECRET_KEY = 'secret-key'
+      expect(config.turnstileSiteKey).toBe('site-key')
+      expect(config.turnstileSecretKey).toBe('secret-key')
+    })
+  })
+
   describe('privateFiles', () => {
     beforeEach(() => {
       delete process.env.PRIVATE_BUCKET
