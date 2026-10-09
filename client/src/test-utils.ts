@@ -9,7 +9,10 @@ type Body = { ok: boolean } & Record<string, unknown>
  * app is rendered.
  */
 export function mockFetch(bodies: Record<string, Body> = {}) {
-  const all: Record<string, Body> = { '/api/config': { ok: true, assetsDomain: 'assets.example.test', features: {} }, ...bodies }
+  const all: Record<string, Body> = {
+    '/api/config': { ok: true, assetsDomain: 'assets.example.test', turnstileSiteKey: '1x00000000000000000000AA', features: {} },
+    ...bodies,
+  }
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {

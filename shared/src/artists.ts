@@ -294,18 +294,23 @@ function parseAddress(value: string): { value?: string; error?: string } {
   }
 }
 
-// The profile name in `value`, for a site whose profile names look like `profile`.
-function parseProfileName(site: LinkSite, profile: RegExp, value: string): { value?: string; error?: string } {
-  // It's an address when it starts with http, has a "/" or is the site's own domain. Otherwise it's a profile
-  // name, which can contain dots (e.g. @parking.radio on Instagram).
+// Whether what the artist typed or pasted for a site whose profiles have names is an address, rather than a profile
+// name: it starts with http, has a "/" or is the site's own domain. A profile name can contain dots, e.g. parking.radio
+// on Instagram.
+export function isAddress(site: LinkSite, raw: string): boolean {
+  const value = raw.trim()
   const lower = value.toLowerCase()
-  const isUrl =
+  return (
     /^https?:\/\//i.test(value) ||
     value.includes('/') ||
     (site.host?.test(lower) ?? false) ||
     (site.subdomainOf !== undefined && lower.endsWith(`.${site.subdomainOf}`))
+  )
+}
 
-  if (isUrl) {
+// The profile name in `value`, for a site whose profile names look like `profile`.
+function parseProfileName(site: LinkSite, profile: RegExp, value: string): { value?: string; error?: string } {
+  if (isAddress(site, value)) {
     let url: URL
     try {
       url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`)

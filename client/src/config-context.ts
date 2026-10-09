@@ -5,7 +5,7 @@ import type { FeatureId } from 'shared/features'
 // Environment-specific values fetched from the server at runtime, and which features are on. ConfigProvider in
 // config.tsx does the fetching; this lives in its own file because a module exporting both a component and a hook
 // breaks Fast Refresh.
-export type AppConfig = Pick<ConfigResponse, 'assetsDomain' | 'features'>
+export type AppConfig = Pick<ConfigResponse, 'assetsDomain' | 'turnstileSiteKey' | 'features'>
 
 export type ConfigState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'loaded'; config: AppConfig }
 
@@ -30,4 +30,10 @@ export function useFeature(id: FeatureId): boolean | undefined {
   const state = use(ConfigContext)
   if (state.kind === 'loading') return undefined
   return state.kind === 'loaded' && state.config.features[id] === true
+}
+
+/** Cloudflare Turnstile's site key, for the "Appliquer" form: undefined until the configuration is fetched. */
+export function useTurnstileSiteKey(): string | undefined {
+  const state = use(ConfigContext)
+  return state.kind === 'loaded' ? state.config.turnstileSiteKey : undefined
 }

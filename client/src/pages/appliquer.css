@@ -1,0 +1,1182 @@
+/* Same look as the Programmation page: Overpass Mono, black borders, big Helvetica titles. */
+.appliquer {
+  --ink: #1c1c1c;
+  --muted: #666;
+  --rule: #ddd;
+  --hover: #f5f5f5;
+  --paper: #fff;
+  --black: #000;
+  --white: #f9f9f9;
+  --error: #c8321f;
+
+  flex: 1;
+  padding: 2rem 1.5rem 5rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+}
+
+.appliquer button,
+.appliquer input,
+.appliquer textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.appliquer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.appliquer h1,
+.appliquer h2,
+.appliquer h3,
+.appliquer .big {
+  margin: 0;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.appliquer-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--black);
+}
+
+.appliquer h1 {
+  font-size: clamp(2.25rem, 7vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.appliquer-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.appliquer .intro {
+  max-width: 62ch;
+  margin: 1.25rem 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Each part: its number and title on the left, its fields on the right. */
+.appliquer .part {
+  display: grid;
+  grid-template-columns: minmax(180px, 22%) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.75rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.appliquer .part-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.appliquer .part-head .number {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.appliquer .part-head h2 {
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.appliquer .part-head p {
+  margin: 0.2rem 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.appliquer .fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem 1.25rem;
+  align-content: start;
+}
+
+.appliquer .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.appliquer fieldset.field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.appliquer .field.wide {
+  grid-column: 1 / -1;
+}
+
+.appliquer label,
+.appliquer legend,
+.appliquer .label {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.appliquer legend {
+  margin-bottom: 6px;
+}
+
+.appliquer .required,
+.appliquer .hint {
+  color: var(--muted);
+}
+
+.appliquer .hint {
+  font-size: 11px;
+  font-weight: 300;
+}
+
+.appliquer input[type='text'],
+.appliquer input[type='email'],
+.appliquer input[type='tel'],
+.appliquer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--black);
+  border-radius: 0;
+  background: var(--paper);
+  font-size: 15px;
+  font-weight: 300;
+}
+
+.appliquer textarea {
+  min-height: 8.5rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.appliquer input::placeholder,
+.appliquer textarea::placeholder {
+  color: #aaa;
+}
+
+.appliquer input:focus-visible,
+.appliquer textarea:focus-visible,
+.appliquer button:focus-visible {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
+}
+
+.appliquer [aria-invalid='true'] {
+  border-color: var(--error) !important;
+  box-shadow: inset 0 0 0 1px var(--error);
+}
+
+.appliquer .error {
+  font-size: 12px;
+  color: var(--error);
+}
+
+.appliquer .count-chars {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.appliquer .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- pays, ville : a search field with a list under it (see combobox.css) ---------- */
+
+.appliquer .combobox:has(.combobox-caret) input {
+  font-weight: 400;
+}
+
+.appliquer .combobox input:disabled {
+  border-color: #ccc;
+  background: #fafafa;
+}
+
+.appliquer .combobox-list {
+  box-shadow: 0 8px 20px rgb(0 0 0 / 8%);
+}
+
+.appliquer .combobox-list li {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.appliquer .combobox-list li[role='option']:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .combobox-list li[role='option']:hover .combobox-detail {
+  color: #aaa;
+}
+
+.appliquer .combobox-detail {
+  font-size: 12px;
+}
+
+.appliquer .combobox-list .combobox-none {
+  font-size: 13px;
+}
+
+/* The pickers are focused to bring the artist to them when they're left empty, which their red border shows already. */
+.appliquer .genres-picked:focus,
+.appliquer .calendar:focus {
+  outline: none;
+}
+
+.appliquer .other-prestation {
+  max-width: 24rem;
+  margin-top: 6px;
+}
+
+/* ---------- genres : up to 3, numbered in the order they're picked ---------- */
+
+.appliquer .genres-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.appliquer .count {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--black);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.appliquer .count.full {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .genres-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 12px;
+  padding: 6px;
+  border: 1px dashed #bbb;
+}
+
+.appliquer .genres-picked.invalid {
+  border-color: var(--error);
+}
+
+.appliquer .genres-picked .placeholder {
+  align-self: center;
+  padding-left: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.appliquer .genres-picked button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border: 1px solid var(--black);
+  background: var(--black);
+  color: var(--white);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.appliquer .genres-picked button:hover {
+  background: var(--paper);
+  color: var(--black);
+}
+
+.appliquer .genres-picked b {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: var(--white);
+  color: var(--black);
+  font-size: 11px;
+}
+
+.appliquer .genres-picked svg {
+  width: 9px;
+  height: 9px;
+  margin-left: 2px;
+}
+
+.appliquer .genre-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.appliquer .genre-group h3 {
+  margin: 0 0 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.appliquer .genre-group div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.appliquer .genre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--black);
+  background: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.appliquer .genre:hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--hover);
+}
+
+.appliquer .genre[aria-pressed='true'] {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .genre[aria-pressed='true']::before {
+  content: attr(data-rank);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  background: var(--white);
+  color: var(--black);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.appliquer .genre:disabled {
+  border-color: #d4d4d4;
+  color: #bbb;
+  cursor: not-allowed;
+}
+
+/* ---------- photo ---------- */
+
+.appliquer .photo {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.appliquer .photo img,
+.appliquer .photo-empty {
+  flex: none;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--black);
+  object-fit: cover;
+}
+
+.appliquer .photo-empty {
+  display: grid;
+  place-items: center;
+  background: #f2f2f2;
+  font-size: 12px;
+  color: #999;
+}
+
+.appliquer .photo.invalid .photo-empty {
+  border-color: var(--error);
+}
+
+.appliquer .photo-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.appliquer .photo-side button {
+  padding: 7px 14px;
+  border: 1px solid var(--black);
+  background: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.appliquer .photo-side button:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .photo-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- liens : one field per site, with the site's address around the profile name ---------- */
+
+.appliquer .links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.25rem;
+}
+
+.appliquer .link {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.appliquer .link-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.appliquer .link-head label {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+}
+
+.appliquer .link-head .remove {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.appliquer .affix {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid var(--black);
+  background: var(--paper);
+}
+
+.appliquer .affix:focus-within {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
+}
+
+.appliquer .affix .prefix,
+.appliquer .affix .suffix {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.appliquer .affix .prefix {
+  padding-left: 12px;
+}
+
+.appliquer .affix .suffix {
+  padding-right: 12px;
+}
+
+.appliquer .affix input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  padding-left: 2px;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.appliquer .affix.full input[type='text'] {
+  padding-left: 12px;
+}
+
+.appliquer .link.bad .affix {
+  border-color: var(--error);
+  box-shadow: inset 0 0 0 1px var(--error);
+}
+
+.appliquer .link.bad .affix input {
+  box-shadow: none;
+}
+
+.appliquer .link-status {
+  min-height: 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.appliquer .link.ok .link-status,
+.appliquer .link-status a {
+  color: var(--ink);
+}
+
+.appliquer .link.bad .link-status {
+  color: var(--error);
+}
+
+.appliquer .add-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.appliquer .add-links span {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.appliquer .add-links button {
+  padding: 4px 10px;
+  border: 1px dashed var(--black);
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.appliquer .add-links button:hover {
+  border-style: solid;
+  background: var(--hover);
+}
+
+/* ---------- type de prestation : checkboxes styled as pills ---------- */
+
+.appliquer .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.appliquer .chip {
+  position: relative;
+}
+
+.appliquer .chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.appliquer .chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--black);
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.appliquer .chip span::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1px solid currentColor;
+}
+
+.appliquer .chip:hover input:not(:checked) + span {
+  background: var(--hover);
+}
+
+.appliquer .chip input:checked + span {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .chip input:checked + span::before {
+  background: currentColor;
+}
+
+.appliquer .chip input:focus-visible + span {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
+}
+
+.appliquer .invalid .chip span {
+  border-color: var(--error);
+}
+
+/* The checkbox is invisible: its span shows the error instead. */
+.appliquer .chip input[aria-invalid='true'] {
+  box-shadow: none;
+}
+
+/* ---------- calendrier ---------- */
+
+.appliquer .calendar-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.appliquer .calendar {
+  border: 2px solid var(--black);
+}
+
+.appliquer .calendar.invalid {
+  border-color: var(--error);
+}
+
+.appliquer .calendar-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0.45rem 0.45rem 1rem;
+  background: var(--black);
+  color: var(--white);
+  font-size: 13px;
+}
+
+.appliquer .calendar-nav {
+  display: flex;
+  gap: 6px;
+}
+
+.appliquer .calendar-nav button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--white);
+  background: none;
+  color: var(--white);
+  cursor: pointer;
+}
+
+.appliquer .calendar-nav button:hover:not(:disabled) {
+  background: var(--white);
+  color: var(--black);
+}
+
+.appliquer .calendar-nav button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.appliquer .calendar-nav svg {
+  width: 14px;
+  height: 14px;
+}
+
+.appliquer .months {
+  display: grid;
+}
+
+.appliquer .month {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.appliquer .month + .month {
+  border-left: 1px solid var(--rule);
+}
+
+.appliquer .month h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.appliquer .month h3 span {
+  font-weight: 300;
+  color: var(--muted);
+}
+
+.appliquer .days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.appliquer .days .weekday {
+  padding-bottom: 4px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.appliquer .day {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.appliquer .day:hover:not(:disabled):not([aria-pressed='true']) {
+  border-color: var(--black);
+}
+
+.appliquer .day[aria-pressed='true'] {
+  background: var(--black);
+  color: var(--white);
+  font-weight: 700;
+}
+
+.appliquer .day:disabled {
+  color: #c4c4c4;
+  cursor: default;
+}
+
+.appliquer .calendar-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 1rem;
+  border-top: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.appliquer .picked {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--black);
+}
+
+.appliquer .picked-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--black);
+  font-size: 13px;
+}
+
+.appliquer .picked-head b {
+  padding: 0 6px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.appliquer .picked-head b.full,
+.appliquer .picked-full {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .picked-full {
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.appliquer .picked ul {
+  max-height: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.appliquer .picked li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+
+.appliquer .picked li .weekday {
+  display: inline-block;
+  width: 3.2em;
+  color: var(--muted);
+}
+
+.appliquer .picked li button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+
+.appliquer .picked li button:hover {
+  border-color: var(--black);
+}
+
+.appliquer .picked li svg {
+  width: 10px;
+  height: 10px;
+}
+
+.appliquer .picked-empty {
+  margin: 0;
+  padding: 1rem 0.9rem;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.appliquer .picked .clear {
+  align-self: flex-start;
+  margin: 0.6rem 0.9rem 0.8rem;
+  padding: 4px 10px;
+  border: 1px solid var(--black);
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.appliquer .picked .clear:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+/* ---------- envoi ---------- */
+
+.appliquer .send {
+  display: grid;
+  grid-template-columns: minmax(180px, 22%) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding-top: 1.75rem;
+}
+
+.appliquer .send-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+}
+
+/* On a line of its own, above the button. Turnstile's widget is 65px high: the space is kept while it loads. */
+.appliquer .turnstile {
+  width: 100%;
+  min-height: 65px;
+}
+
+.appliquer .send-error {
+  width: 100%;
+  margin: 0;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--error);
+  font-size: 13px;
+  color: var(--error);
+}
+
+.appliquer .submit {
+  padding: 14px 26px;
+  border: 2px solid var(--black);
+  background: var(--black);
+  color: var(--white);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.appliquer .submit:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--black);
+}
+
+.appliquer .submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.appliquer .send-note {
+  max-width: 48ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.appliquer .credits {
+  margin: 3rem 0 0;
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--muted);
+}
+
+.appliquer .credits a {
+  color: inherit;
+}
+
+/* ---------- merci ---------- */
+
+.appliquer .sent {
+  margin-top: 1rem;
+  border: 2px solid var(--black);
+  outline: none;
+}
+
+.appliquer .sent-bar {
+  padding: 0.6rem 1.25rem;
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .sent-bar h2 {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.appliquer .sent-body {
+  padding: 1.5rem 1.25rem 1.75rem;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.appliquer .sent-body p {
+  margin: 0;
+}
+
+.appliquer .big {
+  margin-bottom: 1rem !important;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 1000px) {
+  .appliquer .calendar-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .appliquer .picked ul {
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .appliquer {
+    padding-inline: 1rem;
+  }
+
+  .appliquer .part,
+  .appliquer .send {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .appliquer .send > div:first-child {
+    display: none;
+  }
+
+  .appliquer .fields,
+  .appliquer .links {
+    grid-template-columns: 1fr;
+  }
+
+  .appliquer .month {
+    padding: 0.75rem 0.6rem 0.8rem;
+  }
+
+  .appliquer .submit {
+    width: 100%;
+  }
+}
+
+/* ---------- artiste ou collectif ---------- */
+
+.appliquer .applicant-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.appliquer .applicant-type {
+  position: relative;
+  display: flex;
+}
+
+.appliquer .applicant-type input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.appliquer .applicant-type > span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--black);
+  cursor: pointer;
+}
+
+.appliquer .applicant-type strong {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.appliquer .applicant-type .slot {
+  align-self: flex-start;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  font-size: 12px;
+}
+
+.appliquer .applicant-type .text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.appliquer .applicant-type:hover input:not(:checked) + span {
+  background: var(--hover);
+}
+
+.appliquer .applicant-type input:checked + span {
+  background: var(--black);
+  color: var(--white);
+}
+
+.appliquer .applicant-type input:checked + span .text {
+  color: #bbb;
+}
+
+.appliquer .applicant-type input:focus-visible + span {
+  outline: 2px solid var(--black);
+  outline-offset: 2px;
+}
+
+.appliquer .invalid .applicant-type > span {
+  border-color: var(--error);
+}
+
+.appliquer .applicant-type input[aria-invalid='true'] {
+  box-shadow: none;
+}
+
+/* a collective's artists */
+
+.appliquer .members {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 1.25rem;
+}
+
+.appliquer .member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appliquer .member-number {
+  flex: none;
+  width: 1.2em;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.appliquer .member-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+
+.appliquer .member-remove:hover {
+  border-color: var(--black);
+}
+
+.appliquer .member-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+.appliquer .add-member {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--black);
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.appliquer .add-member:hover {
+  border-style: solid;
+  background: var(--hover);
+}
+
+.appliquer .flyer-note {
+  margin: 8px 0 0;
+  padding: 0.8rem 1rem;
+  border-left: 4px solid var(--black);
+  background: var(--hover);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .appliquer .applicant-types,
+  .appliquer .members {
+    grid-template-columns: 1fr;
+  }
+}

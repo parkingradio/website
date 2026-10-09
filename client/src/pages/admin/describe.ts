@@ -1,9 +1,8 @@
-import { COUNTRIES, GENRES } from 'shared/artists'
-import type { ArtistKind, GenreId } from 'shared/artists'
+import type { ArtistKind } from 'shared/artists'
 import { PRESTATIONS } from 'shared/applications'
 import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
 import type { FeatureId } from 'shared/features'
-import type { ComboboxOption } from '../../combobox'
+import { countryName, countryOptions } from '../../artist-profile'
 
 // How the admin sections show what the API returns.
 
@@ -11,22 +10,17 @@ export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', coll
 export const STATUS_LABELS: Record<ApplicationStatus, string> = { new: 'nouvelle', accepted: 'retenue', rejected: 'refusée' }
 
 // What each feature flag is: its name, and what turning it on does (see shared/src/features.ts).
-export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {}
-
-const countryNames = new Intl.DisplayNames(['fr'], { type: 'region' })
-
-export function countryName(code: string): string {
-  return countryNames.of(code) ?? code
+export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {
+  'nouveau-formulaire-candidature': {
+    name: 'Nouveau formulaire de candidature',
+    description: 'La page « Appliquer » montre le formulaire du site plutôt que le Google Form.',
+  },
 }
+
+export { countryName, genreName } from '../../artist-profile'
 
 // Every country, by name, for picking one.
-export const COUNTRY_OPTIONS: ComboboxOption[] = COUNTRIES.map((key) => ({ key, label: countryName(key) })).sort((a, b) =>
-  a.label.localeCompare(b.label, 'fr'),
-)
-
-export function genreName(id: GenreId): string {
-  return GENRES.find((genre) => genre.id === id)?.name ?? id
-}
+export const COUNTRY_OPTIONS = countryOptions()
 
 export function prestationName(id: PrestationId): string {
   return PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id

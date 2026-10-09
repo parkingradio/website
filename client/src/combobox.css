@@ -1,8 +1,22 @@
-/* A text input that suggests options, under it. */
+/* A text input that suggests options, under it. When only an option can be picked, a caret says so. */
 .combobox {
   position: relative;
   display: flex;
   flex-direction: column;
+}
+
+.combobox:has(.combobox-caret) input {
+  padding-right: 2rem;
+}
+
+.combobox-caret {
+  position: absolute;
+  top: 50%;
+  right: 0.7rem;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .combobox-list {
@@ -22,8 +36,19 @@
 }
 
 .combobox-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0.4rem 0.6rem;
   cursor: pointer;
+}
+
+.combobox-detail {
+  color: #666;
+}
+
+.combobox-list li[aria-selected='true'] .combobox-detail {
+  color: #aaa;
 }
 
 .combobox-list li[aria-selected='true'] {

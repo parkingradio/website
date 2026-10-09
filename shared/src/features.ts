@@ -7,12 +7,12 @@
 
 // The flags, in the order the admin pages show them. Adding a flag only takes adding its id here, and its name on the
 // admin pages. Removing one from here retires it: the server ignores what it saved for flags that aren't listed.
-export const FEATURES = [] as const
+export const FEATURES = ['nouveau-formulaire-candidature'] as const
 
 export type FeatureId = (typeof FEATURES)[number]
 
 // In the response of `GET /api/config` (see config.ts): whether each flag is on, by id. A flag that isn't there is off.
-export type Features = Record<FeatureId, boolean>
+export type Features = Partial<Record<FeatureId, boolean>>
 
 // A flag, as the admin pages show it.
 export type Feature = {

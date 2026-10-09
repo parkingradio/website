@@ -11,10 +11,10 @@ import {
   PHOTO_TYPES,
   checkProfile,
   parseLink,
-  photoError,
 } from 'shared/artists'
 import type { ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
 import { checkLine } from 'shared/checks'
+import { pickedPhotoError } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { COUNTRY_OPTIONS, KIND_LABELS, genreName } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
@@ -62,7 +62,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   if (unpinned) errors.members = `« ${unpinned} » n'est pas ajouté : appuyer sur + pour l'ajouter.`
   // A new artist needs a photo. Otherwise, the artist keeps theirs unless another one is chosen. When the browser doesn't
   // know the photo's type, which the server tells from its contents anyway, only its size is checked.
-  const photoProblem = isNew || photo ? photoError(photo && { type: photo.type || PHOTO_TYPES[0], size: photo.size }) : null
+  const photoProblem = isNew || photo ? pickedPhotoError(photo) : null
   if (photoProblem) errors.photo = photoProblem
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () => {
     // What's saved of the profile, e.g. without the members of an artist who was a collective at first. There's one,
