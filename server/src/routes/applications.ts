@@ -36,6 +36,7 @@ function application(row: StoredApplication): Application {
     dates: row.dates,
     timeSlots: row.timeSlots,
     prestations: row.prestations,
+    otherPrestation: row.otherPrestation,
     details: row.details,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,

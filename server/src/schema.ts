@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from 'shared/applications'
-import type { ApplicationStatus, TimeSlot } from 'shared/applications'
+import type { ApplicationStatus, PrestationId, TimeSlot } from 'shared/applications'
 import { ARTIST_KINDS } from 'shared/artists'
 import type { ArtistKind, GenreId, LinkSiteId } from 'shared/artists'
 
@@ -107,7 +107,8 @@ export const applications = pgTable(
       .references(() => artists.id, { onDelete: 'cascade' }),
     dates: date('dates').array().notNull(), // sorted
     timeSlots: jsonb('time_slots').$type<TimeSlot[]>().notNull(), // sorted; empty means any time
-    prestations: text('prestations').array().notNull(),
+    prestations: text('prestations').array().$type<PrestationId[]>().notNull(), // ids, in the order of PRESTATIONS
+    otherPrestation: text('other_prestation').notNull(),
     details: text('details').notNull(),
     // The email of the admin who last changed the application, and when (null until then).
     updatedBy: text('updated_by'),

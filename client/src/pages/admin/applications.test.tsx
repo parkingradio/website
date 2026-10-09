@@ -42,7 +42,8 @@ const APPLICATION: Application = {
   createdBy: 'admin@example.com',
   dates: ['2026-12-10', '2026-12-17', '2027-01-07', '2027-01-14'],
   timeSlots: [{ start: '18:00', end: '22:00' }],
-  prestations: ['DJ', 'Vinyle seulement'],
+  prestations: ['dj'],
+  otherPrestation: 'Vinyle seulement',
   details: 'Une question ?\nUne autre.',
   updatedBy: null,
   updatedAt: null,
@@ -53,8 +54,8 @@ const APPLICATION: Application = {
 
 // Newest first, as the server lists them.
 const APPLICATIONS: Application[] = [
-  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['Rap'], status: 'rejected' },
-  { ...APPLICATION, id: 'application-2', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['Full band'], status: 'accepted' },
+  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['rap'], status: 'rejected' },
+  { ...APPLICATION, id: 'application-2', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['full-band'], otherPrestation: '', status: 'accepted' },
   APPLICATION,
 ]
 
@@ -86,9 +87,9 @@ describe('The list of applications', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['7 octobre 2026', 'Brume', '5 nov. 2026', 'Rap', 'refusée'],
-      ['6 octobre 2026', 'Aurore', '12 nov. 2026', 'Full band', 'retenue'],
-      ['5 octobre 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, Vinyle seulement', 'nouvelle'],
+      ['7 octobre 2026', 'Brume', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
+      ['6 octobre 2026', 'Aurore', '12 nov. 2026', 'Full Band', 'retenue'],
+      ['5 octobre 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
     ])
     expect(screen.getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
@@ -341,12 +342,12 @@ describe('An application’s page', () => {
     expect(screen.getByText('jeudi 10 décembre 2026')).toBeInTheDocument()
     expect(screen.getByText('jeudi 14 janvier 2027')).toBeInTheDocument()
     expect(screen.getByText('18:00 à 22:00')).toBeInTheDocument()
-    expect(screen.getByText('DJ, Vinyle seulement')).toBeInTheDocument()
+    expect(screen.getByText('DJ, autre : Vinyle seulement')).toBeInTheDocument()
     expect(screen.getByText(/^Une question/)).toHaveTextContent('Une question ? Une autre.')
   })
 
   it('says when an application has no time slot, prestation or details', async () => {
-    const bare = { ...APPLICATION, timeSlots: [], prestations: [], details: '' }
+    const bare = { ...APPLICATION, timeSlots: [], prestations: [], otherPrestation: '', details: '' }
     mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: bare } })
     renderAt('/admin/candidatures/application-1')
 
@@ -386,12 +387,14 @@ describe('An application’s page', () => {
     expect(screen.getByLabelText('Date 4')).toHaveValue('2027-01-14')
     expect(screen.getByLabelText('DJ')).toBeChecked()
     expect(screen.getByLabelText('Rap')).not.toBeChecked()
-    expect(screen.getByLabelText('Autre prestation 1')).toHaveValue('Vinyle seulement')
+    expect(screen.getByLabelText('Performance Live')).not.toBeChecked()
+    expect(screen.getByLabelText('Autre')).toHaveValue('Vinyle seulement')
     fireEvent.click(screen.getByRole('button', { name: 'retirer la date 1' }))
     fireEvent.click(screen.getByRole('button', { name: 'ajouter une date' }))
     fireEvent.change(screen.getByLabelText('Date 4'), { target: { value: '2027-02-04' } })
     fireEvent.click(screen.getByRole('button', { name: 'retirer la plage 1' }))
     fireEvent.click(screen.getByLabelText('Rap'))
+    fireEvent.change(screen.getByLabelText('Autre'), { target: { value: 'Vinyle, surtout' } })
     fireEvent.change(screen.getByLabelText('Questions ou détails'), { target: { value: 'Corrigé.' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
@@ -399,29 +402,48 @@ describe('An application’s page', () => {
     expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0])).toEqual({
       dates: ['2026-12-17', '2027-01-07', '2027-01-14', '2027-02-04'],
       timeSlots: [],
-      prestations: ['DJ', 'Rap', 'Vinyle seulement'],
+      // By their ids.
+      prestations: ['dj', 'rap'],
+      otherPrestation: 'Vinyle, surtout',
       details: 'Corrigé.',
     })
     expect(screen.getByText(/^Modifiée par/)).toHaveTextContent(/^Modifiée par other@example.com le 6 octobre 2026/)
   })
 
-  it('keeps the prestations as they were written when something else is changed', async () => {
-    const application = { ...APPLICATION, prestations: ['Live, avec visuels', 'dj', 'B2B'] }
-    mockFetch({
-      ...PAGE,
-      '/api/admin/applications/application-1': { ok: true, application },
-      'PUT /api/admin/applications/application-1': { ok: true, application },
-    })
+  it('sends the prestations in the order of the list, whatever order they were checked in', async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
-    expect(screen.getByLabelText('DJ')).toBeChecked()
-    expect(screen.getByLabelText('Autre prestation 1')).toHaveValue('Live, avec visuels')
-    fireEvent.change(screen.getByLabelText('Questions ou détails'), { target: { value: 'Corrigé.' } })
+    fireEvent.click(screen.getByLabelText('Full Band'))
+    fireEvent.click(screen.getByLabelText('Vinyl'))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'Live, avec visuels', 'B2B'])
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'vinyl', 'full-band'])
+  })
+
+  it('shows a prestation that is no longer in the list by its id, as wrong, until it is unchecked', async () => {
+    const application = { ...APPLICATION, prestations: ['dj', 'theremin'] }
+    mockFetch({
+      ...PAGE,
+      '/api/admin/applications/application-1': { ok: true, application },
+      'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION },
+    })
+    renderAt('/admin/candidatures/application-1')
+
+    expect(await screen.findByText('DJ, theremin, autre : Vinyle seulement')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    expect(screen.getByText("Une des prestations n'est pas dans la liste.")).toBeInTheDocument()
+    expect(screen.getByLabelText('theremin')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('theremin')).toHaveFocus()
+    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
+
+    fireEvent.click(screen.getByLabelText('theremin'))
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj'])
   })
 
   it('says what is wrong with a time slot once the time slots are left, and sends nothing', async () => {
@@ -514,7 +536,7 @@ describe('An application’s page', () => {
 
 describe('Creating an application', () => {
   it('creates an application for the artist it was started from, then shows it', async () => {
-    const created = { ...APPLICATION, id: 'application-4', artistId: 'artist-2', timeSlots: [], prestations: ['DJ', 'B2B'], details: '' }
+    const created = { ...APPLICATION, id: 'application-4', artistId: 'artist-2', timeSlots: [], prestations: ['dj'], otherPrestation: 'B2B', details: '' }
     mockFetch({
       ...LOGGED_IN,
       ...ARTISTS,
@@ -528,8 +550,7 @@ describe('Creating an application', () => {
     expect(picked).toHaveValue('artist-2')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
     fireEvent.click(screen.getByLabelText('DJ'))
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter une autre prestation' }))
-    fireEvent.change(screen.getByLabelText('Autre prestation 1'), { target: { value: 'B2B' } })
+    fireEvent.change(screen.getByLabelText('Autre'), { target: { value: 'B2B' } })
     fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/candidatures/application-4'))
@@ -537,7 +558,8 @@ describe('Creating an application', () => {
       artistId: 'artist-2',
       dates: ['2026-12-10'],
       timeSlots: [],
-      prestations: ['DJ', 'B2B'],
+      prestations: ['dj'],
+      otherPrestation: 'B2B',
       details: '',
     })
   })

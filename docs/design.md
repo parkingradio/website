@@ -116,7 +116,7 @@ that Parking Radio has about an artist. The fields of the form are (* means mand
 - "Instagram": free form text with validation
 - "Bandcamp": free form text with link validation
 - "Youtube": free form text with link validation
-- "Type de prestation" (*): choice between "DJ", "Performance Live", "Rap", "Full Band", "Other:" (with free form text input)
+- "Type de prestation" (*): choice between "DJ", "Vinyl", "Performance Live", "Rap", "Full Band", "Autre" (with free form text input)
 - "Adresse e-mail" (*): free form text with format validation
 - "Numéro de téléphone" (*): free form text with format validation
 - "Disponibilités" (*): date picker that allows selecting multiple days. Mention that it may or may not be respected.
@@ -186,8 +186,11 @@ above). From top to bottom, it shows:
 
 At `/admin/candidatures`: the artists' applications for a set, for the team to go through. An application belongs
 to an artist (see "Artistes" below), and says when they'd like to play (days, and times of day if they have a
-preference), what they'd do (e.g. DJ, live performance) and anything else they'd like to say. Each one has a
-status: "nouvelle" when it's created, then "retenue" or "refusée" as an admin decides.
+preference), what they'd do and anything else they'd like to say. What they'd do is picked from a list (DJ, Vinyl,
+Performance Live, Rap, Full Band), plus "autre" in a few words, the same on the "Appliquer" form and on the admin
+pages. Each one in the list is stored as an id that doesn't change, so that applications can be told apart by what the
+artists would do, whatever its name. Each application has a status: "nouvelle" when it's created, then "retenue" or
+"refusée" as an admin decides.
 
 The section lists every application, most recent first, with when it was created, the artist, their first few
 dates, the prestations and the status. Buttons above the list show only the applications with a status, with how

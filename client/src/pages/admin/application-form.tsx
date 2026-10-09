@@ -1,24 +1,18 @@
 import { useState } from 'react'
-import { DETAILS_MAX_LENGTH, PRESTATION_MAX_LENGTH, checkApplication, isDay, isTime } from 'shared/applications'
-import type { ApplicationFields, TimeSlot } from 'shared/applications'
+import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, isDay, isTime } from 'shared/applications'
+import type { ApplicationFields, PrestationId, TimeSlot } from 'shared/applications'
 import type { Artist } from 'shared/artists'
 import { leaving, useCheckedForm } from './checked-form'
+import { prestationName } from './describe'
 import { FieldError, FormActions, Labeled } from './fields'
 
 // A form for an application's fields, to create an application or change one. Each field is checked with the rules
 // the server checks it with (see `checkApplication`), and says what's wrong once it's been left, or once the form is
 // sent. The server's error is shown if it refuses the application anyway.
 
-// The prestations that are offered as choices. Any other can be written in.
-const PRESTATION_CHOICES = ['DJ', 'Performance live', 'Rap', 'Full band']
-
-const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], details: '' }
+const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], otherPrestation: '', details: '' }
 
 type Field = keyof ApplicationFields | 'artist'
-
-// Whether two prestations are the same, which the server also decides whatever their case.
-const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
-const isChoice = (prestation: string) => PRESTATION_CHOICES.some((choice) => same(choice, prestation))
 
 type ApplicationFormProps = {
   // The application to change, or nothing for a new one.
@@ -37,10 +31,14 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
   // Days as "YYYY-MM-DD", or empty for a field that's not filled yet.
   const [dates, setDates] = useState(application.dates.length > 0 ? application.dates : [''])
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(application.timeSlots)
-  // The prestations checked, and those written in, each as it was written, so that changing something else doesn't
-  // change them.
-  const [chosen, setChosen] = useState(application.prestations.filter(isChoice))
-  const [others, setOthers] = useState(application.prestations.filter((prestation) => !isChoice(prestation)))
+  const [prestations, setPrestations] = useState(application.prestations)
+  // Every prestation, and those of the application that aren't one anymore, e.g. if one was removed from the list. The
+  // server refuses them, so they're shown as wrong, to be unchecked.
+  const choices: PrestationId[] = [
+    ...PRESTATIONS.map(({ id }) => id),
+    ...application.prestations.filter((id) => !PRESTATIONS.some((prestation) => prestation.id === id)),
+  ]
+  const [otherPrestation, setOtherPrestation] = useState(application.otherPrestation)
   const [details, setDetails] = useState(application.details)
 
   const fields: ApplicationFields = {
@@ -48,7 +46,9 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
     dates: dates.length === 1 && !dates[0] ? [] : dates,
     // A slot left entirely empty is dropped, but one that's half filled is wrong.
     timeSlots: timeSlots.filter((slot) => slot.start || slot.end),
-    prestations: [...chosen, ...others],
+    // In the order of the list, like the server keeps them.
+    prestations: choices.filter((id) => prestations.includes(id)),
+    otherPrestation,
     details,
   }
   const errors: Partial<Record<Field, string>> = { ...checkApplication(fields).errors }
@@ -134,37 +134,29 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
       <fieldset className="admin-fields" onBlur={leaving(leave('prestations'))}>
         <legend>Type de prestation</legend>
         <div className="admin-choices">
-          {PRESTATION_CHOICES.map((choice) => (
-            <label key={choice}>
+          {choices.map((id) => (
+            <label key={id}>
               <input
                 type="checkbox"
-                checked={chosen.some((prestation) => same(prestation, choice))}
-                onChange={(event) =>
-                  setChosen(event.target.checked ? [...chosen, choice] : chosen.filter((prestation) => !same(prestation, choice)))
-                }
+                checked={prestations.includes(id)}
+                aria-invalid={shown('prestations') && !PRESTATIONS.some((prestation) => prestation.id === id) ? true : undefined}
+                onChange={(event) => setPrestations(event.target.checked ? [...prestations, id] : prestations.filter((other) => other !== id))}
               />
-              {choice}
+              {prestationName(id)}
             </label>
           ))}
         </div>
-        {others.map((other, index) => (
-          <div className="admin-row" key={index}>
-            <input
-              aria-label={`Autre prestation ${index + 1}`}
-              value={other}
-              maxLength={PRESTATION_MAX_LENGTH}
-              aria-invalid={shown('prestations') ? true : undefined}
-              onChange={(event) => setOthers(others.map((prestation, i) => (i === index ? event.target.value : prestation)))}
-            />
-            <button type="button" aria-label={`retirer l'autre prestation ${index + 1}`} onClick={() => setOthers(others.filter((_, i) => i !== index))}>
-              ×
-            </button>
-          </div>
-        ))}
-        <button type="button" onClick={() => setOthers([...others, ''])}>
-          ajouter une autre prestation
-        </button>
         <FieldError message={shown('prestations')} />
+        <Labeled label="Autre" error={shown('otherPrestation')}>
+          <input
+            placeholder="en quelques mots"
+            value={otherPrestation}
+            maxLength={OTHER_PRESTATION_MAX_LENGTH}
+            aria-invalid={shown('otherPrestation') ? true : undefined}
+            onChange={(event) => setOtherPrestation(event.target.value)}
+            onBlur={leave('otherPrestation')}
+          />
+        </Labeled>
       </fieldset>
 
       <Labeled label="Questions ou détails" error={shown('details')}>

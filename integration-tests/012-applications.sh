@@ -31,7 +31,7 @@ json() {
 
 # application <artist id> [<details>] -- an application for that artist, as JSON.
 application() {
-    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["DJ"],"details":"%s"}' \
+    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"}' \
         "$1" "${2:-}"
 }
 
@@ -68,7 +68,7 @@ expect_status 200
 expect_body_contains "\"artistId\":\"${artist}\""
 expect_body_contains '"dates":["2020-02-29","2027-01-15"]'
 # jsonb doesn't keep the order of keys, so a time slot's keys can come back in either order.
-expect_body '"timeSlots":\[\{("start":"18:00","end":"22:00"|"end":"22:00","start":"18:00")\}\],"prestations":\["DJ"\],"details":"first"'
+expect_body '"timeSlots":\[\{("start":"18:00","end":"22:00"|"end":"22:00","start":"18:00")\}\],"prestations":\["dj"\],"otherPrestation":"","details":"first"'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains '"status":"new"'
 
@@ -88,9 +88,9 @@ expect_body_contains '"applications":[]'
 
 echo "  an application is changed, and its status too"
 json PUT "${BASE_URL}/api/admin/applications/${first}" \
-    '{"dates":["2026-12-10"],"timeSlots":[],"prestations":["Synthé modulaire"],"details":""}'
+    '{"dates":["2026-12-10"],"timeSlots":[],"prestations":["full-band","live-performance"],"otherPrestation":"Synthé modulaire","details":""}'
 expect_status 200
-expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"prestations":["Synthé modulaire"]'
+expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"prestations":["live-performance","full-band"],"otherPrestation":"Synthé modulaire"'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 json PUT "${BASE_URL}/api/admin/applications/${first}/status" '{"status":"accepted"}'
 expect_status 200

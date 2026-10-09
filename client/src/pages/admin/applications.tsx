@@ -14,7 +14,7 @@ import type {
 import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
-import { KIND_LABELS, STATUS_LABELS, byWhom, dateFormat, formatDay, formatShortDay, place } from './describe'
+import { KIND_LABELS, STATUS_LABELS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
 import { Recipients } from './recipients'
 import { useApi } from './use-api'
 
@@ -62,7 +62,7 @@ export function ApplicationsTable({ applications, artists }: { applications: App
                 {application.dates.slice(0, LISTED_DATES).map(formatShortDay).join(', ')}
                 {more > 0 && ` (+${more})`}
               </td>
-              <td>{application.prestations.join(', ')}</td>
+              <td>{describePrestations(application)}</td>
               <td className={`admin-status admin-status-${application.status}`}>{STATUS_LABELS[application.status]}</td>
             </tr>
           )
@@ -277,7 +277,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
             : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}
         </dd>
         <dt>Type de prestation</dt>
-        <dd>{application.prestations.join(', ') || '—'}</dd>
+        <dd>{describePrestations(application) || '—'}</dd>
         <dt>Questions ou détails</dt>
         <dd className="admin-text">{application.details || '—'}</dd>
       </dl>

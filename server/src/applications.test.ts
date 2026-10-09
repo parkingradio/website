@@ -12,7 +12,8 @@ function fields(changes: Partial<Record<keyof ApplicationFields, unknown>> = {})
       { start: '18:00', end: '22:00' },
       { start: '11:00', end: '15:00' },
     ],
-    prestations: ['Performance live', 'DJ'],
+    prestations: ['live-performance', 'dj'],
+    otherPrestation: '',
     details: '',
     ...changes,
   }
@@ -34,12 +35,14 @@ describe('isTime', () => {
 })
 
 describe('validateApplication', () => {
-  it('keeps dates and time slots in order, without duplicates, and prestations as they were sent', () => {
+  it('keeps dates, time slots and prestations in order, without duplicates', () => {
     const slot = { start: '18:00', end: '22:00' }
     expect(validateApplication(fields({ dates: ['2027-01-15', '2026-12-10', '2027-01-15'], timeSlots: [slot, { start: '11:00', end: '15:00' }, slot] }))).toEqual({
       dates: ['2026-12-10', '2027-01-15'],
       timeSlots: [{ start: '11:00', end: '15:00' }, slot],
-      prestations: ['Performance live', 'DJ'],
+      // In the order of PRESTATIONS.
+      prestations: ['dj', 'live-performance'],
+      otherPrestation: '',
       details: '',
     })
   })
@@ -68,11 +71,20 @@ describe('validateApplication', () => {
     }
   })
 
-  it('trims prestations, without blank ones or duplicates whatever their case, and limits their length', () => {
-    expect(validateApplication(fields({ prestations: ['  Modular\n synth  ', 'DJ', 'dj', '  '] })).prestations).toEqual(['Modular synth', 'DJ'])
+  it('only takes prestations from the list, by their id, without duplicates', () => {
+    expect(validateApplication(fields({ prestations: ['full-band', 'vinyl', 'full-band', 'rap'] })).prestations).toEqual(['vinyl', 'rap', 'full-band'])
     expect(validateApplication(fields({ prestations: [] })).prestations).toEqual([])
     expect(validateApplication(fields({ prestations: undefined })).prestations).toEqual([])
-    expect(() => validateApplication(fields({ prestations: ['x'.repeat(61)] }))).toThrow('Une prestation dépasse 60 caractères.')
+    for (const prestation of ['DJ', 'Performance Live', 'modular', '', 42, null]) {
+      expect(() => validateApplication(fields({ prestations: ['dj', prestation] }))).toThrow("Une des prestations n'est pas dans la liste.")
+    }
+  })
+
+  it('trims the other prestation, and limits its length', () => {
+    expect(validateApplication(fields({ otherPrestation: '  Modular\n synth  ' })).otherPrestation).toBe('Modular synth')
+    expect(validateApplication(fields({ otherPrestation: undefined })).otherPrestation).toBe('')
+    expect(validateApplication(fields({ otherPrestation: 'x'.repeat(60) })).otherPrestation).toHaveLength(60)
+    expect(() => validateApplication(fields({ otherPrestation: 'x'.repeat(61) }))).toThrow('La prestation « Autre » dépasse 60 caractères.')
   })
 
   it('trims the details, and limits their length', () => {
@@ -90,11 +102,13 @@ describe('validateApplication', () => {
 
 describe('checkApplication', () => {
   it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
-    expect(checkApplication({ dates: [''], timeSlots: [{ start: '18:00', end: '' }], prestations: ['x'.repeat(61)], details: 'x'.repeat(2001) })).toEqual({
+    const sent = { dates: [''], timeSlots: [{ start: '18:00', end: '' }], prestations: ['modular'], otherPrestation: 'x'.repeat(61), details: 'x'.repeat(2001) }
+    expect(checkApplication(sent)).toEqual({
       errors: {
         dates: 'Une des dates est invalide.',
         timeSlots: 'Une des plages horaires est invalide.',
-        prestations: 'Une prestation dépasse 60 caractères.',
+        prestations: "Une des prestations n'est pas dans la liste.",
+        otherPrestation: 'La prestation « Autre » dépasse 60 caractères.',
         details: 'Le champ « Questions ou détails » dépasse 2000 caractères.',
       },
     })

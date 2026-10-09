@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ApplicationFields } from 'shared/applications'
+import type { ApplicationFields, PrestationId } from 'shared/applications'
 import type { ArtistProfile } from 'shared/artists'
 import { applicationEmails, describeApplication } from './application-emails.js'
 
@@ -26,7 +26,8 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
       { start: '14:00', end: '18:00' },
       { start: '18:00', end: '22:00' },
     ],
-    prestations: ['DJ', 'Vinyl'],
+    prestations: ['dj', 'vinyl'],
+    otherPrestation: 'Synthé modulaire',
     details: 'Une question ?',
     ...changes,
   }
@@ -54,7 +55,8 @@ describe('describeApplication', () => {
         '  vendredi 8 janvier 2027',
         '  vendredi 15 janvier 2027',
         'Plages horaires : 14:00 à 18:00, 18:00 à 22:00',
-        'Type de prestation : DJ, Vinyl',
+        // By their names, then the other one.
+        'Type de prestation : DJ, Vinyl, autre : Synthé modulaire',
         '',
         'Bio :',
         'Une bio.\nSur deux lignes.',
@@ -70,8 +72,13 @@ describe('describeApplication', () => {
     expect(text).toMatch(/^Collectif : Le Collectif\nArtistes du collectif : Une, Deux\n/)
   })
 
+  it('names a prestation that is no longer in the list by its id', () => {
+    const text = describeApplication(profile(), fields({ prestations: ['dj', 'theremin' as PrestationId], otherPrestation: '' }))
+    expect(text).toContain('Type de prestation : DJ, theremin\n')
+  })
+
   it('says when any time works, and leaves out what the artist left blank', () => {
-    const text = describeApplication(profile(), fields({ timeSlots: [], prestations: [], details: '' }))
+    const text = describeApplication(profile(), fields({ timeSlots: [], prestations: [], otherPrestation: '', details: '' }))
     expect(text).toContain('Plages horaires : à toute heure\nType de prestation : —\n')
     expect(text).not.toContain('Questions ou détails')
     expect(text.endsWith('Sur deux lignes.')).toBe(true)

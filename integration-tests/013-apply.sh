@@ -23,7 +23,7 @@ profile() {
         "$1" "$2"
 }
 
-readonly APPLICATION='{"dates":["2027-03-12"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["DJ"],"details":""}'
+readonly APPLICATION='{"dates":["2027-03-12"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":""}'
 
 # apply <client address> <profile> [<token>] -- apply, as a client at that address.
 apply() {

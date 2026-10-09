@@ -64,7 +64,8 @@ function application(changes: object = {}) {
     artistId: 'artist-1',
     dates: ['2027-01-15', '2026-12-10'],
     timeSlots: [{ start: '18:00', end: '22:00' }],
-    prestations: ['DJ'],
+    prestations: ['dj'],
+    otherPrestation: '',
     details: 'Une question ?',
     ...changes,
   }
@@ -241,7 +242,7 @@ describe('applications routes', () => {
       await create(app)
       await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
       const response = await send(app, 'PUT', '/api/admin/applications/application-1', {
-        ...application({ artistId: 'artist-2', timeSlots: [], prestations: ['Performance live'], details: '' }),
+        ...application({ artistId: 'artist-2', timeSlots: [], prestations: ['live-performance'], otherPrestation: 'Visuels', details: '' }),
         status: 'rejected',
       })
 
@@ -249,7 +250,8 @@ describe('applications routes', () => {
       expect(response.json().application).toMatchObject({
         artistId: 'artist-1',
         timeSlots: [],
-        prestations: ['Performance live'],
+        prestations: ['live-performance'],
+        otherPrestation: 'Visuels',
         details: '',
         status: 'accepted',
         updatedBy: 'admin@example.com',

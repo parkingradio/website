@@ -13,9 +13,10 @@ export type ApplicationFields = {
   dates: string[]
   // The times of day that work for the artist, on any of their dates, sorted. An empty list means any time.
   timeSlots: TimeSlot[]
-  // What the artist would do, e.g. "DJ" or "Performance live". Each one is up to PRESTATION_MAX_LENGTH characters. Can
-  // be empty.
-  prestations: string[]
+  // What the artist would do: the ids of some of PRESTATIONS, in the order of that list. Can be empty.
+  prestations: PrestationId[]
+  // Anything else the artist would do, in a few words, up to OTHER_PRESTATION_MAX_LENGTH characters. Can be empty.
+  otherPrestation: string
   // The artist's questions or other details. Up to DETAILS_MAX_LENGTH characters. Can be empty.
   details: string
 }
@@ -23,6 +24,17 @@ export type ApplicationFields = {
 // A time range when the artist can play, in Québec time, e.g. from 18:00 to 22:00. Both times are "HH:MM", and the end
 // is later the same day.
 export type TimeSlot = { start: string; end: string }
+
+// What an artist can do in their set, with their names in French. What's stored is their id, which doesn't change, so
+// that applications can be told apart by what the artists would do whatever their names, e.g. once they're translated.
+export const PRESTATIONS = [
+  { id: 'dj', name: 'DJ' },
+  { id: 'vinyl', name: 'Vinyl' },
+  { id: 'live-performance', name: 'Performance Live' },
+  { id: 'rap', name: 'Rap' },
+  { id: 'full-band', name: 'Full Band' },
+] as const
+export type PrestationId = (typeof PRESTATIONS)[number]['id']
 
 // Admins decide on applications on the admin pages. Every application starts as "new".
 export const APPLICATION_STATUSES = ['new', 'accepted', 'rejected'] as const
@@ -112,7 +124,7 @@ export type ApplicationRecipientsRequest = { recipients: string[] }
 
 export const MAX_RECIPIENTS = 10
 
-export const PRESTATION_MAX_LENGTH = 60
+export const OTHER_PRESTATION_MAX_LENGTH = 60
 export const DETAILS_MAX_LENGTH = 2000
 
 // Whether `value` is a "YYYY-MM-DD" day that exists (not e.g. 2026-02-30).
@@ -131,7 +143,7 @@ export function isTime(value: string): boolean {
 // version to store:
 // - dates and time slots are sorted, without duplicates
 // - text is trimmed
-// - blank prestations are dropped, and so are duplicates, ignoring case
+// - prestations are in the order of PRESTATIONS, without duplicates
 // If they aren't valid, returns what's wrong with each field instead.
 export function checkApplication(
   sent: unknown,
@@ -156,12 +168,12 @@ export function checkApplication(
     }
   }
 
-  const prestations: string[] = []
-  for (const sentPrestation of Array.isArray(application.prestations) ? application.prestations : []) {
-    const prestation = checkLine(sentPrestation, 'Une prestation', PRESTATION_MAX_LENGTH, null)
-    if (prestation.error !== undefined) errors.prestations ??= prestation.error
-    else if (prestation.value && !prestations.some((other) => other.toLowerCase() === prestation.value.toLowerCase())) prestations.push(prestation.value)
-  }
+  const sentPrestations: unknown[] = Array.isArray(application.prestations) ? application.prestations : []
+  if (sentPrestations.some((sent) => !PRESTATIONS.some(({ id }) => id === sent))) errors.prestations = "Une des prestations n'est pas dans la liste."
+  const prestations = PRESTATIONS.filter(({ id }) => sentPrestations.includes(id)).map(({ id }) => id)
+
+  const otherPrestation = checkLine(application.otherPrestation, 'La prestation « Autre »', OTHER_PRESTATION_MAX_LENGTH, null)
+  if (otherPrestation.error !== undefined) errors.otherPrestation = otherPrestation.error
 
   const details = checkText(application.details, 'Le champ « Questions ou détails »', DETAILS_MAX_LENGTH, null)
   if (details.error !== undefined) errors.details = details.error
@@ -172,6 +184,7 @@ export function checkApplication(
       dates: dates.sort(),
       timeSlots: [...timeSlots.keys()].sort().map((key) => timeSlots.get(key)!),
       prestations,
+      otherPrestation: otherPrestation.value ?? '',
       details: details.value ?? '',
     },
   }

@@ -1,3 +1,4 @@
+import { PRESTATIONS } from 'shared/applications'
 import type { ApplicationFields } from 'shared/applications'
 import { GENRES, LINK_SITES } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
@@ -15,6 +16,8 @@ const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'nume
 export function describeApplication(profile: ArtistProfile, application: ApplicationFields): string {
   const collective = profile.kind === 'collective'
   const genres = profile.genres.map((id) => GENRES.find((genre) => genre.id === id)?.name ?? id)
+  const prestations: string[] = application.prestations.map((id) => PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id)
+  if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
   const links = LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)
   return [
     collective ? `Collectif : ${profile.name}` : `Artiste : ${profile.name}`,
@@ -30,7 +33,7 @@ export function describeApplication(profile: ArtistProfile, application: Applica
     'Dates souhaitées :',
     ...application.dates.map((date) => `  ${dayFormat.format(new Date(date))}`),
     `Plages horaires : ${application.timeSlots.length === 0 ? 'à toute heure' : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}`,
-    `Type de prestation : ${application.prestations.join(', ') || '—'}`,
+    `Type de prestation : ${prestations.join(', ') || '—'}`,
     '',
     'Bio :',
     profile.bio,

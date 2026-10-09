@@ -91,7 +91,8 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
   return {
     dates: ['2027-01-15', '2027-01-08'],
     timeSlots: [{ start: '18:00', end: '22:00' }],
-    prestations: ['DJ'],
+    prestations: ['dj'],
+    otherPrestation: '',
     details: 'Une question.',
     ...changes,
   }

@@ -367,7 +367,8 @@ An application has these fields:
 |---|---|---|
 | `dates` | list of strings | The days the artist would like to play, sorted. At least one. Past days are allowed, e.g. to import old applications |
 | `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end` in Québec time, e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
-| `prestations` | list of strings | What the artist would do, e.g. `"DJ"` or `"Performance live"`, as they wrote it. Each one is up to 60 characters. Can be empty |
+| `prestations` | list of strings | What the artist would do: ids from `PRESTATIONS` in `shared/src/applications.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PRESTATIONS`. Can be empty |
+| `otherPrestation` | string | Anything else the artist would do, in a few words, e.g. `"Synthé modulaire"`. Up to 60 characters. Can be empty |
 | `details` | string | The artist's questions or other details. Up to 2000 characters. Can be empty |
 
 The endpoints below also return these fields:

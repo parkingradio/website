@@ -57,6 +57,13 @@
       "when": 1791545386896,
       "tag": "0007_feature_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791549073821,
+      "tag": "0008_canonical_prestations",
+      "breakpoints": true
     }
   ]
 }
