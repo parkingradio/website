@@ -502,6 +502,29 @@ dl.admin-record {
   gap: 6px;
 }
 
+/* Feature flags, each a switch with its name, then what it does and who last switched it. */
+.admin-features {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-features li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.admin-features label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.admin-features p {
+  margin: 0.25rem 0 0;
+}
+
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */
 @media (max-width: 700px) {
   .admin {

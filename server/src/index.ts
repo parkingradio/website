@@ -13,6 +13,7 @@ import { radioRoutes } from './routes/radio.js'
 import { artistsRoutes } from './routes/artists.js'
 import { applicationsRoutes } from './routes/applications.js'
 import { applyRoutes } from './routes/apply.js'
+import { featuresRoutes } from './routes/features.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -28,6 +29,7 @@ import { applicationsSettingsStore } from './applications-settings.js'
 import { applyStore } from './apply.js'
 import { turnstileVerifier } from './turnstile.js'
 import { sesEmailSender } from './email.js'
+import { featuresStore } from './features.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -42,7 +44,8 @@ try {
 
 await app.register(fastifyCookie)
 await app.register(healthRoutes)
-await app.register(configRoutes)
+const features = featuresStore(db)
+await app.register(configRoutes, { store: features })
 await app.register(authRoutes)
 await app.register(adminRoutes)
 await app.register(eventsRoutes)
@@ -62,6 +65,7 @@ await app.register(applyRoutes, {
   settings: applicationsSettings,
   sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
 })
+await app.register(featuresRoutes, { store: features })
 await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')

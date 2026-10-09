@@ -9,7 +9,7 @@ type Body = { ok: boolean } & Record<string, unknown>
  * app is rendered.
  */
 export function mockFetch(bodies: Record<string, Body> = {}) {
-  const all: Record<string, Body> = { '/api/config': { ok: true, assetsDomain: 'assets.example.test' }, ...bodies }
+  const all: Record<string, Body> = { '/api/config': { ok: true, assetsDomain: 'assets.example.test', features: {} }, ...bodies }
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
@@ -19,6 +19,9 @@ export function mockFetch(bodies: Record<string, Body> = {}) {
     }),
   )
 }
+
+/** The JSON body of a request, e.g. one from `requestsTo`. */
+export const jsonBody = (request: RequestInit) => JSON.parse(request.body as string)
 
 /** The options of every request `fetch` was asked to make with `method` to `url`, oldest first. */
 export function requestsTo(method: string, url: string): RequestInit[] {

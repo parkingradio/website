@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, check, jsonb, date } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from 'shared/applications'
 import type { ApplicationStatus, TimeSlot } from 'shared/applications'
@@ -136,3 +136,12 @@ export const applicationsSettings = pgTable(
   },
   (table) => [check('applications_settings_single_row', sql`${table.id} = 1`)],
 )
+
+// The feature flags that admins turned on or off on the admin pages (see shared/src/features.ts). A flag without a row
+// is off, and rows for flags that were retired are ignored.
+export const featureFlags = pgTable('feature_flags', {
+  id: text('id').primaryKey(), // one of FEATURES
+  enabled: boolean('enabled').notNull(),
+  updatedBy: text('updated_by').notNull(), // the email of the admin who last turned it on or off
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+})

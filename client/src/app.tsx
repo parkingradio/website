@@ -16,6 +16,7 @@ import { Calendrier } from './pages/admin/calendrier'
 import { Rotation } from './pages/admin/rotation'
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
 import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
+import { Features } from './pages/admin/features'
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
               <Route path="artistes" element={<ArtistsPage />} />
               <Route path="artistes/nouveau" element={<NewArtistPage />} />
               <Route path="artistes/:id" element={<ArtistPage />} />
+              <Route path="features" element={<Features />} />
             </Route>
           </Route>
           {/* Also catches unknown paths under /admin, which are shown like any other unknown URL. */}

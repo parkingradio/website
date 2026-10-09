@@ -243,3 +243,21 @@ typed without being pinned. Genres are tags to click, which pins them in order o
 typed, with the matching countries suggested, of which one has to be picked.
 Each field says what's wrong with it once it's left, with the same rules and messages as the server (see
 `checkProfile` in shared/src/artists.ts), and so does the application form (see `checkApplication`).
+
+### Features
+
+At `/admin/features`: the feature flags, switches that turn parts of the site on or off without deploying it again.
+They're meant for going back to the old version of something, e.g. the Google Form in place of the new "Appliquer"
+form if it has a problem.
+
+The section lists every flag, each with a switch, its name, what it does, and which admin last switched it, and when.
+Each switch is saved right away, and visitors get the change as soon as they load a page of the site. A page they
+already have open stays as it was until they load it again. While there are no flags, the section says so.
+
+Every flag is off until an admin turns it on, so that a flag can be deployed without changing anything until then. A
+page that depends on a flag shows nothing until it knows whether the flag is on, rather than switching from one version
+to the other in front of the visitor. When it can't know, it behaves as if the flag were off. For that reason, "off"
+always has to be the safe option: the old version, or the one that relies the least on our own server.
+
+The flags are listed in `FEATURES`, in shared/src/features.ts, and named in `FEATURE_LABELS`, in
+client/src/pages/admin/describe.ts. Retiring a flag only takes removing it from both.

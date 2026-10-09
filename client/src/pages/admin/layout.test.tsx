@@ -43,6 +43,7 @@ describe('Admin pages', () => {
       ['rotation radio', '/admin/rotation'],
       ['candidatures', '/admin/candidatures'],
       ['artistes', '/admin/artistes'],
+      ['features', '/admin/features'],
     ]) {
       expect(within(adminMenu()).getByRole('link', { name })).toHaveAttribute('href', path)
     }

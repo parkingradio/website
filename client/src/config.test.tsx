@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { FeatureId } from 'shared/features'
 import { ConfigProvider } from './config'
-import { useAssetUrl } from './config-context'
+import { useAssetUrl, useFeature } from './config-context'
+import { mockFetch } from './test-utils'
 
 function AssetUrl({ assetKey }: { assetKey: string }) {
   const assetUrl = useAssetUrl()
@@ -22,5 +24,43 @@ describe('useAssetUrl', () => {
     await waitFor(() =>
       expect(screen.getByTestId('url')).toHaveTextContent('https://assets.example.test/poster.jpg'),
     )
+  })
+})
+
+describe('useFeature', () => {
+  // There are no flags for now, so these tests use flags of their own.
+  function Feature({ id }: { id: string }) {
+    const enabled = useFeature(id as FeatureId)
+    return <span data-testid={id}>{enabled === undefined ? '(pending)' : enabled ? 'on' : 'off'}</span>
+  }
+
+  function renderFeatures() {
+    render(
+      <ConfigProvider>
+        <Feature id="on-thing" />
+        <Feature id="off-thing" />
+        <Feature id="unknown-thing" />
+      </ConfigProvider>,
+    )
+  }
+
+  it('says whether each flag is on, once the configuration has been fetched', async () => {
+    mockFetch({ '/api/config': { ok: true, assetsDomain: 'assets.example.test', features: { 'on-thing': true, 'off-thing': false } } })
+    renderFeatures()
+
+    expect(screen.getByTestId('on-thing')).toHaveTextContent('(pending)')
+
+    await waitFor(() => expect(screen.getByTestId('on-thing')).toHaveTextContent('on'))
+    expect(screen.getByTestId('off-thing')).toHaveTextContent('off')
+    expect(screen.getByTestId('unknown-thing')).toHaveTextContent('off')
+  })
+
+  it("turns every flag off when the configuration can't be fetched", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFetch({ '/api/config': { ok: false, error: 'Boom' } })
+    renderFeatures()
+
+    await waitFor(() => expect(screen.getByTestId('on-thing')).toHaveTextContent('off'))
+    expect(screen.getByTestId('off-thing')).toHaveTextContent('off')
   })
 })

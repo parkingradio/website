@@ -60,6 +60,8 @@ can be `null`.
 | `DELETE /api/admin/applications/:id` | admin | Deleting an application | `applications.ts` |
 | `GET /api/admin/applications/recipients` | admin | Who applications from artists are emailed to | `applications.ts` |
 | `PUT /api/admin/applications/recipients` | admin | Choosing who applications from artists are emailed to | `applications.ts` |
+| `GET /api/admin/features` | admin | Every feature flag, and whether it's on | `features.ts` |
+| `PUT /api/admin/features/:id` | admin | Turning a feature flag on or off | `features.ts` |
 
 ## Health and configuration
 
@@ -76,6 +78,10 @@ Values that depend on the environment, which the client reads before anything el
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
 | `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget. Pages need it to show the widget, which gives them the token `POST /api/applications` asks for |
+| `features` | object | Whether each feature flag is on (`true`) or off (`false`), by id, e.g. `{"some-flag": true}`. A flag that isn't there is off (see "Feature flags" below) |
+
+The response is never cached (`Cache-Control: no-store`), so that switching a feature flag takes effect for every page
+loaded after that. When the flags can't be read from the database, `features` is empty, so they're all off, rather than the request failing.
 
 ## Admins and sessions
 
@@ -496,3 +502,37 @@ Who applications sent with `POST /api/applications` are emailed to. Applications
 
 Replaces the recipients, and responds like `GET /api/admin/applications/recipients`. Fails with 400 if `recipients`
 isn't a list of strings, if one of them isn't an email address, or if there are more than 10.
+
+## Feature flags
+
+Switches that admins turn on and off, to change what the site does without deploying it again (see "Features" in
+[design.md](design.md)). The flags are listed in `FEATURES`, in `shared/src/features.ts`. Each one is off until an
+admin turns it on. Pages read them in `GET /api/config`.
+
+### `GET /api/admin/features` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `features` | list of flags | Every flag, in the order of `FEATURES`. See below |
+
+Each flag:
+
+| Field | Type | |
+|---|---|---|
+| `id` | string | E.g. `"some-flag"` |
+| `enabled` | boolean | Whether it's on |
+| `updatedBy`, `updatedAt` | string or null | Who last turned it on or off (an admin's email), and when |
+
+### `PUT /api/admin/features/:id` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `enabled` | boolean | Whether to turn it on or off |
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `feature` | flag | The flag, like in `GET /api/admin/features` |
+
+Fails with 400 if `enabled` isn't a boolean, or 404 if there's no such flag, including one that was retired.

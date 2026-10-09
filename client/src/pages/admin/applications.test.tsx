@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from 'shared/applications'
 import type { Artist } from 'shared/artists'
 import App from '../../app'
-import { mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
@@ -78,7 +78,6 @@ const rows = () =>
     .slice(1)
     .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
 
-const body = (request: RequestInit) => JSON.parse(request.body as string)
 
 describe('The list of applications', () => {
   it('lists every application, newest first, with its artist', async () => {
@@ -188,7 +187,7 @@ describe('Who applications are emailed to', () => {
     add(' equipe@example.com ')
 
     await waitFor(() => expect(shown()).toEqual(['equipe@example.com']))
-    expect(requestsTo('PUT', URL).map(body)).toEqual([{ recipients: ['equipe@example.com'] }])
+    expect(requestsTo('PUT', URL).map(jsonBody)).toEqual([{ recipients: ['equipe@example.com'] }])
     expect(entry()).toHaveValue('')
     expect(screen.queryByText(/Aucun destinataire/)).not.toBeInTheDocument()
     expect(screen.getByText(/^Changé par admin@example.com le 8 octobre 2026/)).toBeInTheDocument()
@@ -206,7 +205,7 @@ describe('Who applications are emailed to', () => {
     expect(screen.getByRole('button', { name: 'ajouter ce destinataire' })).toBeDisabled()
 
     await waitFor(() => expect(shown()).toEqual(['equipe@example.com']))
-    expect(requestsTo('PUT', URL).map(body)).toEqual([{ recipients: ['equipe@example.com'] }])
+    expect(requestsTo('PUT', URL).map(jsonBody)).toEqual([{ recipients: ['equipe@example.com'] }])
     expect(screen.getByRole('button', { name: 'ajouter ce destinataire' })).toBeEnabled()
     expect(entry()).toHaveFocus()
   })
@@ -234,7 +233,7 @@ describe('Who applications are emailed to', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'retirer equipe@example.com' }))
     expect(screen.getByRole('button', { name: 'retirer booking@example.com' })).toBeDisabled()
     await waitFor(() => expect(shown()).toEqual(['booking@example.com']))
-    expect(requestsTo('PUT', URL).map(body)).toEqual([{ recipients: ['booking@example.com'] }])
+    expect(requestsTo('PUT', URL).map(jsonBody)).toEqual([{ recipients: ['booking@example.com'] }])
     // Rather than being lost with the button that was clicked.
     expect(entry()).toHaveFocus()
   })
@@ -365,7 +364,7 @@ describe('An application’s page', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'retenue' })).toHaveAttribute('aria-pressed', 'true'))
     expect(screen.getByRole('button', { name: 'nouvelle' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText(/^Changé par/)).toHaveTextContent(/^Changé par other@example.com le 6 octobre 2026/)
-    expect(body(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
   })
 
   it('says when the status could not be changed', async () => {
@@ -397,7 +396,7 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Corrigé.')).toBeInTheDocument())
-    expect(body(requestsTo('PUT', '/api/admin/applications/application-1')[0])).toEqual({
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0])).toEqual({
       dates: ['2026-12-17', '2027-01-07', '2027-01-14', '2027-02-04'],
       timeSlots: [],
       prestations: ['DJ', 'Rap', 'Vinyle seulement'],
@@ -422,7 +421,7 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    expect(body(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'Live, avec visuels', 'B2B'])
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'Live, avec visuels', 'B2B'])
   })
 
   it('says what is wrong with a time slot once the time slots are left, and sends nothing', async () => {
@@ -534,7 +533,7 @@ describe('Creating an application', () => {
     fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/candidatures/application-4'))
-    expect(body(requestsTo('POST', '/api/admin/applications')[0])).toEqual({
+    expect(jsonBody(requestsTo('POST', '/api/admin/applications')[0])).toEqual({
       artistId: 'artist-2',
       dates: ['2026-12-10'],
       timeSlots: [],

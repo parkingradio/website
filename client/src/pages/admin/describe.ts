@@ -1,12 +1,16 @@
 import { COUNTRIES, GENRES } from 'shared/artists'
 import type { ArtistKind, GenreId } from 'shared/artists'
 import type { ApplicationStatus } from 'shared/applications'
+import type { FeatureId } from 'shared/features'
 import type { ComboboxOption } from '../../combobox'
 
-// How the artists and applications sections show what the API returns.
+// How the admin sections show what the API returns.
 
 export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', collective: 'collectif' }
 export const STATUS_LABELS: Record<ApplicationStatus, string> = { new: 'nouvelle', accepted: 'retenue', rejected: 'refusée' }
+
+// What each feature flag is: its name, and what turning it on does (see shared/src/features.ts).
+export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {}
 
 const countryNames = new Intl.DisplayNames(['fr'], { type: 'region' })
 

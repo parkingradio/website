@@ -42,6 +42,7 @@ export function AdminLayout() {
           <NavLink to="/admin/rotation">rotation radio</NavLink>
           <NavLink to="/admin/candidatures">candidatures</NavLink>
           <NavLink to="/admin/artistes">artistes</NavLink>
+          <NavLink to="/admin/features">features</NavLink>
         </div>
         <div className="admin-session">
           <span>{session.email}</span>
