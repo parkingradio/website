@@ -4,6 +4,7 @@ import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 import { NoSuchArtist } from '../applications.js'
 import type { ApplicationsStore, StoredApplication } from '../applications.js'
+import type { ApplicationsSettings, ApplicationsSettingsStore } from '../applications-settings.js'
 import { SESSION_COOKIE, signSessionToken } from '../auth.js'
 import { applicationsRoutes } from './applications.js'
 
@@ -49,6 +50,15 @@ const store: ApplicationsStore = {
   },
 }
 
+// Who applications are emailed to, as the database would keep them.
+let savedSettings: ApplicationsSettings | null = null
+const settings: ApplicationsSettingsStore = {
+  load: async () => savedSettings,
+  save: vi.fn<ApplicationsSettingsStore['save']>(async (changed) => {
+    savedSettings = changed
+  }),
+}
+
 function application(changes: object = {}) {
   return {
     artistId: 'artist-1',
@@ -64,7 +74,7 @@ function application(changes: object = {}) {
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
   await app.register(fastifyCookie)
-  await app.register(applicationsRoutes, { store })
+  await app.register(applicationsRoutes, { store, settings })
   return app
 }
 
@@ -88,6 +98,7 @@ describe('applications routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     nextId = 0
+    savedSettings = null
     vi.clearAllMocks()
   })
 
@@ -104,11 +115,14 @@ describe('applications routes', () => {
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: application() }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: { status: 'accepted' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1' }),
+      app.inject({ method: 'GET', url: '/api/admin/applications/recipients' }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/recipients', payload: { recipients: [] } }),
     ]
     for (const response of await Promise.all(requests)) {
       expect(response.statusCode).toBe(401)
     }
     expect(store.create).not.toHaveBeenCalled()
+    expect(settings.save).not.toHaveBeenCalled()
   })
 
   describe('POST /api/admin/applications', () => {
@@ -291,6 +305,77 @@ describe('applications routes', () => {
       expect((await send(app, 'DELETE', '/api/admin/applications/application-1')).json()).toEqual({ ok: true })
       expect(rows).toHaveLength(0)
       expect((await send(app, 'DELETE', '/api/admin/applications/application-1')).statusCode).toBe(404)
+    })
+  })
+
+  describe('/api/admin/applications/recipients', () => {
+    const URL = '/api/admin/applications/recipients'
+
+    it('has nobody until recipients are chosen', async () => {
+      const app = await buildApp()
+      const response = await send(app, 'GET', URL)
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({ ok: true, recipients: [], updatedBy: null, updatedAt: null })
+    })
+
+    it('replaces the recipients, with who changed them and when, and returns them', async () => {
+      const app = await buildApp()
+      const before = Date.now()
+      const response = await send(app, 'PUT', URL, { recipients: ['equipe@example.com', 'booking@example.com'] })
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body).toEqual({
+        ok: true,
+        recipients: ['equipe@example.com', 'booking@example.com'],
+        updatedBy: 'admin@example.com',
+        updatedAt: expect.any(String),
+      })
+      expect(Date.parse(body.updatedAt)).toBeGreaterThanOrEqual(before)
+      expect((await send(app, 'GET', URL)).json()).toEqual(body)
+    })
+
+    it('trims the recipients, and drops blank entries and duplicates, whatever their case', async () => {
+      const app = await buildApp()
+      const response = await send(app, 'PUT', URL, { recipients: [' equipe@example.com ', '', '  ', 'Equipe@Example.com', 'booking@example.com'] })
+      expect(response.json().recipients).toEqual(['equipe@example.com', 'booking@example.com'])
+    })
+
+    it('can be emptied', async () => {
+      const app = await buildApp()
+      await send(app, 'PUT', URL, { recipients: ['equipe@example.com'] })
+      expect((await send(app, 'PUT', URL, { recipients: [] })).json().recipients).toEqual([])
+      expect(savedSettings?.recipients).toEqual([])
+    })
+
+    it("refuses what isn't a list of email addresses, or too many of them, and keeps the recipients as they were", async () => {
+      const app = await buildApp()
+      await send(app, 'PUT', URL, { recipients: ['equipe@example.com'] })
+      vi.mocked(settings.save).mockClear()
+      const invalid = [
+        { body: { recipients: ['equipe@example.com', 'pas une adresse'] }, error: 'Not an email address: pas une adresse' },
+        { body: { recipients: ['Équipe <equipe@example.com>'] }, error: 'Not an email address: Équipe <equipe@example.com>' },
+        { body: { recipients: [`${'x'.repeat(190)}@example.com`] }, error: `Not an email address: ${'x'.repeat(190)}@example.com` },
+        { body: { recipients: 'equipe@example.com' }, error: 'The recipients must be a list of email addresses' },
+        { body: { recipients: [42] }, error: 'The recipients must be a list of email addresses' },
+        { body: {}, error: 'The recipients must be a list of email addresses' },
+        {
+          body: { recipients: Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`) },
+          error: 'There can be at most 10 recipients',
+        },
+      ]
+      for (const { body, error } of invalid) {
+        const response = await send(app, 'PUT', URL, body)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(settings.save).not.toHaveBeenCalled()
+      expect(savedSettings?.recipients).toEqual(['equipe@example.com'])
+    })
+
+    it('counts recipients once blank entries and duplicates are dropped', async () => {
+      const app = await buildApp()
+      const recipients = [...Array.from({ length: 10 }, (_, i) => `admin-${i}@example.com`), 'ADMIN-0@example.com', '']
+      expect((await send(app, 'PUT', URL, { recipients })).statusCode).toBe(200)
     })
   })
 })

@@ -43,6 +43,13 @@
       "when": 1791507026669,
       "tag": "0005_applications_from_artists",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791513356572,
+      "tag": "0006_applications_settings",
+      "breakpoints": true
     }
   ]
 }

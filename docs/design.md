@@ -193,6 +193,13 @@ The section lists every application, most recent first, with when it was created
 dates, the prestations and the status. Buttons above the list show only the applications with a status, with how
 many there are of each.
 
+Under the list, "Envoi par e-mail" chooses who the applications artists send are emailed to: email addresses, each
+typed then added with + (or Enter) and removed with its ×, like a collective's artists. Each change is saved right
+away. It also says which admin last changed them, and when. Each application is emailed to them with the artist's
+photo, and replying answers the artist. The artist also gets an email confirming that their application was
+received, and replying to that one answers these addresses. Until someone is chosen, applications are only listed
+here, and only the artist gets an email. Applications that admins create by hand aren't emailed.
+
 Clicking an application opens it at `/admin/candidatures/<id>`. From top to bottom, it shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when.

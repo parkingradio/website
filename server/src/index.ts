@@ -24,8 +24,10 @@ import { radioSettingsStore } from './radio-settings.js'
 import { artistPhotos, artistsStore } from './artists.js'
 import { privateBucket } from './private-bucket.js'
 import { applicationsStore } from './applications.js'
+import { applicationsSettingsStore } from './applications-settings.js'
 import { applyStore } from './apply.js'
 import { turnstileVerifier } from './turnstile.js'
+import { sesEmailSender } from './email.js'
 
 const app = Fastify({ loggerInstance: logger })
 app.addHook('onClose', () => db.$client.end())
@@ -51,11 +53,14 @@ await app.register(radioRoutes, {
 })
 const photos = artistPhotos(privateBucket(config.privateFiles))
 await app.register(artistsRoutes, { store: artistsStore(db), photos })
-await app.register(applicationsRoutes, { store: applicationsStore(db) })
+const applicationsSettings = applicationsSettingsStore(db)
+await app.register(applicationsRoutes, { store: applicationsStore(db), settings: applicationsSettings })
 await app.register(applyRoutes, {
   store: applyStore(db),
   photos,
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
+  settings: applicationsSettings,
+  sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
 })
 await app.register(notFoundRoutes, { prefix: '/api' })
 

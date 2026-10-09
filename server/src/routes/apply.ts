@@ -1,15 +1,18 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import type { ApplicationFields, ApplyResponse } from 'shared/applications'
 import { PHOTO_TOO_LARGE } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
 import type { ApiError } from 'shared/error'
+import { applicationEmails } from '../application-emails.js'
 import { InvalidApplication, validateApplication } from '../applications.js'
+import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { Photos, SentPhoto } from '../artists.js'
 import { clientAddress, visitorAddress } from '../client-address.js'
+import type { Email, SendEmail } from '../email.js'
 import { jsonField, readPhotoForm } from '../photo-form.js'
 import type { PhotoForm } from '../photo-form.js'
 import { keepQueryValuesPrivate } from '../query-errors.js'
@@ -43,13 +46,55 @@ function validated(form: PhotoForm): { profile: ArtistProfile; photo: SentPhoto;
   }
 }
 
-type ApplyOptions = {
+type EmailOptions = {
+  settings: Pick<ApplicationsSettingsStore, 'load'>
+  // Null when the server can't send emails, e.g. in development, where MAIL_DOMAIN isn't set.
+  sendEmail: SendEmail | null
+}
+
+// Emails the application to the recipients chosen on the admin pages, and confirms it to the artist. The application
+// is saved by then, so failures are only logged.
+async function emailApplication(
+  log: FastifyBaseLogger,
+  { settings, sendEmail }: EmailOptions,
+  sent: { profile: ArtistProfile; application: ApplicationFields; photo: SentPhoto; photoKey: string },
+) {
+  if (!sendEmail) {
+    log.warn('Not emailing the application: MAIL_DOMAIN is not set')
+    return
+  }
+  // Null when they couldn't be loaded, which is logged, so that it isn't also logged as nobody having been chosen.
+  const recipients = await settings.load().then(
+    (loaded) => loaded?.recipients ?? [],
+    (error: unknown) => {
+      log.error({ err: error }, 'Failed to load who applications are emailed to')
+      return null
+    },
+  )
+  if (recipients?.length === 0) log.warn('Not emailing the application to anyone: no recipients were chosen on the admin pages')
+  const { toRecipients, confirmation } = applicationEmails({ ...sent, recipients: recipients ?? [] })
+
+  const send = async (email: Email, failure: string) => {
+    try {
+      await sendEmail(email)
+    } catch (error) {
+      // An EmailNotSent, which leaves the addresses out.
+      log.error({ err: error }, failure)
+    }
+  }
+  await Promise.all([
+    toRecipients && send(toRecipients, 'Failed to email an application to its recipients'),
+    send(confirmation, 'Failed to confirm an application to the artist'),
+  ])
+}
+
+type ApplyOptions = EmailOptions & {
   store: ApplyStore
   photos: Pick<Photos, 'store' | 'delete'>
   verifyTurnstile: TurnstileVerifier
 }
 
-export async function applyRoutes(app: FastifyInstance, { store, photos, verifyTurnstile }: ApplyOptions) {
+export async function applyRoutes(app: FastifyInstance, { store, photos, verifyTurnstile, settings, sendEmail }: ApplyOptions) {
   // Only routes that opt in through `config.rateLimit` are limited.
   await app.register(rateLimit, { global: false, keyGenerator: clientAddress })
   // Needed by `readPhotoForm`, which sets its own limits.
@@ -99,15 +144,21 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
       // Only new artists can apply here, so an existing email gets a 409. That tells the sender the email belongs to an
       // artist, which is why it's only checked now: finding that out takes passing Turnstile, like applying does.
       const photoKey = await photos.store(sent.photo)
+      let applied: { artistId: string; applicationId: string }
       try {
-        const applied = await store.apply({ ...sent.profile, photoKey, photoType: sent.photo.type }, sent.application)
-        request.log.info(applied, 'An artist applied')
-        return { ok: true }
+        applied = await store.apply({ ...sent.profile, photoKey, photoType: sent.photo.type }, sent.application)
       } catch (error) {
         await forgetPhoto(photos, request.log, photoKey)
         if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
         throw error
       }
+      const log = request.log.child(applied)
+      log.info('An artist applied')
+      // The application is saved, so nothing about its emails, even unexpected, can make the request fail.
+      await emailApplication(log, { settings, sendEmail }, { ...sent, photoKey }).catch((error: unknown) => {
+        log.error({ err: error }, 'Failed to email an application')
+      })
+      return { ok: true }
     },
   )
 }

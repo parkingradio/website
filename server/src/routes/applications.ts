@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
-import { APPLICATION_STATUSES } from 'shared/applications'
+import { APPLICATION_STATUSES, MAX_RECIPIENTS } from 'shared/applications'
 import type {
   Application,
   ApplicationFields,
+  ApplicationRecipientsRequest,
+  ApplicationRecipientsResponse,
   ApplicationResponse,
   ApplicationStatusRequest,
   ApplicationsResponse,
@@ -10,13 +12,16 @@ import type {
   DeleteApplicationResponse,
   UpdateApplicationRequest,
 } from 'shared/applications'
+import { EMAIL_MAX_LENGTH, isEmailAddress } from 'shared/artists'
 import type { ApiError } from 'shared/error'
 import { InvalidApplication, NoSuchArtist, validateApplication } from '../applications.js'
 import type { ApplicationsStore, StoredApplication } from '../applications.js'
+import type { ApplicationsSettings, ApplicationsSettingsStore } from '../applications-settings.js'
 import { requireAuth } from '../auth.js'
 import { keepQueryValuesPrivate } from '../query-errors.js'
 
-// Admin routes for applications: create, view, change, accept or reject, and delete them.
+// Admin routes for applications: create, view, change, accept or reject, and delete them, and choose who the ones artists
+// send are emailed to.
 
 const NO_SUCH_APPLICATION: ApiError = { ok: false, error: 'No such application' }
 const NO_SUCH_ARTIST: ApiError = { ok: false, error: 'No such artist' }
@@ -50,13 +55,40 @@ function validated(sent: unknown): ApplicationFields | ApiError {
   }
 }
 
+function recipientsResponse(settings: ApplicationsSettings | null): ApplicationRecipientsResponse {
+  return {
+    ok: true,
+    recipients: settings?.recipients ?? [],
+    updatedBy: settings?.updatedBy ?? null,
+    updatedAt: settings?.updatedAt.toISOString() ?? null,
+  }
+}
+
+// The recipients that were sent, trimmed, without blank entries or duplicates (ignoring case), or the error to send
+// back.
+function validatedRecipients(sent: unknown): string[] | ApiError {
+  if (!Array.isArray(sent) || sent.some((recipient) => typeof recipient !== 'string')) {
+    return { ok: false, error: 'The recipients must be a list of email addresses' }
+  }
+  // By address, ignoring case, the first spelling of each.
+  const recipients = new Map<string, string>()
+  for (const recipient of sent.map((recipient: string) => recipient.trim()).filter(Boolean)) {
+    // Like an artist's email.
+    if (!isEmailAddress(recipient) || recipient.length > EMAIL_MAX_LENGTH) return { ok: false, error: `Not an email address: ${recipient}` }
+    if (!recipients.has(recipient.toLowerCase())) recipients.set(recipient.toLowerCase(), recipient)
+    if (recipients.size > MAX_RECIPIENTS) return { ok: false, error: `There can be at most ${MAX_RECIPIENTS} recipients` }
+  }
+  return [...recipients.values()]
+}
+
 type ApplicationsOptions = {
   store: ApplicationsStore
+  settings: ApplicationsSettingsStore
 }
 
 type ById = { Params: { id: string } }
 
-export async function applicationsRoutes(app: FastifyInstance, { store }: ApplicationsOptions) {
+export async function applicationsRoutes(app: FastifyInstance, { store, settings }: ApplicationsOptions) {
   // An application's details can contain the artist's personal data.
   keepQueryValuesPrivate(app, 'Failed to handle a request about applications')
 
@@ -68,12 +100,31 @@ export async function applicationsRoutes(app: FastifyInstance, { store }: Applic
     },
   )
 
+  // Fastify matches this path before `/api/admin/applications/:id`, and `recipients` isn't an application's id anyway.
+  app.get<{ Reply: ApplicationRecipientsResponse }>('/api/admin/applications/recipients', { preHandler: requireAuth }, async () => {
+    return recipientsResponse(await settings.load())
+  })
+
+  app.put<{ Body: Partial<ApplicationRecipientsRequest> | null; Reply: ApplicationRecipientsResponse | ApiError }>(
+    '/api/admin/applications/recipients',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const recipients = validatedRecipients(request.body?.recipients)
+      if ('error' in recipients) return reply.status(400).send(recipients)
+      const saved = { recipients, updatedBy: request.user!.email, updatedAt: new Date() }
+      await settings.save(saved)
+      return recipientsResponse(saved)
+    },
+  )
+
   app.get<ById & { Reply: ApplicationResponse | ApiError }>('/api/admin/applications/:id', { preHandler: requireAuth }, async (request, reply) => {
     const row = await store.get(request.params.id)
     if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
     return { ok: true, application: application(row) }
   })
 
+  // Unlike applications that artists send, these aren't emailed to the recipients, nor confirmed to the artist: the admin
+  // who creates one already knows about it, and may be bringing in an old one.
   app.post<{ Body: Partial<CreateApplicationRequest> | null; Reply: ApplicationResponse | ApiError }>(
     '/api/admin/applications',
     { preHandler: requireAuth },

@@ -179,6 +179,11 @@ describe('validateProfile', () => {
 
   it('checks the email address and phone number', () => {
     expect(error({ email: 'pas-une-adresse' })).toBe('Indique une adresse e-mail valide.')
+    // Addresses with a name, or several of them, which would send emails to someone else too.
+    for (const email of ['Nom <artiste@example.com>', 'artiste@example.com, autre@example.com', 'a"b@example.com', 'a@example.com;b@example.com']) {
+      expect(error({ email })).toBe('Indique une adresse e-mail valide.')
+    }
+    expect(error({ email: 'prénom.nom+radio@example.co.uk' })).toBeNull()
     expect(error({ phone: '123' })).toBe('Indique un numéro de téléphone valide.')
     expect(error({ email: `${'a'.repeat(190)}@example.com` })).toBe("L'adresse e-mail dépasse 200 caractères.")
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')

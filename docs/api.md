@@ -58,6 +58,8 @@ can be `null`.
 | `PUT /api/admin/applications/:id` | admin | Changing an application | `applications.ts` |
 | `PUT /api/admin/applications/:id/status` | admin | Accepting or rejecting an application | `applications.ts` |
 | `DELETE /api/admin/applications/:id` | admin | Deleting an application | `applications.ts` |
+| `GET /api/admin/applications/recipients` | admin | Who applications from artists are emailed to | `applications.ts` |
+| `PUT /api/admin/applications/recipients` | admin | Choosing who applications from artists are emailed to | `applications.ts` |
 
 ## Health and configuration
 
@@ -398,6 +400,17 @@ The request is `multipart/form-data`, with four parts:
 A few other fields or files, e.g. a form's submit button, are ignored. A second photo isn't: the request fails. On
 success, the response is `{"ok": true}`.
 
+**Emails.** Once the application is saved, the server sends two emails, in French, from `noreply@<MAIL_DOMAIN>`:
+
+- To the recipients chosen on the admin pages (see `GET /api/admin/applications/recipients`): everything the artist
+  sent, with their photo attached. Replying to it answers the artist. When nobody was chosen, it isn't sent.
+- To the artist: a confirmation that the application was received. Replying to it answers the recipients, if there
+  are any. It goes to whatever address the application has, so it doesn't repeat anything the artist wrote: otherwise,
+  anyone could have the server send their own text to any address.
+
+Emails that can't be sent are only logged: the application is saved either way, and the request still succeeds. When
+`MAIL_DOMAIN` isn't set, e.g. in development, no email is sent.
+
 **Only new artists can apply this way.** If an artist with the same email already exists (ignoring upper and lower
 case), the request fails with 409 and nothing is created. Otherwise, anyone could take over an artist's profile just by
 typing their email. The downside is that the 409 tells whoever sent the request that this email belongs to an artist.
@@ -464,3 +477,22 @@ Changes an application's status. The response is the same as for `POST /api/admi
 ### `DELETE /api/admin/applications/:id` (admin)
 
 Deletes an application, and responds `{"ok": true}`. Fails with 404 if the application doesn't exist.
+
+### `GET /api/admin/applications/recipients` (admin)
+
+Who applications sent with `POST /api/applications` are emailed to. Applications that admins create aren't emailed.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `recipients` | list of strings | Email addresses. Empty until admins choose them: until then, applications are saved and confirmed to the artist, but not emailed to anyone else |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the recipients (an admin's email), and when |
+
+### `PUT /api/admin/applications/recipients` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `recipients` | list of strings | Email addresses, up to 10. They're trimmed, and blanks and duplicates (ignoring upper and lower case) are dropped. Empty means nobody |
+
+Replaces the recipients, and responds like `GET /api/admin/applications/recipients`. Fails with 400 if `recipients`
+isn't a list of strings, if one of them isn't an email address, or if there are more than 10.

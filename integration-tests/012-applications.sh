@@ -7,6 +7,7 @@
 # - that an application can only belong to an artist who exists
 # - that applications are listed newest first
 # - that deleting an artist deletes their applications
+# - the applications_settings migration, and that who applications are emailed to is saved, and replaced
 
 source "$(dirname "$0")/lib.sh"
 
@@ -121,3 +122,22 @@ json DELETE "${BASE_URL}/api/admin/artists/${artist}"
 expect_status 200
 json GET "${BASE_URL}/api/admin/applications/${second}"
 expect_status 404
+
+echo "  nobody gets applications by email until they're chosen, and they're saved, then replaced"
+readonly RECIPIENTS="${BASE_URL}/api/admin/applications/recipients"
+request "$RECIPIENTS"
+expect_status 401
+json GET "$RECIPIENTS"
+expect_status 200
+expect_body_contains '"recipients":[],"updatedBy":null,"updatedAt":null'
+json PUT "$RECIPIENTS" '{"recipients":["equipe@integration.test"," Equipe@Integration.test ",""]}'
+expect_status 200
+expect_body_contains "\"recipients\":[\"equipe@integration.test\"],\"updatedBy\":\"${ADMIN_EMAIL}\""
+json PUT "$RECIPIENTS" '{"recipients":["booking@integration.test","equipe@integration.test"]}'
+expect_status 200
+json GET "$RECIPIENTS"
+expect_status 200
+expect_body_contains "\"recipients\":[\"booking@integration.test\",\"equipe@integration.test\"],\"updatedBy\":\"${ADMIN_EMAIL}\""
+json PUT "$RECIPIENTS" '{"recipients":["pas une adresse"]}'
+expect_status 400
+expect_body_contains 'Not an email address: pas une adresse'

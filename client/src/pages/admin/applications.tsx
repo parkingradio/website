@@ -15,6 +15,7 @@ import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
 import { KIND_LABELS, STATUS_LABELS, byWhom, dateFormat, formatDay, formatShortDay, place } from './describe'
+import { Recipients } from './recipients'
 import { useApi } from './use-api'
 
 // The applications section: every application, each one's page, where it's accepted or rejected, changed or deleted,
@@ -71,14 +72,9 @@ export function ApplicationsTable({ applications, artists }: { applications: App
   )
 }
 
-// Every application, newest first, or only those with the status in the `statut` query parameter.
+// Every application, and who the ones artists send are emailed to.
 export function ApplicationsPage() {
-  const applications = useApi<ApplicationsResponse>('/api/admin/applications')
-  const artists = useApi<ArtistsResponse>('/api/admin/artists')
-  const [searchParams, setSearchParams] = useSearchParams()
-  const status = APPLICATION_STATUSES.find((status) => status === searchParams.get('statut')) ?? null
-
-  const header = (
+  return (
     <>
       <h1>Candidatures</h1>
       <div className="admin-toolbar">
@@ -86,19 +82,29 @@ export function ApplicationsPage() {
           nouvelle candidature
         </Link>
       </div>
+      <ApplicationsList />
+
+      <h2>Envoi par e-mail</h2>
+      <Recipients />
     </>
   )
+}
+
+// Every application, newest first, or only those with the status in the `statut` query parameter.
+function ApplicationsList() {
+  const applications = useApi<ApplicationsResponse>('/api/admin/applications')
+  const artists = useApi<ArtistsResponse>('/api/admin/artists')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const status = APPLICATION_STATUSES.find((status) => status === searchParams.get('statut')) ?? null
+
   if (applications.kind === 'error') {
     return (
-      <>
-        {header}
-        <p className="admin-error" role="alert">
-          Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
-        </p>
-      </>
+      <p className="admin-error" role="alert">
+        Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
+      </p>
     )
   }
-  if (applications.kind === 'loading' || artists.kind === 'loading') return header
+  if (applications.kind === 'loading' || artists.kind === 'loading') return null
 
   const all = applications.value.applications
   const listed = status ? all.filter((application) => application.status === status) : all
@@ -111,7 +117,6 @@ export function ApplicationsPage() {
 
   return (
     <>
-      {header}
       <div className="admin-filters" role="group" aria-label="Statut">
         {filters.map((filter) => (
           <button

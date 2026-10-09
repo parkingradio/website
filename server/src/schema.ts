@@ -123,3 +123,16 @@ export const applications = pgTable(
     check('applications_status', oneOf(table.status, APPLICATION_STATUSES)),
   ],
 )
+
+// Who the applications artists send are emailed to, as chosen on the admin pages. There is only ever one row, and none
+// until they've been chosen.
+export const applicationsSettings = pgTable(
+  'applications_settings',
+  {
+    id: smallint('id').primaryKey().default(1),
+    recipients: text('recipients').array().notNull(), // email addresses; empty means nobody
+    updatedBy: text('updated_by').notNull(), // the email of the admin who last changed them
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [check('applications_settings_single_row', sql`${table.id} = 1`)],
+)

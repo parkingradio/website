@@ -140,9 +140,11 @@ export const GENRES = [
 ] as const
 export type GenreId = (typeof GENRES)[number]['id']
 
-// Whether `value` looks like an email address. Only the shape is checked, not that it exists.
+// Whether `value` looks like an email address. Only the shape is checked, not that it exists. Besides spaces and @, it
+// can't have the characters that make it more than a single address, or an address with a name, e.g. "Name <address>"
+// or "address, address": we send emails to these addresses, so each one must be exactly one mailbox.
 export function isEmailAddress(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  return /^[^\s@<>()[\],;:"\\]+@[^\s@<>()[\],;:"\\]+\.[^\s@<>()[\],;:"\\]+$/.test(value)
 }
 
 // Whether `value` looks like a phone number: at least 7 digits, written however the artist likes.

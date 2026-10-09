@@ -5,9 +5,12 @@ import type { ApplicationFields } from 'shared/applications'
 import { PHOTO_MAX_BYTES } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
 import type { StoredApplication } from '../applications.js'
+import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
 import { EmailTaken } from '../artists.js'
 import type { SentPhoto, StoredArtist } from '../artists.js'
+import { EmailNotSent } from '../email.js'
+import type { SendEmail } from '../email.js'
 import type { TurnstileVerifier } from '../turnstile.js'
 import { APPLICATIONS_PER_WINDOW, applyRoutes } from './apply.js'
 
@@ -56,6 +59,13 @@ const photos = {
 const verifyTurnstile = vi.fn<TurnstileVerifier>(async (token) =>
   token && token !== 'refused' ? { success: true } : { success: false, errorCodes: ['invalid-input-response'] },
 )
+
+// Who applications are emailed to, as chosen on the admin pages.
+let recipients: string[] | null = null
+const settings: Pick<ApplicationsSettingsStore, 'load'> = {
+  load: vi.fn(async () => (recipients ? { recipients, updatedBy: 'admin@example.com', updatedAt: new Date() } : null)),
+}
+const sendEmail = vi.fn<SendEmail>(async () => {})
 
 // The smallest things that start like a JPEG and a PNG file.
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
@@ -130,10 +140,11 @@ function multipart(parts: Parts = {}) {
   return { payload: Buffer.concat(chunks), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } }
 }
 
-// `logs`, when given, gets every line the app logs.
-async function buildApp(logs?: string[]) {
+// `logs`, when given, gets every line the app logs. Without `canEmail`, the server can't send emails, like without
+// MAIL_DOMAIN.
+async function buildApp(logs?: string[], { canEmail = true } = {}) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
-  await app.register(applyRoutes, { store, photos, verifyTurnstile })
+  await app.register(applyRoutes, { store, photos, verifyTurnstile, settings, sendEmail: canEmail ? sendEmail : null })
   return app
 }
 
@@ -154,6 +165,7 @@ describe('POST /api/applications', () => {
     stored.clear()
     nextId = 0
     nextPhoto = 0
+    recipients = null
     vi.clearAllMocks()
   })
 
@@ -339,6 +351,79 @@ describe('POST /api/applications', () => {
     expect(logs.join('')).toContain('57P01')
     expect(logs.join('')).not.toContain('artiste@example.com')
     expect(logs.join('')).not.toContain('418 555-0123')
+  })
+
+  describe('emails', () => {
+    // What's in the emails is checked in application-emails.test.ts. Here, it's what the route passes on.
+    it('emails the application to the recipients, with the photo, and confirms it to the artist', async () => {
+      recipients = ['equipe@example.com', 'booking@example.com']
+      const app = await buildApp()
+      expect((await apply(app)).statusCode).toBe(200)
+
+      expect(sendEmail).toHaveBeenCalledTimes(2)
+      const [toRecipients, confirmation] = sendEmail.mock.calls.map(([email]) => email)
+      expect(toRecipients).toMatchObject({ to: recipients, attachments: [{ fileName: 'photo-1.jpeg', body: JPEG }] })
+      expect(confirmation).toMatchObject({ to: ['artiste@example.com'], replyTo: recipients })
+      // What's described is what was saved, e.g. links reduced to profile names.
+      expect(toRecipients.text).toContain('SoundCloud : https://soundcloud.com/parkingdotradio')
+    })
+
+    it.each([null, []])('only confirms the application to the artist when the recipients are %j', async (chosen) => {
+      recipients = chosen
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      expect((await apply(app)).statusCode).toBe(200)
+      expect(sendEmail).toHaveBeenCalledTimes(1)
+      expect(sendEmail.mock.calls[0][0]).toMatchObject({ to: ['artiste@example.com'], replyTo: undefined })
+      expect(logs.join('')).toContain('no recipients were chosen')
+    })
+
+    it('still confirms the application to the artist when the recipients cannot be loaded', async () => {
+      vi.mocked(settings.load).mockRejectedValueOnce(new Error('database is down'))
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      expect((await apply(app)).statusCode).toBe(200)
+      expect(sendEmail).toHaveBeenCalledTimes(1)
+      expect(sendEmail.mock.calls[0][0]).toMatchObject({ to: ['artiste@example.com'] })
+      expect(logs.join('')).toContain('Failed to load who applications are emailed to')
+      // Nobody may have been chosen, but that isn't known.
+      expect(logs.join('')).not.toContain('no recipients were chosen')
+    })
+
+    it("saves the application when emails can't be sent, and logs why", async () => {
+      recipients = ['equipe@example.com']
+      sendEmail.mockRejectedValueOnce(new EmailNotSent('MessageRejected: one')).mockRejectedValueOnce(new EmailNotSent('MessageRejected: two'))
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      expect((await apply(app)).statusCode).toBe(200)
+      expect(applications).toHaveLength(1)
+      const failures = logs.map((line) => JSON.parse(line)).filter((line) => line.err?.message.startsWith('MessageRejected'))
+      expect(failures.map((line) => line.msg).sort()).toEqual([
+        'Failed to confirm an application to the artist',
+        'Failed to email an application to its recipients',
+      ])
+      expect(failures[0]).toMatchObject({ level: 50, applicationId: applications[0].id })
+    })
+
+    it("doesn't email anything when the server can't send emails", async () => {
+      recipients = ['equipe@example.com']
+      const logs: string[] = []
+      const app = await buildApp(logs, { canEmail: false })
+      expect((await apply(app)).statusCode).toBe(200)
+      expect(settings.load).not.toHaveBeenCalled()
+      expect(logs.join('')).toContain('MAIL_DOMAIN is not set')
+    })
+
+    it("doesn't email anything about applications that weren't saved", async () => {
+      recipients = ['equipe@example.com']
+      const app = await buildApp()
+      await apply(app)
+      sendEmail.mockClear()
+      expect((await apply(app)).statusCode).toBe(409)
+      expect((await apply(app, { turnstileToken: 'refused' })).statusCode).toBe(400)
+      expect((await apply(app, { application: fields({ dates: [] }) })).statusCode).toBe(400)
+      expect(sendEmail).not.toHaveBeenCalled()
+    })
   })
 
   describe('rate limiting', () => {

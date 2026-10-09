@@ -58,6 +58,10 @@ export type Application = ApplicationFields & {
 // Only new artists can apply this way: if an artist with the same email already exists, ignoring case, the request
 // fails with 409.
 //
+// Once the application is saved, it's emailed to the recipients chosen on the admin pages (see
+// `ApplicationRecipientsResponse`), and the artist gets an email confirming it. If those emails can't be sent, the
+// request still succeeds.
+//
 // Cloudflare only accepts each token once. The server checks the profile, the application and the photo first, so if
 // one of them isn't valid, the page can fix it and send the same token again. After any other error, the page needs a
 // new token.
@@ -89,6 +93,24 @@ export type ApplicationStatusRequest = { status: ApplicationStatus }
 
 // `DELETE /api/admin/applications/:id`: deletes an application. Fails with 404 if it doesn't exist.
 export type DeleteApplicationResponse = { ok: true }
+
+// `GET /api/admin/applications/recipients`: who applications sent through `POST /api/applications` are emailed to.
+export type ApplicationRecipientsResponse = {
+  ok: true
+  // Empty until admins choose them. Until then, applications are still saved, and confirmed to the artist, but they
+  // aren't emailed to anyone else.
+  recipients: string[]
+  // Who last changed the recipients (an admin's email), and when (ISO 8601). Null until then.
+  updatedBy: string | null
+  updatedAt: string | null
+}
+
+// `PUT /api/admin/applications/recipients`: replaces the recipients, and returns them. They're trimmed, and blank
+// entries and duplicates, ignoring case, are dropped. Fails with 400 if `recipients` isn't a list of strings, if one of
+// them isn't an email address (see `isEmailAddress` in artists.ts), or if there are more than MAX_RECIPIENTS.
+export type ApplicationRecipientsRequest = { recipients: string[] }
+
+export const MAX_RECIPIENTS = 10
 
 export const PRESTATION_MAX_LENGTH = 60
 export const DETAILS_MAX_LENGTH = 2000
