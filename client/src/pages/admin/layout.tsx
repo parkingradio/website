@@ -37,12 +37,12 @@ export function AdminLayout() {
     <div className="admin-inner">
       <nav className="admin-nav" aria-label="admin">
         <div className="admin-links">
-          <NavLink to="/admin/admins">admins</NavLink>
           <NavLink to="/admin/calendrier">calendrier</NavLink>
           <NavLink to="/admin/rotation">rotation radio</NavLink>
           <NavLink to="/admin/candidatures">candidatures</NavLink>
           <NavLink to="/admin/artistes">artistes</NavLink>
-          <NavLink to="/admin/features">features</NavLink>
+          <NavLink to="/admin/admins">admins</NavLink>
+          <NavLink to="/admin/configuration">configuration</NavLink>
         </div>
         <div className="admin-session">
           <span>{session.email}</span>

@@ -27,26 +27,24 @@ describe('Admin pages', () => {
     mockFetch(LOGGED_IN)
     renderAt('/admin')
 
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Admins' })).toBeInTheDocument())
-    expect(screen.getByTestId('path')).toHaveTextContent('/admin/admins')
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Calendrier' })).toBeInTheDocument())
+    expect(screen.getByTestId('path')).toHaveTextContent('/admin/calendrier')
     expect(within(adminMenu()).getByText('admin@example.com')).toBeInTheDocument()
   })
 
-  it('links to every section from the menu', async () => {
+  it('links to every section from the menu, in order', async () => {
     mockFetch(LOGGED_IN)
     renderAt('/admin')
 
     await waitFor(() => expect(adminMenu()).toBeInTheDocument())
-    for (const [name, path] of [
-      ['admins', '/admin/admins'],
+    expect(within(adminMenu()).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['calendrier', '/admin/calendrier'],
       ['rotation radio', '/admin/rotation'],
       ['candidatures', '/admin/candidatures'],
       ['artistes', '/admin/artistes'],
-      ['features', '/admin/features'],
-    ]) {
-      expect(within(adminMenu()).getByRole('link', { name })).toHaveAttribute('href', path)
-    }
+      ['admins', '/admin/admins'],
+      ['configuration', '/admin/configuration'],
+    ])
   })
 
   it('shows the login form in place of the page while logged out, then the page once logged in', async () => {

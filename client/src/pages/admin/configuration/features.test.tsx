@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo } from '../../../test-utils'
 import { Features } from './features'
 
 // There are no flags for now, so these tests use flags of their own.
-vi.mock('./describe', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./describe')>()),
+vi.mock('../describe', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../describe')>()),
   FEATURE_LABELS: {
     'new-thing': { name: 'Nouveau truc', description: 'Montre le nouveau truc.' },
     'other-thing': { name: 'Autre truc', description: "Montre l'autre truc." },

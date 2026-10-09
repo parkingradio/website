@@ -3,12 +3,12 @@ import type { FormEvent } from 'react'
 import { MAX_RECIPIENTS } from 'shared/applications'
 import type { ApplicationRecipientsRequest, ApplicationRecipientsResponse } from 'shared/applications'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from 'shared/artists'
-import { putJson } from '../../api'
-import { byWhom } from './describe'
-import { FieldError } from './fields'
-import { useApi } from './use-api'
+import { putJson } from '../../../api'
+import { byWhom } from '../describe'
+import { FieldError } from '../fields'
+import { useApi } from '../use-api'
 
-// Who the applications artists send are emailed to, in the applications section.
+// Who the applications artists send are emailed to, in the configuration section.
 
 const RECIPIENTS_URL = '/api/admin/applications/recipients'
 
@@ -76,7 +76,7 @@ function RecipientsForm({ loaded }: { loaded: ApplicationRecipientsResponse }) {
         en reply-to. L'artiste reçoit aussi une confirmation avec ces adresses en reply-to.
       </p>
       {saved.recipients.length === 0 && (
-        <p className="admin-placeholder">Aucun destinataire&nbsp;: les candidatures ne sont envoyées à personne, mais restent listées ici.</p>
+        <p className="admin-placeholder">Aucun destinataire&nbsp;: les candidatures ne sont envoyées à personne, mais restent listées dans la section candidatures.</p>
       )}
       {saved.updatedBy && <p className="admin-meta">{byWhom('Changé', saved.updatedBy, saved.updatedAt)}</p>}
       <form className="admin-form" onSubmit={add} noValidate>

@@ -153,7 +153,7 @@ When an artist sends the form, it goes to `POST /api/applications` (see "Candida
 Once it's sent, the form thanks the artist and says where the confirmation went. Otherwise, it shows the server's
 error, e.g. when an artist already has that email address: the form is only for new artists for now.
 
-Until the `nouveau-formulaire-candidature` feature flag is turned on (see "Features" below), the page shows the
+Until the `nouveau-formulaire-candidature` feature flag is turned on (see "Configuration" below), the page shows the
 original Google Form instead, and it goes back to it when the flag is turned off, e.g. if the form has a problem.
 
 ## Contribuer
@@ -188,14 +188,6 @@ logged-in admin's email and a "se déconnecter" button. The section itself is sh
 On narrow screens like phones, the menu becomes a row above the section instead. `/admin` shows the first
 section.
 
-### Admins
-
-At `/admin/admins`: manages who can access the admin pages.
-
-- "Inviter un admin": emails an invite to a given address. The invite links to `/accept-invite`, where the
-  new admin chooses their password, after which they can log in.
-- "Admins existants": lists the existing admins, and lets an admin revoke another one. Not designed yet.
-
 ### Calendrier
 
 At `/admin/calendrier`: the internal calendar of bookings. Not designed yet.
@@ -225,12 +217,8 @@ The section lists every application, most recent first, with when it was created
 dates, the prestations and the status. Buttons above the list show only the applications with a status, with how
 many there are of each.
 
-Under the list, "Envoi par e-mail" chooses who the applications artists send are emailed to: email addresses, each
-typed then added with + (or Enter) and removed with its ×, like a collective's artists. Each change is saved right
-away. It also says which admin last changed them, and when. Each application is emailed to them with the artist's
-photo, and replying answers the artist. The artist also gets an email confirming that their application was
-received, and replying to that one answers these addresses. Until someone is chosen, applications are only listed
-here, and only the artist gets an email. Applications that admins create by hand aren't emailed.
+Under the list, a line says that who the applications artists send are emailed to is chosen in "Configuration" (see
+below), and links to it.
 
 Clicking an application opens it at `/admin/candidatures/<id>`. From top to bottom, it shows:
 
@@ -274,15 +262,40 @@ typed, with the matching countries suggested, of which one has to be picked.
 Each field says what's wrong with it once it's left, with the same rules and messages as the server (see
 `checkProfile` in shared/src/artists.ts), and so does the application form (see `checkApplication`).
 
-### Features
+### Admins
 
-At `/admin/features`: the feature flags, switches that turn parts of the site on or off without deploying it again.
-They're meant for going back to the old version of something, e.g. the Google Form in place of the new "Appliquer"
-form if it has a problem.
+At `/admin/admins`: manages who can access the admin pages.
 
-The section lists every flag, each with a switch, its name, what it does, and which admin last switched it, and when.
+- "Inviter un admin": emails an invite to a given address. The invite links to `/accept-invite`, where the
+  new admin chooses their password, after which they can log in.
+- "Admins existants": lists the existing admins, and lets an admin revoke another one. Not designed yet.
+
+### Configuration
+
+At `/admin/configuration`: the settings that change what the site does. From top to bottom, it shows:
+
+- "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
+- "Features": the feature flags.
+
+`/admin/features`, where the feature flags used to be, leads here.
+
+#### Envoi des candidatures par e-mail
+
+Chooses who the applications artists send are emailed to: email addresses, each typed then added with + (or Enter) and
+removed with its ×, like a collective's artists. Each change is saved right away. It also says which admin last
+changed them, and when. Each application is emailed to them with the artist's photo, and replying answers the artist.
+The artist also gets an email confirming that their application was received, and replying to that one answers these
+addresses. Until someone is chosen, applications are only listed in "Candidatures", and only the artist gets an email.
+Applications that admins create by hand aren't emailed.
+
+#### Features
+
+The feature flags, switches that turn parts of the site on or off without deploying it again. They're meant for going
+back to the old version of something, e.g. the Google Form in place of the new "Appliquer" form if it has a problem.
+
+It lists every flag, each with a switch, its name, what it does, and which admin last switched it, and when.
 Each switch is saved right away, and visitors get the change as soon as they load a page of the site. A page they
-already have open stays as it was until they load it again. While there are no flags, the section says so.
+already have open stays as it was until they load it again. While there are no flags, it says so.
 
 Every flag is off until an admin turns it on, so that a flag can be deployed without changing anything until then. A
 page that depends on a flag shows nothing until it knows whether the flag is on, rather than switching from one version

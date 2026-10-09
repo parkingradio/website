@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import type { Feature, FeatureRequest, FeatureResponse, FeaturesResponse } from 'shared/features'
-import { putJson } from '../../api'
-import { FEATURE_LABELS, byWhom } from './describe'
-import { useApi } from './use-api'
+import { putJson } from '../../../api'
+import { FEATURE_LABELS, byWhom } from '../describe'
+import { useApi } from '../use-api'
 
+// The feature flags, in the configuration section.
 export function Features() {
   const loaded = useApi<FeaturesResponse>('/api/admin/features')
 
   return (
     <>
-      <h1>Features</h1>
       <p>
         Ces interrupteurs activent ou désactivent des parties du site sans le redéployer, par exemple pour revenir à
         l'ancienne version d'une page qui a un problème. Les visiteurs voient le changement dès qu'ils chargent une page du

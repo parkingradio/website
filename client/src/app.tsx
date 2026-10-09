@@ -16,7 +16,7 @@ import { Calendrier } from './pages/admin/calendrier'
 import { Rotation } from './pages/admin/rotation'
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
 import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
-import { Features } from './pages/admin/features'
+import { Configuration } from './pages/admin/configuration'
 
 function App() {
   return (
@@ -34,7 +34,7 @@ function App() {
           <Route element={<AdminShell />}>
             <Route path="accept-invite" element={<AcceptInvite />} />
             <Route path="admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to="/admin/admins" replace />} />
+              <Route index element={<Navigate to="/admin/calendrier" replace />} />
               <Route path="admins" element={<Admins />} />
               <Route path="calendrier" element={<Calendrier />} />
               <Route path="rotation" element={<Rotation />} />
@@ -44,7 +44,9 @@ function App() {
               <Route path="artistes" element={<ArtistsPage />} />
               <Route path="artistes/nouveau" element={<NewArtistPage />} />
               <Route path="artistes/:id" element={<ArtistPage />} />
-              <Route path="features" element={<Features />} />
+              <Route path="configuration" element={<Configuration />} />
+              {/* The feature flags moved to the configuration section. This keeps older links working. */}
+              <Route path="features" element={<Navigate to="/admin/configuration" replace />} />
             </Route>
           </Route>
           {/* Also catches unknown paths under /admin, which are shown like any other unknown URL. */}

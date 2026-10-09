@@ -15,7 +15,6 @@ import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
 import { KIND_LABELS, STATUS_LABELS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
-import { Recipients } from './recipients'
 import { useApi } from './use-api'
 
 // The applications section: every application, each one's page, where it's accepted or rejected, changed or deleted,
@@ -72,7 +71,7 @@ export function ApplicationsTable({ applications, artists }: { applications: App
   )
 }
 
-// Every application, and who the ones artists send are emailed to.
+// Every application.
 export function ApplicationsPage() {
   return (
     <>
@@ -83,9 +82,10 @@ export function ApplicationsPage() {
         </Link>
       </div>
       <ApplicationsList />
-
-      <h2>Envoi par e-mail</h2>
-      <Recipients />
+      <p className="admin-meta">
+        Les destinataires des candidatures envoyées par e-mail se choisissent dans la{' '}
+        <Link to="/admin/configuration">configuration</Link>.
+      </p>
     </>
   )
 }
