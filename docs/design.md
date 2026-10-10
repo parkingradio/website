@@ -215,7 +215,8 @@ preference), what they'd do and anything else they'd like to say. What they'd do
 Performance Live, Rap, Full Band), plus "autre" in a few words, the same on the "Appliquer" form and on the admin
 pages. Each one in the list is stored as an id that doesn't change, so that applications can be told apart by what the
 artists would do, whatever its name. Each application has a status: "nouvelle" when it's created, then "retenue" or
-"refusée" as an admin decides.
+"refusée" as an admin decides, and a retained application is "planifiée" once a date has been set with the artist, then
+"faite" once they've played. That's only the usual order: admins can change a status to any other.
 
 The section lists every application, most recent first, with when it was created, the artist, their first few
 dates, the prestations and the status. Buttons above the list show only the applications with a status, with how

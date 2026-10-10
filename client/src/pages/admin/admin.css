@@ -322,6 +322,8 @@
   font-weight: 700;
 }
 
+/* Applications there's nothing more to do about. */
+.admin-status-done,
 .admin-status-rejected {
   color: #666;
 }

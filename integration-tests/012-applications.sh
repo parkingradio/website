@@ -2,7 +2,7 @@
 #
 # The admin routes for applications work with a real database. The server's unit tests fake the database, so this is
 # where we check:
-# - the applications migration
+# - the applications migration, and that the database takes every status
 # - that dates come back from the database as "YYYY-MM-DD"
 # - that an application can only belong to an artist who exists
 # - that applications are listed newest first
@@ -92,9 +92,11 @@ json PUT "${BASE_URL}/api/admin/applications/${first}" \
 expect_status 200
 expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"prestations":["live-performance","full-band"],"otherPrestation":"Synthé modulaire"'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
-json PUT "${BASE_URL}/api/admin/applications/${first}/status" '{"status":"accepted"}'
-expect_status 200
-expect_body_contains '"status":"accepted"'
+for status in accepted scheduled done rejected new; do
+    json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
+    expect_status 200
+    expect_body_contains "\"status\":\"${status}\""
+done
 expect_body_contains "\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
 json PUT "${BASE_URL}/api/admin/applications/${first}/status" '{"status":"maybe"}'
 expect_status 400

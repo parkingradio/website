@@ -14,11 +14,11 @@ import type {
 import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
-import { KIND_LABELS, STATUS_LABELS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
+import { KIND_LABELS, STATUS_LABELS, STATUS_PLURALS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
 import { useApi } from './use-api'
 
-// The applications section: every application, each one's page, where it's accepted or rejected, changed or deleted,
-// and creating one by hand, e.g. to bring in an application that came through the Google Form.
+// The applications section: every application, each one's page, where its status is changed and it's changed or
+// deleted, and creating one by hand, e.g. to bring in an application that came through the Google Form.
 
 // How many of an application's dates the list shows, before saying how many more there are.
 const LISTED_DATES = 3
@@ -112,7 +112,7 @@ function ApplicationsList() {
   const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
   const filters: { status: ApplicationStatus | null; label: string }[] = [
     { status: null, label: 'toutes' },
-    ...APPLICATION_STATUSES.map((status) => ({ status, label: `${STATUS_LABELS[status]}s` })),
+    ...APPLICATION_STATUSES.map((status) => ({ status, label: STATUS_PLURALS[status] })),
   ]
 
   return (

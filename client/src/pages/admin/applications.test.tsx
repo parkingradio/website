@@ -51,6 +51,7 @@ const APPLICATION: Application = {
 
 // Newest first, as the server lists them.
 const APPLICATIONS: Application[] = [
+  { ...APPLICATION, id: 'application-4', createdAt: '2026-10-08T16:00:00.000Z', dates: ['2026-10-29'], prestations: ['vinyl'], otherPrestation: '', status: 'done' },
   { ...APPLICATION, id: 'application-3', artistId: 'artist-2', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['rap'], status: 'rejected' },
   { ...APPLICATION, id: 'application-2', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['full-band'], otherPrestation: '', status: 'accepted' },
   APPLICATION,
@@ -84,10 +85,13 @@ describe('The list of applications', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
+      ['8 octobre 2026', 'Aurore', '29 oct. 2026', 'Vinyl', 'faite'],
       ['7 octobre 2026', 'Brume', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
       ['6 octobre 2026', 'Aurore', '12 nov. 2026', 'Full Band', 'retenue'],
       ['5 octobre 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
     ])
+    // There's nothing more to do about an application that's done, so it's greyed out like a rejected one.
+    expect(screen.getByRole('cell', { name: 'faite' })).toHaveClass('admin-status-done')
     expect(screen.getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')
@@ -101,20 +105,22 @@ describe('The list of applications', () => {
 
     const filters = within(await screen.findByRole('group', { name: 'Statut' }))
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'toutes (3)',
+      'toutes (4)',
       'nouvelles (1)',
       'retenues (1)',
+      'planifiées (0)',
+      'faites (1)',
       'refusées (1)',
     ])
-    expect(filters.getByRole('button', { name: 'toutes (3)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(filters.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
 
     fireEvent.click(filters.getByRole('button', { name: 'retenues (1)' }))
     expect(screen.getByTestId('path')).toHaveTextContent('/admin/candidatures?statut=accepted')
     expect(filters.getByRole('button', { name: 'retenues (1)' })).toHaveAttribute('aria-pressed', 'true')
     expect(rows().map((row) => row[0])).toEqual(['6 octobre 2026'])
 
-    fireEvent.click(filters.getByRole('button', { name: 'toutes (3)' }))
-    expect(rows()).toHaveLength(3)
+    fireEvent.click(filters.getByRole('button', { name: 'toutes (4)' }))
+    expect(rows()).toHaveLength(4)
   })
 
   it('lists the applications without their artists when those could not be loaded', async () => {
@@ -123,7 +129,7 @@ describe('The list of applications', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
-    expect(rows().map((row) => row[1])).toEqual(['artiste inconnu', 'artiste inconnu', 'artiste inconnu'])
+    expect(rows().map((row) => row[1])).toEqual(['artiste inconnu', 'artiste inconnu', 'artiste inconnu', 'artiste inconnu'])
   })
 
   it('says when there are no applications', async () => {

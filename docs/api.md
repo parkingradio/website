@@ -414,7 +414,7 @@ The endpoints below also return these fields:
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count |
-| `status` | `"new"`, `"accepted"` or `"rejected"` | Every application starts as `"new"` |
+| `status` | `"new"`, `"accepted"`, `"scheduled"`, `"done"` or `"rejected"` | Every application starts as `"new"` |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
 ### `POST /api/applications`
@@ -510,7 +510,7 @@ updated application. Fails with 400 if the application isn't valid, or 404 if it
 
 | Request field | Type | |
 |---|---|---|
-| `status` | `"new"`, `"accepted"` or `"rejected"` | |
+| `status` | `"new"`, `"accepted"`, `"scheduled"`, `"done"` or `"rejected"` | |
 
 Changes an application's status. The response is the same as for `POST /api/admin/applications`. Fails with 400 if
 `status` isn't one of these values, or 404 if the application doesn't exist.

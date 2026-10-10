@@ -36,8 +36,10 @@ export const PRESTATIONS = [
 ] as const
 export type PrestationId = (typeof PRESTATIONS)[number]['id']
 
-// Admins decide on applications on the admin pages. Every application starts as "new".
-export const APPLICATION_STATUSES = ['new', 'accepted', 'rejected'] as const
+// Admins follow applications on the admin pages, in this order: every application starts as "new", then is "accepted"
+// or "rejected", and an accepted one is "scheduled" once a date has been set with the artist, then "done" once they have
+// played. This order is only a convention: admins can change a status to any other.
+export const APPLICATION_STATUSES = ['new', 'accepted', 'scheduled', 'done', 'rejected'] as const
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number]
 
 // An application, as the API returns it.

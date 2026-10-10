@@ -7,7 +7,21 @@ import { countryName, countryOptions } from '../../artist-profile'
 // How the admin sections show what the API returns.
 
 export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', collective: 'collectif' }
-export const STATUS_LABELS: Record<ApplicationStatus, string> = { new: 'nouvelle', accepted: 'retenue', rejected: 'refusée' }
+export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  new: 'nouvelle',
+  accepted: 'retenue',
+  scheduled: 'planifiée',
+  done: 'faite',
+  rejected: 'refusée',
+}
+// The same, in the plural, e.g. for the filters of the applications list.
+export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
+  new: 'nouvelles',
+  accepted: 'retenues',
+  scheduled: 'planifiées',
+  done: 'faites',
+  rejected: 'refusées',
+}
 
 // What each feature flag is: its name, and what turning it on does (see shared/src/features.ts).
 export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {
