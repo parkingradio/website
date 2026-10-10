@@ -3,7 +3,8 @@
 # Checks applying (`POST /api/applications`) against a real database and Cloudflare's real Turnstile endpoint. It uses
 # Cloudflare's test keys from .env.example, whose secret key accepts every token. The unit tests fake both the database
 # and Turnstile, so this is where we check that:
-# - a new artist who applies is created along with their application, both with a null createdBy
+# - a new artist who applies is created along with their application, both with a null createdBy, with or without a
+#   photo
 # - an artist who already exists (same email, ignoring case) can't apply again, and the photo they sent is deleted
 # - if two people apply with the same new email at the same time, only one artist is created
 # - an application without a token is refused
@@ -25,10 +26,13 @@ profile() {
 
 readonly APPLICATION='{"dates":["2027-03-12"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":""}'
 
-# apply <client address> <profile> [<token>] -- apply, as a client at that address.
+# apply <client address> <profile> [<token>] [<photo>] -- apply, as a client at that address, with PHOTO unless another
+# file, or '' for no photo, is given.
 apply() {
+    local photo=()
+    if [ -n "${4-$PHOTO}" ]; then photo=(--form "photo=@${4-$PHOTO}"); fi
     request --header "CF-Connecting-IP: $1" --form-string "artist=$2" --form-string "application=${APPLICATION}" \
-        --form-string "turnstileToken=${3-$TOKEN}" --form "photo=@${PHOTO}" "${BASE_URL}/api/applications"
+        --form-string "turnstileToken=${3-$TOKEN}" ${photo[@]+"${photo[@]}"} "${BASE_URL}/api/applications"
 }
 
 echo "  an artist applies, and is added, as having added themselves"
@@ -53,6 +57,15 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/applications?artist=
 expect_status 200
 expect_body_contains '"dates":["2027-03-12"]'
 expect_body_contains '"createdBy":null'
+
+echo "  an artist applies without a photo, and is added without one"
+photos="$(photos_on_disk)"
+apply 198.51.100.22 "$(profile Photoless photoless@integration.test)" "$TOKEN" ''
+expect_status 200
+[ "$(photos_on_disk)" = "$photos" ] || fail "expected no photo to be stored"
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
+# The artist's links are an object, which comes before hasPhoto.
+expect_body '"name":"Photoless"[^{]*\{[^}]*\}[^}]*"hasPhoto":false'
 
 echo "  an artist who already exists, whatever the case of their email, can't apply again"
 photos="$(photos_on_disk)"

@@ -5,6 +5,7 @@ type Props = { value: File | null; onChange: (file: File | null) => void; invali
 
 export function PhotoField({ value, onChange, invalid }: Props) {
   const input = useRef<HTMLInputElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
   // The address of the photo picked, to show it, made when it's picked and released once it's replaced or the form is
   // gone. When the browser doesn't know the photo's type, it's shown anyway: the server tells it from its contents.
   const [preview, setPreview] = useState<string | null>(null)
@@ -41,10 +42,26 @@ export function PhotoField({ value, onChange, invalid }: Props) {
           accept={PHOTO_TYPES.join(',')}
           onChange={(event) => pick(event.target.files?.[0] ?? null)}
         />
-        <button id="photo" type="button" aria-invalid={invalid || undefined} onClick={() => input.current?.click()}>
+        <button ref={button} id="photo" type="button" aria-invalid={invalid || undefined} onClick={() => input.current?.click()}>
           {value ? 'changer de photo' : 'choisir une photo'}
         </button>
-        {value && <span className="photo-name">{value.name}</span>}
+        {value && (
+          <>
+            <span className="photo-name">{value.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                // So that picking the same file again still counts as a change.
+                if (input.current) input.current.value = ''
+                pick(null)
+                // This button goes away, so the focus goes to the one that picks a photo rather than being lost.
+                button.current?.focus()
+              }}
+            >
+              retirer la photo
+            </button>
+          </>
+        )}
         <span className="hint">JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo. Une photo de presse, en bonne qualité.</span>
       </div>
     </div>

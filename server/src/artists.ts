@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
-import { checkProfile, photoError } from 'shared/artists'
+import { PHOTO_WRONG_TYPE, checkProfile, photoError } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
 import { firstError } from 'shared/checks'
 import type { Queryable } from './db.js'
@@ -36,19 +36,24 @@ function photoType(body: Buffer): string | null {
   return null
 }
 
-// Checks the photo with `photoError`, from its type as told from its contents, and returns it with that type. Throws an
-// InvalidProfile otherwise, including when there's no photo.
-export function validatePhoto(body: Buffer | undefined): SentPhoto {
-  const type = body ? photoType(body) : null
-  const error = photoError(body && type ? { type, size: body.length } : null)
+// Checks the photo with `photoError`, from its type as told from its contents, and returns it with that type, or null
+// when there's none. Throws an InvalidProfile otherwise.
+export function validatePhoto(body: Buffer | undefined): SentPhoto | null {
+  if (!body) return null
+  const type = photoType(body)
+  if (!type) throw new InvalidProfile(PHOTO_WRONG_TYPE)
+  const error = photoError({ type, size: body.length })
   if (error !== null) throw new InvalidProfile(error)
-  return { body: body!, type: type! }
+  return { body, type }
 }
 
 export type StoredArtist = typeof artists.$inferSelect
 
-// Where the photo of an artist is stored (see `Photos`), and its MIME type.
-type StoredPhoto = Pick<StoredArtist, 'photoKey' | 'photoType'>
+// Where the photo of an artist is stored (see `Photos`), and its MIME type, or nulls when they have none: never one
+// without the other, which the database checks too.
+export type StoredPhoto = { photoKey: string; photoType: string } | { photoKey: null; photoType: null }
+
+const NO_PHOTO: StoredPhoto = { photoKey: null, photoType: null }
 
 // Thrown when saving an artist with the email of another one, whatever its case.
 export class EmailTaken extends Error {}
@@ -62,11 +67,11 @@ export type ArtistsStore = {
   // `createdBy` is the email of the admin who adds the artist, or null if the artist adds themselves by applying.
   // Throws an EmailTaken.
   create(artist: ArtistProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
-  // Replaces the artist's profile, and their photo when there's a new one. Returns the artist as they were, so that
-  // a photo that was replaced can be deleted, and as they are then. Throws an EmailTaken.
+  // Replaces the artist's profile, and their photo when there's a new one, or nulls to remove it. Returns the artist as
+  // they were, so that a photo that was replaced or removed can be deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
-    changes: ArtistProfile & Partial<StoredPhoto> & { updatedBy: string; updatedAt: Date },
+    changes: ArtistProfile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: StoredArtist; after: StoredArtist } | null>
   // Returns the artist as they were, so that their photo can be deleted too.
   delete(id: string): Promise<StoredArtist | null>
@@ -138,9 +143,15 @@ export function artistPhotos(files: PrivateFiles): Photos {
   }
 }
 
-// Deletes a photo that was stored but that no artist uses, or uses anymore. If that fails, the error is only logged, so
-// that the request it's part of can still succeed.
-export async function forgetPhoto(photos: Pick<Photos, 'delete'>, log: FastifyBaseLogger, key: string) {
+// Stores the photo that was sent, if there's one, and returns where, as an artist keeps it.
+export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SentPhoto | null): Promise<StoredPhoto> {
+  return photo ? { photoKey: await photos.store(photo), photoType: photo.type } : NO_PHOTO
+}
+
+// Deletes a photo that was stored but that no artist uses, or uses anymore, if there's one. If that fails, the error is
+// only logged, so that the request it's part of can still succeed.
+export async function forgetPhoto(photos: Pick<Photos, 'delete'>, log: FastifyBaseLogger, key: string | null) {
+  if (!key) return
   await photos.delete(key).catch((error: unknown) => {
     log.error({ err: error, key }, 'Failed to delete a photo that is not used anymore')
   })

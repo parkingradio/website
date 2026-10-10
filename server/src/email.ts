@@ -9,7 +9,6 @@ export type Email = {
   replyTo?: string[]
   subject: string
   text: string
-  attachments?: { fileName: string; type: string; body: Buffer }[]
 }
 
 // Fails with an EmailNotSent.
@@ -31,7 +30,7 @@ const TIMEOUT_MS = 10_000
 // Sends emails through SES, from noreply@<mailDomain>.
 export function sesEmailSender(region: string | undefined, mailDomain: string): SendEmail {
   const ses = new SESv2Client({ region })
-  return async ({ to, replyTo, subject, text, attachments }) => {
+  return async ({ to, replyTo, subject, text }) => {
     const command = new SendEmailCommand({
       FromEmailAddress: `noreply@${mailDomain}`,
       Destination: { ToAddresses: to },
@@ -41,7 +40,6 @@ export function sesEmailSender(region: string | undefined, mailDomain: string): 
           // SES assumes ASCII unless told otherwise, and emails are in French.
           Subject: { Data: subject, Charset: 'UTF-8' },
           Body: { Text: { Data: text, Charset: 'UTF-8' } },
-          Attachments: attachments?.map(({ fileName, type, body }) => ({ FileName: fileName, ContentType: type, RawContent: body })),
         },
       },
     })

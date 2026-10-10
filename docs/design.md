@@ -128,7 +128,8 @@ The fields are (* means mandatory):
   the field works as plain text. As GeoNames' terms ask, the bottom of the page credits it.
 - "Genres musicaux" (*): 1 to 3 genres from a list grouped by family, in order: the first one is the artist's
   main genre.
-- "Photo" (*): a JPEG, PNG or WebP image of up to 10 MB.
+- "Photo": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by saying it's for the
+  artist's page on our site. A photo that was picked can be removed.
 - "Bio" (*): free-form text, up to 1500 characters.
 - "Liens" (*, at least one): one field per site (SoundCloud, Instagram, website and Bandcamp are always shown;
   Mixcloud, Resident Advisor, YouTube, Spotify and TikTok can be added). Each field shows the site's address
@@ -249,16 +250,18 @@ apply again from a different page, which isn't designed yet.
 
 At `/admin/artistes`: the artists Parking Radio knows of, which are the artists who applied. An artist is an
 artist or a collective, with their name (and for a collective, the names of its artists), country and city,
-genres (most important first), bio, links, email address, phone number and photo.
+genres (most important first), bio, links, email address, phone number and photo, which is optional.
 
 The section lists every artist, by name, with which of the two they are, their city, genres and how many
 applications they have.
 
-Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo, their links
-rebuilt from the profile names, who added them (or that they applied by themselves) and who last changed them. A
-button changes the artist in a form in its place, where the photo is only replaced if another one is chosen. Under
-it, their applications are listed like in "Candidatures", with a button to create another one. At the bottom, the
-artist can be deleted for good, with their photo and applications, after confirming.
+Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo (or "Pas de
+photo" in its place, so that the team notices), their links rebuilt from the profile names, who added them (or that they
+applied by themselves) and who last changed them. A button changes the artist in a form in its place. The form shows the
+artist's photo with an × that removes it once the artist is saved, and a photo that's chosen replaces it, shown in its
+place with an × that takes it back. Under it, their applications are listed like in "Candidatures", with a button to
+create another one. At the bottom, the artist can be deleted for good, with their photo, if they have one, and
+applications, after confirming.
 
 "ajouter un artiste" adds an artist by hand, with the same form. In it, a collective's artists are typed one by one
 and pinned with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left
@@ -289,7 +292,8 @@ At `/admin/configuration`: the settings that change what the site does. From top
 
 Chooses who the applications artists send are emailed to: email addresses, each typed then added with + (or Enter) and
 removed with its ×, like a collective's artists. Each change is saved right away. It also says which admin last
-changed them, and when. Each application is emailed to them with the artist's photo, and replying answers the artist.
+changed them, and when. Each application is emailed to them, without the artist's photo, which is on the artist's page,
+and replying answers the artist.
 The artist also gets an email confirming that their application was received, and replying to that one answers these
 addresses. Until someone is chosen, applications are only listed in "Candidatures", and only the artist gets an email.
 Applications that admins create by hand aren't emailed.

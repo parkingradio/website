@@ -20,8 +20,8 @@ export function genreName(id: GenreId): string {
   return GENRES.find((genre) => genre.id === id)?.name ?? id
 }
 
-// What's wrong with a photo picked in a form, or with there being none (see `photoError`). When the browser doesn't
-// know the photo's type, which the server tells from its contents anyway, only its size is checked.
+// What's wrong with a photo picked in a form, if one was (see `photoError`). When the browser doesn't know the photo's
+// type, which the server tells from its contents anyway, only its size is checked.
 export function pickedPhotoError(photo: File | null): string | null {
-  return photoError(photo && { type: photo.type || PHOTO_TYPES[0], size: photo.size })
+  return photo && photoError({ type: photo.type || PHOTO_TYPES[0], size: photo.size })
 }

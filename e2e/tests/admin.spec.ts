@@ -1,7 +1,7 @@
 import { test, expect, admin, adminMenu, logIn } from './fixtures'
 
 // The admin pages: logging in and out, and managing artists, which goes through every layer: a form with a photo, the
-// database, the private bucket and back.
+// database, the private bucket and back, then removing the photo.
 
 test.describe('logging in', () => {
   test('a wrong password is refused, and the login form stays', async ({ page }) => {
@@ -39,7 +39,7 @@ const PHOTO = Buffer.from(
   'base64',
 )
 
-test('an artist is added, shown, and deleted', async ({ page }, testInfo) => {
+test('an artist is added, shown, has their photo removed, and is deleted', async ({ page }, testInfo) => {
   // Tests run side by side on the same database, where artists' emails must be unique. Their names are too, so that the
   // test finds its own artist.
   const unique = `${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`
@@ -67,8 +67,17 @@ test('an artist is added, shown, and deleted', async ({ page }, testInfo) => {
   await expect(photo).toHaveJSProperty('naturalWidth', 1)
   await expect(page.getByText('Montréal')).toBeVisible()
 
+  // The form shows the photo, with an × that removes it once the artist is saved.
+  await page.getByRole('button', { name: 'modifier' }).click()
+  await page.getByRole('button', { name: 'retirer la photo', exact: true }).click()
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(page.getByText('Pas de photo')).toBeVisible()
+
+  // It's still gone once the artist is loaded again.
   await page.getByRole('link', { name: '← tous les artistes' }).click()
   await page.getByRole('link', { name, exact: true }).click()
+  await expect(page.getByText('Pas de photo')).toBeVisible()
+  await expect(photo).toBeHidden()
 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: "supprimer l'artiste" }).click()

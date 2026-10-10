@@ -49,12 +49,12 @@ can be `null`.
 | `PUT /api/admin/radio/credentials` | admin | Entering the credentials of that SoundCloud app | `radio.ts` |
 | `POST /api/admin/radio/credentials/check` | admin | Whether SoundCloud accepts credentials, without saving them | `radio.ts` |
 | `GET /api/admin/artists` | admin | Every artist | `artists.ts` |
-| `POST /api/admin/artists` | admin | Adding an artist, with their photo | `artists.ts` |
+| `POST /api/admin/artists` | admin | Adding an artist, with or without a photo | `artists.ts` |
 | `GET /api/admin/artists/:id` | admin | An artist | `artists.ts` |
 | `GET /api/admin/artists/:id/photo` | admin | An artist's photo | — |
-| `PUT /api/admin/artists/:id` | admin | Changing an artist's profile or photo | `artists.ts` |
+| `PUT /api/admin/artists/:id` | admin | Changing an artist's profile, or replacing or removing their photo | `artists.ts` |
 | `DELETE /api/admin/artists/:id` | admin | Deleting an artist, their photo and their applications | `artists.ts` |
-| `POST /api/applications` | public | A new artist applying, with their profile and photo | `applications.ts` |
+| `POST /api/applications` | public | A new artist applying, with their profile and maybe a photo | `applications.ts` |
 | `GET /api/admin/applications` | admin | Every application, or an artist's | `applications.ts` |
 | `POST /api/admin/applications` | admin | Creating an application for an artist | `applications.ts` |
 | `GET /api/admin/applications/:id` | admin | An application | `applications.ts` |
@@ -292,14 +292,14 @@ otherwise. The admin pages use it so that credentials can be verified before the
 
 ## Artists
 
-The artists Parking Radio knows, each with their profile and a photo, are rows of the `artists` table
+The artists Parking Radio knows, each with their profile and maybe a photo, are rows of the `artists` table
 (`server/src/schema.ts`). An artist is known by their email: two artists can't have the same one, whatever its case.
 The rules a profile has to follow are in `shared/src/artists.ts`, and the server checks every profile it's sent
 against them. The server explains what's wrong with a profile or a photo in French, unlike its other admin errors,
 because artists will see the same messages when they apply.
 
-The photo is a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents. It's kept in the app's
-private S3 bucket, or in a local directory in development, and only the server reads it.
+The photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents. It's kept
+in the app's private S3 bucket, or in a local directory in development, and only the server reads it.
 
 A profile has:
 
@@ -330,6 +330,7 @@ An artist, as the endpoints below return them, is their profile with:
 | `createdBy` | string or null | The email of the admin who added the artist, or null when they added themselves, by applying |
 | `updatedBy` | string or null | The email of the admin who last changed the artist |
 | `updatedAt` | string or null | When |
+| `hasPhoto` | boolean | Whether the artist has a photo |
 
 ### `GET /api/admin/artists` (admin)
 
@@ -351,13 +352,13 @@ Fails with 404 when there's no such artist.
 
 Responds with the photo itself, with the type it was checked to have, rather than JSON. Browsers are told not to
 guess another type (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`). Fails with
-404 when there's no such artist, or when their photo is missing.
+404 when there's no such artist, when they have no photo, or when their photo is missing.
 
 ### `POST /api/admin/artists` (admin)
 
 Adds an artist. It's `multipart/form-data`, with two parts: `artist`, the profile as JSON, in a field rather than a
-file, and `photo`, the artist's photo. A few other fields or files, e.g. a form's submit button, are ignored. A second
-photo isn't: the request fails.
+file, and `photo`, the artist's photo, which can be left out. A few other fields or files, e.g. a form's submit button,
+are ignored. A second photo isn't: the request fails.
 
 | Response field | Type | |
 |---|---|---|
@@ -369,16 +370,16 @@ photo larger than 10 MB).
 
 ### `PUT /api/admin/artists/:id` (admin)
 
-Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`, except that `photo` is optional:
-without one, the artist keeps theirs. With one, it replaces theirs, which is deleted. Responds like
-`POST /api/admin/artists`, with the artist as they are then, and fails like it, and with 404 when there's no such
-artist.
+Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`. With a photo, it replaces the
+artist's, which is deleted. Without one, the artist keeps theirs, unless there's also a `removePhoto` field set to
+`true`, which removes it, and deletes it. Responds like `POST /api/admin/artists`, with the artist as they are then,
+and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404 when there's no such artist.
 
 ### `DELETE /api/admin/artists/:id` (admin)
 
-Deletes an artist, their photo and their applications, and responds `{"ok": true}`. The photo stays in the bucket's previous versions for
-as long as the database's backups are kept, like the artist's row, and is gone for good after that. Fails with 404 when
-there's no such artist.
+Deletes an artist, their photo if they have one and their applications, and responds `{"ok": true}`. The photo stays in
+the bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for
+good after that. Fails with 404 when there's no such artist.
 
 ## Applications
 
@@ -419,8 +420,8 @@ The endpoints below also return these fields:
 
 ### `POST /api/applications`
 
-A new artist applies. This creates the artist, with their profile and photo, and their application. The artist's
-`createdBy` and the application's are both null, since nobody on the team created them.
+A new artist applies. This creates the artist, with their profile and photo, if they sent one, and their application.
+The artist's `createdBy` and the application's are both null, since nobody on the team created them.
 
 Anyone can call this endpoint, so it has two protections against bots and floods:
 
@@ -435,7 +436,7 @@ The request is `multipart/form-data`, with four parts:
 |---|---|
 | `artist` | The artist's profile (see "Artists"), as JSON, in a field rather than a file |
 | `application` | The application's fields, as JSON, the same way |
-| `photo` | The artist's photo (see "Artists") |
+| `photo` | The artist's photo (see "Artists"), which can be left out |
 | `turnstileToken` | The token Turnstile gave the page |
 
 A few other fields or files, e.g. a form's submit button, are ignored. A second photo isn't: the request fails. On
@@ -444,7 +445,8 @@ success, the response is `{"ok": true}`.
 **Emails.** Once the application is saved, the server sends two emails, in French, from `noreply@<MAIL_DOMAIN>`:
 
 - To the recipients chosen on the admin pages (see `GET /api/admin/applications/recipients`): everything the artist
-  sent, with their photo attached. Replying to it answers the artist. When nobody was chosen, it isn't sent.
+  sent, except their photo, which is on the artist's page on the admin pages. Replying to it answers the artist. When
+  nobody was chosen, it isn't sent.
 - To the artist: a confirmation that the application was received. Replying to it answers the recipients, if there
   are any. It goes to whatever address the application has, so it doesn't repeat anything the artist wrote: otherwise,
   anyone could have the server send their own text to any address.

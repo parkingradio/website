@@ -6,7 +6,7 @@ import type { ApplicationsResponse } from 'shared/applications'
 import { deleteJson, sendForm } from '../../api'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
-import { KIND_LABELS, byWhom, dateFormat, genreName, place } from './describe'
+import { KIND_LABELS, byWhom, dateFormat, genreName, photoUrl, place } from './describe'
 import { useApi } from './use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
@@ -146,10 +146,11 @@ function ArtistById({ id }: { id: string }) {
   }
 
   const count = applications.kind === 'loaded' ? applications.value.applications.length : null
+  const theirPhoto = artist.hasPhoto ? ', sa photo' : ''
   const remove = async () => {
     // Their applications are mentioned unless it's known that there are none.
     const theirApplications = count === 0 ? '' : ` et ses candidatures${count ? ` (${count})` : ''}`
-    if (!window.confirm(`Supprimer définitivement ${artist.name}, sa photo${theirApplications} ?`)) return
+    if (!window.confirm(`Supprimer définitivement ${artist.name}${theirPhoto}${theirApplications} ?`)) return
     setBusy(true)
     setError(null)
     const result = await deleteJson<DeleteArtistResponse>(url)
@@ -198,7 +199,7 @@ function ArtistById({ id }: { id: string }) {
         ))}
 
       <h2>Supprimer</h2>
-      <p>L'artiste, sa photo et ses candidatures seront supprimés pour de bon.</p>
+      <p>L'artiste{theirPhoto} et ses candidatures seront supprimés pour de bon.</p>
       {error && (
         <p className="admin-error" role="alert">
           {error}
@@ -211,14 +212,15 @@ function ArtistById({ id }: { id: string }) {
   )
 }
 
-// Everything about an artist: their photo, then their profile.
+// Everything about an artist: their photo, or that they have none, then their profile.
 function ArtistDetails({ artist }: { artist: Artist }) {
-  // The photo can change while its address stays the same, so the address changes with the artist to get the browser
-  // to load it again. The server ignores it.
-  const photo = `/api/admin/artists/${artist.id}/photo?v=${encodeURIComponent(artist.updatedAt ?? artist.createdAt)}`
   return (
     <div className="admin-record">
-      <img src={photo} alt={`Photo de ${artist.name}`} />
+      {artist.hasPhoto ? (
+        <img src={photoUrl(artist)} alt={`Photo de ${artist.name}`} />
+      ) : (
+        <div className="admin-no-photo">Pas de photo</div>
+      )}
       <dl>
         {artist.kind === 'collective' && (
           <>

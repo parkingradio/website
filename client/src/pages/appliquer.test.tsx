@@ -55,7 +55,7 @@ function sentParts() {
   return {
     artist: JSON.parse(body.get('artist') as string),
     application: JSON.parse(body.get('application') as string),
-    photo: body.get('photo') as File,
+    photo: body.get('photo') as File | null,
     turnstileToken: body.get('turnstileToken'),
   }
 }
@@ -150,8 +150,9 @@ describe('Appliquer', () => {
     renderForm()
     fireEvent.click(screen.getByRole('button', { name: 'envoyer ma candidature' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('12 champs sont à remplir ou à corriger.')
-    expect(screen.getByText('Ajoute une photo en JPEG, PNG ou WebP.')).toBeInTheDocument()
+    // The photo is optional.
+    expect(await screen.findByRole('alert')).toHaveTextContent('11 champs sont à remplir ou à corriger.')
+    expect(screen.getByLabelText(/^Photo/)).not.toHaveAttribute('aria-invalid')
     expect(screen.getByText('Choisis au moins une date.')).toBeInTheDocument()
     expect(screen.getByText('Choisis au moins un type de prestation.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
@@ -166,7 +167,7 @@ describe('Appliquer', () => {
     expect(screen.getByText('artiste@example.com')).toBeInTheDocument()
 
     const { artist, application, photo, turnstileToken } = sentParts()
-    expect(photo.name).toBe('presse.jpg')
+    expect(photo?.name).toBe('presse.jpg')
     expect(turnstileToken).toBe(TOKEN)
     expect(artist).toEqual({
       kind: 'artist',
@@ -423,7 +424,34 @@ describe('Appliquer', () => {
     const photo = new File(['fake'], 'presse.heic', { type: '' })
     fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [photo] } })
     await send()
-    expect(sentParts().photo.name).toBe('presse.heic')
+    expect(sentParts().photo?.name).toBe('presse.heic')
+  })
+
+  it('sends the application without a photo, once the one picked is removed', async () => {
+    renderForm()
+    await fillIn()
+    expect(screen.getByRole('img', { name: 'Aperçu de ta photo' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
+    expect(screen.queryByRole('img', { name: 'Aperçu de ta photo' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/^Photo/)).toHaveTextContent('choisir une photo')
+    // The button that was clicked is gone, so the focus moves to the one that picks a photo.
+    expect(screen.getByLabelText(/^Photo/)).toHaveFocus()
+    // So that picking the same file again still counts as a change.
+    expect(document.querySelector('input[type=file]')).toHaveValue('')
+    await send()
+
+    expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
+    expect(sentParts().photo).toBeNull()
+  })
+
+  it('says what is wrong with a photo that is not an image, and sends nothing', async () => {
+    renderForm()
+    await fillIn()
+    fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['gif'], 'presse.gif', { type: 'image/gif' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'envoyer ma candidature' }))
+
+    expect(await screen.findByText('La photo doit être en JPEG, PNG ou WebP.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
   })
 
   it("doesn't ask GeoNames again for a city that was picked from its suggestions", async () => {

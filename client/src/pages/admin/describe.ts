@@ -1,4 +1,4 @@
-import type { ArtistKind } from 'shared/artists'
+import type { Artist, ArtistKind } from 'shared/artists'
 import { PRESTATIONS } from 'shared/applications'
 import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
 import type { FeatureId } from 'shared/features'
@@ -43,6 +43,12 @@ export function prestationName(id: PrestationId): string {
 // E.g. "DJ, Vinyl, autre : synthé modulaire", or "" when there's none.
 export function describePrestations({ prestations, otherPrestation }: Pick<Application, 'prestations' | 'otherPrestation'>): string {
   return [...prestations.map(prestationName), ...(otherPrestation ? [`autre : ${otherPrestation}`] : [])].join(', ')
+}
+
+// The address of an artist's photo. The photo can change while its address stays the same, so the address changes with
+// the artist to get the browser to load it again. The server ignores it.
+export function photoUrl(artist: Artist): string {
+  return `/api/admin/artists/${artist.id}/photo?v=${encodeURIComponent(artist.updatedAt ?? artist.createdAt)}`
 }
 
 export function place({ city, country }: { city: string; country: string }): string {

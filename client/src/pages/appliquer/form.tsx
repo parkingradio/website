@@ -194,7 +194,7 @@ export function ApplicationForm() {
     const body = new FormData()
     body.append('artist', JSON.stringify(profile))
     body.append('application', JSON.stringify(application))
-    body.append('photo', form.photo!)
+    if (form.photo) body.append('photo', form.photo)
     body.append('turnstileToken', turnstileToken)
     setStatus({ state: 'sending' })
     let error = SEND_FAILED
@@ -377,7 +377,7 @@ export function ApplicationForm() {
           <Part number="02" title="Présentation">
             <div className="field wide">
               <label htmlFor="photo">
-                Photo <span className="required">*</span>
+                Photo <span className="hint">— pour ta page artiste sur notre site web</span>
               </label>
               <PhotoField value={form.photo} onChange={(photo) => update('photo', photo)} invalid={!!errors.photo} />
               <FieldError message={errors.photo} />

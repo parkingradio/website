@@ -3,8 +3,8 @@ import multipart from '@fastify/multipart'
 import { PHOTO_TOO_LARGE } from 'shared/artists'
 import type { Artist, ArtistProfile, ArtistResponse, ArtistsResponse, DeleteArtistResponse } from 'shared/artists'
 import type { ApiError } from 'shared/error'
-import { EmailTaken, InvalidProfile, forgetPhoto, validatePhoto, validateProfile } from '../artists.js'
-import type { ArtistsStore, Photos, StoredArtist } from '../artists.js'
+import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists.js'
+import type { ArtistsStore, Photos, SentPhoto, StoredArtist } from '../artists.js'
 import { requireAuth } from '../auth.js'
 import { jsonField, readPhotoForm } from '../photo-form.js'
 import { keepQueryValuesPrivate } from '../query-errors.js'
@@ -13,6 +13,7 @@ import { keepQueryValuesPrivate } from '../query-errors.js'
 
 const NO_SUCH_ARTIST: ApiError = { ok: false, error: 'No such artist' }
 const EMAIL_TAKEN: ApiError = { ok: false, error: 'Another artist has this email address' }
+const ARTIST_HAS_NO_PHOTO: ApiError = { ok: false, error: 'This artist has no photo' }
 const INVALID_REQUEST = { status: 400, error: 'Invalid request' }
 
 function artist(row: StoredArtist): Artist {
@@ -32,23 +33,23 @@ function artist(row: StoredArtist): Artist {
     phone: row.phone,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,
+    hasPhoto: row.photoKey !== null,
   }
 }
 
-// Reads the profile and photo from a request that adds or changes an artist, and checks them: the photo with
-// `checkPhoto`, which gets undefined when there's none. Returns the checked profile and photo, or the error to reply
-// with when the request is malformed or invalid.
-async function readArtist<Photo>(
+// Reads the profile and photo from a request that adds or changes an artist, and checks them, along with the
+// "removePhoto" field, which only changing an artist reads. Returns the checked profile and photo (null when there's
+// none), or the error to reply with when the request is malformed or invalid.
+async function readArtist(
   request: FastifyRequest,
-  checkPhoto: (body: Buffer | undefined) => Photo,
-): Promise<{ profile: ArtistProfile; photo: Photo } | { status: number; error: string }> {
+): Promise<{ profile: ArtistProfile; photo: SentPhoto | null; removePhoto: boolean } | { status: number; error: string }> {
   const form = await readPhotoForm(request)
   if (form === 'too-large') return { status: 413, error: PHOTO_TOO_LARGE }
   if (form === 'malformed') return INVALID_REQUEST
   const sent = jsonField(form.fields.artist)
   if (sent === undefined) return INVALID_REQUEST
   try {
-    return { profile: validateProfile(sent), photo: checkPhoto(form.photo) }
+    return { profile: validateProfile(sent), photo: validatePhoto(form.photo), removePhoto: form.fields.removePhoto === 'true' }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message }
@@ -81,6 +82,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   app.get<ById>('/api/admin/artists/:id/photo', { preHandler: requireAuth }, async (request, reply) => {
     const row = await store.get(request.params.id)
     if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
+    if (!row.photoKey) return reply.status(404).send(ARTIST_HAS_NO_PHOTO)
     const photo = await photos.read(row.photoKey)
     if (!photo) {
       request.log.error({ key: row.photoKey }, 'The photo of an artist is missing')
@@ -88,47 +90,49 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     }
     // The type was checked from the photo's contents when it was sent, and browsers mustn't guess another.
     return reply
-      .header('Content-Type', row.photoType)
+      .header('Content-Type', row.photoType!)
       .header('X-Content-Type-Options', 'nosniff')
       .header('Cache-Control', 'private, no-store')
       .send(photo)
   })
 
   app.post<{ Reply: ArtistResponse | ApiError }>('/api/admin/artists', { preHandler: requireAuth }, async (request, reply) => {
-    const sent = await readArtist(request, validatePhoto)
+    const sent = await readArtist(request)
     if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
 
-    const photoKey = await photos.store(sent.photo)
+    const photo = await storePhoto(photos, sent.photo)
     try {
-      const row = await store.create({ ...sent.profile, photoKey, photoType: sent.photo.type, createdBy: request.user!.email })
+      const row = await store.create({ ...sent.profile, ...photo, createdBy: request.user!.email })
       return { ok: true, artist: artist(row) }
     } catch (error) {
-      await forgetPhoto(photos, request.log, photoKey)
+      await forgetPhoto(photos, request.log, photo.photoKey)
       if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
       throw error
     }
   })
 
   app.put<ById & { Reply: ArtistResponse | ApiError }>('/api/admin/artists/:id', { preHandler: requireAuth }, async (request, reply) => {
-    // Without a photo, the artist keeps theirs.
-    const sent = await readArtist(request, (body) => (body ? validatePhoto(body) : null))
+    const sent = await readArtist(request)
     if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
+    if (sent.photo && sent.removePhoto) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
 
-    const photo = sent.photo ? { photoKey: await photos.store(sent.photo), photoType: sent.photo.type } : {}
+    // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
+    const photo = sent.photo || sent.removePhoto ? await storePhoto(photos, sent.photo) : null
     let changed: Awaited<ReturnType<ArtistsStore['update']>>
     try {
       changed = await store.update(request.params.id, { ...sent.profile, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
     } catch (error) {
-      if (photo.photoKey) await forgetPhoto(photos, request.log, photo.photoKey)
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
       if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
       throw error
     }
     if (!changed) {
-      if (photo.photoKey) await forgetPhoto(photos, request.log, photo.photoKey)
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
       return reply.status(404).send(NO_SUCH_ARTIST)
     }
 
-    if (photo.photoKey) await forgetPhoto(photos, request.log, changed.before.photoKey)
+    // The photo the artist had, which was replaced or removed.
+    if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
     return { ok: true, artist: artist(changed.after) }
   })
 

@@ -1,7 +1,7 @@
 // Artists: who they are, where they're from, where to hear them and how to reach them. An artist is known by their
-// email address, whatever its case, and describes themselves in their profile, along with a photo. The lists and rules
-// below are the ones every profile has to follow, and the server checks each profile against them. The server explains
-// what's wrong with a profile in French, because artists will see its messages.
+// email address, whatever its case, and describes themselves in their profile, along with a photo if they like. The
+// lists and rules below are the ones every profile has to follow, and the server checks each profile against them. The
+// server explains what's wrong with a profile in French, because artists will see its messages.
 
 import { checkLine, checkText } from './checks.ts'
 import type { Checked, FieldErrors } from './checks.ts'
@@ -41,12 +41,13 @@ export const EMAIL_MAX_LENGTH = 200
 export const PHONE_MAX_LENGTH = 40
 export const LINK_MAX_LENGTH = 200
 
-// The photo is sent as a file, next to the profile: a JPEG, PNG or WebP image of up to PHOTO_MAX_BYTES.
+// The photo is optional, and sent as a file, next to the profile: a JPEG, PNG or WebP image of up to PHOTO_MAX_BYTES.
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
-// An artist, as the admin pages see them. Their photo is at `GET /api/admin/artists/:id/photo`.
+// An artist, as the admin pages see them. Their photo, if they have one, is at `GET /api/admin/artists/:id/photo`.
 export type Artist = ArtistProfile & {
   id: string
+  hasPhoto: boolean
   // When the artist was added (ISO 8601), and the email of the admin who added them, or null when they added
   // themselves, by applying.
   createdAt: string
@@ -60,22 +61,24 @@ export type Artist = ArtistProfile & {
 export type ArtistsResponse = { ok: true; artists: Artist[] }
 
 // `GET /api/admin/artists/:id`: an artist. Requires a session. Fails with 401 (no valid session) or 404 (no such
-// artist). Their photo is at `GET /api/admin/artists/:id/photo`, which fails the same way.
+// artist). Their photo is at `GET /api/admin/artists/:id/photo`, which fails the same way, and with 404 when the artist
+// has no photo.
 export type ArtistResponse = { ok: true; artist: Artist }
 
-// `POST /api/admin/artists`: adds an artist, and returns them. A multipart/form-data request with two parts,
-// "artist" (an `ArtistProfile`, as JSON, in a field rather than a file) and "photo" (see PHOTO_MAX_BYTES). A few other
-// parts are ignored, but a second photo makes the request fail. Requires a session. Fails with 400 (an invalid profile
-// or photo, with a message in French, or a malformed request), 401 (no valid session), 409 (an artist with that email
-// already exists) or 413 (photo too large).
+// `POST /api/admin/artists`: adds an artist, and returns them. A multipart/form-data request with two parts, "artist"
+// (an `ArtistProfile`, as JSON, in a field rather than a file) and "photo" (see PHOTO_MAX_BYTES), which can be left
+// out. A few other parts are ignored, but a second photo makes the request fail. Requires a session. Fails with 400 (an
+// invalid profile or photo, with a message in French, or a malformed request), 401 (no valid session), 409 (an artist
+// with that email already exists) or 413 (photo too large).
 //
-// `PUT /api/admin/artists/:id`: replaces an artist's profile, and returns them. The same request, where the photo
-// is optional: without one, the artist keeps theirs. Fails like `POST /api/admin/artists`, and with 404 (no such
-// artist).
+// `PUT /api/admin/artists/:id`: replaces an artist's profile, and returns them. The same request, where a photo
+// replaces the artist's, and without one, the artist keeps theirs, unless there's also a "removePhoto" field set to
+// "true", which removes it. Fails like `POST /api/admin/artists`, with 400 when there's both a photo and "removePhoto",
+// and with 404 (no such artist).
 export type ArtistRequest = ArtistProfile
 
-// `DELETE /api/admin/artists/:id`: deletes an artist, their photo and their applications. Requires a session. Fails
-// with 401 (no valid session) or 404 (no such artist).
+// `DELETE /api/admin/artists/:id`: deletes an artist, their photo if they have one, and their applications. Requires a
+// session. Fails with 401 (no valid session) or 404 (no such artist).
 export type DeleteArtistResponse = { ok: true }
 
 // ISO 3166-1 alpha-2 codes, and XK, which ISO hasn't assigned but is used for Kosovo. `Intl.DisplayNames` gives
@@ -414,12 +417,13 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
 // The photo's types, as the server tells them from its contents.
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
-// The error for a photo larger than PHOTO_MAX_BYTES.
+// The errors for a photo that isn't one of PHOTO_TYPES, and for one larger than PHOTO_MAX_BYTES.
+export const PHOTO_WRONG_TYPE = 'La photo doit être en JPEG, PNG ou WebP.'
 export const PHOTO_TOO_LARGE = `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
 
-// What's wrong with a photo of this type and size (in bytes), or with there being none, if anything.
-export function photoError(photo: { type: string; size: number } | null): string | null {
-  if (!photo || !PHOTO_TYPES.includes(photo.type)) return 'Ajoute une photo en JPEG, PNG ou WebP.'
+// What's wrong with a photo of this type and size (in bytes), if anything.
+export function photoError(photo: { type: string; size: number }): string | null {
+  if (!PHOTO_TYPES.includes(photo.type)) return PHOTO_WRONG_TYPE
   if (photo.size > PHOTO_MAX_BYTES) return PHOTO_TOO_LARGE
   return null
 }

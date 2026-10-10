@@ -72,8 +72,8 @@ function RecipientsForm({ loaded }: { loaded: ApplicationRecipientsResponse }) {
   return (
     <>
       <p>
-        Les candidatures que les artistes envoient sont transmises par e-mail à ces adresses, avec leur photo et l'artiste
-        en reply-to. L'artiste reçoit aussi une confirmation avec ces adresses en reply-to.
+        Les candidatures que les artistes envoient sont transmises par e-mail à ces adresses, avec l'artiste en reply-to.
+        L'artiste reçoit aussi une confirmation avec ces adresses en reply-to.
       </p>
       {saved.recipients.length === 0 && (
         <p className="admin-placeholder">Aucun destinataire&nbsp;: les candidatures ne sont envoyées à personne, mais restent listées dans la section candidatures.</p>

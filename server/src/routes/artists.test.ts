@@ -77,14 +77,16 @@ function profile(changes: Partial<ArtistProfile> = {}): ArtistProfile {
   }
 }
 
-// A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, and the photo.
-function multipart(artist: object | string, photo: Buffer | null = JPEG) {
+// A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, the photo, and whether to
+// remove the photo.
+function multipart(artist: object | string, photo: Buffer | null = JPEG, removePhoto = false) {
   const boundary = 'test-boundary'
   const chunks: Buffer[] = [
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="artist"\r\n\r\n`),
     Buffer.from(typeof artist === 'string' ? artist : JSON.stringify(artist)),
     Buffer.from('\r\n'),
   ]
+  if (removePhoto) chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="removePhoto"\r\n\r\ntrue\r\n`))
   if (photo) {
     chunks.push(
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),
@@ -111,8 +113,8 @@ async function asAdmin() {
   return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
 }
 
-async function send(app: App, method: 'POST' | 'PUT', url: string, artist: object | string, photo?: Buffer | null) {
-  return app.inject({ method, url, ...multipart(artist, photo), cookies: await asAdmin() })
+async function send(app: App, method: 'POST' | 'PUT', url: string, artist: object | string, photo?: Buffer | null, removePhoto?: boolean) {
+  return app.inject({ method, url, ...multipart(artist, photo, removePhoto), cookies: await asAdmin() })
 }
 
 async function create(app: App, artist: object | string = profile(), photo?: Buffer | null) {
@@ -166,6 +168,7 @@ describe('artists routes', () => {
           // Only the profile names are kept.
           links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
           id: 'artist-1',
+          hasPhoto: true,
           createdAt: rows[0].createdAt.toISOString(),
           createdBy: 'admin@example.com',
           updatedBy: null,
@@ -174,6 +177,15 @@ describe('artists routes', () => {
       })
       expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg' })
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
+    })
+
+    it('adds an artist without a photo', async () => {
+      const app = await buildApp()
+      const response = await create(app, profile(), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ id: 'artist-1', hasPhoto: false })
+      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
+      expect(photos.store).not.toHaveBeenCalled()
     })
 
     it('refuses an email another artist has, whatever its case, and forgets the photo', async () => {
@@ -194,13 +206,13 @@ describe('artists routes', () => {
       expect(rows).toHaveLength(0)
     })
 
-    it('requires a photo, and checks that it really is an image', async () => {
+    it('checks that a photo really is an image', async () => {
       const app = await buildApp()
-      expect((await create(app, profile(), null)).json()).toEqual({ ok: false, error: 'Ajoute une photo en JPEG, PNG ou WebP.' })
       const notAnImage = await create(app, profile(), Buffer.from('%PDF-1.7'))
       expect(notAnImage.statusCode).toBe(400)
-      expect(notAnImage.json().error).toContain('JPEG, PNG ou WebP')
+      expect(notAnImage.json()).toEqual({ ok: false, error: 'La photo doit être en JPEG, PNG ou WebP.' })
       expect(photos.store).not.toHaveBeenCalled()
+      expect(rows).toHaveLength(0)
     })
 
     it('refuses photos over the size limit', async () => {
@@ -251,8 +263,9 @@ describe('artists routes', () => {
     it('treats an empty photo, as a form sends when no file was chosen, as no photo', async () => {
       const app = await buildApp()
       const response = await create(app, profile(), Buffer.alloc(0))
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Ajoute une photo en JPEG, PNG ou WebP.' })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ hasPhoto: false })
+      expect(photos.store).not.toHaveBeenCalled()
     })
 
     it('rejects malformed requests', async () => {
@@ -350,6 +363,17 @@ describe('artists routes', () => {
       stored.clear()
       expect((await get(app, '/api/admin/artists/artist-1/photo')).statusCode).toBe(404)
     })
+
+    it('responds 404 for an artist who has no photo, which is not an error worth logging', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      await create(app, profile(), null)
+      const response = await get(app, '/api/admin/artists/artist-1/photo')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'This artist has no photo' })
+      expect(photos.read).not.toHaveBeenCalled()
+      expect(logs.join('')).not.toContain('"level":50')
+    })
   })
 
   describe('PUT /api/admin/artists/:id', () => {
@@ -405,6 +429,56 @@ describe('artists routes', () => {
       expect(response.statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png', photoType: 'image/png' })
       expect([...stored.keys()]).toEqual(['artists/photo-2.png'])
+    })
+
+    it('gives a photo to an artist who had none', async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ hasPhoto: true })
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.png', photoType: 'image/png' })
+      expect(photos.delete).not.toHaveBeenCalled()
+    })
+
+    it('removes the photo when asked to, and deletes it', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), null, true)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ hasPhoto: false, updatedBy: 'admin@example.com' })
+      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
+      expect(stored.size).toBe(0)
+    })
+
+    it('removes nothing from an artist who has no photo', async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), null, true)).statusCode).toBe(200)
+      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
+      expect(photos.delete).not.toHaveBeenCalled()
+    })
+
+    it('keeps the photo when it cannot be removed, e.g. for an email that is taken, or an artist who does not exist', async () => {
+      const app = await buildApp()
+      await create(app)
+      await create(app, profile({ email: 'other@example.com' }), null)
+      const taken = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ email: 'other@example.com' }), null, true)
+      expect(taken.statusCode).toBe(409)
+      expect((await send(app, 'PUT', '/api/admin/artists/nobody', profile(), null, true)).statusCode).toBe(404)
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+      expect(photos.delete).not.toHaveBeenCalled()
+    })
+
+    it('refuses both a photo and removing it, without storing anything', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG, true)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Invalid request' })
+      expect(photos.store).toHaveBeenCalledTimes(1)
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', updatedBy: null })
     })
 
     it("changes the email, unless it's another artist's", async () => {
@@ -463,6 +537,15 @@ describe('artists routes', () => {
       expect(response.json()).toEqual({ ok: true })
       expect(rows).toHaveLength(0)
       expect(stored.size).toBe(0)
+    })
+
+    it('deletes an artist who has no photo', async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await asAdmin() })
+      expect(response.statusCode).toBe(200)
+      expect(rows).toHaveLength(0)
+      expect(photos.delete).not.toHaveBeenCalled()
     })
 
     it('deletes the artist even when their photo cannot be deleted', async () => {

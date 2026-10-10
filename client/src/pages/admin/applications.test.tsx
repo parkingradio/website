@@ -11,6 +11,7 @@ const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 function artist(id: string, name: string): Artist {
   return {
     id,
+    hasPhoto: true,
     createdAt: '2026-10-01T16:00:00.000Z',
     createdBy: 'admin@example.com',
     kind: 'artist',

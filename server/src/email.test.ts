@@ -18,15 +18,13 @@ describe('sesEmailSender', () => {
     send.mockReset()
   })
 
-  it('sends from noreply@<mail domain>, in UTF-8, with replies and attachments', async () => {
+  it('sends from noreply@<mail domain>, in UTF-8, with replies', async () => {
     const sendEmail = sesEmailSender('us-east-1', 'parking.radio')
-    const body = Buffer.from('photo')
     await sendEmail({
       to: ['equipe@example.com'],
       replyTo: ['artiste@example.com'],
       subject: 'Nouvelle candidature : Éloïse',
       text: 'Ça va ?',
-      attachments: [{ fileName: 'photo.png', type: 'image/png', body }],
     })
     expect(send).toHaveBeenCalledWith(
       {
@@ -37,7 +35,6 @@ describe('sesEmailSender', () => {
           Simple: {
             Subject: { Data: 'Nouvelle candidature : Éloïse', Charset: 'UTF-8' },
             Body: { Text: { Data: 'Ça va ?', Charset: 'UTF-8' } },
-            Attachments: [{ FileName: 'photo.png', ContentType: 'image/png', RawContent: body }],
           },
         },
       },

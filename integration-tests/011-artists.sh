@@ -3,7 +3,7 @@
 # The admin routes for artists work against a real database and the shared sources in the image. The server's
 # unit tests mock the database and the photos, so this is what covers the artists migration, emails being unique
 # whatever their case, artists listed by name, the transaction that changes an artist, profiles read back from the
-# database, and photos kept on disk, then deleted.
+# database, and photos kept on disk, then deleted, or no photo at all.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -98,6 +98,28 @@ expect_status 200
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
 expect_status 404
 [ "$(photos_on_disk)" = 1 ] || fail "expected the deleted artist's photo to be deleted"
+
+echo "  an artist is added without a photo, given one, then has it removed"
+photos="$(photos_on_disk)"
+photoless="${PROFILE/artiste@integration.test/nophoto@integration.test}"
+artist POST "${BASE_URL}/api/admin/artists" "$photoless"
+expect_status 200
+expect_body_contains '"hasPhoto":false'
+id="$(body_id)"
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
+expect_status 404
+expect_body_contains 'This artist has no photo'
+artist PUT "${BASE_URL}/api/admin/artists/${id}" "$photoless" "${PHOTOS}/photo.png"
+expect_status 200
+expect_body_contains '"hasPhoto":true'
+[ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected the artist's new photo on disk"
+request --header "Cookie: ${cookie}" --request PUT --form-string "artist=${photoless}" \
+    --form-string 'removePhoto=true' "${BASE_URL}/api/admin/artists/${id}"
+expect_status 200
+expect_body_contains '"hasPhoto":false'
+[ "$(photos_on_disk)" = "$photos" ] || fail "expected the removed photo to be deleted"
+request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
+expect_status 200
 
 echo "  an artist that doesn't exist can't be viewed, changed or deleted"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${NOBODY}"

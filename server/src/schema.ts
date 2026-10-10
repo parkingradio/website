@@ -94,9 +94,10 @@ export const artists = pgTable(
     bio: text('bio').notNull(),
     links: jsonb('links').$type<Partial<Record<LinkSiteId, string>>>().notNull(), // by site, profile names, or the address for "web"
     phone: text('phone').notNull(),
-    // Where the photo is stored (see `Photos` in artists.ts), and its MIME type, as checked from its contents.
-    photoKey: text('photo_key').notNull(),
-    photoType: text('photo_type').notNull(),
+    // Where the photo is stored (see `Photos` in artists.ts), and its MIME type, as checked from its contents. Both null
+    // when the artist has no photo.
+    photoKey: text('photo_key'),
+    photoType: text('photo_type'),
     // The email of the admin who last changed the artist, and when (null until then).
     updatedBy: text('updated_by'),
     updatedAt: timestamp('updated_at', { withTimezone: true }),
@@ -104,6 +105,7 @@ export const artists = pgTable(
   (table) => [
     uniqueIndex('artists_email_lower_idx').on(sql`lower(${table.email})`),
     check('artists_kind', oneOf(table.kind, ARTIST_KINDS)),
+    check('artists_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
   ],
 )
 

@@ -78,6 +78,13 @@
       "when": 1791655201108,
       "tag": "0010_application_statuses",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791656444987,
+      "tag": "0011_optional_artist_photos",
+      "breakpoints": true
     }
   ]
 }

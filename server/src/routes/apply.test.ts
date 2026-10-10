@@ -193,6 +193,15 @@ describe('POST /api/applications', () => {
     expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
   })
 
+  it('adds the artist without a photo, which is optional', async () => {
+    const app = await buildApp()
+    const response = await apply(app, { photo: null })
+    expect(response.statusCode).toBe(200)
+    expect(artists).toEqual([expect.objectContaining({ email: 'artiste@example.com', photoKey: null, photoType: null })])
+    expect(applications).toHaveLength(1)
+    expect(photos.store).not.toHaveBeenCalled()
+  })
+
   it('checks the token with Turnstile, with the address Cloudflare reports', async () => {
     const app = await buildApp()
     await apply(app, { turnstileToken: 'the-token' }, '198.51.100.7')
@@ -244,8 +253,7 @@ describe('POST /api/applications', () => {
     const invalid = [
       { parts: { artist: profile({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
       { parts: { artist: profile({ email: 'pas une adresse' }) }, error: 'Indique une adresse e-mail valide.' },
-      { parts: { photo: null }, error: 'Ajoute une photo en JPEG, PNG ou WebP.' },
-      { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'Ajoute une photo en JPEG, PNG ou WebP.' },
+      { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisis au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },
     ]
@@ -356,14 +364,15 @@ describe('POST /api/applications', () => {
 
   describe('emails', () => {
     // What's in the emails is checked in application-emails.test.ts. Here, it's what the route passes on.
-    it('emails the application to the recipients, with the photo, and confirms it to the artist', async () => {
+    it('emails the application to the recipients, without the photo, and confirms it to the artist', async () => {
       recipients = ['equipe@example.com', 'booking@example.com']
       const app = await buildApp()
       expect((await apply(app)).statusCode).toBe(200)
 
       expect(sendEmail).toHaveBeenCalledTimes(2)
       const [toRecipients, confirmation] = sendEmail.mock.calls.map(([email]) => email)
-      expect(toRecipients).toMatchObject({ to: recipients, attachments: [{ fileName: 'photo-1.jpeg', body: JPEG }] })
+      expect(toRecipients).toMatchObject({ to: recipients })
+      expect(toRecipients).not.toHaveProperty('attachments')
       expect(confirmation).toMatchObject({ to: ['artiste@example.com'], replyTo: recipients })
       // What's described is what was saved, e.g. links reduced to profile names.
       expect(toRecipients.text).toContain('SoundCloud : https://soundcloud.com/parkingdotradio')

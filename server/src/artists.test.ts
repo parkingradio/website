@@ -228,8 +228,7 @@ describe('checkProfile', () => {
 describe('photoError', () => {
   it('takes a JPEG, PNG or WebP photo up to the size limit', () => {
     for (const type of ['image/jpeg', 'image/png', 'image/webp']) expect(photoError({ type, size: 10 * 1024 * 1024 })).toBeNull()
-    expect(photoError({ type: 'image/gif', size: 1 })).toBe('Ajoute une photo en JPEG, PNG ou WebP.')
-    expect(photoError(null)).toBe('Ajoute une photo en JPEG, PNG ou WebP.')
+    expect(photoError({ type: 'image/gif', size: 1 })).toBe('La photo doit être en JPEG, PNG ou WebP.')
     expect(photoError({ type: 'image/png', size: 10 * 1024 * 1024 + 1 })).toBe('La photo dépasse 10 Mo.')
   })
 })
@@ -242,10 +241,13 @@ describe('validatePhoto', () => {
     expect(validatePhoto(Buffer.from('RIFF\0\0\0\0WEBPVP8 ', 'latin1')).type).toBe('image/webp')
   })
 
-  it('refuses anything else, or no photo', () => {
-    expect(() => validatePhoto(Buffer.from('%PDF-1.7'))).toThrow('JPEG, PNG ou WebP')
-    expect(() => validatePhoto(Buffer.alloc(0))).toThrow('JPEG, PNG ou WebP')
-    expect(() => validatePhoto(undefined)).toThrow('JPEG, PNG ou WebP')
+  it('refuses anything else', () => {
+    expect(() => validatePhoto(Buffer.from('%PDF-1.7'))).toThrow('La photo doit être en JPEG, PNG ou WebP.')
+    expect(() => validatePhoto(Buffer.alloc(0))).toThrow('La photo doit être en JPEG, PNG ou WebP.')
+  })
+
+  it('returns null when there is no photo, which is fine', () => {
+    expect(validatePhoto(undefined)).toBeNull()
   })
 })
 

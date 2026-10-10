@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ARTIST_KINDS,
   BIO_MAX_LENGTH,
@@ -12,11 +12,11 @@ import {
   checkProfile,
   parseLink,
 } from 'shared/artists'
-import type { ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
+import type { Artist, ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
 import { checkLine } from 'shared/checks'
 import { pickedPhotoError } from '../../artist-profile'
 import { Combobox } from '../../combobox'
-import { COUNTRY_OPTIONS, KIND_LABELS, genreName } from './describe'
+import { COUNTRY_OPTIONS, KIND_LABELS, genreName, photoUrl } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 
@@ -40,8 +40,8 @@ const EMPTY: ArtistProfile = {
 type Field = keyof ArtistProfile | 'photo'
 
 type ArtistFormProps = {
-  // The profile to change, or nothing for a new artist, who must then have a photo.
-  artist?: ArtistProfile
+  // The artist to change, or nothing for a new one.
+  artist?: Artist
   submitLabel: string
   // Sends the form, as `POST` or `PUT /api/admin/artists[/:id]` expect it, and returns the error, if it failed.
   onSubmit: (form: FormData) => Promise<string | null>
@@ -49,9 +49,10 @@ type ArtistFormProps = {
 }
 
 export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }: ArtistFormProps) {
-  const isNew = initial === undefined
   const [profile, setProfile] = useState<ArtistProfile>(initial ?? EMPTY)
   const [photo, setPhoto] = useState<File | null>(null)
+  // Whether to remove the artist's photo, which only happens once the form is sent.
+  const [removePhoto, setRemovePhoto] = useState(false)
   // The name of a collective's artist being typed, before it's pinned.
   const [memberEntry, setMemberEntry] = useState('')
 
@@ -60,9 +61,8 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   // Only the names pinned are sent. One that's left typed would be lost, so it has to be pinned (or cleared) first.
   const unpinned = profile.kind === 'collective' ? memberEntry.trim() : ''
   if (unpinned) errors.members = `« ${unpinned} » n'est pas ajouté : appuyer sur + pour l'ajouter.`
-  // A new artist needs a photo. Otherwise, the artist keeps theirs unless another one is chosen. When the browser doesn't
-  // know the photo's type, which the server tells from its contents anyway, only its size is checked.
-  const photoProblem = isNew || photo ? pickedPhotoError(photo) : null
+  // The artist keeps their photo, if they have one, unless another one is chosen or it's removed.
+  const photoProblem = pickedPhotoError(photo)
   if (photoProblem) errors.photo = photoProblem
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () => {
     // What's saved of the profile, e.g. without the members of an artist who was a collective at first. There's one,
@@ -70,6 +70,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
     const sent = new FormData()
     sent.append('artist', JSON.stringify(checked.profile!))
     if (photo) sent.append('photo', photo)
+    else if (removePhoto) sent.append('removePhoto', 'true')
     return onSubmit(sent)
   })
   const update = (changes: Partial<ArtistProfile>) => setProfile((profile) => ({ ...profile, ...changes }))
@@ -149,22 +150,110 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
         <input type="tel" {...input('phone')} maxLength={PHONE_MAX_LENGTH} required />
       </Labeled>
 
-      <Labeled label="Photo" error={shown('photo')}>
-        <input
-          type="file"
-          accept={PHOTO_TYPES.join(',')}
-          required={isNew}
-          aria-invalid={shown('photo') ? true : undefined}
-          onChange={(event) => {
-            setPhoto(event.target.files?.[0] ?? null)
-            leave('photo')()
-          }}
-        />
-      </Labeled>
-      <p className="admin-hint">JPEG, PNG ou WebP.{!isNew && ' Laisser vide pour garder la photo actuelle.'}</p>
+      <PhotoField
+        current={initial?.hasPhoto ? photoUrl(initial) : null}
+        removed={removePhoto}
+        onRemove={() => setRemovePhoto(true)}
+        photo={photo}
+        onChange={(photo) => {
+          setPhoto(photo)
+          leave('photo')()
+        }}
+        error={shown('photo')}
+      />
 
       <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
+  )
+}
+
+// The photo picked, or else the artist's, if they have one and it isn't removed, each with an × that takes it away,
+// then the input that picks a photo, which replaces the artist's. An × goes away once clicked, so the focus goes to the
+// input rather than being lost.
+function PhotoField({
+  current,
+  removed,
+  onRemove,
+  photo,
+  onChange,
+  error,
+}: {
+  // The address of the artist's photo, if they have one, and whether it's to be removed.
+  current: string | null
+  removed: boolean
+  onRemove: () => void
+  photo: File | null
+  onChange: (photo: File | null) => void
+  error: string | undefined
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  // The address of the photo picked, to show it, made when it's picked and released once it's replaced or the form is
+  // gone. When the browser doesn't know the photo's type, it's shown anyway: the server tells it from its contents.
+  const [preview, setPreview] = useState<string | null>(null)
+  const shown = useRef<string | null>(null)
+  useEffect(() => () => {
+    if (shown.current) URL.revokeObjectURL(shown.current)
+  }, [])
+
+  const pick = (file: File | null) => {
+    if (shown.current) URL.revokeObjectURL(shown.current)
+    shown.current = file && (!file.type || PHOTO_TYPES.includes(file.type)) ? URL.createObjectURL(file) : null
+    setPreview(shown.current)
+    onChange(file)
+  }
+  const kept = current && !removed ? current : null
+
+  return (
+    <div className="admin-field">
+      <label htmlFor="artist-photo">Photo</label>
+      {photo ? (
+        <div className="admin-photo">
+          {preview ? <img src={preview} alt="Photo choisie" /> : <span>{photo.name}</span>}
+          <button
+            type="button"
+            aria-label="retirer la photo choisie"
+            onClick={() => {
+              // So that picking the same file again still counts as a change.
+              if (input.current) input.current.value = ''
+              pick(null)
+              input.current?.focus()
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        kept && (
+          <div className="admin-photo">
+            <img src={kept} alt="Photo actuelle" />
+            <button
+              type="button"
+              aria-label="retirer la photo"
+              onClick={() => {
+                onRemove()
+                input.current?.focus()
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )
+      )}
+      <input
+        ref={input}
+        id="artist-photo"
+        type="file"
+        accept={PHOTO_TYPES.join(',')}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => pick(event.target.files?.[0] ?? null)}
+      />
+      <FieldError message={error} />
+      <p className="admin-hint">
+        Facultative. JPEG, PNG ou WebP.
+        {kept && !photo && ' En choisir une autre remplace la photo actuelle.'}
+        {current && removed && !photo && " La photo actuelle sera retirée à l'enregistrement."}
+      </p>
+    </div>
   )
 }
 

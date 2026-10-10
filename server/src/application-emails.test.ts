@@ -33,9 +33,6 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
   }
 }
 
-const photo = { body: Buffer.from('photo'), type: 'image/png' }
-const photoKey = 'artists/1234.png'
-
 describe('describeApplication', () => {
   it('describes everything the artist sent, in French', () => {
     expect(describeApplication(profile(), fields())).toBe(
@@ -86,19 +83,18 @@ describe('describeApplication', () => {
 })
 
 describe('applicationEmails', () => {
-  it('emails the recipients, with the photo, and replies go to the artist', () => {
-    const { toRecipients } = applicationEmails({ profile: profile(), application: fields(), photo, photoKey, recipients: ['equipe@example.com'] })
+  it('emails the recipients everything the artist sent, without their photo, and replies go to the artist', () => {
+    const { toRecipients } = applicationEmails({ profile: profile(), application: fields(), recipients: ['equipe@example.com'] })
     expect(toRecipients).toEqual({
       to: ['equipe@example.com'],
       replyTo: ['artiste@example.com'],
       subject: 'Nouvelle candidature : DJ Test',
       text: describeApplication(profile(), fields()),
-      attachments: [{ fileName: '1234.png', type: 'image/png', body: photo.body }],
     })
   })
 
   it('confirms the application to the artist, with none of what they wrote, and replies go to the recipients', () => {
-    const { confirmation } = applicationEmails({ profile: profile(), application: fields(), photo, photoKey, recipients: ['equipe@example.com'] })
+    const { confirmation } = applicationEmails({ profile: profile(), application: fields(), recipients: ['equipe@example.com'] })
     expect(confirmation).toEqual({
       to: ['artiste@example.com'],
       replyTo: ['equipe@example.com'],
@@ -109,12 +105,12 @@ describe('applicationEmails', () => {
 
   it('reminds collectives to make a flyer', () => {
     const collective = profile({ kind: 'collective', members: ['Une'] })
-    const { confirmation } = applicationEmails({ profile: collective, application: fields(), photo, photoKey, recipients: [] })
+    const { confirmation } = applicationEmails({ profile: collective, application: fields(), recipients: [] })
     expect(confirmation.text).toContain('nous demandons aux collectifs de produire un flyer')
   })
 
   it('only confirms the application when there are no recipients', () => {
-    const emails = applicationEmails({ profile: profile(), application: fields(), photo, photoKey, recipients: [] })
+    const emails = applicationEmails({ profile: profile(), application: fields(), recipients: [] })
     expect(emails.toRecipients).toBeNull()
     expect(emails.confirmation.replyTo).toBeUndefined()
   })

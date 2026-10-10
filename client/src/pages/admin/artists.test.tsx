@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from 'shared/applications'
 import type { Artist, ArtistProfile } from 'shared/artists'
@@ -8,8 +8,15 @@ import { mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
+beforeEach(() => {
+  // jsdom has neither, and the form uses both to show the photo picked.
+  URL.createObjectURL = vi.fn(() => 'blob:preview')
+  URL.revokeObjectURL = vi.fn()
+})
+
 const AURORE: Artist = {
   id: 'artist-1',
+  hasPhoto: true,
   createdAt: '2026-10-01T16:00:00.000Z',
   createdBy: 'admin@example.com',
   kind: 'artist',
@@ -74,10 +81,10 @@ function renderAt(path: string) {
   )
 }
 
-// What was sent as the artist's profile and photo in a request to save one.
+// What was sent as the artist's profile and photo in a request to save one, and whether to remove their photo.
 function sent(request: RequestInit) {
   const form = request.body as FormData
-  return { profile: JSON.parse(form.get('artist') as string) as ArtistProfile, photo: form.get('photo') }
+  return { profile: JSON.parse(form.get('artist') as string) as ArtistProfile, photo: form.get('photo'), removePhoto: form.get('removePhoto') }
 }
 
 const rows = () =>
@@ -172,12 +179,13 @@ describe('An artist’s page', () => {
     expect(screen.getByLabelText("Nom d'artiste")).toHaveValue('Aurore')
     expect(screen.getByLabelText('SoundCloud')).toHaveValue('aurore')
     expect(screen.getByLabelText('Photo')).not.toBeRequired()
+    expect(screen.getByRole('img', { name: 'Photo actuelle' }).getAttribute('src')).toMatch(/^\/api\/admin\/artists\/artist-1\/photo\?v=/)
     fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Une bio corrigée.' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Une bio corrigée.')).toBeInTheDocument())
     const [request] = requestsTo('PUT', '/api/admin/artists/artist-1')
-    const { profile, photo } = sent(request)
+    const { profile, photo, removePhoto } = sent(request)
     expect(profile).toEqual({
       kind: 'artist',
       name: 'Aurore',
@@ -191,6 +199,7 @@ describe('An artist’s page', () => {
       phone: '514 555 0101',
     })
     expect(photo).toBeNull()
+    expect(removePhoto).toBeNull()
     expect(screen.getByText(/^Modifié par/)).toHaveTextContent(/^Modifié par other@example.com le 6 octobre 2026/)
   })
 
@@ -201,9 +210,80 @@ describe('An artist’s page', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
     const photo = screen.getByLabelText('Photo')
     fireEvent.change(photo, { target: { files: [new File(['gif'], 'aurore.gif', { type: 'image/gif' })] } })
-    expect(photo.closest('.admin-field')?.querySelector('.admin-field-error')).toHaveTextContent('Ajoute une photo en JPEG, PNG ou WebP.')
+    expect(photo.closest('.admin-field')?.querySelector('.admin-field-error')).toHaveTextContent('La photo doit être en JPEG, PNG ou WebP.')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(0)
+  })
+
+  it('removes the photo with its ×, once the artist is saved', async () => {
+    const changed: Artist = { ...AURORE, hasPhoto: false, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
+    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: changed } })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
+    expect(screen.queryByRole('img', { name: 'Photo actuelle' })).not.toBeInTheDocument()
+    expect(screen.getByText(/La photo actuelle sera retirée à l'enregistrement\./)).toBeInTheDocument()
+    // The × is gone, so the focus moves to the input that picks a photo.
+    expect(screen.getByLabelText('Photo')).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByText('Pas de photo')).toBeInTheDocument())
+    const { photo, removePhoto } = sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0])
+    expect(photo).toBeNull()
+    expect(removePhoto).toBe('true')
+    expect(screen.queryByRole('img', { name: 'Photo de Aurore' })).not.toBeInTheDocument()
+  })
+
+  it('shows the photo picked in place of the current one, with an × that brings the current one back', async () => {
+    mockFetch(AURORE_PAGE)
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    const input = screen.getByLabelText('Photo')
+    fireEvent.change(input, { target: { files: [new File(['photo'], 'aurore.png', { type: 'image/png' })] } })
+    expect(screen.getByRole('img', { name: 'Photo choisie' })).toHaveAttribute('src', 'blob:preview')
+    expect(screen.queryByRole('img', { name: 'Photo actuelle' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo choisie' }))
+    expect(screen.queryByRole('img', { name: 'Photo choisie' })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Photo actuelle' })).toBeInTheDocument()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview')
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+  })
+
+  it('sends a photo picked after removing the current one, rather than removing it', async () => {
+    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: AURORE } })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'aurore.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(1))
+    const { photo, removePhoto } = sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0])
+    expect((photo as File).name).toBe('aurore.png')
+    expect(removePhoto).toBeNull()
+  })
+
+  it("shows that an artist has no photo, and doesn't offer to remove it", async () => {
+    const withoutPhoto: Artist = { ...AURORE, hasPhoto: false }
+    mockFetch({ ...AURORE_PAGE, '/api/admin/artists/artist-1': { ok: true, artist: withoutPhoto } })
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
+    renderAt('/admin/artistes/artist-1')
+
+    expect(await screen.findByText('Pas de photo')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Photo de Aurore' })).not.toBeInTheDocument()
+    expect(screen.getByText(/^L'artiste et ses candidatures seront supprimés/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('link', { name: '5 octobre 2026' })).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: "supprimer l'artiste" }))
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement Aurore et ses candidatures (2) ?')
+
+    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    expect(screen.queryByRole('img', { name: 'Photo actuelle' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'retirer la photo' })).not.toBeInTheDocument()
   })
 
   it('shows why the artist could not be changed, and keeps the form', async () => {
@@ -288,7 +368,8 @@ describe('Adding an artist', () => {
     renderAt('/admin/artistes/nouveau')
 
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Nouvel artiste' })).toBeInTheDocument())
-    expect(screen.getByLabelText('Photo')).toBeRequired()
+    expect(screen.getByLabelText('Photo')).not.toBeRequired()
+    expect(screen.queryByRole('button', { name: 'retirer la photo' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('collectif'))
     fireEvent.change(screen.getByLabelText('Nom du collectif'), { target: { value: 'Brume' } })
     const member = screen.getByLabelText("Nom d'un artiste du collectif")
@@ -330,6 +411,25 @@ describe('Adding an artist', () => {
     expect((photo as File).name).toBe('brume.jpg')
   })
 
+  it('adds an artist without a photo', async () => {
+    const added: Artist = { ...AURORE, id: 'artist-3', hasPhoto: false }
+    mockFetch({
+      ...LOGGED_IN,
+      'POST /api/admin/artists': { ok: true, artist: added },
+      '/api/admin/artists/artist-3': { ok: true, artist: added },
+      '/api/admin/applications?artist=artist-3': { ok: true, applications: [] },
+    })
+    renderAt('/admin/artistes/nouveau')
+
+    await screen.findByLabelText('collectif')
+    fillValidArtist()
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [] } })
+    fireEvent.click(submitButton("ajouter l'artiste"))
+
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/artistes/artist-3'))
+    expect(sent(requestsTo('POST', '/api/admin/artists')[0]).photo).toBeNull()
+  })
+
   it('says what is wrong with every field when the form is sent, and sends nothing', async () => {
     mockFetch(NEW)
     renderAt('/admin/artistes/nouveau')
@@ -346,7 +446,8 @@ describe('Adding an artist', () => {
     expect(screen.getByText('Ajoute au moins un lien.')).toBeInTheDocument()
     expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indique ton adresse e-mail.')
     expect(errorOf(screen.getByLabelText('Téléphone'))).toBe('Indique ton numéro de téléphone.')
-    expect(errorOf(screen.getByLabelText('Photo'))).toBe('Ajoute une photo en JPEG, PNG ou WebP.')
+    // The photo is optional.
+    expect(errorOf(screen.getByLabelText('Photo'))).toBeNull()
     // The first field to fix gets the focus.
     await waitFor(() => expect(screen.getByLabelText('Nom du collectif')).toHaveFocus())
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)

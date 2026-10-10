@@ -9,7 +9,7 @@ import { applicationEmails } from '../application-emails.js'
 import { InvalidApplication, validateApplication } from '../applications.js'
 import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
-import { EmailTaken, InvalidProfile, forgetPhoto, validatePhoto, validateProfile } from '../artists.js'
+import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { Photos, SentPhoto } from '../artists.js'
 import { clientAddress, visitorAddress } from '../client-address.js'
 import type { Email, SendEmail } from '../email.js'
@@ -34,7 +34,7 @@ const TURNSTILE_UNAVAILABLE: ApiError = {
 
 // Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
 // the first one that isn't valid.
-function validated(form: PhotoForm): { profile: ArtistProfile; photo: SentPhoto; application: ApplicationFields } | ApiError {
+function validated(form: PhotoForm): { profile: ArtistProfile; photo: SentPhoto | null; application: ApplicationFields } | ApiError {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
@@ -57,7 +57,7 @@ type EmailOptions = {
 async function emailApplication(
   log: FastifyBaseLogger,
   { settings, sendEmail }: EmailOptions,
-  sent: { profile: ArtistProfile; application: ApplicationFields; photo: SentPhoto; photoKey: string },
+  sent: { profile: ArtistProfile; application: ApplicationFields },
 ) {
   if (!sendEmail) {
     log.warn('Not emailing the application: MAIL_DOMAIN is not set')
@@ -143,19 +143,19 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
 
       // Only new artists can apply here, so an existing email gets a 409. That tells the sender the email belongs to an
       // artist, which is why it's only checked now: finding that out takes passing Turnstile, like applying does.
-      const photoKey = await photos.store(sent.photo)
+      const photo = await storePhoto(photos, sent.photo)
       let applied: { artistId: string; applicationId: string }
       try {
-        applied = await store.apply({ ...sent.profile, photoKey, photoType: sent.photo.type }, sent.application)
+        applied = await store.apply({ ...sent.profile, ...photo }, sent.application)
       } catch (error) {
-        await forgetPhoto(photos, request.log, photoKey)
+        await forgetPhoto(photos, request.log, photo.photoKey)
         if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
         throw error
       }
       const log = request.log.child(applied)
       log.info('An artist applied')
       // The application is saved, so nothing about its emails, even unexpected, can make the request fail.
-      await emailApplication(log, { settings, sendEmail }, { ...sent, photoKey }).catch((error: unknown) => {
+      await emailApplication(log, { settings, sendEmail }, sent).catch((error: unknown) => {
         log.error({ err: error }, 'Failed to email an application')
       })
       return { ok: true }

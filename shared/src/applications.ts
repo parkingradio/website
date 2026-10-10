@@ -66,7 +66,7 @@ export type Application = ApplicationFields & {
 // a few requests per hour. It's a multipart/form-data request with four parts:
 // - "artist": the artist's `ArtistProfile` (see artists.ts), as JSON, in a field rather than a file
 // - "application": the application's `ApplicationFields`, as JSON, the same way
-// - "photo": the artist's photo (see PHOTO_MAX_BYTES in artists.ts)
+// - "photo": the artist's photo (see PHOTO_MAX_BYTES in artists.ts), which can be left out
 // - "turnstileToken": the token the Turnstile widget gave the page, using the site key from `GET /api/config`
 //
 // Only new artists can apply this way: if an artist with the same email already exists, ignoring case, the request

@@ -2,7 +2,6 @@ import { PRESTATIONS } from 'shared/applications'
 import type { ApplicationFields } from 'shared/applications'
 import { GENRES, LINK_SITES } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
-import type { SentPhoto } from './artists.js'
 import type { Email } from './email.js'
 
 // The emails sent when an artist applies through `POST /api/applications`: the application, to the recipients chosen on
@@ -12,7 +11,8 @@ const countryNames = new Intl.DisplayNames(['fr'], { type: 'region' })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to stay the same day.
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 
-// Everything the artist sent but their photo, as plain text.
+// Everything the artist sent but their photo, as plain text. The photo isn't emailed: it's on the artist's page, on the
+// admin pages.
 export function describeApplication(profile: ArtistProfile, application: ApplicationFields): string {
   const collective = profile.kind === 'collective'
   const genres = profile.genres.map((id) => GENRES.find((genre) => genre.id === id)?.name ?? id)
@@ -49,15 +49,10 @@ export function describeApplication(profile: ArtistProfile, application: Applica
 export function applicationEmails({
   profile,
   application,
-  photo,
-  photoKey,
   recipients,
 }: {
   profile: ArtistProfile
   application: ApplicationFields
-  photo: SentPhoto
-  // Where the photo is stored, which names the attachment.
-  photoKey: string
   recipients: string[]
 }): { toRecipients: Email | null; confirmation: Email } {
   const anyone = recipients.length > 0
@@ -68,7 +63,6 @@ export function applicationEmails({
           replyTo: [profile.email],
           subject: `Nouvelle candidature : ${profile.name}`,
           text: describeApplication(profile, application),
-          attachments: [{ fileName: photoKey.split('/').pop()!, type: photo.type, body: photo.body }],
         }
       : null,
     confirmation: {
