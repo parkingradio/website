@@ -205,6 +205,30 @@ describe('soundCloudClient', () => {
     })
   })
 
+  describe('checkCredentials', () => {
+    it('says SoundCloud accepts the credentials when it gives a token for them, which the requests that follow use', async () => {
+      const soundcloud = client()
+
+      expect(await soundcloud.checkCredentials()).toBe(true)
+      await soundcloud.playlist('1', null)
+
+      expect(tokenRequests()).toBe(1)
+      expect(authorization()).toBe('OAuth token-1')
+    })
+
+    it.each([400, 401])('says SoundCloud refuses the credentials when it answers %i for a token', async (status) => {
+      fakeSoundCloud({ [TOKEN_URL]: () => new Response('', { status }) })
+
+      expect(await client().checkCredentials()).toBe(false)
+    })
+
+    it('fails when SoundCloud fails otherwise', async () => {
+      fakeSoundCloud({ [TOKEN_URL]: () => new Response('', { status: 503 }) })
+
+      await expect(client().checkCredentials()).rejects.toThrow('SoundCloud refused to issue a token: 503')
+    })
+  })
+
   describe('resolvePlaylist', () => {
     const resolve = (location: string | null, status = 302) =>
       fakeSoundCloud({ [RESOLVE_URL]: () => new Response(null, { status, headers: location ? { location } : {} }) })

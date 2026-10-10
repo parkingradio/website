@@ -64,6 +64,13 @@
       "when": 1791549073821,
       "tag": "0008_canonical_prestations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791578291364,
+      "tag": "0009_soundcloud_credentials",
+      "breakpoints": true
     }
   ]
 }

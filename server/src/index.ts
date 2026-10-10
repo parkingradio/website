@@ -20,6 +20,7 @@ import { logger } from './logger.js'
 import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 import { spaRoutes } from './spa.js'
 import { soundCloudClient } from './soundcloud.js'
+import { soundCloudCredentialsStore } from './soundcloud-credentials.js'
 import { onAirStore } from './on-air.js'
 import { radioSettingsStore } from './radio-settings.js'
 import { artistPhotos, artistsStore } from './artists.js'
@@ -50,7 +51,8 @@ await app.register(authRoutes)
 await app.register(adminRoutes)
 await app.register(eventsRoutes)
 await app.register(radioRoutes, {
-  soundcloud: soundCloudClient({ clientId: config.soundcloudClientId, clientSecret: config.soundcloudClientSecret }),
+  soundcloud: soundCloudClient,
+  credentials: soundCloudCredentialsStore(db),
   onAir: onAirStore(db),
   settings: radioSettingsStore(db),
 })

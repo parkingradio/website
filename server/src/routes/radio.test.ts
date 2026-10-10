@@ -1,17 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 
 import type { RadioResponse } from 'shared/radio'
 import { SESSION_COOKIE, signSessionToken } from '../auth.js'
 import type { OnAir } from '../on-air.js'
 import type { RadioSettings } from '../radio-settings.js'
-import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudTrack } from '../soundcloud.js'
+import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from '../soundcloud.js'
+import type { StoredSoundCloudCredentials } from '../soundcloud-credentials.js'
 import { radioRoutes } from './radio.js'
 
+const checkCredentials = vi.fn<SoundCloudClient['checkCredentials']>()
 const playlist = vi.fn<SoundCloudClient['playlist']>()
 const resolvePlaylist = vi.fn<SoundCloudClient['resolvePlaylist']>()
 const hlsStream = vi.fn<SoundCloudClient['hlsStream']>()
+// Every client is a new one, as far as the routes can tell, but they all share the mocks above.
+const newClient = vi.fn<(credentials: SoundCloudCredentials) => SoundCloudClient>(() => ({ checkCredentials, playlist, resolvePlaylist, hlsStream }))
+
+// The credentials of the SoundCloud app, as the database would keep them.
+let entered: StoredSoundCloudCredentials | null = null
+const loadCredentials = vi.fn<() => Promise<StoredSoundCloudCredentials | null>>()
+const saveCredentials = vi.fn<(credentials: StoredSoundCloudCredentials) => Promise<void>>()
 
 // The track on air, as the database would keep it.
 let stored: OnAir | null = null
@@ -58,15 +68,23 @@ const CHOSEN: RadioSettings = {
   updatedAt: NOW - 24 * 60 * MINUTE,
 }
 
+const ENTERED: StoredSoundCloudCredentials = {
+  clientId: 'client-id',
+  clientSecret: 'client-secret',
+  updatedBy: 'someone@example.com',
+  updatedAt: new Date(NOW - 48 * 60 * MINUTE),
+}
+
 function streamFor(id: number, expiresAt = NOW + 62 * MINUTE): HlsStream {
   return { url: `https://cdn.test/${id}/playlist.m3u8?n=${hlsStream.mock.calls.length}`, expiresAt }
 }
 
-async function buildApp() {
-  const app = Fastify({ logger: false })
+async function buildApp(logs?: string[]) {
+  const app = Fastify({ logger: logs ? { stream: { write: (line: string) => logs.push(line) } } : false })
   await app.register(fastifyCookie)
   await app.register(radioRoutes, {
-    soundcloud: { playlist, resolvePlaylist, hlsStream },
+    soundcloud: newClient,
+    credentials: { load: loadCredentials, save: saveCredentials },
     onAir: { load, save },
     settings: { load: loadSettings, save: saveSettings },
   })
@@ -98,6 +116,8 @@ describe('radio routes', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW)
     process.env.JWT_SECRET = 'test-secret'
+    newClient.mockClear()
+    checkCredentials.mockReset().mockResolvedValue(true)
     playlist.mockReset()
     resolvePlaylist.mockReset()
     hlsStream.mockReset()
@@ -109,6 +129,11 @@ describe('radio routes', () => {
       stored = onAir
     })
     chosen = CHOSEN
+    entered = ENTERED
+    loadCredentials.mockReset().mockImplementation(async () => entered)
+    saveCredentials.mockReset().mockImplementation(async (credentials) => {
+      entered = credentials
+    })
     loadSettings.mockReset().mockImplementation(async () => chosen)
     saveSettings.mockReset().mockImplementation(async (settings) => {
       chosen = settings
@@ -247,6 +272,36 @@ describe('radio routes', () => {
       expect(response.statusCode).toBe(503)
       expect(response.json()).toEqual({ ok: false, error: 'No playlist has been chosen for the radio yet' })
       expect(playlist).not.toHaveBeenCalled()
+    })
+
+    it('reads the rotation through the credentials of the SoundCloud app that were entered', async () => {
+      const app = await buildApp()
+
+      await radio(app)
+
+      expect(newClient).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ clientId: 'client-id', clientSecret: 'client-secret' }))
+    })
+
+    it('responds 502 until the credentials of the SoundCloud app have been entered', async () => {
+      entered = null
+      const app = await buildApp()
+
+      const response = await app.inject({ method: 'GET', url: '/api/radio' })
+
+      expect(response.statusCode).toBe(502)
+      expect(newClient).not.toHaveBeenCalled()
+    })
+
+    it('reads the rotation anew through other credentials entered elsewhere, going on with what it read before if that fails', async () => {
+      const app = await buildApp()
+      await radio(app)
+
+      entered = { ...ENTERED, clientId: 'other-id', clientSecret: 'other-secret', updatedAt: new Date(NOW) }
+      playlist.mockRejectedValue(new Error('SoundCloud refused to issue a token: 401'))
+
+      expect((await radio(app)).current.track.id).toBe('1')
+      expect(playlist).toHaveBeenCalledTimes(2)
+      expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'other-id', clientSecret: 'other-secret' }))
     })
 
     it('asks SoundCloud at most once every 5 minutes', async () => {
@@ -512,6 +567,17 @@ describe('radio routes', () => {
       expect(response.json()).toEqual({ ok: false, error: 'The radio is unavailable right now' })
     })
 
+    it('asks for streams again through other credentials entered elsewhere', async () => {
+      const app = await buildApp()
+      const first = await streamUrl(app)
+
+      entered = { ...ENTERED, clientId: 'other-id', clientSecret: 'other-secret', updatedAt: new Date(NOW) }
+
+      expect(await streamUrl(app)).not.toBe(first)
+      expect(hlsStream).toHaveBeenCalledTimes(2)
+      expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'other-id' }))
+    })
+
     it('responds 502 when SoundCloud fails to give a stream, and tries again 30 seconds later', async () => {
       hlsStream.mockRejectedValueOnce(new Error('SoundCloud did not redirect to a stream'))
       const app = await buildApp()
@@ -596,13 +662,19 @@ describe('radio routes', () => {
       ['GET', '/api/admin/radio'],
       ['POST', '/api/admin/radio/preview'],
       ['POST', '/api/admin/radio/playlist'],
+      ['GET', '/api/admin/radio/credentials'],
+      ['PUT', '/api/admin/radio/credentials'],
+      ['POST', '/api/admin/radio/credentials/check'],
     ] as const)('responds 401 to %s %s without a session', async (method, url) => {
       const app = await buildApp()
 
-      const response = await app.inject({ method, url, payload: method === 'POST' ? { link: LINK } : undefined })
+      const payload = url.includes('credentials') ? { clientId: 'id', clientSecret: 'secret' } : method === 'POST' ? { link: LINK } : undefined
+      const response = await app.inject({ method, url, payload })
 
       expect(response.statusCode).toBe(401)
       expect(saveSettings).not.toHaveBeenCalled()
+      expect(saveCredentials).not.toHaveBeenCalled()
+      expect(checkCredentials).not.toHaveBeenCalled()
     })
 
     describe('GET /api/admin/radio', () => {
@@ -610,7 +682,7 @@ describe('radio routes', () => {
         chosen = null
         const app = await buildApp()
 
-        expect(await settings(app)).toEqual({ ok: true, current: null })
+        expect(await settings(app)).toEqual({ ok: true, credentialsEntered: true, current: null })
       })
 
       it('returns the chosen playlist, with every track in it, in order, and whether it is on the radio', async () => {
@@ -628,6 +700,7 @@ describe('radio routes', () => {
 
         expect(await settings(app)).toEqual({
           ok: true,
+          credentialsEntered: true,
           current: {
             url: ROTATION.url,
             title: 'Rotation',
@@ -678,6 +751,26 @@ describe('radio routes', () => {
         expect((await radio(app)).current.track.id).toBe('1')
       })
 
+      it('says that the credentials of the SoundCloud app have not been entered, and that nothing could be read', async () => {
+        entered = null
+        const app = await buildApp()
+
+        const response = await settings(app)
+
+        expect(response.credentialsEntered).toBe(false)
+        // That's not a failure to read the playlist.
+        expect(response.current).toMatchObject({ title: 'Rotation', playlist: null, error: null })
+        expect(playlist).not.toHaveBeenCalled()
+      })
+
+      it('says that the credentials have not been entered before a playlist is chosen too', async () => {
+        entered = null
+        chosen = null
+        const app = await buildApp()
+
+        expect(await settings(app)).toEqual({ ok: true, credentialsEntered: false, current: null })
+      })
+
       it('says why the playlist could not be read when it never could be', async () => {
         playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))
         const app = await buildApp()
@@ -713,6 +806,18 @@ describe('radio routes', () => {
 
         expect(resolvePlaylist).toHaveBeenCalledWith(LINK)
         expect(playlist).toHaveBeenCalledWith('9', 's-AbC123')
+      })
+
+      it('responds 409 until the credentials of the SoundCloud app have been entered', async () => {
+        entered = null
+        const app = await buildApp()
+
+        const response = await post(app, url, { link: LINK })
+
+        expect(response.statusCode).toBe(409)
+        expect(response.json()).toEqual({ ok: false, error: 'The credentials of the SoundCloud app have not been entered yet' })
+        expect(resolvePlaylist).not.toHaveBeenCalled()
+        expect(saveSettings).not.toHaveBeenCalled()
       })
 
       it('responds 404 when SoundCloud shows no playlist at the link', async () => {
@@ -863,6 +968,190 @@ describe('radio routes', () => {
         expect(await streamStatus(app, '2')).toBe(200)
         vi.advanceTimersByTime(30 * MINUTE)
         expect(await streamStatus(app, '2')).toBe(404)
+      })
+    })
+
+    describe('/api/admin/radio/credentials', () => {
+      const URL = '/api/admin/radio/credentials'
+
+      async function credentials(app: App) {
+        return (await app.inject({ method: 'GET', url: URL, cookies: await asAdmin() })).json()
+      }
+
+      async function put(app: App, body: unknown) {
+        return app.inject({ method: 'PUT', url: URL, payload: body as object, cookies: await asAdmin() })
+      }
+
+      it('returns null until the credentials have been entered', async () => {
+        entered = null
+        const app = await buildApp()
+
+        expect(await credentials(app)).toEqual({ ok: true, credentials: null })
+      })
+
+      it('returns the client id, and who entered the credentials and when, but never the secret', async () => {
+        const app = await buildApp()
+
+        const response = await credentials(app)
+
+        expect(response).toEqual({
+          ok: true,
+          credentials: { clientId: 'client-id', updatedBy: 'someone@example.com', updatedAt: ENTERED.updatedAt.toISOString() },
+        })
+        expect(JSON.stringify(response)).not.toContain('client-secret')
+      })
+
+      it('saves the credentials, trimmed, once SoundCloud accepts them, and returns them without the secret', async () => {
+        entered = null
+        const app = await buildApp()
+
+        const response = await put(app, { clientId: ' new-id ', clientSecret: ' new-secret ' })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json()).toEqual({
+          ok: true,
+          credentials: { clientId: 'new-id', updatedBy: 'admin@example.com', updatedAt: new Date(NOW).toISOString() },
+        })
+        expect(newClient).toHaveBeenCalledExactlyOnceWith({ clientId: 'new-id', clientSecret: 'new-secret' })
+        expect(checkCredentials).toHaveBeenCalledOnce()
+        expect(saveCredentials).toHaveBeenCalledExactlyOnceWith({
+          clientId: 'new-id',
+          clientSecret: 'new-secret',
+          updatedBy: 'admin@example.com',
+          updatedAt: new Date(NOW),
+        })
+      })
+
+      it('puts the radio on air through them right away, with the client that checked them', async () => {
+        entered = null
+        const app = await buildApp()
+        expect((await app.inject({ method: 'GET', url: '/api/radio' })).statusCode).toBe(502)
+
+        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+        expect((await radio(app)).current.track.id).toBe('1')
+        // It already has a token for them.
+        expect(newClient).toHaveBeenCalledOnce()
+      })
+
+      it('reads the playlist again right away through new credentials, going on with what it read before if that fails', async () => {
+        const app = await buildApp()
+        await radio(app)
+
+        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+        playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))
+
+        expect((await radio(app)).current.track.id).toBe('1')
+        expect(playlist).toHaveBeenCalledTimes(2)
+        // The one that checked them.
+        expect(newClient).toHaveBeenCalledTimes(2)
+      })
+
+      it('ignores credentials that a request loaded before newer ones were saved', async () => {
+        const app = await buildApp()
+        await radio(app)
+        let resolveStale: ((credentials: StoredSoundCloudCredentials) => void) | undefined
+        loadCredentials.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+        const stale = radio(app)
+
+        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+        await vi.waitFor(() => expect(resolveStale).toBeDefined())
+        resolveStale!(ENTERED)
+        await stale
+        await radio(app)
+
+        expect(newClient).toHaveBeenCalledTimes(2)
+        expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'new-id' }))
+      })
+
+      it('keeps the credentials out of the logs and the response when the database fails to save them', async () => {
+        const cause = Object.assign(new Error('terminating connection due to administrator command'), { code: '57P01' })
+        const query = 'insert into "soundcloud_credentials" ("id", "client_id", "client_secret") values (default, $1, $2)'
+        saveCredentials.mockRejectedValueOnce(new DrizzleQueryError(query, ['new-id', 'new-secret'], cause))
+        const logs: string[] = []
+        const app = await buildApp(logs)
+
+        const response = await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+        expect(response.statusCode).toBe(500)
+        expect(response.json()).toEqual({ ok: false, error: 'Internal server error' })
+        expect(logs.join('')).toContain('57P01')
+        expect(logs.join('')).not.toContain('new-secret')
+      })
+
+      it('checks credentials with SoundCloud without saving them', async () => {
+        const app = await buildApp()
+
+        const response = await app.inject({
+          method: 'POST',
+          url: `${URL}/check`,
+          payload: { clientId: ' new-id ', clientSecret: ' new-secret ' },
+          cookies: await asAdmin(),
+        })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json()).toEqual({ ok: true })
+        expect(newClient).toHaveBeenCalledExactlyOnceWith({ clientId: 'new-id', clientSecret: 'new-secret' })
+        expect(checkCredentials).toHaveBeenCalledOnce()
+        expect(saveCredentials).not.toHaveBeenCalled()
+        // The radio goes on with the credentials it had.
+        await radio(app)
+        expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'client-id' }))
+      })
+
+      // Saving them checks them too, the same way.
+      describe.each([
+        ['PUT', URL],
+        ['POST', `${URL}/check`],
+      ] as const)('%s %s', (method, url) => {
+        async function send(app: App, body: unknown) {
+          return app.inject({ method, url, payload: body as object, cookies: await asAdmin() })
+        }
+
+        it.each([
+          ['the client id is missing', { clientSecret: 'secret' }],
+          ['the client secret is missing', { clientId: 'id' }],
+          ['the client id is blank', { clientId: '  ', clientSecret: 'secret' }],
+          ['the client secret is not a string', { clientId: 'id', clientSecret: 42 }],
+          ['the client id is too long', { clientId: 'x'.repeat(201), clientSecret: 'secret' }],
+          ['there is no body', undefined],
+        ])('responds 400 when %s', async (_, body) => {
+          const app = await buildApp()
+
+          const response = await send(app, body)
+
+          expect(response.statusCode).toBe(400)
+          expect(response.json()).toEqual({ ok: false, error: 'The client id and the client secret must each have between 1 and 200 characters' })
+          expect(checkCredentials).not.toHaveBeenCalled()
+          expect(saveCredentials).not.toHaveBeenCalled()
+        })
+
+        it('responds 400, and keeps the credentials it had, when SoundCloud refuses them', async () => {
+          checkCredentials.mockResolvedValue(false)
+          const app = await buildApp()
+
+          const response = await send(app, { clientId: 'wrong-id', clientSecret: 'wrong-secret' })
+
+          expect(response.statusCode).toBe(400)
+          expect(response.json()).toEqual({ ok: false, error: 'SoundCloud refused these credentials' })
+          expect(saveCredentials).not.toHaveBeenCalled()
+          await radio(app)
+          expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'client-id' }))
+        })
+
+        it('responds 502 when SoundCloud cannot be reached to check them', async () => {
+          checkCredentials.mockRejectedValue(new Error('SoundCloud refused to issue a token: 503'))
+          const app = await buildApp()
+
+          const response = await send(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+          expect(response.statusCode).toBe(502)
+          expect(response.json()).toEqual({
+            ok: false,
+            error: 'The credentials cannot be checked with SoundCloud: SoundCloud refused to issue a token: 503',
+          })
+          expect(saveCredentials).not.toHaveBeenCalled()
+        })
       })
     })
   })

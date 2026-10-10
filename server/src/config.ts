@@ -52,13 +52,6 @@ export const config = {
   get assetsDomain() {
     return required('ASSETS_DOMAIN')
   },
-  // Credentials of the SoundCloud app the radio's rotation is read through.
-  get soundcloudClientId() {
-    return required('SOUNDCLOUD_CLIENT_ID')
-  },
-  get soundcloudClientSecret() {
-    return required('SOUNDCLOUD_CLIENT_SECRET')
-  },
   // The keys of the Cloudflare Turnstile widget that keeps bots from sending applications (see turnstile.ts). Required,
   // so that applications are never accepted without it.
   get turnstileSiteKey() {

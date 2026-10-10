@@ -25,27 +25,6 @@ variable "app_image_tag" {
   type        = string
 }
 
-variable "soundcloud_client_id" {
-  description = "Client ID of the SoundCloud app through which the app reads the radio's rotation"
-  type        = string
-
-  validation {
-    condition     = length(var.soundcloud_client_id) > 0
-    error_message = "soundcloud_client_id must not be empty."
-  }
-}
-
-variable "soundcloud_client_secret" {
-  description = "Client secret of the SoundCloud app through which the app reads the radio's rotation"
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.soundcloud_client_secret) > 0
-    error_message = "soundcloud_client_secret must not be empty."
-  }
-}
-
 variable "manage_mail" {
   description = <<-EOT
     Whether Terraform owns mail for var.domain: Cloudflare Email Routing for inbound, the mail

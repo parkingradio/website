@@ -24,7 +24,6 @@ resource "aws_secretsmanager_secret_version" "app" {
     private_key              = tls_private_key.origin.private_key_pem
     jwt_secret               = random_password.jwt_secret.result
     bootstrap_admin_password = random_password.bootstrap_admin.result
-    soundcloud_client_secret = var.soundcloud_client_secret
     turnstile_secret_key     = cloudflare_turnstile_widget.applications.secret
   })
 }

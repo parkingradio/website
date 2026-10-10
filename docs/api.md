@@ -45,6 +45,9 @@ can be `null`.
 | `GET /api/admin/radio` | admin | The playlist the radio's rotation is read from | `radio.ts` |
 | `POST /api/admin/radio/preview` | admin | What the radio would read from a playlist | `radio.ts` |
 | `POST /api/admin/radio/playlist` | admin | Choosing the playlist the rotation is read from | `radio.ts` |
+| `GET /api/admin/radio/credentials` | admin | The SoundCloud app the radio reads playlists through | `radio.ts` |
+| `PUT /api/admin/radio/credentials` | admin | Entering the credentials of that SoundCloud app | `radio.ts` |
+| `POST /api/admin/radio/credentials/check` | admin | Whether SoundCloud accepts credentials, without saving them | `radio.ts` |
 | `GET /api/admin/artists` | admin | Every artist | `artists.ts` |
 | `POST /api/admin/artists` | admin | Adding an artist, with their photo | `artists.ts` |
 | `GET /api/admin/artists/:id` | admin | An artist | `artists.ts` |
@@ -168,6 +171,9 @@ The radio plays a rotation: the tracks of a SoundCloud playlist chosen on the ad
 decides what's on air and moves along the rotation as tracks end, so that every listener hears the same track at
 the same point.
 
+The server reads playlists through a SoundCloud app, whose credentials are also entered on the admin pages (see
+`PUT /api/admin/radio/credentials`). Until they are, it can't read any playlist, so the radio is off air.
+
 A track has:
 
 | Field | Type | |
@@ -186,8 +192,8 @@ A track has:
 | `current` | object | The track on air: `track`, a track, and `startedAt`, when it went on air. It's on air until `startedAt` plus its `durationMs` |
 | `upcoming` | list of tracks | The next N tracks of the rotation, all of them by default. They can still change |
 
-Fails with 400 (`upcoming` isn't a whole number), 502 (the playlist can't be read from SoundCloud) or 503 (no
-playlist has been chosen yet).
+Fails with 400 (`upcoming` isn't a whole number), 502 (the playlist can't be read from SoundCloud, e.g. because the
+credentials of the SoundCloud app haven't been entered yet) or 503 (no playlist has been chosen yet).
 
 ### `GET /api/radio/tracks/:id/stream`
 
@@ -204,6 +210,7 @@ the rotation) or 502 (SoundCloud can't be reached).
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `credentialsEntered` | boolean | Whether the credentials of the SoundCloud app have been entered. Until they are, no playlist can be read |
 | `current` | object or null | The chosen playlist (below), or null until one has been chosen |
 
 The chosen playlist has:
@@ -213,7 +220,7 @@ The chosen playlist has:
 | `url`, `title` | string | The playlist's link and title, as they were when it was chosen |
 | `chosenBy` | string | The email of the admin who chose it |
 | `chosenAt` | string | When |
-| `playlist` | playlist or null | What the radio reads from it, or null when it couldn't be read yet |
+| `playlist` | playlist or null | What the radio reads from it, or null when it couldn't be read yet, or the credentials haven't been entered |
 | `error` | string or null | Why it couldn't be read the last time it was tried, if it couldn't |
 
 A playlist has:
@@ -245,7 +252,7 @@ Each of a playlist's tracks is one of:
 | `playlist` | playlist | What the radio would read from it |
 
 Reads the playlist without choosing it. Fails with 400 (not a link to a playlist), 404 (SoundCloud shows no playlist
-there) or 502 (SoundCloud can't be reached).
+there), 409 (the credentials of the SoundCloud app haven't been entered yet) or 502 (SoundCloud can't be reached).
 
 ### `POST /api/admin/radio/playlist` (admin)
 
@@ -255,6 +262,32 @@ there) or 502 (SoundCloud can't be reached).
 
 Reads the rotation from the playlist at `link` from now on, and responds `{"ok": true}`: its first track goes on air
 right away. Fails like the preview, and with 400 when none of the playlist's tracks can be played in full.
+
+### `GET /api/admin/radio/credentials` (admin)
+
+The SoundCloud app the radio reads playlists through. Its secret is never sent back: it can only be replaced.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `credentials` | object or null | The app's `clientId`, and who last changed the credentials (`updatedBy`, an admin's email) and when (`updatedAt`). Null until they're entered: until then, the radio is off air |
+
+### `PUT /api/admin/radio/credentials` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `clientId` | string | The app's client ID, up to 200 characters. Trimmed |
+| `clientSecret` | string | The app's client secret, up to 200 characters. Trimmed |
+
+Asks SoundCloud for a token with the credentials, and only if it gives one, saves them and responds like
+`GET /api/admin/radio/credentials`. The radio reads its playlist through them right away. Fails with 400 (either one
+is blank or too long, or SoundCloud refuses them) or 502 (SoundCloud can't be reached).
+
+### `POST /api/admin/radio/credentials/check` (admin)
+
+Takes the same request as `PUT /api/admin/radio/credentials`, and asks SoundCloud for a token with the credentials the
+same way, but doesn't save them: it responds `{"ok": true}` when SoundCloud accepts them, and fails like `PUT`
+otherwise. The admin pages use it so that credentials can be verified before they're saved.
 
 ## Artists
 

@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router'
 import { playlistLink } from 'shared/radio'
 import type {
   RadioLeftOutReason,
@@ -46,6 +47,12 @@ export function Rotation() {
   return (
     <>
       <h1>Rotation radio</h1>
+      {settings.kind === 'loaded' && !settings.value.credentialsEntered && (
+        <p className="admin-error" role="alert">
+          La radio ne peut lire aucune playlist sur SoundCloud tant que les identifiants de son application n'ont pas été
+          entrés dans la <Link to="/admin/configuration">configuration</Link>.
+        </p>
+      )}
 
       <h2>À l'antenne</h2>
       <OnAir settings={settings} radio={radio} />

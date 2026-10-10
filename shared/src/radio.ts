@@ -1,7 +1,7 @@
 // `GET /api/radio[?upcoming=N]`: what's on the radio, with the next N tracks of the rotation, or all of
 // them by default. Fails with 400 when N isn't a whole number, with 502 when the radio is unavailable, e.g.
-// because its rotation can't be fetched from SoundCloud, or with 503 when no playlist has been chosen for
-// the rotation yet.
+// because its rotation can't be fetched from SoundCloud or the credentials of the SoundCloud app it's read
+// through haven't been entered yet, or with 503 when no playlist has been chosen for the rotation yet.
 //
 // The radio isn't a live stream, but the server decides what's on air: it moves along the rotation, which
 // is the tracks of a SoundCloud playlist chosen on the admin pages, in the playlist's order, as tracks end.
@@ -53,6 +53,9 @@ export type RadioStreamResponse = {
 // a valid one.
 export type RadioSettingsResponse = {
   ok: true
+  // Whether the credentials of the SoundCloud app have been entered (see `RadioCredentialsResponse`). Until they are,
+  // no playlist can be read, so the radio is off air.
+  credentialsEntered: boolean
   // Null until a playlist has been chosen: until then, the radio is off air.
   current: {
     // The playlist's link and title as they were when it was chosen.
@@ -61,7 +64,8 @@ export type RadioSettingsResponse = {
     // The email of the admin who chose it, and when (ISO 8601).
     chosenBy: string
     chosenAt: string
-    // What the radio reads from it. Null when it couldn't be read yet, with `error` saying why.
+    // What the radio reads from it. Null when it couldn't be read yet, with `error` saying why, or when the
+    // credentials of the SoundCloud app haven't been entered yet.
     playlist: RadioPlaylist | null
     // Why it couldn't be read the last time it was tried, if it couldn't. The radio then goes on with what
     // it read before, in `playlist`, if anything.
@@ -71,7 +75,8 @@ export type RadioSettingsResponse = {
 
 // `POST /api/admin/radio/preview`: what the radio would read from the playlist at `link`, without choosing
 // it. Requires a session. Fails with 400 (not a playlist link, see `playlistLink`), 401 (no valid session),
-// 404 (no playlist SoundCloud shows at that link) or 502 (SoundCloud can't be reached).
+// 404 (no playlist SoundCloud shows at that link), 409 (the credentials of the SoundCloud app haven't been
+// entered yet, see `RadioCredentialsResponse`) or 502 (SoundCloud can't be reached).
 export type RadioPreviewRequest = { link: string }
 export type RadioPreviewResponse = { ok: true; playlist: RadioPlaylist }
 
@@ -80,6 +85,32 @@ export type RadioPreviewResponse = { ok: true; playlist: RadioPlaylist }
 // `POST /api/admin/radio/preview`, and with 400 when none of the playlist's tracks can be played.
 export type RadioPlaylistRequest = { link: string }
 export type RadioPlaylistResponse = { ok: true }
+
+// `GET /api/admin/radio/credentials`: the SoundCloud app the radio reads playlists through. Its secret is never sent
+// back: it can only be replaced. Requires a session: fails with 401 without a valid one.
+export type RadioCredentialsResponse = {
+  ok: true
+  // Null until admins enter the app's credentials. Until then, the radio can't read any playlist, so it's off air.
+  credentials: {
+    clientId: string
+    // Who last changed the credentials (an admin's email), and when (ISO 8601).
+    updatedBy: string
+    updatedAt: string
+  } | null
+}
+
+// `PUT /api/admin/radio/credentials`: replaces the app's credentials, once SoundCloud accepts them, and returns them
+// like `GET` does. They're trimmed. The radio reads its playlist through them right away. Requires a session. Fails
+// with 400 (either one is blank or longer than SOUNDCLOUD_CREDENTIAL_MAX_LENGTH, or SoundCloud refuses them), 401 (no
+// valid session) or 502 (SoundCloud can't be reached).
+export type RadioCredentialsRequest = { clientId: string; clientSecret: string }
+
+// `POST /api/admin/radio/credentials/check`: whether SoundCloud accepts credentials, without saving them. It takes the
+// same request as `PUT`, and fails the same way when SoundCloud doesn't accept them, so it responds `{"ok": true}`
+// when it does. Requires a session.
+export type RadioCredentialsCheckResponse = { ok: true }
+
+export const SOUNDCLOUD_CREDENTIAL_MAX_LENGTH = 200
 
 // A SoundCloud playlist, as the radio reads it.
 export type RadioPlaylist = {

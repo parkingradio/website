@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import type { RadioPlaylist, RadioPlaylistTrack, RadioResponse, RadioSettingsResponse, RadioTrack } from 'shared/radio'
 import { mockFetch } from '../../test-utils'
 import { Rotation } from './rotation'
@@ -28,6 +29,7 @@ const ROTATION: RadioPlaylist = {
 
 const CURRENT: RadioSettingsResponse = {
   ok: true,
+  credentialsEntered: true,
   current: {
     url: ROTATION.url,
     title: 'Rotation',
@@ -109,7 +111,7 @@ describe('Rotation', () => {
 
   it('shows tracks that SoundCloud describes unexpectedly by what is known of them', async () => {
     const playlist = { ...ROTATION, tracks: [...ROTATION.tracks, { kind: 'unexpected' as const, title: 'soundcloud:tracks:99' }] }
-    mockFetch({ '/api/admin/radio': { ok: true, current: { ...CURRENT.current!, playlist } }, '/api/radio?upcoming=0': onAir('b') })
+    mockFetch({ '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist } }, '/api/radio?upcoming=0': onAir('b') })
     render(<Rotation />)
 
     const unexpected = await screen.findByRole('button', { name: 'soundcloud:tracks:99' })
@@ -136,7 +138,7 @@ describe('Rotation', () => {
     const tracks = Array.from({ length: 40 }, (_, i) => onRadio(track(String(i), `T${i}`, 1)))
     const playlist = { ...ROTATION, tracks }
     mockFetch({
-      '/api/admin/radio': { ok: true, current: { ...CURRENT.current!, playlist } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist } },
       '/api/radio?upcoming=0': { ...onAir('b'), current: { track: track('0', 'T0', 1), startedAt: new Date(STARTED_AT).toISOString() } },
     })
     render(<Rotation />)
@@ -151,7 +153,7 @@ describe('Rotation', () => {
 
   it('says when no playlist has been chosen yet', async () => {
     mockFetch({
-      '/api/admin/radio': { ok: true, current: null },
+      '/api/admin/radio': { ...CURRENT, current: null },
       '/api/radio?upcoming=0': { ok: false, error: 'No playlist has been chosen for the radio yet' },
     })
     render(<Rotation />)
@@ -159,9 +161,28 @@ describe('Rotation', () => {
     expect(await screen.findByText("Aucune playlist n'a encore été choisie : la radio est hors ondes.")).toBeInTheDocument()
   })
 
+  it('says that the radio cannot read any playlist until the credentials of the SoundCloud app are entered', async () => {
+    mockFetch({
+      '/api/admin/radio': { ...CURRENT, credentialsEntered: false, current: { ...CURRENT.current!, playlist: null } },
+      '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
+    })
+    render(
+      <MemoryRouter>
+        <Rotation />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "La radio ne peut lire aucune playlist sur SoundCloud tant que les identifiants de son application n'ont pas été entrés dans la configuration.",
+      ),
+    )
+    expect(within(screen.getByRole('alert')).getByRole('link', { name: 'configuration' })).toHaveAttribute('href', '/admin/configuration')
+  })
+
   it('says why the playlist could not be read, and that the radio goes on with what it read before', async () => {
     mockFetch({
-      '/api/admin/radio': { ok: true, current: { ...CURRENT.current!, error: 'SoundCloud shows no such playlist' } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, error: 'SoundCloud shows no such playlist' } },
       '/api/radio?upcoming=0': onAir('b'),
     })
     render(<Rotation />)
@@ -176,7 +197,7 @@ describe('Rotation', () => {
 
   it('shows the title of the playlist when it could never be read, and that the radio is off air', async () => {
     mockFetch({
-      '/api/admin/radio': { ok: true, current: { ...CURRENT.current!, playlist: null, error: 'SoundCloud responded with 500' } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist: null, error: 'SoundCloud responded with 500' } },
       '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
     })
     render(<Rotation />)

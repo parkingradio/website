@@ -70,30 +70,6 @@ describe('config', () => {
     })
   })
 
-  describe('soundcloudClientId', () => {
-    it('throws a clear error when SOUNDCLOUD_CLIENT_ID is unset', () => {
-      delete process.env.SOUNDCLOUD_CLIENT_ID
-      expect(() => config.soundcloudClientId).toThrow('Missing required environment variable: SOUNDCLOUD_CLIENT_ID')
-    })
-
-    it('returns SOUNDCLOUD_CLIENT_ID when set', () => {
-      process.env.SOUNDCLOUD_CLIENT_ID = 'client-id'
-      expect(config.soundcloudClientId).toBe('client-id')
-    })
-  })
-
-  describe('soundcloudClientSecret', () => {
-    it('throws a clear error when SOUNDCLOUD_CLIENT_SECRET is unset', () => {
-      delete process.env.SOUNDCLOUD_CLIENT_SECRET
-      expect(() => config.soundcloudClientSecret).toThrow('Missing required environment variable: SOUNDCLOUD_CLIENT_SECRET')
-    })
-
-    it('returns SOUNDCLOUD_CLIENT_SECRET when set', () => {
-      process.env.SOUNDCLOUD_CLIENT_SECRET = 'client-secret'
-      expect(config.soundcloudClientSecret).toBe('client-secret')
-    })
-  })
-
   describe('Turnstile keys', () => {
     it('throw a clear error when unset', () => {
       delete process.env.TURNSTILE_SITE_KEY

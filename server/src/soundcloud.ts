@@ -146,7 +146,7 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     })
     if (!response.ok) {
       await response.body?.cancel()
-      throw new Error(`SoundCloud refused to issue a token: ${response.status}`)
+      throw new SoundCloudStatusError(`SoundCloud refused to issue a token: ${response.status}`, response.status)
     }
     // Not parsed with `parse`, which would put the response, and so the token, in the error message.
     const parsed = TokenResponse.safeParse(await response.json())
@@ -184,6 +184,21 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
   }
 
   return {
+    /**
+     * Whether SoundCloud accepts the app's credentials, i.e. gives a token for them, which is then used by the requests
+     * that follow. Throws when SoundCloud can't be reached, or answers unexpectedly.
+     */
+    async checkCredentials(): Promise<boolean> {
+      try {
+        await token()
+        return true
+      } catch (error) {
+        // What OAuth servers answer for credentials they don't know (https://www.rfc-editor.org/rfc/rfc6749#section-5.2).
+        if (error instanceof SoundCloudStatusError && (error.status === 400 || error.status === 401)) return false
+        throw error
+      }
+    },
+
     /**
      * The playlist a link to it on soundcloud.com leads to, e.g. "https://soundcloud.com/user/sets/name", or
      * "https://soundcloud.com/user/sets/name/s-secret" for a private one. Null when SoundCloud shows no

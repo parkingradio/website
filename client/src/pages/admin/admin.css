@@ -467,6 +467,18 @@ dl.admin-record {
   margin-right: 0.4rem;
 }
 
+/* A secret that's saved, but never shown: its field looks filled in, though it's only a placeholder. */
+.admin-form .admin-secret::placeholder {
+  color: #1c1c1c;
+  opacity: 1;
+}
+
+/* Next to a form's button, once what it sent was accepted. */
+.admin-saved {
+  color: #1e7d32;
+  font-size: 1.25rem;
+}
+
 /* A field that's one of a list, e.g. a date, with the button that removes it. */
 .admin-row {
   display: flex;

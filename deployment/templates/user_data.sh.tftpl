@@ -31,7 +31,6 @@ SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "${secret_arn}" --
   --query SecretString --output text)
 JWT_SECRET=$(echo "$SECRET_JSON" | jq -r '.jwt_secret')
 BOOTSTRAP_ADMIN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.bootstrap_admin_password')
-SOUNDCLOUD_CLIENT_SECRET=$(echo "$SECRET_JSON" | jq -r '.soundcloud_client_secret')
 TURNSTILE_SECRET_KEY=$(echo "$SECRET_JSON" | jq -r '.turnstile_secret_key')
 
 cat > /opt/app/.env <<EOF
@@ -46,8 +45,6 @@ PRIVATE_BUCKET=${private_bucket}
 JWT_SECRET=$JWT_SECRET
 BOOTSTRAP_ADMIN_EMAIL=${bootstrap_admin_email}
 BOOTSTRAP_ADMIN_PASSWORD=$BOOTSTRAP_ADMIN_PASSWORD
-SOUNDCLOUD_CLIENT_ID=${soundcloud_client_id}
-SOUNDCLOUD_CLIENT_SECRET=$SOUNDCLOUD_CLIENT_SECRET
 TURNSTILE_SITE_KEY=${turnstile_site_key}
 TURNSTILE_SECRET_KEY=$TURNSTILE_SECRET_KEY
 EOF

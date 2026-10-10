@@ -97,7 +97,6 @@ resource "aws_instance" "app" {
     db_name               = aws_db_instance.main.db_name
     secret_arn            = aws_secretsmanager_secret.app.arn
     bootstrap_admin_email = "admin@${var.domain}"
-    soundcloud_client_id  = var.soundcloud_client_id
     compose_file = templatefile("${path.module}/../templates/docker-compose.prod.yml.tftpl", {
       image = "${var.ghcr_image}:${var.app_image_tag}"
     })

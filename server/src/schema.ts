@@ -61,6 +61,20 @@ export const radioOnAir = pgTable(
   (table) => [check('radio_on_air_single_row', sql`${table.id} = 1`)],
 )
 
+// The credentials of the SoundCloud app the radio reads playlists through, as entered on the admin pages. There is only
+// ever one row, and none until they've been entered.
+export const soundcloudCredentials = pgTable(
+  'soundcloud_credentials',
+  {
+    id: smallint('id').primaryKey().default(1),
+    clientId: text('client_id').notNull(),
+    clientSecret: text('client_secret').notNull(),
+    updatedBy: text('updated_by').notNull(), // the email of the admin who last changed them
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [check('soundcloud_credentials_single_row', sql`${table.id} = 1`)],
+)
+
 // Artists, known by their email address whatever its case. See `ArtistProfile` in shared/src/artists.ts for what each
 // field may contain.
 export const artists = pgTable(

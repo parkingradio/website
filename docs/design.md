@@ -32,7 +32,8 @@ visitors aren't listening to two audio sources at once.
 ### Radio rotation
 
 The rotation playing on the radio is the tracks of a SoundCloud playlist, read by the server. The playlist is
-chosen on the admin pages. The server reads the playlist again every 5 minutes, so that changes made to it on
+chosen on the admin pages. The server reads it through a SoundCloud app, whose credentials are entered on the admin
+pages too (see "Configuration" below): until they are, the radio is off air. The server reads the playlist again every 5 minutes, so that changes made to it on
 SoundCloud get on the radio. If SoundCloud can't be reached, the radio goes on with what it read before.
 
 The server decides what's on air: it keeps the track on air and when it started in the database, and moves
@@ -203,6 +204,9 @@ above). From top to bottom, it shows:
 - "À l'antenne": the playlist the rotation is read from.
 - "Changer de playlist": a field for the link to another playlist.
 
+Until the credentials of the SoundCloud app have been entered, a line at the top says that the radio can't read any
+playlist until then, and links to "Configuration", where they're entered.
+
 ### Candidatures
 
 At `/admin/candidatures`: the artists' applications for a set, for the team to go through. An application belongs
@@ -275,6 +279,7 @@ At `/admin/admins`: manages who can access the admin pages.
 At `/admin/configuration`: the settings that change what the site does. From top to bottom, it shows:
 
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
+- "Application SoundCloud": the credentials of the SoundCloud app the radio reads its playlist through.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -287,6 +292,21 @@ changed them, and when. Each application is emailed to them with the artist's ph
 The artist also gets an email confirming that their application was received, and replying to that one answers these
 addresses. Until someone is chosen, applications are only listed in "Candidatures", and only the artist gets an email.
 Applications that admins create by hand aren't emailed.
+
+#### Application SoundCloud
+
+The credentials of the SoundCloud app the radio reads its playlist through (see "Radio rotation" above), which are
+found in the apps of the SoundCloud account it belongs to. It shows which admin last changed the credentials, and when,
+or that the radio is off air until they're entered.
+
+Under that, a form replaces the credentials: the client ID, filled in with the current one, and the secret. The secret is
+never shown again once it's entered, so its field only shows dots in its place, and it has to be typed to replace the
+credentials. "vérifier" asks SoundCloud whether it accepts the credentials typed, without saving them, and
+"enregistrer" saves them, which it only allows once the credentials typed have been verified. Each one shows a green
+check mark next to it once it went through, until the credentials are changed again. The server checks the credentials
+with SoundCloud again when it saves them, so that a typo can't take the radio off air, and the radio reads its playlist
+through them right away. They're kept in the database rather than set when
+the site is deployed, so that they can be changed without deploying it again.
 
 #### Features
 
