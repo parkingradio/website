@@ -71,7 +71,8 @@ can be `null`.
 ### `GET /healthz`
 
 Checks that the database answers. Responds `{"ok": true}`, or 500 with `{"ok": false}` when it doesn't. The deploy
-workflow and the integration tests use it.
+workflow and the integration tests use it. Be careful about polling it continuously (e.g. Docker's `HEALTHCHECK`, or an
+uptime monitor), since every request queries the database.
 
 ### `GET /api/config`
 
