@@ -9,10 +9,6 @@ import { config } from './config.js'
 import { logger } from './logger.js'
 import { secretsManagerPassword } from './db-password.js'
 
-// Keep idle connections open for longer than the default, and in particular longer than the
-// health check intervals. This allows health checks to reuse the same DB connection.
-const IDLE_TIMEOUT_MILLIS = 60_000
-
 // pg waits forever for a new connection by default. Opening one includes fetching the password from
 // Secrets Manager, so bound it to fail requests quickly rather than hang them if that call is slow.
 const CONNECTION_TIMEOUT_MILLIS = 5_000
@@ -24,7 +20,6 @@ export function poolConfig(): PoolConfig {
     return {
       connectionString: config.databaseUrl,
       ssl,
-      idleTimeoutMillis: IDLE_TIMEOUT_MILLIS,
       connectionTimeoutMillis: CONNECTION_TIMEOUT_MILLIS,
     }
   }
@@ -36,7 +31,6 @@ export function poolConfig(): PoolConfig {
     ssl,
     ...parseIntoClientConfig(config.databaseUrl),
     password: secretsManagerPassword(secretId, config.awsRegion),
-    idleTimeoutMillis: IDLE_TIMEOUT_MILLIS,
     connectionTimeoutMillis: CONNECTION_TIMEOUT_MILLIS,
   }
 }

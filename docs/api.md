@@ -70,8 +70,8 @@ can be `null`.
 
 ### `GET /healthz`
 
-Checks that the database answers. Responds `{"ok": true}`, or 500 with `{"ok": false}` when it doesn't. Docker's
-health check and the integration tests use it.
+Checks that the database answers. Responds `{"ok": true}`, or 500 with `{"ok": false}` when it doesn't. The deploy
+workflow and the integration tests use it.
 
 ### `GET /api/config`
 
