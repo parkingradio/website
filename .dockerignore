@@ -6,3 +6,7 @@ dist
 .git
 .run-via
 *.md
+
+# Playwright's results, when the browser tests were run
+e2e/test-results
+e2e/playwright-report

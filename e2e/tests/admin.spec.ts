@@ -1,0 +1,79 @@
+import { test, expect, admin, adminMenu, logIn } from './fixtures'
+
+// The admin pages: logging in and out, and managing artists, which goes through every layer: a form with a photo, the
+// database, the private bucket and back.
+
+test.describe('logging in', () => {
+  test('a wrong password is refused, and the login form stays', async ({ page }) => {
+    await logIn(page, { password: 'not-the-password' })
+    await expect(page.getByRole('alert')).toHaveText('Invalid email or password')
+    await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+    await expect(adminMenu(page)).toBeHidden()
+  })
+
+  test('the session lasts until logging out', async ({ page }) => {
+    await logIn(page)
+    // `/admin` shows its first section.
+    await expect(page).toHaveURL('/admin/calendrier')
+    await expect(adminMenu(page).getByText(admin.email)).toBeVisible()
+
+    await page.reload()
+    await expect(adminMenu(page)).toBeVisible()
+
+    await adminMenu(page).getByRole('button', { name: 'se déconnecter' }).click()
+    await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+  })
+
+  test('logging in shows the page that was asked for', async ({ page }) => {
+    await logIn(page, { at: '/admin/artistes' })
+    await expect(page.getByRole('heading', { name: 'Artistes' })).toBeVisible()
+    await expect(page).toHaveURL('/admin/artistes')
+  })
+})
+
+// The smallest PNG there is: one transparent pixel. The server tells a photo's type from its first bytes.
+const PHOTO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+)
+
+test('an artist is added, shown, and deleted', async ({ page }, testInfo) => {
+  // Tests run side by side on the same database, where artists' emails must be unique. Their names are too, so that the
+  // test finds its own artist.
+  const unique = `${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`
+  const name = `Artiste e2e ${unique}`
+
+  await logIn(page)
+  await adminMenu(page).getByRole('link', { name: 'artistes' }).click()
+  await page.getByRole('link', { name: 'ajouter un artiste' }).click()
+  await expect(page.getByRole('heading', { name: 'Nouvel artiste' })).toBeVisible()
+
+  await page.getByLabel("Nom d'artiste").fill(name)
+  await page.getByLabel('Ville').fill('Montréal')
+  await page.getByRole('group', { name: 'Tous les genres' }).getByRole('button', { name: 'house', exact: true }).click()
+  await page.getByLabel('Bio', { exact: true }).fill('Une bio.')
+  await page.getByLabel('SoundCloud').fill(`e2e-${unique}`)
+  await page.getByLabel('Adresse e-mail').fill(`e2e-${unique}@example.com`)
+  await page.getByLabel('Téléphone').fill('514 555 0100')
+  await page.getByLabel('Photo').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: PHOTO })
+  await page.getByRole('button', { name: "ajouter l'artiste" }).click()
+
+  // Their page, with their photo as the server keeps it.
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  const photo = page.getByRole('img', { name: `Photo de ${name}`, exact: true })
+  await expect(photo).toBeVisible()
+  await expect(photo).toHaveJSProperty('naturalWidth', 1)
+  await expect(page.getByText('Montréal')).toBeVisible()
+
+  await page.getByRole('link', { name: '← tous les artistes' }).click()
+  await page.getByRole('link', { name, exact: true }).click()
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: "supprimer l'artiste" }).click()
+  await expect(page).toHaveURL('/admin/artistes')
+  // Once the list is loaded, rather than while it's loading.
+  await expect(page.getByRole('table').or(page.getByText('Aucun artiste.'))).toBeVisible()
+  await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
+})

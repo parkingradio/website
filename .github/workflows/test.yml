@@ -1,6 +1,6 @@
 #
-# Build the app, lint and run tests.
-# Then, build the Docker image, run the integration tests against it, and push it (if this is a push to main).
+# Build the app, lint and run tests. Meanwhile, build the Docker image, and run the integration and browser tests
+# against it. Then, push the image (if this is a push to main and everything passed).
 #
 
 name: Test
@@ -13,6 +13,7 @@ on:
 jobs:
   test-npm:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -36,14 +37,13 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  # The app runs on arm64 in EC2, so the jobs that build, test and push the Docker image use native arm64 Github runners,
+  # since that simplifies building and testing it.
   build-docker:
-    needs: [test-npm]
-    # The app runs on arm64 in EC2, so we use native arm64 Github runners since that simplifies
-    # building and testing the Docker image.
     runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 20
+    outputs:
+      image: ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
 
@@ -54,13 +54,91 @@ jobs:
         run: |
           docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
                        --tag ghcr.io/parkingradio/radio:latest .
+          docker save --output image.tar ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
+                                         ghcr.io/parkingradio/radio:latest
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
+          overwrite: true
+
+  integration:
+    needs: [build-docker]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: docker-image
+
+      - run: docker load --input image.tar
 
       - name: Integration tests
-        run: npm run test:integration -- ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
+        env:
+          PARKING_RADIO_IMAGE: ${{ needs.build-docker.outputs.image }}
+        run: npm run test:integration
 
-      # Only done when pushing to main
+  e2e:
+    needs: [build-docker]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Only the headless shell, which is all the tests run.
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: docker-image
+
+      - run: docker load --input image.tar
+
+      - name: Browser tests
+        env:
+          PARKING_RADIO_IMAGE: ${{ needs.build-docker.outputs.image }}
+        run: npm run test:e2e
+
+      # Playwright's report, with a trace of each test that failed and the server's log, to see what went wrong.
+      - name: Upload the browser tests' report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 14
+          # A re-run of the job uploads its report under the same name.
+          overwrite: true
+
+  # Only once everything passed, including test-npm, which nothing else waits for. build-docker is listed for its output.
+  push:
+    needs: [test-npm, build-docker, integration, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: docker-image
+
+      - run: docker load --input image.tar
+
       - name: Login to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -68,7 +146,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push Docker image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          docker push ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
+          docker push ${{ needs.build-docker.outputs.image }}
           docker push ghcr.io/parkingradio/radio:latest

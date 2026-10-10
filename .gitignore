@@ -12,3 +12,7 @@ private-bucket/
 *.tfstate.*
 *.tfvars
 *_override.tf
+
+# Playwright
+test-results/
+playwright-report/

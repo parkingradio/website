@@ -26,7 +26,8 @@ the server's API.
 
 The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to
 Postgres via Drizzle) and `shared`, which holds the contract between the two and nothing else (see
-[shared/README.md](shared/README.md) for what that covers and how the other two use it).
+[shared/README.md](shared/README.md) for what that covers and how the other two use it). A fourth workspace, `e2e`,
+holds the browser tests.
 
 ### Prerequisites
 
@@ -55,7 +56,12 @@ This starts the Vite dev server at http://localhost:5173 and the Fastify server 
 npm run build
 npm run test                # runs every workspace's test suite
 npm run test:integration    # integration tests on the Docker image
+npm run test:e2e            # browser tests on the Docker image
 ```
+
+Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
+use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need
+`npm run db:up`.
 
 Stop the local database with `npm run db:down` when you're done.
 
