@@ -1,2 +1,0 @@
-ALTER TABLE "applications" DROP CONSTRAINT "applications_status";--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_status" CHECK ("applications"."status" in ('new', 'accepted', 'scheduled', 'done', 'rejected'));

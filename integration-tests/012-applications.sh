@@ -2,12 +2,12 @@
 #
 # The admin routes for applications work with a real database. The server's unit tests fake the database, so this is
 # where we check:
-# - the applications migration, and that the database takes every status
+# - the applications table, and that the database takes every status
 # - that dates come back from the database as "YYYY-MM-DD"
 # - that an application can only belong to an artist who exists
 # - that applications are listed newest first
 # - that deleting an artist deletes their applications
-# - the applications_settings migration, and that who applications are emailed to is saved, and replaced
+# - the applications_settings table, and that who applications are emailed to is saved, and replaced
 
 source "$(dirname "$0")/lib.sh"
 

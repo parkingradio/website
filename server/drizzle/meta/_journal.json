@@ -12,78 +12,8 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1790952688362,
-      "tag": "0001_next_omega_flight",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791151901748,
-      "tag": "0002_even_cable",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1791322238576,
-      "tag": "0003_artists",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1791376706390,
-      "tag": "0004_applications",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1791507026669,
-      "tag": "0005_applications_from_artists",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1791513356572,
-      "tag": "0006_applications_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1791545386896,
-      "tag": "0007_feature_flags",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1791549073821,
-      "tag": "0008_canonical_prestations",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1791578291364,
-      "tag": "0009_soundcloud_credentials",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1791655201108,
-      "tag": "0010_application_statuses",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
       "when": 1791656444987,
-      "tag": "0011_optional_artist_photos",
+      "tag": "0001_radio_artists_applications",
       "breakpoints": true
     }
   ]

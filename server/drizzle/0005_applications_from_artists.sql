@@ -1,1 +1,0 @@
-ALTER TABLE "applications" ALTER COLUMN "created_by" DROP NOT NULL;
