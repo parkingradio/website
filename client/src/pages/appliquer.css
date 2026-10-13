@@ -24,9 +24,9 @@
   color: inherit;
 }
 
+/* The whole width of the window, with only the side margins, like the Archives and Programmation pages. */
 .appliquer-inner {
-  max-width: 1100px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .appliquer h1,
@@ -40,11 +40,6 @@
 }
 
 .appliquer-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
   padding-bottom: 1rem;
   border-bottom: 2px solid var(--black);
 }
@@ -55,17 +50,11 @@
   letter-spacing: -0.02em;
 }
 
+/* Under the title, like the link and the count of the Archives and Programmation pages. */
 .appliquer-header p {
-  margin: 0;
+  margin: 0.5rem 0 0;
   font-size: 13px;
   color: var(--muted);
-}
-
-.appliquer .intro {
-  max-width: 62ch;
-  margin: 1.25rem 0 0;
-  font-size: 14px;
-  line-height: 1.6;
 }
 
 /* Each part: its number and title on the left, its fields on the right. */
@@ -89,9 +78,9 @@
 }
 
 .appliquer .part-head h2 {
-  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-size: 1.25rem;
   line-height: 1;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
 .appliquer .part-head p {
@@ -153,11 +142,11 @@
 .appliquer textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--black);
   border-radius: 0;
   background: var(--paper);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 300;
 }
 
@@ -169,7 +158,7 @@
 
 .appliquer input::placeholder,
 .appliquer textarea::placeholder {
-  color: #aaa;
+  color: #999;
 }
 
 .appliquer input:focus-visible,
@@ -221,8 +210,8 @@
 }
 
 .appliquer .combobox-list li {
-  padding: 8px 12px;
-  font-size: 14px;
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 .appliquer .combobox-list li[role='option']:hover {
@@ -301,12 +290,12 @@
 .appliquer .genres-picked button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px 6px 6px;
+  gap: 6px;
+  padding: 2px 8px 2px 3px;
   border: 1px solid var(--black);
   background: var(--black);
   color: var(--white);
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -318,11 +307,11 @@
 .appliquer .genres-picked b {
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   background: var(--white);
   color: var(--black);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .appliquer .genres-picked svg {
@@ -355,11 +344,12 @@
 .appliquer .genre {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 5px;
+  padding: 2px 8px;
   border: 1px solid var(--black);
   background: none;
-  font-size: 13px;
+  font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -376,8 +366,8 @@
   content: attr(data-rank);
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   margin-left: -4px;
   background: var(--white);
   color: var(--black);
@@ -429,7 +419,7 @@
 }
 
 .appliquer .photo-side button {
-  padding: 7px 14px;
+  padding: 4.5px 10px;
   border: 1px solid var(--black);
   background: none;
   font-size: 13px;
@@ -568,7 +558,7 @@
 }
 
 .appliquer .add-links button {
-  padding: 4px 10px;
+  padding: 2px 8px;
   border: 1px dashed var(--black);
   background: none;
   font-size: 12px;
@@ -580,12 +570,13 @@
   background: var(--hover);
 }
 
-/* ---------- type de prestation : checkboxes styled as pills ---------- */
+/* ---------- type de prestation, plages horaires : checkboxes styled as the Archives and Programmation pages'
+   buttons, black once picked ---------- */
 
 .appliquer .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .appliquer .chip {
@@ -603,19 +594,11 @@
 .appliquer .chip span {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  padding: 4.5px 10px;
   border: 1px solid var(--black);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   user-select: none;
-}
-
-.appliquer .chip span::before {
-  content: '';
-  width: 10px;
-  height: 10px;
-  border: 1px solid currentColor;
 }
 
 .appliquer .chip:hover input:not(:checked) + span {
@@ -625,10 +608,6 @@
 .appliquer .chip input:checked + span {
   background: var(--black);
   color: var(--white);
-}
-
-.appliquer .chip input:checked + span::before {
-  background: currentColor;
 }
 
 .appliquer .chip input:focus-visible + span {
@@ -872,7 +851,7 @@
 .appliquer .picked .clear {
   align-self: flex-start;
   margin: 0.6rem 0.9rem 0.8rem;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border: 1px solid var(--black);
   background: none;
   font-size: 12px;
@@ -1070,9 +1049,10 @@
 
 .appliquer .applicant-type .slot {
   align-self: flex-start;
-  padding: 1px 7px;
+  padding: 0 6px;
   border: 1px solid currentColor;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .appliquer .applicant-type .text {
@@ -1152,7 +1132,7 @@
 .appliquer .add-member {
   align-self: flex-start;
   margin-top: 4px;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border: 1px dashed var(--black);
   background: none;
   font-size: 12px;
@@ -1177,5 +1157,29 @@
   .appliquer .applicant-types,
   .appliquer .members {
     grid-template-columns: 1fr;
+  }
+
+  /* Below 16px, iPhones zoom into the page when a field is touched. */
+  .appliquer input[type='text'],
+  .appliquer input[type='email'],
+  .appliquer input[type='tel'],
+  .appliquer textarea {
+    font-size: 16px;
+  }
+
+  /* On phones, the genres are a single list without their families' names, instead of taking more than a screen. */
+  .appliquer .genre-groups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .appliquer .genre-group,
+  .appliquer .genre-group div {
+    display: contents;
+  }
+
+  .appliquer .genre-group h3 {
+    display: none;
   }
 }

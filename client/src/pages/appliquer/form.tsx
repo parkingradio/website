@@ -234,10 +234,6 @@ export function ApplicationForm() {
           <h1>Appliquer</h1>
           <p>formulaire de candidature · parking.radio</p>
         </header>
-        <p className="intro">
-          Tu veux jouer sur parking.radio&nbsp;? Présente-toi, dis-nous ce que tu fais et coche les dates qui te conviennent dans
-          le calendrier. On te répond par e-mail.
-        </p>
 
         <form ref={formRef} onSubmit={submit} noValidate>
           <Part number="01" title="L'artiste">
