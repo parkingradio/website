@@ -221,10 +221,10 @@ describe('Appliquer', () => {
     expect(sentParts().application).toMatchObject({ prestations: [], otherPrestation: 'B2B' })
   })
 
-  it("renders Turnstile with the site key from the server's configuration, in French", () => {
+  it("renders Turnstile with the site key from the server's configuration, in French, only shown when it's needed", () => {
     renderForm()
     expect(turnstile.render).toHaveBeenCalledOnce()
-    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: SITE_KEY, language: 'fr' })
+    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: SITE_KEY, language: 'fr', appearance: 'interaction-only' })
   })
 
   it("doesn't send the application until Turnstile vouches for the artist", async () => {

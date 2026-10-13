@@ -900,10 +900,9 @@
   gap: 1rem 1.5rem;
 }
 
-/* On a line of its own, above the button. Turnstile's widget is 65px high: the space is kept while it loads. */
+/* On a line of its own, above the button. No space is kept for Turnstile's widget, since it's usually not shown. */
 .appliquer .turnstile {
   width: 100%;
-  min-height: 65px;
 }
 
 .appliquer .send-error {

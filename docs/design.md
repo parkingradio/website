@@ -128,8 +128,8 @@ The fields are (* means mandatory):
   the field works as plain text. As GeoNames' terms ask, the bottom of the page credits it.
 - "Genres musicaux" (*): 1 to 3 genres from a list grouped by family, in order: the first one is the artist's
   main genre.
-- "Photo": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by saying it's for the
-  artist's page on our site. A photo that was picked can be removed.
+- "Photo": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a good
+  quality press photo for our site. A photo that was picked can be removed.
 - "Bio" (*): free-form text, up to 1500 characters.
 - "Liens" (*, at least one): one field per site (SoundCloud, Instagram, website and Bandcamp are always shown;
   Mixcloud, Resident Advisor, YouTube, Spotify and TikTok can be added). Each field shows the site's address
@@ -140,7 +140,7 @@ The fields are (* means mandatory):
 - "Adresse e-mail" (*) and "Numéro de téléphone" (*).
 - "Dates souhaitées" (*): a calendar where the artist picks 1 to 14 days, from 2 months ahead (to leave time to
   plan) up to 12 months ahead. The form says these availabilities may not be respected.
-- "Plages horaires qui te conviennent": any of the programmation's time slots (11 h – 15 h, 13 h – 17 h and
+- "Plages horaires préférées": any of the programmation's time slots (11 h – 15 h, 13 h – 17 h and
   18 h – 22 h), for all the chosen dates. None means any of them. They're sent as the times they start and end.
 - "Questions ou détails": free-form text.
 
@@ -148,8 +148,9 @@ Errors only show once the artist tries to send the form, which brings them to th
 they update as the fields are fixed.
 
 Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without
-them having to do anything. The form can't be sent until it has, and the server checks it again with Cloudflare.
-Since Cloudflare only checks each token once, the form gets a new one whenever an application is refused.
+them having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't
+be sent until it has, and the server checks it again with Cloudflare. Since Cloudflare only checks each token once,
+the form gets a new one whenever an application is refused.
 
 When an artist sends the form, it goes to `POST /api/applications` (see "Candidatures" below for what happens then).
 Once it's sent, the form thanks the artist and says where the confirmation went. Otherwise, it shows the server's

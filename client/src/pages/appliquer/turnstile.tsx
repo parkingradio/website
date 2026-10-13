@@ -7,6 +7,7 @@ const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render
 type RenderOptions = {
   sitekey: string
   language: string
+  appearance: 'always' | 'execute' | 'interaction-only'
   callback: (token: string) => void
   'expired-callback': () => void
   'error-callback': () => void
@@ -65,6 +66,8 @@ export function Turnstile({ siteKey, onToken }: Props) {
       widget = turnstile.render(container.current, {
         sitekey: siteKey,
         language: 'fr',
+        // Only shown when Cloudflare needs the artist to click it.
+        appearance: 'interaction-only',
         callback: (value) => token(value),
         'expired-callback': () => token(null),
         'error-callback': () => token(null),

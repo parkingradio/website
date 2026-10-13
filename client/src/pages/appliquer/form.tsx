@@ -377,7 +377,7 @@ export function ApplicationForm() {
           <Part number="02" title="Présentation">
             <div className="field wide">
               <label htmlFor="photo">
-                Photo <span className="hint">— pour ta page artiste sur notre site web</span>
+                Photo <span className="hint">— une photo de presse en bonne qualité pour notre site web</span>
               </label>
               <PhotoField value={form.photo} onChange={(photo) => update('photo', photo)} invalid={!!errors.photo} />
               <FieldError message={errors.photo} />
@@ -402,7 +402,7 @@ export function ApplicationForm() {
             <fieldset className={errors.links ? 'field wide invalid' : 'field wide'}>
               <legend>
                 Liens <span className="required">*</span>{' '}
-                <span className="hint">— au moins un. Tu peux coller l'adresse complète : on garde seulement ton nom de profil.</span>
+                <span className="hint">— au moins un</span>
               </legend>
               <LinksField values={form.links} onChange={(links) => update('links', links)} showErrors={attempts > 0} invalid={!!errors.links} />
               <FieldError message={errors.links} />
@@ -494,10 +494,7 @@ export function ApplicationForm() {
               <FieldError message={errors.dates} />
             </div>
             <fieldset className="field wide">
-              <legend>
-                Plages horaires qui te conviennent{' '}
-                <span className="hint">— pour toutes tes dates. Sans réponse, on considère qu'elles te conviennent toutes.</span>
-              </legend>
+              <legend>Plages horaires préférées</legend>
               <div className="chips">
                 {TIME_SLOTS.map((slot) => (
                   <label key={slot.id} className="chip">

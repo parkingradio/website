@@ -62,7 +62,7 @@ export function PhotoField({ value, onChange, invalid }: Props) {
             </button>
           </>
         )}
-        <span className="hint">JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo. Une photo de presse, en bonne qualité.</span>
+        <span className="hint">JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo.</span>
       </div>
     </div>
   )
