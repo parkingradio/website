@@ -18,7 +18,8 @@ or change an endpoint, update both.
   error.
 - **Sessions.** Logging in sets a `session` cookie: a JWT signed by the server, HTTP-only, `SameSite=Lax`, `Secure` in
   production, which lasts 7 days. Endpoints marked "admin" require it, and fail with 401
-  (`{"ok": false, "error": "Unauthorized"}`) without a valid one. Every admin can do everything: there are no roles.
+  (`{"ok": false, "error": "Unauthorized"}`) without a valid one. A session also ends when its admin is revoked, or
+  chooses a new password. Every admin can do everything: there are no roles.
   Since `SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET` that a
   browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail with 403.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
@@ -39,6 +40,8 @@ can be `null`.
 | `POST /api/auth/accept-invite` | public | Setting an invited admin's password | `auth.ts` |
 | `GET /api/admin/me` | admin | The logged-in admin | `auth.ts` |
 | `POST /api/admin/invite` | admin | Inviting a new admin by email | `admin.ts` |
+| `GET /api/admin/admins` | admin | Every admin, and whether they accepted their invite | `admin.ts` |
+| `DELETE /api/admin/admins/:id` | admin | Revoking an admin | `admin.ts` |
 | `GET /api/events` | public | Parking Radio's events, from Resident Advisor | `events.ts` |
 | `GET /api/radio` | public | What's on the radio, and what comes next | `radio.ts` |
 | `GET /api/radio/tracks/:id/stream` | public | Where to stream a track of the rotation from | `radio.ts` |
@@ -116,8 +119,9 @@ session is only in the cookie.
 | `token` | string | From the link the invite emailed |
 | `password` | string | At least 8 characters |
 
-Sets the password of the admin `token` invites, and responds `{"ok": true}`. The invite can't be used again. Fails
-with 400: missing fields, a password that's too short, or an invalid or expired invite.
+Sets the password of the admin `token` invites, and responds `{"ok": true}`. The invite can't be used again, and the
+admin's sessions end, e.g. when the invite resets their password. Fails with 400: missing fields, a password that's too
+short, or an invalid or expired invite.
 
 ### `GET /api/admin/me` (admin)
 
@@ -137,6 +141,30 @@ The admin pages use it to know whether there's a session.
 Emails an invite to `email`, which lasts 24 hours, replacing any earlier invite to that address, and responds
 `{"ok": true}`. Fails with 400 (missing email), 409 (already an admin who accepted their invite) or 500 (the server
 isn't set up to send email). An email that fails to send is only logged.
+
+### `GET /api/admin/admins` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `admins` | array of `Admin` | By email |
+
+`Admin`:
+
+| Field | Type | |
+|---|---|---|
+| `id` | string | |
+| `email` | string | |
+| `status` | `"active"`, `"invited"` or `"expired"` | Active once they've chosen their password, and until then, invited while their invite lasts |
+| `inviteExpiresAt` | string or null | When their invite expires, while they're invited |
+| `invitedBy` | string or null | The email of the admin who invited them. Null when they were created with `tools/create-admin`, or before that was known |
+| `createdAt` | string | When they were invited |
+| `you` | boolean | Whether this is the admin who asks |
+
+### `DELETE /api/admin/admins/:id` (admin)
+
+Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, and their sessions end. For an admin who
+hasn't accepted their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).
 
 ## Events
 

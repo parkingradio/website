@@ -7,7 +7,7 @@ import { PHOTO_MAX_BYTES } from 'shared/artists'
 import type { ArtistProfile } from 'shared/artists'
 import { EmailTaken } from '../artists.js'
 import type { ArtistsStore, SentPhoto, StoredArtist } from '../artists.js'
-import { SESSION_COOKIE, signSessionToken } from '../auth.js'
+import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import { artistsRoutes } from './artists.js'
 
 // The artists, as the database would keep them, and the photos, as the bucket would.
@@ -102,19 +102,15 @@ function multipart(artist: object | string, photo: Buffer | null = JPEG, removeP
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
   await app.register(fastifyCookie)
+  acceptSessions(app)
   await app.register(artistsRoutes, { store, photos })
   return app
 }
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-// A session for an admin, as the admin pages would send it.
-async function asAdmin() {
-  return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
-}
-
 async function send(app: App, method: 'POST' | 'PUT', url: string, artist: object | string, photo?: Buffer | null, removePhoto?: boolean) {
-  return app.inject({ method, url, ...multipart(artist, photo, removePhoto), cookies: await asAdmin() })
+  return app.inject({ method, url, ...multipart(artist, photo, removePhoto), cookies: await sessionCookies() })
 }
 
 async function create(app: App, artist: object | string = profile(), photo?: Buffer | null) {
@@ -122,7 +118,7 @@ async function create(app: App, artist: object | string = profile(), photo?: Buf
 }
 
 async function get(app: App, url: string) {
-  return app.inject({ method: 'GET', url, cookies: await asAdmin() })
+  return app.inject({ method: 'GET', url, cookies: await sessionCookies() })
 }
 
 describe('artists routes', () => {
@@ -238,7 +234,7 @@ describe('artists routes', () => {
         url: '/api/admin/artists',
         payload: Buffer.concat([extra, payload]),
         headers,
-        cookies: await asAdmin(),
+        cookies: await sessionCookies(),
       })
       expect(response.statusCode).toBe(200)
     })
@@ -252,7 +248,7 @@ describe('artists routes', () => {
         url: '/api/admin/artists',
         payload: Buffer.concat([second, PNG, Buffer.from('\r\n'), payload]),
         headers,
-        cookies: await asAdmin(),
+        cookies: await sessionCookies(),
       })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'Invalid request' })
@@ -270,7 +266,7 @@ describe('artists routes', () => {
 
     it('rejects malformed requests', async () => {
       const app = await buildApp()
-      const cookies = await asAdmin()
+      const cookies = await sessionCookies()
       const multipartHeaders = { 'content-type': 'multipart/form-data; boundary=test-boundary' }
       const malformed = [
         await create(app, '{not json'),
@@ -404,7 +400,7 @@ describe('artists routes', () => {
       const file = Buffer.from('--test-boundary\r\nContent-Disposition: form-data; name="other"; filename="x"\r\n\r\nxyz\r\n')
       const put = async (photo: Buffer | null) => {
         const { payload, headers } = multipart(profile({ bio: 'Une nouvelle bio.' }), photo)
-        return app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: Buffer.concat([file, payload]), headers, cookies: await asAdmin() })
+        return app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: Buffer.concat([file, payload]), headers, cookies: await sessionCookies() })
       }
       expect((await put(null)).statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.', photoKey: 'artists/photo-1.jpeg' })
@@ -417,7 +413,7 @@ describe('artists routes', () => {
       await create(app)
       const { payload, headers } = multipart(profile({ bio: 'Une nouvelle bio.' }), null)
       const json = Buffer.from(payload.toString('latin1').replace('name="artist"\r\n', 'name="artist"\r\nContent-Type: application/json\r\n'), 'latin1')
-      const response = await app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: json, headers, cookies: await asAdmin() })
+      const response = await app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: json, headers, cookies: await sessionCookies() })
       expect(response.statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.' })
     })
@@ -532,7 +528,7 @@ describe('artists routes', () => {
     it('deletes the artist and their photo', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await asAdmin() })
+      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await sessionCookies() })
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true })
       expect(rows).toHaveLength(0)
@@ -542,7 +538,7 @@ describe('artists routes', () => {
     it('deletes an artist who has no photo', async () => {
       const app = await buildApp()
       await create(app, profile(), null)
-      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await asAdmin() })
+      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await sessionCookies() })
       expect(response.statusCode).toBe(200)
       expect(rows).toHaveLength(0)
       expect(photos.delete).not.toHaveBeenCalled()
@@ -552,14 +548,14 @@ describe('artists routes', () => {
       photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
       const app = await buildApp()
       await create(app)
-      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await asAdmin() })
+      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await sessionCookies() })
       expect(response.statusCode).toBe(200)
       expect(rows).toHaveLength(0)
     })
 
     it('responds 404 for an artist that does not exist', async () => {
       const app = await buildApp()
-      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/nobody', cookies: await asAdmin() })
+      const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/nobody', cookies: await sessionCookies() })
       expect(response.statusCode).toBe(404)
     })
   })

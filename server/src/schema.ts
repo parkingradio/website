@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from 'shared/applications'
 import type { ApplicationStatus, PrestationId, TimeSlot } from 'shared/applications'
@@ -18,6 +18,11 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash'), // null until the invite is accepted
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // The email of the admin who invited them, or null when they were created with the create-admin command.
+    invitedBy: text('invited_by'),
+    // Only the sessions that started with this version are valid. Sessions get it when they start, and choosing a new
+    // password increments it, which ends the sessions that started with the old one.
+    sessionVersion: integer('session_version').notNull().default(0),
   },
   (table) => [uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`)],
 )

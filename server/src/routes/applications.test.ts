@@ -5,7 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { NoSuchArtist } from '../applications.js'
 import type { ApplicationsStore, StoredApplication } from '../applications.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from '../applications-settings.js'
-import { SESSION_COOKIE, signSessionToken } from '../auth.js'
+import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import { applicationsRoutes } from './applications.js'
 
 // A fake database: the applications, and the ids of the artists who exist.
@@ -75,19 +75,15 @@ function application(changes: object = {}) {
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
   await app.register(fastifyCookie)
+  acceptSessions(app)
   await app.register(applicationsRoutes, { store, settings })
   return app
 }
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-// An admin's session cookie.
-async function asAdmin() {
-  return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
-}
-
 async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: object) {
-  return app.inject({ method, url, payload, cookies: await asAdmin() })
+  return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
 async function create(app: App, changes: object = {}) {
@@ -177,7 +173,7 @@ describe('applications routes', () => {
 
     it('rejects malformed requests', async () => {
       const app = await buildApp()
-      const cookies = await asAdmin()
+      const cookies = await sessionCookies()
       const malformed = [
         await app.inject({ method: 'POST', url: '/api/admin/applications', payload: '{not json', headers: { 'content-type': 'application/json' }, cookies }),
         await app.inject({ method: 'POST', url: '/api/admin/applications', cookies }),

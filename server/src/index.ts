@@ -45,12 +45,15 @@ try {
 // Null when the server can't send emails, e.g. in development, where MAIL_DOMAIN isn't set.
 const sendEmail = config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null
 
+const admins = adminsStore(db)
+app.decorate('sessions', admins)
+
 await app.register(fastifyCookie)
 await app.register(healthRoutes)
 const features = featuresStore(db)
 await app.register(configRoutes, { store: features })
 await app.register(authRoutes)
-await app.register(adminRoutes, { store: adminsStore(db), sendEmail, origin: config.siteOrigin })
+await app.register(adminRoutes, { store: admins, sendEmail, origin: config.siteOrigin })
 await app.register(eventsRoutes)
 await app.register(radioRoutes, {
   soundcloud: soundCloudClient,

@@ -51,7 +51,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const [user] = await db
-      .select({ id: users.id, email: users.email, passwordHash: users.passwordHash })
+      .select({ id: users.id, email: users.email, passwordHash: users.passwordHash, sessionVersion: users.sessionVersion })
       .from(users)
       .where(sql`lower(${users.email}) = lower(${email})`)
 
@@ -59,7 +59,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ ok: false, error: 'Invalid email or password' })
     }
 
-    const token = await signSessionToken({ id: user.id, email: user.email })
+    const token = await signSessionToken(user)
     setSessionCookie(reply, token)
     return { ok: true, email: user.email }
   })
@@ -90,8 +90,13 @@ export async function authRoutes(app: FastifyInstance) {
         return false
       }
 
+      // A new password ends the sessions that started with the old one, e.g. when an admin's password is reset with the
+      // create-admin command.
       const passwordHash = await hashPassword(password)
-      await tx.update(users).set({ passwordHash }).where(eq(users.id, invite.userId))
+      await tx
+        .update(users)
+        .set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
+        .where(eq(users.id, invite.userId))
       return true
     })
 

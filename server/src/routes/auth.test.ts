@@ -7,6 +7,7 @@ const { selectResult, dbState } = vi.hoisted(() => ({
   selectResult: { rows: [] as Record<string, unknown>[] },
   dbState: {
     updatedPasswordHashes: [] as string[],
+    updatedSessionVersions: [] as unknown[],
     deleteCallCount: 0,
     deleteWhereArgs: [] as unknown[],
   },
@@ -31,9 +32,10 @@ vi.mock('../db.js', () => ({
           },
         }),
         update: () => ({
-          set: (values: { passwordHash: string }) => ({
+          set: (values: { passwordHash: string; sessionVersion: unknown }) => ({
             where: () => {
               dbState.updatedPasswordHashes.push(values.passwordHash)
+              dbState.updatedSessionVersions.push(values.sessionVersion)
               return Promise.resolve()
             },
           }),
@@ -46,7 +48,8 @@ vi.mock('../db.js', () => ({
 
 import { eq } from 'drizzle-orm'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth.js'
-import { hashPassword, generateInviteToken, hashInviteToken, signSessionToken, SESSION_COOKIE } from '../auth.js'
+import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken, SESSION_COOKIE } from '../auth.js'
+import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import { invites } from '../schema.js'
 
 describe('auth routes', () => {
@@ -55,6 +58,7 @@ describe('auth routes', () => {
   beforeEach(() => {
     selectResult.rows = []
     dbState.updatedPasswordHashes = []
+    dbState.updatedSessionVersions = []
     dbState.deleteCallCount = 0
     dbState.deleteWhereArgs = []
     process.env.JWT_SECRET = 'test-secret'
@@ -67,14 +71,15 @@ describe('auth routes', () => {
   async function buildApp() {
     const app = Fastify()
     await app.register(fastifyCookie)
+    acceptSessions(app)
     await app.register(authRoutes)
     return app
   }
 
   describe('POST /api/auth/login', () => {
-    it('logs in and sets a session cookie when the password matches', async () => {
+    it('logs in and sets a session cookie, of the current version of their sessions, when the password matches', async () => {
       selectResult.rows = [
-        { id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password') },
+        { id: 'user-1', email: 'admin@example.com', passwordHash: await hashPassword('correct-password'), sessionVersion: 2 },
       ]
       const app = await buildApp()
 
@@ -86,7 +91,8 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
-      expect(response.cookies.find((c) => c.name === SESSION_COOKIE)).toBeDefined()
+      const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+      expect(await verifySessionToken(cookie!.value)).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 2 })
     })
 
     it('returns 401 when the password does not match', async () => {
@@ -218,6 +224,9 @@ describe('auth routes', () => {
       expect(response.json()).toEqual({ ok: true })
       expect(dbState.updatedPasswordHashes).toHaveLength(1)
       expect(dbState.updatedPasswordHashes[0]).not.toBe('new-password-123')
+      // Which ends the sessions that started before, e.g. when the invite resets the password of an admin, by changing the
+      // version of their sessions (incremented in SQL).
+      expect(dbState.updatedSessionVersions[0]).toBeDefined()
       expect(dbState.deleteCallCount).toBe(1)
     })
 
@@ -360,13 +369,8 @@ describe('auth routes', () => {
 
     it('returns the current user when the session cookie is valid', async () => {
       const app = await buildApp()
-      const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
 
-      const response = await app.inject({
-        method: 'GET',
-        url: '/api/admin/me',
-        headers: { cookie: `${SESSION_COOKIE}=${token}` },
-      })
+      const response = await app.inject({ method: 'GET', url: '/api/admin/me', cookies: await sessionCookies() })
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })

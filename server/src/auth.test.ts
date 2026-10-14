@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
+import { SignJWT } from 'jose'
 import {
   hashPassword,
   verifyPassword,
@@ -14,6 +15,7 @@ import {
   SESSION_COOKIE,
   SESSION_DURATION_SECONDS,
 } from './auth.js'
+import { sessionCookies } from './test-sessions.js'
 
 describe('passwords', () => {
   it('does not just return the password unchanged', async () => {
@@ -44,19 +46,29 @@ describe('session tokens', () => {
     vi.useRealTimers()
   })
 
-  it('round-trips a signed token back to the user it was signed for', async () => {
-    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
-    expect(await verifySessionToken(token)).toEqual({ id: 'user-1', email: 'admin@example.com' })
+  it('round-trips a signed token back to the user it was signed for, and the version of their sessions', async () => {
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 3 })
+    expect(await verifySessionToken(token)).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 3 })
+  })
+
+  it('reads the tokens signed before sessions had versions as being of the first version', async () => {
+    const token = await new SignJWT({ email: 'admin@example.com' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('user-1')
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(new TextEncoder().encode('test-secret'))
+    expect(await verifySessionToken(token)).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
   })
 
   it('rejects a token signed with a different secret', async () => {
-    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
     process.env.JWT_SECRET = 'different-secret'
     expect(await verifySessionToken(token)).toBeNull()
   })
 
   it('rejects a tampered token', async () => {
-    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
     const [header, payload, signature] = token.split('.')
     const tamperedChar = signature[0] === 'a' ? 'b' : 'a'
     const tamperedSignature = tamperedChar + signature.slice(1)
@@ -69,7 +81,7 @@ describe('session tokens', () => {
 
   it('rejects an expired token', async () => {
     vi.useFakeTimers()
-    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
     vi.advanceTimersByTime((SESSION_DURATION_SECONDS + 1) * 1000)
     expect(await verifySessionToken(token)).toBeNull()
   })
@@ -90,9 +102,14 @@ describe('invite tokens', () => {
 
 describe('requireAuth', () => {
   const originalEnv = { ...process.env }
+  // The version of the sessions of the admin asked about, as the database would say. Null for an admin who was revoked.
+  let version: number
+  const sessionVersion = vi.fn(async (id: string) => (id === 'user-1' ? version : null))
 
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret'
+    version = 0
+    sessionVersion.mockClear()
   })
 
   afterEach(() => {
@@ -102,8 +119,13 @@ describe('requireAuth', () => {
   function buildApp() {
     const app = Fastify()
     app.register(fastifyCookie)
+    app.decorate('sessions', { sessionVersion })
     app.get('/protected', { preHandler: requireAuth }, async (request) => ({ user: request.user }))
     return app
+  }
+
+  async function getProtected(app: ReturnType<typeof buildApp>, user = { id: 'user-1', email: 'admin@example.com', sessionVersion: 0 }) {
+    return app.inject({ method: 'GET', url: '/protected', cookies: await sessionCookies(user) })
   }
 
   it('returns 401 when there is no session cookie', async () => {
@@ -123,21 +145,30 @@ describe('requireAuth', () => {
   })
 
   it('calls the handler with request.user set when the session cookie is valid', async () => {
-    const app = buildApp()
-    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com' })
-    const response = await app.inject({
-      method: 'GET',
-      url: '/protected',
-      headers: { cookie: `${SESSION_COOKIE}=${token}` },
-    })
+    const response = await getProtected(buildApp())
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ user: { id: 'user-1', email: 'admin@example.com' } })
+    expect(sessionVersion).toHaveBeenCalledWith('user-1')
+  })
+
+  it('returns 401 for the session of an admin who was revoked', async () => {
+    const response = await getProtected(buildApp(), { id: 'revoked-user', email: 'revoked@example.com', sessionVersion: 0 })
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('returns 401 for a session that started before the admin chose a new password', async () => {
+    const app = buildApp()
+    const cookies = await sessionCookies({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })
+    version = 1
+    expect((await app.inject({ method: 'GET', url: '/protected', cookies })).statusCode).toBe(401)
+    // While the sessions that started after it are valid.
+    expect((await getProtected(app, { id: 'user-1', email: 'admin@example.com', sessionVersion: 1 })).statusCode).toBe(200)
   })
 
   it("refuses requests that change something from another origin's page, even with a valid session", async () => {
     const app = buildApp()
     app.post('/protected', { preHandler: requireAuth }, async () => ({ ok: true }))
-    const cookie = `${SESSION_COOKIE}=${await signSessionToken({ id: 'user-1', email: 'admin@example.com' })}`
+    const cookie = `${SESSION_COOKIE}=${await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })}`
     const post = (headers: Record<string, string>) =>
       app.inject({ method: 'POST', url: '/protected', headers: { cookie, host: 'parking.radio', ...headers } })
 

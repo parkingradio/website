@@ -15,6 +15,13 @@
       "when": 1791656444987,
       "tag": "0001_radio_artists_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791988213596,
+      "tag": "0002_admins_invited_by_session_version",
+      "breakpoints": true
     }
   ]
 }

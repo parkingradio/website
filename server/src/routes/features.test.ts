@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import type { FeatureId } from 'shared/features'
-import { SESSION_COOKIE, signSessionToken } from '../auth.js'
+import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import { NoSuchFeature } from '../features.js'
 import type { FeaturesStore, StoredFeature } from '../features.js'
 import { featuresRoutes } from './features.js'
@@ -22,19 +22,15 @@ const store: FeaturesStore = {
 async function buildApp() {
   const app = Fastify()
   await app.register(fastifyCookie)
+  acceptSessions(app)
   await app.register(featuresRoutes, { store })
   return app
 }
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-// An admin's session cookie.
-async function asAdmin() {
-  return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
-}
-
 async function send(app: App, method: 'GET' | 'PUT', url: string, payload?: object) {
-  return app.inject({ method, url, payload, cookies: await asAdmin() })
+  return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
 describe('features routes', () => {

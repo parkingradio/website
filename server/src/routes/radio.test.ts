@@ -4,7 +4,7 @@ import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 
 import type { RadioResponse } from 'shared/radio'
-import { SESSION_COOKIE, signSessionToken } from '../auth.js'
+import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import type { OnAir } from '../on-air.js'
 import type { RadioSettings } from '../radio-settings.js'
 import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from '../soundcloud.js'
@@ -82,6 +82,7 @@ function streamFor(id: number, expiresAt = NOW + 62 * MINUTE): HlsStream {
 async function buildApp(logs?: string[]) {
   const app = Fastify({ logger: logs ? { stream: { write: (line: string) => logs.push(line) } } : false })
   await app.register(fastifyCookie)
+  acceptSessions(app)
   await app.register(radioRoutes, {
     soundcloud: newClient,
     credentials: { load: loadCredentials, save: saveCredentials },
@@ -634,17 +635,12 @@ describe('radio routes', () => {
   })
 
   describe('admin', () => {
-    // A session for an admin, as the admin pages would send it.
-    async function asAdmin() {
-      return { [SESSION_COOKIE]: await signSessionToken({ id: 'admin-id', email: 'admin@example.com' }) }
-    }
-
     async function settings(app: App) {
-      return (await app.inject({ method: 'GET', url: '/api/admin/radio', cookies: await asAdmin() })).json()
+      return (await app.inject({ method: 'GET', url: '/api/admin/radio', cookies: await sessionCookies() })).json()
     }
 
     async function post(app: App, url: string, body: unknown) {
-      return app.inject({ method: 'POST', url, payload: body as object, cookies: await asAdmin() })
+      return app.inject({ method: 'POST', url, payload: body as object, cookies: await sessionCookies() })
     }
 
     // Another playlist, at LINK, with two sets.
@@ -975,11 +971,11 @@ describe('radio routes', () => {
       const URL = '/api/admin/radio/credentials'
 
       async function credentials(app: App) {
-        return (await app.inject({ method: 'GET', url: URL, cookies: await asAdmin() })).json()
+        return (await app.inject({ method: 'GET', url: URL, cookies: await sessionCookies() })).json()
       }
 
       async function put(app: App, body: unknown) {
-        return app.inject({ method: 'PUT', url: URL, payload: body as object, cookies: await asAdmin() })
+        return app.inject({ method: 'PUT', url: URL, payload: body as object, cookies: await sessionCookies() })
       }
 
       it('returns null until the credentials have been entered', async () => {
@@ -1086,7 +1082,7 @@ describe('radio routes', () => {
           method: 'POST',
           url: `${URL}/check`,
           payload: { clientId: ' new-id ', clientSecret: ' new-secret ' },
-          cookies: await asAdmin(),
+          cookies: await sessionCookies(),
         })
 
         expect(response.statusCode).toBe(200)
@@ -1105,7 +1101,7 @@ describe('radio routes', () => {
         ['POST', `${URL}/check`],
       ] as const)('%s %s', (method, url) => {
         async function send(app: App, body: unknown) {
-          return app.inject({ method, url, payload: body as object, cookies: await asAdmin() })
+          return app.inject({ method, url, payload: body as object, cookies: await sessionCookies() })
         }
 
         it.each([

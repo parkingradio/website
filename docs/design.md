@@ -277,7 +277,10 @@ At `/admin/admins`: manages who can access the admin pages.
 
 - "Inviter un admin": emails an invite to a given address. The invite links to `/accept-invite`, where the
   new admin chooses their password, after which they can log in.
-- "Admins existants": lists the existing admins, and lets an admin revoke another one. Not designed yet.
+- "Admins existants": lists the admins by email, with "(vous)" next to the admin's own, their status ("actif",
+  "invitation envoyée" with when it expires, or "invitation expirée"), and when they were added and by whom. "révoquer"
+  revokes another admin after confirming, which ends their sessions, or cancels their invite if they haven't accepted it.
+  Those who haven't can be invited again with "renvoyer".
 
 There's no admin to begin with: the first admin of a deployment is created with `tools/create-admin` (see
 [deployment.md](deployment.md#creating-admins)), which also gives an admin who forgot their password a link to choose a

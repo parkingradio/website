@@ -2,8 +2,8 @@
 """
 Invites an admin to a deployment of Parking Radio, and prints the invite link: this is how the first admin of a new
 deployment is created. It also works for an admin who already accepted their invite, e.g. one who forgot their
-password: the link then resets their password, and their current one keeps working until then. Resetting it doesn't end
-the sessions they already have.
+password: the link then resets their password, and their current one keeps working until then. Once it's reset, the
+sessions they already have end.
 
 The invite is created by the server's own create-admin command (see server/src/create-admin.ts), which this runs inside
 the server's container through SSM, since the database is only reachable from the server's instance. Nothing is emailed:
