@@ -12,6 +12,9 @@ export const MAX_MEMBERS = 4
 
 export const MAX_GENRES = 3
 
+// The admin pages allow longer bios, up to BIO_MAX_LENGTH.
+export const APPLY_BIO_MAX_LENGTH = 1500
+
 // Every genre, grouped only to make the list easier to scan.
 export const GENRE_GROUPS: { name: string; genres: GenreId[] }[] = [
   { name: 'House & disco', genres: ['house', 'deep-house', 'tech-house', 'afro-house', 'amapiano', 'disco', 'nu-disco', 'italo'] },

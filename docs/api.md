@@ -311,7 +311,7 @@ A profile has:
 | `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` |
 | `city` | string | As the artist wrote it. Up to 100 characters |
 | `genres` | list of strings | The ids of at least one of `GENRES` (e.g. `"drum-and-bass"`), most important first |
-| `bio` | string | Up to 1500 characters |
+| `bio` | string | Up to 5000 characters |
 | `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one: see below |
 | `email` | string | What the artist is known by. Up to 200 characters |
 | `phone` | string | At least 7 digits. Up to 40 characters |

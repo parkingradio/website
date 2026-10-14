@@ -165,7 +165,8 @@ describe('validateProfile', () => {
 
   it('needs a bio', () => {
     expect(error({ bio: '' })).toBe('Écrivez quelques lignes de bio.')
-    expect(error({ bio: 'x'.repeat(1501) })).toBe('La bio dépasse 1500 caractères.')
+    expect(error({ bio: 'x'.repeat(5000) })).toBeNull()
+    expect(error({ bio: 'x'.repeat(5001) })).toBe('La bio dépasse 5000 caractères.')
   })
 
   it('needs at least one valid link', () => {

@@ -36,7 +36,7 @@ export type ArtistKind = (typeof ARTIST_KINDS)[number]
 
 export const NAME_MAX_LENGTH = 100
 export const CITY_MAX_LENGTH = 100
-export const BIO_MAX_LENGTH = 1500
+export const BIO_MAX_LENGTH = 5000
 export const EMAIL_MAX_LENGTH = 200
 export const PHONE_MAX_LENGTH = 40
 export const LINK_MAX_LENGTH = 200

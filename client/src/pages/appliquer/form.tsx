@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication } from 'shared/applications'
 import type { ApplicationFields, ApplyResponse, PrestationId } from 'shared/applications'
-import { BIO_MAX_LENGTH, CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, parseLink } from 'shared/artists'
+import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, parseLink } from 'shared/artists'
 import type { ArtistKind, ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
 import type { ApiError } from 'shared/error'
 import { countryOptions, pickedPhotoError } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { useTurnstileSiteKey } from '../../config-context'
-import { MAX_GENRES, MAX_MEMBERS, PRIORITY_COUNTRIES, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './choices'
+import { APPLY_BIO_MAX_LENGTH, MAX_GENRES, MAX_MEMBERS, PRIORITY_COUNTRIES, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './choices'
 import type { TimeSlotId } from './choices'
 import { DatePicker } from './date-picker'
 import { useCitySuggestions } from './geonames'
@@ -384,14 +384,14 @@ export function ApplicationForm() {
               </label>
               <textarea
                 id="bio"
-                maxLength={BIO_MAX_LENGTH}
+                maxLength={APPLY_BIO_MAX_LENGTH}
                 placeholder="Quelques lignes sur vous ou votre projet."
                 aria-invalid={errors.bio ? true : undefined}
                 value={form.bio}
                 onChange={(event) => update('bio', event.target.value)}
               />
               <span className="count-chars">
-                {form.bio.length} / {BIO_MAX_LENGTH}
+                {form.bio.length} / {APPLY_BIO_MAX_LENGTH}
               </span>
               <FieldError message={errors.bio} />
             </div>
