@@ -438,14 +438,14 @@ describe('Adding an artist', () => {
     expect(document.querySelectorAll('.admin-field-error')).toHaveLength(0)
     fireEvent.click(submitButton("ajouter l'artiste"))
 
-    expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indique le nom du collectif.')
-    expect(errorOf(screen.getByLabelText("Nom d'un artiste du collectif"))).toBe('Indique au moins un artiste du collectif.')
-    expect(errorOf(screen.getByLabelText('Ville'))).toBe('Indique ta ville.')
-    expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBe('Choisis au moins un genre.')
-    expect(errorOf(screen.getByLabelText('Bio'))).toBe('Écris quelques lignes de bio.')
-    expect(screen.getByText('Ajoute au moins un lien.')).toBeInTheDocument()
-    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indique ton adresse e-mail.')
-    expect(errorOf(screen.getByLabelText('Téléphone'))).toBe('Indique ton numéro de téléphone.')
+    expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indiquez le nom du collectif.')
+    expect(errorOf(screen.getByLabelText("Nom d'un artiste du collectif"))).toBe('Indiquez au moins un artiste du collectif.')
+    expect(errorOf(screen.getByLabelText('Ville'))).toBe('Indiquez votre ville.')
+    expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBe('Choisissez au moins un genre.')
+    expect(errorOf(screen.getByLabelText('Bio'))).toBe('Écrivez quelques lignes de bio.')
+    expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
+    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez votre adresse e-mail.')
+    expect(errorOf(screen.getByLabelText('Téléphone'))).toBe('Indiquez votre numéro de téléphone.')
     // The photo is optional.
     expect(errorOf(screen.getByLabelText('Photo'))).toBeNull()
     // The first field to fix gets the focus.
@@ -461,7 +461,7 @@ describe('Adding an artist', () => {
     fireEvent.change(email, { target: { value: 'aurore@' } })
     expect(errorOf(email)).toBeNull()
     fireEvent.blur(email)
-    expect(errorOf(email)).toBe('Indique une adresse e-mail valide.')
+    expect(errorOf(email)).toBe('Indiquez une adresse e-mail valide.')
     expect(email).toHaveAttribute('aria-invalid', 'true')
     fireEvent.change(email, { target: { value: 'aurore@example.com' } })
     expect(errorOf(email)).toBeNull()
@@ -478,9 +478,9 @@ describe('Adding an artist', () => {
     fireEvent.change(soundcloud, { target: { value: 'https://soundcloud.com/discover' } })
     expect(errorOf(soundcloud)).toBeNull()
     fireEvent.blur(soundcloud)
-    expect(errorOf(soundcloud)).toBe("copie l'adresse de ta page de profil, qui commence par soundcloud.com/")
+    expect(errorOf(soundcloud)).toBe("copiez l'adresse de votre page de profil, qui commence par soundcloud.com/")
     // The field's own error, that there's no link, isn't shown on top.
-    expect(screen.queryByText('Ajoute au moins un lien.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ajoutez au moins un lien.')).not.toBeInTheDocument()
 
     fireEvent.change(soundcloud, { target: { value: 'https://soundcloud.com/aurore/un-set?si=1' } })
     fireEvent.blur(soundcloud)
@@ -498,7 +498,7 @@ describe('Adding an artist', () => {
     fireEvent.change(screen.getByLabelText('SoundCloud'), { target: { value: '' } })
     fireEvent.click(submitButton("ajouter l'artiste"))
 
-    expect(screen.getByText('Ajoute au moins un lien.')).toBeInTheDocument()
+    expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText('SoundCloud')).toHaveFocus())
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
   })

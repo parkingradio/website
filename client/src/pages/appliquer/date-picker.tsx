@@ -142,9 +142,9 @@ export function DatePicker({ value, onChange, first, last, invalid }: Props) {
             {value.length} / {MAX_DATES}
           </b>
         </div>
-        {full && <p className="picked-full">maximum atteint : enlève une date pour en choisir une autre.</p>}
+        {full && <p className="picked-full">maximum atteint : enlevez une date pour en choisir une autre.</p>}
         {value.length === 0 ? (
-          <p className="picked-empty">Aucune date pour l'instant. Choisis-en au moins une dans le calendrier.</p>
+          <p className="picked-empty">Aucune date pour l'instant. Choisissez-en au moins une dans le calendrier.</p>
         ) : (
           <ul>
             {value.map((key) => {

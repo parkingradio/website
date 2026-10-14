@@ -264,7 +264,7 @@ describe('applications routes', () => {
       await create(app)
       const response = await send(app, 'PUT', '/api/admin/applications/application-1', application({ dates: [] }))
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Choisis au moins une date.' })
+      expect(response.json()).toEqual({ ok: false, error: 'Choisissez au moins une date.' })
       expect(rows[0].updatedBy).toBeNull()
     })
 

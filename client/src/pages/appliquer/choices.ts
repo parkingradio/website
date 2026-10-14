@@ -26,7 +26,7 @@ export const GENRE_GROUPS: { name: string; genres: GenreId[] }[] = [
 // At least one prestation, or "Autre" with a few words (null when it isn't checked). Returns what's missing, if anything.
 export function prestationError(prestations: PrestationId[], otherPrestation: string | null): string | null {
   if (prestations.length > 0 || otherPrestation?.trim()) return null
-  return otherPrestation === null ? 'Choisis au moins un type de prestation.' : 'Précise ton autre type de prestation.'
+  return otherPrestation === null ? 'Choisissez au moins un type de prestation.' : 'Précisez votre autre type de prestation.'
 }
 
 // Links to these sites are always shown. The others are added with a button.

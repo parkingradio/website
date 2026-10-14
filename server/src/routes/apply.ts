@@ -26,10 +26,10 @@ const APPLICATIONS_WINDOW = '1 hour'
 
 const INVALID_REQUEST: ApiError = { ok: false, error: 'Candidature invalide.' }
 const EMAIL_TAKEN: ApiError = { ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }
-const TURNSTILE_REFUSED: ApiError = { ok: false, error: 'La vérification anti-robot a échoué. Réessaie.' }
+const TURNSTILE_REFUSED: ApiError = { ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }
 const TURNSTILE_UNAVAILABLE: ApiError = {
   ok: false,
-  error: "La vérification anti-robot n'a pas pu être faite. Réessaie dans quelques minutes.",
+  error: "La vérification anti-robot n'a pas pu être faite. Réessayez dans quelques minutes.",
 }
 
 // Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
@@ -115,7 +115,7 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
           timeWindow: APPLICATIONS_WINDOW,
           // The plugin throws this error, and the error handler set by `keepQueryValuesPrivate` sends its message.
           errorResponseBuilder: () =>
-            Object.assign(new Error('Trop de candidatures envoyées depuis ta connexion. Réessaie plus tard.'), { statusCode: 429 }),
+            Object.assign(new Error('Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.'), { statusCode: 429 }),
         },
       },
     },

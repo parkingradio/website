@@ -68,11 +68,11 @@ export function applicationEmails({
     confirmation: {
       to: [profile.email],
       replyTo: anyone ? recipients : undefined,
-      subject: 'parking.radio : on a bien reçu ta candidature',
+      subject: 'parking.radio : nous avons bien reçu votre candidature',
       text: [
-        'Salut !',
+        'Bonjour,',
         '',
-        "Merci pour ta candidature à parking.radio, on l'a bien reçue. On regarde les dates et on te recontacte par e-mail.",
+        "Merci pour votre candidature à parking.radio, nous l'avons bien reçue. Nous regardons les dates et nous vous recontacterons par e-mail.",
         ...(profile.kind === 'collective'
           ? ['', 'Petit rappel pour les takeovers : nous demandons aux collectifs de produire un flyer (carte blanche).']
           : []),

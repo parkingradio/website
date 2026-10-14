@@ -226,7 +226,7 @@ describe('POST /api/applications', () => {
     await apply(app)
     const response = await apply(app, { turnstileToken: 'refused' })
     expect(response.statusCode).toBe(400)
-    expect(response.json()).toEqual({ ok: false, error: 'La vérification anti-robot a échoué. Réessaie.' })
+    expect(response.json()).toEqual({ ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' })
   })
 
   it('ignores other fields and files, e.g. a submit button', async () => {
@@ -252,9 +252,9 @@ describe('POST /api/applications', () => {
     const app = await buildApp()
     const invalid = [
       { parts: { artist: profile({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
-      { parts: { artist: profile({ email: 'pas une adresse' }) }, error: 'Indique une adresse e-mail valide.' },
+      { parts: { artist: profile({ email: 'pas une adresse' }) }, error: 'Indiquez une adresse e-mail valide.' },
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
-      { parts: { application: fields({ dates: [] }) }, error: 'Choisis au moins une date.' },
+      { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },
     ]
     for (const { parts, error } of invalid) {
@@ -317,7 +317,7 @@ describe('POST /api/applications', () => {
     for (const turnstileToken of [undefined, 'refused']) {
       const response = await apply(app, { turnstileToken })
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'La vérification anti-robot a échoué. Réessaie.' })
+      expect(response.json()).toEqual({ ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' })
     }
     expect(photos.store).not.toHaveBeenCalled()
     expect(store.apply).not.toHaveBeenCalled()
@@ -337,7 +337,7 @@ describe('POST /api/applications', () => {
     const app = await buildApp()
     const response = await apply(app)
     expect(response.statusCode).toBe(502)
-    expect(response.json()).toEqual({ ok: false, error: "La vérification anti-robot n'a pas pu être faite. Réessaie dans quelques minutes." })
+    expect(response.json()).toEqual({ ok: false, error: "La vérification anti-robot n'a pas pu être faite. Réessayez dans quelques minutes." })
     expect(photos.store).not.toHaveBeenCalled()
   })
 
@@ -448,7 +448,7 @@ describe('POST /api/applications', () => {
       }
       const response = await apply(app, another(), '203.0.113.200')
       expect(response.statusCode).toBe(429)
-      expect(response.json()).toEqual({ ok: false, error: 'Trop de candidatures envoyées depuis ta connexion. Réessaie plus tard.' })
+      expect(response.json()).toEqual({ ok: false, error: 'Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.' })
       expect(applications).toHaveLength(APPLICATIONS_PER_WINDOW)
     })
 

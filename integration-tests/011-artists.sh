@@ -42,7 +42,7 @@ expect_body_contains '"artists":[]'
 echo "  an invalid profile is explained, in French"
 artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Test"}' "${PHOTOS}/photo.jpg"
 expect_status 400
-expect_body_contains 'Choisis ton pays.'
+expect_body_contains 'Choisissez votre pays.'
 
 echo "  an artist is added, and read back as they were sent"
 artist POST "${BASE_URL}/api/admin/artists" "$PROFILE" "${PHOTOS}/photo.jpg"

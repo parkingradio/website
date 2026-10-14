@@ -114,7 +114,7 @@ doesn't (admins can bring in applications that don't follow them): they're liste
 
 The fields are (* means mandatory):
 
-- "Tu postules en tant que" (*): "Artiste" or "Collectif". The form explains the difference: an artist
+- "Vous postulez en tant que" (*): "Artiste" or "Collectif". The form explains the difference: an artist
   usually gets an hour in one of the programmation's time slots, a collective a whole (4-hour) slot, and once
   its date is confirmed a collective makes its own flyer (to diversify Parking Radio's content and let the
   collective's spirit take over the usual schedule).

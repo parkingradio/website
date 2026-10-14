@@ -48,8 +48,8 @@ describe('validateApplication', () => {
   })
 
   it('requires at least one date, of any day that exists, past or future', () => {
-    expect(() => validateApplication(fields({ dates: [] }))).toThrow('Choisis au moins une date.')
-    expect(() => validateApplication(fields({ dates: undefined }))).toThrow('Choisis au moins une date.')
+    expect(() => validateApplication(fields({ dates: [] }))).toThrow('Choisissez au moins une date.')
+    expect(() => validateApplication(fields({ dates: undefined }))).toThrow('Choisissez au moins une date.')
     expect(() => validateApplication(fields({ dates: ['2027-02-30'] }))).toThrow('Une des dates est invalide.')
     expect(() => validateApplication(fields({ dates: [20270115] }))).toThrow('Une des dates est invalide.')
     expect(validateApplication(fields({ dates: ['2099-12-31', '2020-02-29'] })).dates).toEqual(['2020-02-29', '2099-12-31'])
@@ -95,7 +95,7 @@ describe('validateApplication', () => {
 
   it('refuses anything but an object', () => {
     for (const sent of [null, undefined, 'application', 42]) {
-      expect(() => validateApplication(sent)).toThrow('Choisis au moins une date.')
+      expect(() => validateApplication(sent)).toThrow('Choisissez au moins une date.')
     }
   })
 })

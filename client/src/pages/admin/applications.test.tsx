@@ -311,7 +311,7 @@ describe('An application’s page', () => {
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-    expect(screen.getByText('Choisis au moins une date.')).toBeInTheDocument()
+    expect(screen.getByText('Choisissez au moins une date.')).toBeInTheDocument()
     expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
@@ -403,7 +403,7 @@ describe('Creating an application', () => {
     expect(await screen.findByLabelText('Artiste')).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
     fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
-    expect(screen.getByText("Choisis l'artiste.")).toBeInTheDocument()
+    expect(screen.getByText("Choisissez l'artiste.")).toBeInTheDocument()
     expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(0)
   })
 

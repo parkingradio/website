@@ -24,7 +24,7 @@ export function PhotoField({ value, onChange, invalid }: Props) {
   return (
     <div className={invalid ? 'photo invalid' : 'photo'}>
       {preview ? (
-        <img src={preview} alt="Aperçu de ta photo" />
+        <img src={preview} alt="Aperçu de votre photo" />
       ) : (
         <div className="photo-empty" aria-hidden="true">
           photo

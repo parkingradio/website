@@ -16,7 +16,7 @@ export function GenrePicker({ value, onChange, invalid }: Props) {
     <>
       {/* Focusable, so that the form can bring the artist here when no genre is picked. */}
       <div className={invalid ? 'genres-picked invalid' : 'genres-picked'} aria-invalid={invalid || undefined} tabIndex={-1}>
-        {value.length === 0 && <span className="placeholder">clique sur un genre ci-dessous · le premier choisi sera ton genre principal</span>}
+        {value.length === 0 && <span className="placeholder">cliquez sur un genre ci-dessous · le premier choisi sera votre genre principal</span>}
         {value.map((genre, index) => (
           <button key={genre} type="button" onClick={() => toggle(genre)} aria-label={`Enlever ${genreName(genre)}`}>
             <b>{index + 1}</b>

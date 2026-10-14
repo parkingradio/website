@@ -52,7 +52,7 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
     details,
   }
   const errors: Partial<Record<Field, string>> = { ...checkApplication(fields).errors }
-  if (artists && !artistId) errors.artist = "Choisis l'artiste."
+  if (artists && !artistId) errors.artist = "Choisissez l'artiste."
   const { form, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(fields, artistId))
 
   const changeSlot = (index: number, changes: Partial<TimeSlot>) =>

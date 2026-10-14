@@ -98,8 +98,8 @@ describe('applicationEmails', () => {
     expect(confirmation).toEqual({
       to: ['artiste@example.com'],
       replyTo: ['equipe@example.com'],
-      subject: 'parking.radio : on a bien reçu ta candidature',
-      text: "Salut !\n\nMerci pour ta candidature à parking.radio, on l'a bien reçue. On regarde les dates et on te recontacte par e-mail.",
+      subject: 'parking.radio : nous avons bien reçu votre candidature',
+      text: "Bonjour,\n\nMerci pour votre candidature à parking.radio, nous l'avons bien reçue. Nous regardons les dates et nous vous recontacterons par e-mail.",
     })
   })
 

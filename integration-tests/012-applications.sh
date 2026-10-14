@@ -57,7 +57,7 @@ expect_body_contains 'No such artist'
 echo "  an invalid application is explained, in French"
 json POST "${BASE_URL}/api/admin/applications" "{\"artistId\":\"${artist}\",\"dates\":[]}"
 expect_status 400
-expect_body_contains 'Choisis au moins une date.'
+expect_body_contains 'Choisissez au moins une date.'
 
 echo "  an application is created, and read back as it was sent, with its dates as days, in order"
 json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" first)"

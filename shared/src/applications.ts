@@ -158,7 +158,7 @@ export function checkApplication(
     if (typeof date !== 'string' || !isDay(date)) errors.dates = 'Une des dates est invalide.'
     else if (!dates.includes(date)) dates.push(date)
   }
-  if (dates.length === 0) errors.dates ??= 'Choisis au moins une date.'
+  if (dates.length === 0) errors.dates ??= 'Choisissez au moins une date.'
 
   const timeSlots = new Map<string, TimeSlot>()
   for (const slot of Array.isArray(application.timeSlots) ? application.timeSlots : []) {

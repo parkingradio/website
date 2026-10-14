@@ -153,8 +153,8 @@ describe('Appliquer', () => {
     // The photo is optional.
     expect(await screen.findByRole('alert')).toHaveTextContent('11 champs sont à remplir ou à corriger.')
     expect(screen.getByLabelText(/^Photo/)).not.toHaveAttribute('aria-invalid')
-    expect(screen.getByText('Choisis au moins une date.')).toBeInTheDocument()
-    expect(screen.getByText('Choisis au moins un type de prestation.')).toBeInTheDocument()
+    expect(screen.getByText('Choisissez au moins une date.')).toBeInTheDocument()
+    expect(screen.getByText('Choisissez au moins un type de prestation.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
   })
 
@@ -213,7 +213,7 @@ describe('Appliquer', () => {
     fireEvent.click(screen.getByLabelText('DJ'))
     fireEvent.click(screen.getByLabelText('Autre'))
     await send()
-    expect(screen.getByText('Précise ton autre type de prestation.')).toBeInTheDocument()
+    expect(screen.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
 
     type('Autre type de prestation', 'B2B')
@@ -255,10 +255,10 @@ describe('Appliquer', () => {
     renderForm()
     await fillIn()
     fetchMock.mockImplementationOnce(() =>
-      Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'La vérification anti-robot a échoué. Réessaie.' }) }),
+      Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }) }),
     )
     await send()
-    expect(await screen.findByRole('alert')).toHaveTextContent('La vérification anti-robot a échoué. Réessaie.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('La vérification anti-robot a échoué. Réessayez.')
     expect(turnstile.remove).toHaveBeenCalledWith('widget')
     expect(turnstile.render).toHaveBeenCalledTimes(2)
 
@@ -384,12 +384,12 @@ describe('Appliquer', () => {
     await fillIn()
     fetchMock.mockImplementation((url: string) =>
       url === '/api/applications'
-        ? Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'Trop de candidatures envoyées depuis ta connexion.' }) })
+        ? Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.' }) })
         : Promise.resolve({ ok: true, json: () => Promise.resolve({ geonames: [] }) }),
     )
     await send()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Trop de candidatures envoyées depuis ta connexion.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.')
   })
 
   it('says when an artist already has that email address', async () => {
@@ -413,7 +413,7 @@ describe('Appliquer', () => {
     // E.g. the proxy in front of the server, refusing a photo that's too large.
     fetchMock.mockImplementationOnce(() => Promise.resolve({ ok: false, json: () => Promise.reject(new SyntaxError('Unexpected token <')) }))
     await send()
-    expect(await screen.findByRole('alert')).toHaveTextContent("La candidature n'a pas pu être envoyée. Réessaie dans un moment.")
+    expect(await screen.findByRole('alert')).toHaveTextContent("La candidature n'a pas pu être envoyée. Réessayez dans un moment.")
     expect(turnstile.remove).toHaveBeenCalledWith('widget')
     expect(turnstile.render).toHaveBeenCalledTimes(2)
   })
@@ -430,9 +430,9 @@ describe('Appliquer', () => {
   it('sends the application without a photo, once the one picked is removed', async () => {
     renderForm()
     await fillIn()
-    expect(screen.getByRole('img', { name: 'Aperçu de ta photo' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Aperçu de votre photo' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
-    expect(screen.queryByRole('img', { name: 'Aperçu de ta photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Aperçu de votre photo' })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/^Photo/)).toHaveTextContent('choisir une photo')
     // The button that was clicked is gone, so the focus moves to the one that picks a photo.
     expect(screen.getByLabelText(/^Photo/)).toHaveFocus()
@@ -514,7 +514,7 @@ describe('Appliquer', () => {
     await fillIn()
     type('SoundCloud', '')
     await send()
-    expect(screen.getByText('Ajoute au moins un lien.')).toBeInTheDocument()
+    expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
     expect(screen.getByLabelText('SoundCloud')).toHaveFocus()
     expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
   })
@@ -525,7 +525,7 @@ describe('Appliquer', () => {
     type('SoundCloud', 'https://on.soundcloud.com/AbC123')
     await send()
     expect(screen.getAllByText(/lien court/)).toHaveLength(1)
-    expect(screen.getByText('Corrige les liens en rouge.')).toBeInTheDocument()
+    expect(screen.getByText('Corrigez les liens en rouge.')).toBeInTheDocument()
     expect(screen.getByLabelText('SoundCloud')).toHaveFocus()
   })
 

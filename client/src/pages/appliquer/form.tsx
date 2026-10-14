@@ -26,7 +26,7 @@ import '../appliquer.css'
 const COUNTRY_OPTIONS = countryOptions(PRIORITY_COUNTRIES).map((option) => ({ ...option, detail: option.key }))
 
 const KIND_OPTIONS: { kind: ArtistKind; title: string; text: string }[] = [
-  { kind: 'artist', title: 'Artiste', text: 'Tu joues seul·e (ou en b2b) pendant une heure, dans une plage de notre programmation.' },
+  { kind: 'artist', title: 'Artiste', text: 'Vous jouez seul·e (ou en b2b) pendant une heure, dans une plage de notre programmation.' },
   { kind: 'collective', title: 'Collectif', text: "Vous prenez en main une plage entière avec votre line-up d'artistes." },
 ]
 
@@ -108,7 +108,7 @@ function checked(form: Form) {
   const fields = checkApplication(application)
   const errors: Partial<Record<Field, string>> = { ...profile.errors, ...fields.errors }
   // A link that's wrong says why next to it, so the links as a whole only say to fix it, rather than say it again.
-  if (errors.links && LINK_SITES.some((site) => parseLink(site, form.links[site.id] ?? '').error)) errors.links = 'Corrige les liens en rouge.'
+  if (errors.links && LINK_SITES.some((site) => parseLink(site, form.links[site.id] ?? '').error)) errors.links = 'Corrigez les liens en rouge.'
   const photo = pickedPhotoError(form.photo)
   if (photo) errors.photo = photo
   const prestation = prestationError(form.prestations, form.otherChecked ? form.otherPrestation : null)
@@ -126,7 +126,7 @@ function toggled<T>(list: T[], item: T, included: boolean): T[] {
 
 type Status = { state: 'editing' | 'sending' } | { state: 'failed'; error: string } | { state: 'sent'; email: string }
 
-const SEND_FAILED = "La candidature n'a pas pu être envoyée. Réessaie dans un moment."
+const SEND_FAILED = "La candidature n'a pas pu être envoyée. Réessayez dans un moment."
 
 function Part({ number, title, note, children }: { number: string; title: string; note?: string; children: ReactNode }) {
   return (
@@ -186,7 +186,7 @@ export function ApplicationForm() {
     if (!turnstileToken) {
       setStatus({
         state: 'failed',
-        error: "La vérification anti-robot n'est pas terminée. Attends quelques secondes, ou recharge la page si elle n'apparaît pas.",
+        error: "La vérification anti-robot n'est pas terminée. Attendez quelques secondes, ou rechargez la page si elle n'apparaît pas.",
       })
       return
     }
@@ -239,7 +239,7 @@ export function ApplicationForm() {
           <Part number="01" title="L'artiste">
             <fieldset className={errors.kind ? 'field wide invalid' : 'field wide'}>
               <legend>
-                Tu postules en tant que <span className="required">*</span>
+                Vous postulez en tant que <span className="required">*</span>
               </legend>
               <div className="applicant-types">
                 {KIND_OPTIONS.map(({ kind, title, text }) => (
@@ -331,7 +331,7 @@ export function ApplicationForm() {
                 id="artiste-pays"
                 options={COUNTRY_OPTIONS}
                 selected={form.country}
-                placeholder="tape pour chercher…"
+                placeholder="tapez pour chercher…"
                 invalid={!!errors.country}
                 // The cities suggested are those of the country, so another country starts the city over.
                 onSelect={(country) => edit((current) => (country === current.country ? current : { ...current, country, city: '' }))}
@@ -346,7 +346,7 @@ export function ApplicationForm() {
                 // Like the country: not "city", and no autofill, which would suggest the visitor's own city on top of
                 // those suggested here.
                 id="artiste-ville"
-                placeholder={form.country ? 'nom de ta ville' : "choisis d'abord un pays"}
+                placeholder={form.country ? 'nom de votre ville' : "choisissez d'abord un pays"}
                 disabled={!form.country}
                 invalid={!!errors.city}
                 maxLength={CITY_MAX_LENGTH}
@@ -359,7 +359,7 @@ export function ApplicationForm() {
               <legend className="genres-legend">
                 <span>
                   Genres musicaux <span className="required">*</span>{' '}
-                  <span className="hint">— jusqu'à {MAX_GENRES}, dans l'ordre : le premier est ton genre principal</span>
+                  <span className="hint">— jusqu'à {MAX_GENRES}, dans l'ordre : le premier est votre genre principal</span>
                 </span>
                 <span className={form.genres.length >= MAX_GENRES ? 'count full' : 'count'} aria-live="polite">
                   {form.genres.length} / {MAX_GENRES}
@@ -385,7 +385,7 @@ export function ApplicationForm() {
               <textarea
                 id="bio"
                 maxLength={BIO_MAX_LENGTH}
-                placeholder="Quelques lignes sur toi ou ton projet."
+                placeholder="Quelques lignes sur vous ou votre projet."
                 aria-invalid={errors.bio ? true : undefined}
                 value={form.bio}
                 onChange={(event) => update('bio', event.target.value)}
@@ -405,7 +405,7 @@ export function ApplicationForm() {
             </fieldset>
           </Part>
 
-          <Part number="03" title="Prestation" note="Coche tout ce qui s'applique.">
+          <Part number="03" title="Prestation" note="Cochez tout ce qui s'applique.">
             <fieldset className={errors.prestations ? 'field wide invalid' : 'field wide'}>
               <legend>
                 Type de prestation <span className="required">*</span>
@@ -444,7 +444,7 @@ export function ApplicationForm() {
             </fieldset>
           </Part>
 
-          <Part number="04" title="Contact" note="Pour te répondre. Tu recevras une confirmation à cette adresse.">
+          <Part number="04" title="Contact" note="Pour vous répondre. Vous recevrez une confirmation à cette adresse.">
             <div className="field">
               <label htmlFor="email">
                 Adresse e-mail <span className="required">*</span>
@@ -453,7 +453,7 @@ export function ApplicationForm() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="toi@exemple.com"
+                placeholder="vous@exemple.com"
                 aria-invalid={errors.email ? true : undefined}
                 value={form.email}
                 onChange={(event) => update('email', event.target.value)}
@@ -480,7 +480,7 @@ export function ApplicationForm() {
           <Part
             number="05"
             title="Dates"
-            note="Clique sur les jours où tu es disponible, jusqu'à 14 dates. Tes disponibilités nous aident à construire la programmation, mais on ne peut pas garantir qu'elles seront respectées."
+            note="Cliquez sur les jours où vous êtes disponible, jusqu'à 14 dates. Vos disponibilités nous aident à construire la programmation, mais nous ne pouvons pas garantir qu'elles seront respectées."
           >
             <div className="field wide">
               <span className="label">
@@ -539,7 +539,7 @@ export function ApplicationForm() {
                 {status.state === 'sending' ? 'envoi…' : 'envoyer ma candidature'}
               </button>
               <p className="send-note">
-                Les champs marqués d'un <span className="required">*</span> sont obligatoires. Ta candidature est envoyée à l'équipe de
+                Les champs marqués d'un <span className="required">*</span> sont obligatoires. Votre candidature est envoyée à l'équipe de
                 parking.radio.
               </p>
             </div>
@@ -566,8 +566,8 @@ function Sent({ email }: { email: string }) {
       <div className="sent-body">
         <p className="big">Merci&nbsp;!</p>
         <p>
-          On a bien reçu ta candidature. Une confirmation vient d'être envoyée à <b>{email}</b>. On te recontacte par e-mail dès
-          qu'on a regardé les dates.
+          Nous avons bien reçu votre candidature. Une confirmation vient d'être envoyée à <b>{email}</b>. Nous vous recontacterons par e-mail
+          dès que nous aurons regardé les dates.
         </p>
       </div>
     </section>

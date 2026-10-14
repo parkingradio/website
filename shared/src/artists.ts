@@ -326,14 +326,14 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
       if (host !== domain && !host.endsWith(`.${domain}`)) return { error: `ce n'est pas une adresse ${site.name}` }
       // E.g. bandcamp.com/<artist> or daily.bandcamp.com, rather than the artist's own subdomain.
       value = host === domain ? '' : host.slice(0, -domain.length - 1).replace(/^www\./, '')
-      if (!value || isReserved(site, value)) return { error: `copie l'adresse de ta page de profil, qui finit par .${domain}` }
+      if (!value || isReserved(site, value)) return { error: `copiez l'adresse de votre page de profil, qui finit par .${domain}` }
     } else {
-      if (host === site.shortLinkHost) return { error: 'lien court : copie plutôt l’adresse de ta page de profil' }
+      if (host === site.shortLinkHost) return { error: 'lien court : copiez plutôt l’adresse de votre page de profil' }
       if (!site.host?.test(host)) return { error: `ce n'est pas une adresse ${site.name}` }
-      if (url.pathname === '/') return { error: 'il manque ton nom de profil' }
+      if (url.pathname === '/') return { error: 'il manque votre nom de profil' }
       // E.g. a post, a track or an event, rather than the profile itself.
       const match = site.path?.exec(url.pathname)
-      if (!match || isReserved(site, match[1])) return { error: `copie l'adresse de ta page de profil, qui commence par ${site.prefix}` }
+      if (!match || isReserved(site, match[1])) return { error: `copiez l'adresse de votre page de profil, qui commence par ${site.prefix}` }
       try {
         value = decodeURIComponent(match[1])
       } catch {
@@ -345,7 +345,7 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
     value = value.replace(/^@/, '')
   }
 
-  if (!value) return { error: 'il manque ton nom de profil' }
+  if (!value) return { error: 'il manque votre nom de profil' }
   return profile.test(value) && !isReserved(site, value) ? { value } : { error: `ce nom de profil ${site.name} n'est pas valide` }
 }
 
@@ -362,11 +362,11 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
   }
 
   const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
-  if (!kind) errors.kind = 'Indique si tu postules comme artiste ou comme collectif.'
+  if (!kind) errors.kind = 'Indiquez si vous postulez comme artiste ou comme collectif.'
   const collective = kind === 'collective'
   const name = check(
     'name',
-    checkLine(artist.name, collective ? 'Le nom du collectif' : "Le nom d'artiste", NAME_MAX_LENGTH, collective ? 'Indique le nom du collectif.' : "Indique ton nom d'artiste."),
+    checkLine(artist.name, collective ? 'Le nom du collectif' : "Le nom d'artiste", NAME_MAX_LENGTH, collective ? 'Indiquez le nom du collectif.' : "Indiquez votre nom d'artiste."),
   )
 
   // Only a collective lists its artists. Blank entries and duplicates, whatever their case, are dropped.
@@ -375,11 +375,11 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     const memberName = check('members', checkLine(member, "Le nom d'un artiste du collectif", NAME_MAX_LENGTH, null))
     if (memberName && !members.some((other) => other.toLowerCase() === memberName.toLowerCase())) members.push(memberName)
   }
-  if (collective && members.length === 0) errors.members ??= 'Indique au moins un artiste du collectif.'
+  if (collective && members.length === 0) errors.members ??= 'Indiquez au moins un artiste du collectif.'
 
   const country = COUNTRIES.find((code) => code === artist.country)
-  if (!country) errors.country = 'Choisis ton pays.'
-  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, 'Indique ta ville.'))
+  if (!country) errors.country = 'Choisissez votre pays.'
+  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.'))
 
   // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
   const genres: GenreId[] = []
@@ -388,9 +388,9 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     if (!genre) errors.genres ??= "Un des genres n'est pas dans la liste."
     else if (!genres.includes(genre.id)) genres.push(genre.id)
   }
-  if (genres.length === 0) errors.genres ??= 'Choisis au moins un genre.'
+  if (genres.length === 0) errors.genres ??= 'Choisissez au moins un genre.'
 
-  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écris quelques lignes de bio.'))
+  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.'))
 
   const links: Partial<Record<LinkSiteId, string>> = {}
   for (const [id, raw] of Object.entries(artist.links !== null && typeof artist.links === 'object' ? artist.links : {})) {
@@ -403,12 +403,12 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     if (error) errors.links ??= `${site.name} : ${error}.`
     else if (value) links[site.id] = value
   }
-  if (Object.keys(links).length === 0) errors.links ??= 'Ajoute au moins un lien.'
+  if (Object.keys(links).length === 0) errors.links ??= 'Ajoutez au moins un lien.'
 
-  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indique ton adresse e-mail.'))
-  if (email && !isEmailAddress(email)) errors.email = 'Indique une adresse e-mail valide.'
-  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indique ton numéro de téléphone.'))
-  if (phone && !isPhoneNumber(phone)) errors.phone = 'Indique un numéro de téléphone valide.'
+  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.'))
+  if (email && !isEmailAddress(email)) errors.email = 'Indiquez une adresse e-mail valide.'
+  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.'))
+  if (phone && !isPhoneNumber(phone)) errors.phone = 'Indiquez un numéro de téléphone valide.'
 
   if (!kind || !country || Object.keys(errors).length > 0) return { errors }
   return { profile: { email, kind, name, members, country, city, genres, bio, links, phone } }
