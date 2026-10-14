@@ -50,6 +50,15 @@ npm run dev
 
 This starts the Vite dev server at http://localhost:5173 and the Fastify server at http://localhost:3000.
 
+To log in to the admin pages at http://localhost:5173/admin, create an admin once the server has started (it creates the
+database's tables when it starts). This prints a link where you choose your password:
+
+```sh
+npm run create-admin -w server -- you@example.com
+```
+
+Running it again for an existing admin gives a link that resets their password.
+
 ### Testing and building
 
 ```sh

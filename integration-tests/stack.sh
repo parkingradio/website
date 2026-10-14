@@ -89,15 +89,13 @@ start_stack() {
     # the development one, so that a newly required setting doesn't have to be added here too.
     #
     # It's published on a port picked by Docker, so that it can't clash with a dev server or another
-    # run, and only on the loopback interface, since the bootstrap admin's password is no secret.
+    # run, and only on the loopback interface, since the admin's password is no secret.
     #
     # Without a private bucket, it keeps artists' photos in a directory it can write to.
     docker run --detach --name "$CONTAINER" --label "$LABEL" --network "$NETWORK" \
         --publish 127.0.0.1::3000 \
         --env-file "${STACK_DIR}/../.env.example" \
         --env DATABASE_URL="postgres://parking_radio:parking_radio@${PG}:5432/parking_radio" \
-        --env BOOTSTRAP_ADMIN_EMAIL="$ADMIN_EMAIL" \
-        --env BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
         --env ASSETS_DOMAIN="$ASSETS_DOMAIN" \
         --env PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
         "$image" >/dev/null
@@ -106,6 +104,23 @@ start_stack() {
 
     if ! wait_until 60 curl --silent --fail "${BASE_URL}/healthz"; then
         echo "Server never became reachable at ${BASE_URL}/healthz" >&2
+        docker logs "$CONTAINER" >&2
+        exit 1
+    fi
+
+    # The admin the tests log in as, created the way a deployment's first admin is: with the create-admin command (see
+    # tools/create-admin), whose invite is then accepted.
+    #
+    # With the checks' helpers, in a subshell, so that what lib.sh sets up (e.g. its ERR trap) stays there.
+    echo "Creating the admin..."
+    if ! (
+        source "${STACK_DIR}/lib.sh"
+        create_admin "$ADMIN_EMAIL"
+        expect_output "Created admin"
+        accept_invite "$(invite_token)" "$ADMIN_PASSWORD"
+        expect_status 200
+    ); then
+        echo "Couldn't create the admin" >&2
         docker logs "$CONTAINER" >&2
         exit 1
     fi

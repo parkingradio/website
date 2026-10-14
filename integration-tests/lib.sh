@@ -56,6 +56,43 @@ session_cookie() {
     printf '%s' "$HEADERS" | sed -n 's/^[Ss]et-[Cc]ookie: *\(session=[^;]*\).*/\1/p'
 }
 
+# create_admin <args...> -- run the create-admin command in the server's container, as tools/create-admin does in
+# production, capturing what it prints (OUTPUT) and its exit status (EXIT_STATUS).
+OUTPUT=""
+EXIT_STATUS=""
+#
+# The output goes through a file rather than $(...), where the ERR trap above would report the command failing even when
+# that's what the check expects.
+create_admin() {
+    local output_file
+    output_file="$(mktemp)"
+    EXIT_STATUS=0
+    docker exec "$CONTAINER" node server/dist/create-admin.js "$@" >"$output_file" 2>&1 || EXIT_STATUS=$?
+    OUTPUT="$(cat "$output_file")"
+    rm -f "$output_file"
+}
+
+# invite_token -- the token in the invite link the last create_admin printed.
+invite_token() {
+    printf '%s' "$OUTPUT" | sed -n 's/.*accept-invite?token=\([0-9a-f]*\).*/\1/p'
+}
+
+# accept_invite <token> <password> -- accept an invite, choosing a password.
+accept_invite() {
+    request --header 'Content-Type: application/json' \
+        --data "{\"token\":\"$1\",\"password\":\"$2\"}" "${BASE_URL}/api/auth/accept-invite"
+}
+
+# expect_output <string> -- expect what the last create_admin printed to contain the string, and it to have succeeded.
+expect_output() {
+    if [ "$EXIT_STATUS" != 0 ] || ! printf '%s' "$OUTPUT" | grep -Fq -- "$1"; then
+        echo "  expected create-admin to succeed, saying: $1" >&2
+        echo "  actual exit status: ${EXIT_STATUS}" >&2
+        printf '%s\n' "$OUTPUT" | sed 's/^/    /' >&2
+        exit 1
+    fi
+}
+
 # photos_on_disk -- how many photos the server keeps, in the directory that stands in for the private bucket.
 photos_on_disk() {
     docker exec "$CONTAINER" find /tmp/private-bucket/artists -type f | wc -l | tr -d ' '

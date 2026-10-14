@@ -30,7 +30,6 @@ NGINX_EOF
 SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "${secret_arn}" --region ${aws_region} \
   --query SecretString --output text)
 JWT_SECRET=$(echo "$SECRET_JSON" | jq -r '.jwt_secret')
-BOOTSTRAP_ADMIN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.bootstrap_admin_password')
 TURNSTILE_SECRET_KEY=$(echo "$SECRET_JSON" | jq -r '.turnstile_secret_key')
 
 cat > /opt/app/.env <<EOF
@@ -43,8 +42,6 @@ MAIL_DOMAIN=${domain}
 ASSETS_DOMAIN=${assets_domain}
 PRIVATE_BUCKET=${private_bucket}
 JWT_SECRET=$JWT_SECRET
-BOOTSTRAP_ADMIN_EMAIL=${bootstrap_admin_email}
-BOOTSTRAP_ADMIN_PASSWORD=$BOOTSTRAP_ADMIN_PASSWORD
 TURNSTILE_SITE_KEY=${turnstile_site_key}
 TURNSTILE_SECRET_KEY=$TURNSTILE_SECRET_KEY
 EOF

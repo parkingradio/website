@@ -55,14 +55,14 @@ function clientAddress(worker: number, nth: number): string {
   return `198.${18 + (index >> 16)}.${(index >> 8) & 255}.${index & 255}`
 }
 
-// The bootstrap admin, whom run.sh starts the server with.
+// The admin run.sh creates when it starts the server (see integration-tests/stack.sh).
 export const admin = {
   email: required('ADMIN_EMAIL'),
   password: required('ADMIN_PASSWORD'),
 }
 
 // Goes to a page of the admin pages, `/admin` unless told otherwise, and sends the login form shown in its place, as the
-// bootstrap admin unless told otherwise.
+// admin unless told otherwise.
 export async function logIn(page: Page, { at = '/admin', email = admin.email, password = admin.password } = {}) {
   await page.goto(at)
   await page.getByLabel('Courriel').fill(email)

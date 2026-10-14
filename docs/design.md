@@ -279,6 +279,10 @@ At `/admin/admins`: manages who can access the admin pages.
   new admin chooses their password, after which they can log in.
 - "Admins existants": lists the existing admins, and lets an admin revoke another one. Not designed yet.
 
+There's no admin to begin with: the first admin of a deployment is created with `tools/create-admin` (see
+[deployment.md](deployment.md#creating-admins)), which also gives an admin who forgot their password a link to choose a
+new one.
+
 ### Configuration
 
 At `/admin/configuration`: the settings that change what the site does. From top to bottom, it shows:

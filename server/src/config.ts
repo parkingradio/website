@@ -25,17 +25,16 @@ export const config = {
   get jwtSecret() {
     return required('JWT_SECRET')
   },
-  get bootstrapAdminEmail() {
-    return required('BOOTSTRAP_ADMIN_EMAIL')
-  },
-  get bootstrapAdminPassword() {
-    return required('BOOTSTRAP_ADMIN_PASSWORD')
-  },
   get awsRegion() {
     return process.env.AWS_REGION
   },
   get mailDomain() {
     return process.env.MAIL_DOMAIN
+  },
+  // Where the site is, e.g. for links to it: the deployment's domain, or else the Vite dev server (see the README).
+  get siteOrigin() {
+    const domain = process.env.MAIL_DOMAIN
+    return domain ? `https://${domain}` : 'http://localhost:5173'
   },
   // Where the app keeps its private files, e.g. artists' photos: the private S3 bucket, or else a local directory that
   // stands in for it (e.g. in development). One of the two is required, so that a missing bucket doesn't go unnoticed

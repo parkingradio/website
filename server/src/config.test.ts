@@ -56,6 +56,18 @@ describe('config', () => {
     })
   })
 
+  describe('siteOrigin', () => {
+    it('is the deployment when MAIL_DOMAIN is set', () => {
+      process.env.MAIL_DOMAIN = 'parking.example.test'
+      expect(config.siteOrigin).toBe('https://parking.example.test')
+    })
+
+    it('is the Vite dev server otherwise', () => {
+      delete process.env.MAIL_DOMAIN
+      expect(config.siteOrigin).toBe('http://localhost:5173')
+    })
+  })
+
   describe('assetsDomain', () => {
     it('throws a clear error when ASSETS_DOMAIN is unset', () => {
       delete process.env.ASSETS_DOMAIN

@@ -17,7 +17,6 @@ import { featuresRoutes } from './routes/features.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
-import { ensureBootstrapAdmin } from './bootstrap-admin.js'
 import { spaRoutes } from './spa.js'
 import { soundCloudClient } from './soundcloud.js'
 import { soundCloudCredentialsStore } from './soundcloud-credentials.js'
@@ -30,6 +29,7 @@ import { applicationsSettingsStore } from './applications-settings.js'
 import { applyStore } from './apply.js'
 import { turnstileVerifier } from './turnstile.js'
 import { sesEmailSender } from './email.js'
+import { adminsStore } from './admins.js'
 import { featuresStore } from './features.js'
 
 const app = Fastify({ loggerInstance: logger })
@@ -37,18 +37,20 @@ app.addHook('onClose', () => db.$client.end())
 
 try {
   await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
-  await ensureBootstrapAdmin(db)
 } catch (error) {
   app.log.error(error)
   process.exit(1)
 }
+
+// Null when the server can't send emails, e.g. in development, where MAIL_DOMAIN isn't set.
+const sendEmail = config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null
 
 await app.register(fastifyCookie)
 await app.register(healthRoutes)
 const features = featuresStore(db)
 await app.register(configRoutes, { store: features })
 await app.register(authRoutes)
-await app.register(adminRoutes)
+await app.register(adminRoutes, { store: adminsStore(db), sendEmail, origin: config.siteOrigin })
 await app.register(eventsRoutes)
 await app.register(radioRoutes, {
   soundcloud: soundCloudClient,
@@ -65,7 +67,7 @@ await app.register(applyRoutes, {
   photos,
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
   settings: applicationsSettings,
-  sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
+  sendEmail,
 })
 await app.register(featuresRoutes, { store: features })
 await app.register(notFoundRoutes, { prefix: '/api' })

@@ -86,17 +86,16 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/../templates/user_data.sh.tftpl", {
-    aws_region            = data.aws_region.current.region
-    domain                = var.domain
-    assets_domain         = local.assets_domain
-    private_bucket        = aws_s3_bucket.private.id
-    turnstile_site_key    = cloudflare_turnstile_widget.applications.sitekey
-    db_secret_arn         = aws_db_instance.main.master_user_secret[0].secret_arn
-    db_username           = aws_db_instance.main.username
-    db_endpoint           = aws_db_instance.main.endpoint
-    db_name               = aws_db_instance.main.db_name
-    secret_arn            = aws_secretsmanager_secret.app.arn
-    bootstrap_admin_email = "admin@${var.domain}"
+    aws_region         = data.aws_region.current.region
+    domain             = var.domain
+    assets_domain      = local.assets_domain
+    private_bucket     = aws_s3_bucket.private.id
+    turnstile_site_key = cloudflare_turnstile_widget.applications.sitekey
+    db_secret_arn      = aws_db_instance.main.master_user_secret[0].secret_arn
+    db_username        = aws_db_instance.main.username
+    db_endpoint        = aws_db_instance.main.endpoint
+    db_name            = aws_db_instance.main.db_name
+    secret_arn         = aws_secretsmanager_secret.app.arn
     compose_file = templatefile("${path.module}/../templates/docker-compose.prod.yml.tftpl", {
       image = "${var.ghcr_image}:${var.app_image_tag}"
     })

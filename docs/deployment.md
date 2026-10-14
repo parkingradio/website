@@ -109,6 +109,20 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."          \
                                        -var="domain=parking.example.com"
 ```
 
+## Creating admins
+
+A new deployment has no admins. Once it's deployed, create the first one with `tools/create-admin`, which prints a link
+where they choose their password:
+
+```sh
+export AWS_PROFILE=your-aws-profile
+tools/create-admin you@example.com --environment test
+```
+
+That admin can then invite the others from the admin pages. The link lasts 24 hours and can be used once, and nothing is
+emailed, so this works before email is set up. This can also be used to regain admin access after being locked out (e.g.
+forgetting your password).
+
 ## Tearing down a deployment
 
 The `teardown.yml` workflow destroys everything Terraform manages in an environment. Note that this includes

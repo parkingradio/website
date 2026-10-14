@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+Invites an admin to a deployment of Parking Radio, and prints the invite link: this is how the first admin of a new
+deployment is created. It also works for an admin who already accepted their invite, e.g. one who forgot their
+password: the link then resets their password, and their current one keeps working until then. Resetting it doesn't end
+the sessions they already have.
+
+The invite is created by the server's own create-admin command (see server/src/create-admin.ts), which this runs inside
+the server's container through SSM, since the database is only reachable from the server's instance. Nothing is emailed:
+the link is only printed here. It lasts 24 hours and can be used once. Note that SSM keeps the command's output, link
+included, for a while.
+
+This script requires the AWS CLI to be configured with credentials that can describe EC2 instances and send SSM
+commands to them, in the deployment's region.
+"""
+
+import argparse
+import json
+import re
+import shlex
+import subprocess
+import sys
+import time
+from typing import Any, Optional
+
+# Instance names come from the stack name in deployment/main/ec2.tf. They're discovered here rather than hardcoded, so
+# this keeps working as environments come and go.
+INSTANCE_RE = re.compile(r"^parking-radio-(?P<environment>.+)$")
+
+# Where deployment/templates/user_data.sh.tftpl puts the Docker Compose stack, and the server's service in it.
+COMPOSE_DIRECTORY = "/opt/app"
+SERVICE = "app"
+
+# How long to wait for the command, which takes a few seconds unless something is wrong.
+TIMEOUT_SECONDS = 120
+
+
+def aws_json(*args: str) -> Any:
+    result = subprocess.run(["aws", *args, "--output", "json"], stdout=subprocess.PIPE, text=True, check=True)
+    return json.loads(result.stdout)
+
+
+def find_instance(environment: str) -> Optional[str]:
+    """Finds the given environment's running instance, listing the environments that do have one if it doesn't."""
+    reservations = aws_json(
+        "ec2",
+        "describe-instances",
+        "--filters",
+        "Name=tag:Name,Values=parking-radio-*",
+        "Name=instance-state-name,Values=running",
+    ).get("Reservations", [])
+    instances: dict[str, list[str]] = {}
+    for reservation in reservations:
+        for instance in reservation.get("Instances", []):
+            name = next((tag["Value"] for tag in instance.get("Tags", []) if tag["Key"] == "Name"), "")
+            match = INSTANCE_RE.match(name)
+            if match:
+                instances.setdefault(match.group("environment"), []).append(instance["InstanceId"])
+
+    found = instances.get(environment, [])
+    if not found:
+        known = ", ".join(sorted(instances)) or "none"
+        print(f"error: no running instance for '{environment}' (environments found: {known})", file=sys.stderr)
+        return None
+    if len(found) > 1:
+        # E.g. while a deployment replaces the instance.
+        print(f"error: more than one running instance for '{environment}' ({', '.join(found)}), try again later", file=sys.stderr)
+        return None
+    return found[0]
+
+
+def run_on_instance(instance: str, command: str) -> dict[str, Any]:
+    """Runs a shell command on the instance through SSM, and returns its invocation once it's done."""
+    command_id = aws_json(
+        "ssm",
+        "send-command",
+        "--instance-ids",
+        instance,
+        "--document-name",
+        "AWS-RunShellScript",
+        "--comment",
+        "tools/create-admin",
+        "--parameters",
+        json.dumps({"commands": [command]}),
+    )["Command"]["CommandId"]
+
+    deadline = time.monotonic() + TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        result = subprocess.run(
+            ["aws", "ssm", "get-command-invocation", "--command-id", command_id, "--instance-id", instance, "--output", "json"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            # SSM may not know the invocation yet, right after the command was sent. Anything else is an actual error.
+            if "InvocationDoesNotExist" in result.stderr:
+                continue
+            print(result.stderr, end="", file=sys.stderr)
+            print(f"error: couldn't get the output of SSM command {command_id}, which may have run anyway", file=sys.stderr)
+            raise subprocess.CalledProcessError(result.returncode, result.args)
+        invocation = json.loads(result.stdout)
+        if invocation["Status"] not in ("Pending", "InProgress", "Delayed", "Cancelling"):
+            return invocation
+    raise TimeoutError(f"SSM command {command_id} didn't finish within {TIMEOUT_SECONDS} seconds")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("email", help="The admin's email address.")
+    parser.add_argument(
+        "--environment",
+        required=True,
+        help="Deployment to act on, i.e. the Terraform workspace (e.g. test, production).",
+    )
+    args = parser.parse_args()
+
+    instance = find_instance(args.environment)
+    if not instance:
+        return 1
+
+    # The server checks the email address. Quoting it is enough to keep it a single argument.
+    command = f"cd {COMPOSE_DIRECTORY} && docker compose exec -T {SERVICE} node server/dist/create-admin.js {shlex.quote(args.email)}"
+    try:
+        invocation = run_on_instance(instance, command)
+    except TimeoutError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+
+    print(invocation.get("StandardOutputContent", ""), end="")
+    print(invocation.get("StandardErrorContent", ""), end="", file=sys.stderr)
+    if invocation["Status"] != "Success":
+        print(f"error: the command ended with status {invocation['Status']}", file=sys.stderr)
+    code = invocation.get("ResponseCode", -1)
+    return code if code > 0 else int(invocation["Status"] != "Success")
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError:
+        sys.exit(1)
