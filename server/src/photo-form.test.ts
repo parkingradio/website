@@ -12,7 +12,7 @@ const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x4
 // A multipart/form-data body with a field, and a file part named "photo" for each of `photos`.
 function form(photos: Buffer[]) {
   const boundary = 'test-boundary'
-  const chunks = [Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="artist"\r\n\r\n{}\r\n`)]
+  const chunks: Buffer[] = [Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="artist"\r\n\r\n{}\r\n`)]
   for (const photo of photos) {
     chunks.push(
       Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),

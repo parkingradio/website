@@ -1,0 +1,9 @@
+// Typechecks the tests too, which tsconfig.json leaves out so that they aren't compiled into `dist`. Vitest strips their
+// types without checking them.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "exclude": []
+}
