@@ -86,7 +86,6 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn(() => 'blob:preview')
   URL.revokeObjectURL = vi.fn()
   Element.prototype.scrollIntoView = vi.fn()
-  window.scrollTo = vi.fn() as never
 })
 
 // The calendar's days, e.g. "ven 4 décembre 2026". `\p{L}` rather than `\w`, which doesn't match accented
@@ -165,6 +164,7 @@ describe('Appliquer', () => {
 
     expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
     expect(screen.getByText('artiste@example.com')).toBeInTheDocument()
+    expect(document.activeElement).toBe(screen.getByText('Candidature envoyée').closest('section'))
 
     const { artist, application, photo, turnstileToken } = sentParts()
     expect(photo?.name).toBe('presse.jpg')

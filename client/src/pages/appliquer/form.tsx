@@ -203,7 +203,6 @@ export function ApplicationForm() {
       const result: ApplyResponse | ApiError = await response.json()
       if (result.ok) {
         setStatus({ state: 'sent', email: profile.email })
-        window.scrollTo?.({ top: 0, behavior: 'smooth' })
         return
       }
       // The server explains what's wrong in French, e.g. that an artist already has that email address.
