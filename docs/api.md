@@ -440,6 +440,7 @@ The endpoints below also return these fields:
 |---|---|---|
 | `id` | string | |
 | `artistId` | string | The artist who applied |
+| `receivedAt` | string | When the artist sent the application. For one sent through `POST /api/applications`, that's when it was created. For one an admin created, it's what the admin said, or else when it was created. Admins can change it either way |
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count |
@@ -507,7 +508,7 @@ token may already be used up, and the page needs to get a new one from the widge
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `applications` | list of applications | Newest first. With `artist`, only that artist's applications. An unknown artist has none |
+| `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications. An unknown artist has none |
 
 ### `GET /api/admin/applications/:id` (admin)
 
@@ -520,21 +521,26 @@ Fails with 404 if the application doesn't exist.
 
 ### `POST /api/admin/applications` (admin)
 
-Creates an application. The request has the application's fields, plus `artistId`: the id of the artist who's
-applying.
+Creates an application, e.g. to bring in one that came by email. The request has the application's fields, plus:
+
+| Request field | Type | |
+|---|---|---|
+| `artistId` | string | The id of the artist who's applying |
+| `receivedAt` | string, optional | When the artist sent the application: a date and time with its offset from UTC, e.g. `"2026-03-28T14:03:00Z"` or `"2026-03-28T10:03:00-04:00"`, which can't be in the future. Now if it's left out |
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
 | `application` | application | The new application |
 
-Fails with 400 if the application isn't valid or the artist doesn't exist.
+Fails with 400 if the application or `receivedAt` isn't valid (with a message in French), or the artist doesn't exist.
 
 ### `PUT /api/admin/applications/:id` (admin)
 
-Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`.
-The artist and the status don't change. The response is the same as for `POST /api/admin/applications`, with the
-updated application. Fails with 400 if the application isn't valid, or 404 if it doesn't exist.
+Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`,
+and leaving `receivedAt` out keeps the one the application has. The artist and the status don't change. The response
+is the same as for `POST /api/admin/applications`, with the updated application. Fails with 400 if the application or
+`receivedAt` isn't valid, or 404 if it doesn't exist.
 
 ### `PUT /api/admin/applications/:id/status` (admin)
 

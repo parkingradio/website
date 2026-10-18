@@ -50,6 +50,7 @@ function application(id: string, artistId: string, changes: Partial<Application>
   return {
     id,
     artistId,
+    receivedAt: '2026-10-05T16:00:00.000Z',
     createdAt: '2026-10-05T16:00:00.000Z',
     createdBy: 'admin@example.com',
     dates: ['2026-12-10'],

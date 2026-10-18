@@ -220,23 +220,29 @@ artists would do, whatever its name. Each application has a status: "nouvelle" w
 "refusée" as an admin decides, and a retained application is "planifiée" once a date has been set with the artist, then
 "faite" once they've played. That's only the usual order: admins can change a status to any other.
 
-The section lists every application, most recent first, with when it was created, the artist, their first few
-dates, the prestations and the status. Buttons above the list show only the applications with a status, with how
-many there are of each.
+Each application also says when the artist sent it ("reçue le"), which isn't always when it was entered on the admin
+pages: an application that came by email, or through the original Google Form, can be brought in long after.
+
+The section lists every application, the most recently received first, with when it was received, the artist, their
+first few dates, the prestations and the status. Buttons above the list show only the applications with a status, with
+how many there are of each.
 
 Under the list, a line says that who the applications artists send are emailed to is chosen in "Configuration" (see
 below), and links to it.
 
-Clicking an application opens it at `/admin/candidatures/<id>`. From top to bottom, it shows:
+Clicking an application opens it at `/admin/candidatures/<id>`. Under its title, it says when it was received, unless
+it's the day it was created, and who created it and when (or that it was sent through the form). From top to bottom, it
+then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when.
 - "Artiste": who the artist is and how to reach them, linking to their page.
-- "Candidature": everything in the application, and a button that changes it in a form in its place.
+- "Candidature": everything in the application, and a button that changes it in a form in its place, including the day
+  it was received.
 - "Supprimer": deletes the application for good, after confirming. The artist stays.
 
 "nouvelle candidature" creates an application by hand, e.g. to bring in one that came through the original Google
-Form: a form with the artist, picked from those in the "Artistes" section, then the application itself. An
-artist's page leads to it with that artist picked already.
+Form: a form with the artist, picked from those in the "Artistes" section, the day the application was received (today
+if it's left empty), then the application itself. An artist's page leads to it with that artist picked already.
 
 Artists apply through the "Appliquer" form once its feature flag is on, and through the original Google Form until
 then. When a new artist applies through the form (`POST /api/applications`), the server creates both the artist and

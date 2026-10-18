@@ -126,6 +126,9 @@ export const applications = pgTable(
     artistId: uuid('artist_id')
       .notNull()
       .references(() => artists.id, { onDelete: 'cascade' }),
+    // When the artist sent the application: when it was created, unless the admin who created it said otherwise, e.g.
+    // for one that came by email.
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
     dates: date('dates').array().notNull(), // sorted
     timeSlots: jsonb('time_slots').$type<TimeSlot[]>().notNull(), // sorted; empty means any time
     prestations: text('prestations').array().$type<PrestationId[]>().notNull(), // ids, in the order of PRESTATIONS

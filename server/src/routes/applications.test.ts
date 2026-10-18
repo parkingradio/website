@@ -15,10 +15,11 @@ let nextId = 0
 // Each application is created a minute after the previous one, so that the tests can check "newest first".
 let clock = Date.parse('2026-10-07T16:00:00Z')
 
+// Like the database, which leaves a column as it is when it's given undefined.
 function change(id: string, changes: Partial<StoredApplication>) {
   const before = rows.find((row) => row.id === id)
   if (!before) return null
-  const after = { ...before, ...changes }
+  const after = { ...before, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
   rows = rows.map((row) => (row.id === id ? after : row))
   return after
 }
@@ -26,11 +27,13 @@ function change(id: string, changes: Partial<StoredApplication>) {
 const store: ApplicationsStore = {
   list: async (artistId) => rows.filter((row) => artistId === undefined || row.artistId === artistId).toReversed(),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
-  create: vi.fn<ApplicationsStore['create']>(async (application) => {
+  create: vi.fn<ApplicationsStore['create']>(async ({ receivedAt, ...application }) => {
     if (!ARTISTS.includes(application.artistId)) throw new NoSuchArtist()
+    const createdAt = new Date((clock += 60_000))
     const row: StoredApplication = {
       id: `application-${++nextId}`,
-      createdAt: new Date((clock += 60_000)),
+      receivedAt: receivedAt ?? createdAt,
+      createdAt,
       updatedBy: null,
       updatedAt: null,
       status: 'new',
@@ -135,6 +138,8 @@ describe('applications routes', () => {
           // Sorted.
           dates: ['2026-12-10', '2027-01-15'],
           id: 'application-1',
+          // When it was created, since nothing else was said.
+          receivedAt: rows[0].createdAt.toISOString(),
           createdAt: rows[0].createdAt.toISOString(),
           createdBy: 'admin@example.com',
           updatedBy: null,
@@ -159,6 +164,31 @@ describe('applications routes', () => {
       const response = await create(app, { dates: ['2099-12-31', '2020-02-29'] })
       expect(response.statusCode).toBe(200)
       expect(response.json().application.dates).toEqual(['2020-02-29', '2099-12-31'])
+    })
+
+    it('takes when the artist sent the application, if it is not in the future', async () => {
+      const app = await buildApp()
+      const received = await create(app, { receivedAt: '2026-03-28T10:03:00-04:00' })
+      expect(received.statusCode).toBe(200)
+      expect(received.json().application).toMatchObject({ receivedAt: '2026-03-28T14:03:00.000Z', createdAt: rows[0].createdAt.toISOString() })
+
+      const now = new Date().toISOString()
+      expect((await create(app, { receivedAt: now })).json().application.receivedAt).toBe(now)
+    })
+
+    it('explains, in French, what is wrong with when the application was received', async () => {
+      const app = await buildApp()
+      // The rules are tested with checkReceivedAt itself.
+      const invalid = [
+        { receivedAt: new Date(Date.now() + 60_000).toISOString(), error: 'La date de réception ne peut pas être dans le futur.' },
+        { receivedAt: '2026-03-28', error: 'La date de réception est invalide.' },
+      ]
+      for (const { receivedAt, error } of invalid) {
+        const response = await create(app, { receivedAt })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(rows).toHaveLength(0)
     })
 
     it('requires an artist that exists', async () => {
@@ -255,12 +285,27 @@ describe('applications routes', () => {
       expect(response.json().application.updatedAt).toEqual(expect.any(String))
     })
 
+    it('changes when the application was received, or keeps it when that is left out', async () => {
+      const app = await buildApp()
+      await create(app, { receivedAt: '2026-03-28T14:03:00Z' })
+      const kept = await send(app, 'PUT', '/api/admin/applications/application-1', application({ details: 'Corrigé.' }))
+      expect(kept.json().application).toMatchObject({ receivedAt: '2026-03-28T14:03:00.000Z', details: 'Corrigé.' })
+
+      const changed = await send(app, 'PUT', '/api/admin/applications/application-1', application({ receivedAt: '2026-03-27T04:00:00Z' }))
+      expect(changed.json().application.receivedAt).toBe('2026-03-27T04:00:00.000Z')
+    })
+
     it('explains what is wrong with an invalid application, without changing it', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/applications/application-1', application({ dates: [] }))
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Choisissez au moins une date.' })
+      for (const [changes, error] of [
+        [{ dates: [] }, 'Choisissez au moins une date.'],
+        [{ receivedAt: '2099-01-01T00:00:00Z' }, 'La date de réception ne peut pas être dans le futur.'],
+      ] as const) {
+        const response = await send(app, 'PUT', '/api/admin/applications/application-1', application(changes))
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
       expect(rows[0].updatedBy).toBeNull()
     })
 

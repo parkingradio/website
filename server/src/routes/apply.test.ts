@@ -27,9 +27,11 @@ const store: ApplyStore = {
     if (artists.some((other) => other.email.toLowerCase() === artist.email.toLowerCase())) throw new EmailTaken()
     const applicant: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...artist }
     artists.push(applicant)
+    const now = new Date()
     const application: StoredApplication = {
       id: `application-${++nextId}`,
-      createdAt: new Date(),
+      receivedAt: now,
+      createdAt: now,
       createdBy: null,
       artistId: applicant.id,
       updatedBy: null,

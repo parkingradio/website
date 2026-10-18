@@ -50,7 +50,7 @@ export function ApplicationsTable({ applications, artists }: { applications: App
           return (
             <tr key={application.id}>
               <td>
-                <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.createdAt))}</Link>
+                <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.receivedAt))}</Link>
               </td>
               {artists && (
                 <td>
@@ -90,7 +90,7 @@ export function ApplicationsPage() {
   )
 }
 
-// Every application, newest first, or only those with the status in the `statut` query parameter.
+// Every application, the most recently received first, or only those with the status in the `statut` query parameter.
 function ApplicationsList() {
   const applications = useApi<ApplicationsResponse>('/api/admin/applications')
   const artists = useApi<ArtistsResponse>('/api/admin/artists')
@@ -226,6 +226,10 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
     <>
       <BackToApplications />
       {title}
+      {/* Unless it was received the day it was created, e.g. if it was sent through the form. */}
+      {dateFormat.format(new Date(application.receivedAt)) !== dateFormat.format(new Date(application.createdAt)) && (
+        <p className="admin-meta">Reçue le {dateFormat.format(new Date(application.receivedAt))}.</p>
+      )}
       <p className="admin-meta">
         {byWhom('Créée', application.createdBy, application.createdAt) ??
           `Envoyée par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(application.createdAt))}.`}

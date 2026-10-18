@@ -5,7 +5,8 @@
 # - the applications table, and that the database takes every status
 # - that dates come back from the database as "YYYY-MM-DD"
 # - that an application can only belong to an artist who exists
-# - that applications are listed newest first
+# - that applications are listed by when they were received, the most recent first, and that an application was received
+#   when it was created unless an admin said otherwise
 # - that deleting an artist deletes their applications
 # - the applications_settings table, and that who applications are emailed to is saved, and replaced
 
@@ -29,10 +30,10 @@ json() {
     request --header "Cookie: ${cookie}" --request "$1" ${body[@]+"${body[@]}"} "$2"
 }
 
-# application <artist id> [<details>] -- an application for that artist, as JSON.
+# application <artist id> [<details>] [<more JSON fields>] -- an application for that artist, as JSON.
 application() {
-    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"}' \
-        "$1" "${2:-}"
+    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"%s}' \
+        "$1" "${2:-}" "${3:+,$3}"
 }
 
 # The artist who applies.
@@ -71,16 +72,28 @@ expect_body_contains '"dates":["2020-02-29","2027-01-15"]'
 expect_body '"timeSlots":\[\{("start":"18:00","end":"22:00"|"end":"22:00","start":"18:00")\}\],"prestations":\["dj"\],"otherPrestation":"","details":"first"'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains '"status":"new"'
+[ "$(body_field receivedAt)" = "$(body_field createdAt)" ] || { _show_body; fail "expected the application to be received when it was created"; }
 
-echo "  applications are listed newest first, and by artist"
+echo "  an application is created with when it was received, which can't be in the future"
+json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" third '"receivedAt":"2026-03-28T10:03:00-04:00"')"
+expect_status 200
+third="$(body_id)"
+json GET "${BASE_URL}/api/admin/applications/${third}"
+expect_body_contains '"receivedAt":"2026-03-28T14:03:00.000Z"'
+json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" future '"receivedAt":"2099-01-01T00:00:00Z"')"
+expect_status 400
+expect_body_contains 'La date de réception ne peut pas être dans le futur.'
+
+echo "  applications are listed by when they were received, the most recent first, and by artist"
 json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" second)"
 expect_status 200
 second="$(body_id)"
 json GET "${BASE_URL}/api/admin/applications"
 expect_status 200
-expect_body "\"id\":\"${second}\".*\"id\":\"${first}\""
+# The third was created before the second, but received long before.
+expect_body "\"id\":\"${second}\".*\"id\":\"${first}\".*\"id\":\"${third}\""
 json GET "${BASE_URL}/api/admin/applications?artist=${artist}"
-expect_body "\"id\":\"${second}\".*\"id\":\"${first}\""
+expect_body "\"id\":\"${second}\".*\"id\":\"${first}\".*\"id\":\"${third}\""
 json GET "${BASE_URL}/api/admin/applications?artist=${NOBODY}"
 expect_body_contains '"applications":[]'
 json GET "${BASE_URL}/api/admin/applications?artist=not-a-uuid"
@@ -92,6 +105,12 @@ json PUT "${BASE_URL}/api/admin/applications/${first}" \
 expect_status 200
 expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"prestations":["live-performance","full-band"],"otherPrestation":"Synthé modulaire"'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
+json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" changed '"receivedAt":"2026-03-27T04:00:00Z"')"
+expect_status 200
+expect_body_contains '"receivedAt":"2026-03-27T04:00:00.000Z"'
+json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" 'changed again')"
+expect_status 200
+expect_body_contains '"receivedAt":"2026-03-27T04:00:00.000Z"'
 for status in accepted scheduled done rejected new; do
     json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
     expect_status 200

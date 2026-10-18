@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkApplication, isDay, isTime } from 'shared/applications'
+import { checkApplication, checkReceivedAt, isDay, isTime } from 'shared/applications'
 import type { ApplicationFields } from 'shared/applications'
 import { validateApplication } from './applications.js'
 
@@ -118,5 +118,32 @@ describe('checkApplication', () => {
     const { application, errors } = checkApplication(fields())
     expect(errors).toBeUndefined()
     expect(application?.dates).toEqual(['2026-12-10', '2027-01-15'])
+  })
+})
+
+describe('checkReceivedAt', () => {
+  const now = new Date('2026-10-14T18:00:00Z')
+
+  it('takes a date and time with its offset from UTC, up to now', () => {
+    expect(checkReceivedAt('0001-01-01T00:00Z', now)).toEqual({ value: new Date('0001-01-01T00:00:00Z') })
+    expect(checkReceivedAt('2026-03-28T10:03-04:00', now)).toEqual({ value: new Date('2026-03-28T14:03:00Z') })
+    expect(checkReceivedAt('2026-03-28T14:03:07.123Z', now)).toEqual({ value: new Date('2026-03-28T14:03:07.123Z') })
+    expect(checkReceivedAt('2026-10-14T18:00:00Z', now)).toEqual({ value: now })
+    expect(checkReceivedAt('2026-10-14T19:00:00+01:00', now)).toEqual({ value: now })
+  })
+
+  it('takes nothing as nothing', () => {
+    expect(checkReceivedAt(undefined, now)).toEqual({ value: undefined })
+  })
+
+  it('refuses a date and time in the future', () => {
+    for (const sent of ['2026-10-14T18:00:00.001Z', '2026-10-14T14:01:00-04:00', '2027-01-01T00:00:00Z']) {
+      expect(checkReceivedAt(sent, now)).toEqual({ error: 'La date de réception ne peut pas être dans le futur.' })
+    }
+  })
+
+  it('refuses anything but a date and time that exist, with their offset from UTC', () => {
+    const invalid = ['0000-06-01T00:00Z', '0001-01-01T00:00+04:00', '2026-03-28', '2026-03-28T10:03', '2026-03-28 10:03Z', '2026-02-29T10:03Z', '2026-03-28T24:00Z', '2026-03-28T10:60Z', '2026-03-28T10:03+24:00', '', null, 1774706580000]
+    for (const sent of invalid) expect(checkReceivedAt(sent, now)).toEqual({ error: 'La date de réception est invalide.' })
   })
 })

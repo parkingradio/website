@@ -4,7 +4,7 @@
 # Cloudflare's test keys from .env.example, whose secret key accepts every token. The unit tests fake both the database
 # and Turnstile, so this is where we check that:
 # - a new artist who applies is created along with their application, both with a null createdBy, with or without a
-#   photo
+#   photo, and the application is received when it's created
 # - an artist who already exists (same email, ignoring case) can't apply again, and the photo they sent is deleted
 # - if two people apply with the same new email at the same time, only one artist is created
 # - an application without a token is refused
@@ -57,6 +57,7 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/applications?artist=
 expect_status 200
 expect_body_contains '"dates":["2027-03-12"]'
 expect_body_contains '"createdBy":null'
+[ -n "$(body_field receivedAt)" ] && [ "$(body_field receivedAt)" = "$(body_field createdAt)" ] || { _show_body; fail "expected the application to be received when it was created"; }
 
 echo "  an artist applies without a photo, and is added without one"
 photos="$(photos_on_disk)"

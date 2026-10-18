@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, isDay, isTime } from 'shared/applications'
-import type { ApplicationFields, PrestationId, TimeSlot } from 'shared/applications'
+import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, checkReceivedAt, isDay, isTime } from 'shared/applications'
+import type { ApplicationFields, PrestationId, TimeSlot, UpdateApplicationRequest } from 'shared/applications'
 import type { Artist } from 'shared/artists'
+import type { Checked } from 'shared/checks'
 import { leaving, useCheckedForm } from './checked-form'
 import { prestationName } from './describe'
 import { FieldError, FormActions, Labeled } from './fields'
@@ -12,22 +13,47 @@ import { FieldError, FormActions, Labeled } from './fields'
 
 const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], otherPrestation: '', details: '' }
 
-type Field = keyof ApplicationFields | 'artist'
+type Field = keyof ApplicationFields | 'artist' | 'receivedAt'
 
 type ApplicationFormProps = {
-  // The application to change, or nothing for a new one.
-  application?: ApplicationFields
+  // The application to change, with when it was received, or nothing for a new one.
+  application?: UpdateApplicationRequest
   // For a new application: the artists it can be for, and the one picked at first, if any.
   artists?: { all: Artist[]; initial: string | null }
   submitLabel: string
-  // Sends the application, with the artist picked for a new one, and returns the error, if it failed.
-  onSubmit: (fields: ApplicationFields, artistId: string) => Promise<string | null>
+  // Sends the application, with the artist picked for a new one, and returns the error, if it failed. `receivedAt` is
+  // left out unless the day it was received was picked, or changed.
+  onSubmit: (fields: UpdateApplicationRequest, artistId: string) => Promise<string | null>
   onCancel?: () => void
+}
+
+// The day of `instant` (ISO 8601), as "YYYY-MM-DD", in the browser's time zone, where the admin pages show dates.
+function localDay(instant: string): string {
+  const date = new Date(instant)
+  const pad = (part: number, length: number) => String(part).padStart(length, '0')
+  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1, 2)}-${pad(date.getDate(), 2)}`
+}
+
+// When an application was received, to send, from the day picked: the start of that day in the browser's time zone, or
+// nothing if it's still `initialDay`, so that the time it was received at is kept. Returns what's wrong with the day
+// instead, if anything.
+function checkReceivedDay(day: string, initialDay: string): Checked<string | undefined> {
+  if (day === initialDay) return { value: undefined }
+  // Only a new application can be left without a day, as received now.
+  if (!day) return { error: 'Choisissez le jour où la candidature a été reçue.' }
+  // Browsers let years have more than 4 digits, which aren't dates the server takes.
+  if (!isDay(day)) return { error: 'La date de réception est invalide.' }
+  const receivedAt = new Date(`${day}T00:00`).toISOString()
+  const { error } = checkReceivedAt(receivedAt)
+  return error === undefined ? { value: receivedAt } : { error }
 }
 
 export function ApplicationForm({ application = EMPTY, artists, submitLabel, onSubmit, onCancel }: ApplicationFormProps) {
   // An artist that isn't one of those listed, e.g. from an outdated link, isn't picked.
   const [artistId, setArtistId] = useState(artists?.all.find((artist) => artist.id === artists.initial)?.id ?? '')
+  // The day the application was received, as "YYYY-MM-DD", or empty for a new one, which was received now.
+  const initialDay = application.receivedAt ? localDay(application.receivedAt) : ''
+  const [receivedDay, setReceivedDay] = useState(initialDay)
   // Days as "YYYY-MM-DD", or empty for a field that's not filled yet.
   const [dates, setDates] = useState(application.dates.length > 0 ? application.dates : [''])
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(application.timeSlots)
@@ -51,9 +77,11 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
     otherPrestation,
     details,
   }
+  const { value: receivedAt, error: receivedAtError } = checkReceivedDay(receivedDay, initialDay)
   const errors: Partial<Record<Field, string>> = { ...checkApplication(fields).errors }
   if (artists && !artistId) errors.artist = "Choisissez l'artiste."
-  const { form, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(fields, artistId))
+  if (receivedAtError) errors.receivedAt = receivedAtError
+  const { form, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit({ ...fields, receivedAt }, artistId))
 
   const changeSlot = (index: number, changes: Partial<TimeSlot>) =>
     setTimeSlots(timeSlots.map((slot, i) => (i === index ? { ...slot, ...changes } : slot)))
@@ -75,6 +103,17 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
           </select>
         </Labeled>
       )}
+
+      <Labeled label="Reçue le" error={shown('receivedAt')}>
+        <input
+          type="date"
+          value={receivedDay}
+          aria-invalid={shown('receivedAt') ? true : undefined}
+          onChange={(event) => setReceivedDay(event.target.value)}
+          onBlur={leave('receivedAt')}
+        />
+      </Labeled>
+      <p className="admin-hint">Le jour où l'artiste a envoyé sa candidature.{!application.receivedAt && " Sans date, c'est aujourd'hui."}</p>
 
       <fieldset className="admin-fields" onBlur={leaving(leave('dates'))}>
         <legend>Dates souhaitées</legend>

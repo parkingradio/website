@@ -22,6 +22,13 @@
       "when": 1791988213596,
       "tag": "0002_admins_invited_by_session_version",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792035661823,
+      "tag": "0003_applications_received_at",
+      "breakpoints": true
     }
   ]
 }

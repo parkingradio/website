@@ -98,9 +98,15 @@ photos_on_disk() {
     docker exec "$CONTAINER" find /tmp/private-bucket/artists -type f | wc -l | tr -d ' '
 }
 
+# body_field <name> -- the string field with this name in the body of the last request (the last one, if there are
+# several).
+body_field() {
+    printf '%s' "$BODY" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"
+}
+
 # body_id -- the "id" in the body of the last request, e.g. of what it created.
 body_id() {
-    printf '%s' "$BODY" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p'
+    body_field id
 }
 
 # expect_status <code>

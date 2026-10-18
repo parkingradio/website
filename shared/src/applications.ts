@@ -6,7 +6,7 @@
 // like for profiles, because artists will see them.
 
 import { checkLine, checkText } from './checks.ts'
-import type { FieldErrors } from './checks.ts'
+import type { Checked, FieldErrors } from './checks.ts'
 
 export type ApplicationFields = {
   // The days the artist would like to play, as "YYYY-MM-DD", sorted. At least one. Past days are allowed.
@@ -47,8 +47,12 @@ export type Application = ApplicationFields & {
   id: string
   // The artist who applied.
   artistId: string
+  // When the artist sent the application (ISO 8601). For an application they sent themselves (see
+  // `POST /api/applications`), that's when it was created. For one an admin created, e.g. to bring in one that came by
+  // email, it's what the admin said, or else when it was created. Admins can change it either way.
+  receivedAt: string
   // When the application was created (ISO 8601), and the email of the admin who created it. `createdBy` is null if the
-  // artist sent the application themselves (see `POST /api/applications`).
+  // artist sent the application themselves.
   createdAt: string
   createdBy: string | null
   // Who last changed the application (an admin's email), and when (ISO 8601). Null until then. Status changes don't
@@ -87,19 +91,22 @@ export type ApplyResponse = { ok: true }
 
 // All the endpoints below require an admin session, and fail with 401 without one.
 
-// `GET /api/admin/applications[?artist=<id>]`: all applications, newest first. With `artist`, only that artist's.
+// `GET /api/admin/applications[?artist=<id>]`: all applications, the most recently received first. With `artist`, only
+// that artist's.
 export type ApplicationsResponse = { ok: true; applications: Application[] }
 
 // `GET /api/admin/applications/:id`: one application. Fails with 404 if it doesn't exist.
 export type ApplicationResponse = { ok: true; application: Application }
 
-// `POST /api/admin/applications`: creates an application for an existing artist, and returns it. Fails with 400 if
-// the application isn't valid (with a message in French) or the artist doesn't exist.
-export type CreateApplicationRequest = ApplicationFields & { artistId: string }
+// `POST /api/admin/applications`: creates an application for an existing artist, and returns it. `receivedAt` is when
+// the artist sent it (see `checkReceivedAt`), now if it's left out. Fails with 400 if the application or `receivedAt`
+// isn't valid (with a message in French) or the artist doesn't exist.
+export type CreateApplicationRequest = ApplicationFields & { artistId: string; receivedAt?: string }
 
-// `PUT /api/admin/applications/:id`: replaces an application's fields, and returns it. The artist and the status
-// don't change. Fails with 400 if the application isn't valid, or 404 if it doesn't exist.
-export type UpdateApplicationRequest = ApplicationFields
+// `PUT /api/admin/applications/:id`: replaces an application's fields, and returns it. `receivedAt` is like for
+// `POST /api/admin/applications`, but leaving it out keeps the one the application has. The artist and the status
+// don't change. Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
+export type UpdateApplicationRequest = ApplicationFields & { receivedAt?: string }
 
 // `PUT /api/admin/applications/:id/status`: changes an application's status, and returns the application. Fails with
 // 400 if the status isn't valid, or 404 if the application doesn't exist.
@@ -139,6 +146,23 @@ export function isDay(value: string): boolean {
 // Whether `value` is a "HH:MM" time of day, from 00:00 to 23:59.
 export function isTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+}
+
+// Checks when an admin says an application was received (see `CreateApplicationRequest`): an ISO 8601 date and time
+// with its offset from UTC, e.g. "2026-03-28T14:03:00Z" or "2026-03-28T10:03:00-04:00", that isn't later than `now`.
+// Returns it as a Date, or undefined if it was left out.
+export function checkReceivedAt(sent: unknown, now = new Date()): Checked<Date | undefined> {
+  if (sent === undefined) return { value: undefined }
+  // Date.parse alone takes more than this, e.g. "2026-02-30T00:00Z" as March 2.
+  const match = typeof sent === 'string' ? /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:[0-5]\d(\.\d+)?)?(Z|[+-](\d{2}:\d{2}))$/.exec(sent) : null
+  if (!match || !isDay(match[1]) || !isTime(match[2]) || (match[6] !== undefined && !isTime(match[6]))) {
+    return { error: 'La date de réception est invalide.' }
+  }
+  const receivedAt = new Date(match[0])
+  // Postgres has no year 0, which is 1 BC, e.g. for "0001-01-01T00:00+01:00".
+  if (receivedAt.getUTCFullYear() < 1) return { error: 'La date de réception est invalide.' }
+  if (receivedAt > now) return { error: 'La date de réception ne peut pas être dans le futur.' }
+  return { value: receivedAt }
 }
 
 // Checks an application's fields, as they were sent or as they're being filled in a form, and returns the cleaned-up

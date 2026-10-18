@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { APPLICATION_STATUSES, MAX_RECIPIENTS } from 'shared/applications'
+import { APPLICATION_STATUSES, MAX_RECIPIENTS, checkReceivedAt } from 'shared/applications'
 import type {
   Application,
   ApplicationFields,
@@ -31,6 +31,7 @@ function application(row: StoredApplication): Application {
   return {
     id: row.id,
     artistId: row.artistId,
+    receivedAt: row.receivedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
     dates: row.dates,
@@ -46,14 +47,19 @@ function application(row: StoredApplication): Application {
   }
 }
 
-// Returns the checked fields of the application that was sent (see `validateApplication`), or the error to send back.
-function validated(sent: unknown): ApplicationFields | ApiError {
+// Returns the checked fields of the application that was sent (see `validateApplication`), with when it was received if
+// that was sent too (see `checkReceivedAt`), or the error to send back.
+function validated(sent: Partial<UpdateApplicationRequest> | null): (ApplicationFields & { receivedAt?: Date }) | ApiError {
+  let fields
   try {
-    return validateApplication(sent)
+    fields = validateApplication(sent)
   } catch (error) {
     if (!(error instanceof InvalidApplication)) throw error
     return { ok: false, error: error.message }
   }
+  const receivedAt = checkReceivedAt(sent?.receivedAt)
+  if (receivedAt.error !== undefined) return { ok: false, error: receivedAt.error }
+  return { ...fields, receivedAt: receivedAt.value }
 }
 
 function recipientsResponse(settings: ApplicationsSettings | null): ApplicationRecipientsResponse {

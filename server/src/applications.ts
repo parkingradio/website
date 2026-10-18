@@ -28,14 +28,14 @@ export class NoSuchArtist extends Error {}
 // Where applications are stored. Methods that take an application's id return null if it doesn't exist, including
 // when the id isn't a UUID.
 export type ApplicationsStore = {
-  // Newest first. With `artistId`, only that artist's applications.
+  // The most recently received first, then the most recently created. With `artistId`, only that artist's applications.
   list(artistId?: string): Promise<StoredApplication[]>
   get(id: string): Promise<StoredApplication | null>
   // `createdBy` is the email of the admin who creates the application, or null if the artist sends it themselves.
-  // Throws a NoSuchArtist.
-  create(application: ApplicationFields & { artistId: string; createdBy: string | null }): Promise<StoredApplication>
-  // Replaces the application's fields, and returns the updated application.
-  update(id: string, changes: ApplicationFields & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
+  // `receivedAt` is when the artist sent it, now if it's left out. Throws a NoSuchArtist.
+  create(application: ApplicationFields & { artistId: string; createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
+  // Replaces the application's fields, and `receivedAt` unless it's left out, and returns the updated application.
+  update(id: string, changes: ApplicationFields & { receivedAt?: Date; updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
   // Changes the application's status, and returns the updated application.
   setStatus(id: string, change: { status: ApplicationStatus; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
   // Returns false if the application didn't exist.
@@ -56,7 +56,7 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
         .select()
         .from(applications)
         .where(artistId === undefined ? undefined : eq(applications.artistId, artistId))
-        .orderBy(desc(applications.createdAt))
+        .orderBy(desc(applications.receivedAt), desc(applications.createdAt))
     },
 
     async get(id) {

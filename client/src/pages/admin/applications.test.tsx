@@ -36,6 +36,7 @@ const ARTISTS = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] } }
 const APPLICATION: Application = {
   id: 'application-1',
   artistId: 'artist-1',
+  receivedAt: '2026-10-05T16:00:00.000Z',
   createdAt: '2026-10-05T16:00:00.000Z',
   createdBy: 'admin@example.com',
   dates: ['2026-12-10', '2026-12-17', '2027-01-07', '2027-01-14'],
@@ -50,12 +51,13 @@ const APPLICATION: Application = {
   statusUpdatedAt: null,
 }
 
-// Newest first, as the server lists them.
+// The most recently received first, as the server lists them. The last one came by email in March, and was created after
+// the others.
 const APPLICATIONS: Application[] = [
-  { ...APPLICATION, id: 'application-4', createdAt: '2026-10-08T16:00:00.000Z', dates: ['2026-10-29'], prestations: ['vinyl'], otherPrestation: '', status: 'done' },
-  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['rap'], status: 'rejected' },
-  { ...APPLICATION, id: 'application-2', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['full-band'], otherPrestation: '', status: 'accepted' },
-  APPLICATION,
+  { ...APPLICATION, id: 'application-4', receivedAt: '2026-10-08T16:00:00.000Z', createdAt: '2026-10-08T16:00:00.000Z', dates: ['2026-10-29'], prestations: ['vinyl'], otherPrestation: '', status: 'done' },
+  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', receivedAt: '2026-10-07T16:00:00.000Z', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['rap'], status: 'rejected' },
+  { ...APPLICATION, id: 'application-2', receivedAt: '2026-10-06T16:00:00.000Z', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['full-band'], otherPrestation: '', status: 'accepted' },
+  { ...APPLICATION, receivedAt: '2026-03-28T14:00:00.000Z', createdAt: '2026-10-09T16:00:00.000Z' },
 ]
 
 function CurrentPath() {
@@ -80,7 +82,7 @@ const rows = () =>
 
 
 describe('The list of applications', () => {
-  it('lists every application, newest first, with its artist', async () => {
+  it('lists every application, the most recently received first, with when it was received and its artist', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
     renderAt('/admin/candidatures')
 
@@ -89,11 +91,11 @@ describe('The list of applications', () => {
       ['8 octobre 2026', 'Aurore', '29 oct. 2026', 'Vinyl', 'faite'],
       ['7 octobre 2026', 'Brume', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
       ['6 octobre 2026', 'Aurore', '12 nov. 2026', 'Full Band', 'retenue'],
-      ['5 octobre 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
+      ['28 mars 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
     ])
     // There's nothing more to do about an application that's done, so it's greyed out like a rejected one.
     expect(screen.getByRole('cell', { name: 'faite' })).toHaveClass('admin-status-done')
-    expect(screen.getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
+    expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')
     // Where who they're emailed to is chosen.
@@ -163,12 +165,33 @@ describe('An application’s page', () => {
     expect(screen.getByText(/^Envoyée par/)).toHaveTextContent('Envoyée par le formulaire « appliquer » le 5 octobre 2026.')
   })
 
+  it('says when the application was received, when that is not the day it was created', async () => {
+    const received = { ...APPLICATION, receivedAt: '2026-03-28T14:00:00.000Z' }
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: received } })
+    renderAt('/admin/candidatures/application-1')
+
+    await waitFor(() => expect(screen.getByText(/^Reçue le/)).toHaveTextContent('Reçue le 28 mars 2026.'))
+    expect(screen.getByText(/^Créée par/)).toHaveTextContent(/^Créée par admin@example.com le 5 octobre 2026/)
+  })
+
+  it('says once when the application was received and created the same day', async () => {
+    // E.g. if the admin who created it picked that day, which is received at its start.
+    const received = { ...APPLICATION, receivedAt: new Date('2026-10-05T00:00').toISOString(), createdAt: new Date('2026-10-05T12:00').toISOString() }
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: received } })
+    renderAt('/admin/candidatures/application-1')
+
+    await waitFor(() => expect(screen.getByText(/^Créée par/)).toHaveTextContent(/^Créée par admin@example.com le 5 octobre 2026/))
+    expect(screen.queryByText(/^Reçue le/)).not.toBeInTheDocument()
+  })
+
   it('shows the application, and who the artist is', async () => {
     mockFetch(PAGE)
     renderAt('/admin/candidatures/application-1')
 
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Aurore' })).toBeInTheDocument())
     expect(screen.getByText(/^Créée par/)).toHaveTextContent(/^Créée par admin@example.com le 5 octobre 2026/)
+    // It was received the day it was created, which is said once.
+    expect(screen.queryByText(/^Reçue le/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'nouvelle' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')
@@ -217,6 +240,7 @@ describe('An application’s page', () => {
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    expect(screen.getByLabelText('Reçue le')).toHaveValue('2026-10-05')
     expect(screen.getByLabelText('Date 4')).toHaveValue('2027-01-14')
     expect(screen.getByLabelText('DJ')).toBeChecked()
     expect(screen.getByLabelText('Rap')).not.toBeChecked()
@@ -232,6 +256,7 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Corrigé.')).toBeInTheDocument())
+    // Without when it was received, which didn't change, so that the server keeps the time too.
     expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0])).toEqual({
       dates: ['2026-12-17', '2027-01-07', '2027-01-14', '2027-02-04'],
       timeSlots: [],
@@ -241,6 +266,41 @@ describe('An application’s page', () => {
       details: 'Corrigé.',
     })
     expect(screen.getByText(/^Modifiée par/)).toHaveTextContent(/^Modifiée par other@example.com le 6 octobre 2026/)
+  })
+
+  it('changes when the application was received, to the start of the day picked', async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
+    renderAt('/admin/candidatures/application-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Reçue le'), { target: { value: '2026-03-28' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
+    // In the browser's time zone, like the admin pages show dates.
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe(new Date('2026-03-28T00:00').toISOString())
+  })
+
+  it('needs a day when the application was received, which is not in the future', async () => {
+    mockFetch(PAGE)
+    renderAt('/admin/candidatures/application-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    const received = screen.getByLabelText('Reçue le')
+    fireEvent.change(received, { target: { value: '2099-01-01' } })
+    fireEvent.blur(received)
+    expect(screen.getByText('La date de réception ne peut pas être dans le futur.')).toBeInTheDocument()
+    expect(received).toHaveAttribute('aria-invalid', 'true')
+
+    // Browsers let years have more digits than the server takes.
+    fireEvent.change(received, { target: { value: '20260-03-28' } })
+    expect(screen.getByText('La date de réception est invalide.')).toBeInTheDocument()
+
+    fireEvent.change(received, { target: { value: '' } })
+    expect(screen.getByText('Choisissez le jour où la candidature a été reçue.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(received).toHaveFocus())
+    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
   it('sends the prestations in the order of the list, whatever order they were checked in', async () => {
@@ -380,6 +440,8 @@ describe('Creating an application', () => {
 
     const picked = await screen.findByLabelText('Artiste')
     expect(picked).toHaveValue('artist-2')
+    // Received now, unless said otherwise.
+    expect(screen.getByLabelText('Reçue le')).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
     fireEvent.click(screen.getByLabelText('DJ'))
     fireEvent.change(screen.getByLabelText('Autre'), { target: { value: 'B2B' } })
@@ -393,6 +455,21 @@ describe('Creating an application', () => {
       prestations: ['dj'],
       otherPrestation: 'B2B',
       details: '',
+    })
+  })
+
+  it('sends when the application was received, if a day was picked', async () => {
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, 'POST /api/admin/applications': { ok: true, application: APPLICATION } })
+    renderAt('/admin/candidatures/nouvelle?artiste=artist-1')
+
+    fireEvent.change(await screen.findByLabelText('Reçue le'), { target: { value: '2026-03-28' } })
+    fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
+
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(1))
+    expect(jsonBody(requestsTo('POST', '/api/admin/applications')[0])).toMatchObject({
+      artistId: 'artist-1',
+      receivedAt: new Date('2026-03-28T00:00').toISOString(),
     })
   })
 
