@@ -16,10 +16,10 @@ import { isUuid } from './uuid.js'
 // Thrown when a profile or photo is invalid. Its message tells the artist what's wrong, in French.
 export class InvalidProfile extends Error {}
 
-// Checks a profile with `checkProfile`, and returns what's saved of it. Throws an InvalidProfile, saying what's wrong
-// with the first field that's wrong, otherwise.
-export function validateProfile(sent: unknown): ArtistProfile {
-  const { profile, errors } = checkProfile(sent)
+// Checks a profile with `checkProfile`, leniently for the admin pages, and returns what's saved of it. Throws an
+// InvalidProfile, saying what's wrong with the first field that's wrong, otherwise.
+export function validateProfile(sent: unknown, options?: { lenient?: boolean }): ArtistProfile {
+  const { profile, errors } = checkProfile(sent, options)
   if (errors) throw new InvalidProfile(firstError(errors))
   return profile
 }

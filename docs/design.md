@@ -259,6 +259,10 @@ At `/admin/artistes`: the artists Parking Radio knows of, which are the artists 
 artist or a collective, with their name (and for a collective, the names of its artists), country and city,
 genres (most important first), bio, links, email address, phone number and photo, which is optional.
 
+Admins can leave out an artist's country, city, genres, links and phone, unlike artists on the "Appliquer" form, since
+admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always ask for them.
+The admin pages show "-" in place of what's left out, or only the city or the country, when the other one is.
+
 The section lists every artist, by name, with which of the two they are, their city, genres and how many
 applications they have.
 
@@ -273,8 +277,8 @@ applications, after confirming.
 "ajouter un artiste" adds an artist by hand, with the same form. In it, a collective's artists are typed one by one
 and pinned with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left
 typed without being pinned. Genres are tags to click, which pins them in order of importance, and the country is
-typed, with the matching countries suggested, of which one has to be picked.
-Each field says what's wrong with it once it's left, with the same rules and messages as the server (see
+typed, with the matching countries suggested, of which one has to be picked, "Pays inconnu" leaving it out.
+Each field says what's wrong with it once it's left, with the same rules and messages as the server, for admins (see
 `checkProfile` in shared/src/artists.ts), and so does the application form (see `checkApplication`).
 
 ### Admins

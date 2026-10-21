@@ -38,8 +38,9 @@ function artist(row: StoredArtist): Artist {
 }
 
 // Reads the profile and photo from a request that adds or changes an artist, and checks them, along with the
-// "removePhoto" field, which only changing an artist reads. Returns the checked profile and photo (null when there's
-// none), or the error to reply with when the request is malformed or invalid.
+// "removePhoto" field, which only changing an artist reads. Profiles are checked leniently, since only admins add and
+// change artists here (see `checkProfile`). Returns the checked profile and photo (null when there's none), or the error
+// to reply with when the request is malformed or invalid.
 async function readArtist(
   request: FastifyRequest,
 ): Promise<{ profile: ArtistProfile; photo: SentPhoto | null; removePhoto: boolean } | { status: number; error: string }> {
@@ -49,7 +50,7 @@ async function readArtist(
   const sent = jsonField(form.fields.artist)
   if (sent === undefined) return INVALID_REQUEST
   try {
-    return { profile: validateProfile(sent), photo: validatePhoto(form.photo), removePhoto: form.fields.removePhoto === 'true' }
+    return { profile: validateProfile(sent, { lenient: true }), photo: validatePhoto(form.photo), removePhoto: form.fields.removePhoto === 'true' }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message }

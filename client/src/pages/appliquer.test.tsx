@@ -154,6 +154,10 @@ describe('Appliquer', () => {
     expect(screen.getByLabelText(/^Photo/)).not.toHaveAttribute('aria-invalid')
     expect(screen.getByText('Choisissez au moins une date.')).toBeInTheDocument()
     expect(screen.getByText('Choisissez au moins un type de prestation.')).toBeInTheDocument()
+    // Which admins can leave out, but artists can't.
+    for (const missing of ['Choisissez votre pays.', 'Indiquez votre ville.', 'Choisissez au moins un genre.', 'Ajoutez au moins un lien.', 'Indiquez votre numéro de téléphone.']) {
+      expect(screen.getByText(missing)).toBeInTheDocument()
+    }
     expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
   })
 

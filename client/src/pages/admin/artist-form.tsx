@@ -21,8 +21,8 @@ import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 
 // A form for an artist's profile and photo, to add an artist or change one. Each field is checked with the rules the
-// server checks it with (see `checkProfile`), and says what's wrong once it's been left, or once the form is sent. The
-// server's error is shown if it refuses the artist anyway, e.g. for an email address another artist has.
+// server checks it with for admins (see `checkProfile`), and says what's wrong once it's been left, or once the form is
+// sent. The server's error is shown if it refuses the artist anyway, e.g. for an email address another artist has.
 
 const EMPTY: ArtistProfile = {
   kind: 'artist',
@@ -56,7 +56,8 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   // The name of a collective's artist being typed, before it's pinned.
   const [memberEntry, setMemberEntry] = useState('')
 
-  const checked = checkProfile(profile)
+  // Admins can leave out more than artists can, e.g. for artists who applied through the original Google Form.
+  const checked = checkProfile(profile, { lenient: true })
   const errors: Partial<Record<Field, string>> = { ...checked.errors }
   // Only the names pinned are sent. One that's left typed would be lost, so it has to be pinned (or cleared) first.
   const unpinned = profile.kind === 'collective' ? memberEntry.trim() : ''
@@ -115,17 +116,16 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
         <Combobox
           id="artist-country"
           options={COUNTRY_OPTIONS}
-          selected={profile.country || null}
+          selected={profile.country}
           onSelect={(country) => update({ country })}
           onBlur={leave('country')}
           invalid={!!shown('country')}
-          placeholder="nom du pays"
         />
         <FieldError message={shown('country')} />
       </div>
 
       <Labeled label="Ville" error={shown('city')}>
-        <input {...input('city')} maxLength={CITY_MAX_LENGTH} required />
+        <input {...input('city')} maxLength={CITY_MAX_LENGTH} />
       </Labeled>
 
       <GenresField genres={profile.genres} onChange={(genres) => update({ genres })} error={shown('genres')} onLeave={leave('genres')} />
@@ -147,7 +147,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
       </Labeled>
 
       <Labeled label="Téléphone" error={shown('phone')}>
-        <input type="tel" {...input('phone')} maxLength={PHONE_MAX_LENGTH} required />
+        <input type="tel" {...input('phone')} maxLength={PHONE_MAX_LENGTH} />
       </Labeled>
 
       <PhotoField
@@ -327,7 +327,7 @@ function GenresField({ genres, onChange, error, onLeave }: GroupProps<GenreId[]>
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Genres</legend>
-      <p className="admin-hint">Au moins un. Le premier choisi est le genre principal.</p>
+      <p className="admin-hint">Le premier choisi est le genre principal.</p>
       {genres.length > 0 && (
         <ol className="admin-chosen">
           {genres.map((genre, index) => (
@@ -369,13 +369,14 @@ function LinksField({
 }) {
   const [left, setLeft] = useState<Set<LinkSiteId>>(new Set())
   const parsed = LINK_SITES.map((site) => ({ site, raw: links[site.id] ?? '', ...parseLink(site, links[site.id] ?? '') }))
-  // Each link says what's wrong with it. The field's error is then about one of them, and otherwise that there's no
-  // link, which the first one is marked with, so that it's the one to fix.
-  const noLink = parsed.some((link) => link.error) ? undefined : error
+  // Each link says what's wrong with it. The field's error is then about one of them, and otherwise about a link that
+  // none of the inputs show, e.g. to a site that was taken out of LINK_SITES. The first input is marked with it, so that
+  // it's the one brought into focus.
+  const unshown = parsed.some((link) => link.error) ? undefined : error
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Liens</legend>
-      <p className="admin-hint">Au moins un. Un lien ou un nom de profil, qui est tout ce qui en est gardé.</p>
+      <p className="admin-hint">Un lien ou un nom de profil, qui est tout ce qui en est gardé.</p>
       {parsed.map(({ site, raw, value, error }, index) => {
         const shownError = error && (showAll || left.has(site.id)) ? error : null
         return (
@@ -385,7 +386,7 @@ function LinksField({
               <input
                 value={raw}
                 spellCheck={false}
-                aria-invalid={shownError || (noLink && index === 0) ? true : undefined}
+                aria-invalid={shownError || (unshown && index === 0) ? true : undefined}
                 placeholder={site.prefix ?? (site.subdomainOf ? `….${site.subdomainOf}` : 'https://…')}
                 onChange={(event) => onChange({ ...links, [site.id]: event.target.value })}
                 onBlur={() => {
@@ -403,7 +404,7 @@ function LinksField({
           </div>
         )
       })}
-      <FieldError message={noLink} />
+      <FieldError message={unshown} />
     </fieldset>
   )
 }

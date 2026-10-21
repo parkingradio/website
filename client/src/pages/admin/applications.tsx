@@ -14,7 +14,7 @@ import type {
 import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
-import { KIND_LABELS, STATUS_LABELS, STATUS_PLURALS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
+import { KIND_LABELS, MISSING, STATUS_LABELS, STATUS_PLURALS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
 import { useApi } from './use-api'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
@@ -310,9 +310,7 @@ function ArtistSummary({ artist }: { artist: Artist }) {
         <a href={`mailto:${artist.email}`}>{artist.email}</a>
       </dd>
       <dt>Téléphone</dt>
-      <dd>
-        <a href={`tel:${artist.phone}`}>{artist.phone}</a>
-      </dd>
+      <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
     </dl>
   )
 }

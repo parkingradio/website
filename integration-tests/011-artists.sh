@@ -3,7 +3,8 @@
 # The admin routes for artists work against a real database and the shared sources in the image. The server's
 # unit tests mock the database and the photos, so this is what covers the artists table, emails being unique
 # whatever their case, artists listed by name, the transaction that changes an artist, profiles read back from the
-# database, and photos kept on disk, then deleted, or no photo at all.
+# database, and photos kept on disk, then deleted, or no photo at all. It also covers profiles that leave out what only
+# admins can leave out, as the database keeps them.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -40,7 +41,7 @@ expect_status 200
 expect_body_contains '"artists":[]'
 
 echo "  an invalid profile is explained, in French"
-artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Test"}' "${PHOTOS}/photo.jpg"
+artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Test","country":"XX"}' "${PHOTOS}/photo.jpg"
 expect_status 400
 expect_body_contains 'Choisissez votre pays.'
 
@@ -118,6 +119,17 @@ request --header "Cookie: ${cookie}" --request PUT --form-string "artist=${photo
 expect_status 200
 expect_body_contains '"hasPhoto":false'
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected the removed photo to be deleted"
+request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
+expect_status 200
+
+echo "  an artist is added without a country, city, genres, links or phone, and read back that way"
+artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Partiel","members":[],"country":"","city":"","genres":[],
+"bio":"Une bio.","links":{},"email":"partiel@integration.test","phone":""}'
+expect_status 200
+id="$(body_id)"
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
+expect_status 200
+expect_body_contains '"country":"","city":"","genres":[],"bio":"Une bio.","links":{},"email":"partiel@integration.test","phone":""'
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
 

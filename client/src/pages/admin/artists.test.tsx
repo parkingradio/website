@@ -46,6 +46,9 @@ const BRUME: Artist = {
   email: 'brume@example.com',
 }
 
+// What admins can leave out of a profile, as it's saved when they do.
+const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+
 function application(id: string, artistId: string, changes: Partial<Application> = {}): Application {
   return {
     id,
@@ -108,6 +111,23 @@ describe('The list of artists', () => {
     expect(screen.getByRole('link', { name: 'ajouter un artiste' })).toHaveAttribute('href', '/admin/artistes/nouveau')
   })
 
+  it('shows what the artists left out, e.g. those who applied through the original Google Form', async () => {
+    const artists = [
+      { ...AURORE, country: '', genres: [] },
+      { ...BRUME, city: '' },
+      { ...AURORE, id: 'artist-3', name: 'Cyan', country: '', city: '' },
+    ]
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists }, '/api/admin/applications': { ok: true, applications: [] } })
+    renderAt('/admin/artistes')
+
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Candidatures' })).toBeInTheDocument())
+    expect(rows()).toEqual([
+      ['Aurore', 'artiste', 'Montréal', '-', '0'],
+      ['Brume', 'collectif', 'France', 'house', '0'],
+      ['Cyan', 'artiste', '-', 'techno, ambient', '0'],
+    ])
+  })
+
   it('says when there are no artists', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] }, '/api/admin/applications': { ok: true, applications: [] } })
     renderAt('/admin/artistes')
@@ -156,6 +176,20 @@ describe('An artist’s page', () => {
     await waitFor(() => expect(screen.getAllByRole('link', { name: '5 octobre 2026' })).toHaveLength(2))
     expect(screen.getAllByRole('link', { name: '5 octobre 2026' })[0]).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?artiste=artist-1')
+  })
+
+  it('shows what the artist left out, e.g. one who applied through the original Google Form', async () => {
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, ...LEFT_OUT } },
+      '/api/admin/applications?artist=artist-1': { ok: true, applications: [] },
+    })
+    renderAt('/admin/artistes/artist-1')
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Aurore' })).toBeInTheDocument())
+    for (const term of ['Ville', 'Genres', 'Liens', 'Téléphone']) {
+      expect(screen.getByText(term, { selector: 'dt' }).nextElementSibling).toHaveTextContent(/^-$/)
+    }
   })
 
   it('shows the artists of a collective, and that it applied by itself', async () => {
@@ -441,13 +475,13 @@ describe('Adding an artist', () => {
 
     expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indiquez le nom du collectif.')
     expect(errorOf(screen.getByLabelText("Nom d'un artiste du collectif"))).toBe('Indiquez au moins un artiste du collectif.')
-    expect(errorOf(screen.getByLabelText('Ville'))).toBe('Indiquez votre ville.')
-    expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBe('Choisissez au moins un genre.')
     expect(errorOf(screen.getByLabelText('Bio'))).toBe('Écrivez quelques lignes de bio.')
-    expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
     expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez votre adresse e-mail.')
-    expect(errorOf(screen.getByLabelText('Téléphone'))).toBe('Indiquez votre numéro de téléphone.')
-    // The photo is optional.
+    // Admins can leave these out, unlike artists, and the photo is optional.
+    expect(errorOf(screen.getByLabelText('Ville'))).toBeNull()
+    expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBeNull()
+    expect(errorOf(screen.getByLabelText('SoundCloud'))).toBeNull()
+    expect(errorOf(screen.getByLabelText('Téléphone'))).toBeNull()
     expect(errorOf(screen.getByLabelText('Photo'))).toBeNull()
     // The first field to fix gets the focus.
     await waitFor(() => expect(screen.getByLabelText('Nom du collectif')).toHaveFocus())
@@ -490,18 +524,69 @@ describe('Adding an artist', () => {
     expect(screen.getByRole('link', { name: 'vérifier ↗' })).toHaveAttribute('href', 'https://soundcloud.com/aurore')
   })
 
-  it('brings the links into focus when there is none', async () => {
+  it('brings the first wrong link into focus when the form is sent', async () => {
     mockFetch(NEW)
     renderAt('/admin/artistes/nouveau')
 
     await screen.findByLabelText('collectif')
     fillValidArtist()
-    fireEvent.change(screen.getByLabelText('SoundCloud'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Instagram'), { target: { value: 'https://soundcloud.com/aurore' } })
     fireEvent.click(submitButton("ajouter l'artiste"))
 
-    expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByLabelText('SoundCloud')).toHaveFocus())
+    expect(errorOf(screen.getByLabelText('Instagram'))).toBe("ce n'est pas une adresse Instagram")
+    await waitFor(() => expect(screen.getByLabelText('Instagram')).toHaveFocus())
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
+  })
+
+  it('says what is wrong with a link that none of the inputs show, e.g. to a site that was taken out of the list', async () => {
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, links: { ...AURORE.links, myspace: 'aurore' } } },
+      '/api/admin/applications?artist=artist-1': { ok: true, applications: [] },
+    })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.click(submitButton('enregistrer'))
+
+    expect(screen.getByText('Un des liens est invalide.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('SoundCloud')).toHaveFocus())
+    expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(0)
+  })
+
+  it('adds an artist without a country, city, genres, links or phone, e.g. one who applied through the original Google Form', async () => {
+    const added: Artist = { ...AURORE, id: 'artist-3', ...LEFT_OUT }
+    mockFetch({
+      ...NEW,
+      'POST /api/admin/artists': { ok: true, artist: added },
+      '/api/admin/artists/artist-3': { ok: true, artist: added },
+      '/api/admin/applications?artist=artist-3': { ok: true, applications: [] },
+    })
+    renderAt('/admin/artistes/nouveau')
+
+    await screen.findByLabelText('collectif')
+    fireEvent.change(screen.getByLabelText("Nom d'artiste"), { target: { value: 'Aurore' } })
+    const country = screen.getByRole('combobox', { name: 'Pays' })
+    fireEvent.change(country, { target: { value: 'inconnu' } })
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Pays inconnu' }))
+    expect(country).toHaveValue('Pays inconnu')
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Une bio.' } })
+    fireEvent.change(screen.getByLabelText('Adresse e-mail'), { target: { value: 'aurore@example.com' } })
+    fireEvent.click(submitButton("ajouter l'artiste"))
+
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/artistes/artist-3'))
+    expect(sent(requestsTo('POST', '/api/admin/artists')[0]).profile).toEqual({
+      kind: 'artist',
+      name: 'Aurore',
+      members: [],
+      country: '',
+      city: '',
+      genres: [],
+      bio: 'Une bio.',
+      links: {},
+      email: 'aurore@example.com',
+      phone: '',
+    })
   })
 
   it('leaves the type of a photo the browser does not know to the server', async () => {

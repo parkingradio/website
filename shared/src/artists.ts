@@ -6,6 +6,7 @@
 import { checkLine, checkText } from './checks.ts'
 import type { Checked, FieldErrors } from './checks.ts'
 
+// Every field is required, but admins can leave out the country, city, genres, links and phone (see `checkProfile`).
 export type ArtistProfile = {
   kind: ArtistKind
   // The artist's name, or the collective's, up to NAME_MAX_LENGTH characters.
@@ -352,7 +353,15 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
 // Checks a profile, as it was sent or as it's being filled in a form, and returns what's saved of it: trimmed, without
 // blank entries, and with links reduced to profile names. If it isn't valid, returns what's wrong with each field
 // instead. For links, that's the first link that's wrong, or that there's none.
-export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: undefined } | { profile?: undefined; errors: FieldErrors<ArtistProfile> } {
+//
+// With `lenient`, which only the admin pages use, the country, city, genres, links and phone can be left out: admins
+// bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always ask for them. What's
+// there still has to be valid. A country that's left out is "", and so is a city or phone, and genres and links are
+// empty.
+export function checkProfile(
+  sent: unknown,
+  { lenient = false } = {},
+): { profile: ArtistProfile; errors?: undefined } | { profile?: undefined; errors: FieldErrors<ArtistProfile> } {
   const artist: Partial<Record<keyof ArtistProfile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
   const errors: FieldErrors<ArtistProfile> = {}
   // The value of a field, or an empty one if it's wrong, after noting why.
@@ -360,6 +369,9 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     if (checked.error !== undefined) errors[field] ??= checked.error
     return checked.value ?? ''
   }
+  // For a field admins can leave out, from which nothing was read, whether it can be taken for one that's left out: it's
+  // absent, or of its type (`ofItsType`). One of another type, e.g. a phone sent as a number, would otherwise be lost.
+  const leftOut = (value: unknown, ofItsType: boolean) => lenient && (value === undefined || value === null || ofItsType)
 
   const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
   if (!kind) errors.kind = 'Indiquez si vous postulez comme artiste ou comme collectif.'
@@ -377,9 +389,13 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
   }
   if (collective && members.length === 0) errors.members ??= 'Indiquez au moins un artiste du collectif.'
 
-  const country = COUNTRIES.find((code) => code === artist.country)
-  if (!country) errors.country = 'Choisissez votre pays.'
-  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.'))
+  // Undefined when it isn't one of COUNTRIES, and "" when it was left out. Only a blank one can be: any other string
+  // isn't a country.
+  const blankCountry = typeof artist.country === 'string' && !artist.country.trim()
+  const country = COUNTRIES.find((code) => code === artist.country) ?? (leftOut(artist.country, blankCountry) ? '' : undefined)
+  if (country === undefined) errors.country = 'Choisissez votre pays.'
+  const cityMissing = leftOut(artist.city, typeof artist.city === 'string') ? null : 'Indiquez votre ville.'
+  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, cityMissing))
 
   // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
   const genres: GenreId[] = []
@@ -388,7 +404,7 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     if (!genre) errors.genres ??= "Un des genres n'est pas dans la liste."
     else if (!genres.includes(genre.id)) genres.push(genre.id)
   }
-  if (genres.length === 0) errors.genres ??= 'Choisissez au moins un genre.'
+  if (genres.length === 0 && !leftOut(artist.genres, Array.isArray(artist.genres))) errors.genres ??= 'Choisissez au moins un genre.'
 
   const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.'))
 
@@ -403,14 +419,15 @@ export function checkProfile(sent: unknown): { profile: ArtistProfile; errors?: 
     if (error) errors.links ??= `${site.name} : ${error}.`
     else if (value) links[site.id] = value
   }
-  if (Object.keys(links).length === 0) errors.links ??= 'Ajoutez au moins un lien.'
+  if (Object.keys(links).length === 0 && !leftOut(artist.links, typeof artist.links === 'object')) errors.links ??= 'Ajoutez au moins un lien.'
 
   const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.'))
   if (email && !isEmailAddress(email)) errors.email = 'Indiquez une adresse e-mail valide.'
-  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.'))
+  const phoneMissing = leftOut(artist.phone, typeof artist.phone === 'string') ? null : 'Indiquez votre numéro de téléphone.'
+  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, phoneMissing))
   if (phone && !isPhoneNumber(phone)) errors.phone = 'Indiquez un numéro de téléphone valide.'
 
-  if (!kind || !country || Object.keys(errors).length > 0) return { errors }
+  if (!kind || country === undefined || Object.keys(errors).length > 0) return { errors }
   return { profile: { email, kind, name, members, country, city, genres, bio, links, phone } }
 }
 

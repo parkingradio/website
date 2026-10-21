@@ -77,6 +77,9 @@ function profile(changes: Partial<ArtistProfile> = {}): ArtistProfile {
   }
 }
 
+// What admins can leave out of a profile, as it's saved when they do.
+const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+
 // A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, the photo, and whether to
 // remove the photo.
 function multipart(artist: object | string, photo: Buffer | null = JPEG, removePhoto = false) {
@@ -182,6 +185,13 @@ describe('artists routes', () => {
       expect(response.json().artist).toMatchObject({ id: 'artist-1', hasPhoto: false })
       expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
       expect(photos.store).not.toHaveBeenCalled()
+    })
+
+    it('adds an artist without a country, city, genres, links or phone, e.g. one who applied through the original Google Form', async () => {
+      const app = await buildApp()
+      const response = await create(app, profile(LEFT_OUT), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject(LEFT_OUT)
     })
 
     it('refuses an email another artist has, whatever its case, and forgets the photo', async () => {
@@ -385,6 +395,14 @@ describe('artists routes', () => {
       expect(photos.delete).not.toHaveBeenCalled()
     })
 
+    it("takes out the artist's country, city, genres, links and phone", async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(LEFT_OUT), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject(LEFT_OUT)
+    })
+
     it('keeps the photo when the photo sent is empty, as a form sends when no file was chosen', async () => {
       const app = await buildApp()
       await create(app)
@@ -518,7 +536,7 @@ describe('artists routes', () => {
     it('checks the profile and photo like when adding an artist', async () => {
       const app = await buildApp()
       await create(app)
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ genres: [] }), null)).statusCode).toBe(400)
+      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ genres: ['polka' as never] }), null)).statusCode).toBe(400)
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), Buffer.from('%PDF-1.7'))).statusCode).toBe(400)
       expect(rows[0].updatedBy).toBeNull()
     })

@@ -81,7 +81,7 @@ export const soundcloudCredentials = pgTable(
 )
 
 // Artists, known by their email address whatever its case. See `ArtistProfile` in shared/src/artists.ts for what each
-// field may contain.
+// field may contain. Admins can leave out the country, city, genres, links and phone, which are then empty.
 export const artists = pgTable(
   'artists',
   {
@@ -93,7 +93,7 @@ export const artists = pgTable(
     kind: text('kind').$type<ArtistKind>().notNull(),
     name: text('name').notNull(), // or the collective's name
     members: text('members').array().notNull(), // a collective's artists; empty for an artist
-    country: text('country').notNull(), // one of COUNTRIES, e.g. "CA"
+    country: text('country').notNull(), // one of COUNTRIES, e.g. "CA", or "" when an admin left it out
     city: text('city').notNull(),
     genres: text('genres').array().$type<GenreId[]>().notNull(), // ids, most important first
     bio: text('bio').notNull(),

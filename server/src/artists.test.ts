@@ -100,9 +100,9 @@ describe('validateProfile', () => {
     phone: '418 555-0123',
   })
   // What's wrong with the valid profile with these changes.
-  const error = (changes: Partial<ArtistProfile>) => {
+  const error = (changes: Partial<ArtistProfile>, options?: { lenient?: boolean }) => {
     try {
-      validateProfile({ ...valid(), ...changes })
+      validateProfile({ ...valid(), ...changes }, options)
       return null
     } catch (thrown) {
       return (thrown as Error).message
@@ -188,6 +188,44 @@ describe('validateProfile', () => {
     expect(error({ phone: '123' })).toBe('Indiquez un numéro de téléphone valide.')
     expect(error({ email: `${'a'.repeat(190)}@example.com` })).toBe("L'adresse e-mail dépasse 200 caractères.")
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
+  })
+
+  describe('leniently', () => {
+    const LENIENT = { lenient: true }
+    // What admins can leave out, as it's saved when they do.
+    const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+
+    it('takes a profile without a country, city, genres, links or phone', () => {
+      expect(validateProfile({ ...valid(), ...LEFT_OUT, country: ' ', city: ' ', phone: ' ' }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
+      // Left out entirely, as well as empty.
+      const leftOut = { country: undefined, city: undefined, genres: undefined, links: undefined, phone: undefined }
+      expect(validateProfile({ ...valid(), ...leftOut }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
+      expect(validateProfile({ ...valid(), links: { soundcloud: '' } }, LENIENT).links).toEqual({})
+    })
+
+    it('still checks what is there', () => {
+      expect(error({ country: 'XX' }, LENIENT)).toBe('Choisissez votre pays.')
+      expect(error({ country: 42 as never }, LENIENT)).toBe('Choisissez votre pays.')
+      expect(error({ city: 'x'.repeat(101) }, LENIENT)).toBe('La ville dépasse 100 caractères.')
+      expect(error({ genres: ['polka' as never] }, LENIENT)).toBe("Un des genres n'est pas dans la liste.")
+      expect(error({ links: { soundcloud: 'https://instagram.com/foo' } }, LENIENT)).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
+      expect(error({ phone: '123' }, LENIENT)).toBe('Indiquez un numéro de téléphone valide.')
+    })
+
+    it('does not take a field of another type for one that is left out, which would lose it', () => {
+      expect(error({ city: 42 as never }, LENIENT)).toBe('Indiquez votre ville.')
+      expect(error({ genres: 'techno' as never }, LENIENT)).toBe('Choisissez au moins un genre.')
+      expect(error({ links: '@parking.radio' as never }, LENIENT)).toBe('Ajoutez au moins un lien.')
+      expect(error({ phone: 4185550123 as never }, LENIENT)).toBe('Indiquez votre numéro de téléphone.')
+    })
+
+    it('still needs everything else', () => {
+      expect(error({ kind: undefined }, LENIENT)).toContain('comme artiste ou comme collectif')
+      expect(error({ name: '' }, LENIENT)).toBe("Indiquez votre nom d'artiste.")
+      expect(error({ kind: 'collective', members: [] }, LENIENT)).toBe('Indiquez au moins un artiste du collectif.')
+      expect(error({ bio: '' }, LENIENT)).toBe('Écrivez quelques lignes de bio.')
+      expect(error({ email: '' }, LENIENT)).toBe('Indiquez votre adresse e-mail.')
+    })
   })
 })
 

@@ -326,6 +326,11 @@ The rules a profile has to follow are in `shared/src/artists.ts`, and the server
 against them. The server explains what's wrong with a profile or a photo in French, unlike its other admin errors,
 because artists will see the same messages when they apply.
 
+Admins can leave out more than artists: the admin endpoints below take profiles without a country, city, genres, links
+or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always
+ask for them. What's left out is stored as an empty string, or an empty list or object. `POST /api/applications`
+requires all of them.
+
 The photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents. It's kept
 in the app's private S3 bucket, or in a local directory in development, and only the server reads it.
 
@@ -336,13 +341,13 @@ A profile has:
 | `kind` | `"artist"` or `"collective"` | An artist usually gets an hour of a time slot, a collective a whole slot |
 | `name` | string | The artist's name, or the collective's. Up to 100 characters |
 | `members` | list of strings | For a collective, the names of its artists, at least one, each up to 100 characters. Empty for an artist |
-| `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` |
-| `city` | string | As the artist wrote it. Up to 100 characters |
-| `genres` | list of strings | The ids of at least one of `GENRES` (e.g. `"drum-and-bass"`), most important first |
+| `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"`, or `""` when an admin left it out |
+| `city` | string | As the artist wrote it. Up to 100 characters, or `""` when an admin left it out |
+| `genres` | list of strings | The ids of at least one of `GENRES` (e.g. `"drum-and-bass"`), most important first, or none when an admin left them out |
 | `bio` | string | Up to 5000 characters |
-| `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one: see below |
+| `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one, or none when an admin left them out: see below |
 | `email` | string | What the artist is known by. Up to 200 characters |
-| `phone` | string | At least 7 digits. Up to 40 characters |
+| `phone` | string | At least 7 digits. Up to 40 characters, or `""` when an admin left it out |
 
 Links are stored as profile names, which the server reduces what was typed or pasted to: e.g.
 `https://soundcloud.com/parkingdotradio/sets/x` is stored as `parkingdotradio`. For `web`, it's the address itself.
@@ -463,7 +468,7 @@ The request is `multipart/form-data`, with four parts:
 
 | Part | |
 |---|---|
-| `artist` | The artist's profile (see "Artists"), as JSON, in a field rather than a file |
+| `artist` | The artist's profile (see "Artists"), with everything an admin could leave out, as JSON, in a field rather than a file |
 | `application` | The application's fields, as JSON, the same way |
 | `photo` | The artist's photo (see "Artists"), which can be left out |
 | `turnstileToken` | The token Turnstile gave the page |

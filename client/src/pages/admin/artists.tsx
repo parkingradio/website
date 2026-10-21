@@ -6,7 +6,7 @@ import type { ApplicationsResponse } from 'shared/applications'
 import { deleteJson, sendForm } from '../../api'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
-import { KIND_LABELS, byWhom, dateFormat, genreName, photoUrl, place } from './describe'
+import { KIND_LABELS, MISSING, byWhom, dateFormat, genreNames, photoUrl, place } from './describe'
 import { useApi } from './use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
@@ -83,7 +83,7 @@ export function ArtistsPage() {
                 </td>
                 <td>{KIND_LABELS[artist.kind]}</td>
                 <td>{place(artist)}</td>
-                <td>{artist.genres.map(genreName).join(', ')}</td>
+                <td>{genreNames(artist.genres)}</td>
                 {applications.kind === 'loaded' && <td>{counts.get(artist.id) ?? 0}</td>}
               </tr>
             ))}
@@ -214,6 +214,8 @@ function ArtistById({ id }: { id: string }) {
 
 // Everything about an artist: their photo, or that they have none, then their profile.
 function ArtistDetails({ artist }: { artist: Artist }) {
+  // The sites the artist has a link to, in the order of LINK_SITES.
+  const linkSites = LINK_SITES.filter((site) => artist.links[site.id])
   return (
     <div className="admin-record">
       {artist.hasPhoto ? (
@@ -231,28 +233,30 @@ function ArtistDetails({ artist }: { artist: Artist }) {
         <dt>Ville</dt>
         <dd>{place(artist)}</dd>
         <dt>Genres</dt>
-        <dd>{artist.genres.map(genreName).join(', ')}</dd>
+        <dd>{genreNames(artist.genres)}</dd>
         <dt>Liens</dt>
         <dd>
-          <ul>
-            {LINK_SITES.filter((site) => artist.links[site.id]).map((site) => (
-              <li key={site.id}>
-                {site.name}&nbsp;:{' '}
-                <a href={site.url(artist.links[site.id]!)} target="_blank" rel="noreferrer">
-                  {artist.links[site.id]}
-                </a>
-              </li>
-            ))}
-          </ul>
+          {linkSites.length > 0 ? (
+            <ul>
+              {linkSites.map((site) => (
+                <li key={site.id}>
+                  {site.name}&nbsp;:{' '}
+                  <a href={site.url(artist.links[site.id]!)} target="_blank" rel="noreferrer">
+                    {artist.links[site.id]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            MISSING
+          )}
         </dd>
         <dt>Adresse e-mail</dt>
         <dd>
           <a href={`mailto:${artist.email}`}>{artist.email}</a>
         </dd>
         <dt>Téléphone</dt>
-        <dd>
-          <a href={`tel:${artist.phone}`}>{artist.phone}</a>
-        </dd>
+        <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
         <dt>Bio</dt>
         <dd className="admin-text">{artist.bio}</dd>
       </dl>

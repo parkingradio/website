@@ -1,8 +1,8 @@
-import type { Artist, ArtistKind } from 'shared/artists'
+import type { Artist, ArtistKind, GenreId } from 'shared/artists'
 import { PRESTATIONS } from 'shared/applications'
 import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
 import type { FeatureId } from 'shared/features'
-import { countryName, countryOptions } from '../../artist-profile'
+import { countryName, countryOptions, genreName } from '../../artist-profile'
 
 // How the admin sections show what the API returns.
 
@@ -33,8 +33,12 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
 
 export { countryName, genreName } from '../../artist-profile'
 
-// Every country, by name, for picking one.
-export const COUNTRY_OPTIONS = countryOptions()
+// What's shown in place of what an artist's profile leaves out, which only admins can do (see `checkProfile`), e.g. for
+// artists who applied through the original Google Form.
+export const MISSING = '-'
+
+// Every country, by name, for picking one, after "Pays inconnu", which leaves the country out.
+export const COUNTRY_OPTIONS = [{ key: '', label: 'Pays inconnu' }, ...countryOptions()]
 
 export function prestationName(id: PrestationId): string {
   return PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id
@@ -51,8 +55,14 @@ export function photoUrl(artist: Artist): string {
   return `/api/admin/artists/${artist.id}/photo?v=${encodeURIComponent(artist.updatedAt ?? artist.createdAt)}`
 }
 
+// E.g. "Québec, Canada", or only the city or the country, when the other one is left out.
 export function place({ city, country }: { city: string; country: string }): string {
-  return `${city}, ${countryName(country)}`
+  return [city, country && countryName(country)].filter(Boolean).join(', ') || MISSING
+}
+
+// E.g. "techno, ambient", most important first.
+export function genreNames(genres: GenreId[]): string {
+  return genres.map(genreName).join(', ') || MISSING
 }
 
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long' })

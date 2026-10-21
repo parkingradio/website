@@ -255,6 +255,12 @@ describe('POST /api/applications', () => {
     const invalid = [
       { parts: { artist: profile({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
       { parts: { artist: profile({ email: 'pas une adresse' }) }, error: 'Indiquez une adresse e-mail valide.' },
+      // Which admins can leave out, but artists can't.
+      { parts: { artist: profile({ country: '' }) }, error: 'Choisissez votre pays.' },
+      { parts: { artist: profile({ city: '' }) }, error: 'Indiquez votre ville.' },
+      { parts: { artist: profile({ genres: [] }) }, error: 'Choisissez au moins un genre.' },
+      { parts: { artist: profile({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
+      { parts: { artist: profile({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },

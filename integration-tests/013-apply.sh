@@ -8,6 +8,7 @@
 # - an artist who already exists (same email, ignoring case) can't apply again, and the photo they sent is deleted
 # - if two people apply with the same new email at the same time, only one artist is created
 # - an application without a token is refused
+# - an artist can't leave out their city, which only admins can, like their country, genres, links or phone
 # - applications are rate limited per CF-Connecting-IP
 
 source "$(dirname "$0")/lib.sh"
@@ -96,6 +97,11 @@ echo "  an application without a token is refused, in French"
 apply 198.51.100.16 "$(profile Tokenless tokenless@integration.test)" ''
 expect_status 400
 expect_body_contains 'La vérification anti-robot a échoué.'
+
+echo "  an artist can't leave out their city, which only admins can"
+apply 198.51.100.16 "$(profile Cityless cityless@integration.test | sed 's/"city":"Montréal"/"city":""/')"
+expect_status 400
+expect_body_contains 'Indiquez votre ville.'
 
 echo "  applications are rate limited per CF-Connecting-IP"
 # Invalid requests count towards the limit too, so these don't need a valid token.
