@@ -1,16 +1,27 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { LINK_SITES } from 'shared/artists'
+import { ARTIST_KINDS, LINK_SITES } from 'shared/artists'
 import type { Artist, ArtistResponse, ArtistsResponse, DeleteArtistResponse } from 'shared/artists'
 import type { ApplicationsResponse } from 'shared/applications'
 import { deleteJson, sendForm } from '../../api'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
-import { KIND_LABELS, MISSING, byWhom, dateFormat, genreNames, photoUrl, place } from './describe'
+import { KIND_LABELS, MISSING, artistSearchFields, byWhom, countryOf, dateFormat, genreNames, photoUrl, place } from './describe'
+import { compareText, search, useSearchQuery, useSort } from './list'
+import type { SortColumn } from './list'
+import { SearchField, SortHeader } from './list-controls'
 import { useApi } from './use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
 // bring in an application that came through the Google Form.
+
+// The columns the list of artists can be sorted by: artists come before collectives, and places are sorted by city, then
+// country. What's left out comes first.
+const ARTIST_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Artist>> = {
+  nom: { compare: (a, b) => compareText(a.name, b.name) },
+  type: { compare: (a, b) => ARTIST_KINDS.indexOf(a.kind) - ARTIST_KINDS.indexOf(b.kind) },
+  ville: { compare: (a, b) => compareText(a.city, b.city) || compareText(countryOf(a), countryOf(b)) },
+}
 
 function BackToArtists() {
   return (
@@ -20,77 +31,71 @@ function BackToArtists() {
   )
 }
 
-// Every artist, by name.
+// Every artist.
 export function ArtistsPage() {
-  const artists = useApi<ArtistsResponse>('/api/admin/artists')
-  const applications = useApi<ApplicationsResponse>('/api/admin/applications')
-
-  const header = (
+  const { query, setQuery } = useSearchQuery()
+  return (
     <>
       <h1>Artistes</h1>
       <div className="admin-toolbar">
         <Link to="/admin/artistes/nouveau" className="admin-button">
           ajouter un artiste
         </Link>
+        <SearchField query={query} onChange={setQuery} />
       </div>
+      <ArtistsList query={query} />
     </>
   )
-  if (artists.kind === 'loading') return header
+}
+
+// Every artist, by name unless they're sorted otherwise, or those `query` finds.
+function ArtistsList({ query }: { query: string }) {
+  const artists = useApi<ArtistsResponse>('/api/admin/artists')
+  const sorting = useSort(ARTIST_COLUMNS, 'nom')
+
+  if (artists.kind === 'loading') return null
   if (artists.kind === 'error') {
     return (
-      <>
-        {header}
-        <p className="admin-error" role="alert">
-          Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
-        </p>
-      </>
+      <p className="admin-error" role="alert">
+        Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
+      </p>
     )
   }
 
-  // How many applications each artist has, once they're loaded. The list goes without them otherwise, and says so.
-  const counts = new Map<string, number>()
-  if (applications.kind === 'loaded') {
-    for (const { artistId } of applications.value.applications) counts.set(artistId, (counts.get(artistId) ?? 0) + 1)
+  const all = artists.value.artists
+  const listed = sorting.sorted(search(all, query, artistSearchFields))
+  if (listed.length === 0) {
+    return <p className="admin-placeholder">{all.length === 0 ? 'Aucun artiste.' : 'Aucun artiste ne correspond à la recherche.'}</p>
   }
-
-  const listed = artists.value.artists
   return (
-    <>
-      {header}
-      {applications.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
-        </p>
-      )}
-      {listed.length === 0 ? (
-        <p className="admin-placeholder">Aucun artiste.</p>
-      ) : (
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Type</th>
-              <th>Ville</th>
-              <th>Genres</th>
-              {applications.kind === 'loaded' && <th>Candidatures</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {listed.map((artist) => (
-              <tr key={artist.id}>
-                <td>
-                  <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link>
-                </td>
-                <td>{KIND_LABELS[artist.kind]}</td>
-                <td>{place(artist)}</td>
-                <td>{genreNames(artist.genres)}</td>
-                {applications.kind === 'loaded' && <td>{counts.get(artist.id) ?? 0}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </>
+    <table className="admin-table">
+      <thead>
+        <tr>
+          <SortHeader column="nom" sorting={sorting}>
+            Nom
+          </SortHeader>
+          <SortHeader column="type" sorting={sorting}>
+            Type
+          </SortHeader>
+          <SortHeader column="ville" sorting={sorting}>
+            Ville
+          </SortHeader>
+          <th>Genres</th>
+        </tr>
+      </thead>
+      <tbody>
+        {listed.map((artist) => (
+          <tr key={artist.id}>
+            <td>
+              <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link>
+            </td>
+            <td>{KIND_LABELS[artist.kind]}</td>
+            <td>{place(artist)}</td>
+            <td>{genreNames(artist.genres)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 

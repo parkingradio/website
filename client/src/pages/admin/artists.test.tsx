@@ -70,15 +70,17 @@ function application(id: string, artistId: string, changes: Partial<Application>
   }
 }
 
-const APPLICATIONS = [application('application-1', 'artist-1'), application('application-2', 'artist-1'), application('application-3', 'artist-2')]
+const APPLICATIONS = [application('application-1', 'artist-1'), application('application-2', 'artist-1')]
 
 function CurrentPath() {
-  return <div data-testid="path">{useLocation().pathname}</div>
+  const location = useLocation()
+  return <div data-testid="path">{location.pathname + location.search}</div>
 }
 
 function renderAt(path: string) {
   render(
-    <MemoryRouter initialEntries={[path]}>
+    // Without transitions, like the app (see main.tsx).
+    <MemoryRouter initialEntries={[path]} useTransitions={false}>
       <App />
       <CurrentPath />
     </MemoryRouter>,
@@ -93,22 +95,34 @@ function sent(request: RequestInit) {
 
 const rows = () =>
   screen
-    .getAllByRole('row')
+    .queryAllByRole('row')
     .slice(1)
     .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+const names = () => rows().map((row) => row[0])
+
+// Searches for `query`, and waits for the list to show `found`, by their first column.
+async function expectSearch(query: string, found: string[]) {
+  const field = await screen.findByRole('searchbox', { name: 'Rechercher' })
+  fireEvent.change(field, { target: { value: query } })
+  expect(field).toHaveValue(query)
+  await waitFor(() => expect(names()).toEqual(found))
+}
 
 describe('The list of artists', () => {
-  it('lists the artists, with how many applications each one has', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] }, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
+  it('lists the artists', async () => {
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] } })
     renderAt('/admin/artistes')
 
-    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Candidatures' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Nom ↑', 'Type', 'Ville', 'Genres'])
     expect(rows()).toEqual([
-      ['Aurore', 'artiste', 'Montréal, Canada', 'techno, ambient', '2'],
-      ['Brume', 'collectif', 'Lyon, France', 'house', '1'],
+      ['Aurore', 'artiste', 'Montréal, Canada', 'techno, ambient'],
+      ['Brume', 'collectif', 'Lyon, France', 'house'],
     ])
     expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
     expect(screen.getByRole('link', { name: 'ajouter un artiste' })).toHaveAttribute('href', '/admin/artistes/nouveau')
+    // Their applications are on their pages.
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(0)
   })
 
   it('shows what the artists left out, e.g. those who applied through the original Google Form', async () => {
@@ -117,38 +131,150 @@ describe('The list of artists', () => {
       { ...BRUME, city: '' },
       { ...AURORE, id: 'artist-3', name: 'Cyan', country: '', city: '' },
     ]
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists }, '/api/admin/applications': { ok: true, applications: [] } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists } })
     renderAt('/admin/artistes')
 
-    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Candidatures' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['Aurore', 'artiste', 'Montréal', '-', '0'],
-      ['Brume', 'collectif', 'France', 'house', '0'],
-      ['Cyan', 'artiste', '-', 'techno, ambient', '0'],
+      ['Aurore', 'artiste', 'Montréal', '-'],
+      ['Brume', 'collectif', 'France', 'house'],
+      ['Cyan', 'artiste', '-', 'techno, ambient'],
     ])
   })
 
   it('says when there are no artists', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] }, '/api/admin/applications': { ok: true, applications: [] } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] } })
     renderAt('/admin/artistes')
 
     await waitFor(() => expect(screen.getByText('Aucun artiste.')).toBeInTheDocument())
   })
 
-  it('lists the artists without how many applications they have when those could not be loaded, and says so', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE] }, '/api/admin/applications': { ok: false, error: 'Boom' } })
-    renderAt('/admin/artistes')
-
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom"))
-    expect(rows()).toEqual([['Aurore', 'artiste', 'Montréal, Canada', 'techno, ambient']])
-    expect(screen.queryByRole('columnheader', { name: 'Candidatures' })).not.toBeInTheDocument()
-  })
-
   it('says when the artists could not be loaded', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: [] } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' } })
     renderAt('/admin/artistes')
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
+  })
+})
+
+describe('Searching the list of artists', () => {
+  const CYAN: Artist = {
+    ...AURORE,
+    id: 'artist-3',
+    name: 'Cyan',
+    country: 'BE',
+    city: 'Bruxelles',
+    genres: ['electro'],
+    links: { instagram: 'cyan.sons' },
+    email: 'cyan@courriel.test',
+    phone: '+32 2 555 01 23',
+    bio: 'Fan de Montréal.',
+  }
+
+  beforeEach(() => {
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, { ...BRUME, members: ['Élise', 'Bo'] }, CYAN] } })
+    renderAt('/admin/artistes')
+  })
+
+  it('finds artists by their names, and a collective by its artists', async () => {
+    await expectSearch('cyan', ['Cyan'])
+    await expectSearch('elise', ['Brume'])
+  })
+
+  it('finds artists whatever the case and accents, and despite a typo', async () => {
+    await expectSearch('MONTREAL', ['Aurore'])
+    await expectSearch('monreal', ['Aurore'])
+    await expectSearch('electro', ['Cyan'])
+  })
+
+  it('finds artists by the start of a word, as it is typed', async () => {
+    await expectSearch('brux', ['Cyan'])
+  })
+
+  it('finds artists by where they are from, their genres, links, email and phone, but not their bio', async () => {
+    await expectSearch('belgique', ['Cyan'])
+    await expectSearch('house', ['Brume'])
+    await expectSearch('cyan.sons', ['Cyan'])
+    await expectSearch('brume@example.com', ['Brume'])
+    await expectSearch('5145550101', ['Aurore', 'Brume'])
+    await expectSearch('Fan', [])
+  })
+
+  it('finds the artists that have every word searched for, in any of their fields', async () => {
+    await expectSearch('house lyon', ['Brume'])
+    await expectSearch('house bruxelles', [])
+  })
+
+  it('lists every artist while the search has no letters or digits, e.g. the start of a phone number', async () => {
+    await expectSearch('+', ['Aurore', 'Brume', 'Cyan'])
+    await expectSearch('+32', ['Cyan'])
+  })
+
+  it('says when no artist matches, and lists them all again once the search is cleared', async () => {
+    await expectSearch('zzzzzz', [])
+    expect(screen.getByText('Aucun artiste ne correspond à la recherche.')).toBeInTheDocument()
+    await expectSearch('', ['Aurore', 'Brume', 'Cyan'])
+  })
+
+  it('empties the field when the menu leads back to every artist', async () => {
+    await expectSearch('lyon', ['Brume'])
+    fireEvent.click(screen.getByRole('link', { name: 'artistes' }))
+    await waitFor(() => expect(names()).toEqual(['Aurore', 'Brume', 'Cyan']))
+    expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('')
+  })
+
+  it('keeps the search in the URL', async () => {
+    await expectSearch('lyon', ['Brume'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?recherche=lyon$/)
+    await expectSearch('', ['Aurore', 'Brume', 'Cyan'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes$/)
+  })
+})
+
+describe('Sorting the list of artists', () => {
+  const CYAN: Artist = { ...AURORE, id: 'artist-3', name: 'Cyan', kind: 'collective', members: ['Do'], country: 'BE', city: 'Bruxelles' }
+  const DORA: Artist = { ...AURORE, id: 'artist-4', name: 'Dora', city: '', country: '' }
+  const ARTISTS = { ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, CYAN, DORA] } }
+
+  it('sorts the artists by a column, then the other way around', async () => {
+    mockFetch(ARTISTS)
+    renderAt('/admin/artistes')
+
+    const header = await screen.findByRole('columnheader', { name: 'Nom' })
+    expect(header).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(within(header).getByRole('button'))
+    expect(header).toHaveAttribute('aria-sort', 'descending')
+    expect(names()).toEqual(['Dora', 'Cyan', 'Brume', 'Aurore'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?tri=nom&ordre=desc$/)
+  })
+
+  it('sorts artists before collectives', async () => {
+    mockFetch(ARTISTS)
+    renderAt('/admin/artistes')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Type' }))
+    expect(screen.getByRole('columnheader', { name: 'Type' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(screen.getByRole('columnheader', { name: 'Nom' })).not.toHaveAttribute('aria-sort')
+    // Artists of the same type stay by name.
+    expect(names()).toEqual(['Aurore', 'Dora', 'Brume', 'Cyan'])
+  })
+
+  it('sorts artists by city, those without one first', async () => {
+    mockFetch(ARTISTS)
+    renderAt('/admin/artistes')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ville' }))
+    expect(names()).toEqual(['Dora', 'Cyan', 'Brume', 'Aurore'])
+  })
+
+  it('sorts the artists as the URL says, along with the search', async () => {
+    mockFetch(ARTISTS)
+    renderAt('/admin/artistes?recherche=techno&tri=ville&ordre=desc')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('techno')
+    // Brume's genre is house.
+    expect(names()).toEqual(['Aurore', 'Cyan', 'Dora'])
   })
 })
 
@@ -156,8 +282,17 @@ describe('An artist’s page', () => {
   const AURORE_PAGE = {
     ...LOGGED_IN,
     '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
-    '/api/admin/applications?artist=artist-1': { ok: true, applications: APPLICATIONS.slice(0, 2) },
+    '/api/admin/applications?artist=artist-1': { ok: true, applications: APPLICATIONS },
   }
+
+  it('lists their applications without sorting them, since there are few', async () => {
+    mockFetch(AURORE_PAGE)
+    renderAt('/admin/artistes/artist-1')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(within(screen.getByRole('table')).queryAllByRole('button')).toHaveLength(0)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
 
   it('shows everything about the artist, and their applications', async () => {
     mockFetch(AURORE_PAGE)
@@ -342,7 +477,6 @@ describe('An artist’s page', () => {
       ...AURORE_PAGE,
       'DELETE /api/admin/artists/artist-1': { ok: true },
       '/api/admin/artists': { ok: true, artists: [] },
-      '/api/admin/applications': { ok: true, applications: [] },
     })
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     renderAt('/admin/artistes/artist-1')

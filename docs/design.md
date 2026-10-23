@@ -227,6 +227,12 @@ The section lists every application, the most recently received first, with when
 first few dates, the prestations and the status. Buttons above the list show only the applications with a status, with
 how many there are of each.
 
+A field above the list searches the applications by their artist, like in "Artistes" (see below), their prestations,
+their questions or details, and the days the artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so
+that "décembre" or "jeudi" finds the applications with a day in December, or a Thursday. Clicking "Reçue le", "Artiste", "Dates" (by the first day the artist would like to play) or
+"Statut" (nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that column, and clicking it again sorts
+it the other way around. The status buttons count the applications the search finds.
+
 Under the list, a line says that who the applications artists send are emailed to is chosen in "Configuration" (see
 below), and links to it.
 
@@ -263,8 +269,16 @@ Admins can leave out an artist's country, city, genres, links and phone, unlike 
 admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always ask for them.
 The admin pages show "-" in place of what's left out, or only the city or the country, when the other one is.
 
-The section lists every artist, by name, with which of the two they are, their city, genres and how many
-applications they have.
+The section lists every artist, by name, with which of the two they are, their city and genres. A field above the list
+searches the artists by their name (and a collective's artists), email address, phone number, city, country, genres and
+the profile names of their links, but not their bio, which would match too many searches. Clicking "Nom", "Type"
+(artists before collectives) or "Ville" (by city, then country) sorts the list by that column, and clicking it again
+sorts it the other way around.
+
+Both this list and the applications' (see "Candidatures" above) find the entries that have every word searched for, in
+any of the fields searched, whatever their case and accents, and allowing for a typo in words of 5 letters or more. The
+search and the order are kept in the page's address, along with the applications' status, so that going back to a list
+from one of its entries with the browser's back button finds it as it was.
 
 Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo (or "Pas de
 photo" in its place, so that the team notices), their links rebuilt from the profile names, who added them (or that they

@@ -70,6 +70,19 @@
   cursor: default;
 }
 
+/* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
+   below), and the headers of the columns that sort a list. */
+.admin .radio-track-left-out button,
+.admin .radio-track-left-out button:hover,
+.admin .admin-sort,
+.admin .admin-sort:hover {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
 /* The menu on the left, the section on the right. */
 .admin-inner {
   display: grid;
@@ -131,7 +144,8 @@
 /* At least 16px, or iOS zooms into the page when an input gets focus. */
 .admin-form input:not([type='radio'], [type='checkbox']),
 .admin-form select,
-.admin-form textarea {
+.admin-form textarea,
+.admin-search {
   padding: 0.5rem 0.6rem;
   border: 1px solid #000;
   border-radius: 0;
@@ -143,7 +157,8 @@
 
 .admin-form input:focus-visible,
 .admin-form select:focus-visible,
-.admin-form textarea:focus-visible {
+.admin-form textarea:focus-visible,
+.admin-search:focus-visible {
   outline: 2px solid #000;
   outline-offset: 1px;
 }
@@ -239,13 +254,7 @@
 
 /* Tracks left out of the rotation are in red (see .admin-error), and say why when hovered, or clicked on
    phones. */
-.admin .radio-track-left-out button,
-.admin .radio-track-left-out button:hover {
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  text-align: left;
+.admin .radio-track-left-out button {
   cursor: help;
 }
 
@@ -288,6 +297,14 @@
   margin-top: 1.5rem;
 }
 
+/* At the other end of the toolbar from its button, and looking like the forms' inputs, only as tall as the button. */
+.admin .admin-search {
+  flex: 0 1 16rem;
+  min-width: 0;
+  margin-left: auto;
+  padding: 4px 8px;
+}
+
 .admin-back {
   display: inline-block;
   margin-bottom: 1rem;
@@ -312,6 +329,11 @@
 .admin-table th {
   color: #666;
   font-weight: 300;
+}
+
+/* The headers of the columns that sort the list look like the others, and are underlined when hovered. */
+.admin .admin-sort:hover {
+  text-decoration: underline;
 }
 
 .admin-table td:first-child {
@@ -610,6 +632,12 @@ dl.admin-record {
     flex-direction: row;
     align-items: center;
     padding-left: 0;
+  }
+
+  /* On a line of its own, under the toolbar's button. */
+  .admin .admin-search {
+    flex-basis: 100%;
+    margin-left: 0;
   }
 
   /* Too wide for phones, tables scroll sideways rather than squeezing their columns. */

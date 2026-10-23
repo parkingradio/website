@@ -4,7 +4,7 @@ import type { Application, ApplicationStatus, PrestationId } from 'shared/applic
 import type { FeatureId } from 'shared/features'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 
-// How the admin sections show what the API returns.
+// How the admin sections show what the API returns, and search it.
 
 export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', collective: 'collectif' }
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
@@ -55,14 +55,36 @@ export function photoUrl(artist: Artist): string {
   return `/api/admin/artists/${artist.id}/photo?v=${encodeURIComponent(artist.updatedAt ?? artist.createdAt)}`
 }
 
+// The name of an artist's country, or "" when it's left out.
+export function countryOf({ country }: { country: string }): string {
+  return country && countryName(country)
+}
+
 // E.g. "Québec, Canada", or only the city or the country, when the other one is left out.
-export function place({ city, country }: { city: string; country: string }): string {
-  return [city, country && countryName(country)].filter(Boolean).join(', ') || MISSING
+export function place(artist: { city: string; country: string }): string {
+  return [artist.city, countryOf(artist)].filter(Boolean).join(', ') || MISSING
 }
 
 // E.g. "techno, ambient", most important first.
 export function genreNames(genres: GenreId[]): string {
   return genres.map(genreName).join(', ') || MISSING
+}
+
+// What an artist is searched by, in the lists: their names, how to reach them, where they're from, their genres and the
+// profile names of their links, but not their bio, which would match too many searches. Their phone number is there
+// with its digits only too, so that it's found however it's typed.
+export function artistSearchFields(artist: Artist): string[] {
+  return [
+    artist.name,
+    ...artist.members,
+    artist.email,
+    artist.phone,
+    artist.phone.replace(/\D/g, ''),
+    artist.city,
+    countryOf(artist),
+    ...artist.genres.map(genreName),
+    ...Object.values(artist.links),
+  ].filter((field): field is string => Boolean(field))
 }
 
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long' })

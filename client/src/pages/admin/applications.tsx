@@ -14,7 +14,22 @@ import type {
 import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
-import { KIND_LABELS, MISSING, STATUS_LABELS, STATUS_PLURALS, byWhom, dateFormat, describePrestations, formatDay, formatShortDay, place } from './describe'
+import {
+  KIND_LABELS,
+  MISSING,
+  STATUS_LABELS,
+  STATUS_PLURALS,
+  artistSearchFields,
+  byWhom,
+  dateFormat,
+  describePrestations,
+  formatDay,
+  formatShortDay,
+  place,
+} from './describe'
+import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
+import type { SortColumn, Sorting } from './list'
+import { SearchField, SortHeader } from './list-controls'
 import { useApi } from './use-api'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
@@ -31,17 +46,49 @@ function BackToApplications() {
   )
 }
 
+// The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
+// them.
+type ApplicationColumn = 'recue' | 'artiste' | 'dates' | 'statut'
+
+function applicationColumns(artists: Map<string, Artist>): Record<ApplicationColumn, SortColumn<Application>> {
+  const name = (application: Application) => artists.get(application.artistId)?.name ?? ''
+  return {
+    recue: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
+    artiste: { compare: (a, b) => compareText(name(a), name(b)) },
+    // By the first day the artist would like to play.
+    dates: { compare: (a, b) => a.dates[0].localeCompare(b.dates[0]) },
+    statut: { compare: (a, b) => APPLICATION_STATUSES.indexOf(a.status) - APPLICATION_STATUSES.indexOf(b.status) },
+  }
+}
+
 // Applications, as listed in this section, or on an artist's page, where `artists` is left out since they're all theirs.
-export function ApplicationsTable({ applications, artists }: { applications: Application[]; artists?: Map<string, Artist> }) {
+// The columns sort the list when there's `sorting`.
+export function ApplicationsTable({
+  applications,
+  artists,
+  sorting,
+}: {
+  applications: Application[]
+  artists?: Map<string, Artist>
+  sorting?: Sorting<ApplicationColumn>
+}) {
+  const header = (column: ApplicationColumn, label: string) =>
+    sorting ? (
+      <SortHeader column={column} sorting={sorting}>
+        {label}
+      </SortHeader>
+    ) : (
+      <th>{label}</th>
+    )
   return (
     <table className="admin-table">
       <thead>
         <tr>
-          <th>Reçue le</th>
-          {artists && <th>Artiste</th>}
-          <th>Dates</th>
+          {header('recue', 'Reçue le')}
+          {artists && header('artiste', 'Artiste')}
+          {header('dates', 'Dates')}
           <th>Prestations</th>
-          <th>Statut</th>
+          {header('statut', 'Statut')}
         </tr>
       </thead>
       <tbody>
@@ -73,6 +120,7 @@ export function ApplicationsTable({ applications, artists }: { applications: App
 
 // Every application.
 export function ApplicationsPage() {
+  const { query, setQuery } = useSearchQuery()
   return (
     <>
       <h1>Candidatures</h1>
@@ -80,8 +128,9 @@ export function ApplicationsPage() {
         <Link to="/admin/candidatures/nouvelle" className="admin-button">
           nouvelle candidature
         </Link>
+        <SearchField query={query} onChange={setQuery} />
       </div>
-      <ApplicationsList />
+      <ApplicationsList query={query} />
       <p className="admin-meta">
         Les destinataires des candidatures envoyées par e-mail se choisissent dans la{' '}
         <Link to="/admin/configuration">configuration</Link>.
@@ -90,12 +139,22 @@ export function ApplicationsPage() {
   )
 }
 
-// Every application, the most recently received first, or only those with the status in the `statut` query parameter.
-function ApplicationsList() {
+// What an application is searched by, besides its artist (see `artistSearchFields`): its prestations, details, and the days
+// the artist would like to play, written out, e.g. "jeudi 10 décembre 2026", so that "décembre" or "jeudi" finds them.
+function applicationSearchFields(application: Application): string[] {
+  return [describePrestations(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
+}
+
+// Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
+// those with the status in the `statut` query parameter. The status's buttons count the applications the search finds.
+function ApplicationsList({ query }: { query: string }) {
   const applications = useApi<ApplicationsResponse>('/api/admin/applications')
   const artists = useApi<ArtistsResponse>('/api/admin/artists')
-  const [searchParams, setSearchParams] = useSearchParams()
-  const status = APPLICATION_STATUSES.find((status) => status === searchParams.get('statut')) ?? null
+  // Without the artists, the applications are still listed, without their names.
+  const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
+  const sorting = useSort(applicationColumns(byId), 'recue')
+  const [params, change] = useQueryParams()
+  const status = APPLICATION_STATUSES.find((status) => status === params.get('statut')) ?? null
 
   if (applications.kind === 'error') {
     return (
@@ -107,9 +166,12 @@ function ApplicationsList() {
   if (applications.kind === 'loading' || artists.kind === 'loading') return null
 
   const all = applications.value.applications
-  const listed = status ? all.filter((application) => application.status === status) : all
-  // Without the artists, the applications are still listed, without their names.
-  const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
+  const found = search(all, query, (application) => {
+    const artist = byId.get(application.artistId)
+    return [...(artist ? artistSearchFields(artist) : []), ...applicationSearchFields(application)]
+  })
+  const withStatus = (applications: Application[]) => (status ? applications.filter((application) => application.status === status) : applications)
+  const listed = sorting.sorted(withStatus(found))
   const filters: { status: ApplicationStatus | null; label: string }[] = [
     { status: null, label: 'toutes' },
     ...APPLICATION_STATUSES.map((status) => ({ status, label: STATUS_PLURALS[status] })),
@@ -119,13 +181,8 @@ function ApplicationsList() {
     <>
       <div className="admin-filters" role="group" aria-label="Statut">
         {filters.map((filter) => (
-          <button
-            key={filter.label}
-            type="button"
-            aria-pressed={status === filter.status}
-            onClick={() => setSearchParams(filter.status ? { statut: filter.status } : {})}
-          >
-            {filter.label} ({filter.status ? all.filter((application) => application.status === filter.status).length : all.length})
+          <button key={filter.label} type="button" aria-pressed={status === filter.status} onClick={() => change({ statut: filter.status })}>
+            {filter.label} ({filter.status ? found.filter((application) => application.status === filter.status).length : found.length})
           </button>
         ))}
       </div>
@@ -135,9 +192,9 @@ function ApplicationsList() {
         </p>
       )}
       {listed.length === 0 ? (
-        <p className="admin-placeholder">Aucune candidature.</p>
+        <p className="admin-placeholder">{withStatus(all).length === 0 ? 'Aucune candidature.' : 'Aucune candidature ne correspond à la recherche.'}</p>
       ) : (
-        <ApplicationsTable applications={listed} artists={byId} />
+        <ApplicationsTable applications={listed} artists={byId} sorting={sorting} />
       )}
     </>
   )
