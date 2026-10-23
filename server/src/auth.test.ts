@@ -12,9 +12,9 @@ import {
   requireAuth,
   generateInviteToken,
   hashInviteToken,
-  SESSION_COOKIE,
   SESSION_DURATION_SECONDS,
 } from './auth.js'
+import { config } from './config.js'
 import { sessionCookies } from './test-sessions.js'
 
 describe('passwords', () => {
@@ -139,7 +139,7 @@ describe('requireAuth', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/protected',
-      headers: { cookie: `${SESSION_COOKIE}=garbage` },
+      headers: { cookie: `${config.sessionCookie}=garbage` },
     })
     expect(response.statusCode).toBe(401)
   })
@@ -168,7 +168,7 @@ describe('requireAuth', () => {
   it("refuses requests that change something from another origin's page, even with a valid session", async () => {
     const app = buildApp()
     app.post('/protected', { preHandler: requireAuth }, async () => ({ ok: true }))
-    const cookie = `${SESSION_COOKIE}=${await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })}`
+    const cookie = `${config.sessionCookie}=${await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 })}`
     const post = (headers: Record<string, string>) =>
       app.inject({ method: 'POST', url: '/protected', headers: { cookie, host: 'parking.radio', ...headers } })
 
@@ -207,7 +207,7 @@ describe('session cookie helpers', () => {
       return { ok: true }
     })
     const response = await app.inject({ method: 'GET', url: '/set' })
-    const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+    const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
     expect(cookie).toBeDefined()
     expect(cookie?.value).toBe('the-token')
     expect(cookie?.httpOnly).toBe(true)
@@ -224,11 +224,11 @@ describe('session cookie helpers', () => {
 
     delete process.env.NODE_ENV
     const devResponse = await app.inject({ method: 'GET', url: '/set' })
-    expect(devResponse.cookies.find((c) => c.name === SESSION_COOKIE)?.secure).toBeFalsy()
+    expect(devResponse.cookies.find((c) => c.name === config.sessionCookie)?.secure).toBeFalsy()
 
     process.env.NODE_ENV = 'production'
     const prodResponse = await app.inject({ method: 'GET', url: '/set' })
-    expect(prodResponse.cookies.find((c) => c.name === SESSION_COOKIE)?.secure).toBe(true)
+    expect(prodResponse.cookies.find((c) => c.name === config.sessionCookie)?.secure).toBe(true)
   })
 
   it('clearCookie clears the session cookie', async () => {
@@ -239,7 +239,7 @@ describe('session cookie helpers', () => {
       return { ok: true }
     })
     const response = await app.inject({ method: 'GET', url: '/clear' })
-    const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+    const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
     expect(cookie).toBeDefined()
     expect(cookie?.value).toBe('')
   })

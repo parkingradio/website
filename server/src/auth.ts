@@ -54,10 +54,8 @@ export async function verifySessionToken(token: string): Promise<{ id: string; e
   }
 }
 
-export const SESSION_COOKIE = 'session'
-
 export function setSessionCookie(reply: FastifyReply, token: string): void {
-  reply.setCookie(SESSION_COOKIE, token, {
+  reply.setCookie(config.sessionCookie, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.isProduction,
@@ -67,7 +65,7 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
 }
 
 export function clearSessionCookie(reply: FastifyReply): void {
-  reply.clearCookie(SESSION_COOKIE, { path: '/' })
+  reply.clearCookie(config.sessionCookie, { path: '/' })
 }
 
 // Whether a request that changes something was sent by another origin's page, e.g. a form on another subdomain
@@ -93,7 +91,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
     return
   }
   if (!request.server.hasDecorator('sessions')) throw new Error("requireAuth needs the app's `sessions` (see index.ts)")
-  const token = request.cookies[SESSION_COOKIE]
+  const token = request.cookies[config.sessionCookie]
   const session = token ? await verifySessionToken(token) : null
   // The session also has to be one that hasn't ended since, by its admin being revoked or choosing a new password.
   if (!session || (await request.server.sessions.sessionVersion(session.id)) !== session.sessionVersion) {

@@ -8,8 +8,17 @@ export const config = {
   get isProduction() {
     return process.env.NODE_ENV === 'production'
   },
+  // SERVER_PORT, in a checkout's .env (see "Several checkouts" in the README), or else PORT, e.g. in production. PORT
+  // alone isn't enough for checkouts, since tools commonly set it for themselves, and what's set takes precedence over
+  // .env, which would give every checkout the same port.
   get port() {
-    return Number(process.env.PORT ?? 3000)
+    return Number(process.env.SERVER_PORT || process.env.PORT || 3000)
+  },
+  // The name of the cookie that holds an admin's session. Browsers share cookies between all of localhost's ports, so in
+  // development, it has the server's port in it, so that checkouts running side by side don't take each other's
+  // sessions (see "Several checkouts" in the README).
+  get sessionCookie() {
+    return this.isProduction ? 'session' : `session-${this.port}`
   },
   get databaseUrl() {
     return required('DATABASE_URL')
@@ -31,10 +40,11 @@ export const config = {
   get mailDomain() {
     return process.env.MAIL_DOMAIN
   },
-  // Where the site is, e.g. for links to it: the deployment's domain, or else the Vite dev server (see the README).
+  // Where the site is, e.g. for links to it: the deployment's domain, or else the Vite dev server, on CLIENT_PORT (see the
+  // README).
   get siteOrigin() {
     const domain = process.env.MAIL_DOMAIN
-    return domain ? `https://${domain}` : 'http://localhost:5173'
+    return domain ? `https://${domain}` : `http://localhost:${process.env.CLIENT_PORT || 5173}`
   },
   // Where the app keeps its private files, e.g. artists' photos: the private S3 bucket, or else a local directory that
   // stands in for it (e.g. in development). One of the two is required, so that a missing bucket doesn't go unnoticed

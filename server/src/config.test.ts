@@ -21,14 +21,27 @@ describe('config', () => {
   })
 
   describe('port', () => {
-    it('defaults to 3000 when PORT is unset', () => {
+    beforeEach(() => {
+      delete process.env.SERVER_PORT
       delete process.env.PORT
+    })
+
+    it('defaults to 3000 when SERVER_PORT and PORT are unset, or empty', () => {
+      expect(config.port).toBe(3000)
+      process.env.SERVER_PORT = ''
+      process.env.PORT = ''
       expect(config.port).toBe(3000)
     })
 
     it('reads PORT when set', () => {
       process.env.PORT = '4000'
       expect(config.port).toBe(4000)
+    })
+
+    it('reads SERVER_PORT first, e.g. when a tool sets PORT for itself', () => {
+      process.env.PORT = '4000'
+      process.env.SERVER_PORT = '3011'
+      expect(config.port).toBe(3011)
     })
   })
 
@@ -56,15 +69,35 @@ describe('config', () => {
     })
   })
 
+  describe('sessionCookie', () => {
+    it('is "session" in production', () => {
+      process.env.NODE_ENV = 'production'
+      process.env.PORT = '4000'
+      expect(config.sessionCookie).toBe('session')
+    })
+
+    it("has the server's port otherwise, so that checkouts side by side don't share it", () => {
+      delete process.env.NODE_ENV
+      delete process.env.SERVER_PORT
+      delete process.env.PORT
+      expect(config.sessionCookie).toBe('session-3000')
+      process.env.PORT = '4000'
+      expect(config.sessionCookie).toBe('session-4000')
+    })
+  })
+
   describe('siteOrigin', () => {
     it('is the deployment when MAIL_DOMAIN is set', () => {
       process.env.MAIL_DOMAIN = 'parking.example.test'
       expect(config.siteOrigin).toBe('https://parking.example.test')
     })
 
-    it('is the Vite dev server otherwise', () => {
+    it('is the Vite dev server otherwise, on CLIENT_PORT', () => {
       delete process.env.MAIL_DOMAIN
+      delete process.env.CLIENT_PORT
       expect(config.siteOrigin).toBe('http://localhost:5173')
+      process.env.CLIENT_PORT = '5174'
+      expect(config.siteOrigin).toBe('http://localhost:5174')
     })
   })
 

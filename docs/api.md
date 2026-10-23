@@ -16,8 +16,9 @@ or change an endpoint, update both.
   `shared/src/error.ts`). Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
   `GET /api/events`, `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404
   error.
-- **Sessions.** Logging in sets a `session` cookie: a JWT signed by the server, HTTP-only, `SameSite=Lax`, `Secure` in
-  production, which lasts 7 days. Endpoints marked "admin" require it, and fail with 401
+- **Sessions.** Logging in sets a `session` cookie (`session-<port>` in development, with the server's port, see
+  "Several checkouts" in the README): a JWT signed by the server, HTTP-only, `SameSite=Lax`, `Secure` in production,
+  which lasts 7 days. Endpoints marked "admin" require it, and fail with 401
   (`{"ok": false, "error": "Unauthorized"}`) without a valid one. A session also ends when its admin is revoked, or
   chooses a new password. Every admin can do everything: there are no roles.
   Since `SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET` that a

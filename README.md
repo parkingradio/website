@@ -48,7 +48,8 @@ npm run db:up      # starts a local Postgres container
 npm run dev
 ```
 
-This starts the Vite dev server at http://localhost:5173 and the Fastify server at http://localhost:3000.
+This starts the Vite dev server at http://localhost:5173 and the Fastify server at http://localhost:3000, unless `.env`
+says otherwise (see "Several checkouts" below).
 
 To log in to the admin pages at http://localhost:5173/admin, create an admin once the server has started (it creates the
 database's tables when it starts). This prints a link where you choose your password:
@@ -58,6 +59,20 @@ npm run create-admin -w server -- you@example.com
 ```
 
 Running it again for an existing admin gives a link that resets their password.
+
+### Several checkouts
+
+To run several checkouts (e.g. git worktrees) side by side, give each one its own ports in its `.env`:
+
+```sh
+SERVER_PORT=3001
+CLIENT_PORT=5174
+POSTGRES_PORT=5433
+DATABASE_URL=postgres://parking_radio:parking_radio@localhost:5433/parking_radio
+```
+
+If two checkouts' directories have the same name, also give one of them its own `COMPOSE_PROJECT_NAME`, so that it gets
+its own database.
 
 ### Testing and building
 
@@ -114,7 +129,10 @@ npm run db:down # when you're done
 
 Note that `DATABASE_URL` is overridden because `.env.example` points at `localhost` (for running the
 server directly on the host), but this container reaches Postgres over the `radio_default` Docker
-network instead, where it's addressable as `postgres`. `PRIVATE_BUCKET_DIRECTORY`, the local directory that stands in
+network instead, where it's addressable as `postgres`. The network is named after the Docker Compose project, i.e.
+the checkout's directory or `COMPOSE_PROJECT_NAME` (see "Several checkouts" above), so it's `radio_default` in a
+checkout named `radio`. Its port 3000 is published on 3000 too, which a checkout's own server may be using: publish it on
+another one, e.g. `-p 3005:3000`, if so. `PRIVATE_BUCKET_DIRECTORY`, the local directory that stands in
 for the private S3 bucket, is overridden too: the server runs as a user who can't write to the app's own directory,
 where `.env.example` puts it, but can write to `/tmp`.
 

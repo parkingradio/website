@@ -6,8 +6,10 @@ services:
       POSTGRES_USER: parking_radio
       POSTGRES_PASSWORD: parking_radio
       POSTGRES_DB: parking_radio
+    # POSTGRES_PORT comes from the checkout's .env, so that checkouts can each have their own database, side by side (see
+    # "Several checkouts" in the README).
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 

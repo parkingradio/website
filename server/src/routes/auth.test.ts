@@ -48,7 +48,8 @@ vi.mock('../db.js', () => ({
 
 import { eq } from 'drizzle-orm'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth.js'
-import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken, SESSION_COOKIE } from '../auth.js'
+import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken } from '../auth.js'
+import { config } from '../config.js'
 import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import { invites } from '../schema.js'
 
@@ -91,7 +92,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true, email: 'admin@example.com' })
-      const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+      const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
       expect(await verifySessionToken(cookie!.value)).toEqual({ id: 'user-1', email: 'admin@example.com', sessionVersion: 2 })
     })
 
@@ -203,7 +204,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({ ok: true })
-      const cookie = response.cookies.find((c) => c.name === SESSION_COOKIE)
+      const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
       expect(cookie?.value).toBe('')
     })
   })
