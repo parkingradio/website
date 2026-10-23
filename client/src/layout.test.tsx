@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, useNavigate } from 'react-router'
 import App from './app'
 
 function renderAt(path: string) {
@@ -63,5 +63,35 @@ describe('Layout menu', () => {
     fireEvent.keyDown(link, { key: 'Escape' })
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(button).toHaveFocus()
+  })
+})
+
+describe('Layout scrolling', () => {
+  it('opens another page at its top, but not the page that is already shown', () => {
+    renderAt('/')
+
+    fireEvent.click(screen.getByRole('link', { name: 'archives' }))
+    expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith(0, 0)
+
+    vi.mocked(window.scrollTo).mockClear()
+    fireEvent.click(screen.getByRole('link', { name: 'archives' }))
+    expect(window.scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('leaves the page where the browser puts it when going back', () => {
+    function Back() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate(-1)}>back</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/', '/archives']} initialIndex={1}>
+        <App />
+        <Back />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }))
+    expect(screen.getByRole('link', { name: 'archives' })).not.toHaveClass('active')
+    expect(window.scrollTo).not.toHaveBeenCalled()
   })
 })

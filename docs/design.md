@@ -1,7 +1,10 @@
 # Site Design
 
-All pages share a common navigation bar at the top, from which all pages can be reached. The web app is
-a single-page application: changing to another page does not require reloading the whole app.
+All pages share a common navigation bar at the top, from which all pages can be reached. It stays at the top of the
+screen as the page scrolls, like the player's bar at the bottom, except on very short screens, like a phone held
+sideways, where it scrolls away to leave the page room. The web app is a single-page application: changing to
+another page does not require reloading the whole app. Another page opens at its top, except when going back or forward
+in the browser's history.
 On narrow screens like phones, the navigation links move into a drawer that slides in from the left,
 opened by a menu button to the left of the logo.
 

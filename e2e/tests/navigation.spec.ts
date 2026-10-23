@@ -70,6 +70,50 @@ test('the drawer closes with Escape', async ({ page, hasDrawer }) => {
   await expect(menu).toBeFocused()
 })
 
+// Scrolls `path` down further than the navigation bar is high. Its content is made long enough for that whatever it
+// shows, and stays so on the pages that follow, since they're shown in the same place. Returns the bar's height.
+async function scrollDown(page: Page, path: string, content: Locator) {
+  await page.goto(path)
+  await expect(content).toBeVisible()
+  await page.locator('main').evaluate((main) => (main.style.minHeight = '3000px'))
+  await page.evaluate(() => window.scrollTo(0, 300))
+  const barHeight = (await page.locator('nav').boundingBox())!.height
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(barHeight)
+  return barHeight
+}
+
+// Whether what's at the top of the screen is the navigation bar, rather than the page scrolled under it, or drawn over it.
+const barOnTop = (page: Page) => page.evaluate(() => document.elementFromPoint(innerWidth / 2, 10)?.closest('nav') !== null)
+
+test('the navigation bar stays at the top of the screen, over the page, as it scrolls', async ({ page, hasDrawer }) => {
+  await scrollDown(page, '/', page.getByTitle('Parking Radio Discord'))
+  expect(await barOnTop(page)).toBe(true)
+
+  // The drawer's backdrop still covers the whole screen, down to its bottom.
+  if (hasDrawer) {
+    await menuButton(page).click()
+    await expect
+      .poll(() => page.evaluate(() => document.elementFromPoint(innerWidth - 5, innerHeight - 5)?.className))
+      .toBe('menu-backdrop')
+  }
+})
+
+test('the navigation bar scrolls away on very short screens', async ({ page }) => {
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 400 })
+  await scrollDown(page, '/', page.getByTitle('Parking Radio Discord'))
+  expect(await barOnTop(page)).toBe(false)
+})
+
+test('another page opens at its top', async ({ page, hasDrawer }) => {
+  const barHeight = await scrollDown(page, '/', page.getByTitle('Parking Radio Discord'))
+
+  await follow(page, hasDrawer, 'archives')
+  await expect(page).toHaveURL('/archives')
+  // It could have stayed scrolled down.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeGreaterThan(barHeight)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
 test('pages are reached by their URL too', async ({ page }) => {
   for (const { link, path, content } of PAGES) {
     await page.goto(path)

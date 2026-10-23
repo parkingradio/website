@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router'
 import { useAssetUrl, useFeature } from './config-context'
 import { LivePill } from './player/live-pill'
 import { PlayerProvider } from './player/player'
@@ -13,7 +13,17 @@ export function Layout() {
   const assetUrl = useAssetUrl()
   const newPlayer = useFeature('nouveau-lecteur') === true
   const location = useLocation()
+  const navigationType = useNavigationType()
   const menuButton = useRef<HTMLButtonElement>(null)
+
+  // Another page opens at its top. Not when going back or forward, where the browser puts the page back where it was, nor
+  // when only the query changes, like the admin lists' search.
+  const shownPath = useRef(location.pathname)
+  useLayoutEffect(() => {
+    if (location.pathname === shownPath.current) return
+    shownPath.current = location.pathname
+    if (navigationType !== 'POP') window.scrollTo(0, 0)
+  }, [location.pathname, navigationType])
 
   // On narrow screens the links collapse into a menu. Remembering which location the menu was opened
   // at (rather than a plain boolean) closes it on any navigation, including the browser's back button.

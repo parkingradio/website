@@ -4,8 +4,14 @@
   min-height: 100vh;
 }
 
-/* The logo is the tallest thing in the bar, so its 36px plus this padding sets the bar's height. */
+/* The logo is the tallest thing in the bar, so its 36px plus this padding sets the bar's height, 55px with its border.
+   Its z-index keeps it over the page, including the home page, which comes after it. Since the drawer and its backdrop
+   can't be drawn higher than the bar, it also puts them over the player's bar. It stays 1, so that the page's own
+   overlays with a z-index of 1, like the Synth Meetups lightbox, which come later, stay over it. */
 .navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -15,6 +21,23 @@
   background: #fff;
   font-family: 'Overpass Mono', ui-monospace, monospace;
   font-size: 13px;
+}
+
+/* What's scrolled into view, e.g. a field that gets focus, stops a little below the navigation bar rather than behind it. */
+:root {
+  scroll-padding-top: calc(55px + 0.5rem);
+}
+
+/* On very short screens, like a phone held sideways, the bar scrolls away with the page, to leave it the room. It stays
+   positioned, so that its z-index still puts the drawer over the page. */
+@media (max-height: 500px) {
+  .navbar {
+    position: relative;
+  }
+
+  :root {
+    scroll-padding-top: 0;
+  }
 }
 
 .nav-links {
@@ -77,6 +100,8 @@
 
   .menu-button {
     display: block;
+    position: relative;
+    z-index: 3;
   }
 
   .nav-links,
@@ -117,13 +142,6 @@
     visibility: visible;
     transform: none;
     opacity: 1;
-  }
-
-  /* Only raised while the menu is open, so the button doesn't cover the page's own overlays (like the
-     synth meetups lightbox) otherwise. */
-  .menu-open .menu-button {
-    position: relative;
-    z-index: 3;
   }
 }
 

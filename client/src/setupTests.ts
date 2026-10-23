@@ -11,6 +11,8 @@ beforeEach(() => {
   // the page it's on goes away, logs that it isn't implemented.
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+  // Nor scrolling, which the layout does when another page opens.
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 })
 
 afterEach(() => {
