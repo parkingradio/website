@@ -1,18 +1,25 @@
+import { StrictMode } from 'react'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Home } from './home'
 
 describe('Home', () => {
-  it('renders without crashing', () => {
-    const { container } = render(<Home />)
-    expect(container).not.toBeEmptyDOMElement()
-  })
+  // The legacy radio bar and the YouTube widget ask other sites for what they show (see their own tests): here, they
+  // wait for them.
+  beforeEach(() => vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {}))))
 
-  it('embeds the combined radio/video/chat widget', () => {
-    render(<Home />)
-    expect(screen.getByTitle('Parking Radio')).toHaveAttribute(
+  it('shows the legacy radio bar, the YouTube widget and the Discord chat', () => {
+    const { container } = render(
+      <StrictMode>
+        <Home />
+      </StrictMode>,
+    )
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
+    expect(screen.getByText('loading…')).toBeInTheDocument()
+    expect(container.querySelector('.youtube-cover')).toBeInTheDocument()
+    expect(screen.getByTitle('Parking Radio Discord')).toHaveAttribute(
       'src',
-      'https://pub-ac6abcc67fed4f8f8072bac54bb99274.r2.dev/combined_widget.html',
+      'https://e.widgetbot.io/channels/1516532918527328428/1516532918527328431',
     )
   })
 })

@@ -1,0 +1,32 @@
+/* The home page, as the combined widget it was ported from looked (see home.tsx). */
+
+/* Its parts' z-indexes, like the schedule's over the video, stay among themselves, below what's drawn over the page
+   (the navigation drawer, the player's bar), as they did in the widget's iframe. So does what's too wide for the
+   screen, like the radio bar on phones once it plays, which scrolls sideways without the rest of the page. */
+.home {
+  isolation: isolate;
+  overflow-x: auto;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: #fff;
+  color: #000;
+}
+
+.home-spacer { height: 12px; width: 100%; }
+
+.home-chat { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; }
+
+/* As WidgetBot's script styled its embed. */
+.home-chat iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 7px;
+  background: #36393e;
+}
+
+@media (max-width: 640px) {
+  .home-spacer { height: 6px; }
+
+  .home-chat { aspect-ratio: 16 / 11; }
+}

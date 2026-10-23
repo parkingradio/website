@@ -1,0 +1,143 @@
+/* The legacy radio bar's styles, as they were in the combined widget (see legacy-radio.tsx), with every class prefixed
+   so that the app's other styles, which are global, can't reach them. */
+
+/* The widget's reset, which, like the `*` it was, doesn't take precedence over any of its other rules. */
+:where(.legacy-radio, .legacy-radio *) {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.legacy-radio {
+  position: relative;
+  background: #fff;
+}
+
+.legacy-radio-bar {
+  height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 16px;
+  border-bottom: 1px solid #000;
+}
+
+.legacy-radio-play {
+  width: 28px; height: 28px; background: none; border: 1px solid #000;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; padding: 0;
+}
+.legacy-radio-play svg { display: block; }
+
+.legacy-radio-live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #000;
+  flex-shrink: 0; opacity: 0;
+}
+.legacy-radio-live-dot.legacy-radio-live { opacity: 1; animation: legacy-radio-pulse 2s infinite; }
+@keyframes legacy-radio-pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.legacy-radio-on-air { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #999; flex-shrink: 0; }
+
+.legacy-radio-progress { flex: 1; height: 1px; background: #e0e0e0; position: relative; }
+.legacy-radio-progress.legacy-radio-seekable { cursor: pointer; }
+.legacy-radio-progress.legacy-radio-seekable::after { content: ''; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; }
+.legacy-radio-progress-bar { height: 100%; background: #000; width: 0%; }
+
+.legacy-radio-track { font-size: 11px; letter-spacing: 0.08em; flex-shrink: 0; white-space: nowrap; }
+.legacy-radio-track .legacy-radio-rediff { color: #999; margin-left: 6px; }
+
+.legacy-radio-status { font-size: 10px; letter-spacing: 0.08em; color: #bbb; flex-shrink: 0; }
+
+.legacy-radio-schedule-button {
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #999; background: none; border: none; cursor: pointer;
+  flex-shrink: 0; padding: 0; white-space: nowrap;
+}
+.legacy-radio-schedule-button:hover { color: #000; }
+
+.legacy-radio-live-button {
+  display: none;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #fff; background: #000; border: 1px solid #000; cursor: pointer;
+  flex-shrink: 0; padding: 3px 8px; white-space: nowrap;
+}
+.legacy-radio-live-button:hover { background: #333; }
+
+.legacy-radio-volume { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.legacy-radio-volume input {
+  -webkit-appearance: none; appearance: none;
+  width: 70px; height: 1px; background: #000; outline: none; cursor: pointer;
+}
+.legacy-radio-volume input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #000; cursor: pointer; }
+.legacy-radio-volume input::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #000; border: none; cursor: pointer; }
+
+/* ── Marquee ── */
+.legacy-radio-marquee {
+  height: 80px;
+  overflow: hidden;
+  display: block;
+  position: relative;
+  border-bottom: 1px solid #000;
+}
+
+.legacy-radio-marquee-track {
+  position: absolute;
+  top: 50%;
+  white-space: nowrap;
+  -webkit-transform: translateY(-50%);
+  transform: translateY(-50%);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Schedule dropdown ── */
+.legacy-radio-schedule {
+  display: none;
+  position: absolute;
+  top: 52px;
+  left: 0; right: 0;
+  background: #fff;
+  border-bottom: 1px solid #000;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 99999;
+}
+.legacy-radio-schedule.legacy-radio-open { display: block; }
+
+.legacy-radio-schedule table { width: 100%; border-collapse: collapse; }
+.legacy-radio-schedule thead th {
+  padding: 8px 20px; text-align: left;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #bbb; font-weight: 400; border-bottom: 1px solid #f0f0f0;
+  position: sticky; top: 0; background: #fff;
+}
+.legacy-radio-schedule tbody tr { border-bottom: 1px solid #f5f5f5; }
+.legacy-radio-schedule tbody td { padding: 7px 20px; font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.legacy-radio-schedule tbody tr { cursor: pointer; }
+.legacy-radio-schedule tbody tr:hover { background: #f5f5f5; }
+.legacy-radio-schedule tbody tr.legacy-radio-row-on-air { background: #000; color: #fff; }
+.legacy-radio-schedule tbody tr.legacy-radio-row-on-air:hover { background: #000; }
+.legacy-radio-schedule tbody tr.legacy-radio-row-on-air .legacy-radio-date,
+.legacy-radio-schedule tbody tr.legacy-radio-row-on-air .legacy-radio-duration { color: #aaa; }
+.legacy-radio-schedule tbody tr.legacy-radio-row-selected { background: #f0f0f0; box-shadow: inset 3px 0 0 #000; }
+.legacy-radio-schedule tbody tr.legacy-radio-row-selected:hover { background: #ececec; }
+.legacy-radio-badge.legacy-radio-badge-demand { border-color: #000; color: #000; opacity: 1; }
+.legacy-radio-time { width: 70px; }
+.legacy-radio-name { font-weight: 500; }
+.legacy-radio-date { color: #999; width: 90px; }
+.legacy-radio-duration  { color: #999; width: 70px; text-align: right; }
+.legacy-radio-badge {
+  font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  border: 1px solid #fff; padding: 1px 4px; margin-left: 8px; vertical-align: middle; opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .legacy-radio-bar { height: 40px; padding: 0 12px; gap: 10px; }
+  .legacy-radio-play { width: 22px; height: 22px; }
+  .legacy-radio-on-air { font-size: 9px; }
+  .legacy-radio-track { font-size: 9px; }
+  .legacy-radio-status { display: none; }
+  .legacy-radio-schedule-button, .legacy-radio-live-button { font-size: 9px; }
+  .legacy-radio-volume { display: none; }
+
+  .legacy-radio-marquee { height: 44px; }
+  .legacy-radio-marquee-track { font-size: 16px; }
+}

@@ -10,7 +10,7 @@ describe('App', () => {
         <App />
       </MemoryRouter>,
     )
-    expect(screen.getByTitle('Parking Radio')).toBeInTheDocument()
+    expect(screen.getByTitle('Parking Radio Discord')).toBeInTheDocument()
   })
 
   it('renders the navbar with links to every page', () => {

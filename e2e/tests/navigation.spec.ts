@@ -14,7 +14,7 @@ const PAGES: { link: string; path: string; content: (page: Page) => Locator }[] 
   { link: 'synth meetups', path: '/synth-meetups', content: (page) => page.getByRole('heading', { name: 'dates à venir' }) },
   { link: 'appliquer', path: '/appliquer', content: (page) => page.getByTitle('Parking Radio Appliquer') },
   { link: 'contribuer', path: '/contribuer', content: (page) => page.getByTitle('Parking Radio Contribuer') },
-  { link: 'parking.radio', path: '/', content: (page) => page.getByTitle('Parking Radio', { exact: true }) },
+  { link: 'parking.radio', path: '/', content: (page) => page.getByTitle('Parking Radio Discord') },
 ]
 
 // A link of the navigation bar. Not the logo, which links to the home page too, under the same name. On phones, the

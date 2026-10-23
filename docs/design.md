@@ -77,22 +77,23 @@ red dot (still named in full for screen readers). On phones, it only shows "● 
 
 ## Main page
 
-This page is the radio's home page. It embeds a single custom-built widget (currently a static HTML/JS page hosted
-externally, on Cloudflare R2) as an iframe, combining three pieces:
+This page is the radio's home page. From top to bottom, it shows three pieces, which used to be a single custom-built
+widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an iframe), and still look and behave as
+they did then:
 
 - **Radio player**: not a real live audio stream, but a simulated 24/7 rotation. It's driven by a playlist
-  manifest (an ordered list of tracks, each with a name, date, audio URL, and duration) and computes "what's
-  playing now" as `elapsed-time-since-epoch modulo total-playlist-duration`, so all listeners hear the same
-  track at the same position at any given moment, like a real broadcast. A play/pause control, a live
+  manifest (an ordered list of tracks, each with a name, date and audio URL) and the tracks' durations, which are
+  kept on that R2 bucket, outside of this app (see [deployment.md](deployment.md#the-legacy-radios-r2-bucket)). It
+  computes "what's playing now" as `elapsed-time-since-epoch modulo total-playlist-duration`, so all listeners hear
+  the same track at the same position at any given moment, like a real broadcast. A play/pause control, a live
   indicator, a progress bar, and the current track's name/date are shown in a bar at the top. A scrolling
   marquee underneath lists all track names in the rotation. A "Schedule" dropdown shows the full rotation as
   a table (start time, artist, date, duration), with the on-air track highlighted; clicking a row plays that
   track on demand (with seeking) instead of the live rotation, and a "Live" button jumps back to the
   synced rotation.
-- **Video widget**: shows Parking Radio's YouTube channel — if the channel is currently live, the live
-  stream is embedded and autoplays; otherwise, a clickable thumbnail of the channel's most recent upload is
-  shown (click-to-play, not autoplay); if there's no video at all, a "Hors direct" placeholder is shown
-  instead. This is polled periodically to detect when the channel goes live.
+- **Video widget**: shows Parking Radio's YouTube channel: a clickable thumbnail of the channel's most recent upload
+  (click-to-play, not autoplay), or a "Hors direct" placeholder if there's no video at all. It's meant to embed the
+  live stream while the channel is live, but doesn't detect it yet.
 - **Discord chat**: an embedded WidgetBot widget showing a specific text channel from Parking Radio's Discord
   server, letting visitors follow and join the conversation without leaving the site.
 
