@@ -646,10 +646,10 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.45rem 0.45rem 0.45rem 1rem;
+  padding: 0.3rem 0.3rem 0.3rem 0.75rem;
   background: var(--black);
   color: var(--white);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .appliquer .calendar-nav {
@@ -660,8 +660,8 @@
 .appliquer .calendar-nav button {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 1px solid var(--white);
   background: none;
@@ -680,8 +680,8 @@
 }
 
 .appliquer .calendar-nav svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .appliquer .months {
@@ -689,7 +689,7 @@
 }
 
 .appliquer .month {
-  padding: 0.9rem 1rem 1rem;
+  padding: 0.5rem 0.75rem 0.6rem;
 }
 
 .appliquer .month + .month {
@@ -697,8 +697,8 @@
 }
 
 .appliquer .month h3 {
-  margin: 0 0 0.6rem;
-  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
   letter-spacing: -0.01em;
 }
 
@@ -710,25 +710,25 @@
 .appliquer .days {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 3px;
+  gap: 2px;
 }
 
 .appliquer .days .weekday {
-  padding-bottom: 4px;
-  font-size: 11px;
+  padding-bottom: 2px;
+  font-size: 10px;
   text-align: center;
   color: var(--muted);
 }
 
 .appliquer .day {
+  /* A fixed height rather than squares, which grew with the width of the columns. */
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
-  min-height: 34px;
+  height: 28px;
   padding: 0;
   border: 1px solid transparent;
   background: none;
-  font-size: 14px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
@@ -752,7 +752,7 @@
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.55rem 1rem;
+  padding: 0.35rem 0.75rem;
   border-top: 1px solid var(--rule);
   font-size: 11px;
   color: var(--muted);
@@ -769,15 +769,15 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 0.5rem;
-  padding: 0.7rem 0.9rem;
+  padding: 0.4rem 0.75rem;
   border-bottom: 1px solid var(--black);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .appliquer .picked-head b {
   padding: 0 6px;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
 }
@@ -808,9 +808,13 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.45rem 0.5rem 0.45rem 0.9rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.75rem;
   border-bottom: 1px solid var(--rule);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.appliquer .picked li .short-month {
+  display: none;
 }
 
 .appliquer .picked li .weekday {
@@ -842,7 +846,7 @@
 
 .appliquer .picked-empty {
   margin: 0;
-  padding: 1rem 0.9rem;
+  padding: 0.6rem 0.75rem;
   font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
@@ -1157,6 +1161,48 @@
   .appliquer .applicant-types,
   .appliquer .members {
     grid-template-columns: 1fr;
+  }
+
+  /* Days a bit taller, to be easy to touch. */
+  .appliquer .day {
+    height: 32px;
+  }
+
+  /* The picked dates are pills side by side, like the genres picked, rather than a line each: "mer 23 déc.". */
+  .appliquer .picked ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .appliquer .picked li {
+    gap: 2px;
+    padding: 1px 1px 1px 7px;
+    border: 1px solid var(--black);
+  }
+
+  .appliquer .picked li .weekday {
+    width: auto;
+    margin-right: 0.3em;
+  }
+
+  .appliquer .picked li .long-month,
+  .appliquer .picked li .year {
+    display: none;
+  }
+
+  .appliquer .picked li .short-month {
+    display: inline;
+  }
+
+  .appliquer .picked li button {
+    width: 22px;
+    height: 22px;
+  }
+
+  .appliquer .picked .clear {
+    margin-top: 0;
   }
 
   /* Below 16px, iPhones zoom into the page when a field is touched. */

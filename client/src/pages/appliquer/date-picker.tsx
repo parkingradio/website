@@ -11,6 +11,8 @@ type Props = {
 }
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+// For the picked dates on phones, where they're pills (see appliquer.css).
+const SHORT_MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
 const WEEKDAYS = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'] // weeks start on Sunday, as in Québec
 
 // Dates are handled as "YYYY-MM-DD" strings, which sort chronologically; these are the calendar's pieces.
@@ -21,7 +23,7 @@ const parts = (key: string) => key.split('-').map(Number) as [number, number, nu
 function describe(key: string) {
   const [year, month, day] = parts(key)
   const weekday = WEEKDAYS[new Date(year, month - 1, day).getDay()]
-  return { weekday, label: `${day} ${MONTHS[month - 1]} ${year}` }
+  return { weekday, day, month: MONTHS[month - 1], shortMonth: SHORT_MONTHS[month - 1], year, label: `${day} ${MONTHS[month - 1]} ${year}` }
 }
 
 // Two months side by side, one on phones.
@@ -148,12 +150,14 @@ export function DatePicker({ value, onChange, first, last, invalid }: Props) {
         ) : (
           <ul>
             {value.map((key) => {
-              const { weekday, label } = describe(key)
+              const { weekday, day, month, shortMonth, year, label } = describe(key)
               return (
                 <li key={key}>
+                  {/* Phones show "mer 23 déc.", other screens "mer 23 décembre 2026" (see appliquer.css). */}
                   <span>
                     <span className="weekday">{weekday}</span>
-                    {label}
+                    {day} <span className="long-month">{month}</span>
+                    <span className="short-month">{shortMonth}</span> <span className="year">{year}</span>
                   </span>
                   <button type="button" aria-label={`Enlever le ${label}`} onClick={() => toggle(key)}>
                     <svg viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">

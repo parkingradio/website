@@ -66,7 +66,8 @@ export function LinksField({ values, onChange, showErrors, invalid }: Props) {
                   spellCheck={false}
                   aria-invalid={showError || (firstWrong && site === visible[0]) ? true : undefined}
                   autoFocus={site.id === added}
-                  placeholder={!site.profile ? 'https://…' : site.id === 'spotify' ? 'identifiant' : 'votre-profil'}
+                  // The site's address around the field says what goes there, so only the website's field has a placeholder.
+                  placeholder={site.profile ? undefined : 'https://…'}
                   value={raw}
                   onChange={(event) => onChange({ ...values, [site.id]: event.target.value })}
                   onPaste={(event) => {
