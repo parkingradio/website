@@ -32,7 +32,7 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
   'nouveau-lecteur': {
     name: 'Nouveau lecteur',
     description:
-      "Une barre noire en bas de chaque page fait jouer la radio en ondes, et une pastille « en ondes » apparaît dans le menu. La barre remplace l'ancien lecteur de l'accueil.",
+      "Une barre noire en bas de chaque page fait jouer la radio en ondes, et une pastille « en ondes » apparaît dans le menu. La barre remplace l'ancien lecteur de l'accueil, où une bannière fait défiler les artistes de la rotation.",
   },
 }
 

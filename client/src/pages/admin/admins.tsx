@@ -4,7 +4,7 @@ import type { Admin, AdminsResponse, DeleteAdminResponse, InviteRequest, InviteR
 import type { ApiError } from 'shared/error'
 import { deleteJson, postJson } from '../../api'
 import { dateFormat, dateTimeFormat } from './describe'
-import { useApi } from './use-api'
+import { useApi } from '../../use-api'
 
 // The admins section: inviting admins, and the admins there are, who can be invited again until they accept, and revoked.
 

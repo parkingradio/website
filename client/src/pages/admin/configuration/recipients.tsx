@@ -6,7 +6,7 @@ import { EMAIL_MAX_LENGTH, isEmailAddress } from 'shared/artists'
 import { putJson } from '../../../api'
 import { byWhom } from '../describe'
 import { FieldError } from '../fields'
-import { useApi } from '../use-api'
+import { useApi } from '../../../use-api'
 
 // Who the applications artists send are emailed to, in the configuration section.
 

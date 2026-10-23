@@ -4,7 +4,7 @@ import { SOUNDCLOUD_CREDENTIAL_MAX_LENGTH } from 'shared/radio'
 import type { RadioCredentialsCheckResponse, RadioCredentialsRequest, RadioCredentialsResponse } from 'shared/radio'
 import { postJson, putJson } from '../../../api'
 import { byWhom } from '../describe'
-import { useApi } from '../use-api'
+import { useApi } from '../../../use-api'
 
 // The credentials of the SoundCloud app the radio reads playlists through, in the configuration section.
 

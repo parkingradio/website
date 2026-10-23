@@ -30,7 +30,7 @@ import {
 import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { useApi } from './use-api'
+import { useApi } from '../../use-api'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in an application that came through the Google Form.

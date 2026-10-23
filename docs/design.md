@@ -80,9 +80,9 @@ red dot (still named in full for screen readers). On phones, it only shows "● 
 
 ## Main page
 
-This page is the radio's home page. From top to bottom, it shows the pieces below, which used to be a single
-custom-built widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an iframe), and still look
-and behave as they did then.
+This page is the radio's home page. From top to bottom, it shows the pieces below. Apart from the rotation banner, they
+used to be a single custom-built widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an
+iframe), and still look and behave as they did then.
 
 - **Radio player**: only while the `nouveau-lecteur` feature flag is off (see "Lecteur" above), and once the page knows
   that it is. It's not a real live audio stream, but a simulated 24/7 rotation. It's driven by a playlist manifest (an
@@ -95,6 +95,10 @@ and behave as they did then.
   a table (start time, artist, date, duration), with the on-air track highlighted; clicking a row plays that
   track on demand (with seeking) instead of the live rotation, and a "Live" button jumps back to the
   synced rotation.
+- **Rotation banner**: in the radio player's place, while the `nouveau-lecteur` feature flag is on, and once the page
+  knows that it is. It lists the artists of the radio's rotation (see "Radio rotation" above), from the set on air and
+  once per set, scrolling like the radio player's marquee. The rotation is read each time the page is shown. The
+  banner's band shows, empty, while it's read, and goes away if the radio is off air.
 - **Video widget**: shows Parking Radio's YouTube channel: a clickable thumbnail of the channel's most recent upload
   (click-to-play, not autoplay), or a "Hors direct" placeholder if there's no video at all. It's meant to embed the
   live stream while the channel is live, but doesn't detect it yet.

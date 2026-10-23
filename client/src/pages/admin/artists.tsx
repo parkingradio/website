@@ -10,7 +10,7 @@ import { KIND_LABELS, MISSING, artistSearchFields, byWhom, countryOf, dateFormat
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { useApi } from './use-api'
+import { useApi } from '../../use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
 // bring in an application that came through the Google Form.

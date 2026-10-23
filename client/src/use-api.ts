@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getJson } from '../../api'
+import { getJson } from './api'
 
 export type Loaded<T> = { kind: 'loading' } | { kind: 'loaded'; value: T } | { kind: 'error'; message: string }
 

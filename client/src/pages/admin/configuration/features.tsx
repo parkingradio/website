@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Feature, FeatureRequest, FeatureResponse, FeaturesResponse } from 'shared/features'
 import { putJson } from '../../../api'
 import { FEATURE_LABELS, byWhom } from '../describe'
-import { useApi } from '../use-api'
+import { useApi } from '../../../use-api'
 
 // The feature flags, in the configuration section.
 export function Features() {

@@ -1,0 +1,33 @@
+import type { RadioResponse } from 'shared/radio'
+import { useApi } from '../../use-api'
+import './rotation-banner.css'
+
+// The banner at the top of the home page while the new player is on: the artists of the radio's rotation, from the set
+// on air, once per set, scrolling like the legacy radio bar's marquee did (see legacy-radio.tsx).
+export function RotationBanner() {
+  const radio = useApi<RadioResponse>('/api/radio')
+  if (radio.kind === 'error') return null
+  const text = radio.kind === 'loaded' ? names(radio.value) : null
+  return (
+    <div className="rotation-banner">
+      {text && (
+        <div ref={scroll} className="rotation-banner-track">
+          <span>{text}</span>
+          <span aria-hidden="true">{text}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function names({ current, upcoming }: RadioResponse): string {
+  return [current.track, ...upcoming].map(({ artist }) => `${artist} · `).join('')
+}
+
+// The names are there twice in a row, and scroll by the width of one of the two, so that they loop without a gap. The
+// width is in ems, so that the speed stays the same whatever the font size (see rotation-banner.css).
+function scroll(track: HTMLElement | null) {
+  if (!track) return
+  const width = track.scrollWidth / 2 / parseFloat(getComputedStyle(track).fontSize)
+  track.style.setProperty('--width', String(width))
+}

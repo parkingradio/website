@@ -1,0 +1,35 @@
+/* The home page's rotation banner (see rotation-banner.tsx). */
+
+.rotation-banner {
+  box-sizing: border-box;
+  height: 80px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #000;
+}
+
+.rotation-banner-track {
+  flex-shrink: 0;
+  /* Keeps the space after the last name, so that the two copies of the names line up. */
+  white-space: pre;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* 30px per second: the names' width in ems (see rotation-banner.tsx), times the font size, over the speed. */
+  animation: rotation-banner-scroll calc(var(--width, 0) * 28s / 30) linear infinite;
+}
+
+@keyframes rotation-banner-scroll {
+  to { transform: translateX(-50%); }
+}
+
+@media (max-width: 640px) {
+  .rotation-banner { height: 44px; }
+  .rotation-banner-track { font-size: 16px; animation-duration: calc(var(--width, 0) * 16s / 30); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotation-banner-track { animation: none; }
+}
