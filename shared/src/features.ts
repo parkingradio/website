@@ -7,7 +7,7 @@
 
 // The flags, in the order the admin pages show them. Adding a flag only takes adding its id here, and its name on the
 // admin pages. Removing one from here retires it: the server ignores what it saved for flags that aren't listed.
-export const FEATURES = ['nouveau-formulaire-candidature'] as const
+export const FEATURES = ['nouveau-formulaire-candidature', 'nouveau-lecteur'] as const
 
 export type FeatureId = (typeof FEATURES)[number]
 

@@ -68,7 +68,8 @@
 
 /* The links need about 880px on a single line. Below that they move into a drawer that slides in from
    the left over the whole page, toggled by the menu button. While the menu is open, the button stays on
-   top of the drawer and turns into its close button. */
+   top of the drawer and turns into its close button. The "en ondes" button's widths depend on this one too (see
+   player/player.css): changing the links means checking them. */
 @media (max-width: 900px) {
   .navbar {
     padding-inline: 0.5rem;

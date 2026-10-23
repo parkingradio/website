@@ -29,6 +29,11 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
     name: 'Nouveau formulaire de candidature',
     description: 'La page « Appliquer » montre le formulaire du site plutôt que le Google Form.',
   },
+  'nouveau-lecteur': {
+    name: 'Nouveau lecteur',
+    description:
+      "Une barre noire en bas de chaque page fait jouer la radio en ondes, et une pastille « en ondes » apparaît dans le menu. À n'allumer qu'une fois l'ancien lecteur de l'accueil retiré.",
+  },
 }
 
 export { countryName, genreName } from '../../artist-profile'

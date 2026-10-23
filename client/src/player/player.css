@@ -1,0 +1,311 @@
+/* The player's bar, at the bottom of every page. It's the last thing in the layout, so that it takes its own room at the
+   end of the page rather than hiding it, and sticks to the bottom of the screen above the rest of the page. Coming after
+   the page, it's drawn over it without a z-index, which leaves it under what's drawn over the page, like the navigation
+   drawer or the Synth Meetups lightbox. */
+.player {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 10px 1.5rem 12px;
+  background: #000;
+  color: #f9f9f9;
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+}
+
+.player-play {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #f9f9f9;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.player-play:hover {
+  background: #f9f9f9;
+  color: #000;
+}
+
+.player-play svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* While the sound is on its way, the pause icon blinks. */
+.player.loading .player-play svg {
+  animation: player-blink 1s steps(2) infinite;
+}
+
+@keyframes player-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* Everything between the button and the volume, in 12px, except the artist and the event. */
+.player-now {
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 12px;
+}
+
+.player-info {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  white-space: nowrap;
+}
+
+.player-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #aaa;
+}
+
+.player-artist {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* A takeover's event, e.g. "qrtz takeover", in a box. */
+.player-event {
+  display: inline-block;
+  margin: 1px 4px 1px 0.5rem;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-transform: lowercase;
+}
+
+.player-wave {
+  flex: 1 1 3rem;
+  min-width: 3rem;
+  height: 26px;
+}
+
+.player-meta {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: #aaa;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The volume, at the far right: the part of the slider left of its thumb is drawn in full, the rest dimmed. */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.volume-button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.volume-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.volume-slider {
+  appearance: none;
+  width: 80px;
+  height: 16px;
+  margin: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  background: linear-gradient(90deg, currentColor var(--level), #555 var(--level));
+}
+
+.volume-slider::-moz-range-track {
+  height: 2px;
+  background: linear-gradient(90deg, currentColor var(--level), #555 var(--level));
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.volume-slider:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* The red dot of "en ondes", which pulses next to the bar's label, and in the navigation bar's button while the radio
+   plays. */
+.on-air-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e0301e;
+}
+
+.player-label .on-air-dot,
+.live-pill[aria-pressed='true'] .on-air-dot {
+  animation: on-air-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes on-air-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* The navigation bar's "● en ondes · ARTISTE" button. */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 16rem;
+  padding: 4.5px 10px;
+  border: 1px solid #1c1c1c;
+  background: none;
+  color: #1c1c1c;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.live-pill:enabled:hover,
+.live-pill[aria-pressed='true'] {
+  background: #000;
+  color: #f9f9f9;
+}
+
+.live-pill-text {
+  display: flex;
+  min-width: 0;
+}
+
+/* Its text starts with the space before "·", which would be dropped at the start of a flex item otherwise. */
+.live-pill-artist {
+  max-width: 9rem;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.live-pill.unknown {
+  visibility: hidden;
+}
+
+.live-pill:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.live-pill:disabled .on-air-dot {
+  background: #bbb;
+}
+
+/* Phones: "● en ondes" and the artist, with the date under them. The event, the waveform and the volume are left out,
+   so that the artist has room (the device's own buttons set the volume, and iOS ignores the one a page sets). */
+@media (max-width: 760px) {
+  .player {
+    gap: 0.75rem;
+    padding-inline: 1rem;
+  }
+
+  .player-play {
+    width: 40px;
+    height: 40px;
+  }
+
+  .player-now {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .player-event,
+  .player-wave,
+  .volume {
+    display: none;
+  }
+
+  .player-meta {
+    font-size: 11px;
+  }
+}
+
+/* The links need about 880px on a single line, up to the 900px at which they move into the menu (see layout.css), and
+   the whole button up to about 280px more. In between, it's only the red dot, still named "en ondes · artiste" for
+   screen readers, and the links get closer to make room for it. Below that, the links move into the menu, which leaves
+   room for "● en ondes" and the artist again. */
+@media (min-width: 901px) and (max-width: 1179px) {
+  .navbar:has(.live-pill) .nav-links {
+    gap: 6px;
+  }
+
+  .live-pill-text {
+    display: none;
+  }
+
+  .live-pill {
+    min-height: 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .live-pill-artist {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player.loading .player-play svg,
+  .player-label .on-air-dot,
+  .live-pill[aria-pressed='true'] .on-air-dot {
+    animation: none;
+  }
+}

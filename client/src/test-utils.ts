@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 
-type Body = { ok: boolean } & Record<string, unknown>
+export type Body = { ok: boolean } & Record<string, unknown>
 
 /**
  * Stubs `fetch` to answer each of these URLs with its body, whose `ok` is also the response's. A URL can be
