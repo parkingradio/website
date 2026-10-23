@@ -4,6 +4,7 @@ import type { MockInstance } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { RadioTrack } from 'shared/radio'
 import App from '../app'
+import { API_KEY, CHANNEL_ID } from '../pages/home/youtube'
 import { mockFetch, requestsTo } from '../test-utils'
 import type { Body } from '../test-utils'
 import { positionAt, rediffusion, untilEnd } from './radio'
@@ -73,18 +74,32 @@ function streamOf(track: RadioTrack) {
   return { [`/api/radio/tracks/${track.id}/stream`]: { ok: true, url: `https://cdn.test/${track.id}.m3u8`, expiresAt: IN_AN_HOUR() } }
 }
 
+// What the YouTube Data API answers the home page's video widget: Parking Radio's channel, and its latest video.
+const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3'
+const YOUTUBE = {
+  [`${YOUTUBE_API}/channels?part=contentDetails&id=${CHANNEL_ID}&key=${API_KEY}`]: {
+    ok: true,
+    items: [{ contentDetails: { relatedPlaylists: { uploads: 'UUuploads' } } }],
+  },
+  [`${YOUTUBE_API}/playlistItems?part=snippet&playlistId=UUuploads&maxResults=1&key=${API_KEY}`]: {
+    ok: true,
+    items: [{ snippet: { resourceId: { videoId: 'latest' } } }],
+  },
+}
+
 function mockSite({ player = true, radio = onAir(KRAKA, 60) }: { player?: boolean; radio?: Body } = {}) {
   mockFetch({
     '/api/config': { ok: true, assetsDomain: 'assets.example.test', turnstileSiteKey: 'key', features: { 'nouveau-lecteur': player } },
     [RADIO_URL]: radio,
     ...streamOf(KRAKA),
     ...streamOf(NEBULO),
+    ...YOUTUBE,
   })
 }
 
-function renderSite() {
-  render(
-    <MemoryRouter initialEntries={['/contribuer']}>
+function renderSite(path = '/contribuer') {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   )
@@ -443,6 +458,61 @@ describe('the player', () => {
     mockSite()
     renderSite()
     expect(await screen.findByRole('slider', { name: 'volume' })).toHaveValue('0.4')
+  })
+})
+
+describe("the home page's video", () => {
+  const video = () => screen.queryByTitle('Parking Radio YouTube')
+
+  // The video's cover, once it shows, which plays the video when it's clicked.
+  async function cover(container: HTMLElement) {
+    await waitFor(() => expect(container.querySelector('.youtube-cover img')).toBeInTheDocument())
+    return container.querySelector('.youtube-cover')!
+  }
+
+  it('pauses the radio when it plays', async () => {
+    mockSite()
+    const { container } = renderSite('/')
+    await startRadio()
+    await waitFor(() => expect(audio()?.src).toBe('https://cdn.test/1.m3u8'))
+    fire('playing')
+
+    fireEvent.click(await cover(container))
+    expect(video()).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'écouter la radio en ondes' })).toBeInTheDocument()
+    expect(audio()!.src).toBe('https://cdn.test/1.m3u8')
+  })
+
+  it('stops when the radio plays', async () => {
+    mockSite()
+    const { container } = renderSite('/')
+    fireEvent.click(await cover(container))
+    expect(video()).toBeInTheDocument()
+
+    await startRadio()
+    expect(video()).not.toBeInTheDocument()
+    expect(container.querySelector('.youtube-cover img')).toBeInTheDocument()
+  })
+
+  it("keeps the radio from starting while it waits for the server to say what's on air", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    // KRAKA ends in 2 seconds.
+    mockSite({ radio: onAir(KRAKA, 60 * 60 - 2) })
+    const { container } = renderSite('/')
+    await screen.findByRole('region', { name: 'lecteur' })
+    const videoCover = await cover(container)
+
+    // Once KRAKA is over, but before the page has asked what's on air next, playing the radio asks the server first,
+    // and playing the video in the meantime stops it.
+    vi.setSystemTime(Date.now() + 5000)
+    mockSite({ radio: onAir(NEBULO, 1) })
+    fireEvent.click(screen.getByRole('button', { name: 'écouter la radio en ondes' }))
+    fireEvent.click(videoCover)
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    expect(requestsTo('GET', RADIO_URL)).toHaveLength(1)
+    expect(play).not.toHaveBeenCalled()
+    expect(video()).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'écouter la radio en ondes' })).toBeInTheDocument()
   })
 })
 

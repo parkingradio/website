@@ -12,8 +12,8 @@ app is a single-page application, it keeps playing while visitors move from page
 "en ondes" everywhere on the site.
 
 Until the `nouveau-lecteur` feature flag is turned on (see "Configuration" below), there's no player: neither the bar
-nor the navigation bar's button. The main page still has a player of its own (see "Main page" below), which plays its
-own rotation: it has to be removed before the flag is turned on.
+nor the navigation bar's button. The main page has a player of its own instead (see "Main page" below), which plays its
+own rotation, and which the shared player replaces while the flag is on: it comes back if the flag is turned off.
 
 ### Radio rotation
 
@@ -77,12 +77,13 @@ red dot (still named in full for screen readers). On phones, it only shows "● 
 
 ## Main page
 
-This page is the radio's home page. From top to bottom, it shows three pieces, which used to be a single custom-built
-widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an iframe), and still look and behave as
-they did then:
+This page is the radio's home page. From top to bottom, it shows the pieces below, which used to be a single
+custom-built widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an iframe), and still look
+and behave as they did then.
 
-- **Radio player**: not a real live audio stream, but a simulated 24/7 rotation. It's driven by a playlist
-  manifest (an ordered list of tracks, each with a name, date and audio URL) and the tracks' durations, which are
+- **Radio player**: only while the `nouveau-lecteur` feature flag is off (see "Lecteur" above), and once the page knows
+  that it is. It's not a real live audio stream, but a simulated 24/7 rotation. It's driven by a playlist manifest (an
+  ordered list of tracks, each with a name, date and audio URL) and the tracks' durations, which are
   kept on that R2 bucket, outside of this app (see [deployment.md](deployment.md#the-legacy-radios-r2-bucket)). It
   computes "what's playing now" as `elapsed-time-since-epoch modulo total-playlist-duration`, so all listeners hear
   the same track at the same position at any given moment, like a real broadcast. A play/pause control, a live
@@ -97,8 +98,8 @@ they did then:
 - **Discord chat**: an embedded WidgetBot widget showing a specific text channel from Parking Radio's Discord
   server, letting visitors follow and join the conversation without leaving the site.
 
-Playback of the radio player and the video widget is mutually exclusive: starting one pauses the other, so
-visitors aren't listening to two audio sources at once.
+Playback of the radio, from either player, and the video widget is mutually exclusive: starting one pauses the other,
+so visitors aren't listening to two audio sources at once.
 
 ## Archives
 

@@ -113,6 +113,20 @@ export class RadioPlayer {
     else this.play()
   }
 
+  /**
+   * Pauses the radio, e.g. when something else on the page starts playing, and keeps its stream, so that the system can
+   * play it again (see `paused`). While there's no stream yet, e.g. while it's asked for, it's stopped instead, and so is
+   * a radio that's waiting for the server to say what to play.
+   */
+  pause = () => {
+    if (!this.state.playing && !this.state.loading) return
+    if (!this.state.playing || !this.stopStream) return this.stop()
+    this.run += 1
+    this.paused = this.state.playing
+    this.update({ playing: null, loading: false })
+    this.audio.pause()
+  }
+
   setLevel = (level: number) => this.setVolume({ level, muted: false })
 
   toggleMute = () => this.setVolume(toggledMute(this.state.volume))
@@ -228,17 +242,6 @@ export class RadioPlayer {
   private resume(paused: OnAir) {
     this.update({ playing: paused, loading: this.audio.paused })
     resumeStream(this.audio, positionAt(paused, Date.now()), this.stop)
-  }
-
-  // Pauses the radio, and keeps its stream, so that the system can play it again (see `paused`). While there's no
-  // stream yet, e.g. while it's asked for, it's stopped instead.
-  private pause = () => {
-    if (!this.state.playing) return
-    if (!this.stopStream) return this.stop()
-    this.run += 1
-    this.paused = this.state.playing
-    this.update({ playing: null, loading: false })
-    this.audio.pause()
   }
 
   private stop = () => {

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PlayerProvider } from '../../player/player'
 import { YouTubeWidget } from './youtube'
 
 // What the YouTube Data API answers for the channel, and for its uploads playlist.
@@ -34,10 +35,13 @@ async function poll() {
 
 const thumbnail = (id: string) => `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
 
+// How it pauses the player shared by every page, and is paused by it, is tested with the player (see player.test.tsx).
 function renderWidget() {
   return render(
     <StrictMode>
-      <YouTubeWidget />
+      <PlayerProvider enabled={false}>
+        <YouTubeWidget />
+      </PlayerProvider>
     </StrictMode>,
   )
 }

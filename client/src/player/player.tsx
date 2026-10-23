@@ -19,6 +19,7 @@ export function PlayerProvider({ enabled, children }: { enabled: boolean; childr
       ...state,
       current: state.playing ?? (state.radio.kind === 'on-air' ? state.radio.onAir : null),
       toggleRadio: player.toggleRadio,
+      pause: player.pause,
       setLevel: player.setLevel,
       toggleMute: player.toggleMute,
     }),

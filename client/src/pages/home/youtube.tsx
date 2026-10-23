@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePlayer } from '../../player/player-context'
 import './youtube.css'
 
 // The YouTube widget of the home page's old "combined widget" (combined_widget.html, which was hosted on R2): the most
 // recent video of Parking Radio's channel, behind a cover that plays it, or "Hors direct" when there's none. It's meant
 // to show the live stream when the channel is live, but doesn't detect it yet: the original tried, and never could.
 //
-// It pauses the legacy radio bar when it plays, and the other way around, through a BroadcastChannel (see
-// legacy-radio.tsx).
+// It pauses the radio when it plays, and the other way around: the player shared by every page directly, and the legacy
+// radio bar, while that one shows, through a BroadcastChannel (see legacy-radio.tsx).
 
-const API_KEY = 'AIzaSyBRcPalxY-XIncjXmTjbwj1RjrN2MTRKX8'
-const CHANNEL_ID = 'UCvMw4qUIPPwkcZmBRRS0vNA'
+export const API_KEY = 'AIzaSyBRcPalxY-XIncjXmTjbwj1RjrN2MTRKX8'
+export const CHANNEL_ID = 'UCvMw4qUIPPwkcZmBRRS0vNA'
 const POLL_MS = 60000
 
 // Shared with legacy-radio.tsx: each one says when it starts playing, and pauses when the other one does.
@@ -26,6 +27,7 @@ type ChannelItem = { contentDetails: { relatedPlaylists: { uploads: string } } }
 type PlaylistItem = { snippet: { resourceId: { videoId: string } } }
 
 export function YouTubeWidget() {
+  const player = usePlayer()
   const [video, setVideoState] = useState<Video>({ kind: 'unknown' })
   const [error, setError] = useState<string | null>(null)
   // What's shown, for the polling and the channel, which outlive renders.
@@ -37,6 +39,12 @@ export function YouTubeWidget() {
     setVideoState(next)
   }, [])
 
+  // Goes back to the cover, when the radio starts playing.
+  const stopVideo = useCallback(() => {
+    const shown = current.current
+    if (shown.kind === 'playing') setVideo({ kind: 'cover', id: shown.id })
+  }, [setVideo])
+
   useEffect(() => {
     const stopped = new AbortController()
     const { signal } = stopped
@@ -44,8 +52,7 @@ export function YouTubeWidget() {
     try {
       channel.current = new BroadcastChannel(CHANNEL)
       channel.current.addEventListener('message', (e) => {
-        const shown = current.current
-        if (e.data === OTHER_PLAYING && shown.kind === 'playing') setVideo({ kind: 'cover', id: shown.id })
+        if (e.data === OTHER_PLAYING) stopVideo()
       })
     } catch {
       // Without BroadcastChannel, the radio and the video just don't pause each other.
@@ -94,10 +101,17 @@ export function YouTubeWidget() {
       channel.current?.close()
       channel.current = null
     }
-  }, [setVideo])
+  }, [setVideo, stopVideo])
+
+  // The radio starting to play stops the video. Playing the video pauses the radio first, so that doesn't stop it.
+  const radioPlaying = player.playing !== null
+  useEffect(() => {
+    if (radioPlaying) stopVideo()
+  }, [radioPlaying, stopVideo])
 
   const play = () => {
     if (video.kind !== 'cover') return
+    player.pause()
     setVideo({ kind: 'playing', id: video.id })
     channel.current?.postMessage(PLAYING)
   }

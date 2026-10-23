@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
 import './legacy-radio.css'
 
-// The radio bar of the home page's old "combined widget" (combined_widget.html, which was hosted on R2), until the new
-// player (the `nouveau-lecteur` feature flag) replaces it. It's meant to be deleted then, so it's a port that stays as
-// close to the original as it can, rather than a React component of our own: React renders its markup once, and
-// `mountLegacyRadio` runs the original's script on it, which owns it from then on. Nothing here re-renders.
+// The radio bar of the home page's old "combined widget" (combined_widget.html, which was hosted on R2), while the new
+// player's feature flag (`nouveau-lecteur`) is off. It's meant to be deleted along with that flag, so it's a port that
+// stays as close to the original as it can, rather than a React component of our own: React renders its markup once,
+// and `mountLegacyRadio` runs the original's script on it, which owns it from then on. Nothing here re-renders.
 //
 // It plays a rotation of its own, which it reads from playlist.json and durations.json on R2, kept up to date outside
 // this repo, and computes what's on air from the time alone, so that every listener hears the same thing. It pauses the
