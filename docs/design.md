@@ -23,6 +23,9 @@ pages too (see "Configuration" below): until they are, the radio is off air. The
 every 5 minutes, so that changes made to it on SoundCloud get on the radio. If SoundCloud can't be reached, the radio
 goes on with what it read before.
 
+The playlist can be private, and so can a private playlist's tracks: they play like the others, and their private
+links aren't handed out to listeners.
+
 The server decides what's on air: it keeps the track on air and when it started in the database, and moves
 along the rotation as tracks end. This is provided to the client via an API:
 

@@ -17,7 +17,16 @@ const track = {
   created_at: '2026/09/27 19:31:03 +0000',
   access: 'playable',
   streamable: true,
+  sharing: 'public',
+  secret_uri: null,
   playback_count: 12,
+}
+
+// A private track, as SoundCloud describes it in a playlist's tracks.
+const privateTrack = {
+  ...track,
+  sharing: 'private',
+  secret_uri: 'https://api.soundcloud.com/tracks/soundcloud:tracks:42?secret_token=s-XyZ789',
 }
 
 const playlist = {
@@ -290,8 +299,8 @@ describe('soundCloudClient', () => {
             id: '42',
             title: '3TONS | parking.radio | 2026.09.27',
             durationMs: 3_874_581,
-            url: 'https://soundcloud.com/parkingdotradio/3tons',
             unplayable: null,
+            secretToken: null,
           },
         ],
       })
@@ -314,6 +323,14 @@ describe('soundCloudClient', () => {
         `${PLAYLIST_URL}?show_tracks=false&secret_token=s-AbC123`,
         `${TRACKS_URL}?linked_partitioning=true&limit=200&secret_token=s-AbC123`,
       ])
+    })
+
+    it("keeps a private track's secret", async () => {
+      fakeSoundCloud({ [TRACKS_URL]: () => Response.json({ collection: [privateTrack] }) })
+
+      const { tracks } = await client().playlist('1', null)
+
+      expect(tracks).toMatchObject([{ id: '42', unplayable: null, secretToken: 's-XyZ789' }])
     })
 
     it('says so when SoundCloud shows no such playlist', async () => {
@@ -349,7 +366,19 @@ describe('soundCloudClient', () => {
 
     it.each([
       ['is missing its duration', { duration: null }, '3TONS | parking.radio | 2026.09.27', 'duration'],
-      ['links outside of SoundCloud', { permalink_url: 'https://example.com' }, '3TONS | parking.radio | 2026.09.27', 'permalink_url'],
+      ['is private without its secret', { sharing: 'private' }, '3TONS | parking.radio | 2026.09.27', 'secret_uri'],
+      [
+        'is private with an empty secret',
+        { sharing: 'private', secret_uri: 'https://api.soundcloud.com/tracks/soundcloud:tracks:42?secret_token=' },
+        '3TONS | parking.radio | 2026.09.27',
+        'secret_uri',
+      ],
+      [
+        'is private with a secret outside the API',
+        { sharing: 'private', secret_uri: 'https://example.com/?secret_token=s-XyZ789' },
+        '3TONS | parking.radio | 2026.09.27',
+        'secret_uri',
+      ],
       ['has no title', { urn: 'soundcloud:tracks:43', title: undefined }, 'soundcloud:tracks:43', 'title'],
       ['has an unknown access', { access: 'members-only' }, '3TONS | parking.radio | 2026.09.27', 'access'],
     ])('keeps a track that %s in its place, and says what was wrong with it', async (_, overrides, name, field) => {
@@ -380,8 +409,9 @@ describe('soundCloudClient', () => {
 
   describe('hlsStream', () => {
     it("returns the signed CDN URL of the track's AAC stream, which expires as its policy says", async () => {
-      const stream = await client().hlsStream('42')
+      const stream = await client().hlsStream('42', null)
 
+      expect(fetchMock.mock.calls.map(([url]) => url)).toContain(STREAMS_URL)
       expect(stream).toEqual({
         url: signedUrl(new Date('2026-10-01T13:07:00Z')),
         expiresAt: new Date('2026-10-01T13:07:00Z').getTime(),
@@ -390,6 +420,12 @@ describe('soundCloudClient', () => {
       expect(url).toBe(`${HLS_URL}?x=1`)
       expect(init.redirect).toBe('manual')
       expect(authorization()).toBe('OAuth token-1')
+    })
+
+    it("asks for a private track's streams with its secret", async () => {
+      await client().hlsStream('42', 's-XyZ789')
+
+      expect(fetchMock.mock.calls.map(([url]) => url)).toContain(`${STREAMS_URL}?secret_token=s-XyZ789`)
     })
 
     it.each([
@@ -402,7 +438,7 @@ describe('soundCloudClient', () => {
     ])('fails when %s', async (_, overrides) => {
       fakeSoundCloud(overrides)
 
-      await expect(client().hlsStream('42')).rejects.toThrow()
+      await expect(client().hlsStream('42', null)).rejects.toThrow()
     })
   })
 })

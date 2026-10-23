@@ -8,7 +8,7 @@ import { Rotation } from './rotation'
 const MINUTE = 60 * 1000
 
 function track(id: string, artist: string, minutes: number): RadioTrack {
-  return { id, artist, event: null, date: '2026-09-13', durationMs: minutes * MINUTE, url: `https://soundcloud.com/parkingdotradio/${id}` }
+  return { id, artist, event: null, date: '2026-09-13', durationMs: minutes * MINUTE }
 }
 
 const onRadio = (track: RadioTrack): RadioPlaylistTrack => ({ kind: 'rotation', track })

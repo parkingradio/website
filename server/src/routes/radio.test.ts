@@ -38,8 +38,8 @@ function track(id: number, title: string, overrides: Partial<SoundCloudTrack> = 
     id: String(id),
     title,
     durationMs: 3_600_000,
-    url: `https://soundcloud.com/parkingdotradio/track-${id}`,
     unplayable: null,
+    secretToken: null,
     ...overrides,
   }
 }
@@ -147,10 +147,10 @@ describe('radio routes', () => {
   })
 
   describe('GET /api/radio', () => {
-    it("returns what's on air and what comes next, parsed from the tracks' titles", async () => {
+    it("returns what's on air and what comes next, parsed from the tracks' titles, without private tracks' secrets", async () => {
       playlist.mockResolvedValue(soundCloudTracks(
         track(1, 'NIM K | parking.radio | 2026.03.14', { durationMs: 3_420_000 }),
-        track(2, 'ZEFRA | HAUTE RIVE TAKEOVER @ parking.radio | 2026.09.13'),
+        track(2, 'ZEFRA | HAUTE RIVE TAKEOVER @ parking.radio | 2026.09.13', { secretToken: 's-XyZ789' }),
         track(3, '  Lumo | QRTZ TAKEOVER @ PARKING.RADIO | 2026.04.19 '),
       ))
       const app = await buildApp()
@@ -164,7 +164,6 @@ describe('radio routes', () => {
         event: null,
         date: '2026-03-14',
         durationMs: 3_420_000,
-        url: 'https://soundcloud.com/parkingdotradio/track-1',
       }
       expect(response.json()).toEqual({
         current: { track: nimK, startedAt: '2026-10-01T12:00:00.000Z' },
@@ -175,7 +174,6 @@ describe('radio routes', () => {
             event: 'HAUTE RIVE TAKEOVER',
             date: '2026-09-13',
             durationMs: 3_600_000,
-            url: 'https://soundcloud.com/parkingdotradio/track-2',
           },
           {
             id: '3',
@@ -183,7 +181,6 @@ describe('radio routes', () => {
             event: 'QRTZ TAKEOVER',
             date: '2026-04-19',
             durationMs: 3_600_000,
-            url: 'https://soundcloud.com/parkingdotradio/track-3',
           },
         ],
       })
@@ -523,7 +520,27 @@ describe('radio routes', () => {
         url: 'https://cdn.test/1/playlist.m3u8?n=1',
         expiresAt: '2026-10-01T13:02:00.000Z',
       })
-      expect(hlsStream).toHaveBeenCalledWith('1')
+      expect(hlsStream).toHaveBeenCalledWith('1', null)
+    })
+
+    it('streams a private track with its secret, as it was last read', async () => {
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'A', { secretToken: 's-AbC123' })))
+      const app = await buildApp()
+
+      expect(await streamStatus(app, '1')).toBe(200)
+      expect(hlsStream).toHaveBeenLastCalledWith('1', 's-AbC123')
+
+      // Its private link is reset: once the stream URL can't be shared anymore, the next one is asked for with the new secret.
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'A', { secretToken: 's-DeF456' })))
+      vi.advanceTimersByTime(31 * MINUTE)
+      expect(await streamStatus(app, '1')).toBe(200)
+      expect(hlsStream).toHaveBeenLastCalledWith('1', 's-DeF456')
+
+      // Once it's made public, it's streamed without a secret.
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'A')))
+      vi.advanceTimersByTime(31 * MINUTE)
+      expect(await streamStatus(app, '1')).toBe(200)
+      expect(hlsStream).toHaveBeenLastCalledWith('1', null)
     })
 
     it.each(['2', 'abc', '1%2Fstreams'])('responds 404 for a track that is not in the rotation (%s)', async (id) => {
@@ -556,6 +573,19 @@ describe('radio routes', () => {
       expect(await streamStatus(app, '1')).toBe(200)
       vi.advanceTimersByTime(1)
       expect(await streamStatus(app, '1')).toBe(404)
+    })
+
+    it('still streams a private track that left the playlist with its secret', async () => {
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'A', { secretToken: 's-AbC123' }), track(2, 'B')))
+      const app = await buildApp()
+      await radio(app)
+
+      playlist.mockResolvedValue(soundCloudTracks(track(2, 'B')))
+      vi.advanceTimersByTime(6 * MINUTE)
+      await radio(app)
+
+      expect(await streamStatus(app, '1')).toBe(200)
+      expect(hlsStream).toHaveBeenLastCalledWith('1', 's-AbC123')
     })
 
     it('responds 502 when the rotation is unavailable', async () => {
@@ -689,7 +719,7 @@ describe('radio routes', () => {
             track(3, 'PREVIEW | parking.radio | 2026.09.03', { unplayable: 'preview' }),
             track(4, 'Blocked', { unplayable: 'blocked' }),
             { invalid: true, name: 'Broken', problem: '✖ Invalid input' },
-            track(2, 'B', { durationMs: 20 * MINUTE }),
+            track(2, 'B', { durationMs: 20 * MINUTE, secretToken: 's-XyZ789' }),
           ],
         })
         const app = await buildApp()
@@ -710,22 +740,22 @@ describe('radio routes', () => {
               tracks: [
                 {
                   kind: 'rotation',
-                  track: { id: '1', artist: 'A', event: null, date: '2026-09-01', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-1' },
+                  track: { id: '1', artist: 'A', event: null, date: '2026-09-01', durationMs: 60 * MINUTE },
                 },
                 {
                   kind: 'left-out',
-                  track: { id: '3', artist: 'PREVIEW', event: null, date: '2026-09-03', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-3' },
+                  track: { id: '3', artist: 'PREVIEW', event: null, date: '2026-09-03', durationMs: 60 * MINUTE },
                   reason: 'preview',
                 },
                 {
                   kind: 'left-out',
-                  track: { id: '4', artist: 'Blocked', event: null, date: null, durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-4' },
+                  track: { id: '4', artist: 'Blocked', event: null, date: null, durationMs: 60 * MINUTE },
                   reason: 'blocked',
                 },
                 { kind: 'unexpected', title: 'Broken' },
                 {
                   kind: 'rotation',
-                  track: { id: '2', artist: 'B', event: null, date: null, durationMs: 20 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-2' },
+                  track: { id: '2', artist: 'B', event: null, date: null, durationMs: 20 * MINUTE },
                 },
               ],
             },
@@ -862,11 +892,11 @@ describe('radio routes', () => {
             tracks: [
               {
                 kind: 'rotation',
-                track: { id: '8', artist: 'H', event: null, date: '2026-09-08', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-8' },
+                track: { id: '8', artist: 'H', event: null, date: '2026-09-08', durationMs: 60 * MINUTE },
               },
               {
                 kind: 'rotation',
-                track: { id: '9', artist: 'I', event: null, date: '2026-09-09', durationMs: 60 * MINUTE, url: 'https://soundcloud.com/parkingdotradio/track-9' },
+                track: { id: '9', artist: 'I', event: null, date: '2026-09-09', durationMs: 60 * MINUTE },
               },
             ],
           },

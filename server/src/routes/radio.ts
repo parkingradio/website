@@ -58,7 +58,6 @@ function toRadioTrack(track: SoundCloudTrack): RadioTrack {
     event: groups?.event ?? null,
     date: groups ? `${groups.year}-${groups.month}-${groups.day}` : null,
     durationMs: track.durationMs,
-    url: track.url,
   }
 }
 
@@ -173,6 +172,9 @@ export async function radioRoutes(
   // The credentials, and a private playlist's secret, are values of the queries that save them.
   keepQueryValuesPrivate(app, 'Failed to handle a request about the radio')
 
+  // The secrets of the private tracks of the playlists read, by track id, as they were last read.
+  const trackSecrets = new Map<string, string>()
+
   async function readPlaylist(soundcloud: SoundCloudClient, id: string, secretToken: string | null): Promise<Rotation> {
     const { playlist, tracks } = await soundcloud.playlist(id, secretToken)
     const playlistTracks: RadioPlaylistTrack[] = []
@@ -183,7 +185,11 @@ export async function radioRoutes(
       if ('invalid' in track) {
         playlistTracks.push({ kind: 'unexpected', title: track.name })
         invalid.push(track)
-      } else if (track.unplayable) {
+        continue
+      }
+      if (track.secretToken) trackSecrets.set(track.id, track.secretToken)
+      else trackSecrets.delete(track.id)
+      if (track.unplayable) {
         // Tracks that can't be played in full would leave silence in the rotation.
         playlistTracks.push({ kind: 'left-out', track: toRadioTrack(track), reason: track.unplayable })
         skipped.push({ title: track.title, reason: track.unplayable })
@@ -314,8 +320,9 @@ export async function radioRoutes(
     const { soundcloud, streams } = client!
     let trackStream = streams.get(trackId)
     if (!trackStream) {
+      // The secret is looked up whenever a stream is asked for, since it changes if the track's private link is reset.
       trackStream = cached(
-        () => soundcloud.hlsStream(trackId),
+        () => soundcloud.hlsStream(trackId, trackSecrets.get(trackId) ?? null),
         (outcome, startedAt) =>
           outcome.status === 'fulfilled'
             ? Math.min(startedAt + STREAM_URL_MAX_AGE_MS, outcome.value.expiresAt - STREAM_URL_MIN_REMAINING_MS)

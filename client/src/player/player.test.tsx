@@ -58,7 +58,6 @@ const KRAKA: RadioTrack = {
   event: 'HAUTE RIVE TAKEOVER',
   date: '2026-04-19',
   durationMs: 60 * 60 * 1000,
-  url: 'https://soundcloud.com/parkingdotradio/kraka',
 }
 const NEBULO: RadioTrack = { ...KRAKA, id: '2', artist: 'NEBULO', event: null }
 

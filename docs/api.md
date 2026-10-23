@@ -213,7 +213,6 @@ A track has:
 | `event` | string or null | The event the set was played at |
 | `date` | string or null | The day the set was recorded |
 | `durationMs` | number | In milliseconds |
-| `url` | string | The track's page on SoundCloud |
 
 ### `GET /api/radio[?upcoming=N]`
 

@@ -2,15 +2,16 @@ import { z } from 'zod'
 import { cached } from './cache.js'
 
 // A minimal client for SoundCloud's API (https://developers.soundcloud.com/docs/api/guide), authenticated
-// as the SoundCloud app whose credentials it's given. It only reads public data, so it uses app-only
-// tokens obtained with the app's own credentials (the "client credentials" grant), with no user attached.
+// as the SoundCloud app whose credentials it's given. It uses app-only tokens obtained with the app's own
+// credentials (the "client credentials" grant), with no user attached.
 //
 // SoundCloud's responses are checked against these schemas rather than trusted, and anything unexpected
 // fails the request with an error that says what was wrong. The exception is a track that's unexpected,
 // which is only reported, so that the others can still be used.
 //
 // Private playlists can be read too, with the secret of their private link: that's all it takes, whichever
-// account they belong to.
+// account they belong to. So can private tracks, with their own secret, which SoundCloud gives with the
+// playlist's tracks: the playlist's secret doesn't let them be streamed.
 const API_ORIGIN = 'https://api.soundcloud.com'
 const TOKEN_URL = 'https://secure.soundcloud.com/oauth/token'
 const REQUEST_TIMEOUT_MS = 10_000
@@ -43,19 +44,31 @@ const Track = z
     title: z.string(),
     // In milliseconds.
     duration: z.number().int().positive(),
-    permalink_url: z.string().startsWith('https://soundcloud.com/'),
     // Whether apps can stream the track in full ("playable"), only a preview of it ("preview"), which is
     // 30 seconds long, or not at all ("blocked"). SoundCloud doesn't say why.
     access: z.enum(['playable', 'preview', 'blocked']),
     streamable: z.boolean(),
+    sharing: z.string(),
+    // For a private track, its address on the API, with its secret, which is what's kept.
+    secret_uri: z
+      .string()
+      .startsWith(`${API_ORIGIN}/`)
+      .nullish()
+      .transform((uri) => (uri && new URL(uri).searchParams.get('secret_token')) || null),
+  })
+  // A private track can't be streamed without its secret.
+  .refine((track) => track.sharing === 'public' || track.secret_uri !== null, {
+    message: 'A private track must have its secret',
+    path: ['secret_uri'],
   })
   .transform((track) => ({
     id: TRACK_URN.exec(track.urn)![1],
     title: track.title,
     durationMs: track.duration,
-    url: withoutParameters(track.permalink_url),
     // Why the track can't be streamed in full, or null if it can.
     unplayable: track.access !== 'playable' ? track.access : track.streamable ? null : ('not-streamable' as const),
+    // What it takes to stream a private track, null for a public one. It must not be handed out.
+    secretToken: track.secret_uri,
   }))
 export type SoundCloudTrack = z.output<typeof Track>
 
@@ -248,9 +261,10 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
       return { playlist, tracks }
     },
 
-    /** Where a track can be streamed from, without credentials. */
-    async hlsStream(trackId: string): Promise<HlsStream> {
-      const { hls_aac_160_url } = await getJson(`${API_ORIGIN}/tracks/soundcloud:tracks:${trackId}/streams`, Streams)
+    /** Where a track can be streamed from, without credentials. A private track needs its secret. */
+    async hlsStream(trackId: string, secretToken: string | null): Promise<HlsStream> {
+      const secret = secretToken ? `?secret_token=${encodeURIComponent(secretToken)}` : ''
+      const { hls_aac_160_url } = await getJson(`${API_ORIGIN}/tracks/soundcloud:tracks:${trackId}/streams${secret}`, Streams)
       // That URL is on the API, so it needs the token. It redirects to a signed URL on SoundCloud's CDN,
       // which doesn't, and that's what's handed out. Following the redirect would download the playlist.
       const response = await get(hls_aac_160_url, 'manual')

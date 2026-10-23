@@ -33,8 +33,6 @@ export type RadioTrack = {
   // The day the set was recorded, "YYYY-MM-DD".
   date: string | null
   durationMs: number
-  // The track's page on SoundCloud.
-  url: string
 }
 
 // `GET /api/radio/tracks/:id/stream`: where to stream a track of the rotation from. Fails with 404 (not
