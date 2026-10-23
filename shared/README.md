@@ -12,7 +12,7 @@ of a type/function/value, it belongs here. Otherwise, it doesn't.
 ## How it's used
 
 The client and the server import it as `shared/<file>` (e.g. `shared/events` for `src/events.ts`), through the
-`exports` of `package.json`.
+`exports` of `package.json`. So does the seed (see `e2e/seed.ts`), which talks to the server through its API.
 
 It has no build: the client and the server both use its TypeScript sources, during development as in
 production. Vite bundles them into the client, and Node runs them for the server by stripping their types.

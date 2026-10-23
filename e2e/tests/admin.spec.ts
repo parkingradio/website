@@ -1,7 +1,7 @@
-import { test, expect, admin, adminMenu, logIn } from './fixtures'
+import { test, expect, admin, adminMenu, logIn } from './fixtures.ts'
 
-// The admin pages: logging in and out, and managing artists, which goes through every layer: a form with a photo, the
-// database, the private bucket and back, then removing the photo.
+// The admin pages: logging in and out, managing artists, which goes through every layer: a form with a photo, the
+// database, the private bucket and back, then removing the photo, and searching the seeded artists.
 
 test.describe('logging in', () => {
   test('a wrong password is refused, and the login form stays', async ({ page }) => {
@@ -85,4 +85,24 @@ test('an artist is added, shown, has their photo removed, and is deleted', async
   // Once the list is loaded, rather than while it's loading.
   await expect(page.getByRole('table').or(page.getByText('Aucun artiste.'))).toBeVisible()
   await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
+})
+
+// With the seeded artists, of whom two have close names.
+test('artists are searched whatever the accents and a typo, and the search is still there when coming back', async ({ page }) => {
+  const searched = page.getByRole('link', { name: 'Clémentine Brûlée', exact: true })
+  const other = page.getByRole('link', { name: 'Clément Brûlé', exact: true })
+  await logIn(page, { at: '/admin/artistes' })
+  await expect(other).toBeVisible()
+
+  const search = page.getByRole('searchbox', { name: 'Rechercher' })
+  await search.fill('clementime brulee')
+  await expect(searched).toBeVisible()
+  await expect(other).toBeHidden()
+
+  await searched.click()
+  await expect(page.getByRole('heading', { name: 'Clémentine Brûlée', exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(search).toHaveValue('clementime brulee')
+  await expect(searched).toBeVisible()
+  await expect(other).toBeHidden()
 })

@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect } from './fixtures.ts'
 import type { Locator, Page } from '@playwright/test'
 
 // The site's navigation: the bar at the top of every page, which phones get as a drawer, and unknown URLs.

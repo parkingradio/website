@@ -1,14 +1,17 @@
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { required } from '../env'
+import { admin } from '../env.ts'
 
 // What every test is written with: Playwright's `test`, where the browser only reaches the server under test, under an
 // address of its own, and where a page that throws fails the test.
 //
-// Tests run side by side against the same server, so they mustn't change what other tests see. In particular, feature
-// flags apply to every visitor at once: tests assume they're all off, as they are until an admin turns one on. A test
-// that turns a flag on has to run apart from the others, e.g. in a project of its own that `dependencies` runs after
-// them, and turn it back off.
+// Tests run side by side against the same server, seeded with the data of seed-data.ts (see global-setup.ts), so they
+// mustn't change what other tests see. A test that writes creates entities of its own, named uniquely, and never
+// changes or deletes seeded ones. No test assumes that the seeded entities are all there is, either.
+//
+// In particular, feature flags apply to every visitor at once: tests assume they're all off, as they are until an admin
+// turns one on. A test that turns a flag on has to run apart from the others, e.g. in a project of its own that
+// `dependencies` runs after them, and turn it back off.
 
 // The options projects set (see playwright.config.ts).
 export type Options = {
@@ -25,7 +28,8 @@ export const test = base.extend<Options>({
   context: async ({ context, baseURL }, use, testInfo) => {
     // Requests for anything else, e.g. the widgets the home page embeds or the assets' domain, fail right away. The
     // browser then doesn't depend on other sites being up, or on how fast they are. The server still does, e.g. for the
-    // events of the "Programmation" page, which it gets from Resident Advisor.
+    // events of the "Programmation" page, which it gets from Resident Advisor, or for the seed's artists who apply
+    // through the form, whose Turnstile tokens it checks with Cloudflare.
     const origin = new URL(baseURL!).origin
     await context.route((url) => url.origin !== origin, (route) => route.abort('blockedbyclient'))
 
@@ -44,7 +48,7 @@ export const test = base.extend<Options>({
   },
 })
 
-export { expect }
+export { expect, admin }
 
 // The address of a worker's nth test, in 198.18.0.0/15, which is reserved for testing. No other worker of the run has
 // the same index, and a retry runs in a new worker, so no two tests share an address. The range has room for 256
@@ -53,12 +57,6 @@ function clientAddress(worker: number, nth: number): string {
   if (worker >= 256 || nth >= 512) throw new Error(`No address left for test ${nth} of worker ${worker}`)
   const index = worker * 512 + nth
   return `198.${18 + (index >> 16)}.${(index >> 8) & 255}.${index & 255}`
-}
-
-// The admin run.sh creates when it starts the server (see integration-tests/stack.sh).
-export const admin = {
-  email: required('ADMIN_EMAIL'),
-  password: required('ADMIN_PASSWORD'),
 }
 
 // Goes to a page of the admin pages, `/admin` unless told otherwise, and sends the login form shown in its place, as the

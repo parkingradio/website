@@ -6,8 +6,8 @@
 #
 # Starts the image PARKING_RADIO_IMAGE names against a throwaway Postgres (see
 # integration-tests/stack.sh), building one from the tree if it isn't set, and runs Playwright
-# against it. Arguments are Playwright's, e.g. `--project mobile`, `--headed` or the name of a test
-# file.
+# against it, which seeds it first (see global-setup.ts). Arguments are Playwright's, e.g.
+# `--project mobile`, `--headed` or the name of a test file.
 
 set -euo pipefail
 

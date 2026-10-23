@@ -2,11 +2,13 @@
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
-    "module": "ESNext",
-    // Playwright resolves imports itself, as bundlers do.
-    "moduleResolution": "Bundler",
+    // As Node resolves imports, since it runs seed.ts itself (see `npm run seed`), so relative imports spell out `.ts`.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
     "types": ["node"],
-    // Only type-checks: Playwright runs the sources itself.
+    // Only type-checks: Playwright and Node run the sources themselves.
     "noEmit": true,
     "strict": true,
     "verbatimModuleSyntax": true,
@@ -14,5 +16,5 @@
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["playwright.config.ts", "env.ts", "tests"]
+  "include": ["*.ts", "tests"]
 }

@@ -15,7 +15,8 @@
     "test:e2e": "e2e/run.sh",
     "lint": "npm run lint --workspaces --if-present",
     "db:up": "docker compose up -d",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "seed": "node e2e/seed.ts"
   },
   "devDependencies": {
     "concurrently": "^10.0.6"

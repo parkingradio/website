@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=24.2"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint ."
@@ -12,6 +15,7 @@
     "@playwright/test": "^1.64.0",
     "@types/node": "^24.13.3",
     "eslint": "^10.9.0",
+    "shared": "*",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0"
   }

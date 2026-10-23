@@ -1,12 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
-import { required } from './env'
-import type { Options } from './tests/fixtures'
+import { required } from './env.ts'
+import type { Options } from './tests/fixtures.ts'
 
 // Browser tests for the site, run against a server that's already up, at BASE_URL. run.sh starts the production Docker
-// image for them (see README.md).
+// image for them (see README.md), and global-setup.ts seeds it.
 
 export default defineConfig<Options>({
   testDir: 'tests',
+  globalSetup: './global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: [[process.env.CI ? 'github' : 'list'], ['html', { open: 'never' }]],

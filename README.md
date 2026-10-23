@@ -27,7 +27,7 @@ the server's API.
 The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to
 Postgres via Drizzle) and `shared`, which holds the contract between the two and nothing else (see
 [shared/README.md](shared/README.md) for what that covers and how the other two use it). A fourth workspace, `e2e`,
-holds the browser tests.
+holds the browser tests, and the seed data they run against (see "Seed data" below).
 
 ### Prerequisites
 
@@ -60,6 +60,22 @@ npm run create-admin -w server -- you@example.com
 
 Running it again for an existing admin gives a link that resets their password.
 
+### Seed data
+
+With `npm run dev` running, fill the dev database with artists, their photos and their applications, of every kind the
+admin pages have to show (see `e2e/seed-data.ts`):
+
+```sh
+npm run seed
+```
+
+It goes through the server's API, as an admin of its own, `seed@example.com`, whom it creates with `create-admin`, and
+who is then listed among the admins. You still log in as your own admin. Seeding again only adds the artists who aren't
+there, by their email, so to seed an artist again, delete them first. It doesn't change any setting, e.g. feature flags.
+
+A few artists apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the Turnstile test keys
+from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send emails.
+
 ### Several checkouts
 
 To run several checkouts (e.g. git worktrees) side by side, give each one its own ports in its `.env`:
@@ -85,7 +101,9 @@ npm run test:e2e            # browser tests on the Docker image
 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need
-`npm run db:up`.
+`npm run db:up`. The browser tests then seed it, as `npm run seed` does, and run against that data, while the
+integration tests start from an empty database. Seeding has some of its artists apply through the "Appliquer" form, so
+the browser tests need Cloudflare to be reachable.
 
 Stop the local database with `npm run db:down` when you're done.
 
