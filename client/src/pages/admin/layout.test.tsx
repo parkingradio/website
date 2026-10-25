@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
-import { mockFetch } from '../../test-utils'
+import { mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 const LOGGED_OUT = { '/api/admin/me': { ok: false, error: 'Unauthorized' } }
@@ -70,7 +70,21 @@ describe('Admin pages', () => {
     fireEvent.click(within(adminMenu()).getByRole('button', { name: 'se déconnecter' }))
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
-    expect(fetch).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }))
+    // Without a body, which it doesn't take, nor a Content-Type, which the server would refuse without one.
+    const [logout] = requestsTo('POST', '/api/auth/logout')
+    expect(logout.body).toBe('')
+    expect(new Headers(logout.headers).has('content-type')).toBe(false)
+  })
+
+  it('stays logged in when logging out fails', async () => {
+    mockFetch({ ...LOGGED_IN, '/api/auth/logout': { ok: false, error: 'Internal server error' } })
+    renderAt('/admin/admins')
+
+    await waitFor(() => expect(adminMenu()).toBeInTheDocument())
+    fireEvent.click(within(adminMenu()).getByRole('button', { name: 'se déconnecter' }))
+
+    await waitFor(() => expect(requestsTo('POST', '/api/auth/logout')).toHaveLength(1))
+    expect(adminMenu()).toBeInTheDocument()
   })
 
   it('sends /login to the admin pages', async () => {

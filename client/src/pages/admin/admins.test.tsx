@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Admin } from 'shared/admin'
+import type { Schema } from '../../api/client'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { Admins } from './admins'
 import { dateFormat, dateTimeFormat } from './describe'
 
 const createdAt = '2026-10-01T12:00:00.000Z'
 const inviteExpiresAt = '2026-10-15T12:00:00.000Z'
+type Admin = Schema<'Admin'>
 const admin = (fields: Partial<Admin> & Pick<Admin, 'id' | 'email'>): Admin => ({
   status: 'active',
   inviteExpiresAt: null,

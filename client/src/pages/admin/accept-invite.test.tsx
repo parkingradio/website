@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AcceptInvite } from './accept-invite'
 import { AdminLayout } from './layout'
-import { mockFetch } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 function submit(password: string, confirmPassword = password) {
   fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: password } })
@@ -45,10 +45,7 @@ describe('AcceptInvite', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
     expect(screen.getByText('Mot de passe enregistré, vous pouvez maintenant vous connecter.')).toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/auth/accept-invite',
-      expect.objectContaining({ body: JSON.stringify({ token: 'abc', password: 'new-password-123' }) }),
-    )
+    expect(requestsTo('POST', '/api/auth/accept-invite').map(jsonBody)).toEqual([{ token: 'abc', password: 'new-password-123' }])
   })
 
   it('rejects a password shorter than 8 characters without calling the server', async () => {

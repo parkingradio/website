@@ -1,5 +1,5 @@
 import { eq, lt, sql } from 'drizzle-orm'
-import type { AdminStatus } from 'shared/admin'
+import { z } from 'zod'
 import { generateInviteToken } from './auth.js'
 import type { Queryable } from './db.js'
 import { invites, users } from './schema.js'
@@ -41,6 +41,10 @@ export type AdminsStore = {
   // they were revoked. What requireAuth checks sessions against.
   sessionVersion(id: string): Promise<number | null>
 }
+
+// 'active' once the admin has chosen their password. Until then, 'invited' while their invite lasts, and 'expired' after.
+export const AdminStatus = z.enum(['active', 'invited', 'expired'])
+export type AdminStatus = z.infer<typeof AdminStatus>
 
 // What the admin pages say of an admin, `now`.
 export function adminStatus({ active, inviteExpiresAt }: Pick<StoredAdmin, 'active' | 'inviteExpiresAt'>, now: Date): AdminStatus {

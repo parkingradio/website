@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
+import { useZodSchemas } from '../api-schemas.js'
 import type { AdminsStore, InviteOutcome, StoredAdmin } from '../admins.js'
 import { EmailNotSent } from '../email.js'
 import type { SendEmail } from '../email.js'
@@ -24,6 +25,7 @@ const send = vi.fn<SendEmail>(async () => {})
 
 async function buildApp({ canEmail = true, logs }: { canEmail?: boolean; logs?: string[] } = {}) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+  useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
   await app.register(adminRoutes, { store, sendEmail: canEmail ? send : null, origin: 'https://parking.radio' })
@@ -61,14 +63,34 @@ describe('admin routes', () => {
     delete process.env.JWT_SECRET
   })
 
-  it('requires a session', async () => {
+  it('requires a session, whatever the request', async () => {
     const app = await buildApp()
     const responses = await Promise.all([
       app.inject({ method: 'GET', url: '/api/admin/admins' }),
       app.inject({ method: 'DELETE', url: '/api/admin/admins/other-id' }),
       app.inject({ method: 'POST', url: '/api/admin/invite', payload: { email: 'new-admin@example.com' } }),
+      app.inject({ method: 'POST', url: '/api/admin/invite', payload: { email: 42 } }),
     ])
-    for (const response of responses) expect(response.statusCode).toBe(401)
+    for (const response of responses) {
+      expect(response.statusCode).toBe(401)
+      expect(response.json()).toEqual({ ok: false, error: 'Unauthorized' })
+    }
+    expect(store.delete).not.toHaveBeenCalled()
+    expect(store.invite).not.toHaveBeenCalled()
+  })
+
+  it('refuses changes from another origin, whatever the request', async () => {
+    const app = await buildApp()
+    const requests = [
+      { method: 'DELETE' as const, url: '/api/admin/admins/other-id' },
+      { method: 'POST' as const, url: '/api/admin/invite', payload: { email: 'new-admin@example.com' } },
+      { method: 'POST' as const, url: '/api/admin/invite', payload: { email: 42 } },
+    ]
+    for (const request of requests) {
+      const response = await app.inject({ ...request, headers: { 'sec-fetch-site': 'cross-site' }, cookies: await sessionCookies() })
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
+    }
     expect(store.delete).not.toHaveBeenCalled()
     expect(store.invite).not.toHaveBeenCalled()
   })
@@ -146,13 +168,29 @@ describe('admin routes', () => {
       const app = await buildApp()
       const response = await request(app, 'POST', '/api/admin/invite', { email: 'already-admin@example.com' })
       expect(response.statusCode).toBe(409)
+      expect(response.json()).toEqual({ ok: false, error: 'This email address is already an activated admin' })
       expect(send).not.toHaveBeenCalled()
     })
 
-    it('fails with 400 without an email', async () => {
+    it('fails with 400 without an email, saying why', async () => {
       const app = await buildApp()
-      const response = await request(app, 'POST', '/api/admin/invite', {})
-      expect(response.statusCode).toBe(400)
+      const refused: [unknown, string][] = [
+        [{}, '`email`: Invalid input: expected string, received undefined'],
+        [{ email: '' }, '`email`: Too small: expected string to have >=1 characters'],
+        [{ email: ['new-admin@example.com'] }, '`email`: Invalid input: expected string, received array'],
+        [null, 'body: Invalid input: expected object, received null'],
+      ]
+      for (const [body, error] of refused) {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/admin/invite',
+          headers: { 'content-type': 'application/json' },
+          payload: JSON.stringify(body),
+          cookies: await sessionCookies(),
+        })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
       expect(store.invite).not.toHaveBeenCalled()
     })
 

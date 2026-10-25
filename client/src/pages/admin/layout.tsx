@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import type { MeResponse } from 'shared/auth'
+import { api } from '../../api/client'
 import { Login } from './login'
 
 type Session = { status: 'checking' } | { status: 'logged-out' } | { status: 'logged-in'; email: string }
@@ -12,22 +12,17 @@ export function AdminLayout() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/admin/me')
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body: MeResponse) => {
-        if (!cancelled) setSession({ status: 'logged-in', email: body.email })
-      })
-      .catch(() => {
-        if (!cancelled) setSession({ status: 'logged-out' })
-      })
+    api.GET('/api/admin/me').then((result) => {
+      if (!cancelled) setSession(result.ok ? { status: 'logged-in', email: result.email } : { status: 'logged-out' })
+    })
     return () => {
       cancelled = true
     }
   }, [])
 
+  // Still logged in if the server couldn't be asked to clear the session's cookie.
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    setSession({ status: 'logged-out' })
+    if ((await api.POST('/api/auth/logout')).ok) setSession({ status: 'logged-out' })
   }
 
   if (session.status === 'checking') return null

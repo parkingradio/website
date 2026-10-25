@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation } from 'react-router'
-import type { LoginRequest, LoginResponse } from 'shared/auth'
-import { postJson } from '../../api'
+import { api } from '../../api/client'
 
 type Status = { kind: 'idle' | 'sending' } | { kind: 'error'; message: string }
 
@@ -17,7 +16,7 @@ export function Login({ onLogin }: { onLogin: (email: string) => void }) {
   const login = async (event: FormEvent) => {
     event.preventDefault()
     setStatus({ kind: 'sending' })
-    const result = await postJson<LoginRequest, LoginResponse>('/api/auth/login', { email, password })
+    const result = await api.POST('/api/auth/login', { body: { email, password } })
     if (result.ok) onLogin(result.email)
     else setStatus({ kind: 'error', message: result.error })
   }

@@ -1,23 +1,22 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import type { Admin, AdminsResponse, DeleteAdminResponse, InviteRequest, InviteResponse } from 'shared/admin'
-import type { ApiError } from 'shared/error'
-import { deleteJson, postJson } from '../../api'
+import { api } from '../../api/client'
+import type { ApiError, Schema } from '../../api/client'
+import { useApi } from '../../api/use-api'
 import { dateFormat, dateTimeFormat } from './describe'
-import { useApi } from '../../use-api'
 
 // The admins section: inviting admins, and the admins there are, who can be invited again until they accept, and revoked.
 
 type Status = { kind: 'idle' | 'sending' | 'success' } | { kind: 'error'; message: string }
 
-function describeStatus(admin: Admin): string {
+function describeStatus(admin: Schema<'Admin'>): string {
   if (admin.status === 'active') return 'actif'
   if (admin.status === 'invited') return `invitation envoyée, expire le ${dateTimeFormat.format(new Date(admin.inviteExpiresAt!))}`
   return 'invitation expirée'
 }
 
 // An admin, with what can be done about them. `onChange` reloads the list once they're invited again or revoked.
-function AdminRow({ admin, onChange }: { admin: Admin; onChange: () => void }) {
+function AdminRow({ admin, onChange }: { admin: Schema<'Admin'>; onChange: () => void }) {
   // Success is only said of inviting them again, since they're no longer listed once they're revoked.
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const pending = admin.status !== 'active'
@@ -32,7 +31,7 @@ function AdminRow({ admin, onChange }: { admin: Admin; onChange: () => void }) {
 
   const reinvite = () =>
     act(
-      () => postJson<InviteRequest, InviteResponse>('/api/admin/invite', { email: admin.email }),
+      () => api.POST('/api/admin/invite', { body: { email: admin.email } }),
       "L'invitation n'a pas pu être renvoyée",
       'success',
     )
@@ -41,7 +40,7 @@ function AdminRow({ admin, onChange }: { admin: Admin; onChange: () => void }) {
     const question = pending ? `Révoquer l'invitation de ${admin.email} ?` : `Révoquer l'accès de ${admin.email} ? Ses sessions prendront fin aussitôt.`
     if (!window.confirm(question)) return
     return act(
-      () => deleteJson<DeleteAdminResponse>(`/api/admin/admins/${encodeURIComponent(admin.id)}`),
+      () => api.DELETE('/api/admin/admins/{id}', { params: { path: { id: admin.id } } }),
       "L'admin n'a pas pu être révoqué",
       'idle',
     )
@@ -81,7 +80,7 @@ function AdminRow({ admin, onChange }: { admin: Admin; onChange: () => void }) {
 }
 
 function AdminsList({ version, onChange }: { version: number; onChange: () => void }) {
-  const admins = useApi<AdminsResponse>('/api/admin/admins', version)
+  const admins = useApi('/api/admin/admins', { version })
   if (admins.kind === 'loading') return null
   if (admins.kind === 'error') {
     return (
@@ -119,7 +118,7 @@ export function Admins() {
   const invite = async (event: FormEvent) => {
     event.preventDefault()
     setStatus({ kind: 'sending' })
-    const result = await postJson<InviteRequest, InviteResponse>('/api/admin/invite', { email })
+    const result = await api.POST('/api/admin/invite', { body: { email } })
     if (result.ok) {
       setStatus({ kind: 'success' })
       setEmail('')

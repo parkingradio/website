@@ -47,6 +47,7 @@ vi.mock('../db.js', () => ({
 }))
 
 import { eq } from 'drizzle-orm'
+import { useZodSchemas } from '../api-schemas.js'
 import { db } from '../db.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth.js'
 import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken } from '../auth.js'
@@ -72,6 +73,7 @@ describe('auth routes', () => {
 
   async function buildApp() {
     const app = Fastify()
+    useZodSchemas(app)
     await app.register(fastifyCookie)
     acceptSessions(app)
     await app.register(authRoutes, { db })
@@ -110,6 +112,7 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(401)
+      expect(response.json()).toEqual({ ok: false, error: 'Invalid email or password' })
     })
 
     it('returns 401 when the email is unknown', async () => {
@@ -137,16 +140,26 @@ describe('auth routes', () => {
       expect(response.statusCode).toBe(401)
     })
 
-    it('returns 400 when email or password is missing', async () => {
+    it('returns 400, saying why, when email or password is missing or not a string', async () => {
       const app = await buildApp()
-
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'admin@example.com' },
-      })
-
-      expect(response.statusCode).toBe(400)
+      const refused: [unknown, string][] = [
+        [{ email: 'admin@example.com' }, '`password`: Invalid input: expected string, received undefined'],
+        [{ email: '', password: 'whatever' }, '`email`: Too small: expected string to have >=1 characters'],
+        [{ email: 'admin@example.com', password: '' }, '`password`: Too small: expected string to have >=1 characters'],
+        // Rather than failing with 500 once it gets to checking the password.
+        [{ email: 'admin@example.com', password: 12345678 }, '`password`: Invalid input: expected string, received number'],
+        [null, 'body: Invalid input: expected object, received null'],
+      ]
+      for (const [body, error] of refused) {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/auth/login',
+          headers: { 'content-type': 'application/json' },
+          payload: JSON.stringify(body),
+        })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
     })
 
     describe('rate limiting', () => {
@@ -174,7 +187,18 @@ describe('auth routes', () => {
 
         const response = await attemptLogin(app)
         expect(response.statusCode).toBe(429)
-        expect(response.json()).toMatchObject({ ok: false, error: expect.stringContaining('Too many login attempts') })
+        expect(response.json()).toEqual({ ok: false, error: 'Too many login attempts, try again in 15 minutes' })
+      })
+
+      it('counts attempts that fail with 400 too', async () => {
+        const app = await buildApp()
+
+        for (let i = 0; i < LOGIN_ATTEMPTS_PER_WINDOW; ++i) {
+          const response = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'nobody@example.com' } })
+          expect(response.statusCode).toBe(400)
+        }
+
+        expect((await attemptLogin(app)).statusCode).toBe(429)
       })
 
       it('limits each client address reported by Cloudflare separately', async () => {
@@ -276,16 +300,19 @@ describe('auth routes', () => {
       expect(dbState.updatedPasswordHashes).toHaveLength(1)
     })
 
-    it('returns 400 for an unknown token', async () => {
+    it('returns 400 for an unknown token, or an empty one', async () => {
       const app = await buildApp()
 
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/auth/accept-invite',
-        payload: { token: 'unknown-token', password: 'new-password-123' },
-      })
+      for (const token of ['unknown-token', '']) {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/auth/accept-invite',
+          payload: { token, password: 'new-password-123' },
+        })
 
-      expect(response.statusCode).toBe(400)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'Invalid or expired invite link' })
+      }
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
 
@@ -301,6 +328,7 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Invalid or expired invite link' })
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
 
@@ -316,6 +344,7 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: '`password`: Too small: expected string to have >=8 characters' })
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
 
@@ -329,6 +358,10 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({
+        ok: false,
+        error: '`token`: Invalid input: expected string, received undefined, `password`: Invalid input: expected string, received undefined',
+      })
     })
 
     it('returns 400 instead of crashing when token is not a string', async () => {
@@ -341,6 +374,7 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: '`token`: Invalid input: expected string, received number' })
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
 
@@ -356,6 +390,7 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: '`password`: Invalid input: expected string, received number' })
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
   })
@@ -367,6 +402,7 @@ describe('auth routes', () => {
       const response = await app.inject({ method: 'GET', url: '/api/admin/me' })
 
       expect(response.statusCode).toBe(401)
+      expect(response.json()).toEqual({ ok: false, error: 'Unauthorized' })
     })
 
     it('returns the current user when the session cookie is valid', async () => {

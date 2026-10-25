@@ -12,7 +12,7 @@ types here implement them: update the documents first when an endpoint changes.
 
 It's going away: the API's areas move one by one to schemas on the server's routes, from which the client's types are
 generated (see [docs/design/README.md](../docs/design/README.md)), and each area's types are deleted from here once it
-has. Feature flags and `GET /api/config` already have.
+has. Feature flags, `GET /api/config`, and the admins and their sessions already have.
 
 ## How it's used
 

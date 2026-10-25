@@ -18,6 +18,9 @@ declare module 'fastify' {
 // Sent with a 4xx or 5xx status when a request fails.
 export const ApiError = z.object({ ok: z.literal(false), error: z.string() }).meta({ id: 'ApiError' })
 
+// What requests that succeed respond when there's nothing else to say.
+export const Ok = z.object({ ok: z.literal(true) }).meta({ id: 'Ok' })
+
 // A date and time, as an ISO 8601 string. It's checked like `z.iso.datetime`, which openapi.json would show as a long
 // regular expression: only its format, `date-time`, is shown instead.
 const isoDateTime = z.iso.datetime({ offset: true })

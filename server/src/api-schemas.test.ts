@@ -3,11 +3,10 @@ import Fastify from 'fastify'
 import type { FastifyInstance, RouteOptions } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
-import { ApiError, Timestamp, useZodSchemas, zodRoutes } from './api-schemas.js'
+import { ApiError, Ok, Timestamp, useZodSchemas, zodRoutes } from './api-schemas.js'
 import { requireAuth } from './auth.js'
 import { acceptSessions } from './test-sessions.js'
 
-const ok = z.object({ ok: z.literal(true) })
 const handler = async () => ({ ok: true as const })
 
 // An app set up like the server's, whose routes `routes` adds in a plugin of its own, with the routes as they end up, by
@@ -38,12 +37,12 @@ describe('zodRoutes', () => {
   it("adds the errors that routes can fail with because of what they are to the routes' responses", async () => {
     const { statuses } = await buildApp((app) => {
       const api = zodRoutes(app, 'Failed')
-      api.get('/public', { schema: { response: { 200: ok } } }, handler)
-      api.get('/public/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: ok } } }, handler)
-      api.get('/admin', { config: { admin: true }, schema: { response: { 200: ok } } }, handler)
+      api.get('/public', { schema: { response: { 200: Ok } } }, handler)
+      api.get('/public/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: Ok } } }, handler)
+      api.get('/admin', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
       api.put(
         '/admin/:id',
-        { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: ok, 404: ApiError } } },
+        { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok, 404: ApiError } } },
         handler,
       )
     })
@@ -58,8 +57,8 @@ describe('zodRoutes', () => {
   it('checks the session of admin routes before anything else, for HEAD too', async () => {
     const { app } = await buildApp((app) => {
       const api = zodRoutes(app, 'Failed')
-      api.get('/admin', { config: { admin: true }, schema: { response: { 200: ok } } }, handler)
-      api.put('/admin', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: ok } } }, handler)
+      api.get('/admin', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
+      api.put('/admin', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
     })
     for (const request of [{ method: 'GET' }, { method: 'HEAD' }, { method: 'PUT', payload: { on: 'yes' } }] as const) {
       expect((await app.inject({ url: '/admin', ...request })).statusCode).toBe(401)

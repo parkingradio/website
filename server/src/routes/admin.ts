@@ -1,17 +1,33 @@
 import type { FastifyInstance } from 'fastify'
-import type { Admin, AdminsResponse, DeleteAdminResponse, InviteRequest, InviteResponse } from 'shared/admin'
-import type { ApiError } from 'shared/error'
-import { adminStatus, inviteLink } from '../admins.js'
+import { z } from 'zod'
+import { ApiError, Ok, Timestamp, zodRoutes } from '../api-schemas.js'
+import { AdminStatus, adminStatus, inviteLink } from '../admins.js'
 import type { AdminsStore, StoredAdmin } from '../admins.js'
-import { requireAuth } from '../auth.js'
 import type { SendEmail } from '../email.js'
 
-// Admin routes for the admins themselves: see them, invite them, and revoke them.
+// Admin routes for the admins themselves: see them, invite them, and revoke them. Logging in is in auth.ts.
 
-const NO_SUCH_ADMIN: ApiError = { ok: false, error: 'No such admin' }
+const Admin = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    status: AdminStatus,
+    // While they're invited.
+    inviteExpiresAt: Timestamp.nullable(),
+    // The email of the admin who invited them. Null when they were created with the create-admin command, or before that
+    // was known.
+    invitedBy: z.string().nullable(),
+    // When they were invited.
+    createdAt: Timestamp,
+    // Whether this is the admin who asked.
+    you: z.boolean(),
+  })
+  .meta({ id: 'Admin' })
+
+const NO_SUCH_ADMIN: z.infer<typeof ApiError> = { ok: false, error: 'No such admin' }
 
 // An admin, as the admin pages show them to `you`, the admin who asked, `now`.
-function admin(stored: StoredAdmin, you: string, now: Date): Admin {
+function admin(stored: StoredAdmin, you: string, now: Date): z.infer<typeof Admin> {
   const status = adminStatus(stored, now)
   return {
     id: stored.id,
@@ -33,14 +49,36 @@ type AdminOptions = {
 }
 
 export async function adminRoutes(app: FastifyInstance, { store, sendEmail, origin }: AdminOptions) {
-  app.get<{ Reply: AdminsResponse }>('/api/admin/admins', { preHandler: requireAuth }, async (request) => {
-    const now = new Date()
-    return { ok: true, admins: (await store.list()).map((stored) => admin(stored, request.user!.id, now)) }
-  })
+  const api = zodRoutes(app, 'Failed to handle a request about admins')
 
-  app.delete<{ Params: { id: string }; Reply: DeleteAdminResponse | ApiError }>(
+  api.get(
+    '/api/admin/admins',
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Every admin, and whether they accepted their invite',
+        tags: ['Admins'],
+        response: { 200: z.object({ ok: z.literal(true), admins: z.array(Admin) }) },
+      },
+    },
+    async (request) => {
+      const now = new Date()
+      return { ok: true as const, admins: (await store.list()).map((stored) => admin(stored, request.user!.id, now)) }
+    },
+  )
+
+  api.delete(
     '/api/admin/admins/:id',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Revokes an admin, or cancels their invite',
+        tags: ['Admins'],
+        // Any id, so that one that isn't an admin's gets a 404.
+        params: z.object({ id: z.string() }),
+        response: { 200: Ok, 404: ApiError, 409: ApiError },
+      },
+    },
     async (request, reply) => {
       // There's always an admin left this way, and if two revoke each other at once, the create-admin command remains. Ids
       // are UUIDs, which the database matches whatever their case, and are lowercase in sessions.
@@ -51,18 +89,24 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
       if (!revoked) return reply.status(404).send(NO_SUCH_ADMIN)
       // Nothing else keeps track of it once the admin is gone.
       request.log.info({ admin: revoked.email, by: request.user!.email }, 'Revoked an admin')
-      return { ok: true }
+      return { ok: true as const }
     },
   )
 
-  app.post<{ Body: Partial<InviteRequest>; Reply: InviteResponse | ApiError }>(
+  api.post(
     '/api/admin/invite',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Invites an admin by email',
+        tags: ['Admins'],
+        body: z.object({ email: z.string().min(1) }),
+        // 500 when the server can't send emails.
+        response: { 200: Ok, 409: ApiError, 500: ApiError },
+      },
+    },
     async (request, reply) => {
-      const email = request.body?.email
-      if (!email) {
-        return reply.status(400).send({ ok: false, error: 'Missing email address' })
-      }
+      const { email } = request.body
       // Checked first, since inviting replaces the earlier invite, e.g. one the create-admin command printed.
       if (!sendEmail) {
         return reply.status(500).send({ ok: false, error: 'Server is not configured to send email' })
@@ -84,7 +128,7 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
         request.log.error({ err: error }, 'Failed to email an admin invite')
       }
 
-      return { ok: true }
+      return { ok: true as const }
     },
   )
 }

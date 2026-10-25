@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import type { AcceptInviteRequest, AcceptInviteResponse } from 'shared/auth'
-import { postJson } from '../../api'
+import { api } from '../../api/client'
 
 type Status = { kind: 'idle' | 'sending' } | { kind: 'error'; message: string }
 
@@ -29,7 +28,7 @@ export function AcceptInvite() {
     }
 
     setStatus({ kind: 'sending' })
-    const result = await postJson<AcceptInviteRequest, AcceptInviteResponse>('/api/auth/accept-invite', { token, password })
+    const result = await api.POST('/api/auth/accept-invite', { body: { token, password } })
     if (result.ok) {
       navigate('/admin', { state: { message: 'Mot de passe enregistré, vous pouvez maintenant vous connecter.' } })
     } else {
