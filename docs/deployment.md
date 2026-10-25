@@ -150,7 +150,7 @@ Note that the S3 bucket containing assets is versionned, so older versions can b
 
 ## The legacy radio's R2 bucket
 
-The home page's legacy radio player (see "Main page" in [design.md](design.md)) plays tracks from a Cloudflare R2 bucket
+The home page's legacy radio player (see [Home](design/client/home.md)) plays tracks from a Cloudflare R2 bucket
 that neither Terraform nor this repository manages (`pub-ac6abcc67fed4f8f8072bac54bb99274.r2.dev`), along with its
 rotation, `playlist.json` and `durations.json`. Browsers read those two from the site, so the bucket's CORS policy has to
 let every deployment's origin, and local development's, `GET` them: it allows any origin. The tracks themselves don't

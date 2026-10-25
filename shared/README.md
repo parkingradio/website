@@ -7,7 +7,8 @@ fall outside this strict scope should not be included in this package.
 If the client and the server would stop agreeing on what a valid request is if they each had their own copy
 of a type/function/value, it belongs here. Otherwise, it doesn't.
 
-[docs/api.md](../docs/api.md) gives an overview of every endpoint: update it too when an endpoint changes.
+The server's design documents ([docs/design/server](../docs/design/server/README.md)) specify every endpoint, and the
+types here implement them: update the documents first when an endpoint changes.
 
 ## How it's used
 

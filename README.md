@@ -19,8 +19,8 @@ apply, and deploy new versions.
 
 ## Site Design
 
-See [docs/design.md](docs/design.md) for the page-by-page design of the site, and [docs/api.md](docs/api.md) for
-the server's API.
+See [docs/design](docs/design/README.md) for the design of the site: the server, area by area, including its API,
+and the client, page by page.
 
 ## Development
 
