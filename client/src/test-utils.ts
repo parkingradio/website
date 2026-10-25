@@ -14,7 +14,8 @@ function described(input: string | Request, options?: RequestInit): { method: st
 }
 
 /**
- * Stubs `fetch` to answer each of these URLs with its body, whose `ok` is also the response's. A URL can be
+ * Stubs `fetch` to answer each of these URLs with its body, whose `ok` is also the response's. The bodies of endpoints
+ * whose responses don't have `ok`, e.g. `/api/config`, still need one to tell success from failure. A URL can be
  * preceded by a method, e.g. `PUT /api/thing`, to answer only that method, which takes precedence over the
  * URL alone. Any other URL fails the test, except `/api/config`, which ConfigProvider fetches whenever the
  * app is rendered.

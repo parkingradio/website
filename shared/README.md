@@ -12,11 +12,11 @@ types here implement them: update the documents first when an endpoint changes.
 
 It's going away: the API's areas move one by one to schemas on the server's routes, from which the client's types are
 generated (see [docs/design/README.md](../docs/design/README.md)), and each area's types are deleted from here once it
-has. Feature flags, `GET /api/config`, and the admins and their sessions already have.
+has. Feature flags, `GET /api/config`, the admins and their sessions, and the events already have.
 
 ## How it's used
 
-The client and the server import it as `shared/<file>` (e.g. `shared/events` for `src/events.ts`), through the
+The client and the server import it as `shared/<file>` (e.g. `shared/artists` for `src/artists.ts`), through the
 `exports` of `package.json`. So does the seed (see `e2e/seed.ts`), which talks to the server through its API.
 
 It has no build: the client and the server both use its TypeScript sources, during development as in

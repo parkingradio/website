@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { decodeHTML } from 'entities'
 import { z } from 'zod'
-import type { ApiError } from 'shared/error'
-import type { EventCategory, EventListing, EventsResponse } from 'shared/events'
+import { ApiError, zodRoutes } from '../api-schemas.js'
 import { cached } from '../cache.js'
 
 // Events are managed on Resident Advisor, under Parking Radio's promoter page. RA has no public API, so
@@ -39,8 +38,37 @@ const RA_QUERY = `
   }
 `
 
-// RA gives local times with no timezone, e.g. "2026-09-25T18:00:00.000".
-const RA_LOCAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
+// The API's response (see docs/design/server/events.md). It checks no more than RaResponse does, e.g. its strings are
+// plain strings, so that every answer from RA that RaResponse accepts makes a valid response, rather than failing with
+// 500. Its local times are "YYYY-MM-DDTHH:mm", without a timezone, unlike a `Timestamp`.
+const LocalTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+
+const Event = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    category: z.enum(['synth-meetup', 'other']),
+    start: LocalTime,
+    end: LocalTime.nullable(),
+    venue: z.string().nullable(),
+    city: z.string().nullable(),
+    lineup: z.array(z.string()),
+    url: z.string(),
+    flyer: z.string().nullable(),
+  })
+  .meta({ id: 'Event' })
+type Event = z.infer<typeof Event>
+
+const Events = z
+  .object({ promoterUrl: z.string(), upcoming: z.array(Event), past: z.array(Event) })
+  .meta({ id: 'Events' })
+type Events = z.infer<typeof Events>
+
+// RA gives local times, e.g. "2026-09-25T18:00:00.000", which are cut to the minute: whatever follows is ignored.
+const raLocalTime = z
+  .string()
+  .transform((time) => time.slice(0, 16))
+  .pipe(LocalTime)
 
 // RA's response is checked against these schemas rather than trusted. Anything that doesn't match fails
 // the whole fetch, even a single event, so that the page shows an error and we get it fixed rather than
@@ -48,8 +76,8 @@ const RA_LOCAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
 const RaEvent = z.object({
   id: z.string(),
   title: z.string(),
-  startTime: z.string().regex(RA_LOCAL_TIME),
-  endTime: z.string().regex(RA_LOCAL_TIME).nullish(),
+  startTime: raLocalTime,
+  endTime: raLocalTime.nullish(),
   // Checked to be a path, so that the URLs built from it always point at RA.
   contentUrl: z.string().startsWith('/'),
   venue: z.object({ name: z.string(), area: z.object({ name: z.string() }).nullish() }).nullish(),
@@ -71,7 +99,7 @@ const RaResponse = z.object({
   }),
 })
 
-async function fetchFromRa(): Promise<EventsResponse> {
+async function fetchFromRa(): Promise<Events> {
   const response = await fetch(`${RA_ORIGIN}/graphql`, {
     method: 'POST',
     headers: {
@@ -98,18 +126,18 @@ async function fetchFromRa(): Promise<EventsResponse> {
 
   return {
     promoterUrl: RA_ORIGIN + promoter.contentUrl,
-    upcoming: promoter.upcoming.map(toEventListing),
-    past: promoter.past.map(toEventListing),
+    upcoming: promoter.upcoming.map(toEvent),
+    past: promoter.past.map(toEvent),
   }
 }
 
-function toEventListing(event: RaEvent): EventListing {
+function toEvent(event: RaEvent): Event {
   return {
     id: event.id,
     title: event.title,
     category: categorize(event.title),
-    start: event.startTime.slice(0, 16),
-    end: event.endTime?.slice(0, 16) ?? null,
+    start: event.startTime,
+    end: event.endTime ?? null,
     venue: event.venue?.name ?? null,
     city: event.venue?.area?.name ?? null,
     lineup: parseLineup(event),
@@ -120,7 +148,7 @@ function toEventListing(event: RaEvent): EventListing {
 
 // RA has no notion of event categories, so they're derived from the titles Parking Radio gives its events
 // on RA (e.g. "SYNTH MEETUPS").
-function categorize(title: string): EventCategory {
+function categorize(title: string): Event['category'] {
   return /\bsynth meetups?\b/i.test(title) ? 'synth-meetup' : 'other'
 }
 
@@ -136,6 +164,8 @@ function parseLineup(event: RaEvent): string[] {
 }
 
 export async function eventsRoutes(app: FastifyInstance) {
+  const api = zodRoutes(app, 'Failed to handle a request for the events')
+
   // The outcome of the last fetch from RA, successful or not, kept for CACHE_TTL_MS so that RA is asked at
   // most that often. Failures are kept too, so that a broken RA isn't retried on every request. A failure
   // is never papered over with an older list: the page must show that something is wrong.
@@ -148,9 +178,19 @@ export async function eventsRoutes(app: FastifyInstance) {
     (_outcome, startedAt) => startedAt + CACHE_TTL_MS,
   )
 
-  app.get<{ Reply: EventsResponse | ApiError }>('/api/events', async (_request, reply) => {
-    const events = await fetchEvents()
-    if (events) return events
-    return reply.status(502).send({ ok: false, error: 'Events are unavailable right now' })
-  })
+  api.get(
+    '/api/events',
+    {
+      schema: {
+        summary: "Parking Radio's events, from Resident Advisor",
+        tags: ['Events'],
+        response: { 200: Events, 502: ApiError },
+      },
+    },
+    async (_request, reply) => {
+      const events = await fetchEvents()
+      if (events) return events
+      return reply.status(502).send({ ok: false, error: 'Events are unavailable right now' })
+    },
+  )
 }

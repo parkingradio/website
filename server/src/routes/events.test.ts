@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
-
+import { useZodSchemas } from '../api-schemas.js'
 import { eventsRoutes } from './events.js'
 
 const raEvent = {
@@ -32,6 +32,7 @@ const fetchMock = vi.fn()
 
 async function buildApp() {
   const app = Fastify({ logger: false })
+  useZodSchemas(app)
   await app.register(eventsRoutes)
   return app
 }
@@ -155,6 +156,47 @@ describe('GET /api/events', () => {
     expect(response.json().upcoming[0]).toMatchObject({ end: null, venue: null, city: null, flyer: null, lineup: [] })
   })
 
+  it('passes on whatever RA answers that it accepts', async () => {
+    const quirky = {
+      ...raEvent,
+      id: '',
+      title: '',
+      startTime: '2026-09-25T18:00',
+      endTime: '2026-09-26T02:30:59.999',
+      contentUrl: '/',
+      venue: { name: '', area: null },
+      lineup: '<artist id="1"></artist>\n \n',
+      artists: [],
+      images: [{ filename: '', type: 'FLYERFRONT' }],
+    }
+    // Fields that are undefined are left out of the JSON.
+    const sparse = { ...raEvent, endTime: undefined, venue: undefined, lineup: undefined, artists: null, images: null }
+    const promoter = { ...raResponse.data.promoter, upcoming: [quirky], past: [sparse] }
+    fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
+    const app = await buildApp()
+
+    const response = await app.inject({ method: 'GET', url: '/api/events' })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().upcoming).toEqual([
+      {
+        id: '',
+        title: '',
+        category: 'other',
+        start: '2026-09-25T18:00',
+        end: '2026-09-26T02:30',
+        venue: '',
+        city: null,
+        lineup: [],
+        url: 'https://ra.co/',
+        flyer: '',
+      },
+    ])
+    expect(response.json().past).toEqual([
+      expect.objectContaining({ start: '2026-09-25T18:00', end: null, venue: null, city: null, lineup: [], flyer: null }),
+    ])
+  })
+
   it.each([
     ['RA responds with an error status', () => new Response('nope', { status: 500 })],
     ['RA responds with something other than JSON', () => new Response('<html>Just a moment...</html>')],
@@ -180,6 +222,20 @@ describe('GET /api/events', () => {
               upcoming: Array.from({ length: 100 }, (_, i) => ({ ...raEvent, id: String(i) })),
             },
           },
+        }),
+    ],
+    [
+      "a single event's start time isn't a local time",
+      () =>
+        Response.json({
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-09-25 18:00:00' }] } },
+        }),
+    ],
+    [
+      "a single event's end time isn't a local time",
+      () =>
+        Response.json({
+          data: { promoter: { ...raResponse.data.promoter, past: [{ ...raEvent, endTime: '2026-9-25T22:00' }] } },
         }),
     ],
     [

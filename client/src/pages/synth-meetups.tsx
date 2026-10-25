@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAssetUrl } from '../config-context'
-import { RA_PROMOTER_URL, useEvents } from '../events'
+import { useApi } from '../api/use-api'
+import { RA_PROMOTER_URL } from '../events'
 import './synth-meetups.css'
 
 // Most recent first, so the gallery shows newer posters higher up.
@@ -48,9 +49,9 @@ const NDI_URL = 'https://ndi.video/tools/'
 const dateFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function UpcomingDates() {
-  const { data, failed } = useEvents()
+  const events = useApi('/api/events')
 
-  if (failed) {
+  if (events.kind === 'error') {
     return (
       <p>
         les dates n'ont pas pu être chargées.{' '}
@@ -61,9 +62,9 @@ function UpcomingDates() {
       </p>
     )
   }
-  if (!data) return <p>chargement…</p>
+  if (events.kind === 'loading') return <p>chargement…</p>
 
-  const meetups = data.upcoming
+  const meetups = events.value.upcoming
     .filter((event) => event.category === 'synth-meetup')
     .sort((a, b) => a.start.localeCompare(b.start))
   if (meetups.length === 0) return <p>aucune date annoncée pour le moment. revenez bientôt.</p>

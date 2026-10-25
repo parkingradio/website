@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { EventListing, EventsResponse } from 'shared/events'
-import { RA_PROMOTER_URL, useEvents } from '../events'
+import type { Schema } from '../api/client'
+import { useApi } from '../api/use-api'
+import { RA_PROMOTER_URL } from '../events'
 import './programmation.css'
 
 type Filter = 'upcoming' | 'past'
@@ -24,9 +25,9 @@ function flyerThumbnail(flyer: string) {
 }
 
 export function Programmation() {
-  const { data, failed } = useEvents()
+  const events = useApi('/api/events')
 
-  if (data) return <ProgrammationList data={data} />
+  if (events.kind === 'loaded') return <ProgrammationList data={events.value} />
 
   return (
     <div className="programmation">
@@ -34,7 +35,7 @@ export function Programmation() {
         <header className="programmation-header">
           <h1>Programmation</h1>
         </header>
-        {failed ? (
+        {events.kind === 'error' ? (
           <p className="status">
             La programmation n'a pas pu être chargée.{' '}
             <a href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
@@ -50,7 +51,7 @@ export function Programmation() {
   )
 }
 
-export function ProgrammationList({ data }: { data: EventsResponse }) {
+export function ProgrammationList({ data }: { data: Schema<'Events'> }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
   const shown = [...(filter === 'upcoming' ? data.upcoming : data.past)].sort(
@@ -98,7 +99,7 @@ export function ProgrammationList({ data }: { data: EventsResponse }) {
   )
 }
 
-function EventRow({ event }: { event: EventListing }) {
+function EventRow({ event }: { event: Schema<'Event'> }) {
   const title = lowercaseName(event.title)
   const start = new Date(event.start)
   const time = event.end
@@ -155,8 +156,8 @@ function EventRow({ event }: { event: EventListing }) {
   )
 }
 
-function groupByMonth(events: EventListing[]): [string, EventListing[]][] {
-  const groups = new Map<string, EventListing[]>()
+function groupByMonth(events: Schema<'Event'>[]): [string, Schema<'Event'>[]][] {
+  const groups = new Map<string, Schema<'Event'>[]>()
   for (const event of events) {
     const month = monthFormat.format(new Date(event.start))
     groups.set(month, [...(groups.get(month) ?? []), event])

@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Schema } from '../api/client'
+import { mockFetch, requestsTo } from '../test-utils'
 import { Programmation, ProgrammationList } from './programmation'
-import type { EventsResponse } from 'shared/events'
 
-const data: EventsResponse = {
+const data: Schema<'Events'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
     {
@@ -67,16 +68,15 @@ describe('Programmation', () => {
   })
 
   it('loads the events from the server', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json(data))
-    vi.stubGlobal('fetch', fetchMock)
+    mockFetch({ '/api/events': { ok: true, ...data } })
     render(<Programmation />)
 
     expect(await screen.findByRole('heading', { name: 'Soon Party' })).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith('/api/events')
+    expect(requestsTo('GET', '/api/events')).toHaveLength(1)
   })
 
   it('points to Resident Advisor when the events cannot be loaded', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 502 })))
+    mockFetch({ '/api/events': { ok: false, error: 'Events are unavailable right now' } })
     render(<Programmation />)
 
     expect(await screen.findByRole('link', { name: /Resident Advisor/ })).toHaveAttribute(

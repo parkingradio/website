@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EventListing, EventsResponse } from 'shared/events'
+import type { Schema } from '../api/client'
+import { mockFetch, requestsTo } from '../test-utils'
 import { SynthMeetups } from './synth-meetups'
 
-function event(id: string, category: EventListing['category'], start: string): EventListing {
+function event(id: string, category: Schema<'Event'>['category'], start: string): Schema<'Event'> {
   return {
     id,
     title: 'Event',
@@ -18,7 +19,7 @@ function event(id: string, category: EventListing['category'], start: string): E
   }
 }
 
-const events: EventsResponse = {
+const events: Schema<'Events'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
     event('later', 'synth-meetup', '2026-11-11T18:00'),
@@ -28,13 +29,9 @@ const events: EventsResponse = {
   past: [event('past', 'synth-meetup', '2026-09-23T18:00')],
 }
 
-const fetchMock = vi.fn()
-
 describe('SynthMeetups', () => {
   beforeEach(() => {
-    fetchMock.mockReset()
-    fetchMock.mockResolvedValue(Response.json(events))
-    vi.stubGlobal('fetch', fetchMock)
+    mockFetch({ '/api/events': { ok: true, ...events } })
   })
 
   afterEach(() => {
@@ -73,18 +70,18 @@ describe('SynthMeetups', () => {
       ['mercredi 7 octobre 2026', 'https://ra.co/events/soon'],
       ['mercredi 11 novembre 2026', 'https://ra.co/events/later'],
     ])
-    expect(fetchMock).toHaveBeenCalledWith('/api/events')
+    expect(requestsTo('GET', '/api/events')).toHaveLength(1)
   })
 
   it('says so when no synth meetup is coming up', async () => {
-    fetchMock.mockResolvedValue(Response.json({ ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00')] }))
+    mockFetch({ '/api/events': { ok: true, ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00')] } })
     render(<SynthMeetups />)
 
     expect(await screen.findByText(/aucune date annoncée/)).toBeInTheDocument()
   })
 
   it('points to Resident Advisor when the dates cannot be loaded', async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 502 }))
+    mockFetch({ '/api/events': { ok: false, error: 'Events are unavailable right now' } })
     render(<SynthMeetups />)
 
     expect(await screen.findByRole('link', { name: /Resident Advisor/ })).toHaveAttribute(

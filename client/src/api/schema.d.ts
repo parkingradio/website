@@ -525,6 +525,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parking Radio's events, from Resident Advisor */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Events"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/features": {
         parameters: {
             query?: never;
@@ -703,6 +757,24 @@ export interface components {
                 "nouveau-formulaire-candidature"?: boolean;
                 "nouveau-lecteur"?: boolean;
             };
+        };
+        Event: {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            category: "synth-meetup" | "other";
+            start: string;
+            end: string | null;
+            venue: string | null;
+            city: string | null;
+            lineup: string[];
+            url: string;
+            flyer: string | null;
+        };
+        Events: {
+            promoterUrl: string;
+            upcoming: components["schemas"]["Event"][];
+            past: components["schemas"]["Event"][];
         };
         Feature: {
             id: components["schemas"]["FeatureId"];
