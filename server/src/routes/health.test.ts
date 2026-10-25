@@ -12,7 +12,7 @@ describe('GET /healthz', () => {
   it('returns ok when the database responds', async () => {
     vi.mocked(db.execute).mockResolvedValueOnce(undefined as never)
     const app = Fastify()
-    await app.register(healthRoutes)
+    await app.register(healthRoutes, { db })
 
     const response = await app.inject({ method: 'GET', url: '/healthz' })
 
@@ -23,7 +23,7 @@ describe('GET /healthz', () => {
   it('returns 500 when the database fails', async () => {
     vi.mocked(db.execute).mockRejectedValueOnce(new Error('boom'))
     const app = Fastify({ logger: false })
-    await app.register(healthRoutes)
+    await app.register(healthRoutes, { db })
 
     const response = await app.inject({ method: 'GET', url: '/healthz' })
 

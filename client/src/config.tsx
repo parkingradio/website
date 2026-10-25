@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { ConfigResponse } from 'shared/config'
+import { api } from './api/client'
 import { ConfigContext } from './config-context'
 import type { ConfigState } from './config-context'
 
@@ -10,15 +10,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/config')
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body: ConfigResponse) => {
-        if (!cancelled) setState({ kind: 'loaded', config: body })
-      })
-      .catch(() => {
-        console.error('Failed to load /api/config: asset URLs will not resolve, and every feature is off')
-        if (!cancelled) setState({ kind: 'failed' })
-      })
+    api.GET('/api/config').then((result) => {
+      if (!result.ok) console.error('Failed to load /api/config: asset URLs will not resolve, and every feature is off')
+      if (!cancelled) setState(result.ok ? { kind: 'loaded', config: result } : { kind: 'failed' })
+    })
     return () => {
       cancelled = true
     }

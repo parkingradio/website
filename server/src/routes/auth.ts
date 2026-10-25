@@ -11,7 +11,7 @@ import type {
   MeResponse,
 } from 'shared/auth'
 import type { ApiError } from 'shared/error'
-import { db } from '../db.js'
+import type { Queryable } from '../db.js'
 import { users, invites } from '../schema.js'
 import {
   hashPassword,
@@ -30,7 +30,7 @@ const MIN_PASSWORD_LENGTH = 8
 export const LOGIN_ATTEMPTS_PER_WINDOW = 10
 const LOGIN_WINDOW = '15 minutes'
 
-export async function authRoutes(app: FastifyInstance) {
+export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }) {
   // Only routes that opt in through `config.rateLimit` are limited.
   await app.register(rateLimit, { global: false, keyGenerator: clientAddress })
 

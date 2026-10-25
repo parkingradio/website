@@ -18,6 +18,11 @@ The code implements these documents, and has to match them: when they disagree, 
 the documents win. The lists and rules that the server documents name in `shared/src/` (e.g. `GENRES`, or
 `checkProfile`) are part of the design by reference, until `shared/` goes away.
 
+The API's OpenAPI document, `server/openapi.json`, is generated from the schemas that the server's routes validate their
+requests and responses with, and the client's types are generated from it (`npm run generate:api`). Both are checked
+in, and CI checks that they're up to date. The document shows the API as it's implemented, for the endpoints that have
+schemas so far, while these documents are its design: when they disagree, these documents still win.
+
 ## Server
 
 | Document | What it covers |

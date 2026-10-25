@@ -25,8 +25,8 @@ and the client, page by page.
 ## Development
 
 The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to
-Postgres via Drizzle) and `shared`, which holds the contract between the two and nothing else (see
-[shared/README.md](shared/README.md) for what that covers and how the other two use it). A fourth workspace, `e2e`,
+Postgres via Drizzle) and `shared`, which holds the parts of the contract between the two that aren't generated yet
+(see [shared/README.md](shared/README.md) for what that covers and how the other two use it). A fourth workspace, `e2e`,
 holds the browser tests, and the seed data they run against (see "Seed data" below).
 
 ### Prerequisites
@@ -98,6 +98,9 @@ npm run test                # runs every workspace's test suite
 npm run test:integration    # integration tests on the Docker image
 npm run test:e2e            # browser tests on the Docker image
 ```
+
+The API's OpenAPI document (`server/openapi.json`) and the client's types (`client/src/api/schema.d.ts`) are generated and
+checked in: `npm run generate:api` regenerates them, and CI checks that they're up to date.
 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need

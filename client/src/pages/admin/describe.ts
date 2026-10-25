@@ -1,7 +1,7 @@
 import type { Artist, ArtistKind, GenreId } from 'shared/artists'
 import { PRESTATIONS } from 'shared/applications'
 import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
-import type { FeatureId } from 'shared/features'
+import type { Schema } from '../../api/client'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 
 // How the admin sections show what the API returns, and search it.
@@ -23,8 +23,8 @@ export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
   rejected: 'refusées',
 }
 
-// What each feature flag is: its name, and what turning it on does (see shared/src/features.ts).
-export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {
+// What each feature flag is: its name, and what turning it on does (see docs/design/server/features.md).
+export const FEATURE_LABELS: Record<Schema<'FeatureId'>, { name: string; description: string }> = {
   'nouveau-formulaire-candidature': {
     name: 'Nouveau formulaire de candidature',
     description: 'La page « Appliquer » montre le formulaire du site plutôt que le Google Form.',

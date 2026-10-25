@@ -1,19 +1,9 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import Fastify from 'fastify'
-import fastifyCookie from '@fastify/cookie'
+import type { FastifyBaseLogger } from 'fastify'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { healthRoutes } from './routes/health.js'
-import { adminRoutes } from './routes/admin.js'
-import { authRoutes } from './routes/auth.js'
-import { configRoutes } from './routes/config.js'
-import { notFoundRoutes } from './routes/not-found.js'
-import { eventsRoutes } from './routes/events.js'
-import { radioRoutes } from './routes/radio.js'
-import { artistsRoutes } from './routes/artists.js'
-import { applicationsRoutes } from './routes/applications.js'
-import { applyRoutes } from './routes/apply.js'
-import { featuresRoutes } from './routes/features.js'
+import { registerRoutes } from './app.js'
 import { config } from './config.js'
 import { db } from './db.js'
 import { logger } from './logger.js'
@@ -32,7 +22,9 @@ import { sesEmailSender } from './email.js'
 import { adminsStore } from './admins.js'
 import { featuresStore } from './features.js'
 
-const app = Fastify({ loggerInstance: logger })
+// As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
+const loggerInstance: FastifyBaseLogger = logger
+const app = Fastify({ loggerInstance })
 app.addHook('onClose', () => db.$client.end())
 
 try {
@@ -42,38 +34,23 @@ try {
   process.exit(1)
 }
 
-// Null when the server can't send emails, e.g. in development, where MAIL_DOMAIN isn't set.
-const sendEmail = config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null
-
-const admins = adminsStore(db)
-app.decorate('sessions', admins)
-
-await app.register(fastifyCookie)
-await app.register(healthRoutes)
-const features = featuresStore(db)
-await app.register(configRoutes, { store: features })
-await app.register(authRoutes)
-await app.register(adminRoutes, { store: admins, sendEmail, origin: config.siteOrigin })
-await app.register(eventsRoutes)
-await app.register(radioRoutes, {
+await registerRoutes(app, {
+  db,
+  admins: adminsStore(db),
+  features: featuresStore(db),
+  sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
+  siteOrigin: config.siteOrigin,
   soundcloud: soundCloudClient,
-  credentials: soundCloudCredentialsStore(db),
+  soundCloudCredentials: soundCloudCredentialsStore(db),
   onAir: onAirStore(db),
-  settings: radioSettingsStore(db),
-})
-const photos = artistPhotos(privateBucket(config.privateFiles))
-await app.register(artistsRoutes, { store: artistsStore(db), photos })
-const applicationsSettings = applicationsSettingsStore(db)
-await app.register(applicationsRoutes, { store: applicationsStore(db), settings: applicationsSettings })
-await app.register(applyRoutes, {
-  store: applyStore(db),
-  photos,
+  radioSettings: radioSettingsStore(db),
+  artists: artistsStore(db),
+  photos: artistPhotos(privateBucket(config.privateFiles)),
+  applications: applicationsStore(db),
+  applicationsSettings: applicationsSettingsStore(db),
+  apply: applyStore(db),
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
-  settings: applicationsSettings,
-  sendEmail,
 })
-await app.register(featuresRoutes, { store: features })
-await app.register(notFoundRoutes, { prefix: '/api' })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')
 

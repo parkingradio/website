@@ -1,31 +1,58 @@
 import type { FastifyInstance } from 'fastify'
-import type { ApiError } from 'shared/error'
-import type { Feature, FeatureRequest, FeatureResponse, FeaturesResponse } from 'shared/features'
-import { requireAuth } from '../auth.js'
-import { NoSuchFeature } from '../features.js'
+import { z } from 'zod'
+import { ApiError, Timestamp, zodRoutes } from '../api-schemas.js'
+import { FeatureId, NoSuchFeature } from '../features.js'
 import type { FeaturesStore, StoredFeature } from '../features.js'
 
 // Admin routes for feature flags: see them, and turn them on or off. Visitors read them through `GET /api/config`.
 
-const NO_SUCH_FEATURE: ApiError = { ok: false, error: 'No such feature' }
+const Feature = z
+  .object({
+    id: FeatureId,
+    enabled: z.boolean(),
+    updatedBy: z.string().nullable(),
+    updatedAt: Timestamp.nullable(),
+  })
+  .meta({ id: 'Feature' })
 
-function feature({ id, enabled, updatedBy, updatedAt }: StoredFeature): Feature {
+const NO_SUCH_FEATURE: z.infer<typeof ApiError> = { ok: false, error: 'No such feature' }
+
+function feature({ id, enabled, updatedBy, updatedAt }: StoredFeature): z.infer<typeof Feature> {
   return { id, enabled, updatedBy, updatedAt: updatedAt?.toISOString() ?? null }
 }
 
 export async function featuresRoutes(app: FastifyInstance, { store }: { store: FeaturesStore }) {
-  app.get<{ Reply: FeaturesResponse }>('/api/admin/features', { preHandler: requireAuth }, async () => {
-    return { ok: true, features: (await store.load()).map(feature) }
-  })
+  const api = zodRoutes(app, 'Failed to handle a request about feature flags')
 
-  app.put<{ Params: { id: string }; Body: Partial<FeatureRequest> | null; Reply: FeatureResponse | ApiError }>(
+  api.get(
+    '/api/admin/features',
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Every feature flag, and whether it is on',
+        tags: ['Features'],
+        response: { 200: z.object({ ok: z.literal(true), features: z.array(Feature) }) },
+      },
+    },
+    async () => ({ ok: true as const, features: (await store.load()).map(feature) }),
+  )
+
+  api.put(
     '/api/admin/features/:id',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Turns a feature flag on or off',
+        tags: ['Features'],
+        // Any id, so that one that isn't a flag gets a 404.
+        params: z.object({ id: z.string() }),
+        body: z.object({ enabled: z.boolean() }),
+        response: { 200: z.object({ ok: z.literal(true), feature: Feature }), 404: ApiError },
+      },
+    },
     async (request, reply) => {
-      const enabled = request.body?.enabled
-      if (typeof enabled !== 'boolean') return reply.status(400).send({ ok: false, error: '`enabled` must be true or false' })
       try {
-        return { ok: true, feature: feature(await store.save(request.params.id, enabled, request.user!.email)) }
+        return { ok: true as const, feature: feature(await store.save(request.params.id, request.body.enabled, request.user!.email)) }
       } catch (error) {
         if (error instanceof NoSuchFeature) return reply.status(404).send(NO_SUCH_FEATURE)
         throw error

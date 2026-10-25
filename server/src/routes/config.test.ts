@@ -1,8 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
-import type { FeatureId } from 'shared/features'
-import type { FeaturesStore, StoredFeature } from '../features.js'
+import { useZodSchemas } from '../api-schemas.js'
+import type { FeatureId, FeaturesStore, StoredFeature } from '../features.js'
 import { configRoutes } from './config.js'
+
+// These tests use flags of their own, so that they don't depend on which flags there are.
+vi.mock('../features.js', async (importOriginal) => {
+  const { z } = await import('zod')
+  const FEATURES = ['new-thing', 'other-thing'] as const
+  return { ...(await importOriginal<typeof import('../features.js')>()), FEATURES, FeatureId: z.enum(FEATURES) }
+})
 
 describe('GET /api/config', () => {
   const originalEnv = { ...process.env }
@@ -16,11 +23,11 @@ describe('GET /api/config', () => {
     process.env.ASSETS_DOMAIN = 'assets.example.test'
     process.env.TURNSTILE_SITE_KEY = 'site-key'
     const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+    useZodSchemas(app)
     await app.register(configRoutes, { store })
     return app
   }
 
-  // There are no flags for now, so these tests use flags of their own.
   const flag = (id: string, enabled: boolean): StoredFeature => ({ id: id as FeatureId, enabled, updatedBy: null, updatedAt: null })
 
   it('returns the assets domain, the Turnstile site key and whether each feature is on', async () => {

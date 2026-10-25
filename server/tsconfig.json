@@ -15,5 +15,5 @@
     "resolveJsonModule": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/test-sessions.ts"]
+  "exclude": ["src/**/*.test.ts", "src/test-sessions.ts", "src/generate-openapi.ts"]
 }

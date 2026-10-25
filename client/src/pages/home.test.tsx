@@ -1,13 +1,13 @@
 import { StrictMode } from 'react'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Features } from 'shared/features'
+import type { Schema } from '../api/client'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
 import { PlayerProvider } from '../player/player'
 import { Home } from './home'
 
-const loaded = (features: Features): ConfigState => ({
+const loaded = (features: Schema<'Config'>['features']): ConfigState => ({
   kind: 'loaded',
   config: { assetsDomain: 'assets.example.test', turnstileSiteKey: 'key', features },
 })

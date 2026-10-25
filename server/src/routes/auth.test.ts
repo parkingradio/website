@@ -47,6 +47,7 @@ vi.mock('../db.js', () => ({
 }))
 
 import { eq } from 'drizzle-orm'
+import { db } from '../db.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth.js'
 import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken } from '../auth.js'
 import { config } from '../config.js'
@@ -73,7 +74,7 @@ describe('auth routes', () => {
     const app = Fastify()
     await app.register(fastifyCookie)
     acceptSessions(app)
-    await app.register(authRoutes)
+    await app.register(authRoutes, { db })
     return app
   }
 

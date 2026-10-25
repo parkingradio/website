@@ -162,7 +162,7 @@ export const applicationsSettings = pgTable(
   (table) => [check('applications_settings_single_row', sql`${table.id} = 1`)],
 )
 
-// The feature flags that admins turned on or off on the admin pages (see shared/src/features.ts). A flag without a row
+// The feature flags that admins turned on or off on the admin pages (see features.ts). A flag without a row
 // is off, and rows for flags that were retired are ignored.
 export const featureFlags = pgTable('feature_flags', {
   id: text('id').primaryKey(), // one of FEATURES

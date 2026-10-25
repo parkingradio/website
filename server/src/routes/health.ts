@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { sql } from 'drizzle-orm'
-import { db } from '../db.js'
+import type { Queryable } from '../db.js'
 
-export async function healthRoutes(app: FastifyInstance) {
+export async function healthRoutes(app: FastifyInstance, { db }: { db: Queryable }) {
   app.get('/healthz', async (_request, reply) => {
     try {
       await db.execute(sql`select 1`)

@@ -1,5 +1,7 @@
 import type { ApiError } from 'shared/error'
 
+// Helpers for the endpoints that aren't in openapi.json yet. The others go through the typed `api` of api/client.ts.
+
 /**
  * Sends a request to the API and returns the server's response, with `ok: true` if it succeeded. Failures,
  * including those that never reach the server, come back as an `ApiError` rather than being thrown, so that

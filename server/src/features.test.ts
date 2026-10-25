@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { FeatureId } from 'shared/features'
 import { currentFeatures } from './features.js'
+import type { FeatureId } from './features.js'
 
-// There are no flags for now, so these tests use flags of their own.
+// These tests use flags of their own, so that they don't depend on which flags there are.
 const IDS = ['new-thing', 'other-thing'] as unknown as FeatureId[]
 
 describe('currentFeatures', () => {

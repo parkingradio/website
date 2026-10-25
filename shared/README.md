@@ -10,6 +10,10 @@ of a type/function/value, it belongs here. Otherwise, it doesn't.
 The server's design documents ([docs/design/server](../docs/design/server/README.md)) specify every endpoint, and the
 types here implement them: update the documents first when an endpoint changes.
 
+It's going away: the API's areas move one by one to schemas on the server's routes, from which the client's types are
+generated (see [docs/design/README.md](../docs/design/README.md)), and each area's types are deleted from here once it
+has. Feature flags and `GET /api/config` already have.
+
 ## How it's used
 
 The client and the server import it as `shared/<file>` (e.g. `shared/events` for `src/events.ts`), through the

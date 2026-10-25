@@ -13,7 +13,7 @@ declare module 'fastify' {
   }
   interface FastifyInstance {
     // What requireAuth checks sessions against, so that sessions end when their admin is revoked or chooses a new
-    // password. index.ts sets it up, and so do the tests of routes that require a session.
+    // password. app.ts sets it up, and so do the tests of routes that require a session.
     sessions: Pick<AdminsStore, 'sessionVersion'>
   }
 }
@@ -68,12 +68,18 @@ export function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(config.sessionCookie, { path: '/' })
 }
 
+// Whether requireAuth refuses requests with this method that come from another origin's page: those that can change
+// something.
+export function checksOrigin(method: string): boolean {
+  return method !== 'GET' && method !== 'HEAD'
+}
+
 // Whether a request that changes something was sent by another origin's page, e.g. a form on another subdomain
 // posting to the admin endpoints, which SameSite=Lax still sends the session cookie with. Browsers say where requests
 // come from in Sec-Fetch-Site, or else in Origin. Requests with neither don't come from a page, so they only have the
 // cookie if whoever sends them has it.
 function isCrossOrigin(request: FastifyRequest): boolean {
-  if (request.method === 'GET' || request.method === 'HEAD') return false
+  if (!checksOrigin(request.method)) return false
   const site = request.headers['sec-fetch-site']
   if (site) return site !== 'same-origin' && site !== 'none'
   const origin = request.headers.origin
@@ -85,18 +91,19 @@ function isCrossOrigin(request: FastifyRequest): boolean {
   }
 }
 
-export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+// Refuses requests without an admin's session, and those from another origin's page. Routes with zod schemas get it with
+// `config: { admin: true }` (see api-schemas.ts). It returns the reply when it refuses a request, so that Fastify waits
+// for it to be sent.
+export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply | undefined> {
   if (isCrossOrigin(request)) {
-    reply.code(403).send({ ok: false, error: 'Cross-origin request refused' } satisfies ApiError)
-    return
+    return reply.code(403).send({ ok: false, error: 'Cross-origin request refused' } satisfies ApiError)
   }
-  if (!request.server.hasDecorator('sessions')) throw new Error("requireAuth needs the app's `sessions` (see index.ts)")
+  if (!request.server.hasDecorator('sessions')) throw new Error("requireAuth needs the app's `sessions` (see app.ts)")
   const token = request.cookies[config.sessionCookie]
   const session = token ? await verifySessionToken(token) : null
   // The session also has to be one that hasn't ended since, by its admin being revoked or choosing a new password.
   if (!session || (await request.server.sessions.sessionVersion(session.id)) !== session.sessionVersion) {
-    reply.code(401).send({ ok: false, error: 'Unauthorized' } satisfies ApiError)
-    return
+    return reply.code(401).send({ ok: false, error: 'Unauthorized' } satisfies ApiError)
   }
   request.user = { id: session.id, email: session.email }
 }

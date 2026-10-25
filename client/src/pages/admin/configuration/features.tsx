@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import type { Feature, FeatureRequest, FeatureResponse, FeaturesResponse } from 'shared/features'
-import { putJson } from '../../../api'
+import { api } from '../../../api/client'
+import type { Schema } from '../../../api/client'
+import { useApi } from '../../../api/use-api'
 import { FEATURE_LABELS, byWhom } from '../describe'
-import { useApi } from '../../../use-api'
 
 // The feature flags, in the configuration section.
 export function Features() {
-  const loaded = useApi<FeaturesResponse>('/api/admin/features')
+  const loaded = useApi('/api/admin/features')
 
   return (
     <>
@@ -35,7 +35,7 @@ export function Features() {
 }
 
 // A flag, which is saved as soon as it's switched.
-function FeatureSwitch({ loaded }: { loaded: Feature }) {
+function FeatureSwitch({ loaded }: { loaded: Schema<'Feature'> }) {
   const [feature, setFeature] = useState(loaded)
   const [busy, setBusy] = useState(false)
   // Why the flag couldn't be switched, if it couldn't.
@@ -45,9 +45,7 @@ function FeatureSwitch({ loaded }: { loaded: Feature }) {
 
   const toggle = async (enabled: boolean) => {
     setBusy(true)
-    const result = await putJson<FeatureRequest, FeatureResponse>(`/api/admin/features/${encodeURIComponent(feature.id)}`, {
-      enabled,
-    })
+    const result = await api.PUT('/api/admin/features/{id}', { params: { path: { id: feature.id } }, body: { enabled } })
     setBusy(false)
     setError(result.ok ? null : result.error)
     if (result.ok) setFeature(result.feature)

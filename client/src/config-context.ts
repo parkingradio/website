@@ -1,11 +1,10 @@
 import { createContext, use } from 'react'
-import type { ConfigResponse } from 'shared/config'
-import type { FeatureId } from 'shared/features'
+import type { Schema } from './api/client'
 
 // Environment-specific values fetched from the server at runtime, and which features are on. ConfigProvider in
 // config.tsx does the fetching; this lives in its own file because a module exporting both a component and a hook
 // breaks Fast Refresh.
-export type AppConfig = Pick<ConfigResponse, 'assetsDomain' | 'turnstileSiteKey' | 'features'>
+export type AppConfig = Schema<'Config'>
 
 export type ConfigState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'loaded'; config: AppConfig }
 
@@ -22,11 +21,11 @@ export function useAssetUrl(): (key: string) => string | undefined {
 }
 
 /**
- * Returns whether a feature flag is on (see shared/src/features.ts), or undefined until that's known. A page that
+ * Returns whether a feature flag is on (see docs/design/server/features.md), or undefined until that's known. A page that
  * depends on a flag shows nothing until then, rather than one version of itself before switching to the other. When
  * the configuration can't be fetched, every flag is off, since off is the safe option.
  */
-export function useFeature(id: FeatureId): boolean | undefined {
+export function useFeature(id: Schema<'FeatureId'>): boolean | undefined {
   const state = use(ConfigContext)
   if (state.kind === 'loading') return undefined
   return state.kind === 'loaded' && state.config.features[id] === true
