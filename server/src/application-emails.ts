@@ -1,7 +1,7 @@
 import { PRESTATIONS } from 'shared/applications'
 import type { ApplicationFields } from 'shared/applications'
-import { GENRES, LINK_SITES } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
+import { LINK_SITES } from './artist-profile.js'
+import type { GenreId, Profile } from './artist-profile.js'
 import type { Email } from './email.js'
 
 // The emails sent when an artist applies through `POST /api/applications`: the application, to the recipients chosen on
@@ -11,11 +11,60 @@ const countryNames = new Intl.DisplayNames(['fr'], { type: 'region' })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to stay the same day.
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 
+// The names of the genres, as the forms show them: the client has its own copy (see GENRE_NAMES in
+// client/src/artist-profile.ts), and they must be changed together.
+const GENRE_NAMES: Record<GenreId, string> = {
+  house: 'house',
+  'deep-house': 'deep house',
+  'tech-house': 'tech house',
+  'afro-house': 'afro house',
+  amapiano: 'amapiano',
+  disco: 'disco',
+  'nu-disco': 'nu-disco',
+  italo: 'italo',
+  techno: 'techno',
+  'hard-techno': 'hard techno',
+  minimal: 'minimal',
+  acid: 'acid',
+  electro: 'électro',
+  trance: 'trance',
+  'ebm-industrial': 'EBM / industriel',
+  'drum-and-bass': 'drum & bass',
+  jungle: 'jungle',
+  breakbeat: 'breakbeat',
+  'uk-garage': 'UK garage',
+  dubstep: 'dubstep',
+  bass: 'bass',
+  'footwork-juke': 'footwork / juke',
+  'baile-funk': 'baile funk',
+  'hip-hop': 'hip-hop',
+  rap: 'rap',
+  trap: 'trap',
+  rnb: 'R&B',
+  'funk-soul': 'funk / soul',
+  jazz: 'jazz',
+  'reggae-dub': 'reggae / dub',
+  dancehall: 'dancehall',
+  'reggaeton-latin': 'reggaeton / latin',
+  afrobeat: 'afrobeat',
+  cumbia: 'cumbia',
+  ambient: 'ambient',
+  downtempo: 'downtempo',
+  experimental: 'expérimental',
+  noise: 'noise',
+  leftfield: 'leftfield',
+  pop: 'pop',
+  'indie-rock': 'indie / rock',
+  punk: 'punk',
+  synthwave: 'synthwave',
+  'hardcore-gabber': 'hardcore / gabber',
+}
+
 // Everything the artist sent but their photo, as plain text. The photo isn't emailed: it's on the artist's page, on the
 // admin pages.
-export function describeApplication(profile: ArtistProfile, application: ApplicationFields): string {
+export function describeApplication(profile: Profile, application: ApplicationFields): string {
   const collective = profile.kind === 'collective'
-  const genres = profile.genres.map((id) => GENRES.find((genre) => genre.id === id)?.name ?? id)
+  const genres = profile.genres.map((id) => GENRE_NAMES[id])
   const prestations: string[] = application.prestations.map((id) => PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id)
   if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
   const links = LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)
@@ -51,7 +100,7 @@ export function applicationEmails({
   application,
   recipients,
 }: {
-  profile: ArtistProfile
+  profile: Profile
   application: ApplicationFields
   recipients: string[]
 }): { toRecipients: Email | null; confirmation: Email } {

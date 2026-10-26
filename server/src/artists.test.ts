@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { checkProfile, linkSite, parseLink, photoError } from 'shared/artists'
-import type { ArtistProfile, LinkSiteId } from 'shared/artists'
+import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, linkSite, parseLink } from './artist-profile.js'
+import type { LinkSiteId, Profile } from './artist-profile.js'
 import { artistPhotos, validatePhoto, validateProfile } from './artists.js'
 import type { PrivateFiles } from './private-bucket.js'
 
-// The rules in shared/src/artists.ts, which every artist's profile has to follow.
+// The rules in artist-profile.ts, which every artist's profile has to follow. The server answers with the first error.
 
 function parse(id: LinkSiteId, raw: string) {
-  return parseLink(linkSite(id)!, raw)
+  return parseLink(linkSite(id), raw)
 }
 
 describe('parseLink', () => {
@@ -87,7 +87,7 @@ describe('parseLink', () => {
 })
 
 describe('validateProfile', () => {
-  const valid = (): ArtistProfile => ({
+  const valid = (): Profile => ({
     kind: 'artist',
     name: 'DJ Test',
     members: [],
@@ -99,10 +99,10 @@ describe('validateProfile', () => {
     email: 'artiste@example.com',
     phone: '418 555-0123',
   })
-  // What's wrong with the valid profile with these changes.
-  const error = (changes: Partial<ArtistProfile>, options?: { lenient?: boolean }) => {
+  // What's wrong with the valid profile with these changes, as an artist or an admin sends it.
+  const error = (changes: Record<string, unknown>, schema: typeof ArtistProfile | typeof AdminArtistProfile = ArtistProfile) => {
     try {
-      validateProfile({ ...valid(), ...changes }, options)
+      validateProfile({ ...valid(), ...changes }, schema)
       return null
     } catch (thrown) {
       return (thrown as Error).message
@@ -110,12 +110,12 @@ describe('validateProfile', () => {
   }
 
   it('keeps fields that are a single line on a single line', () => {
-    const profile = validateProfile({ ...valid(), kind: 'collective', name: 'DJ\n  Test', members: ['Zefra\r\nMlle Zed'], city: 'Québec\t(QC)', bio: 'Une\n\nbio.' })
+    const profile = validateProfile({ ...valid(), kind: 'collective', name: 'DJ\n  Test', members: ['Zefra\r\nMlle Zed'], city: 'Québec\t(QC)', bio: 'Une\n\nbio.' }, ArtistProfile)
     expect(profile).toMatchObject({ name: 'DJ Test', members: ['Zefra Mlle Zed'], city: 'Québec (QC)', bio: 'Une\n\nbio.' })
   })
 
   it('returns what is saved of a valid profile', () => {
-    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ' })).toEqual({
+    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ' }, ArtistProfile)).toEqual({
       ...valid(),
       // Only the profile names are kept.
       links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
@@ -123,8 +123,8 @@ describe('validateProfile', () => {
   })
 
   it('needs a profile', () => {
-    expect(() => validateProfile(undefined)).toThrow('comme artiste ou comme collectif')
-    expect(() => validateProfile('DJ Test')).toThrow('comme artiste ou comme collectif')
+    expect(() => validateProfile(undefined, ArtistProfile)).toThrow('comme artiste ou comme collectif')
+    expect(() => validateProfile('DJ Test', ArtistProfile)).toThrow('comme artiste ou comme collectif')
   })
 
   it('needs to know whether it is an artist or a collective, and a collective needs at least one artist', () => {
@@ -134,8 +134,8 @@ describe('validateProfile', () => {
     expect(error({ kind: 'collective', members: ['  '] })).toBe('Indiquez au moins un artiste du collectif.')
     expect(error({ kind: 'collective', members: ['A', 'B', 'C', 'D', 'E'] })).toBeNull()
     // Blank entries and duplicates are dropped, and an artist's members are ignored.
-    expect(validateProfile({ ...valid(), kind: 'collective', members: ['Zefra', ' Mlle Zed ', '', 'zefra'] }).members).toEqual(['Zefra', 'Mlle Zed'])
-    expect(validateProfile({ ...valid(), kind: 'artist', members: ['A'] }).members).toEqual([])
+    expect(validateProfile({ ...valid(), kind: 'collective', members: ['Zefra', ' Mlle Zed ', '', 'zefra'] }, ArtistProfile).members).toEqual(['Zefra', 'Mlle Zed'])
+    expect(validateProfile({ ...valid(), kind: 'artist', members: ['A'] }, ArtistProfile).members).toEqual([])
   })
 
   it('needs a name', () => {
@@ -152,7 +152,7 @@ describe('validateProfile', () => {
     // Only their ids, not their names.
     expect(error({ genres: ['électro' as never] })).toBe("Un des genres n'est pas dans la liste.")
     expect(error({ genres: ['electro', 'drum-and-bass'] })).toBeNull()
-    expect(validateProfile({ ...valid(), genres: ['acid', 'techno', 'acid'] }).genres).toEqual(['acid', 'techno'])
+    expect(validateProfile({ ...valid(), genres: ['acid', 'techno', 'acid'] }, ArtistProfile).genres).toEqual(['acid', 'techno'])
   })
 
   it('checks the country, and that there is a city', () => {
@@ -176,6 +176,10 @@ describe('validateProfile', () => {
     expect(error({ links: { myspace: 'foo' } as never })).toBe('Un des liens est invalide.')
     expect(error({ links: { soundcloud: 42 } as never })).toBe('Un des liens est invalide.')
     expect(error({ links: { soundcloud: 'https://instagram.com/foo' } })).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
+    // With several, the first in the order of the sites, then links to other sites.
+    expect(error({ links: { instagram: 'bad name!', soundcloud: 'https://instagram.com/foo' } })).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
+    expect(error({ links: { myspace: 'x', soundcloud: 'https://instagram.com/foo' } })).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
+    expect(error({ links: { myspace: 'x', tiktok: 'x' } })).toBe("TikTok : ce nom de profil TikTok n'est pas valide.")
   })
 
   it('checks the email address and phone number', () => {
@@ -190,85 +194,95 @@ describe('validateProfile', () => {
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
   })
 
-  describe('leniently', () => {
-    const LENIENT = { lenient: true }
+  describe('as admins send it', () => {
+    const ADMIN = AdminArtistProfile
     // What admins can leave out, as it's saved when they do.
-    const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+    const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
 
     it('takes a profile without a country, city, genres, links or phone', () => {
-      expect(validateProfile({ ...valid(), ...LEFT_OUT, country: ' ', city: ' ', phone: ' ' }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
+      expect(validateProfile({ ...valid(), ...LEFT_OUT, country: ' ', city: ' ', phone: ' ' }, ADMIN)).toEqual({ ...valid(), ...LEFT_OUT })
       // Left out entirely, as well as empty.
       const leftOut = { country: undefined, city: undefined, genres: undefined, links: undefined, phone: undefined }
-      expect(validateProfile({ ...valid(), ...leftOut }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
-      expect(validateProfile({ ...valid(), links: { soundcloud: '' } }, LENIENT).links).toEqual({})
+      expect(validateProfile({ ...valid(), ...leftOut }, ADMIN)).toEqual({ ...valid(), ...LEFT_OUT })
+      expect(validateProfile({ ...valid(), links: { soundcloud: '' } }, ADMIN).links).toEqual({})
     })
 
     it('still checks what is there', () => {
-      expect(error({ country: 'XX' }, LENIENT)).toBe('Choisissez votre pays.')
-      expect(error({ country: 42 as never }, LENIENT)).toBe('Choisissez votre pays.')
-      expect(error({ city: 'x'.repeat(101) }, LENIENT)).toBe('La ville dépasse 100 caractères.')
-      expect(error({ genres: ['polka' as never] }, LENIENT)).toBe("Un des genres n'est pas dans la liste.")
-      expect(error({ links: { soundcloud: 'https://instagram.com/foo' } }, LENIENT)).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
-      expect(error({ phone: '123' }, LENIENT)).toBe('Indiquez un numéro de téléphone valide.')
+      expect(error({ country: 'XX' }, ADMIN)).toBe('Choisissez votre pays.')
+      expect(error({ country: 42 as never }, ADMIN)).toBe('Choisissez votre pays.')
+      expect(error({ city: 'x'.repeat(101) }, ADMIN)).toBe('La ville dépasse 100 caractères.')
+      expect(error({ genres: ['polka' as never] }, ADMIN)).toBe("Un des genres n'est pas dans la liste.")
+      expect(error({ links: { soundcloud: 'https://instagram.com/foo' } }, ADMIN)).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
+      expect(error({ phone: '123' }, ADMIN)).toBe('Indiquez un numéro de téléphone valide.')
     })
 
     it('does not take a field of another type for one that is left out, which would lose it', () => {
-      expect(error({ city: 42 as never }, LENIENT)).toBe('Indiquez votre ville.')
-      expect(error({ genres: 'techno' as never }, LENIENT)).toBe('Choisissez au moins un genre.')
-      expect(error({ links: '@parking.radio' as never }, LENIENT)).toBe('Ajoutez au moins un lien.')
-      expect(error({ phone: 4185550123 as never }, LENIENT)).toBe('Indiquez votre numéro de téléphone.')
+      expect(error({ city: 42 as never }, ADMIN)).toBe('Indiquez votre ville.')
+      expect(error({ genres: 'techno' as never }, ADMIN)).toBe('Choisissez au moins un genre.')
+      expect(error({ links: '@parking.radio' as never }, ADMIN)).toBe('Ajoutez au moins un lien.')
+      expect(error({ phone: 4185550123 as never }, ADMIN)).toBe('Indiquez votre numéro de téléphone.')
     })
 
     it('still needs everything else', () => {
-      expect(error({ kind: undefined }, LENIENT)).toContain('comme artiste ou comme collectif')
-      expect(error({ name: '' }, LENIENT)).toBe("Indiquez votre nom d'artiste.")
-      expect(error({ kind: 'collective', members: [] }, LENIENT)).toBe('Indiquez au moins un artiste du collectif.')
-      expect(error({ bio: '' }, LENIENT)).toBe('Écrivez quelques lignes de bio.')
-      expect(error({ email: '' }, LENIENT)).toBe('Indiquez votre adresse e-mail.')
+      expect(error({ kind: undefined }, ADMIN)).toContain('comme artiste ou comme collectif')
+      expect(error({ name: '' }, ADMIN)).toBe("Indiquez votre nom d'artiste.")
+      expect(error({ kind: 'collective', members: [] }, ADMIN)).toBe('Indiquez au moins un artiste du collectif.')
+      expect(error({ bio: '' }, ADMIN)).toBe('Écrivez quelques lignes de bio.')
+      expect(error({ email: '' }, ADMIN)).toBe('Indiquez votre adresse e-mail.')
     })
   })
 })
 
-describe('checkProfile', () => {
-  it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
-    expect(checkProfile({ kind: 'collective', members: ['  '], country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' })).toEqual({
-      errors: {
-        name: 'Indiquez le nom du collectif.',
-        members: 'Indiquez au moins un artiste du collectif.',
-        country: 'Choisissez votre pays.',
-        city: 'Indiquez votre ville.',
-        genres: 'Choisissez au moins un genre.',
-        bio: 'Écrivez quelques lignes de bio.',
-        links: 'SoundCloud : il manque votre nom de profil.',
-        email: 'Indiquez une adresse e-mail valide.',
-        phone: 'Indiquez votre numéro de téléphone.',
-      },
-    })
+describe('the first error', () => {
+  it('is that of the first field that is wrong, in the order of the profile', () => {
+    const sent = { kind: 'collective', members: ['  '], country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' }
+    expect(() => validateProfile(sent, ArtistProfile)).toThrow('Indiquez le nom du collectif.')
+    expect(() => validateProfile({ ...sent, name: 'Brume' }, ArtistProfile)).toThrow('Indiquez au moins un artiste du collectif.')
+    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'] }, ArtistProfile)).toThrow('Choisissez votre pays.')
+    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'], country: 'CA' }, ArtistProfile)).toThrow('Indiquez votre ville.')
+    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'], country: 'CA', city: 'Q' }, ArtistProfile)).toThrow('Choisissez au moins un genre.')
   })
 
-  it('returns the profile without errors when it is valid', () => {
-    const { profile, errors } = checkProfile({
-      kind: 'artist',
-      name: 'DJ Test',
-      members: ['ignored'],
-      country: 'CA',
-      city: 'Québec',
-      genres: ['techno'],
-      bio: 'Une bio.',
-      links: { instagram: '@parking.radio', web: '' },
-      email: 'artiste@example.com',
-      phone: '418 555-0123',
-    })
-    expect(errors).toBeUndefined()
-    expect(profile).toMatchObject({ members: [], links: { instagram: 'parking.radio' } })
-  })
-})
+  // The messages a profile can get, other than for its links, which say which site is wrong.
+  const MESSAGES = [
+    'Indiquez si vous postulez comme artiste ou comme collectif.',
+    "Indiquez votre nom d'artiste.",
+    "Le nom d'artiste dépasse 100 caractères.",
+    'Indiquez le nom du collectif.',
+    'Le nom du collectif dépasse 100 caractères.',
+    'Indiquez au moins un artiste du collectif.',
+    "Le nom d'un artiste du collectif dépasse 100 caractères.",
+    'Choisissez votre pays.',
+    'Indiquez votre ville.',
+    'La ville dépasse 100 caractères.',
+    'Choisissez au moins un genre.',
+    "Un des genres n'est pas dans la liste.",
+    'Écrivez quelques lignes de bio.',
+    'La bio dépasse 5000 caractères.',
+    'Ajoutez au moins un lien.',
+    'Un des liens est invalide.',
+    'Indiquez votre adresse e-mail.',
+    "L'adresse e-mail dépasse 200 caractères.",
+    'Indiquez une adresse e-mail valide.',
+    'Indiquez votre numéro de téléphone.',
+    'Le numéro de téléphone dépasse 40 caractères.',
+    'Indiquez un numéro de téléphone valide.',
+  ]
+  const isFrench = (message: string) => MESSAGES.includes(message) || /^(SoundCloud|Instagram|Site web|Bandcamp|Mixcloud|Resident Advisor|YouTube|Spotify|TikTok) : .+\.$/.test(message)
 
-describe('photoError', () => {
-  it('takes a JPEG, PNG or WebP photo up to the size limit', () => {
-    for (const type of ['image/jpeg', 'image/png', 'image/webp']) expect(photoError({ type, size: 10 * 1024 * 1024 })).toBeNull()
-    expect(photoError({ type: 'image/gif', size: 1 })).toBe('La photo doit être en JPEG, PNG ou WebP.')
-    expect(photoError({ type: 'image/png', size: 10 * 1024 * 1024 + 1 })).toBe('La photo dépasse 10 Mo.')
+  it('is in French, whatever was sent instead of each field', () => {
+    const valid = { kind: 'artist', name: 'DJ Test', members: [], country: 'CA', city: 'Québec', genres: ['techno'], bio: 'Une bio.', links: { web: 'parking.radio' }, email: 'a@example.com', phone: '418 555-0123' }
+    const anything = [undefined, null, '', ' ', 0, 42, true, [], {}, ['x'], [42], { a: 1 }, { soundcloud: 42 }, 'x'.repeat(6000)]
+    for (const schema of [ArtistProfile, AdminArtistProfile]) {
+      for (const kind of ['artist', 'collective']) {
+        for (const field of Object.keys(valid)) {
+          for (const value of anything) {
+            const result = schema.safeParse({ ...valid, kind, members: ['A'], [field]: value })
+            if (!result.success) expect(result.error.issues[0].message).toSatisfy(isFrench)
+          }
+        }
+      }
+    }
   })
 })
 
@@ -283,6 +297,10 @@ describe('validatePhoto', () => {
   it('refuses anything else', () => {
     expect(() => validatePhoto(Buffer.from('%PDF-1.7'))).toThrow('La photo doit être en JPEG, PNG ou WebP.')
     expect(() => validatePhoto(Buffer.alloc(0))).toThrow('La photo doit être en JPEG, PNG ou WebP.')
+  })
+
+  it('refuses one larger than the limit', () => {
+    expect(() => validatePhoto(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(PHOTO_MAX_BYTES)]))).toThrow('La photo dépasse 10 Mo.')
   })
 
   it('returns null when there is no photo, which is fine', () => {

@@ -3,8 +3,9 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
-import { PHOTO_MAX_BYTES } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
+import { useZodSchemas } from '../api-schemas.js'
+import { PHOTO_MAX_BYTES } from '../artist-profile.js'
+import type { Profile } from '../artist-profile.js'
 import { EmailTaken } from '../artists.js'
 import type { ArtistsStore, SentPhoto, StoredArtist } from '../artists.js'
 import { acceptSessions, sessionCookies } from '../test-sessions.js'
@@ -61,7 +62,7 @@ const photos = {
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
-function profile(changes: Partial<ArtistProfile> = {}): ArtistProfile {
+function profile(changes: Partial<Profile> = {}): Profile {
   return {
     kind: 'artist',
     name: 'DJ Test',
@@ -78,7 +79,7 @@ function profile(changes: Partial<ArtistProfile> = {}): ArtistProfile {
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
-const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
 
 // A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, the photo, and whether to
 // remove the photo.
@@ -104,6 +105,7 @@ function multipart(artist: object | string, photo: Buffer | null = JPEG, removeP
 // `logs`, when given, gets every line the app logs.
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+  useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
   await app.register(artistsRoutes, { store, photos })
@@ -150,6 +152,36 @@ describe('artists routes', () => {
     ]
     for (const response of await Promise.all(requests)) {
       expect(response.statusCode).toBe(401)
+    }
+    expect(photos.store).not.toHaveBeenCalled()
+  })
+
+  it('requires a session before reading the request, whatever it sends', async () => {
+    const app = await buildApp()
+    for (const [method, url] of [
+      ['POST', '/api/admin/artists'],
+      ['PUT', '/api/admin/artists/artist-1'],
+    ] as const) {
+      for (const sent of [multipart('{not json'), { payload: 'null', headers: { 'content-type': 'application/json' } }, { payload: '{', headers: { 'content-type': 'application/json' } }]) {
+        const response = await app.inject({ method, url, ...sent })
+        expect(response.statusCode).toBe(401)
+        expect(response.json()).toEqual({ ok: false, error: 'Unauthorized' })
+      }
+    }
+  })
+
+  it('refuses the requests that change artists from another origin', async () => {
+    const app = await buildApp()
+    const cookies = await sessionCookies()
+    const headers = { 'sec-fetch-site': 'cross-site' }
+    const requests = [
+      app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
+      app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
+      app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', headers, cookies }),
+    ]
+    for (const response of await Promise.all(requests)) {
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
     }
     expect(photos.store).not.toHaveBeenCalled()
   })
@@ -209,6 +241,19 @@ describe('artists routes', () => {
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: "SoundCloud : ce n'est pas une adresse SoundCloud." })
       expect(photos.store).not.toHaveBeenCalled()
+      expect(rows).toHaveLength(0)
+    })
+
+    it('explains what is wrong with a profile that is not one, or has a field of the wrong type, as before', async () => {
+      const app = await buildApp()
+      const errors = async (artist: unknown) => (await create(app, JSON.stringify(artist), null)).json()
+      for (const artist of [null, 'DJ Test', 42, [], {}]) {
+        expect(await errors(artist)).toEqual({ ok: false, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' })
+      }
+      expect(await errors(profile({ name: 42 as never }))).toEqual({ ok: false, error: "Indiquez votre nom d'artiste." })
+      expect(await errors(profile({ kind: 'collective', members: 'Zefra' as never }))).toEqual({ ok: false, error: 'Indiquez au moins un artiste du collectif.' })
+      expect(await errors(profile({ phone: 4185550123 as never }))).toEqual({ ok: false, error: 'Indiquez votre numéro de téléphone.' })
+      expect(await errors(profile({ links: { myspace: 'dj' } as never }))).toEqual({ ok: false, error: 'Un des liens est invalide.' })
       expect(rows).toHaveLength(0)
     })
 

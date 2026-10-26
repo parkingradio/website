@@ -48,15 +48,3 @@ export async function putJson<Request, Response>(url: string, body: Request): Pr
 export async function deleteJson<Response>(url: string): Promise<(Response & { ok: true }) | ApiError> {
   return requestJson(url, { method: 'DELETE' })
 }
-
-/**
- * Sends `form` to `url` as multipart/form-data, e.g. with a file, like `postJson`. The browser sets the
- * Content-Type, since it includes the boundary between the parts.
- */
-export async function sendForm<Response>(
-  method: 'POST' | 'PUT',
-  url: string,
-  form: FormData,
-): Promise<(Response & { ok: true }) | ApiError> {
-  return requestJson(url, { method, body: form })
-}

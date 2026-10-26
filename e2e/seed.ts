@@ -7,12 +7,15 @@ import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { ApplicationResponse, ApplicationsResponse, ApplicationStatus, CreateApplicationRequest } from 'shared/applications'
-import type { ArtistResponse, ArtistsResponse } from 'shared/artists'
+import type { paths } from '../client/src/api/schema.d.ts'
 import type { ApiError } from 'shared/error'
 import { SEED_ARTISTS } from './seed-data.ts'
 import type { SeedApplication, SeedArtist } from './seed-data.ts'
 
 export type Credentials = { email: string; password: string }
+
+type ArtistResponse = paths['/api/admin/artists']['post']['responses'][200]['content']['application/json']
+type ArtistsResponse = paths['/api/admin/artists']['get']['responses'][200]['content']['application/json']
 
 export type SeedOptions = {
   // Where the server is, e.g. "http://localhost:3000".

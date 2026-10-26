@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "generate:api": "openapi-typescript ../server/openapi.json -o src/api/schema.d.ts",
-    "check:api": "openapi-typescript ../server/openapi.json -o src/api/schema.d.ts --check",
+    "generate:api": "node generate-api.ts",
+    "check:api": "node generate-api.ts --check",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"

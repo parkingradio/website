@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { checkLine } from 'shared/checks'
+import type { Body } from '../../api/client'
 import {
   ARTIST_KINDS,
   BIO_MAX_LENGTH,
@@ -11,20 +13,19 @@ import {
   PHOTO_TYPES,
   checkProfile,
   parseLink,
-} from 'shared/artists'
-import type { Artist, ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
-import { checkLine } from 'shared/checks'
-import { pickedPhotoError } from '../../artist-profile'
+  pickedPhotoError,
+} from '../../artist-profile'
+import type { Artist, ArtistLinks, Profile, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { COUNTRY_OPTIONS, KIND_LABELS, genreName, photoUrl } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 
-// A form for an artist's profile and photo, to add an artist or change one. Each field is checked with the rules the
-// server checks it with for admins (see `checkProfile`), and says what's wrong once it's been left, or once the form is
-// sent. The server's error is shown if it refuses the artist anyway, e.g. for an email address another artist has.
+// A form for an artist's profile and photo, to add an artist or change one. Each field is checked as the server checks it
+// for admins (see `checkProfile`), and says what's wrong once it's been left, or once the form is sent. The server's
+// error is shown if it refuses the artist anyway, e.g. for an email address another artist has.
 
-const EMPTY: ArtistProfile = {
+const EMPTY: Profile = {
   kind: 'artist',
   name: '',
   members: [],
@@ -37,19 +38,20 @@ const EMPTY: ArtistProfile = {
   phone: '',
 }
 
-type Field = keyof ArtistProfile | 'photo'
+type Field = keyof Profile | 'photo'
 
 type ArtistFormProps = {
   // The artist to change, or nothing for a new one.
   artist?: Artist
   submitLabel: string
-  // Sends the form, as `POST` or `PUT /api/admin/artists[/:id]` expect it, and returns the error, if it failed.
-  onSubmit: (form: FormData) => Promise<string | null>
+  // Sends the form, as `PUT /api/admin/artists/:id` takes it, which `POST /api/admin/artists` takes too, without
+  // `removePhoto`, and returns the error, if it failed.
+  onSubmit: (body: Body<'put', '/api/admin/artists/{id}'>) => Promise<string | null>
   onCancel?: () => void
 }
 
 export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }: ArtistFormProps) {
-  const [profile, setProfile] = useState<ArtistProfile>(initial ?? EMPTY)
+  const [profile, setProfile] = useState<Profile>(initial ?? EMPTY)
   const [photo, setPhoto] = useState<File | null>(null)
   // Whether to remove the artist's photo, which only happens once the form is sent.
   const [removePhoto, setRemovePhoto] = useState(false)
@@ -68,13 +70,9 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () => {
     // What's saved of the profile, e.g. without the members of an artist who was a collective at first. There's one,
     // since there are no errors by then.
-    const sent = new FormData()
-    sent.append('artist', JSON.stringify(checked.profile!))
-    if (photo) sent.append('photo', photo)
-    else if (removePhoto) sent.append('removePhoto', 'true')
-    return onSubmit(sent)
+    return onSubmit({ artist: checked.profile!, photo: photo ?? undefined, removePhoto: !photo && removePhoto ? 'true' : undefined })
   })
-  const update = (changes: Partial<ArtistProfile>) => setProfile((profile) => ({ ...profile, ...changes }))
+  const update = (changes: Partial<Profile>) => setProfile((profile) => ({ ...profile, ...changes }))
 
   // The props of the input of a field of the profile that's a single value.
   const input = (field: 'name' | 'city' | 'bio' | 'email' | 'phone') => ({
@@ -117,7 +115,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
           id="artist-country"
           options={COUNTRY_OPTIONS}
           selected={profile.country}
-          onSelect={(country) => update({ country })}
+          onSelect={(country) => update({ country: country as Profile['country'] })}
           onBlur={leave('country')}
           invalid={!!shown('country')}
         />
@@ -137,7 +135,6 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
       <LinksField
         links={profile.links}
         onChange={(links) => update({ links })}
-        error={shown('links')}
         showAll={submitted}
         onLeave={leave('links')}
       />
@@ -344,8 +341,8 @@ function GenresField({ genres, onChange, error, onLeave }: GroupProps<GenreId[]>
       {/* Focused when the genres are the first thing to fix, which is why it can be focused. */}
       <div className="admin-tags" role="group" aria-label="Tous les genres" aria-invalid={error ? true : undefined} tabIndex={-1}>
         {GENRES.map((genre) => (
-          <button key={genre.id} type="button" aria-pressed={genres.includes(genre.id)} onClick={() => toggle(genre.id)}>
-            {genre.name}
+          <button key={genre} type="button" aria-pressed={genres.includes(genre)} onClick={() => toggle(genre)}>
+            {genreName(genre)}
           </button>
         ))}
       </div>
@@ -359,25 +356,21 @@ function GenresField({ genres, onChange, error, onLeave }: GroupProps<GenreId[]>
 function LinksField({
   links,
   onChange,
-  error,
   showAll,
   onLeave,
-}: GroupProps<Partial<Record<LinkSiteId, string>>> & {
-  links: Partial<Record<LinkSiteId, string>>
+}: Omit<GroupProps<ArtistLinks>, 'error'> & {
+  links: ArtistLinks
   // Whether to show the errors of the inputs that haven't been left too, once the form is sent.
   showAll: boolean
 }) {
   const [left, setLeft] = useState<Set<LinkSiteId>>(new Set())
   const parsed = LINK_SITES.map((site) => ({ site, raw: links[site.id] ?? '', ...parseLink(site, links[site.id] ?? '') }))
-  // Each link says what's wrong with it. The field's error is then about one of them, and otherwise about a link that
-  // none of the inputs show, e.g. to a site that was taken out of LINK_SITES. The first input is marked with it, so that
-  // it's the one brought into focus.
-  const unshown = parsed.some((link) => link.error) ? undefined : error
+  // Each link says what's wrong with it, which is what the field's error is about, since admins can leave out the links.
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Liens</legend>
       <p className="admin-hint">Un lien ou un nom de profil, qui est tout ce qui en est gardé.</p>
-      {parsed.map(({ site, raw, value, error }, index) => {
+      {parsed.map(({ site, raw, value, error }) => {
         const shownError = error && (showAll || left.has(site.id)) ? error : null
         return (
           <div className="admin-field" key={site.id}>
@@ -386,7 +379,7 @@ function LinksField({
               <input
                 value={raw}
                 spellCheck={false}
-                aria-invalid={shownError || (unshown && index === 0) ? true : undefined}
+                aria-invalid={shownError ? true : undefined}
                 placeholder={site.prefix ?? (site.subdomainOf ? `….${site.subdomainOf}` : 'https://…')}
                 onChange={(event) => onChange({ ...links, [site.id]: event.target.value })}
                 onBlur={() => {
@@ -404,7 +397,6 @@ function LinksField({
           </div>
         )
       })}
-      <FieldError message={unshown} />
     </fieldset>
   )
 }

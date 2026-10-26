@@ -1,8 +1,8 @@
-import type { Artist, ArtistKind, GenreId } from 'shared/artists'
 import { PRESTATIONS } from 'shared/applications'
 import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
 import type { Schema } from '../../api/client'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
+import type { Artist, ArtistKind, GenreId } from '../../artist-profile'
 
 // How the admin sections show what the API returns, and search it.
 

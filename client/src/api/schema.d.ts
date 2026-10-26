@@ -1218,6 +1218,476 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/artists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every artist, by name */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            artists: components["schemas"]["Artist"][];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Adds an artist, with or without a photo */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        artist: components["schemas"]["AdminArtistProfile"];
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         */
+                        photo?: Blob;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            artist: components["schemas"]["Artist"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An artist */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            artist: components["schemas"]["Artist"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        /** Changes an artist's profile, and replaces or removes their photo */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        artist: components["schemas"]["AdminArtistProfile"];
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         */
+                        photo?: Blob;
+                        /** @description "true" removes the artist's photo, when there's no new one. Anything else keeps it */
+                        removePhoto?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            artist: components["schemas"]["Artist"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Deletes an artist, their photo and their applications */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Ok"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/artists/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An artist's photo */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/features": {
         parameters: {
             query?: never;
@@ -1384,10 +1854,95 @@ export interface components {
             createdAt: string;
             you: boolean;
         };
+        AdminArtistProfile: {
+            /** @constant */
+            kind: "artist";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description Ignored: only a collective has members */
+            members?: unknown;
+            country?: (components["schemas"]["Country"] | string) | null;
+            city?: string | null;
+            genres?: components["schemas"]["GenreId"][] | null;
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            links?: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            } | null;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            phone?: string | null;
+        } | {
+            /** @constant */
+            kind: "collective";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
+            members: string[];
+            country?: (components["schemas"]["Country"] | string) | null;
+            city?: string | null;
+            genres?: components["schemas"]["GenreId"][] | null;
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            links?: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            } | null;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            phone?: string | null;
+        };
         ApiError: {
             /** @constant */
             ok: false;
             error: string;
+        };
+        Artist: {
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: string | null;
+            kind: components["schemas"]["ArtistKind"];
+            name: string;
+            members: string[];
+            country: components["schemas"]["Country"] | "";
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            bio: string;
+            links: components["schemas"]["ArtistLinks"];
+            email: string;
+            phone: string;
+            updatedBy: string | null;
+            updatedAt: string | null;
+            hasPhoto: boolean;
+        };
+        /** @enum {string} */
+        ArtistKind: "artist" | "collective";
+        ArtistLinks: {
+            soundcloud?: string;
+            instagram?: string;
+            web?: string;
+            bandcamp?: string;
+            mixcloud?: string;
+            ra?: string;
+            youtube?: string;
+            spotify?: string;
+            tiktok?: string;
         };
         ChosenPlaylist: {
             url: string;
@@ -1406,6 +1961,8 @@ export interface components {
                 "nouveau-lecteur"?: boolean;
             };
         };
+        /** @enum {string} */
+        Country: "AD" | "AE" | "AF" | "AG" | "AI" | "AL" | "AM" | "AO" | "AQ" | "AR" | "AS" | "AT" | "AU" | "AW" | "AX" | "AZ" | "BA" | "BB" | "BD" | "BE" | "BF" | "BG" | "BH" | "BI" | "BJ" | "BL" | "BM" | "BN" | "BO" | "BQ" | "BR" | "BS" | "BT" | "BV" | "BW" | "BY" | "BZ" | "CA" | "CC" | "CD" | "CF" | "CG" | "CH" | "CI" | "CK" | "CL" | "CM" | "CN" | "CO" | "CR" | "CU" | "CV" | "CW" | "CX" | "CY" | "CZ" | "DE" | "DJ" | "DK" | "DM" | "DO" | "DZ" | "EC" | "EE" | "EG" | "EH" | "ER" | "ES" | "ET" | "FI" | "FJ" | "FK" | "FM" | "FO" | "FR" | "GA" | "GB" | "GD" | "GE" | "GF" | "GG" | "GH" | "GI" | "GL" | "GM" | "GN" | "GP" | "GQ" | "GR" | "GS" | "GT" | "GU" | "GW" | "GY" | "HK" | "HM" | "HN" | "HR" | "HT" | "HU" | "ID" | "IE" | "IL" | "IM" | "IN" | "IO" | "IQ" | "IR" | "IS" | "IT" | "JE" | "JM" | "JO" | "JP" | "KE" | "KG" | "KH" | "KI" | "KM" | "KN" | "KP" | "KR" | "KW" | "KY" | "KZ" | "LA" | "LB" | "LC" | "LI" | "LK" | "LR" | "LS" | "LT" | "LU" | "LV" | "LY" | "MA" | "MC" | "MD" | "ME" | "MF" | "MG" | "MH" | "MK" | "ML" | "MM" | "MN" | "MO" | "MP" | "MQ" | "MR" | "MS" | "MT" | "MU" | "MV" | "MW" | "MX" | "MY" | "MZ" | "NA" | "NC" | "NE" | "NF" | "NG" | "NI" | "NL" | "NO" | "NP" | "NR" | "NU" | "NZ" | "OM" | "PA" | "PE" | "PF" | "PG" | "PH" | "PK" | "PL" | "PM" | "PN" | "PR" | "PS" | "PT" | "PW" | "PY" | "QA" | "RE" | "RO" | "RS" | "RU" | "RW" | "SA" | "SB" | "SC" | "SD" | "SE" | "SG" | "SH" | "SI" | "SJ" | "SK" | "SL" | "SM" | "SN" | "SO" | "SR" | "SS" | "ST" | "SV" | "SX" | "SY" | "SZ" | "TC" | "TD" | "TF" | "TG" | "TH" | "TJ" | "TK" | "TL" | "TM" | "TN" | "TO" | "TR" | "TT" | "TV" | "TW" | "TZ" | "UA" | "UG" | "UM" | "US" | "UY" | "UZ" | "VA" | "VC" | "VE" | "VG" | "VI" | "VN" | "VU" | "WF" | "WS" | "XK" | "YE" | "YT" | "ZA" | "ZM" | "ZW";
         Event: {
             id: string;
             title: string;
@@ -1432,6 +1989,8 @@ export interface components {
         };
         /** @enum {string} */
         FeatureId: "nouveau-formulaire-candidature" | "nouveau-lecteur";
+        /** @enum {string} */
+        GenreId: "house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber";
         LeftOutTrack: {
             /** @constant */
             kind: "left-out";

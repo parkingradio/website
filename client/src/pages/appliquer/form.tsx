@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication } from 'shared/applications'
 import type { ApplicationFields, ApplyResponse, PrestationId } from 'shared/applications'
-import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, parseLink } from 'shared/artists'
-import type { ArtistKind, ArtistProfile, GenreId, LinkSiteId } from 'shared/artists'
 import type { ApiError } from 'shared/error'
-import { countryOptions, pickedPhotoError } from '../../artist-profile'
+import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, countryOptions, parseLink, pickedPhotoError } from '../../artist-profile'
+import type { ArtistKind, Profile, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { useTurnstileSiteKey } from '../../config-context'
 import { APPLY_BIO_MAX_LENGTH, MAX_GENRES, MAX_MEMBERS, PRIORITY_COUNTRIES, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './choices'
@@ -73,7 +72,7 @@ const EMPTY: Form = {
   details: '',
 }
 
-type Field = keyof ArtistProfile | keyof ApplicationFields | 'photo'
+type Field = keyof Profile | keyof ApplicationFields | 'photo'
 
 // The profile and the application, as they're sent, before they're checked.
 function sent(form: Form) {

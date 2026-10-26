@@ -19,6 +19,9 @@ The server provides the API under `/api`, which this directory specifies, and se
   Cloudflare and nginx. Over the limit, they get a 429 error.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
+- **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
+  in responses as in requests. So removing a value from a list, or renaming one, has to change the stored data that
+  still uses it, in the same change: until then, every response that would include the old value fails.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.

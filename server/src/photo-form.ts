@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify'
-import { PHOTO_MAX_BYTES } from 'shared/artists'
+import { PHOTO_MAX_BYTES } from './artist-profile.js'
 
 // The contents of a multipart/form-data request that sends a photo with a few fields: the fields, as they were sent,
 // and the photo from the "photo" part, if there's one.

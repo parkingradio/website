@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { GENRES } from 'shared/artists'
+import { GENRES } from '../artist-profile'
 import { requestsTo } from '../test-utils'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
@@ -480,7 +480,7 @@ describe('Appliquer', () => {
   })
 
   it('offers every genre, once', () => {
-    expect(GENRE_GROUPS.flatMap((group) => group.genres).toSorted()).toEqual(GENRES.map((genre) => genre.id).toSorted())
+    expect(GENRE_GROUPS.flatMap((group) => group.genres).toSorted()).toEqual(GENRES.toSorted())
   })
 
   it('lets the artist pick up to 3 genres, numbered in order', () => {

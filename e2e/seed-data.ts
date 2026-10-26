@@ -1,14 +1,19 @@
 import type { ApplicationFields, ApplicationStatus } from 'shared/applications'
-import { BIO_MAX_LENGTH } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
+import type { components } from '../client/src/api/schema.d.ts'
 
 // The data seed.ts fills a database with: artists, some with a photo, and their applications, with the variety the admin
 // pages have to handle. It's the same every time it's seeded, except for days, which are counted from the day it's
 // seeded, so that the data always looks current: new applications are for the coming months, and those that are done
 // were for past days.
 
+// A profile, as the server returns it, which is also how it can be sent, as it's already cleaned up.
+export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto'>
+
+// The longest bio the server takes (see BIO_MAX_LENGTH in server/src/artist-profile.ts).
+const BIO_MAX_LENGTH = 5000
+
 export type SeedArtist = {
-  profile: ArtistProfile
+  profile: Profile
   // The colour of their photo, for artists who have one.
   photo?: string
   // Whether the artist applied through the "Appliquer" form, which created them along with their first application.
@@ -26,16 +31,16 @@ export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
   receivedDaysAgo?: number
 }
 
-function artist(profile: Omit<ArtistProfile, 'kind' | 'members'>): ArtistProfile {
+function artist(profile: Omit<Profile, 'kind' | 'members'>): Profile {
   return { kind: 'artist', members: [], ...profile }
 }
 
-function collective(profile: Omit<ArtistProfile, 'kind'>): ArtistProfile {
+function collective(profile: Omit<Profile, 'kind'>): Profile {
   return { kind: 'collective', ...profile }
 }
 
 // What admins can leave out of a profile, left out, as for artists brought in from the original Google Form.
-const LEFT_OUT = { country: '', city: '', genres: [], links: {}, phone: '' }
+const LEFT_OUT = { country: '', city: '', genres: [], links: {}, phone: '' } satisfies Partial<Profile>
 
 function application(days: number[], status: ApplicationStatus, fields: Partial<SeedApplication> = {}): SeedApplication {
   return { days, status, timeSlots: [], prestations: ['dj'], otherPrestation: '', details: '', ...fields }

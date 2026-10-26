@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from 'shared/applications'
-import type { Artist, ArtistProfile } from 'shared/artists'
 import App from '../../app'
+import type { Artist, Profile } from '../../artist-profile'
 import { mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
@@ -47,7 +47,7 @@ const BRUME: Artist = {
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
-const LEFT_OUT: Partial<ArtistProfile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
 
 function application(id: string, artistId: string, changes: Partial<Application> = {}): Application {
   return {
@@ -90,7 +90,7 @@ function renderAt(path: string) {
 // What was sent as the artist's profile and photo in a request to save one, and whether to remove their photo.
 function sent(request: RequestInit) {
   const form = request.body as FormData
-  return { profile: JSON.parse(form.get('artist') as string) as ArtistProfile, photo: form.get('photo'), removePhoto: form.get('removePhoto') }
+  return { profile: JSON.parse(form.get('artist') as string) as Profile, photo: form.get('photo'), removePhoto: form.get('removePhoto') }
 }
 
 const rows = () =>
@@ -562,7 +562,10 @@ describe('Adding an artist', () => {
     fireEvent.click(submitButton("ajouter l'artiste"))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/artistes/artist-3'))
-    const { profile, photo } = sent(requestsTo('POST', '/api/admin/artists')[0])
+    const [request] = requestsTo('POST', '/api/admin/artists')
+    // As multipart/form-data, with the boundary between its parts, as the browser sets it.
+    expect(new Headers(request.headers).get('Content-Type')).toMatch(/^multipart\/form-data; boundary=/)
+    const { profile, photo } = sent(request)
     // What's saved of it, e.g. the profile name rather than the address of the Instagram profile.
     expect(profile).toEqual({
       kind: 'collective',
@@ -670,22 +673,6 @@ describe('Adding an artist', () => {
     expect(errorOf(screen.getByLabelText('Instagram'))).toBe("ce n'est pas une adresse Instagram")
     await waitFor(() => expect(screen.getByLabelText('Instagram')).toHaveFocus())
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
-  })
-
-  it('says what is wrong with a link that none of the inputs show, e.g. to a site that was taken out of the list', async () => {
-    mockFetch({
-      ...LOGGED_IN,
-      '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, links: { ...AURORE.links, myspace: 'aurore' } } },
-      '/api/admin/applications?artist=artist-1': { ok: true, applications: [] },
-    })
-    renderAt('/admin/artistes/artist-1')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
-    fireEvent.click(submitButton('enregistrer'))
-
-    expect(screen.getByText('Un des liens est invalide.')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByLabelText('SoundCloud')).toHaveFocus())
-    expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(0)
   })
 
   it('adds an artist without a country, city, genres, links or phone, e.g. one who applied through the original Google Form', async () => {

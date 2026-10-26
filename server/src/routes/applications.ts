@@ -12,9 +12,9 @@ import type {
   DeleteApplicationResponse,
   UpdateApplicationRequest,
 } from 'shared/applications'
-import { EMAIL_MAX_LENGTH, isEmailAddress } from 'shared/artists'
 import type { ApiError } from 'shared/error'
 import { InvalidApplication, NoSuchArtist, validateApplication } from '../applications.js'
+import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artist-profile.js'
 import type { ApplicationsStore, StoredApplication } from '../applications.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from '../applications-settings.js'
 import { requireAuth } from '../auth.js'

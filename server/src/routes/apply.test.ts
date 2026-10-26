@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import type { ApplicationFields } from 'shared/applications'
-import { PHOTO_MAX_BYTES } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
 import type { StoredApplication } from '../applications.js'
 import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
+import { PHOTO_MAX_BYTES } from '../artist-profile.js'
+import type { Profile } from '../artist-profile.js'
 import { EmailTaken } from '../artists.js'
 import type { SentPhoto, StoredArtist } from '../artists.js'
 import { EmailNotSent } from '../email.js'
@@ -73,7 +73,7 @@ const sendEmail = vi.fn<SendEmail>(async () => {})
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
-function profile(changes: Partial<ArtistProfile> = {}): ArtistProfile {
+function profile(changes: Partial<Profile> = {}): Profile {
   return {
     kind: 'artist',
     name: 'DJ Test',

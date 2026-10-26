@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from 'shared/applications'
-import type { Artist } from 'shared/artists'
 import App from '../../app'
+import type { Artist } from '../../artist-profile'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }

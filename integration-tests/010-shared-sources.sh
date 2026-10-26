@@ -9,9 +9,8 @@ source "$(dirname "$0")/lib.sh"
 docker exec --workdir /app/server "$CONTAINER" node --input-type=module -e "await import('shared/error')" \
     || fail "couldn't import shared/error"
 
-# Code, rather than only types, which the server runs to check requests. shared/artists also relies on globals that aren't
-# part of ECMAScript (see shared/src/globals.d.ts).
+# Code, rather than only types, which the server runs to check requests.
 docker exec --workdir /app/server "$CONTAINER" node --input-type=module -e "
-    const { linkSite, parseLink } = await import('shared/artists')
-    if (parseLink(linkSite('soundcloud'), 'https://soundcloud.com/parkingdotradio/wobbla').value !== 'parkingdotradio') process.exit(1)
-" || fail "couldn't run shared/artists"
+    const { isDay } = await import('shared/applications')
+    if (!isDay('2026-10-25') || isDay('2026-02-30')) process.exit(1)
+" || fail "couldn't run shared/applications"

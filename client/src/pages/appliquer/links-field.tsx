@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { LINK_SITES, isAddress, parseLink } from 'shared/artists'
-import type { LinkSiteId } from 'shared/artists'
+import { LINK_SITES, isAddress, parseLink } from '../../artist-profile'
+import type { LinkSiteId } from '../../artist-profile'
 import { DEFAULT_LINK_SITES } from './choices'
 
 type Props = {

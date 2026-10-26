@@ -60,6 +60,282 @@
         ],
         "additionalProperties": false
       },
+      "AdminArtistProfile": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "artist"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "members": {
+                "description": "Ignored: only a collective has members"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Country"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^\\s*$"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "genres": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GenreId"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "anyOf": [
+                  {
+                    "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                    "type": "object",
+                    "properties": {
+                      "soundcloud": {
+                        "type": "string"
+                      },
+                      "instagram": {
+                        "type": "string"
+                      },
+                      "web": {
+                        "type": "string"
+                      },
+                      "bandcamp": {
+                        "type": "string"
+                      },
+                      "mixcloud": {
+                        "type": "string"
+                      },
+                      "ra": {
+                        "type": "string"
+                      },
+                      "youtube": {
+                        "type": "string"
+                      },
+                      "spotify": {
+                        "type": "string"
+                      },
+                      "tiktok": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "bio",
+              "email"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "collective"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "members": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                },
+                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Country"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^\\s*$"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "genres": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GenreId"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "anyOf": [
+                  {
+                    "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                    "type": "object",
+                    "properties": {
+                      "soundcloud": {
+                        "type": "string"
+                      },
+                      "instagram": {
+                        "type": "string"
+                      },
+                      "web": {
+                        "type": "string"
+                      },
+                      "bandcamp": {
+                        "type": "string"
+                      },
+                      "mixcloud": {
+                        "type": "string"
+                      },
+                      "ra": {
+                        "type": "string"
+                      },
+                      "youtube": {
+                        "type": "string"
+                      },
+                      "spotify": {
+                        "type": "string"
+                      },
+                      "tiktok": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "members",
+              "bio",
+              "email"
+            ]
+          }
+        ]
+      },
       "ApiError": {
         "type": "object",
         "properties": {
@@ -75,6 +351,147 @@
           "ok",
           "error"
         ],
+        "additionalProperties": false
+      },
+      "Artist": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ArtistKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Country"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenreId"
+            }
+          },
+          "bio": {
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/ArtistLinks"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasPhoto": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "createdBy",
+          "kind",
+          "name",
+          "members",
+          "country",
+          "city",
+          "genres",
+          "bio",
+          "links",
+          "email",
+          "phone",
+          "updatedBy",
+          "updatedAt",
+          "hasPhoto"
+        ],
+        "additionalProperties": false
+      },
+      "ArtistKind": {
+        "type": "string",
+        "enum": [
+          "artist",
+          "collective"
+        ]
+      },
+      "ArtistLinks": {
+        "type": "object",
+        "properties": {
+          "soundcloud": {
+            "type": "string"
+          },
+          "instagram": {
+            "type": "string"
+          },
+          "web": {
+            "type": "string"
+          },
+          "bandcamp": {
+            "type": "string"
+          },
+          "mixcloud": {
+            "type": "string"
+          },
+          "ra": {
+            "type": "string"
+          },
+          "youtube": {
+            "type": "string"
+          },
+          "spotify": {
+            "type": "string"
+          },
+          "tiktok": {
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       },
       "ChosenPlaylist": {
@@ -148,6 +565,261 @@
           "features"
         ],
         "additionalProperties": false
+      },
+      "Country": {
+        "type": "string",
+        "enum": [
+          "AD",
+          "AE",
+          "AF",
+          "AG",
+          "AI",
+          "AL",
+          "AM",
+          "AO",
+          "AQ",
+          "AR",
+          "AS",
+          "AT",
+          "AU",
+          "AW",
+          "AX",
+          "AZ",
+          "BA",
+          "BB",
+          "BD",
+          "BE",
+          "BF",
+          "BG",
+          "BH",
+          "BI",
+          "BJ",
+          "BL",
+          "BM",
+          "BN",
+          "BO",
+          "BQ",
+          "BR",
+          "BS",
+          "BT",
+          "BV",
+          "BW",
+          "BY",
+          "BZ",
+          "CA",
+          "CC",
+          "CD",
+          "CF",
+          "CG",
+          "CH",
+          "CI",
+          "CK",
+          "CL",
+          "CM",
+          "CN",
+          "CO",
+          "CR",
+          "CU",
+          "CV",
+          "CW",
+          "CX",
+          "CY",
+          "CZ",
+          "DE",
+          "DJ",
+          "DK",
+          "DM",
+          "DO",
+          "DZ",
+          "EC",
+          "EE",
+          "EG",
+          "EH",
+          "ER",
+          "ES",
+          "ET",
+          "FI",
+          "FJ",
+          "FK",
+          "FM",
+          "FO",
+          "FR",
+          "GA",
+          "GB",
+          "GD",
+          "GE",
+          "GF",
+          "GG",
+          "GH",
+          "GI",
+          "GL",
+          "GM",
+          "GN",
+          "GP",
+          "GQ",
+          "GR",
+          "GS",
+          "GT",
+          "GU",
+          "GW",
+          "GY",
+          "HK",
+          "HM",
+          "HN",
+          "HR",
+          "HT",
+          "HU",
+          "ID",
+          "IE",
+          "IL",
+          "IM",
+          "IN",
+          "IO",
+          "IQ",
+          "IR",
+          "IS",
+          "IT",
+          "JE",
+          "JM",
+          "JO",
+          "JP",
+          "KE",
+          "KG",
+          "KH",
+          "KI",
+          "KM",
+          "KN",
+          "KP",
+          "KR",
+          "KW",
+          "KY",
+          "KZ",
+          "LA",
+          "LB",
+          "LC",
+          "LI",
+          "LK",
+          "LR",
+          "LS",
+          "LT",
+          "LU",
+          "LV",
+          "LY",
+          "MA",
+          "MC",
+          "MD",
+          "ME",
+          "MF",
+          "MG",
+          "MH",
+          "MK",
+          "ML",
+          "MM",
+          "MN",
+          "MO",
+          "MP",
+          "MQ",
+          "MR",
+          "MS",
+          "MT",
+          "MU",
+          "MV",
+          "MW",
+          "MX",
+          "MY",
+          "MZ",
+          "NA",
+          "NC",
+          "NE",
+          "NF",
+          "NG",
+          "NI",
+          "NL",
+          "NO",
+          "NP",
+          "NR",
+          "NU",
+          "NZ",
+          "OM",
+          "PA",
+          "PE",
+          "PF",
+          "PG",
+          "PH",
+          "PK",
+          "PL",
+          "PM",
+          "PN",
+          "PR",
+          "PS",
+          "PT",
+          "PW",
+          "PY",
+          "QA",
+          "RE",
+          "RO",
+          "RS",
+          "RU",
+          "RW",
+          "SA",
+          "SB",
+          "SC",
+          "SD",
+          "SE",
+          "SG",
+          "SH",
+          "SI",
+          "SJ",
+          "SK",
+          "SL",
+          "SM",
+          "SN",
+          "SO",
+          "SR",
+          "SS",
+          "ST",
+          "SV",
+          "SX",
+          "SY",
+          "SZ",
+          "TC",
+          "TD",
+          "TF",
+          "TG",
+          "TH",
+          "TJ",
+          "TK",
+          "TL",
+          "TM",
+          "TN",
+          "TO",
+          "TR",
+          "TT",
+          "TV",
+          "TW",
+          "TZ",
+          "UA",
+          "UG",
+          "UM",
+          "US",
+          "UY",
+          "UZ",
+          "VA",
+          "VC",
+          "VE",
+          "VG",
+          "VI",
+          "VN",
+          "VU",
+          "WF",
+          "WS",
+          "XK",
+          "YE",
+          "YT",
+          "ZA",
+          "ZM",
+          "ZW"
+        ]
       },
       "Event": {
         "type": "object",
@@ -288,6 +960,55 @@
         "enum": [
           "nouveau-formulaire-candidature",
           "nouveau-lecteur"
+        ]
+      },
+      "GenreId": {
+        "type": "string",
+        "enum": [
+          "house",
+          "deep-house",
+          "tech-house",
+          "afro-house",
+          "amapiano",
+          "disco",
+          "nu-disco",
+          "italo",
+          "techno",
+          "hard-techno",
+          "minimal",
+          "acid",
+          "electro",
+          "trance",
+          "ebm-industrial",
+          "drum-and-bass",
+          "jungle",
+          "breakbeat",
+          "uk-garage",
+          "dubstep",
+          "bass",
+          "footwork-juke",
+          "baile-funk",
+          "hip-hop",
+          "rap",
+          "trap",
+          "rnb",
+          "funk-soul",
+          "jazz",
+          "reggae-dub",
+          "dancehall",
+          "reggaeton-latin",
+          "afrobeat",
+          "cumbia",
+          "ambient",
+          "downtempo",
+          "experimental",
+          "noise",
+          "leftfield",
+          "pop",
+          "indie-rock",
+          "punk",
+          "synthwave",
+          "hardcore-gabber"
         ]
       },
       "LeftOutTrack": {
@@ -1760,6 +2481,580 @@
             }
           },
           "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/artists": {
+      "get": {
+        "summary": "Every artist, by name",
+        "tags": [
+          "Artists"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artists": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Artist"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artists"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Adds an artist, with or without a photo",
+        "tags": [
+          "Artists"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "artist": {
+                    "$ref": "#/components/schemas/AdminArtistProfile"
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  }
+                },
+                "required": [
+                  "artist"
+                ]
+              },
+              "encoding": {
+                "artist": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/artists/{id}": {
+      "get": {
+        "summary": "An artist",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Changes an artist's profile, and replaces or removes their photo",
+        "tags": [
+          "Artists"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "artist": {
+                    "$ref": "#/components/schemas/AdminArtistProfile"
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  },
+                  "removePhoto": {
+                    "description": "\"true\" removes the artist's photo, when there's no new one. Anything else keeps it",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "artist"
+                ]
+              },
+              "encoding": {
+                "artist": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes an artist, their photo and their applications",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/artists/{id}/photo": {
+      "get": {
+        "summary": "An artist's photo",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
             "description": "Default Response",
             "content": {
               "application/json": {

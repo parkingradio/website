@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from 'shared/artists'
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../../artist-profile'
 
 type Props = { value: File | null; onChange: (file: File | null) => void; invalid: boolean }
 

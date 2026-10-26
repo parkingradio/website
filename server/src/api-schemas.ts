@@ -13,6 +13,13 @@ declare module 'fastify' {
     // The route requires an admin's session: see `useZodSchemas`.
     admin?: boolean
   }
+
+  interface FastifySchema {
+    // The parts of a multipart/form-data request, which the route reads itself, e.g. with `readPhotoForm`, rather than
+    // Fastify, so they aren't validated against it: it describes the request in openapi.json (see generate-openapi.ts).
+    // Parts that are JSON, e.g. a profile, are described by their schema, which the route checks them against.
+    multipart?: z.ZodObject
+  }
 }
 
 // Sent with a 4xx or 5xx status when a request fails.
@@ -37,7 +44,8 @@ export const Day = z
   .meta({ format: 'date' })
 
 // The errors that routes can fail with because of what they are, which they don't declare:
-// - 400 when the route has a schema for its request, which refuses the requests that don't match it,
+// - 400 when the route has a schema for its request, which refuses the requests that don't match it (or describes a
+//   multipart request, which the route checks itself),
 // - 401 when it requires an admin's session, and 403 too when its method isn't GET (see requireAuth),
 // - 500 for every route.
 // Routes declare the other errors they send, e.g. `404: ApiError`, including generic ones they send themselves, e.g. a
@@ -59,7 +67,8 @@ function addGenericErrors(route: RouteOptions) {
   if (admin) route.onRequest = [requireAuth, route.onRequest ?? []].flat()
 
   const statuses = [500]
-  if (route.schema.params || route.schema.querystring || route.schema.body || route.schema.headers) statuses.push(400)
+  const { params, querystring, body, headers, multipart } = route.schema
+  if (params || querystring || body || headers || multipart) statuses.push(400)
   if (admin) statuses.push(401)
   if (admin && methods.some(checksOrigin)) statuses.push(403)
   const errors = Object.fromEntries(statuses.map((status) => [status, ApiError]))

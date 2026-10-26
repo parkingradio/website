@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { jsonBody, mockFetch, requestsTo } from '../test-utils'
-import { api } from './client'
+import { api, formData } from './client'
 import { useApi } from './use-api'
 
 const FEATURE = { id: 'nouveau-lecteur', enabled: true, updatedBy: 'admin@example.com', updatedAt: '2026-10-09T16:30:00.000Z' }
@@ -24,6 +24,28 @@ describe('api', () => {
     const [request] = requestsTo('PUT', '/api/admin/features/nouveau-lecteur')
     expect(jsonBody(request)).toEqual({ enabled: true })
     expect(new Headers(request.headers).get('Content-Type')).toBe('application/json')
+  })
+
+  it('sends a multipart/form-data body with `formData`: files as they are, objects as JSON, and nothing for undefined', async () => {
+    mockFetch({ 'PUT /api/admin/artists/artist-1': { ok: false, error: 'Stop' } })
+    const photo = new File(['photo'], 'photo.png', { type: 'image/png' })
+    const artist = { kind: 'artist' as const, name: 'Aurore', bio: 'Une bio.', email: 'aurore@example.com' }
+    await api.PUT('/api/admin/artists/{id}', { params: { path: { id: 'artist-1' } }, body: { artist, photo, removePhoto: undefined }, bodySerializer: formData })
+    const form = requestsTo('PUT', '/api/admin/artists/artist-1')[0].body as FormData
+    expect(form.get('artist')).toBe(JSON.stringify(artist))
+    expect(form.get('photo')).toBe(photo)
+    expect(form.has('removePhoto')).toBe(false)
+  })
+
+  it('only sends a multipart/form-data body with `formData`', () => {
+    const typeCheck = () => {
+      const artist = { kind: 'artist' as const, name: 'Aurore', bio: 'Une bio.', email: 'aurore@example.com' }
+      // @ts-expect-error: as JSON.
+      void api.POST('/api/admin/artists', { body: { artist } })
+      // @ts-expect-error: a JSON body.
+      void api.PUT('/api/admin/features/{id}', { params: { path: { id: 'x' } }, body: { enabled: true }, bodySerializer: formData })
+    }
+    expect(typeCheck).toBeTypeOf('function')
   })
 
   it("returns the server's error when the request fails", async () => {

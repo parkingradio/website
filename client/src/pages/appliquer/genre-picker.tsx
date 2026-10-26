@@ -1,10 +1,8 @@
-import { GENRES } from 'shared/artists'
-import type { GenreId } from 'shared/artists'
+import { genreName } from '../../artist-profile'
+import type { GenreId } from '../../artist-profile'
 import { GENRE_GROUPS, MAX_GENRES } from './choices'
 
 type Props = { value: GenreId[]; onChange: (genres: GenreId[]) => void; invalid: boolean }
-
-const genreName = (id: GenreId) => GENRES.find((genre) => genre.id === id)?.name ?? id
 
 // Up to MAX_GENRES genres, in the order they're picked: the first one is the artist's main genre.
 export function GenrePicker({ value, onChange, invalid }: Props) {

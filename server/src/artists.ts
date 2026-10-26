@@ -1,27 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
-import { PHOTO_WRONG_TYPE, checkProfile, photoError } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
-import { firstError } from 'shared/checks'
+import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './artist-profile.js'
+import type { AdminArtistProfile, ArtistProfile, Profile } from './artist-profile.js'
 import type { Queryable } from './db.js'
 import type { PrivateFiles } from './private-bucket.js'
 import { artists } from './schema.js'
 import { violatesConstraint } from './query-errors.js'
 import { isUuid } from './uuid.js'
 
-// Checks the profiles and photos sent for artists against the rules in shared/src/artists.ts, keeps artists in the
-// database, and keeps their photos in the private bucket.
+// Checks the profiles and photos sent for artists against the rules in artist-profile.ts, keeps artists in the database,
+// and keeps their photos in the private bucket.
 
 // Thrown when a profile or photo is invalid. Its message tells the artist what's wrong, in French.
 export class InvalidProfile extends Error {}
 
-// Checks a profile with `checkProfile`, leniently for the admin pages, and returns what's saved of it. Throws an
-// InvalidProfile, saying what's wrong with the first field that's wrong, otherwise.
-export function validateProfile(sent: unknown, options?: { lenient?: boolean }): ArtistProfile {
-  const { profile, errors } = checkProfile(sent, options)
-  if (errors) throw new InvalidProfile(firstError(errors))
-  return profile
+// Checks a profile against `schema`, which says who sent it, and returns what's saved of it. Throws an InvalidProfile,
+// saying what's wrong with the first field that's wrong, otherwise.
+export function validateProfile(sent: unknown, schema: typeof ArtistProfile | typeof AdminArtistProfile): Profile {
+  const result = schema.safeParse(sent)
+  if (!result.success) throw new InvalidProfile(result.error.issues[0].message)
+  return result.data
 }
 
 // A photo that was sent, and its MIME type, as checked from its contents.
@@ -36,14 +35,13 @@ function photoType(body: Buffer): string | null {
   return null
 }
 
-// Checks the photo with `photoError`, from its type as told from its contents, and returns it with that type, or null
-// when there's none. Throws an InvalidProfile otherwise.
+// Checks the photo, from its type as told from its contents, and returns it with that type, or null when there's none.
+// Throws an InvalidProfile otherwise.
 export function validatePhoto(body: Buffer | undefined): SentPhoto | null {
   if (!body) return null
   const type = photoType(body)
   if (!type) throw new InvalidProfile(PHOTO_WRONG_TYPE)
-  const error = photoError({ type, size: body.length })
-  if (error !== null) throw new InvalidProfile(error)
+  if (body.length > PHOTO_MAX_BYTES) throw new InvalidProfile(PHOTO_TOO_LARGE)
   return { body, type }
 }
 
@@ -66,12 +64,12 @@ export type ArtistsStore = {
   get(id: string): Promise<StoredArtist | null>
   // `createdBy` is the email of the admin who adds the artist, or null if the artist adds themselves by applying.
   // Throws an EmailTaken.
-  create(artist: ArtistProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
+  create(artist: Profile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
   // Replaces the artist's profile, and their photo when there's a new one, or nulls to remove it. Returns the artist as
   // they were, so that a photo that was replaced or removed can be deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
-    changes: ArtistProfile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Profile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: StoredArtist; after: StoredArtist } | null>
   // Returns the artist as they were, so that their photo can be deleted too.
   delete(id: string): Promise<StoredArtist | null>

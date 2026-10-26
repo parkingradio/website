@@ -1,8 +1,8 @@
 import type { ApplicationFields } from 'shared/applications'
-import type { ArtistProfile } from 'shared/artists'
 import { applicationsStore } from './applications.js'
 import { artistsStore } from './artists.js'
 import type { StoredPhoto } from './artists.js'
+import type { Profile } from './artist-profile.js'
 import type { db as Database } from './db.js'
 
 // Stores the applications that new artists send themselves, from `POST /api/applications`. On the admin pages, an
@@ -13,7 +13,7 @@ export type ApplyStore = {
   // Creates the artist, with this profile and photo, and their application, both with a null `createdBy`. Returns their
   // ids. If an artist with the same email already exists (ignoring case), throws an EmailTaken and creates nothing.
   apply(
-    artist: ArtistProfile & StoredPhoto,
+    artist: Profile & StoredPhoto,
     application: ApplicationFields,
   ): Promise<{ artistId: string; applicationId: string }>
 }

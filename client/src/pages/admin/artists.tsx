@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ARTIST_KINDS, LINK_SITES } from 'shared/artists'
-import type { Artist, ArtistResponse, ArtistsResponse, DeleteArtistResponse } from 'shared/artists'
 import type { ApplicationsResponse } from 'shared/applications'
-import { deleteJson, sendForm } from '../../api'
+import { api, formData } from '../../api/client'
+import { useApi } from '../../api/use-api'
+import { ARTIST_KINDS, LINK_SITES } from '../../artist-profile'
+import type { Artist } from '../../artist-profile'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
 import { KIND_LABELS, MISSING, artistSearchFields, byWhom, countryOf, dateFormat, genreNames, photoUrl, place } from './describe'
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { useApi } from '../../use-api'
+// For the applications, which aren't in openapi.json yet.
+import { useApi as useUntypedApi } from '../../use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
 // bring in an application that came through the Google Form.
@@ -50,7 +52,7 @@ export function ArtistsPage() {
 
 // Every artist, by name unless they're sorted otherwise, or those `query` finds.
 function ArtistsList({ query }: { query: string }) {
-  const artists = useApi<ArtistsResponse>('/api/admin/artists')
+  const artists = useApi('/api/admin/artists')
   const sorting = useSort(ARTIST_COLUMNS, 'nom')
 
   if (artists.kind === 'loading') return null
@@ -106,9 +108,8 @@ export function ArtistPage() {
 }
 
 function ArtistById({ id }: { id: string }) {
-  const url = `/api/admin/artists/${encodeURIComponent(id)}`
-  const loaded = useApi<ArtistResponse>(url)
-  const applications = useApi<ApplicationsResponse>(`/api/admin/applications?artist=${encodeURIComponent(id)}`)
+  const loaded = useApi('/api/admin/artists/{id}', { params: { path: { id } } })
+  const applications = useUntypedApi<ApplicationsResponse>(`/api/admin/applications?artist=${encodeURIComponent(id)}`)
   // The artist as the last change left them, which replaces the one loaded.
   const [changed, setChanged] = useState<Artist | null>(null)
   const [editing, setEditing] = useState(false)
@@ -138,8 +139,8 @@ function ArtistById({ id }: { id: string }) {
           artist={artist}
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
-          onSubmit={async (form) => {
-            const result = await sendForm<ArtistResponse>('PUT', url, form)
+          onSubmit={async (body) => {
+            const result = await api.PUT('/api/admin/artists/{id}', { params: { path: { id } }, body, bodySerializer: formData })
             if (!result.ok) return `L'artiste n'a pas pu être enregistré : ${result.error}`
             setChanged(result.artist)
             setEditing(false)
@@ -158,7 +159,7 @@ function ArtistById({ id }: { id: string }) {
     if (!window.confirm(`Supprimer définitivement ${artist.name}${theirPhoto}${theirApplications} ?`)) return
     setBusy(true)
     setError(null)
-    const result = await deleteJson<DeleteArtistResponse>(url)
+    const result = await api.DELETE('/api/admin/artists/{id}', { params: { path: { id } } })
     if (result.ok) {
       navigate('/admin/artistes')
     } else {
@@ -277,8 +278,8 @@ export function NewArtistPage() {
       <h1>Nouvel artiste</h1>
       <ArtistForm
         submitLabel="ajouter l'artiste"
-        onSubmit={async (form) => {
-          const result = await sendForm<ArtistResponse>('POST', '/api/admin/artists', form)
+        onSubmit={async (body) => {
+          const result = await api.POST('/api/admin/artists', { body, bodySerializer: formData })
           if (!result.ok) return `L'artiste n'a pas pu être ajouté : ${result.error}`
           navigate(`/admin/artistes/${result.artist.id}`)
           return null

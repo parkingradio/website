@@ -3,8 +3,8 @@ import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, 
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from 'shared/applications'
 import type { ApplicationStatus, PrestationId, TimeSlot } from 'shared/applications'
-import { ARTIST_KINDS } from 'shared/artists'
-import type { ArtistKind, GenreId, LinkSiteId } from 'shared/artists'
+import { ARTIST_KINDS } from './artist-profile.js'
+import type { ArtistKind, Country, GenreId, LinkSiteId } from './artist-profile.js'
 
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
@@ -80,7 +80,7 @@ export const soundcloudCredentials = pgTable(
   (table) => [check('soundcloud_credentials_single_row', sql`${table.id} = 1`)],
 )
 
-// Artists, known by their email address whatever its case. See `ArtistProfile` in shared/src/artists.ts for what each
+// Artists, known by their email address whatever its case. See the profile's schemas in artist-profile.ts for what each
 // field may contain. Admins can leave out the country, city, genres, links and phone, which are then empty.
 export const artists = pgTable(
   'artists',
@@ -93,7 +93,7 @@ export const artists = pgTable(
     kind: text('kind').$type<ArtistKind>().notNull(),
     name: text('name').notNull(), // or the collective's name
     members: text('members').array().notNull(), // a collective's artists; empty for an artist
-    country: text('country').notNull(), // one of COUNTRIES, e.g. "CA", or "" when an admin left it out
+    country: text('country').$type<Country | ''>().notNull(), // one of COUNTRIES, e.g. "CA", or "" when an admin left it out
     city: text('city').notNull(),
     genres: text('genres').array().$type<GenreId[]>().notNull(), // ids, most important first
     bio: text('bio').notNull(),

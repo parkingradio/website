@@ -1,4 +1,4 @@
-// Helpers for the checks in artists.ts and applications.ts. What's wrong is said in French, since artists see it.
+// Helpers for the checks in applications.ts, and the client's copy of the server's profile rules. What's wrong is said in French, since artists see it.
 
 // The cleaned-up value of a field, or what's wrong with it.
 export type Checked<T> = { value: T; error?: undefined } | { value?: undefined; error: string }

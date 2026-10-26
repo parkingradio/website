@@ -11,7 +11,6 @@ import type {
   DeleteApplicationResponse,
   UpdateApplicationRequest,
 } from 'shared/applications'
-import type { Artist, ArtistResponse, ArtistsResponse } from 'shared/artists'
 import { deleteJson, postJson, putJson } from '../../api'
 import { ApplicationForm } from './application-form'
 import {
@@ -30,7 +29,10 @@ import {
 import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { useApi } from '../../use-api'
+import { useApi } from '../../api/use-api'
+import type { Artist } from '../../artist-profile'
+// For the applications, which aren't in openapi.json yet.
+import { useApi as useUntypedApi } from '../../use-api'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in an application that came through the Google Form.
@@ -148,8 +150,8 @@ function applicationSearchFields(application: Application): string[] {
 // Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
 // those with the status in the `statut` query parameter. The status's buttons count the applications the search finds.
 function ApplicationsList({ query }: { query: string }) {
-  const applications = useApi<ApplicationsResponse>('/api/admin/applications')
-  const artists = useApi<ArtistsResponse>('/api/admin/artists')
+  const applications = useUntypedApi<ApplicationsResponse>('/api/admin/applications')
+  const artists = useApi('/api/admin/artists')
   // Without the artists, the applications are still listed, without their names.
   const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
   const sorting = useSort(applicationColumns(byId), 'recue')
@@ -208,7 +210,7 @@ export function ApplicationPage() {
 }
 
 function ApplicationById({ id }: { id: string }) {
-  const loaded = useApi<ApplicationResponse>(`/api/admin/applications/${encodeURIComponent(id)}`)
+  const loaded = useUntypedApi<ApplicationResponse>(`/api/admin/applications/${encodeURIComponent(id)}`)
 
   if (loaded.kind === 'loading') return <BackToApplications />
   if (loaded.kind === 'error') {
@@ -225,7 +227,7 @@ function ApplicationById({ id }: { id: string }) {
 }
 
 function LoadedApplication({ loaded }: { loaded: Application }) {
-  const artist = useApi<ArtistResponse>(`/api/admin/artists/${loaded.artistId}`)
+  const artist = useApi('/api/admin/artists/{id}', { params: { path: { id: loaded.artistId } } })
   // The application as the last change left it, which replaces the one loaded.
   const [application, setApplication] = useState(loaded)
   const [editing, setEditing] = useState(false)
@@ -374,7 +376,7 @@ function ArtistSummary({ artist }: { artist: Artist }) {
 
 // Creating an application, for the artist in the `artiste` query parameter at first, if any.
 export function NewApplicationPage() {
-  const artists = useApi<ArtistsResponse>('/api/admin/artists')
+  const artists = useApi('/api/admin/artists')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 

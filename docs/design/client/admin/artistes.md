@@ -24,8 +24,9 @@ one, and applications, after confirming.
 and pinned with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left
 typed without being pinned. Genres are tags to click, which pins them in order of importance, and the country is
 typed, with the matching countries suggested, of which one has to be picked, "Pays inconnu" leaving it out.
-Each field says what's wrong with it once it's left, with the same rules and messages as the server, for admins (see
-[Profiles](../../server/artists.md#profiles)).
+Each field says what's wrong with it once it's left: the form checks the profile as the server does for admins (see
+[Profiles](../../server/artists.md#profiles)), for immediate feedback. The server's check is the one that counts: if it
+refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints
 

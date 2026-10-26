@@ -2,13 +2,13 @@ import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import type { ApplicationFields, ApplyResponse } from 'shared/applications'
-import { PHOTO_TOO_LARGE } from 'shared/artists'
-import type { ArtistProfile } from 'shared/artists'
 import type { ApiError } from 'shared/error'
 import { applicationEmails } from '../application-emails.js'
 import { InvalidApplication, validateApplication } from '../applications.js'
 import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
+import { ArtistProfile, PHOTO_TOO_LARGE } from '../artist-profile.js'
+import type { Profile } from '../artist-profile.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { Photos, SentPhoto } from '../artists.js'
 import { clientAddress, visitorAddress } from '../client-address.js'
@@ -34,12 +34,12 @@ const TURNSTILE_UNAVAILABLE: ApiError = {
 
 // Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
 // the first one that isn't valid.
-function validated(form: PhotoForm): { profile: ArtistProfile; photo: SentPhoto | null; application: ApplicationFields } | ApiError {
+function validated(form: PhotoForm): { profile: Profile; photo: SentPhoto | null; application: ApplicationFields } | ApiError {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
   try {
-    return { profile: validateProfile(sentArtist), photo: validatePhoto(form.photo), application: validateApplication(sentApplication) }
+    return { profile: validateProfile(sentArtist, ArtistProfile), photo: validatePhoto(form.photo), application: validateApplication(sentApplication) }
   } catch (error) {
     if (!(error instanceof InvalidProfile || error instanceof InvalidApplication)) throw error
     return { ok: false, error: error.message }
@@ -57,7 +57,7 @@ type EmailOptions = {
 async function emailApplication(
   log: FastifyBaseLogger,
   { settings, sendEmail }: EmailOptions,
-  sent: { profile: ArtistProfile; application: ApplicationFields },
+  sent: { profile: Profile; application: ApplicationFields },
 ) {
   if (!sendEmail) {
     log.warn('Not emailing the application: MAIL_DOMAIN is not set')

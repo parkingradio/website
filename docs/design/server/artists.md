@@ -7,9 +7,10 @@ The artists Parking Radio knows of, which are the artists who applied, and their
 An artist is an artist or a collective. Each one has a profile, and maybe a photo, and is a row of the `artists` table
 (`server/src/schema.ts`). An artist is known by their email: two artists can't have the same one, whatever its case.
 
-The rules a profile has to follow are in `shared/src/artists.ts` (`checkProfile`), and the server checks every profile
-it's sent against them. The server explains what's wrong with a profile or a photo in French, unlike its other admin
-errors, because artists see the same messages when they apply.
+The rules a profile has to follow are the schemas of `server/src/artist-profile.ts` (`ArtistProfile`, and
+`AdminArtistProfile` for admins), and the server checks every profile it's sent against them. The server explains
+what's wrong with a profile or a photo in French, unlike its other admin errors, because artists see the same messages
+when they apply.
 
 Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, links or
 phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always
@@ -23,9 +24,9 @@ A profile has:
 | `kind` | `"artist"` or `"collective"` | An artist usually gets an hour of a time slot, a collective a whole slot |
 | `name` | string | The artist's name, or the collective's. Up to 100 characters |
 | `members` | list of strings | For a collective, the names of the artists representing it, at least one, each up to 100 characters. Empty for an artist |
-| `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` (one of `COUNTRIES`), or `""` when an admin left it out |
+| `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` (one of `COUNTRIES` in `server/src/artist-profile.ts`), or `""` when an admin left it out |
 | `city` | string | As the artist wrote it. Up to 100 characters, or `""` when an admin left it out |
-| `genres` | list of strings | The ids of at least one of `GENRES` (e.g. `"drum-and-bass"`), most important first, or none when an admin left them out |
+| `genres` | list of strings | The ids of at least one of `GENRES` in `server/src/artist-profile.ts` (e.g. `"drum-and-bass"`), most important first, or none when an admin left them out |
 | `bio` | string | Up to 5000 characters |
 | `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one, or none when an admin left them out: see below |
 | `email` | string | What the artist is known by. Up to 200 characters |
@@ -33,7 +34,8 @@ A profile has:
 
 Links are stored as profile names, which the server reduces what was typed or pasted to: e.g.
 `https://soundcloud.com/parkingdotradio/sets/x` is stored as `parkingdotradio`. For `web`, it's the address itself.
-Either is up to 200 characters. `linkSite(id).url(value)` turns a profile name back into an address.
+Either is up to 200 characters. `linkSite(id).url(value)`, in `server/src/artist-profile.ts`, turns a profile name back
+into an address.
 
 An artist, as the endpoints below return them, is their profile with:
 

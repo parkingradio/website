@@ -2,11 +2,11 @@
 
 This page is the form artists fill in to apply for a slot at Parking Radio. What it collects is reused in the
 rest of Parking Radio's workflow, so it avoids free-form text wherever it can: answers are picked from lists,
-and links are reduced to profile names. The form checks the artist's profile and application with the same rules
-and messages as the server (see [Profiles](../server/artists.md#profiles) and
-[Applications](../server/artists.md#applications)), which checks them again. On top of those, it sets limits of its own,
-which the server doesn't (admins can bring in applications that don't follow them): they're listed in
-`client/src/pages/appliquer/choices.ts`.
+and links are reduced to profile names. The form checks the artist's profile and application as the server does (see
+[Profiles](../server/artists.md#profiles) and [Applications](../server/artists.md#applications)), for immediate
+feedback. The server checks them again, and its check is the one that counts: if it refuses what the form accepted, the form
+shows the server's message. On top of those, it sets limits of its own, which the server doesn't (admins can bring in applications
+that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`.
 
 The fields are (* means mandatory):
 
