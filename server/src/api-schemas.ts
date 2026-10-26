@@ -24,6 +24,7 @@ declare module 'fastify' {
 
 // Sent with a 4xx or 5xx status when a request fails.
 export const ApiError = z.object({ ok: z.literal(false), error: z.string() }).meta({ id: 'ApiError' })
+export type ApiError = z.infer<typeof ApiError>
 
 // What requests that succeed respond when there's nothing else to say.
 export const Ok = z.object({ ok: z.literal(true) }).meta({ id: 'Ok' })

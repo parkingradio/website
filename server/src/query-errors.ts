@@ -1,6 +1,6 @@
 import type { FastifyError, FastifyInstance } from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
-import type { ApiError } from 'shared/error'
+import type { ApiError } from './api-schemas.js'
 
 // The parts of an error that are safe to log: for a failed query, everything but its values.
 function withoutValues(error: Error): object {

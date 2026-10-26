@@ -20,8 +20,8 @@ the documents win. The lists and rules that the server documents name in the ser
 
 The API's OpenAPI document, `server/openapi.json`, is generated from the schemas that the server's routes validate their
 requests and responses with, and the client's types are generated from it (`npm run generate:api`). Both are checked
-in, and CI checks that they're up to date. The document shows the API as it's implemented, for the endpoints that have
-schemas so far, while these documents are its design: when they disagree, these documents still win.
+in, and CI checks that they're up to date. The document shows the API, i.e. every endpoint under `/api`, as it's
+implemented, while these documents are its design: when they disagree, these documents still win.
 
 ## Server
 

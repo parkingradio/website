@@ -3,7 +3,7 @@ import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type {} from '@fastify/cookie'
-import type { ApiError } from 'shared/error'
+import type { ApiError } from './api-schemas.js'
 import type { AdminsStore } from './admins.js'
 import { config } from './config.js'
 

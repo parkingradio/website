@@ -24,10 +24,10 @@ and the client, page by page.
 
 ## Development
 
-The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to
-Postgres via Drizzle) and `shared`, which holds the parts of the contract between the two that aren't generated yet
-(see [shared/README.md](shared/README.md) for what that covers and how the other two use it). A fourth workspace, `e2e`,
-holds the browser tests, and the seed data they run against (see "Seed data" below).
+The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastify, talking to Postgres via Drizzle) and
+`e2e`, which holds the browser tests, and the seed data they run against (see "Seed data" below). The client's types for
+the API are generated from the server's schemas (see "Testing and building" below, and
+[docs/design](docs/design/README.md)).
 
 ### Prerequisites
 

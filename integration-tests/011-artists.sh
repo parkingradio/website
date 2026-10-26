@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# The admin routes for artists work against a real database and the shared sources in the image. The server's
-# unit tests mock the database and the photos, so this is what covers the artists table, emails being unique
-# whatever their case, artists listed by name, the transaction that changes an artist, profiles read back from the
-# database, and photos kept on disk, then deleted, or no photo at all. It also covers profiles that leave out what only
-# admins can leave out, as the database keeps them.
+# The admin routes for artists work against a real database. The server's unit tests mock the database and the
+# photos, so this is what covers the artists table, emails being unique whatever their case, artists listed by name,
+# the transaction that changes an artist, profiles read back from the database, and photos kept on disk, then deleted,
+# or no photo at all. It also covers profiles that leave out what only admins can leave out, as the database keeps
+# them.
 
 source "$(dirname "$0")/lib.sh"
 

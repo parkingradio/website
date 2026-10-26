@@ -7,7 +7,6 @@ import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { components, paths } from '../client/src/api/schema.d.ts'
-import type { ApiError } from 'shared/error'
 import { SEED_ARTISTS } from './seed-data.ts'
 import type { SeedApplication, SeedArtist } from './seed-data.ts'
 
@@ -19,6 +18,7 @@ type ApplicationsResponse = paths['/api/admin/applications']['get']['responses']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
+type ApiError = components['schemas']['ApiError']
 
 export type SeedOptions = {
   // Where the server is, e.g. "http://localhost:3000".

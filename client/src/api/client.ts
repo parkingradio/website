@@ -11,8 +11,8 @@ import type { components, paths } from './schema'
 //
 //     const result = await api.POST('/api/admin/artists', { body: { artist, photo }, bodySerializer: formData })
 //
-// Like the helpers of ../api.ts, calls never throw: they return the response with `ok: true` if it succeeded, or else an
-// `ApiError`, including for failures that never reach the server, which say so (see `Failure`).
+// Calls never throw: they return the response with `ok: true` if it succeeded, or else an `ApiError`, including for
+// failures that never reach the server, which say so (see `Failure`).
 
 // A schema of the API, by name, e.g. `Schema<'Feature'>`.
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
