@@ -1,6 +1,6 @@
 # Parking Radio
 
-Parking Radio an independent non-profit radio whose goal is to promote underground artists and their
+Parking Radio is an independent non-profit radio whose goal is to promote underground artists and their
 music, and to provide a professional grade diffusion platform for their performances.
 
 This web app implements both the user-visible web site for the radio and also provides tools to administer
