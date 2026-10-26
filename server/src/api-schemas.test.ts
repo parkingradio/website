@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import type { FastifyInstance, RouteOptions } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
-import { ApiError, Ok, Timestamp, useZodSchemas, zodRoutes } from './api-schemas.js'
+import { ApiError, Day, Ok, Timestamp, useZodSchemas, zodRoutes } from './api-schemas.js'
 import { requireAuth } from './auth.js'
 import { acceptSessions } from './test-sessions.js'
 
@@ -91,5 +91,17 @@ describe('zodRoutes', () => {
       statuses[at] = (await app.inject({ method: 'GET', url: '/at' })).statusCode
     }
     expect(statuses).toEqual({ '2026-10-09T16:30:00.000Z': 200, '2026-10-09T12:30:00-04:00': 200, yesterday: 500, '2026-10-09': 500 })
+  })
+
+  it('only sends days that exist', async () => {
+    let day = ''
+    const { app } = await buildApp((app) => {
+      zodRoutes(app, 'Failed').get('/day', { schema: { response: { 200: z.object({ day: Day }) } } }, async () => ({ day }))
+    })
+    const statuses: Record<string, number> = {}
+    for (day of ['2026-10-09', '2028-02-29', '2026-02-29', '2026-13-45', '2026-10-09T16:30:00.000Z']) {
+      statuses[day] = (await app.inject({ method: 'GET', url: '/day' })).statusCode
+    }
+    expect(statuses).toEqual({ '2026-10-09': 200, '2028-02-29': 200, '2026-02-29': 500, '2026-13-45': 500, '2026-10-09T16:30:00.000Z': 500 })
   })
 })

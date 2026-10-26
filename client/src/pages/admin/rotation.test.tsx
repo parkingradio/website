@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import type { RadioPlaylist, RadioPlaylistTrack, RadioResponse, RadioSettingsResponse, RadioTrack } from 'shared/radio'
-import { mockFetch } from '../../test-utils'
+import type { Data, Schema } from '../../api/client'
+import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { Rotation } from './rotation'
+
+type RadioTrack = Schema<'RadioTrack'>
+type RadioPlaylist = Schema<'RadioPlaylist'>
 
 const MINUTE = 60 * 1000
 
@@ -11,7 +14,7 @@ function track(id: string, artist: string, minutes: number): RadioTrack {
   return { id, artist, event: null, date: '2026-09-13', durationMs: minutes * MINUTE }
 }
 
-const onRadio = (track: RadioTrack): RadioPlaylistTrack => ({ kind: 'rotation', track })
+const onRadio = (track: RadioTrack): Schema<'RadioPlaylistTrack'> => ({ kind: 'rotation', track })
 
 // The playlist's order, with B on air (see ON_AIR).
 const ROTATION: RadioPlaylist = {
@@ -27,25 +30,23 @@ const ROTATION: RadioPlaylist = {
   ],
 }
 
-const CURRENT: RadioSettingsResponse = {
-  ok: true,
-  credentialsEntered: true,
-  current: {
-    url: ROTATION.url,
-    title: 'Rotation',
-    chosenBy: 'someone@example.com',
-    chosenAt: '2026-09-30T12:00:00.000Z',
-    playlist: ROTATION,
-    error: null,
-  },
+const CHOSEN: Schema<'ChosenPlaylist'> = {
+  url: ROTATION.url,
+  title: 'Rotation',
+  chosenBy: 'someone@example.com',
+  chosenAt: '2026-09-30T12:00:00.000Z',
+  playlist: ROTATION,
+  error: null,
 }
+
+const CURRENT: Data<'get', '/api/admin/radio'> = { ok: true, credentialsEntered: true, current: CHOSEN }
 
 // Midday, local time, so that the tracks of the rotation all begin the same day.
 const STARTED_AT = new Date(2026, 9, 1, 12, 0).getTime()
 
-function onAir(id: string, startedAt = STARTED_AT): RadioResponse & { ok: true } {
+function onAir(id: string, startedAt = STARTED_AT): Schema<'Radio'> {
   const playlistTrack = ROTATION.tracks.find((t) => t.kind === 'rotation' && t.track.id === id) as { track: RadioTrack }
-  return { ok: true, current: { track: playlistTrack.track, startedAt: new Date(startedAt).toISOString() }, upcoming: [] }
+  return { current: { track: playlistTrack.track, startedAt: new Date(startedAt).toISOString() }, upcoming: [] }
 }
 
 const LINK = 'https://soundcloud.com/parkingdotradio/sets/other/s-AbC123'
@@ -71,7 +72,6 @@ function preview(link: string) {
   fireEvent.click(screen.getByRole('button', { name: 'prévisualiser' }))
 }
 
-const requests = (url: string) => vi.mocked(fetch).mock.calls.filter(([requested]) => requested === url)
 const previewBox = () => document.querySelector<HTMLElement>('.radio-preview')!
 
 describe('Rotation', () => {
@@ -111,7 +111,7 @@ describe('Rotation', () => {
 
   it('shows tracks that SoundCloud describes unexpectedly by what is known of them', async () => {
     const playlist = { ...ROTATION, tracks: [...ROTATION.tracks, { kind: 'unexpected' as const, title: 'soundcloud:tracks:99' }] }
-    mockFetch({ '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist } }, '/api/radio?upcoming=0': onAir('b') })
+    mockFetch({ '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist } }, '/api/radio?upcoming=0': onAir('b') })
     render(<Rotation />)
 
     const unexpected = await screen.findByRole('button', { name: 'soundcloud:tracks:99' })
@@ -138,7 +138,7 @@ describe('Rotation', () => {
     const tracks = Array.from({ length: 40 }, (_, i) => onRadio(track(String(i), `T${i}`, 1)))
     const playlist = { ...ROTATION, tracks }
     mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist } },
       '/api/radio?upcoming=0': { ...onAir('b'), current: { track: track('0', 'T0', 1), startedAt: new Date(STARTED_AT).toISOString() } },
     })
     render(<Rotation />)
@@ -163,7 +163,7 @@ describe('Rotation', () => {
 
   it('says that the radio cannot read any playlist until the credentials of the SoundCloud app are entered', async () => {
     mockFetch({
-      '/api/admin/radio': { ...CURRENT, credentialsEntered: false, current: { ...CURRENT.current!, playlist: null } },
+      '/api/admin/radio': { ...CURRENT, credentialsEntered: false, current: { ...CHOSEN, playlist: null } },
       '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
     })
     render(
@@ -182,7 +182,7 @@ describe('Rotation', () => {
 
   it('says why the playlist could not be read, and that the radio goes on with what it read before', async () => {
     mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, error: 'SoundCloud shows no such playlist' } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, error: 'SoundCloud shows no such playlist' } },
       '/api/radio?upcoming=0': onAir('b'),
     })
     render(<Rotation />)
@@ -197,7 +197,7 @@ describe('Rotation', () => {
 
   it('shows the title of the playlist when it could never be read, and that the radio is off air', async () => {
     mockFetch({
-      '/api/admin/radio': { ...CURRENT, current: { ...CURRENT.current!, playlist: null, error: 'SoundCloud responded with 500' } },
+      '/api/admin/radio': { ...CURRENT, current: { ...CHOSEN, playlist: null, error: 'SoundCloud responded with 500' } },
       '/api/radio?upcoming=0': { ok: false, error: 'The radio is unavailable right now' },
     })
     render(<Rotation />)
@@ -233,16 +233,16 @@ describe('Rotation', () => {
     expect(within(previewBox()).getByRole('link', { name: 'Other' })).toHaveAttribute('href', LINK)
     expect(within(previewBox()).getByText(/^Playlist privée de/)).toBeInTheDocument()
     expect(rows(previewBox())).toEqual(['H · 2026-09-13', 'I · 2026-09-13'])
-    expect(requests('/api/admin/radio/preview')[0][1]).toMatchObject({ body: JSON.stringify({ link: LINK }) })
+    expect(requestsTo('POST', '/api/admin/radio/preview').map(jsonBody)).toEqual([{ link: LINK }])
 
     fireEvent.click(screen.getByRole('button', { name: 'jouer cette playlist' }))
 
     await waitFor(() => expect(screen.getByText('La radio joue maintenant « Other ».')).toBeInTheDocument())
-    expect(requests('/api/admin/radio/playlist')[0][1]).toMatchObject({ body: JSON.stringify({ link: LINK }) })
+    expect(requestsTo('POST', '/api/admin/radio/playlist').map(jsonBody)).toEqual([{ link: LINK }])
     expect(screen.queryByRole('button', { name: 'jouer cette playlist' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Lien de la playlist')).toHaveValue('')
-    await waitFor(() => expect(requests('/api/admin/radio')).toHaveLength(2))
-    expect(requests('/api/radio?upcoming=0')).toHaveLength(2)
+    await waitFor(() => expect(requestsTo('GET', '/api/admin/radio')).toHaveLength(2))
+    expect(requestsTo('GET', '/api/radio?upcoming=0')).toHaveLength(2)
   })
 
   it('does not let a playlist none of whose tracks can be played be chosen', async () => {
@@ -281,7 +281,7 @@ describe('Rotation', () => {
     preview('https://soundcloud.com/parkingdotradio')
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Ce n'est pas un lien vers une playlist SoundCloud."))
-    expect(requests('/api/admin/radio/preview')).toHaveLength(0)
+    expect(requestsTo('POST', '/api/admin/radio/preview')).toHaveLength(0)
   })
 
   it('shows why a playlist could not be previewed', async () => {

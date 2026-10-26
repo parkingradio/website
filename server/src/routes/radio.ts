@@ -1,38 +1,116 @@
 import type { FastifyInstance } from 'fastify'
-import type { ApiError } from 'shared/error'
-import { SOUNDCLOUD_CREDENTIAL_MAX_LENGTH, playlistLink } from 'shared/radio'
-import type {
-  RadioLeftOutReason,
-  RadioPlaylist,
-  RadioPlaylistRequest,
-  RadioPlaylistTrack,
-  RadioPlaylistResponse,
-  RadioCredentialsCheckResponse,
-  RadioCredentialsRequest,
-  RadioCredentialsResponse,
-  RadioPreviewRequest,
-  RadioPreviewResponse,
-  RadioResponse,
-  RadioSettingsResponse,
-  RadioStreamResponse,
-  RadioTrack,
-} from 'shared/radio'
-import { requireAuth } from '../auth.js'
+import { z } from 'zod'
+import { ApiError, Day, Ok, Timestamp, zodRoutes } from '../api-schemas.js'
 import { cached } from '../cache.js'
-import { keepQueryValuesPrivate } from '../query-errors.js'
 import type { OnAir, OnAirStore } from '../on-air.js'
 import type { RadioSettings, RadioSettingsStore } from '../radio-settings.js'
 import type { HlsStream, InvalidTrack, PlaylistLink, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from '../soundcloud.js'
 import type { SoundCloudCredentialsStore, StoredSoundCloudCredentials } from '../soundcloud-credentials.js'
+
+// The API's requests and responses (see docs/design/server/radio.md). Since responses are checked against them, what
+// they say of the values that come from SoundCloud must hold for everything that the schemas of soundcloud.ts accept,
+// or a quirk in SoundCloud's data would fail with 500 rather than be handled: strings that come from SoundCloud are
+// plain strings, e.g. URLs, and an empty title makes an empty artist. A track's date is only read from its title when
+// it's a `Day` (see `toRadioTrack`).
+
+const RadioTrack = z
+  .object({
+    id: z.string(),
+    artist: z.string(),
+    event: z.string().nullable(),
+    date: Day.nullable(),
+    // Like SoundCloud's durations (see soundcloud.ts).
+    durationMs: z.number().int().positive(),
+  })
+  .meta({ id: 'RadioTrack' })
+type RadioTrack = z.infer<typeof RadioTrack>
+
+// The track on air, and what comes next. Like the stream below, it has no `ok`.
+const Radio = z
+  .object({
+    current: z.object({ track: RadioTrack, startedAt: Timestamp }),
+    upcoming: z.array(RadioTrack),
+  })
+  .meta({ id: 'Radio' })
+export type Radio = z.infer<typeof Radio>
+
+const RadioStream = z.object({ url: z.string(), expiresAt: Timestamp }).meta({ id: 'RadioStream' })
+
+const RotationTrack = z.object({ kind: z.literal('rotation'), track: RadioTrack }).meta({ id: 'RotationTrack' })
+const LeftOutTrack = z
+  .object({ kind: z.literal('left-out'), track: RadioTrack, reason: z.enum(['preview', 'blocked', 'not-streamable']) })
+  .meta({ id: 'LeftOutTrack' })
+// Only its title is known, or SoundCloud's id for it, without one (see soundcloud.ts).
+const UnexpectedTrack = z.object({ kind: z.literal('unexpected'), title: z.string() }).meta({ id: 'UnexpectedTrack' })
+const RadioPlaylistTrack = z.discriminatedUnion('kind', [RotationTrack, LeftOutTrack, UnexpectedTrack]).meta({ id: 'RadioPlaylistTrack' })
+type RadioPlaylistTrack = z.infer<typeof RadioPlaylistTrack>
+
+const RadioPlaylist = z
+  .object({
+    url: z.string(),
+    title: z.string(),
+    private: z.boolean(),
+    account: z.object({ name: z.string(), url: z.string() }),
+    tracks: z.array(RadioPlaylistTrack),
+  })
+  .meta({ id: 'RadioPlaylist' })
+type RadioPlaylist = z.infer<typeof RadioPlaylist>
+
+const ChosenPlaylist = z
+  .object({
+    url: z.string(),
+    title: z.string(),
+    chosenBy: z.string(),
+    chosenAt: Timestamp,
+    playlist: RadioPlaylist.nullable(),
+    error: z.string().nullable(),
+  })
+  .meta({ id: 'ChosenPlaylist' })
+type ChosenPlaylist = z.infer<typeof ChosenPlaylist>
+
+const PlaylistRequest = z.object({ link: z.string() })
+
+// The client has its own copy, for its form (see client/src/pages/admin/configuration/soundcloud.tsx).
+const CREDENTIAL_MAX_LENGTH = 200
+// openapi.json can't say that it's trimmed before its length is checked, so the description does.
+const Credential = z
+  .string()
+  .trim()
+  .min(1)
+  .max(CREDENTIAL_MAX_LENGTH)
+  .meta({ description: `Trimmed, then between 1 and ${CREDENTIAL_MAX_LENGTH} characters` })
+const CredentialsRequest = z.object({ clientId: Credential, clientSecret: Credential })
+
+// What `GET` and `PUT /api/admin/radio/credentials` respond. The secret is never sent back.
+const RadioCredentials = z
+  .object({
+    ok: z.literal(true),
+    credentials: z.object({ clientId: z.string(), updatedBy: z.string(), updatedAt: Timestamp }).nullable(),
+  })
+  .meta({ id: 'RadioCredentials' })
+type RadioCredentials = z.infer<typeof RadioCredentials>
+
+// Links to SoundCloud playlists, e.g. "https://soundcloud.com/parkingdotradio/sets/rotation". A private
+// playlist can only be read through its private link, which ends with its secret, e.g.
+// "https://soundcloud.com/parkingdotradio/sets/rotation/s-AbC123". Parameters, e.g. "?si=...", are allowed.
+// The client has a copy of this, to check links before asking for a preview (see client/src/pages/admin/rotation.tsx).
+const PLAYLIST_LINK = /^\s*https?:\/\/(?:www\.)?soundcloud\.com(\/[^/?#\s]+\/sets\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?\s*$/
+
+// The playlist `link` leads to, as a link without anything that doesn't identify the playlist, or null if
+// it isn't a link to a playlist.
+function playlistLink(link: string): string | null {
+  const path = PLAYLIST_LINK.exec(link)?.[1]
+  return path ? `https://soundcloud.com${path}` : null
+}
 
 // The rotation is the tracks of a SoundCloud playlist chosen on the admin pages, in the playlist's order. It's
 // read again every ROTATION_CACHE_TTL_MS, so that changes to the playlist get on the radio. When reading it
 // fails, the radio goes on with what it read before, and it's tried again after ROTATION_RETRY_MS.
 const ROTATION_CACHE_TTL_MS = 5 * 60 * 1000
 const ROTATION_RETRY_MS = 60 * 1000
-const RADIO_UNAVAILABLE: ApiError = { ok: false, error: 'The radio is unavailable right now' }
-const NO_PLAYLIST: ApiError = { ok: false, error: 'No playlist has been chosen for the radio yet' }
-const NOT_IN_ROTATION: ApiError = { ok: false, error: 'Not a track of the radio rotation' }
+const RADIO_UNAVAILABLE: z.infer<typeof ApiError> = { ok: false, error: 'The radio is unavailable right now' }
+const NO_PLAYLIST: z.infer<typeof ApiError> = { ok: false, error: 'No playlist has been chosen for the radio yet' }
+const NOT_IN_ROTATION: z.infer<typeof ApiError> = { ok: false, error: 'Not a track of the radio rotation' }
 const NO_CREDENTIALS = 'The credentials of the SoundCloud app have not been entered yet'
 
 // A track's stream URL is shared by the listeners who start it around the same time, which in a radio is
@@ -52,13 +130,12 @@ const TITLE = /^(?<artist>.+?)\s*\|\s*(?:(?<event>.+?)\s*@\s*)?parking\.radio\s*
 function toRadioTrack(track: SoundCloudTrack): RadioTrack {
   const title = track.title.trim()
   const groups = TITLE.exec(title)?.groups
-  return {
-    id: track.id,
-    artist: groups?.artist ?? title,
-    event: groups?.event ?? null,
-    date: groups ? `${groups.year}-${groups.month}-${groups.day}` : null,
-    durationMs: track.durationMs,
+  const date = groups ? `${groups.year}-${groups.month}-${groups.day}` : ''
+  // A title whose day doesn't exist, e.g. "2026.13.45", doesn't follow the pattern either.
+  if (!groups || !Day.safeParse(date).success) {
+    return { id: track.id, artist: title, event: null, date: null, durationMs: track.durationMs }
   }
+  return { id: track.id, artist: groups.artist, event: groups.event ?? null, date, durationMs: track.durationMs }
 }
 
 // Where the rotation is at `now`: the track on air when it was last saved, or the one after it, and so on,
@@ -93,7 +170,7 @@ type Rotation = {
 
 // What the radio knows of the playlist chosen for the rotation: the rotation as it was last read successfully,
 // if it was, and why it couldn't be read the last time it was tried, if it couldn't.
-type Radio = {
+type Chosen = {
   settings: RadioSettings
   rotation: Rotation | null
   error: string | null
@@ -105,7 +182,7 @@ type Source = {
   soundcloud: SoundCloudClient
   // The rotation as it was last read successfully, if it was.
   rotation(): Rotation | null
-  read(): Promise<Pick<Radio, 'rotation' | 'error'>>
+  read(): Promise<Pick<Chosen, 'rotation' | 'error'>>
 }
 
 // A client for SoundCloud, the credentials it uses, as they were saved, and where to stream each track from through it,
@@ -136,7 +213,7 @@ function sameCredentials(a: SoundCloudCredentials, b: SoundCloudCredentials): bo
   return a.clientId === b.clientId && a.clientSecret === b.clientSecret
 }
 
-function credentialsResponse(credentials: StoredSoundCloudCredentials | null): RadioCredentialsResponse {
+function credentialsResponse(credentials: StoredSoundCloudCredentials | null): RadioCredentials {
   return {
     ok: true,
     credentials: credentials && {
@@ -147,14 +224,7 @@ function credentialsResponse(credentials: StoredSoundCloudCredentials | null): R
   }
 }
 
-// A credential that was sent, trimmed, or null if it isn't valid.
-function validatedCredential(sent: unknown): string | null {
-  if (typeof sent !== 'string') return null
-  const credential = sent.trim()
-  return credential && credential.length <= SOUNDCLOUD_CREDENTIAL_MAX_LENGTH ? credential : null
-}
-
-function currentPlaylist({ settings, rotation, error }: Radio): RadioSettingsResponse['current'] {
+function currentPlaylist({ settings, rotation, error }: Chosen): ChosenPlaylist {
   return {
     url: settings.url,
     title: settings.title,
@@ -169,8 +239,9 @@ export async function radioRoutes(
   app: FastifyInstance,
   { soundcloud: newClient, credentials: credentialsStore, onAir, settings: settingsStore }: RadioOptions,
 ) {
-  // The credentials, and a private playlist's secret, are values of the queries that save them.
-  keepQueryValuesPrivate(app, 'Failed to handle a request about the radio')
+  // The credentials, and a private playlist's secret, are values of the queries that save them, which zodRoutes keeps
+  // out of the logs and responses.
+  const api = zodRoutes(app, 'Failed to handle a request about the radio')
 
   // The secrets of the private tracks of the playlists read, by track id, as they were last read.
   const trackSecrets = new Map<string, string>()
@@ -180,7 +251,7 @@ export async function radioRoutes(
     const playlistTracks: RadioPlaylistTrack[] = []
     // The tracks that are left out, for the logs.
     const invalid: InvalidTrack[] = []
-    const skipped: { title: string; reason: RadioLeftOutReason }[] = []
+    const skipped: { title: string; reason: z.infer<typeof LeftOutTrack>['reason'] }[] = []
     for (const track of tracks) {
       if ('invalid' in track) {
         playlistTracks.push({ kind: 'unexpected', title: track.name })
@@ -301,7 +372,7 @@ export async function radioRoutes(
   // What the radio knows of the playlist chosen for the rotation, or null until one is chosen, and whether the
   // credentials have been entered. The choice is loaded every time, rather than kept in memory, so that every server
   // picks it up.
-  async function current(): Promise<{ radio: Radio | null; credentialsEntered: boolean }> {
+  async function current(): Promise<{ radio: Chosen | null; credentialsEntered: boolean }> {
     const [settings, soundcloud] = await Promise.all([settingsStore.load(), loadClient()])
     const credentialsEntered = soundcloud !== null
     if (!settings) return { radio: null, credentialsEntered }
@@ -333,58 +404,74 @@ export async function radioRoutes(
     return trackStream()
   }
 
-  app.get<{ Querystring: { upcoming?: string }; Reply: RadioResponse | ApiError }>('/api/radio', async (request, reply) => {
-    const { upcoming } = request.query
-    if (upcoming !== undefined && !/^\d+$/.test(upcoming)) {
-      return reply.status(400).send({ ok: false, error: 'upcoming must be a whole number' })
-    }
+  api.get(
+    '/api/radio',
+    {
+      schema: {
+        summary: "What's on the radio, and what comes next",
+        tags: ['Radio'],
+        querystring: z.object({ upcoming: z.string().regex(/^\d+$/, 'Invalid input: expected a whole number').optional() }),
+        response: { 200: Radio, 502: ApiError, 503: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const { upcoming } = request.query
 
-    let radio: Radio | null
-    let saved: OnAir | null
-    try {
-      ;[{ radio }, saved] = await Promise.all([current(), onAir.load()])
-    } catch (error) {
-      request.log.error(error, 'Failed to load the radio from the database')
-      return reply.status(502).send(RADIO_UNAVAILABLE)
-    }
-    if (!radio) return reply.status(503).send(NO_PLAYLIST)
+      let radio: Chosen | null
+      let saved: OnAir | null
+      try {
+        ;[{ radio }, saved] = await Promise.all([current(), onAir.load()])
+      } catch (error) {
+        request.log.error(error, 'Failed to load the radio from the database')
+        return reply.status(502).send(RADIO_UNAVAILABLE)
+      }
+      if (!radio) return reply.status(503).send(NO_PLAYLIST)
 
-    const { rotation } = radio
-    if (!rotation) return reply.status(502).send(RADIO_UNAVAILABLE)
-    const { playlistId } = radio.settings
-    // When another playlist was chosen, it goes on air from its first track.
-    const previous = saved?.playlistId === playlistId ? saved : null
-    const now = Date.now()
-    const { index, startedAt } = onAirAt(rotation.tracks, previous, now)
-    const track = rotation.tracks[index]
-    // The rest of the rotation, in the order it comes after the track on air.
-    const after = [...rotation.tracks.slice(index + 1), ...rotation.tracks.slice(0, index)]
-    const nextTrackIds = after.map(({ id }) => id)
-    if (
-      track.id !== previous?.trackId ||
-      startedAt !== previous.startedAt ||
-      nextTrackIds.length !== previous.nextTrackIds.length ||
-      nextTrackIds.some((id, i) => id !== previous.nextTrackIds[i])
-    ) {
-      // Moving along from an older save comes to the same outcome, so failing to save that only costs the
-      // next request some work. A track put on air anew, the first time or in place of one that left the
-      // rotation, is only kept if it's saved, but the radio can go on anyway.
-      await onAir.save({ playlistId, trackId: track.id, startedAt, nextTrackIds }).catch((error: unknown) => {
-        request.log.error(error, 'Failed to save the track on air on the radio')
-      })
-    }
+      const { rotation } = radio
+      if (!rotation) return reply.status(502).send(RADIO_UNAVAILABLE)
+      const { playlistId } = radio.settings
+      // When another playlist was chosen, it goes on air from its first track.
+      const previous = saved?.playlistId === playlistId ? saved : null
+      const now = Date.now()
+      const { index, startedAt } = onAirAt(rotation.tracks, previous, now)
+      const track = rotation.tracks[index]
+      // The rest of the rotation, in the order it comes after the track on air.
+      const after = [...rotation.tracks.slice(index + 1), ...rotation.tracks.slice(0, index)]
+      const nextTrackIds = after.map(({ id }) => id)
+      if (
+        track.id !== previous?.trackId ||
+        startedAt !== previous.startedAt ||
+        nextTrackIds.length !== previous.nextTrackIds.length ||
+        nextTrackIds.some((id, i) => id !== previous.nextTrackIds[i])
+      ) {
+        // Moving along from an older save comes to the same outcome, so failing to save that only costs the
+        // next request some work. A track put on air anew, the first time or in place of one that left the
+        // rotation, is only kept if it's saved, but the radio can go on anyway.
+        await onAir.save({ playlistId, trackId: track.id, startedAt, nextTrackIds }).catch((error: unknown) => {
+          request.log.error(error, 'Failed to save the track on air on the radio')
+        })
+      }
 
-    return {
-      current: { track, startedAt: new Date(startedAt).toISOString() },
-      upcoming: upcoming === undefined ? after : after.slice(0, Number(upcoming)),
-    }
-  })
+      return {
+        current: { track, startedAt: new Date(startedAt).toISOString() },
+        upcoming: upcoming === undefined ? after : after.slice(0, Number(upcoming)),
+      }
+    },
+  )
 
-  app.get<{ Params: { id: string }; Reply: RadioStreamResponse | ApiError }>(
+  api.get(
     '/api/radio/tracks/:id/stream',
+    {
+      schema: {
+        summary: 'Where to stream a track of the rotation from',
+        tags: ['Radio'],
+        params: z.object({ id: z.string() }),
+        response: { 200: RadioStream, 404: ApiError, 502: ApiError },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params
-      let radio: Radio | null
+      let radio: Chosen | null
       try {
         ;({ radio } = await current())
       } catch (error) {
@@ -407,16 +494,27 @@ export async function radioRoutes(
     },
   )
 
-  app.get<{ Reply: RadioSettingsResponse }>('/api/admin/radio', { preHandler: requireAuth }, async () => {
-    const { radio, credentialsEntered } = await current()
-    return { ok: true, credentialsEntered, current: radio && currentPlaylist(radio) }
-  })
+  api.get(
+    '/api/admin/radio',
+    {
+      config: { admin: true },
+      schema: {
+        summary: "The playlist the radio's rotation is read from",
+        tags: ['Radio'],
+        response: { 200: z.object({ ok: z.literal(true), credentialsEntered: z.boolean(), current: ChosenPlaylist.nullable() }) },
+      },
+    },
+    async () => {
+      const { radio, credentialsEntered } = await current()
+      return { ok: true as const, credentialsEntered, current: radio && currentPlaylist(radio) }
+    },
+  )
 
   // The playlist that `link` leads to, read like the rotation is, or the error to respond with.
   async function readLink(
-    link: unknown,
-  ): Promise<{ soundcloud: SoundCloudClient; playlist: PlaylistLink; rotation: Rotation } | { status: number; error: string }> {
-    const normalized = typeof link === 'string' ? playlistLink(link) : null
+    link: string,
+  ): Promise<{ soundcloud: SoundCloudClient; playlist: PlaylistLink; rotation: Rotation } | { status: 400 | 404 | 409 | 502; error: string }> {
+    const normalized = playlistLink(link)
     if (!normalized) return { status: 400, error: 'Not a link to a SoundCloud playlist' }
     const soundcloud = await loadClient()
     if (!soundcloud) return { status: 409, error: NO_CREDENTIALS }
@@ -430,21 +528,43 @@ export async function radioRoutes(
     }
   }
 
-  app.post<{ Body: Partial<RadioPreviewRequest>; Reply: RadioPreviewResponse | ApiError }>(
+  api.post(
     '/api/admin/radio/preview',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'What the radio would read from a playlist',
+        tags: ['Radio'],
+        body: PlaylistRequest,
+        response: {
+          200: z.object({ ok: z.literal(true), playlist: RadioPlaylist }),
+          400: ApiError,
+          404: ApiError,
+          409: ApiError,
+          502: ApiError,
+        },
+      },
+    },
     async (request, reply) => {
-      const read = await readLink(request.body?.link)
+      const read = await readLink(request.body.link)
       if ('error' in read) return reply.status(read.status).send({ ok: false, error: read.error })
-      return { ok: true, playlist: read.rotation.playlist }
+      return { ok: true as const, playlist: read.rotation.playlist }
     },
   )
 
-  app.post<{ Body: Partial<RadioPlaylistRequest>; Reply: RadioPlaylistResponse | ApiError }>(
+  api.post(
     '/api/admin/radio/playlist',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Choosing the playlist the rotation is read from',
+        tags: ['Radio'],
+        body: PlaylistRequest,
+        response: { 200: Ok, 400: ApiError, 404: ApiError, 409: ApiError, 502: ApiError },
+      },
+    },
     async (request, reply) => {
-      const read = await readLink(request.body?.link)
+      const read = await readLink(request.body.link)
       if ('error' in read) return reply.status(read.status).send({ ok: false, error: read.error })
       const { soundcloud, playlist, rotation } = read
       if (rotation.tracks.length === 0) {
@@ -465,25 +585,28 @@ export async function radioRoutes(
       // chosen again), and the tracks of the previous playlist can still be streamed for a while.
       source = sourceFor(settings, soundcloud, { rotation, justRead: true })
       request.log.info({ playlistId: playlist.id, title: settings.title, by: settings.updatedBy }, 'Chose the playlist of the radio rotation')
-      return { ok: true }
+      return { ok: true as const }
     },
   )
 
-  app.get<{ Reply: RadioCredentialsResponse }>('/api/admin/radio/credentials', { preHandler: requireAuth }, async () => {
-    return credentialsResponse(await credentialsStore.load())
-  })
+  api.get(
+    '/api/admin/radio/credentials',
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'The SoundCloud app the radio reads playlists through',
+        tags: ['Radio'],
+        response: { 200: RadioCredentials },
+      },
+    },
+    async () => credentialsResponse(await credentialsStore.load()),
+  )
 
   // The credentials that were sent, with a client that uses them, once SoundCloud accepts them, or the error to respond
   // with.
   async function checkedCredentials(
-    sent: Partial<RadioCredentialsRequest> | null,
-  ): Promise<{ credentials: SoundCloudCredentials; soundcloud: SoundCloudClient } | { status: number; error: string }> {
-    const clientId = validatedCredential(sent?.clientId)
-    const clientSecret = validatedCredential(sent?.clientSecret)
-    if (clientId === null || clientSecret === null) {
-      return { status: 400, error: `The client id and the client secret must each have between 1 and ${SOUNDCLOUD_CREDENTIAL_MAX_LENGTH} characters` }
-    }
-    const credentials = { clientId, clientSecret }
+    credentials: SoundCloudCredentials,
+  ): Promise<{ credentials: SoundCloudCredentials; soundcloud: SoundCloudClient } | { status: 400 | 502; error: string }> {
     const soundcloud = newClient(credentials)
     try {
       if (!(await soundcloud.checkCredentials())) return { status: 400, error: 'SoundCloud refused these credentials' }
@@ -494,19 +617,35 @@ export async function radioRoutes(
     return { credentials, soundcloud }
   }
 
-  app.post<{ Body: Partial<RadioCredentialsRequest> | null; Reply: RadioCredentialsCheckResponse | ApiError }>(
+  api.post(
     '/api/admin/radio/credentials/check',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Whether SoundCloud accepts credentials, without saving them',
+        tags: ['Radio'],
+        body: CredentialsRequest,
+        response: { 200: Ok, 400: ApiError, 502: ApiError },
+      },
+    },
     async (request, reply) => {
       const checked = await checkedCredentials(request.body)
       if ('error' in checked) return reply.status(checked.status).send({ ok: false, error: checked.error })
-      return { ok: true }
+      return { ok: true as const }
     },
   )
 
-  app.put<{ Body: Partial<RadioCredentialsRequest> | null; Reply: RadioCredentialsResponse | ApiError }>(
+  api.put(
     '/api/admin/radio/credentials',
-    { preHandler: requireAuth },
+    {
+      config: { admin: true },
+      schema: {
+        summary: 'Entering the credentials of the SoundCloud app',
+        tags: ['Radio'],
+        body: CredentialsRequest,
+        response: { 200: RadioCredentials, 400: ApiError, 502: ApiError },
+      },
+    },
     async (request, reply) => {
       // They're checked again, even if they were just checked, so that a typo can't take the radio off air.
       const checked = await checkedCredentials(request.body)

@@ -27,8 +27,8 @@ track that's removed from the playlist. To make this possible, the server still 
 the rotation for as long as they last.
 
 Each track's artist, event and date are read from its title on SoundCloud,
-`ARTIST | [EVENT @ ]parking.radio | YYYY.MM.DD`. A title that doesn't follow that pattern is used whole as the artist,
-with no event or date.
+`ARTIST | [EVENT @ ]parking.radio | YYYY.MM.DD`, where the date is a day that exists. A title that doesn't follow that
+pattern is used whole as the artist, with no event or date.
 
 ## The SoundCloud app
 
@@ -114,7 +114,7 @@ Each of a playlist's tracks is one of:
 
 | Request field | Type | |
 |---|---|---|
-| `link` | string | A link to a SoundCloud playlist (see `playlistLink` in `shared/src/radio.ts`), e.g. `https://soundcloud.com/parkingdotradio/sets/rotation`, or a private one's private link. Parameters, e.g. `?si=...`, are allowed |
+| `link` | string | A link to a SoundCloud playlist (see `playlistLink` in `server/src/routes/radio.ts`), e.g. `https://soundcloud.com/parkingdotradio/sets/rotation`, or a private one's private link. Parameters, e.g. `?si=...`, are allowed |
 
 | Response field | Type | |
 |---|---|---|

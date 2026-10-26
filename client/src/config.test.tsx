@@ -45,7 +45,7 @@ describe('useFeature', () => {
   }
 
   it('says whether each flag is on, once the configuration has been fetched', async () => {
-    mockFetch({ '/api/config': { ok: true, assetsDomain: 'assets.example.test', features: { 'on-thing': true, 'off-thing': false } } })
+    mockFetch({ '/api/config': { assetsDomain: 'assets.example.test', features: { 'on-thing': true, 'off-thing': false } } })
     renderFeatures()
 
     expect(screen.getByTestId('on-thing')).toHaveTextContent('(pending)')

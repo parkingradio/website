@@ -1,20 +1,20 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { SOUNDCLOUD_CREDENTIAL_MAX_LENGTH } from 'shared/radio'
-import type { RadioCredentialsCheckResponse, RadioCredentialsRequest, RadioCredentialsResponse } from 'shared/radio'
-import { postJson, putJson } from '../../../api'
+import { api } from '../../../api/client'
+import type { Schema } from '../../../api/client'
+import { useApi } from '../../../api/use-api'
 import { byWhom } from '../describe'
-import { useApi } from '../../../use-api'
 
 // The credentials of the SoundCloud app the radio reads playlists through, in the configuration section.
 
-const CREDENTIALS_URL = '/api/admin/radio/credentials'
+// How long each credential can be. The server's schema says so too (see server/src/routes/radio.ts), and decides.
+const CREDENTIAL_MAX_LENGTH = 200
 
 // What the secret field shows once a secret is saved, since the secret itself is never sent back.
 const SAVED_SECRET = '•'.repeat(32)
 
 export function SoundCloudCredentials() {
-  const loaded = useApi<RadioCredentialsResponse>(CREDENTIALS_URL)
+  const loaded = useApi('/api/admin/radio/credentials')
 
   if (loaded.kind === 'loading') return null
   if (loaded.kind === 'error') {
@@ -30,12 +30,12 @@ export function SoundCloudCredentials() {
 // Who last changed the credentials, and a form that replaces them, filled in with the client ID that's saved. Since the
 // secret is never shown again, it has to be typed to replace them. They're verified with SoundCloud first, and can only
 // be saved once they've been.
-function CredentialsForm({ loaded }: { loaded: RadioCredentialsResponse }) {
+function CredentialsForm({ loaded }: { loaded: Schema<'RadioCredentials'> }) {
   const [saved, setSaved] = useState(loaded.credentials)
   const [clientId, setClientId] = useState(loaded.credentials?.clientId ?? '')
   const [clientSecret, setClientSecret] = useState('')
   // The credentials SoundCloud accepted the last time they were verified.
-  const [verified, setVerified] = useState<RadioCredentialsRequest | null>(null)
+  const [verified, setVerified] = useState<{ clientId: string; clientSecret: string } | null>(null)
   const [busy, setBusy] = useState(false)
   // Whether the credentials were just saved, or why they couldn't be verified or saved, until they're changed again.
   const [outcome, setOutcome] = useState<{ ok: true } | { ok: false; error: string } | null>(null)
@@ -51,7 +51,7 @@ function CredentialsForm({ loaded }: { loaded: RadioCredentialsResponse }) {
 
   const verify = async () => {
     setBusy(true)
-    const result = await postJson<RadioCredentialsRequest, RadioCredentialsCheckResponse>(`${CREDENTIALS_URL}/check`, typed)
+    const result = await api.POST('/api/admin/radio/credentials/check', { body: typed })
     setBusy(false)
     if (result.ok) setVerified(typed)
     else setOutcome({ ok: false, error: `Les identifiants n'ont pas pu être vérifiés : ${result.error}` })
@@ -61,7 +61,7 @@ function CredentialsForm({ loaded }: { loaded: RadioCredentialsResponse }) {
     event.preventDefault()
     if (!isVerified) return
     setBusy(true)
-    const result = await putJson<RadioCredentialsRequest, RadioCredentialsResponse>(CREDENTIALS_URL, typed)
+    const result = await api.PUT('/api/admin/radio/credentials', { body: typed })
     setBusy(false)
     if (result.ok) {
       setSaved(result.credentials)
@@ -92,7 +92,7 @@ function CredentialsForm({ loaded }: { loaded: RadioCredentialsResponse }) {
           Client ID
           <input
             value={clientId}
-            maxLength={SOUNDCLOUD_CREDENTIAL_MAX_LENGTH}
+            maxLength={CREDENTIAL_MAX_LENGTH}
             autoComplete="off"
             onChange={(event) => change(() => setClientId(event.target.value))}
             required
@@ -105,7 +105,7 @@ function CredentialsForm({ loaded }: { loaded: RadioCredentialsResponse }) {
             className="admin-secret"
             value={clientSecret}
             placeholder={saved ? SAVED_SECRET : undefined}
-            maxLength={SOUNDCLOUD_CREDENTIAL_MAX_LENGTH}
+            maxLength={CREDENTIAL_MAX_LENGTH}
             autoComplete="off"
             onChange={(event) => change(() => setClientSecret(event.target.value))}
             required

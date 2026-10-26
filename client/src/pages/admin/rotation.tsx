@@ -1,29 +1,20 @@
 import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
-import { playlistLink } from 'shared/radio'
-import type {
-  RadioLeftOutReason,
-  RadioPlaylist,
-  RadioPlaylistRequest,
-  RadioPlaylistResponse,
-  RadioPlaylistTrack,
-  RadioPreviewRequest,
-  RadioPreviewResponse,
-  RadioResponse,
-  RadioSettingsResponse,
-  RadioTrack,
-} from 'shared/radio'
-import { postJson } from '../../api'
-import { useApi } from '../../use-api'
-import type { Loaded } from '../../use-api'
+import { api } from '../../api/client'
+import type { Data, Schema } from '../../api/client'
+import { useApi } from '../../api/use-api'
+import type { Loaded } from '../../api/use-api'
+
+type RadioPlaylist = Schema<'RadioPlaylist'>
+type RadioPlaylistTrack = Schema<'RadioPlaylistTrack'>
 
 const chosenAtFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short' })
 const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit' })
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })
 
 // Why a track is left out of the rotation, as SoundCloud says.
-const LEFT_OUT_REASONS: Record<RadioLeftOutReason | 'unexpected', string> = {
+const LEFT_OUT_REASONS: Record<Schema<'LeftOutTrack'>['reason'] | 'unexpected', string> = {
   preview: 'Track marquée comme preview sur SoundCloud',
   blocked: 'SoundCloud ne permet pas aux applications de la jouer',
   'not-streamable': 'SoundCloud ne permet pas de la diffuser',
@@ -34,15 +25,15 @@ const LEFT_OUT_REASONS: Record<RadioLeftOutReason | 'unexpected', string> = {
 const FIRST_TRACKS = 10
 const MORE_TRACKS = 25
 
-function describeTrack({ artist, event, date }: RadioTrack): string {
+function describeTrack({ artist, event, date }: Schema<'RadioTrack'>): string {
   return [artist, event, date].filter(Boolean).join(' · ')
 }
 
 export function Rotation() {
   // Changed to load everything again, once another playlist is chosen.
   const [version, setVersion] = useState(0)
-  const settings = useApi<RadioSettingsResponse>('/api/admin/radio', version)
-  const radio = useApi<RadioResponse>('/api/radio?upcoming=0', version)
+  const settings = useApi('/api/admin/radio', { version })
+  const radio = useApi('/api/radio', { params: { query: { upcoming: '0' } }, version })
 
   return (
     <>
@@ -64,7 +55,7 @@ export function Rotation() {
 }
 
 // The playlist the rotation is read from, and its tracks from the one on air.
-function OnAir({ settings, radio }: { settings: Loaded<RadioSettingsResponse>; radio: Loaded<RadioResponse> }) {
+function OnAir({ settings, radio }: { settings: Loaded<Data<'get', '/api/admin/radio'>>; radio: Loaded<Schema<'Radio'>> }) {
   if (settings.kind === 'loading') return null
   if (settings.kind === 'error') {
     return (
@@ -120,7 +111,7 @@ function PlaylistHeader({ url, title, playlist }: { url: string; title: string; 
 
 // The tracks of a playlist in the order they come on air: from the one on air, if it's given, around the
 // playlist and back.
-function PlaylistTracks({ playlist, onAir }: { playlist: RadioPlaylist; onAir: RadioResponse['current'] | null }) {
+function PlaylistTracks({ playlist, onAir }: { playlist: RadioPlaylist; onAir: Schema<'Radio'>['current'] | null }) {
   const [visible, setVisible] = useState(FIRST_TRACKS)
   const { tracks } = playlist
 
@@ -204,7 +195,7 @@ function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
       return
     }
     setStep({ kind: 'previewing' })
-    const result = await postJson<RadioPreviewRequest, RadioPreviewResponse>('/api/admin/radio/preview', { link })
+    const result = await api.POST('/api/admin/radio/preview', { body: { link } })
     if (result.ok) setStep({ kind: 'preview', link, playlist: result.playlist })
     else setStep({ kind: 'error', message: `La playlist n'a pas pu être lue : ${result.error}` })
   }
@@ -212,7 +203,7 @@ function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
   const choose = async () => {
     if (step.kind !== 'preview') return
     setStep({ ...step, kind: 'choosing' })
-    const result = await postJson<RadioPlaylistRequest, RadioPlaylistResponse>('/api/admin/radio/playlist', { link: step.link })
+    const result = await api.POST('/api/admin/radio/playlist', { body: { link: step.link } })
     if (result.ok) {
       setLink('')
       setStep({ kind: 'chosen', title: step.playlist.title })
@@ -271,4 +262,19 @@ function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
       )}
     </>
   )
+}
+
+// Links to SoundCloud playlists, e.g. "https://soundcloud.com/parkingdotradio/sets/rotation". A private playlist can only
+// be read through its private link, which ends with its secret, e.g.
+// "https://soundcloud.com/parkingdotradio/sets/rotation/s-AbC123". Parameters, e.g. "?si=...", are allowed.
+//
+// This is a copy of the server's `playlistLink` (server/src/routes/radio.ts), which decides: it lets the page say that a
+// link isn't to a playlist without asking for a preview.
+const PLAYLIST_LINK = /^\s*https?:\/\/(?:www\.)?soundcloud\.com(\/[^/?#\s]+\/sets\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?\s*$/
+
+// The playlist `link` leads to, as a link without anything that doesn't identify the playlist, or null if it isn't a link
+// to a playlist.
+function playlistLink(link: string): string | null {
+  const path = PLAYLIST_LINK.exec(link)?.[1]
+  return path ? `https://soundcloud.com${path}` : null
 }

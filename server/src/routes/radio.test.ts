@@ -3,13 +3,14 @@ import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 
-import type { RadioResponse } from 'shared/radio'
+import { useZodSchemas } from '../api-schemas.js'
 import { acceptSessions, sessionCookies } from '../test-sessions.js'
 import type { OnAir } from '../on-air.js'
 import type { RadioSettings } from '../radio-settings.js'
 import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from '../soundcloud.js'
 import type { StoredSoundCloudCredentials } from '../soundcloud-credentials.js'
 import { radioRoutes } from './radio.js'
+import type { Radio } from './radio.js'
 
 const checkCredentials = vi.fn<SoundCloudClient['checkCredentials']>()
 const playlist = vi.fn<SoundCloudClient['playlist']>()
@@ -81,6 +82,7 @@ function streamFor(id: number, expiresAt = NOW + 62 * MINUTE): HlsStream {
 
 async function buildApp(logs?: string[]) {
   const app = Fastify({ logger: logs ? { stream: { write: (line: string) => logs.push(line) } } : false })
+  useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
   await app.register(radioRoutes, {
@@ -94,7 +96,7 @@ async function buildApp(logs?: string[]) {
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-async function radio(app: App, query = ''): Promise<RadioResponse> {
+async function radio(app: App, query = ''): Promise<Radio> {
   return (await app.inject({ method: 'GET', url: `/api/radio${query}` })).json()
 }
 
@@ -194,6 +196,16 @@ describe('radio routes', () => {
       const { current } = await radio(app)
 
       expect(current.track).toMatchObject({ artist: 'Special broadcast', event: null, date: null })
+    })
+
+    it('uses a title whose day does not exist whole', async () => {
+      playlist.mockResolvedValue(soundCloudTracks(track(1, 'NIM K | parking.radio | 2026.02.29'), track(2, 'LEAP | parking.radio | 2028.02.29')))
+      const app = await buildApp()
+
+      const [nimK, leap] = await inOrder(app)
+
+      expect(nimK).toMatchObject({ artist: 'NIM K | parking.radio | 2026.02.29', event: null, date: null })
+      expect(leap).toMatchObject({ artist: 'LEAP', date: '2028-02-29' })
     })
 
     it('reads a private playlist with its secret', async () => {
@@ -494,7 +506,7 @@ describe('radio routes', () => {
       const response = await app.inject({ method: 'GET', url: `/api/radio?upcoming=${count}` })
 
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'upcoming must be a whole number' })
+      expect(response.json()).toEqual({ ok: false, error: '`upcoming`: Invalid input: expected a whole number' })
       expect(playlist).not.toHaveBeenCalled()
     })
 
@@ -521,6 +533,17 @@ describe('radio routes', () => {
         expiresAt: '2026-10-01T13:02:00.000Z',
       })
       expect(hlsStream).toHaveBeenCalledWith('1', null)
+    })
+
+    // The SoundCloud client only gives expiries in years 0000 to 9999 (see soundcloud.ts), which all make timestamps.
+    it.each(['0000-01-01T00:00:00.000Z', '9999-12-31T23:59:59.999Z'])('hands out a stream that expires at %s', async (expiresAt) => {
+      hlsStream.mockResolvedValue(streamFor(1, Date.parse(expiresAt)))
+      const app = await buildApp()
+
+      const response = await app.inject({ method: 'GET', url: '/api/radio/tracks/1/stream' })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().expiresAt).toBe(expiresAt)
     })
 
     it('streams a private track with its secret, as it was last read', async () => {
@@ -673,6 +696,20 @@ describe('radio routes', () => {
       return app.inject({ method: 'POST', url, payload: body as object, cookies: await sessionCookies() })
     }
 
+    // Sends `body` as JSON, whatever it is, e.g. `null`, or no body at all when it's undefined.
+    async function sendJson(app: App, method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string> = {}) {
+      const json = body === undefined ? {} : { headers: { 'content-type': 'application/json', ...headers }, payload: JSON.stringify(body) }
+      return app.inject({ method, url, headers, ...json, cookies: await sessionCookies() })
+    }
+
+    // Requests that are refused before they're handled.
+    function expectNothingDone() {
+      expect(saveSettings).not.toHaveBeenCalled()
+      expect(saveCredentials).not.toHaveBeenCalled()
+      expect(checkCredentials).not.toHaveBeenCalled()
+      expect(resolvePlaylist).not.toHaveBeenCalled()
+    }
+
     // Another playlist, at LINK, with two sets.
     const LINK = 'https://soundcloud.com/parkingdotradio/sets/other/s-AbC123'
     const other = (...tracks: SoundCloudTrack[]): PlaylistTracks => ({
@@ -684,23 +721,41 @@ describe('radio routes', () => {
       playlist.mockImplementation(async (id) => (id === '9' ? other(...tracks) : soundCloudTracks(track(1, 'A'), track(2, 'B'))))
     }
 
+    const CHANGES = [
+      ['POST', '/api/admin/radio/preview', { link: LINK }],
+      ['POST', '/api/admin/radio/playlist', { link: LINK }],
+      ['PUT', '/api/admin/radio/credentials', { clientId: 'id', clientSecret: 'secret' }],
+      ['POST', '/api/admin/radio/credentials/check', { clientId: 'id', clientSecret: 'secret' }],
+    ] as const
+
     it.each([
-      ['GET', '/api/admin/radio'],
-      ['POST', '/api/admin/radio/preview'],
-      ['POST', '/api/admin/radio/playlist'],
-      ['GET', '/api/admin/radio/credentials'],
-      ['PUT', '/api/admin/radio/credentials'],
-      ['POST', '/api/admin/radio/credentials/check'],
-    ] as const)('responds 401 to %s %s without a session', async (method, url) => {
+      ['GET', '/api/admin/radio', undefined],
+      ['GET', '/api/admin/radio/credentials', undefined],
+      ...CHANGES,
+    ] as const)('responds 401 to %s %s without a session, whatever the request', async (method, url, payload) => {
       const app = await buildApp()
 
-      const payload = url.includes('credentials') ? { clientId: 'id', clientSecret: 'secret' } : method === 'POST' ? { link: LINK } : undefined
-      const response = await app.inject({ method, url, payload })
+      // Bodies that are valid, invalid, null, or not even JSON.
+      for (const sent of payload ? [JSON.stringify(payload), '{}', 'null', '{'] : [undefined]) {
+        const headers = sent === undefined ? {} : { 'content-type': 'application/json' }
+        const response = await app.inject({ method, url, headers, payload: sent })
 
-      expect(response.statusCode).toBe(401)
-      expect(saveSettings).not.toHaveBeenCalled()
-      expect(saveCredentials).not.toHaveBeenCalled()
-      expect(checkCredentials).not.toHaveBeenCalled()
+        expect(response.statusCode).toBe(401)
+        expect(response.json()).toEqual({ ok: false, error: 'Unauthorized' })
+      }
+      expectNothingDone()
+    })
+
+    it.each(CHANGES)('responds 403 to %s %s from another origin, whatever the request', async (method, url, payload) => {
+      const app = await buildApp()
+
+      for (const sent of [payload, {}, null]) {
+        const response = await sendJson(app, method, url, sent, { 'sec-fetch-site': 'cross-site' })
+
+        expect(response.statusCode).toBe(403)
+        expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
+      }
+      expectNothingDone()
     })
 
     describe('GET /api/admin/radio', () => {
@@ -812,8 +867,7 @@ describe('radio routes', () => {
         ['a track', 'https://soundcloud.com/parkingdotradio/3tons'],
         ['another site', 'https://example.com/parkingdotradio/sets/rotation'],
         ['not a link', 'rotation'],
-        ['not a string', 42],
-        ['missing', undefined],
+        ['empty', ''],
       ])('responds 400 when the link is %s', async (_, link) => {
         const app = await buildApp()
 
@@ -821,6 +875,21 @@ describe('radio routes', () => {
 
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: 'Not a link to a SoundCloud playlist' })
+        expect(resolvePlaylist).not.toHaveBeenCalled()
+      })
+
+      it.each([
+        [{ link: 42 }, '`link`: Invalid input: expected string, received number'],
+        [{}, '`link`: Invalid input: expected string, received undefined'],
+        [null, 'body: Invalid input: expected object, received null'],
+        [LINK, 'body: Invalid input: expected object, received string'],
+      ])('responds 400 to %j, saying why', async (body, error) => {
+        const app = await buildApp()
+
+        const response = await sendJson(app, 'POST', url, body)
+
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
         expect(resolvePlaylist).not.toHaveBeenCalled()
       })
 
@@ -872,6 +941,49 @@ describe('radio routes', () => {
         expect(response.json().error).toMatch(/^The playlist cannot be read from SoundCloud: SoundCloud responded to/)
         expect(saveSettings).not.toHaveBeenCalled()
       })
+    })
+
+    // Responses are checked against the API's schemas, so a quirk in SoundCloud's data that soundcloud.ts accepts must
+    // still make a valid response, rather than a 500.
+    it('passes on whatever the SoundCloud client reads', async () => {
+      const quirky: PlaylistTracks = {
+        playlist: { title: '', url: 'https://soundcloud.com/', private: true, account: { name: '', url: 'https://soundcloud.com/' } },
+        tracks: [
+          track(1, '', { durationMs: 1 }),
+          track(2, 'A | parking.radio | 2026.13.45'),
+          track(3, '| parking.radio | 2026.09.13'),
+          track(4, ' \u00a0 '),
+          track(5, 'B | parking.radio | 2026.09.13', { unplayable: 'not-streamable' }),
+          { invalid: true, name: '', problem: '✖ Invalid input' },
+          { invalid: true, name: 'soundcloud:tracks:99', problem: '✖ Invalid input' },
+          { invalid: true, name: 'A track with no title', problem: '✖ Invalid input' },
+        ],
+      }
+      playlist.mockResolvedValue(quirky)
+      resolvePlaylist.mockResolvedValue({ id: '7', secretToken: 's-AbC123' })
+      const app = await buildApp()
+
+      const onAir = await app.inject({ method: 'GET', url: '/api/radio' })
+      expect(onAir.statusCode).toBe(200)
+      expect([onAir.json().current.track, ...onAir.json().upcoming]).toEqual([
+        { id: '1', artist: '', event: null, date: null, durationMs: 1 },
+        { id: '2', artist: 'A | parking.radio | 2026.13.45', event: null, date: null, durationMs: 60 * MINUTE },
+        { id: '3', artist: '| parking.radio | 2026.09.13', event: null, date: null, durationMs: 60 * MINUTE },
+        { id: '4', artist: '', event: null, date: null, durationMs: 60 * MINUTE },
+      ])
+
+      const chosen = await app.inject({ method: 'GET', url: '/api/admin/radio', cookies: await sessionCookies() })
+      expect(chosen.statusCode).toBe(200)
+      expect(chosen.json().current.playlist.tracks.slice(4)).toEqual([
+        { kind: 'left-out', track: expect.objectContaining({ id: '5' }), reason: 'not-streamable' },
+        { kind: 'unexpected', title: '' },
+        { kind: 'unexpected', title: 'soundcloud:tracks:99' },
+        { kind: 'unexpected', title: 'A track with no title' },
+      ])
+
+      const preview = await post(app, '/api/admin/radio/preview', { link: LINK })
+      expect(preview.statusCode).toBe(200)
+      expect(preview.json().playlist).toEqual(chosen.json().current.playlist)
     })
 
     describe('POST /api/admin/radio/preview', () => {
@@ -1130,26 +1242,38 @@ describe('radio routes', () => {
         ['PUT', URL],
         ['POST', `${URL}/check`],
       ] as const)('%s %s', (method, url) => {
-        async function send(app: App, body: unknown) {
-          return app.inject({ method, url, payload: body as object, cookies: await sessionCookies() })
-        }
+        const send = (app: App, body: unknown) => sendJson(app, method, url, body)
 
         it.each([
-          ['the client id is missing', { clientSecret: 'secret' }],
-          ['the client secret is missing', { clientId: 'id' }],
-          ['the client id is blank', { clientId: '  ', clientSecret: 'secret' }],
-          ['the client secret is not a string', { clientId: 'id', clientSecret: 42 }],
-          ['the client id is too long', { clientId: 'x'.repeat(201), clientSecret: 'secret' }],
-          ['there is no body', undefined],
-        ])('responds 400 when %s', async (_, body) => {
+          ['the client id is missing', { clientSecret: 'secret' }, '`clientId`: Invalid input: expected string, received undefined'],
+          ['the client secret is missing', { clientId: 'id' }, '`clientSecret`: Invalid input: expected string, received undefined'],
+          ['the client id is blank', { clientId: '  ', clientSecret: 'secret' }, '`clientId`: Too small: expected string to have >=1 characters'],
+          ['the client secret is not a string', { clientId: 'id', clientSecret: 42 }, '`clientSecret`: Invalid input: expected string, received number'],
+          [
+            'the client id is too long',
+            { clientId: 'x'.repeat(201), clientSecret: 'secret' },
+            '`clientId`: Too big: expected string to have <=200 characters',
+          ],
+          ['the body is null', null, 'body: Invalid input: expected object, received null'],
+          ['there is no body', undefined, 'body: Invalid input: expected object, received null'],
+        ])('responds 400 when %s, saying why', async (_, body, error) => {
           const app = await buildApp()
 
           const response = await send(app, body)
 
           expect(response.statusCode).toBe(400)
-          expect(response.json()).toEqual({ ok: false, error: 'The client id and the client secret must each have between 1 and 200 characters' })
+          expect(response.json()).toEqual({ ok: false, error })
           expect(checkCredentials).not.toHaveBeenCalled()
           expect(saveCredentials).not.toHaveBeenCalled()
+        })
+
+        it('accepts credentials of 200 characters once trimmed', async () => {
+          const app = await buildApp()
+
+          const response = await send(app, { clientId: ` ${'x'.repeat(200)} `, clientSecret: 'secret' })
+
+          expect(response.statusCode).toBe(200)
+          expect(newClient).toHaveBeenCalledExactlyOnceWith({ clientId: 'x'.repeat(200), clientSecret: 'secret' })
         })
 
         it('responds 400, and keeps the credentials it had, when SoundCloud refuses them', async () => {

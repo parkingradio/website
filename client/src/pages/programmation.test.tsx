@@ -68,7 +68,7 @@ describe('Programmation', () => {
   })
 
   it('loads the events from the server', async () => {
-    mockFetch({ '/api/events': { ok: true, ...data } })
+    mockFetch({ '/api/events': data })
     render(<Programmation />)
 
     expect(await screen.findByRole('heading', { name: 'Soon Party' })).toBeInTheDocument()

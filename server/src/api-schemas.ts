@@ -29,6 +29,13 @@ export const Timestamp = z
   .refine((value) => isoDateTime.safeParse(value).success, 'Invalid date and time')
   .meta({ format: 'date-time' })
 
+// A day, "YYYY-MM-DD", that exists. It's checked like `z.iso.date`, and shown as only its format, `date`, like `Timestamp`.
+const isoDate = z.iso.date()
+export const Day = z
+  .string()
+  .refine((value) => isoDate.safeParse(value).success, 'Invalid date')
+  .meta({ format: 'date' })
+
 // The errors that routes can fail with because of what they are, which they don't declare:
 // - 400 when the route has a schema for its request, which refuses the requests that don't match it,
 // - 401 when it requires an admin's session, and 403 too when its method isn't GET (see requireAuth),

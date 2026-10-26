@@ -106,10 +106,10 @@ const Streams = z.object({
 })
 
 // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-creating-signed-url-custom-policy.html
+// The expiry, in seconds since the epoch, is handed out as an ISO 8601 timestamp, which only has years 0000 to 9999.
+const EpochTime = z.number().min(Date.parse('0000-01-01T00:00:00Z') / 1000).lt(Date.parse('+010000-01-01T00:00:00Z') / 1000)
 const CloudFrontPolicy = z.object({
-  Statement: z
-    .array(z.object({ Condition: z.object({ DateLessThan: z.object({ 'AWS:EpochTime': z.number() }) }) }))
-    .min(1),
+  Statement: z.array(z.object({ Condition: z.object({ DateLessThan: z.object({ 'AWS:EpochTime': EpochTime }) }) })).min(1),
 })
 
 export type PlaylistTracks = {

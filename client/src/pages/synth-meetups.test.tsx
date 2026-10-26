@@ -31,7 +31,7 @@ const events: Schema<'Events'> = {
 
 describe('SynthMeetups', () => {
   beforeEach(() => {
-    mockFetch({ '/api/events': { ok: true, ...events } })
+    mockFetch({ '/api/events': events })
   })
 
   afterEach(() => {
@@ -74,7 +74,7 @@ describe('SynthMeetups', () => {
   })
 
   it('says so when no synth meetup is coming up', async () => {
-    mockFetch({ '/api/events': { ok: true, ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00')] } })
+    mockFetch({ '/api/events': { ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00')] } })
     render(<SynthMeetups />)
 
     expect(await screen.findByText(/aucune date annoncée/)).toBeInTheDocument()

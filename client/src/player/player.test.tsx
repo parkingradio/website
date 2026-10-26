@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockInstance } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import type { RadioTrack } from 'shared/radio'
+import type { Schema } from '../api/client'
 import App from '../app'
 import { API_KEY, CHANNEL_ID } from '../pages/home/youtube'
 import { mockFetch, requestsTo } from '../test-utils'
@@ -52,43 +52,41 @@ vi.mock('hls.js/light', () => {
   return { default: Hls }
 })
 
-const KRAKA: RadioTrack = {
+const KRAKA: Schema<'RadioTrack'> = {
   id: '1',
   artist: 'KRAKA',
   event: 'HAUTE RIVE TAKEOVER',
   date: '2026-04-19',
   durationMs: 60 * 60 * 1000,
 }
-const NEBULO: RadioTrack = { ...KRAKA, id: '2', artist: 'NEBULO', event: null }
+const NEBULO: Schema<'RadioTrack'> = { ...KRAKA, id: '2', artist: 'NEBULO', event: null }
 
 const RADIO_URL = '/api/radio?upcoming=0'
 const IN_AN_HOUR = () => new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
 // What's on air: `track`, which started `secondsAgo` seconds ago.
-function onAir(track: RadioTrack, secondsAgo: number) {
-  return { ok: true, current: { track, startedAt: new Date(Date.now() - secondsAgo * 1000).toISOString() }, upcoming: [] }
+function onAir(track: Schema<'RadioTrack'>, secondsAgo: number) {
+  return { current: { track, startedAt: new Date(Date.now() - secondsAgo * 1000).toISOString() }, upcoming: [] }
 }
 
-function streamOf(track: RadioTrack) {
-  return { [`/api/radio/tracks/${track.id}/stream`]: { ok: true, url: `https://cdn.test/${track.id}.m3u8`, expiresAt: IN_AN_HOUR() } }
+function streamOf(track: Schema<'RadioTrack'>) {
+  return { [`/api/radio/tracks/${track.id}/stream`]: { url: `https://cdn.test/${track.id}.m3u8`, expiresAt: IN_AN_HOUR() } }
 }
 
 // What the YouTube Data API answers the home page's video widget: Parking Radio's channel, and its latest video.
 const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3'
 const YOUTUBE = {
   [`${YOUTUBE_API}/channels?part=contentDetails&id=${CHANNEL_ID}&key=${API_KEY}`]: {
-    ok: true,
     items: [{ contentDetails: { relatedPlaylists: { uploads: 'UUuploads' } } }],
   },
   [`${YOUTUBE_API}/playlistItems?part=snippet&playlistId=UUuploads&maxResults=1&key=${API_KEY}`]: {
-    ok: true,
     items: [{ snippet: { resourceId: { videoId: 'latest' } } }],
   },
 }
 
 function mockSite({ player = true, radio = onAir(KRAKA, 60) }: { player?: boolean; radio?: Body } = {}) {
   mockFetch({
-    '/api/config': { ok: true, assetsDomain: 'assets.example.test', turnstileSiteKey: 'key', features: { 'nouveau-lecteur': player } },
+    '/api/config': { assetsDomain: 'assets.example.test', turnstileSiteKey: 'key', features: { 'nouveau-lecteur': player } },
     [RADIO_URL]: radio,
     ...streamOf(KRAKA),
     ...streamOf(NEBULO),

@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { RadioTrack } from 'shared/radio'
-import { mockFetch } from '../../test-utils'
+import type { Schema } from '../../api/client'
+import { mockFetch, requestsTo } from '../../test-utils'
 import { RotationBanner } from './rotation-banner'
 
-const set = (id: string, artist: string): RadioTrack => ({ id, artist, event: null, date: null, durationMs: 3_600_000 })
+const set = (id: string, artist: string): Schema<'RadioTrack'> => ({ id, artist, event: null, date: null, durationMs: 3_600_000 })
 
 function renderBanner() {
   return render(
@@ -22,7 +22,6 @@ describe('RotationBanner', () => {
     vi.spyOn(window, 'getComputedStyle').mockReturnValue({ fontSize: '20px' } as CSSStyleDeclaration)
     mockFetch({
       '/api/radio': {
-        ok: true,
         current: { track: set('2', 'BRAVO'), startedAt: '2026-10-23T20:00:00.000Z' },
         upcoming: [set('3', 'Charlie'), set('1', 'ALPHA'), set('4', 'BRAVO')],
       },
@@ -35,6 +34,9 @@ describe('RotationBanner', () => {
     expect(again).toHaveAttribute('aria-hidden', 'true')
     // In ems, which the stylesheet turns into how long they take to scroll by.
     expect(names.parentElement!.style.getPropertyValue('--width')).toBe('30')
+    // Asked for without `upcoming`, so with every set that comes next, and without a body.
+    const [request] = requestsTo('GET', '/api/radio')
+    expect(new Headers(request.headers).has('Content-Type')).toBe(false)
   })
 
   it('shows its band while it reads the rotation', () => {

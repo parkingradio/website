@@ -1,5 +1,5 @@
-import type { RadioResponse, RadioStreamResponse } from 'shared/radio'
-import { getJson } from '../api'
+import { api } from '../api/client'
+import type { Schema } from '../api/client'
 import { playStream, preloadHls, resumeStream } from './hls'
 import { positionAt, untilEnd } from './radio'
 import type { OnAir, RadioState } from './radio'
@@ -11,18 +11,18 @@ const OFF_AIR_RETRY_MS = 60 * 1000
 // What's on air next is asked for a little after the track on air ends, so that the server has moved along by then.
 const NEXT_TRACK_DELAY_MS = 1000
 // A stream's URL is only used while it has at least this long before it expires, since its playlist has to be loaded
-// by then (see `RadioStreamResponse`).
+// by then (see `GET /api/radio/tracks/:id/stream` in docs/design/server/radio.md).
 const STREAM_MIN_REMAINING_MS = 60 * 1000
 // How many times in a row a stream that stops working is asked for again, e.g. because its URL expired, before the
 // player gives up and stops.
 const MAX_STREAM_RETRIES = 2
 
-type Stream = RadioStreamResponse & { ok: true }
+type Stream = Schema<'RadioStream'> & { ok: true }
 
 export type PlayerState = {
   radio: RadioState
   // What's playing, or null when nothing is. It can differ from what's on air for a moment: a track that's playing goes
-  // on until it ends, even if what's on air changed in the meantime (see shared/src/radio.ts).
+  // on until it ends, even if what's on air changed in the meantime (see docs/design/server/radio.md).
   playing: OnAir | null
   // Whether what's playing is waiting for its sound to arrive.
   loading: boolean
@@ -169,7 +169,7 @@ export class RadioPlayer {
   // on air, or null when the radio is off air.
   private loadRadio = async (): Promise<OnAir | null> => {
     clearTimeout(this.refreshTimer)
-    const result = await getJson<RadioResponse>('/api/radio?upcoming=0')
+    const result = await api.GET('/api/radio', { params: { query: { upcoming: '0' } } })
     if (!this.connected) return null
     // Another request may have been answered in the meantime: only the last one keeps a timer.
     clearTimeout(this.refreshTimer)
@@ -204,7 +204,7 @@ export class RadioPlayer {
       const pending = this.pendingStreams.get(trackId)
       if (pending) return pending
     }
-    const request = getJson<RadioStreamResponse>(`/api/radio/tracks/${trackId}/stream`).then((result) => {
+    const request = api.GET('/api/radio/tracks/{id}/stream', { params: { path: { id: trackId } } }).then((result) => {
       // A fresh request may have been sent in the meantime: only the last one counts.
       if (this.pendingStreams.get(trackId) !== request) return result.ok ? result : null
       this.pendingStreams.delete(trackId)
