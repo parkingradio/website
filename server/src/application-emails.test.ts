@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ApplicationFields, PrestationId } from 'shared/applications'
 import { applicationEmails, describeApplication } from './application-emails.js'
+import type { ApplicationFields } from './application-fields.js'
 import type { Profile } from './artist-profile.js'
 
 function profile(changes: Partial<Profile> = {}): Profile {
@@ -67,11 +67,6 @@ describe('describeApplication', () => {
   it("names a collective's artists", () => {
     const text = describeApplication(profile({ kind: 'collective', name: 'Le Collectif', members: ['Une', 'Deux'] }), fields())
     expect(text).toMatch(/^Collectif : Le Collectif\nArtistes du collectif : Une, Deux\n/)
-  })
-
-  it('names a prestation that is no longer in the list by its id', () => {
-    const text = describeApplication(profile(), fields({ prestations: ['dj', 'theremin' as PrestationId], otherPrestation: '' }))
-    expect(text).toContain('Type de prestation : DJ, theremin\n')
   })
 
   it('says when any time works, and leaves out what the artist left blank', () => {

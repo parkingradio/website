@@ -1,8 +1,8 @@
-import type { PrestationId } from 'shared/applications'
+import type { PrestationId } from '../../application-fields'
 import type { ArtistKind, GenreId, LinkSiteId } from '../../artist-profile'
 
 // What the "Appliquer" form offers, and the limits it sets, on top of the rules that every profile and application has to
-// follow (see artist-profile.ts and shared/src/applications.ts). The server doesn't know about these: admins can
+// follow (see artist-profile.ts and application-fields.ts). The server doesn't know about these: admins can
 // bring in applications that don't follow them, e.g. from the original Google Form.
 
 // An artist usually gets an hour of a time slot in the programmation, a collective a whole one, which is about 4 hours.

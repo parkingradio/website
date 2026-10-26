@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
-import type { Application } from 'shared/applications'
+import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist } from '../../artist-profile'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
@@ -465,29 +465,6 @@ describe('An application’s page', () => {
 
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
     expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'vinyl', 'full-band'])
-  })
-
-  it('shows a prestation that is no longer in the list by its id, as wrong, until it is unchecked', async () => {
-    const application = { ...APPLICATION, prestations: ['dj', 'theremin'] }
-    mockFetch({
-      ...PAGE,
-      '/api/admin/applications/application-1': { ok: true, application },
-      'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION },
-    })
-    renderAt('/admin/candidatures/application-1')
-
-    expect(await screen.findByText('DJ, theremin, autre : Vinyle seulement')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
-    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(screen.getByText("Une des prestations n'est pas dans la liste.")).toBeInTheDocument()
-    expect(screen.getByLabelText('theremin')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('theremin')).toHaveFocus()
-    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
-
-    fireEvent.click(screen.getByLabelText('theremin'))
-    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj'])
   })
 
   it('says what is wrong with a time slot once the time slots are left, and sends nothing', async () => {

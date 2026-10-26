@@ -1,5 +1,4 @@
-import { PRESTATIONS } from 'shared/applications'
-import type { ApplicationFields } from 'shared/applications'
+import type { ApplicationFields, PrestationId } from './application-fields.js'
 import { LINK_SITES } from './artist-profile.js'
 import type { GenreId, Profile } from './artist-profile.js'
 import type { Email } from './email.js'
@@ -60,12 +59,22 @@ const GENRE_NAMES: Record<GenreId, string> = {
   'hardcore-gabber': 'hardcore / gabber',
 }
 
+// The names of the prestations, as the forms show them: the client has its own copy (see PRESTATION_NAMES in
+// client/src/application-fields.ts), and they must be changed together.
+const PRESTATION_NAMES: Record<PrestationId, string> = {
+  dj: 'DJ',
+  vinyl: 'Vinyl',
+  'live-performance': 'Performance Live',
+  rap: 'Rap',
+  'full-band': 'Full Band',
+}
+
 // Everything the artist sent but their photo, as plain text. The photo isn't emailed: it's on the artist's page, on the
 // admin pages.
 export function describeApplication(profile: Profile, application: ApplicationFields): string {
   const collective = profile.kind === 'collective'
   const genres = profile.genres.map((id) => GENRE_NAMES[id])
-  const prestations: string[] = application.prestations.map((id) => PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id)
+  const prestations = application.prestations.map((id) => PRESTATION_NAMES[id])
   if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
   const links = LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)
   return [

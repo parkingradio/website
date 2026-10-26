@@ -109,9 +109,10 @@ An application says when the artist would like to play and what they'd do. Appli
 `applications` table (`server/src/schema.ts`). Each one belongs to an artist, and is deleted when the artist is
 deleted.
 
-The server checks every application against the rules in `shared/src/applications.ts` (`checkApplication`). These
-rules only make sure the data is valid. Suggestions and limits, like which dates or time slots to offer, are up to the
-forms. Error messages are in French, like for profiles, because artists see them.
+The server checks every application against the rules in `server/src/application-fields.ts` (the `ApplicationFields`
+schema). These rules only make sure the data is valid: every field below has to be there, with its type, even when it's
+empty. Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are in
+French, like for profiles, because artists see them.
 
 Applications are created in two ways:
 
@@ -126,7 +127,7 @@ An application has these fields:
 |---|---|---|
 | `dates` | list of strings | The days the artist would like to play, sorted. At least one. Past days are allowed, e.g. to import old applications |
 | `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end` in Québec time, `"HH:MM"`, e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
-| `prestations` | list of strings | What the artist would do: ids from `PRESTATIONS` in `shared/src/applications.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PRESTATIONS`. Can be empty |
+| `prestations` | list of strings | What the artist would do: ids from `PRESTATIONS` in `server/src/application-fields.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PRESTATIONS`. Can be empty |
 | `otherPrestation` | string | Anything else the artist would do, in a few words, e.g. `"Synthé modulaire"`. Up to 60 characters. Can be empty |
 | `details` | string | The artist's questions or other details. Up to 2000 characters. Can be empty |
 
@@ -156,6 +157,8 @@ admins can change a status to any other.
 |---|---|---|
 | `ok` | `true` | |
 | `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications. An unknown artist has none |
+
+Fails with 400 if `artist` is given more than once.
 
 ## `GET /api/admin/applications/:id` (admin)
 

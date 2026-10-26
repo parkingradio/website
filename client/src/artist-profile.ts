@@ -1,6 +1,6 @@
-import { checkLine, checkText } from 'shared/checks'
-import type { Checked, FieldErrors } from 'shared/checks'
 import type { Schema } from './api/client'
+import { checkLine, checkText, everyOne } from './checks'
+import type { Checked, FieldErrors } from './checks'
 import type { ComboboxOption } from './combobox'
 
 // How an artist's profile is shown and checked in the browser, by the admin pages and by the "Appliquer" form alike.
@@ -18,13 +18,6 @@ export type LinkSiteId = keyof ArtistLinks
 
 // A profile, as the server saves it, which is what `checkProfile` returns.
 export type Profile = Omit<Artist, 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto'>
-
-// The list of every `T`, e.g. a copy of one of the server's lists: the compiler refuses a value that isn't a `T`, and says
-// which are missing.
-function everyOne<T extends string>() {
-  return <const List extends readonly T[]>(list: List & ([Exclude<T, List[number]>] extends [never] ? unknown : { missing: Exclude<T, List[number]> })) =>
-    list
-}
 
 export const ARTIST_KINDS = everyOne<ArtistKind>()(['artist', 'collective'])
 

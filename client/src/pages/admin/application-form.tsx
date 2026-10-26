@@ -1,15 +1,27 @@
 import { useState } from 'react'
-import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, checkReceivedAt, isDay, isTime } from 'shared/applications'
-import type { ApplicationFields, PrestationId, TimeSlot, UpdateApplicationRequest } from 'shared/applications'
-import type { Checked } from 'shared/checks'
+import type { Body } from '../../api/client'
+import {
+  DETAILS_MAX_LENGTH,
+  OTHER_PRESTATION_MAX_LENGTH,
+  PRESTATIONS,
+  checkApplication,
+  checkReceivedAt,
+  isDay,
+  isTime,
+  prestationName,
+} from '../../application-fields'
+import type { ApplicationFields, TimeSlot } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
+import type { Checked } from '../../checks'
 import { leaving, useCheckedForm } from './checked-form'
-import { prestationName } from './describe'
 import { FieldError, FormActions, Labeled } from './fields'
 
-// A form for an application's fields, to create an application or change one. Each field is checked with the rules
-// the server checks it with (see `checkApplication`), and says what's wrong once it's been left, or once the form is
-// sent. The server's error is shown if it refuses the application anyway.
+// A form for an application's fields, to create an application or change one. Each field is checked as the server checks
+// it (see `checkApplication`), and says what's wrong once it's been left, or once the form is sent. The server's error is
+// shown if it refuses the application anyway.
+
+// What changing an application sends: its fields, and when it was received, if that changed.
+type ApplicationChanges = Body<'put', '/api/admin/applications/{id}'>
 
 const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], otherPrestation: '', details: '' }
 
@@ -17,13 +29,13 @@ type Field = keyof ApplicationFields | 'artist' | 'receivedAt'
 
 type ApplicationFormProps = {
   // The application to change, with when it was received, or nothing for a new one.
-  application?: UpdateApplicationRequest
+  application?: ApplicationChanges
   // For a new application: the artists it can be for, and the one picked at first, if any.
   artists?: { all: Artist[]; initial: string | null }
   submitLabel: string
   // Sends the application, with the artist picked for a new one, and returns the error, if it failed. `receivedAt` is
   // left out unless the day it was received was picked, or changed.
-  onSubmit: (fields: UpdateApplicationRequest, artistId: string) => Promise<string | null>
+  onSubmit: (fields: ApplicationChanges, artistId: string) => Promise<string | null>
   onCancel?: () => void
 }
 
@@ -43,9 +55,9 @@ function checkReceivedDay(day: string, initialDay: string): Checked<string | und
   if (!day) return { error: 'Choisissez le jour où la candidature a été reçue.' }
   // Browsers let years have more than 4 digits, which aren't dates the server takes.
   if (!isDay(day)) return { error: 'La date de réception est invalide.' }
-  const receivedAt = new Date(`${day}T00:00`).toISOString()
-  const { error } = checkReceivedAt(receivedAt)
-  return error === undefined ? { value: receivedAt } : { error }
+  const receivedAt = new Date(`${day}T00:00`)
+  const error = checkReceivedAt(receivedAt)
+  return error === null ? { value: receivedAt.toISOString() } : { error }
 }
 
 export function ApplicationForm({ application = EMPTY, artists, submitLabel, onSubmit, onCancel }: ApplicationFormProps) {
@@ -58,12 +70,6 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
   const [dates, setDates] = useState(application.dates.length > 0 ? application.dates : [''])
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(application.timeSlots)
   const [prestations, setPrestations] = useState(application.prestations)
-  // Every prestation, and those of the application that aren't one anymore, e.g. if one was removed from the list. The
-  // server refuses them, so they're shown as wrong, to be unchecked.
-  const choices: PrestationId[] = [
-    ...PRESTATIONS.map(({ id }) => id),
-    ...application.prestations.filter((id) => !PRESTATIONS.some((prestation) => prestation.id === id)),
-  ]
   const [otherPrestation, setOtherPrestation] = useState(application.otherPrestation)
   const [details, setDetails] = useState(application.details)
 
@@ -73,7 +79,7 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
     // A slot left entirely empty is dropped, but one that's half filled is wrong.
     timeSlots: timeSlots.filter((slot) => slot.start || slot.end),
     // In the order of the list, like the server keeps them.
-    prestations: choices.filter((id) => prestations.includes(id)),
+    prestations: PRESTATIONS.filter((id) => prestations.includes(id)),
     otherPrestation,
     details,
   }
@@ -170,22 +176,20 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
         <FieldError message={shown('timeSlots')} />
       </fieldset>
 
-      <fieldset className="admin-fields" onBlur={leaving(leave('prestations'))}>
+      <fieldset className="admin-fields">
         <legend>Type de prestation</legend>
         <div className="admin-choices">
-          {choices.map((id) => (
+          {PRESTATIONS.map((id) => (
             <label key={id}>
               <input
                 type="checkbox"
                 checked={prestations.includes(id)}
-                aria-invalid={shown('prestations') && !PRESTATIONS.some((prestation) => prestation.id === id) ? true : undefined}
                 onChange={(event) => setPrestations(event.target.checked ? [...prestations, id] : prestations.filter((other) => other !== id))}
               />
               {prestationName(id)}
             </label>
           ))}
         </div>
-        <FieldError message={shown('prestations')} />
         <Labeled label="Autre" error={shown('otherPrestation')}>
           <input
             placeholder="en quelques mots"

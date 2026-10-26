@@ -6,8 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
-import type { ApplicationResponse, ApplicationsResponse, ApplicationStatus, CreateApplicationRequest } from 'shared/applications'
-import type { paths } from '../client/src/api/schema.d.ts'
+import type { components, paths } from '../client/src/api/schema.d.ts'
 import type { ApiError } from 'shared/error'
 import { SEED_ARTISTS } from './seed-data.ts'
 import type { SeedApplication, SeedArtist } from './seed-data.ts'
@@ -16,6 +15,10 @@ export type Credentials = { email: string; password: string }
 
 type ArtistResponse = paths['/api/admin/artists']['post']['responses'][200]['content']['application/json']
 type ArtistsResponse = paths['/api/admin/artists']['get']['responses'][200]['content']['application/json']
+type ApplicationsResponse = paths['/api/admin/applications']['get']['responses'][200]['content']['application/json']
+type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
+type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
+type ApplicationStatus = components['schemas']['ApplicationStatus']
 
 export type SeedOptions = {
   // Where the server is, e.g. "http://localhost:3000".
@@ -132,7 +135,7 @@ async function findApplied(server: Server, artist: SeedArtist): Promise<{ artist
 
 // Adds an application for the artist, as an admin would, with its status.
 async function addApplication(server: Server, artistId: string, application: SeedApplication): Promise<void> {
-  const body: CreateApplicationRequest = { ...applicationFields(application), artistId }
+  const body: NewApplication = { ...applicationFields(application), artistId }
   if (application.receivedDaysAgo !== undefined) body.receivedAt = new Date(Date.now() - application.receivedDaysAgo * DAY_MS).toISOString()
   const { id } = (await server.call<ApplicationResponse>('POST', '/api/admin/applications', body)).application
   await setStatus(server, id, application.status)

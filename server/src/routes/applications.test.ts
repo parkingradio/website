@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
+import { useZodSchemas } from '../api-schemas.js'
 import fastifyCookie from '@fastify/cookie'
 import { NoSuchArtist } from '../applications.js'
 import type { ApplicationsStore, StoredApplication } from '../applications.js'
@@ -77,6 +78,7 @@ function application(changes: object = {}) {
 // If `logs` is given, every line the app logs is added to it.
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+  useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
   await app.register(applicationsRoutes, { store, settings })
@@ -123,6 +125,51 @@ describe('applications routes', () => {
     }
     expect(store.create).not.toHaveBeenCalled()
     expect(settings.save).not.toHaveBeenCalled()
+  })
+
+  it('requires a session before reading the request, whatever it sends', async () => {
+    const app = await buildApp()
+    const json = { 'content-type': 'application/json' }
+    for (const [method, url] of [
+      ['POST', '/api/admin/applications'],
+      ['PUT', '/api/admin/applications/application-1'],
+      ['PUT', '/api/admin/applications/application-1/status'],
+      ['PUT', '/api/admin/applications/recipients'],
+    ] as const) {
+      for (const sent of [{ payload: { dates: 'x', status: 'maybe', recipients: 42 } }, { payload: 'null', headers: json }, { payload: '{', headers: json }]) {
+        const response = await app.inject({ method, url, ...sent })
+        expect(response.statusCode).toBe(401)
+        expect(response.json()).toEqual({ ok: false, error: 'Unauthorized' })
+      }
+    }
+    expect((await app.inject({ method: 'GET', url: '/api/admin/applications?artist=a&artist=b' })).statusCode).toBe(401)
+  })
+
+  it('refuses the requests that change applications from another origin', async () => {
+    const app = await buildApp()
+    await create(app)
+    const options = { headers: { 'sec-fetch-site': 'cross-site' }, cookies: await sessionCookies() }
+    const requests = [
+      app.inject({ method: 'POST', url: '/api/admin/applications', payload: application(), ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: application(), ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: { status: 'accepted' }, ...options }),
+      app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1', ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/recipients', payload: { recipients: [] }, ...options }),
+    ]
+    for (const response of await Promise.all(requests)) {
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
+    }
+    expect(rows).toEqual([expect.objectContaining({ status: 'new', updatedBy: null })])
+    expect(settings.save).not.toHaveBeenCalled()
+  })
+
+  it('responds 500 rather than return an application that the API cannot describe, e.g. with a prestation that is not in the list anymore', async () => {
+    const app = await buildApp()
+    await create(app)
+    rows[0] = { ...rows[0], prestations: ['theremin' as StoredApplication['prestations'][number]] }
+    expect((await send(app, 'GET', '/api/admin/applications/application-1')).statusCode).toBe(500)
+    expect((await send(app, 'GET', '/api/admin/applications')).statusCode).toBe(500)
   })
 
   describe('POST /api/admin/applications', () => {
@@ -178,7 +225,7 @@ describe('applications routes', () => {
 
     it('explains, in French, what is wrong with when the application was received', async () => {
       const app = await buildApp()
-      // The rules are tested with checkReceivedAt itself.
+      // The rules are tested with ReceivedAt itself (see applications.test.ts).
       const invalid = [
         { receivedAt: new Date(Date.now() + 60_000).toISOString(), error: 'La date de réception ne peut pas être dans le futur.' },
         { receivedAt: '2026-03-28', error: 'La date de réception est invalide.' },
@@ -204,16 +251,44 @@ describe('applications routes', () => {
     it('rejects malformed requests', async () => {
       const app = await buildApp()
       const cookies = await sessionCookies()
-      const malformed = [
-        await app.inject({ method: 'POST', url: '/api/admin/applications', payload: '{not json', headers: { 'content-type': 'application/json' }, cookies }),
-        await app.inject({ method: 'POST', url: '/api/admin/applications', cookies }),
-        await app.inject({ method: 'POST', url: '/api/admin/applications', payload: 'null', headers: { 'content-type': 'application/json' }, cookies }),
-      ]
-      for (const response of malformed) {
+      const json = { 'content-type': 'application/json' }
+      const invalidJson = await app.inject({ method: 'POST', url: '/api/admin/applications', payload: '{not json', headers: json, cookies })
+      expect(invalidJson.statusCode).toBe(400)
+      expect(invalidJson.json()).toEqual({ ok: false, error: expect.stringContaining('not valid JSON') })
+      // Without an application, the first thing missing is a date.
+      for (const sent of [{}, { payload: 'null', headers: json }, { payload: '[]', headers: json }, { payload: '"application"', headers: json }]) {
+        const response = await app.inject({ method: 'POST', url: '/api/admin/applications', ...sent, cookies })
         expect(response.statusCode).toBe(400)
-        expect(response.json()).toMatchObject({ ok: false })
+        expect(response.json()).toEqual({ ok: false, error: 'Choisissez au moins une date.' })
       }
       expect(rows).toHaveLength(0)
+    })
+
+    it('explains, in French, what is wrong with a field that is missing, or of the wrong type', async () => {
+      const app = await buildApp()
+      const invalid = [
+        { changes: { timeSlots: undefined }, error: 'Les plages horaires sont invalides.' },
+        { changes: { timeSlots: '18:00-22:00' }, error: 'Les plages horaires sont invalides.' },
+        { changes: { timeSlots: [null] }, error: 'Une des plages horaires est invalide.' },
+        { changes: { prestations: 'dj' }, error: 'Les prestations sont invalides.' },
+        { changes: { prestations: null }, error: 'Les prestations sont invalides.' },
+        { changes: { otherPrestation: 42 }, error: 'La prestation « Autre » est invalide.' },
+        { changes: { details: ['Une question ?'] }, error: 'Le champ « Questions ou détails » est invalide.' },
+        { changes: { receivedAt: null }, error: 'La date de réception est invalide.' },
+      ]
+      for (const { changes, error } of invalid) {
+        const response = await create(app, changes)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(rows).toHaveLength(0)
+    })
+
+    it('says what is wrong with the application before what is wrong with the artist', async () => {
+      const app = await buildApp()
+      const response = await create(app, { artistId: 42, receivedAt: '2026-03-28', prestations: ['modular'] })
+      expect(response.json()).toEqual({ ok: false, error: "Une des prestations n'est pas dans la liste." })
+      expect((await create(app, { artistId: 42, receivedAt: '2026-03-28' })).json()).toEqual({ ok: false, error: 'La date de réception est invalide.' })
     })
 
     it("keeps the application's details out of the logs and the response when the database fails", async () => {
@@ -244,6 +319,9 @@ describe('applications routes', () => {
       const theirs = await send(app, 'GET', '/api/admin/applications?artist=artist-1')
       expect(theirs.json().applications.map((row: { id: string }) => row.id)).toEqual(['application-3', 'application-1'])
       expect((await send(app, 'GET', '/api/admin/applications?artist=nobody')).json()).toEqual({ ok: true, applications: [] })
+      const twice = await send(app, 'GET', '/api/admin/applications?artist=artist-1&artist=artist-2')
+      expect(twice.statusCode).toBe(400)
+      expect(twice.json()).toEqual({ ok: false, error: 'The artist must be a single id' })
     })
   })
 
@@ -309,6 +387,25 @@ describe('applications routes', () => {
       expect(rows[0].updatedBy).toBeNull()
     })
 
+    it('explains, in French, what is wrong with an application that is malformed, without changing it', async () => {
+      const app = await buildApp()
+      await create(app)
+      const cookies = await sessionCookies()
+      const json = { 'content-type': 'application/json' }
+      const url = '/api/admin/applications/application-1'
+      const malformed = [
+        { response: await app.inject({ method: 'PUT', url, payload: 'null', headers: json, cookies }), error: 'Choisissez au moins une date.' },
+        { response: await app.inject({ method: 'PUT', url, payload: '[]', headers: json, cookies }), error: 'Choisissez au moins une date.' },
+        { response: await send(app, 'PUT', url, application({ prestations: undefined })), error: 'Les prestations sont invalides.' },
+        { response: await send(app, 'PUT', url, application({ details: 42 })), error: 'Le champ « Questions ou détails » est invalide.' },
+      ]
+      for (const { response, error } of malformed) {
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(rows[0].updatedBy).toBeNull()
+    })
+
     it('responds 404 for an application that does not exist', async () => {
       const app = await buildApp()
       expect((await send(app, 'PUT', '/api/admin/applications/nothing', application())).statusCode).toBe(404)
@@ -328,9 +425,14 @@ describe('applications routes', () => {
     it('refuses anything but a status', async () => {
       const app = await buildApp()
       await create(app)
-      for (const payload of [{ status: 'maybe' }, {}, { status: 'toString' }]) {
-        const response = await send(app, 'PUT', '/api/admin/applications/application-1/status', payload)
+      const cookies = await sessionCookies()
+      const refused = [
+        ...[{ status: 'maybe' }, {}, { status: 'toString' }, { status: 'Accepted' }].map((payload) => send(app, 'PUT', '/api/admin/applications/application-1/status', payload)),
+        app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: 'null', headers: { 'content-type': 'application/json' }, cookies }),
+      ]
+      for (const response of await Promise.all(refused)) {
         expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'The status must be one of new, accepted, scheduled, done, rejected' })
       }
       expect(rows[0].status).toBe('new')
     })
@@ -401,6 +503,13 @@ describe('applications routes', () => {
         { body: { recipients: 'equipe@example.com' }, error: 'The recipients must be a list of email addresses' },
         { body: { recipients: [42] }, error: 'The recipients must be a list of email addresses' },
         { body: {}, error: 'The recipients must be a list of email addresses' },
+        { body: { recipients: null }, error: 'The recipients must be a list of email addresses' },
+        // The first that's wrong.
+        { body: { recipients: ['pas une adresse', ...Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`)] }, error: 'Not an email address: pas une adresse' },
+        {
+          body: { recipients: [...Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`), 'pas une adresse'] },
+          error: 'There can be at most 10 recipients',
+        },
         {
           body: { recipients: Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`) },
           error: 'There can be at most 10 recipients',
@@ -411,6 +520,9 @@ describe('applications routes', () => {
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error })
       }
+      const nothing = await app.inject({ method: 'PUT', url: URL, payload: 'null', headers: { 'content-type': 'application/json' }, cookies: await sessionCookies() })
+      expect(nothing.statusCode).toBe(400)
+      expect(nothing.json()).toEqual({ ok: false, error: 'The recipients must be a list of email addresses' })
       expect(settings.save).not.toHaveBeenCalled()
       expect(savedSettings?.recipients).toEqual(['equipe@example.com'])
     })

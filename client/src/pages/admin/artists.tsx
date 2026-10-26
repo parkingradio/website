@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import type { ApplicationsResponse } from 'shared/applications'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import { ARTIST_KINDS, LINK_SITES } from '../../artist-profile'
@@ -11,8 +10,6 @@ import { KIND_LABELS, MISSING, artistSearchFields, byWhom, countryOf, dateFormat
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
-// For the applications, which aren't in openapi.json yet.
-import { useApi as useUntypedApi } from '../../use-api'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
 // bring in an application that came through the Google Form.
@@ -109,7 +106,7 @@ export function ArtistPage() {
 
 function ArtistById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/artists/{id}', { params: { path: { id } } })
-  const applications = useUntypedApi<ApplicationsResponse>(`/api/admin/applications?artist=${encodeURIComponent(id)}`)
+  const applications = useApi('/api/admin/applications', { params: { query: { artist: id } } })
   // The artist as the last change left them, which replaces the one loaded.
   const [changed, setChanged] = useState<Artist | null>(null)
   const [editing, setEditing] = useState(false)

@@ -1,13 +1,14 @@
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
-import type { ApplicationFields, ApplyResponse } from 'shared/applications'
-import type { ApiError } from 'shared/error'
+import { z } from 'zod'
+import { ApiError, Ok, zodRoutes } from '../api-schemas.js'
 import { applicationEmails } from '../application-emails.js'
+import { ApplicationFields } from '../application-fields.js'
 import { InvalidApplication, validateApplication } from '../applications.js'
 import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
-import { ArtistProfile, PHOTO_TOO_LARGE } from '../artist-profile.js'
+import { ArtistProfile, PHOTO_TOO_LARGE, PhotoFile } from '../artist-profile.js'
 import type { Profile } from '../artist-profile.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { Photos, SentPhoto } from '../artists.js'
@@ -15,26 +16,36 @@ import { clientAddress, visitorAddress } from '../client-address.js'
 import type { Email, SendEmail } from '../email.js'
 import { jsonField, readPhotoForm } from '../photo-form.js'
 import type { PhotoForm } from '../photo-form.js'
-import { keepQueryValuesPrivate } from '../query-errors.js'
 import type { TurnstileVerifier } from '../turnstile.js'
 
-// The public endpoint where new artists apply for a set. Artists see its errors, so they're in French.
+// The public endpoint where new artists apply for a set (see docs/design/server/artists.md). Artists see its errors, so
+// they're in French.
 
 // Enough for an artist to retry a few times after errors, but low enough to stop a flood of applications.
 export const APPLICATIONS_PER_WINDOW = 5
 const APPLICATIONS_WINDOW = '1 hour'
 
-const INVALID_REQUEST: ApiError = { ok: false, error: 'Candidature invalide.' }
-const EMAIL_TAKEN: ApiError = { ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }
-const TURNSTILE_REFUSED: ApiError = { ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }
-const TURNSTILE_UNAVAILABLE: ApiError = {
+const INVALID_REQUEST: z.infer<typeof ApiError> = { ok: false, error: 'Candidature invalide.' }
+const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }
+const TURNSTILE_REFUSED: z.infer<typeof ApiError> = { ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }
+const TURNSTILE_UNAVAILABLE: z.infer<typeof ApiError> = {
   ok: false,
   error: "La vérification anti-robot n'a pas pu être faite. Réessayez dans quelques minutes.",
 }
 
+// What applying sends, as multipart/form-data. The route reads it itself (see `validated`), checking the profile and the
+// application against these schemas, but in its own order, with its own errors: before the token, which can only be
+// checked once.
+const ApplyForm = z.object({
+  artist: ArtistProfile,
+  application: ApplicationFields,
+  photo: PhotoFile.optional(),
+  turnstileToken: z.string().meta({ description: 'The token the Turnstile widget gave the page' }),
+})
+
 // Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
 // the first one that isn't valid.
-function validated(form: PhotoForm): { profile: Profile; photo: SentPhoto | null; application: ApplicationFields } | ApiError {
+function validated(form: PhotoForm): { profile: Profile; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
@@ -102,21 +113,27 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
 
   // The rate limit's error already has a French message. Other errors that Fastify or a plugin raises get the generic
   // one.
-  keepQueryValuesPrivate(app, 'Failed to save an application sent by an artist', (error) =>
+  const api = zodRoutes(app, 'Failed to save an application sent by an artist', (error) =>
     error.statusCode === 429 ? error.message : INVALID_REQUEST.error,
   )
 
-  app.post<{ Reply: ApplyResponse | ApiError }>(
+  api.post(
     '/api/applications',
     {
       config: {
         rateLimit: {
           max: APPLICATIONS_PER_WINDOW,
           timeWindow: APPLICATIONS_WINDOW,
-          // The plugin throws this error, and the error handler set by `keepQueryValuesPrivate` sends its message.
+          // The plugin throws this error, and the error handler set by `zodRoutes` sends its message.
           errorResponseBuilder: () =>
             Object.assign(new Error('Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.'), { statusCode: 429 }),
         },
+      },
+      schema: {
+        summary: 'A new artist applies, with their profile, their application and maybe a photo',
+        tags: ['Applications'],
+        multipart: ApplyForm,
+        response: { 200: Ok, 400: ApiError, 409: ApiError, 413: ApiError, 429: ApiError, 502: ApiError },
       },
     },
     async (request, reply) => {
@@ -158,7 +175,7 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
       await emailApplication(log, { settings, sendEmail }, sent).catch((error: unknown) => {
         log.error({ err: error }, 'Failed to email an application')
       })
-      return { ok: true }
+      return { ok: true as const }
     },
   )
 }

@@ -1,4 +1,4 @@
-import type { ApplicationFields } from 'shared/applications'
+import type { ApplicationFields } from './application-fields.js'
 import { applicationsStore } from './applications.js'
 import { artistsStore } from './artists.js'
 import type { StoredPhoto } from './artists.js'

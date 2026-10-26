@@ -102,6 +102,10 @@ export const PHOTO_MAX_BYTES = 10 * 1024 * 1024
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 export const PHOTO_WRONG_TYPE = 'La photo doit être en JPEG, PNG ou WebP.'
 export const PHOTO_TOO_LARGE = `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+// The photo, as a part of a multipart/form-data request, which the route reads itself (see `readPhotoForm`).
+export const PhotoFile = z.file().meta({
+  description: `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents. An empty file is no photo`,
+})
 
 // Whether `value` looks like an email address. Only the shape is checked, not that it exists. Besides spaces and @, it
 // can't have the characters that make it more than a single address, or an address with a name, e.g. "Name <address>"
@@ -313,8 +317,10 @@ const BAD_LINK = 'Un des liens est invalide.'
 
 // A text, trimmed, then up to `maxLength` characters. `field` names it in the error when it's too long, e.g. "La bio",
 // and `missing` is the error when it isn't a string, or when it's empty unless it `canBeEmpty`. openapi.json would read
-// as applying its lengths to what's sent, so the description says they apply after the cleanup.
-function text(field: string, maxLength: number, missing: string, { canBeEmpty = false, singleLine = false } = {}) {
+// as applying its lengths to what's sent, so the description says they apply after the cleanup. Applications' text fields
+// follow the same rules (see application-fields.ts). The client has its own copy (see checkText and checkLine in
+// client/src/checks.ts), and they must be changed together.
+export function text(field: string, maxLength: number, missing: string, { canBeEmpty = false, singleLine = false } = {}) {
   let schema = z.string({ error: missing })
   // Each run of spaces, tabs or line breaks in a single line, e.g. a name, becomes a single space.
   if (singleLine) schema = schema.overwrite((value) => value.replace(/\s+/g, ' '))
@@ -326,7 +332,7 @@ function text(field: string, maxLength: number, missing: string, { canBeEmpty = 
 }
 
 // Like `text`, for a field that's a single line, e.g. a name.
-function line(field: string, maxLength: number, missing: string, options: { canBeEmpty?: boolean } = {}) {
+export function line(field: string, maxLength: number, missing: string, options: { canBeEmpty?: boolean } = {}) {
   return text(field, maxLength, missing, { ...options, singleLine: true })
 }
 

@@ -49,9 +49,29 @@ function configWith(newForm: boolean): ConfigState {
   }
 }
 
+// The applications that were sent, oldest first.
+const applications = () => requestsTo('POST', '/api/applications')
+
+// GeoNames gets URLs, and the server gets `Request`s, from the typed client.
+const isGeonames = (input: string | Request): input is string => typeof input === 'string' && input.startsWith(GEONAMES)
+
+// The calls to GeoNames, by their URLs.
+const geonamesCalls = () => fetchMock.mock.calls.map(([input]) => input).filter(isGeonames)
+
+// What the server and GeoNames answer, unless a test says otherwise: GeoNames finds Lévis, and the server takes the
+// application.
+function answer(input: string | Request) {
+  if (isGeonames(input)) return Promise.resolve(Response.json(geonamesResults))
+  if (input instanceof Request && new URL(input.url).pathname === '/api/applications') return Promise.resolve(Response.json({ ok: true }))
+  throw new Error(`Unexpected fetch to ${typeof input === 'string' ? input : input.url}`)
+}
+
+// The server refuses the application with `error`.
+const refused = (error: string, status = 400) => Promise.resolve(Response.json({ ok: false, error }, { status }))
+
 // The parts of the last application that was sent.
 function sentParts() {
-  const body = requestsTo('POST', '/api/applications').at(-1)!.body as FormData
+  const body = applications().at(-1)!.body as FormData
   return {
     artist: JSON.parse(body.get('artist') as string),
     application: JSON.parse(body.get('application') as string),
@@ -75,12 +95,10 @@ beforeEach(() => {
   })
   turnstile.remove.mockReset()
   window.turnstile = turnstile
+  // Rather than mockFetch's, which setupTests.ts calls, but whose `Request` still keeps the FormData each request is made
+  // with (see requestsTo).
   fetchMock.mockReset()
-  fetchMock.mockImplementation((url: string) => {
-    if (url.startsWith(GEONAMES)) return Promise.resolve({ ok: true, json: () => Promise.resolve(geonamesResults) })
-    if (url === '/api/applications') return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) })
-    throw new Error(`Unexpected fetch to ${url}`)
-  })
+  fetchMock.mockImplementation(answer)
   vi.stubGlobal('fetch', fetchMock)
   // jsdom has neither, and the form uses both.
   URL.createObjectURL = vi.fn(() => 'blob:preview')
@@ -158,7 +176,7 @@ describe('Appliquer', () => {
     for (const missing of ['Choisissez votre pays.', 'Indiquez votre ville.', 'Choisissez au moins un genre.', 'Ajoutez au moins un lien.', 'Indiquez votre numéro de téléphone.']) {
       expect(screen.getByText(missing)).toBeInTheDocument()
     }
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
   })
 
   it('sends the profile and the application with the photo, then thanks the artist', async () => {
@@ -218,7 +236,7 @@ describe('Appliquer', () => {
     fireEvent.click(screen.getByLabelText('Autre'))
     await send()
     expect(screen.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
 
     type('Autre type de prestation', 'B2B')
     await send()
@@ -238,7 +256,7 @@ describe('Appliquer', () => {
     await send()
 
     expect(await screen.findByRole('alert')).toHaveTextContent("La vérification anti-robot n'est pas terminée.")
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
 
     act(() => turnstile.callbacks!.callback(TOKEN))
     await send()
@@ -252,15 +270,13 @@ describe('Appliquer', () => {
     await send()
 
     expect(await screen.findByRole('alert')).toHaveTextContent("La vérification anti-robot n'est pas terminée.")
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
   })
 
   it('gets a new token from Turnstile once an application is refused, since a token can only be checked once', async () => {
     renderForm()
     await fillIn()
-    fetchMock.mockImplementationOnce(() =>
-      Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }) }),
-    )
+    fetchMock.mockImplementationOnce(() => refused('La vérification anti-robot a échoué. Réessayez.'))
     await send()
     expect(await screen.findByRole('alert')).toHaveTextContent('La vérification anti-robot a échoué. Réessayez.')
     expect(turnstile.remove).toHaveBeenCalledWith('widget')
@@ -268,7 +284,7 @@ describe('Appliquer', () => {
 
     await send()
     expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
-    expect(requestsTo('POST', '/api/applications').map((init) => (init.body as FormData).get('turnstileToken'))).toEqual([
+    expect(applications().map((init) => (init.body as FormData).get('turnstileToken'))).toEqual([
       TOKEN,
       NEXT_TOKEN,
     ])
@@ -318,7 +334,7 @@ describe('Appliquer', () => {
     const options = await screen.findAllByRole('option')
     // Parts of a city aren't suggested.
     expect(options.map((option) => option.textContent)).toEqual(['LévisQC'])
-    const [url] = fetchMock.mock.calls.find(([url]) => url.startsWith(GEONAMES))!
+    const [url] = geonamesCalls()
     expect(Object.fromEntries(new URL(url).searchParams)).toMatchObject({ name_startsWith: 'levis', country: 'CA', username: 'parkingradio' })
 
     // A single letter doesn't search.
@@ -344,8 +360,8 @@ describe('Appliquer', () => {
 
   it('goes through the city suggestions from either end with the arrow keys', async () => {
     const cities = ['Lévis', 'Lévisville', 'Lévis-Est'].map((name, i) => ({ geonameId: i + 1, name, toponymName: name, fcode: 'PPL' }))
-    fetchMock.mockImplementation((url: string) =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve(url.startsWith(GEONAMES) ? { geonames: cities } : { ok: true }) }),
+    fetchMock.mockImplementation((input: string | Request) =>
+      isGeonames(input) ? Promise.resolve(Response.json({ geonames: cities })) : answer(input),
     )
     renderForm()
     await pick(/^Pays/, 'canada', /^Canada/)
@@ -367,11 +383,11 @@ describe('Appliquer', () => {
   })
 
   it('takes a city the artist types, even when GeoNames is unavailable', async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url.startsWith(GEONAMES)) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: { message: 'the daily limit of 10000 credits has been exceeded', value: 18 } }) })
+    fetchMock.mockImplementation((input: string | Request) => {
+      if (isGeonames(input)) {
+        return Promise.resolve(Response.json({ status: { message: 'the daily limit of 10000 credits has been exceeded', value: 18 } }))
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) })
+      return answer(input)
     })
     renderForm()
     await fillIn({ city: ' Saint-Glinglin ' })
@@ -386,10 +402,8 @@ describe('Appliquer', () => {
   it("shows the server's error when the application is refused", async () => {
     renderForm()
     await fillIn()
-    fetchMock.mockImplementation((url: string) =>
-      url === '/api/applications'
-        ? Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.' }) })
-        : Promise.resolve({ ok: true, json: () => Promise.resolve({ geonames: [] }) }),
+    fetchMock.mockImplementation((input: string | Request) =>
+      input instanceof Request ? refused('Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.', 429) : Promise.resolve(Response.json({ geonames: [] })),
     )
     await send()
 
@@ -399,9 +413,7 @@ describe('Appliquer', () => {
   it('says when an artist already has that email address', async () => {
     renderForm()
     await fillIn()
-    fetchMock.mockImplementationOnce(() =>
-      Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }) }),
-    )
+    fetchMock.mockImplementationOnce(() => refused('Un artiste est déjà inscrit avec cette adresse e-mail.', 409))
     await send()
     expect(await screen.findByRole('alert')).toHaveTextContent('Un artiste est déjà inscrit avec cette adresse e-mail.')
     expect(screen.queryByText('Candidature envoyée')).not.toBeInTheDocument()
@@ -415,10 +427,19 @@ describe('Appliquer', () => {
     renderForm()
     await fillIn()
     // E.g. the proxy in front of the server, refusing a photo that's too large.
-    fetchMock.mockImplementationOnce(() => Promise.resolve({ ok: false, json: () => Promise.reject(new SyntaxError('Unexpected token <')) }))
+    fetchMock.mockImplementationOnce(() => Promise.resolve(new Response('<html>413 Request Entity Too Large</html>', { status: 413 })))
     await send()
     expect(await screen.findByRole('alert')).toHaveTextContent("La candidature n'a pas pu être envoyée. Réessayez dans un moment.")
     expect(turnstile.remove).toHaveBeenCalledWith('widget')
+    expect(turnstile.render).toHaveBeenCalledTimes(2)
+  })
+
+  it("says the application couldn't be sent when the server can't be reached", async () => {
+    renderForm()
+    await fillIn()
+    fetchMock.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')))
+    await send()
+    expect(await screen.findByRole('alert')).toHaveTextContent("La candidature n'a pas pu être envoyée. Réessayez dans un moment.")
     expect(turnstile.render).toHaveBeenCalledTimes(2)
   })
 
@@ -455,7 +476,7 @@ describe('Appliquer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'envoyer ma candidature' }))
 
     expect(await screen.findByText('La photo doit être en JPEG, PNG ou WebP.')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
   })
 
   it("doesn't ask GeoNames again for a city that was picked from its suggestions", async () => {
@@ -464,7 +485,7 @@ describe('Appliquer', () => {
     await pick(/^Ville/, 'levis', /^Lévis/)
     expect(screen.getByLabelText(/^Ville/)).toHaveValue('Lévis')
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
-    expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(GEONAMES))).toHaveLength(1)
+    expect(geonamesCalls()).toHaveLength(1)
   })
 
   it('asks GeoNames once for a city typed again', async () => {
@@ -476,7 +497,7 @@ describe('Appliquer', () => {
     fireEvent.change(city, { target: { value: 'lev' } })
     fireEvent.change(city, { target: { value: 'Levis ' } })
     await screen.findAllByRole('option')
-    expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(GEONAMES))).toHaveLength(1)
+    expect(geonamesCalls()).toHaveLength(1)
   })
 
   it('offers every genre, once', () => {
@@ -520,7 +541,7 @@ describe('Appliquer', () => {
     await send()
     expect(screen.getByText('Ajoutez au moins un lien.')).toBeInTheDocument()
     expect(screen.getByLabelText('SoundCloud')).toHaveFocus()
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/applications', expect.anything())
+    expect(applications()).toEqual([])
   })
 
   it('says once what is wrong with a link, next to it, and to fix the links in red under them', async () => {

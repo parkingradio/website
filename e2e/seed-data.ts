@@ -1,4 +1,3 @@
-import type { ApplicationFields, ApplicationStatus } from 'shared/applications'
 import type { components } from '../client/src/api/schema.d.ts'
 
 // The data seed.ts fills a database with: artists, some with a photo, and their applications, with the variety the admin
@@ -21,6 +20,9 @@ export type SeedArtist = {
   form?: true
   applications: SeedApplication[]
 }
+
+type ApplicationFields = components['schemas']['ApplicationFields']
+type ApplicationStatus = components['schemas']['ApplicationStatus']
 
 export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
   // The days the artist would like to play, as how many days after the day it's seeded (before, if negative).

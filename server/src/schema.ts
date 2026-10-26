@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
-import { APPLICATION_STATUSES } from 'shared/applications'
-import type { ApplicationStatus, PrestationId, TimeSlot } from 'shared/applications'
+import { APPLICATION_STATUSES } from './application-fields.js'
+import type { ApplicationStatus, PrestationId, TimeSlot } from './application-fields.js'
 import { ARTIST_KINDS } from './artist-profile.js'
 import type { ArtistKind, Country, GenreId, LinkSiteId } from './artist-profile.js'
 
@@ -115,7 +115,7 @@ export const artists = pgTable(
 )
 
 // Artists' applications for a set. Each one belongs to an artist, and is deleted with them. See `ApplicationFields` in
-// shared/src/applications.ts for what each field can contain.
+// application-fields.ts for what each field can contain.
 export const applications = pgTable(
   'applications',
   {

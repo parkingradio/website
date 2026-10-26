@@ -353,6 +353,205 @@
         ],
         "additionalProperties": false
       },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "artistId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "timeSlots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSlot"
+            }
+          },
+          "prestations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrestationId"
+            }
+          },
+          "otherPrestation": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "statusUpdatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "statusUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "artistId",
+          "receivedAt",
+          "createdAt",
+          "createdBy",
+          "dates",
+          "timeSlots",
+          "prestations",
+          "otherPrestation",
+          "details",
+          "updatedBy",
+          "updatedAt",
+          "status",
+          "statusUpdatedBy",
+          "statusUpdatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationFields": {
+        "type": "object",
+        "properties": {
+          "dates": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Saved sorted, without duplicates. Past days are allowed"
+          },
+          "timeSlots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSlotInput"
+            },
+            "description": "Saved sorted, without duplicates. None means any time"
+          },
+          "prestations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrestationId"
+            },
+            "description": "In any order, even more than once: saved in the order of the list, without duplicates"
+          },
+          "otherPrestation": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Trimmed, then up to 2000 characters"
+          }
+        },
+        "required": [
+          "dates",
+          "timeSlots",
+          "prestations",
+          "otherPrestation",
+          "details"
+        ]
+      },
+      "ApplicationRecipients": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "recipients",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationStatus": {
+        "type": "string",
+        "enum": [
+          "new",
+          "accepted",
+          "scheduled",
+          "done",
+          "rejected"
+        ]
+      },
       "Artist": {
         "type": "object",
         "properties": {
@@ -493,6 +692,212 @@
           }
         },
         "additionalProperties": false
+      },
+      "ArtistProfile": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "artist"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "members": {
+                "description": "Ignored: only a collective has members"
+              },
+              "country": {
+                "$ref": "#/components/schemas/Country"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "genres": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GenreId"
+                }
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "country",
+              "city",
+              "genres",
+              "bio",
+              "links",
+              "email",
+              "phone"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "collective"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "members": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                },
+                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
+              },
+              "country": {
+                "$ref": "#/components/schemas/Country"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "genres": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GenreId"
+                }
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "members",
+              "country",
+              "city",
+              "genres",
+              "bio",
+              "links",
+              "email",
+              "phone"
+            ]
+          }
+        ]
       },
       "ChosenPlaylist": {
         "type": "object",
@@ -1067,6 +1472,16 @@
         ],
         "additionalProperties": false
       },
+      "PrestationId": {
+        "type": "string",
+        "enum": [
+          "dj",
+          "vinyl",
+          "live-performance",
+          "rap",
+          "full-band"
+        ]
+      },
       "Radio": {
         "type": "object",
         "properties": {
@@ -1273,6 +1688,43 @@
           "track"
         ],
         "additionalProperties": false
+      },
+      "TimeSlot": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "additionalProperties": false,
+        "description": "In Québec time, ending later the same day"
+      },
+      "TimeSlotInput": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "description": "In Québec time, ending later the same day"
       },
       "UnexpectedTrack": {
         "type": "object",
@@ -3055,6 +3507,890 @@
             }
           },
           "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/applications": {
+      "get": {
+        "summary": "Every application, or an artist's, the most recently received first",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "artist",
+            "required": false,
+            "description": "Only this artist's applications. An unknown artist has none"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "applications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Application"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "applications"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Creates an application for an artist",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dates": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "description": "Saved sorted, without duplicates. Past days are allowed"
+                  },
+                  "timeSlots": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/TimeSlotInput"
+                    },
+                    "description": "Saved sorted, without duplicates. None means any time"
+                  },
+                  "prestations": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PrestationId"
+                    },
+                    "description": "In any order, even more than once: saved in the order of the list, without duplicates"
+                  },
+                  "otherPrestation": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
+                  },
+                  "details": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Trimmed, then up to 2000 characters"
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "A date and time with its offset from UTC, which can be left without seconds. Not in the future"
+                  },
+                  "artistId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "dates",
+                  "timeSlots",
+                  "prestations",
+                  "otherPrestation",
+                  "details",
+                  "artistId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "application": {
+                      "$ref": "#/components/schemas/Application"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "application"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/applications/recipients": {
+      "get": {
+        "summary": "Who applications from artists are emailed to",
+        "tags": [
+          "Applications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationRecipients"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Chooses who applications from artists are emailed to",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipients": {
+                    "description": "Email addresses, which are trimmed, and blank ones and duplicates, whatever their case, are dropped. Then up to 10, each up to 200 characters",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "recipients"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationRecipients"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/applications/{id}": {
+      "get": {
+        "summary": "An application",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "application": {
+                      "$ref": "#/components/schemas/Application"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "application"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Changes an application",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dates": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "description": "Saved sorted, without duplicates. Past days are allowed"
+                  },
+                  "timeSlots": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/TimeSlotInput"
+                    },
+                    "description": "Saved sorted, without duplicates. None means any time"
+                  },
+                  "prestations": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PrestationId"
+                    },
+                    "description": "In any order, even more than once: saved in the order of the list, without duplicates"
+                  },
+                  "otherPrestation": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
+                  },
+                  "details": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Trimmed, then up to 2000 characters"
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "A date and time with its offset from UTC, which can be left without seconds. Not in the future"
+                  }
+                },
+                "required": [
+                  "dates",
+                  "timeSlots",
+                  "prestations",
+                  "otherPrestation",
+                  "details"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "application": {
+                      "$ref": "#/components/schemas/Application"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "application"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes an application",
+        "tags": [
+          "Applications"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/applications/{id}/status": {
+      "put": {
+        "summary": "Accepts or rejects an application, or gives it another status",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/ApplicationStatus"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "application": {
+                      "$ref": "#/components/schemas/Application"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "application"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications": {
+      "post": {
+        "summary": "A new artist applies, with their profile, their application and maybe a photo",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "artist": {
+                    "$ref": "#/components/schemas/ArtistProfile"
+                  },
+                  "application": {
+                    "$ref": "#/components/schemas/ApplicationFields"
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  },
+                  "turnstileToken": {
+                    "type": "string",
+                    "description": "The token the Turnstile widget gave the page"
+                  }
+                },
+                "required": [
+                  "artist",
+                  "application",
+                  "turnstileToken"
+                ]
+              },
+              "encoding": {
+                "artist": {
+                  "contentType": "application/json"
+                },
+                "application": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
             "description": "Default Response",
             "content": {
               "application/json": {

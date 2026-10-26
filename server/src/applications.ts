@@ -1,23 +1,22 @@
 import { desc, eq } from 'drizzle-orm'
-import { checkApplication } from 'shared/applications'
-import type { ApplicationFields, ApplicationStatus } from 'shared/applications'
-import { firstError } from 'shared/checks'
+import { ApplicationFields } from './application-fields.js'
+import type { ApplicationStatus } from './application-fields.js'
 import type { Queryable } from './db.js'
 import { violatesConstraint } from './query-errors.js'
 import { applications } from './schema.js'
 import { isUuid } from './uuid.js'
 
-// Checks applications against the rules in shared/src/applications.ts, and stores them in the database.
+// Checks applications against the rules in application-fields.ts, and stores them in the database.
 
 // Thrown when an application isn't valid. The message tells the artist what's wrong, in French.
 export class InvalidApplication extends Error {}
 
-// Checks an application's fields with `checkApplication`, and returns the cleaned-up version to store. Throws an
+// Checks an application's fields against `ApplicationFields`, and returns the cleaned-up version to store. Throws an
 // InvalidApplication, saying what's wrong with the first field that's wrong, otherwise.
 export function validateApplication(sent: unknown): ApplicationFields {
-  const { application, errors } = checkApplication(sent)
-  if (errors) throw new InvalidApplication(firstError(errors))
-  return application
+  const result = ApplicationFields.safeParse(sent)
+  if (!result.success) throw new InvalidApplication(result.error.issues[0].message)
+  return result.data
 }
 
 export type StoredApplication = typeof applications.$inferSelect

@@ -12,14 +12,19 @@ import type { components, paths } from './schema'
 //     const result = await api.POST('/api/admin/artists', { body: { artist, photo }, bodySerializer: formData })
 //
 // Like the helpers of ../api.ts, calls never throw: they return the response with `ok: true` if it succeeded, or else an
-// `ApiError`, including for failures that never reach the server.
+// `ApiError`, including for failures that never reach the server, which say so (see `Failure`).
 
 // A schema of the API, by name, e.g. `Schema<'Feature'>`.
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
 
 export type ApiError = Schema<'ApiError'>
 
-export type Result<Data> = (Data & { ok: true }) | ApiError
+// Why a request failed: the server's error, or, with `fromServer` set to false, what went wrong when the server didn't
+// answer with one, e.g. because the network failed, or because a proxy in front of it refused the request. Pages that
+// artists see show a message of their own then, since this one isn't meant for them.
+export type Failure = ApiError & { fromServer?: false }
+
+export type Result<Data> = (Data & { ok: true }) | Failure
 
 const client = createClient<paths>({
   // Absolute, since openapi-fetch builds a `Request`, which only accepts relative URLs in a browser, e.g. not in tests.
@@ -57,9 +62,10 @@ async function settle<Data>(request: Promise<{ data?: Data; error?: unknown; res
   try {
     const { data, error, response } = await request
     if (response.ok) return { ...data, ok: true } as Data & { ok: true }
-    return { ok: false, error: (error as Partial<ApiError> | undefined)?.error ?? 'Erreur inconnue' }
+    const message = (error as Partial<ApiError> | undefined)?.error
+    return typeof message === 'string' ? { ok: false, error: message } : { ok: false, error: 'Erreur inconnue', fromServer: false }
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    return { ok: false, error: error instanceof Error ? error.message : String(error), fromServer: false }
   }
 }
 

@@ -2,8 +2,8 @@ import { Readable } from 'node:stream'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, Ok, Timestamp, zodRoutes } from '../api-schemas.js'
-import { AdminArtistProfile, ArtistKind, ArtistLinks, Country, GenreId, PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_TYPES } from '../artist-profile.js'
+import { ApiError, ById, Ok, Timestamp, zodRoutes } from '../api-schemas.js'
+import { AdminArtistProfile, ArtistKind, ArtistLinks, Country, GenreId, PHOTO_TOO_LARGE, PHOTO_TYPES, PhotoFile } from '../artist-profile.js'
 import type { Profile } from '../artist-profile.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists.js'
 import type { ArtistsStore, Photos, SentPhoto, StoredArtist } from '../artists.js'
@@ -38,10 +38,7 @@ const ArtistResponse = z.object({ ok: z.literal(true), artist: Artist })
 
 // What adding an artist sends, as multipart/form-data, and changing one with `removePhoto`. The route reads it itself
 // (see `readArtist`): only the profile is checked against its schema here.
-const photo = z.file().meta({
-  description: `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents. An empty file is no photo`,
-})
-const NewArtistForm = z.object({ artist: AdminArtistProfile, photo: photo.optional() })
+const NewArtistForm = z.object({ artist: AdminArtistProfile, photo: PhotoFile.optional() })
 const ArtistForm = NewArtistForm.extend({
   removePhoto: z
     .string()
@@ -103,8 +100,6 @@ type ArtistsOptions = {
   store: ArtistsStore
   photos: Photos
 }
-
-const ById = z.object({ id: z.string() })
 
 export async function artistsRoutes(app: FastifyInstance, { store, photos }: ArtistsOptions) {
   // Needed by `readPhotoForm`, which sets its own limits.

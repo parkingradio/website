@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { firstError } from 'shared/checks'
 import { checkProfile, linkSite, parseLink, pickedPhotoError } from './artist-profile'
 import type { Profile, LinkSiteId } from './artist-profile'
 
@@ -9,7 +8,7 @@ import type { Profile, LinkSiteId } from './artist-profile'
 // What `checkProfile` returns of a valid profile, or throws the first error, as the server would answer.
 function validateProfile(sent: unknown, options?: { lenient?: boolean }): Profile {
   const { profile, errors } = checkProfile(sent, options)
-  if (errors) throw new Error(firstError(errors))
+  if (errors) throw new Error(Object.values(errors)[0])
   return profile
 }
 

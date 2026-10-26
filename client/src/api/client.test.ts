@@ -55,12 +55,12 @@ describe('api', () => {
 
   it("returns an error, rather than throwing, when the response isn't the API's", async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>Request Entity Too Large</html>', { status: 413 })))
-    expect(await api.GET('/api/admin/features')).toEqual({ ok: false, error: 'Erreur inconnue' })
+    expect(await api.GET('/api/admin/features')).toEqual({ ok: false, error: 'Erreur inconnue', fromServer: false })
   })
 
   it("returns an error, rather than throwing, when the server can't be reached", async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
-    expect(await api.GET('/api/admin/features')).toEqual({ ok: false, error: 'Failed to fetch' })
+    expect(await api.GET('/api/admin/features')).toEqual({ ok: false, error: 'Failed to fetch', fromServer: false })
   })
 })
 

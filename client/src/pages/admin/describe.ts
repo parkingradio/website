@@ -1,6 +1,6 @@
-import { PRESTATIONS } from 'shared/applications'
-import type { Application, ApplicationStatus, PrestationId } from 'shared/applications'
 import type { Schema } from '../../api/client'
+import { prestationName } from '../../application-fields'
+import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistKind, GenreId } from '../../artist-profile'
 
@@ -44,10 +44,6 @@ export const MISSING = '-'
 
 // Every country, by name, for picking one, after "Pays inconnu", which leaves the country out.
 export const COUNTRY_OPTIONS = [{ key: '', label: 'Pays inconnu' }, ...countryOptions()]
-
-export function prestationName(id: PrestationId): string {
-  return PRESTATIONS.find((prestation) => prestation.id === id)?.name ?? id
-}
 
 // E.g. "DJ, Vinyl, autre : synthé modulaire", or "" when there's none.
 export function describePrestations({ prestations, otherPrestation }: Pick<Application, 'prestations' | 'otherPrestation'>): string {

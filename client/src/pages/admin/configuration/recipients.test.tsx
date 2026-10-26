@@ -83,7 +83,7 @@ describe('Who applications are emailed to', () => {
     vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => (respond = resolve)))
     add('equipe@example.com')
     fireEvent.change(entry(), { target: { value: 'booking@' } })
-    respond({ ok: true, json: () => Promise.resolve({ ...CHOSEN, recipients: ['equipe@example.com'] }) } as Response)
+    respond(Response.json({ ...CHOSEN, recipients: ['equipe@example.com'] }))
 
     await waitFor(() => expect(shown()).toEqual(['equipe@example.com']))
     expect(entry()).toHaveValue('booking@')

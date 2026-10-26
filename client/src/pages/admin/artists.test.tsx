@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
-import type { Application } from 'shared/applications'
+import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist, Profile } from '../../artist-profile'
 import { mockFetch, requestsTo } from '../../test-utils'

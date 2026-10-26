@@ -1,19 +1,19 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { MAX_RECIPIENTS } from 'shared/applications'
-import type { ApplicationRecipientsRequest, ApplicationRecipientsResponse } from 'shared/applications'
+import { api } from '../../../api/client'
+import type { Schema } from '../../../api/client'
+import { useApi } from '../../../api/use-api'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../../../artist-profile'
-import { putJson } from '../../../api'
 import { byWhom } from '../describe'
 import { FieldError } from '../fields'
-import { useApi } from '../../../use-api'
 
 // Who the applications artists send are emailed to, in the configuration section.
 
-const RECIPIENTS_URL = '/api/admin/applications/recipients'
+// The most the server takes (see server/src/routes/applications.ts), which must be changed together with it.
+const MAX_RECIPIENTS = 10
 
 export function Recipients() {
-  const loaded = useApi<ApplicationRecipientsResponse>(RECIPIENTS_URL)
+  const loaded = useApi('/api/admin/applications/recipients')
 
   if (loaded.kind === 'loading') return null
   if (loaded.kind === 'error') {
@@ -28,7 +28,7 @@ export function Recipients() {
 
 // The recipients, as they're saved: each address is typed, then added with + (or Enter), or removed with its ×, which
 // saves the recipients right away.
-function RecipientsForm({ loaded }: { loaded: ApplicationRecipientsResponse }) {
+function RecipientsForm({ loaded }: { loaded: Schema<'ApplicationRecipients'> }) {
   const [saved, setSaved] = useState(loaded)
   // The address being typed, and what's wrong with it.
   const [entry, setEntry] = useState('')
@@ -42,7 +42,7 @@ function RecipientsForm({ loaded }: { loaded: ApplicationRecipientsResponse }) {
   // Returns whether the recipients were saved.
   const save = async (recipients: string[]) => {
     setBusy(true)
-    const result = await putJson<ApplicationRecipientsRequest, ApplicationRecipientsResponse>(RECIPIENTS_URL, { recipients })
+    const result = await api.PUT('/api/admin/applications/recipients', { body: { recipients } })
     setBusy(false)
     setError(result.ok ? null : result.error)
     if (result.ok) setSaved(result)

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { checkLine } from 'shared/checks'
 import type { Body } from '../../api/client'
 import {
   ARTIST_KINDS,
@@ -15,6 +14,7 @@ import {
   parseLink,
   pickedPhotoError,
 } from '../../artist-profile'
+import { checkLine } from '../../checks'
 import type { Artist, ArtistLinks, Profile, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { COUNTRY_OPTIONS, KIND_LABELS, genreName, photoUrl } from './describe'

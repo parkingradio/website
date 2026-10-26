@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication } from 'shared/applications'
-import type { ApplicationFields, ApplyResponse, PrestationId } from 'shared/applications'
-import type { ApiError } from 'shared/error'
+import { api, formData } from '../../api/client'
+import type { Schema } from '../../api/client'
+import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, prestationName } from '../../application-fields'
+import type { ApplicationFields, PrestationId } from '../../application-fields'
 import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, countryOptions, parseLink, pickedPhotoError } from '../../artist-profile'
 import type { ArtistKind, Profile, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
@@ -190,25 +191,20 @@ export function ApplicationForm() {
       return
     }
 
-    const body = new FormData()
-    body.append('artist', JSON.stringify(profile))
-    body.append('application', JSON.stringify(application))
-    if (form.photo) body.append('photo', form.photo)
-    body.append('turnstileToken', turnstileToken)
     setStatus({ state: 'sending' })
-    let error = SEND_FAILED
-    try {
-      const response = await fetch('/api/applications', { method: 'POST', body })
-      const result: ApplyResponse | ApiError = await response.json()
-      if (result.ok) {
-        setStatus({ state: 'sent', email: profile.email })
-        return
-      }
-      // The server explains what's wrong in French, e.g. that an artist already has that email address.
-      error = result.error || SEND_FAILED
-    } catch {
-      // The network failed, or the answer wasn't the server's, e.g. a photo too large for the proxy in front of it.
+    const sent = await api.POST('/api/applications', {
+      // Without `lenient`, `checkProfile` only returns what artists can send, e.g. with a country, which its type doesn't
+      // say.
+      body: { artist: profile as Schema<'ArtistProfile'>, application, photo: form.photo ?? undefined, turnstileToken },
+      bodySerializer: formData,
+    })
+    if (sent.ok) {
+      setStatus({ state: 'sent', email: profile.email })
+      return
     }
+    // The server explains what's wrong in French, e.g. that an artist already has that email address. Otherwise, the
+    // network failed, or the answer wasn't the server's, e.g. a photo too large for the proxy in front of it.
+    const error = (sent.fromServer !== false && sent.error) || SEND_FAILED
     // The server may have checked the token, which can only be checked once.
     setTurnstileToken(null)
     setTurnstileWidget((count) => count + 1)
@@ -409,7 +405,7 @@ export function ApplicationForm() {
                 Type de prestation <span className="required">*</span>
               </legend>
               <div className="chips">
-                {PRESTATIONS.map(({ id, name }) => (
+                {PRESTATIONS.map((id) => (
                   <label key={id} className="chip">
                     <input
                       type="checkbox"
@@ -417,7 +413,7 @@ export function ApplicationForm() {
                       aria-invalid={errors.prestations ? true : undefined}
                       onChange={(event) => update('prestations', toggled(form.prestations, id, event.target.checked))}
                     />
-                    <span>{name}</span>
+                    <span>{prestationName(id)}</span>
                   </label>
                 ))}
                 <label className="chip">

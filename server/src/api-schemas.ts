@@ -1,4 +1,4 @@
-import type { FastifyInstance, RouteOptions } from 'fastify'
+import type { FastifyError, FastifyInstance, FastifySchemaValidationError, RouteOptions } from 'fastify'
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
@@ -28,20 +28,11 @@ export const ApiError = z.object({ ok: z.literal(false), error: z.string() }).me
 // What requests that succeed respond when there's nothing else to say.
 export const Ok = z.object({ ok: z.literal(true) }).meta({ id: 'Ok' })
 
-// A date and time, as an ISO 8601 string. It's checked like `z.iso.datetime`, which openapi.json would show as a long
-// regular expression: only its format, `date-time`, is shown instead.
-const isoDateTime = z.iso.datetime({ offset: true })
-export const Timestamp = z
-  .string()
-  .refine((value) => isoDateTime.safeParse(value).success, 'Invalid date and time')
-  .meta({ format: 'date-time' })
+// The parameters of a path with an id, e.g. `/api/admin/artists/:id`.
+export const ById = z.object({ id: z.string() })
 
-// A day, "YYYY-MM-DD", that exists. It's checked like `z.iso.date`, and shown as only its format, `date`, like `Timestamp`.
-const isoDate = z.iso.date()
-export const Day = z
-  .string()
-  .refine((value) => isoDate.safeParse(value).success, 'Invalid date')
-  .meta({ format: 'date' })
+// Formats, e.g. `Timestamp`, which modules other than the routes' use too, e.g. the database's schema.
+export { Day, Timestamp } from './api-formats.js'
 
 // The errors that routes can fail with because of what they are, which they don't declare:
 // - 400 when the route has a schema for its request, which refuses the requests that don't match it (or describes a
@@ -96,11 +87,18 @@ export function useZodSchemas(app: FastifyInstance) {
   })
 }
 
+// For routes whose schemas' messages are whole sentences, e.g. in French where artists see them, as their
+// `schemaErrorFormatter` (e.g. a plugin's, with `setSchemaErrorFormatter`): a request that doesn't match gets the message
+// of its first issue, as it is, rather than every issue with where it is (see `useZodSchemas`). The issues are in the
+// order of the schema's fields.
+export const firstIssue = (errors: FastifySchemaValidationError[]) => new Error(errors[0].message)
+
 // The routes of a plugin, declared with zod schemas. Their responses get the generic errors, and admin routes check the
 // session (see `addGenericErrors`). Their errors are sent as an `ApiError` (see query-errors.ts), which also logs
-// `message` for unexpected ones.
-export function zodRoutes(app: FastifyInstance, message: string) {
-  keepQueryValuesPrivate(app, message)
+// `message` for unexpected ones. `clientError` can choose the message of the 4xx errors that Fastify or a plugin
+// raises, e.g. to have it in French.
+export function zodRoutes(app: FastifyInstance, message: string, clientError?: (error: FastifyError) => string) {
+  keepQueryValuesPrivate(app, message, clientError)
   // Unless a parent plugin already did, since its routes are this plugin's too.
   if (!app.hasDecorator('zodRoutes')) {
     app.decorate('zodRoutes', true)

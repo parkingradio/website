@@ -1688,6 +1688,707 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every application, or an artist's, the most recently received first */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this artist's applications. An unknown artist has none */
+                    artist?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            applications: components["schemas"]["Application"][];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Creates an application for an artist */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Saved sorted, without duplicates. Past days are allowed */
+                        dates: string[];
+                        /** @description Saved sorted, without duplicates. None means any time */
+                        timeSlots: components["schemas"]["TimeSlotInput"][];
+                        /** @description In any order, even more than once: saved in the order of the list, without duplicates */
+                        prestations: components["schemas"]["PrestationId"][];
+                        /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
+                        otherPrestation: string;
+                        /** @description Trimmed, then up to 2000 characters */
+                        details: string;
+                        /**
+                         * Format: date-time
+                         * @description A date and time with its offset from UTC, which can be left without seconds. Not in the future
+                         */
+                        receivedAt?: string;
+                        artistId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            application: components["schemas"]["Application"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/applications/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who applications from artists are emailed to */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationRecipients"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        /** Chooses who applications from artists are emailed to */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Email addresses, which are trimmed, and blank ones and duplicates, whatever their case, are dropped. Then up to 10, each up to 200 characters */
+                        recipients: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationRecipients"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/applications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An application */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            application: components["schemas"]["Application"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        /** Changes an application */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Saved sorted, without duplicates. Past days are allowed */
+                        dates: string[];
+                        /** @description Saved sorted, without duplicates. None means any time */
+                        timeSlots: components["schemas"]["TimeSlotInput"][];
+                        /** @description In any order, even more than once: saved in the order of the list, without duplicates */
+                        prestations: components["schemas"]["PrestationId"][];
+                        /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
+                        otherPrestation: string;
+                        /** @description Trimmed, then up to 2000 characters */
+                        details: string;
+                        /**
+                         * Format: date-time
+                         * @description A date and time with its offset from UTC, which can be left without seconds. Not in the future
+                         */
+                        receivedAt?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            application: components["schemas"]["Application"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Deletes an application */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Ok"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/applications/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Accepts or rejects an application, or gives it another status */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        status: components["schemas"]["ApplicationStatus"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            application: components["schemas"]["Application"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new artist applies, with their profile, their application and maybe a photo */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        artist: components["schemas"]["ArtistProfile"];
+                        application: components["schemas"]["ApplicationFields"];
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         */
+                        photo?: Blob;
+                        /** @description The token the Turnstile widget gave the page */
+                        turnstileToken: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Ok"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/features": {
         parameters: {
             query?: never;
@@ -1912,6 +2613,46 @@ export interface components {
             ok: false;
             error: string;
         };
+        Application: {
+            id: string;
+            artistId: string;
+            /** Format: date-time */
+            receivedAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: string | null;
+            dates: string[];
+            timeSlots: components["schemas"]["TimeSlot"][];
+            prestations: components["schemas"]["PrestationId"][];
+            otherPrestation: string;
+            details: string;
+            updatedBy: string | null;
+            updatedAt: string | null;
+            status: components["schemas"]["ApplicationStatus"];
+            statusUpdatedBy: string | null;
+            statusUpdatedAt: string | null;
+        };
+        ApplicationFields: {
+            /** @description Saved sorted, without duplicates. Past days are allowed */
+            dates: string[];
+            /** @description Saved sorted, without duplicates. None means any time */
+            timeSlots: components["schemas"]["TimeSlotInput"][];
+            /** @description In any order, even more than once: saved in the order of the list, without duplicates */
+            prestations: components["schemas"]["PrestationId"][];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
+            otherPrestation: string;
+            /** @description Trimmed, then up to 2000 characters */
+            details: string;
+        };
+        ApplicationRecipients: {
+            /** @constant */
+            ok: true;
+            recipients: string[];
+            updatedBy: string | null;
+            updatedAt: string | null;
+        };
+        /** @enum {string} */
+        ApplicationStatus: "new" | "accepted" | "scheduled" | "done" | "rejected";
         Artist: {
             id: string;
             /** Format: date-time */
@@ -1943,6 +2684,65 @@ export interface components {
             youtube?: string;
             spotify?: string;
             tiktok?: string;
+        };
+        ArtistProfile: {
+            /** @constant */
+            kind: "artist";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description Ignored: only a collective has members */
+            members?: unknown;
+            country: components["schemas"]["Country"];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            /** @description By site, a link to the artist's profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            links: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            };
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
+            phone: string;
+        } | {
+            /** @constant */
+            kind: "collective";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
+            members: string[];
+            country: components["schemas"]["Country"];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            /** @description By site, a link to the artist's profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            links: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            };
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
+            phone: string;
         };
         ChosenPlaylist: {
             url: string;
@@ -2007,6 +2807,8 @@ export interface components {
             /** @constant */
             ok: true;
         };
+        /** @enum {string} */
+        PrestationId: "dj" | "vinyl" | "live-performance" | "rap" | "full-band";
         Radio: {
             current: {
                 track: components["schemas"]["RadioTrack"];
@@ -2052,6 +2854,16 @@ export interface components {
             /** @constant */
             kind: "rotation";
             track: components["schemas"]["RadioTrack"];
+        };
+        /** @description In Québec time, ending later the same day */
+        TimeSlot: {
+            start: string;
+            end: string;
+        };
+        /** @description In Québec time, ending later the same day */
+        TimeSlotInput: {
+            start: string;
+            end: string;
         };
         UnexpectedTrack: {
             /** @constant */

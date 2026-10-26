@@ -1,10 +1,14 @@
-// Helpers for the checks in applications.ts, and the client's copy of the server's profile rules. What's wrong is said in French, since artists see it.
+// Helpers for the client's copies of the server's rules (see artist-profile.ts and application-fields.ts). What's wrong is
+// said in French, since artists see it.
+//
+// They're copies of how the server checks text (see `text` and `line` in server/src/artist-profile.ts), and must be
+// changed together with it.
 
 // The cleaned-up value of a field, or what's wrong with it.
 export type Checked<T> = { value: T; error?: undefined } | { value?: undefined; error: string }
 
-// What's wrong with each field of a `T` that isn't valid, in the order the fields were checked in, which `firstError`
-// relies on. Fields that are fine are left out.
+// What's wrong with each field of a `T` that isn't valid, in the order the fields were checked in, which is the order of
+// the server's checks, which answer with the first error. Fields that are fine are left out.
 export type FieldErrors<T> = Partial<Record<keyof T, string>>
 
 // The text in `value`, trimmed. `field` names it in the error when it's too long, e.g. "La bio", and `missing` is the
@@ -22,7 +26,9 @@ export function checkLine(value: unknown, field: string, maxLength: number, miss
   return checkText(typeof value === 'string' ? value.replace(/\s+/g, ' ') : value, field, maxLength, missing)
 }
 
-// The first of `errors`, e.g. to say what's wrong when only one thing can be said.
-export function firstError<T>(errors: FieldErrors<T>): string {
-  return Object.values<string | undefined>(errors).find(Boolean) ?? ''
+// The list of every `T`, e.g. a copy of one of the server's lists: the compiler refuses a value that isn't a `T`, and says
+// which are missing.
+export function everyOne<T extends string>() {
+  return <const List extends readonly T[]>(list: List & ([Exclude<T, List[number]>] extends [never] ? unknown : { missing: Exclude<T, List[number]> })) =>
+    list
 }

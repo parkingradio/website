@@ -33,8 +33,9 @@ then shows:
 Form: a form with the artist, picked from those in the "Artistes" section, the day the application was received (today
 if it's left empty), then the application itself. An artist's page leads to it with that artist picked already. The
 application form says what's wrong with each field once it's left, like the artist form (see
-[Artistes](artistes.md)), with the rules and messages of the server (see
-[Applications](../../server/artists.md#applications)).
+[Artistes](artistes.md)): it checks the application as the server does (see
+[Applications](../../server/artists.md#applications)), for immediate feedback. The server's check is the one that counts:
+if it refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints
 

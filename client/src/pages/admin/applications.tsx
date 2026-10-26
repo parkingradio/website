@@ -1,17 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { APPLICATION_STATUSES } from 'shared/applications'
-import type {
-  Application,
-  ApplicationResponse,
-  ApplicationStatus,
-  ApplicationStatusRequest,
-  ApplicationsResponse,
-  CreateApplicationRequest,
-  DeleteApplicationResponse,
-  UpdateApplicationRequest,
-} from 'shared/applications'
-import { deleteJson, postJson, putJson } from '../../api'
+import { api } from '../../api/client'
+import { useApi } from '../../api/use-api'
+import { APPLICATION_STATUSES } from '../../application-fields'
+import type { Application, ApplicationStatus } from '../../application-fields'
+import type { Artist } from '../../artist-profile'
 import { ApplicationForm } from './application-form'
 import {
   KIND_LABELS,
@@ -29,10 +22,6 @@ import {
 import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { useApi } from '../../api/use-api'
-import type { Artist } from '../../artist-profile'
-// For the applications, which aren't in openapi.json yet.
-import { useApi as useUntypedApi } from '../../use-api'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in an application that came through the Google Form.
@@ -150,7 +139,7 @@ function applicationSearchFields(application: Application): string[] {
 // Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
 // those with the status in the `statut` query parameter. The status's buttons count the applications the search finds.
 function ApplicationsList({ query }: { query: string }) {
-  const applications = useUntypedApi<ApplicationsResponse>('/api/admin/applications')
+  const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
   // Without the artists, the applications are still listed, without their names.
   const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
@@ -210,7 +199,7 @@ export function ApplicationPage() {
 }
 
 function ApplicationById({ id }: { id: string }) {
-  const loaded = useUntypedApi<ApplicationResponse>(`/api/admin/applications/${encodeURIComponent(id)}`)
+  const loaded = useApi('/api/admin/applications/{id}', { params: { path: { id } } })
 
   if (loaded.kind === 'loading') return <BackToApplications />
   if (loaded.kind === 'error') {
@@ -234,7 +223,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
-  const url = `/api/admin/applications/${application.id}`
+  const params = { path: { id: application.id } }
   const name = artist.kind === 'loaded' ? artist.value.artist.name : null
   const title = <h1>{name ? `Candidature de ${name}` : 'Candidature'}</h1>
 
@@ -248,7 +237,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
           onSubmit={async (fields) => {
-            const result = await putJson<UpdateApplicationRequest, ApplicationResponse>(url, fields)
+            const result = await api.PUT('/api/admin/applications/{id}', { params, body: fields })
             if (!result.ok) return `La candidature n'a pas pu être enregistrée : ${result.error}`
             setApplication(result.application)
             setEditing(false)
@@ -262,7 +251,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
   const changeStatus = async (status: ApplicationStatus) => {
     setBusy(true)
     setError(null)
-    const result = await putJson<ApplicationStatusRequest, ApplicationResponse>(`${url}/status`, { status })
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status } })
     setBusy(false)
     if (result.ok) setApplication(result.application)
     else setError(`Le statut n'a pas pu être changé : ${result.error}`)
@@ -272,7 +261,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
     if (!window.confirm(`Supprimer définitivement cette candidature${name ? ` de ${name}` : ''} ?`)) return
     setBusy(true)
     setError(null)
-    const result = await deleteJson<DeleteApplicationResponse>(url)
+    const result = await api.DELETE('/api/admin/applications/{id}', { params })
     if (result.ok) {
       navigate('/admin/candidatures')
     } else {
@@ -401,7 +390,7 @@ export function NewApplicationPage() {
         artists={{ all: artists.value.artists, initial: searchParams.get('artiste') }}
         submitLabel="créer la candidature"
         onSubmit={async (fields, artistId) => {
-          const result = await postJson<CreateApplicationRequest, ApplicationResponse>('/api/admin/applications', { ...fields, artistId })
+          const result = await api.POST('/api/admin/applications', { body: { ...fields, artistId } })
           if (!result.ok) return `La candidature n'a pas pu être créée : ${result.error}`
           navigate(`/admin/candidatures/${result.application.id}`)
           return null

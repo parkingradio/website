@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
-import type { ApplicationFields } from 'shared/applications'
+import { useZodSchemas } from '../api-schemas.js'
+import type { ApplicationFields } from '../application-fields.js'
 import type { StoredApplication } from '../applications.js'
 import type { ApplicationsSettingsStore } from '../applications-settings.js'
 import type { ApplyStore } from '../apply.js'
@@ -147,6 +148,7 @@ function multipart(parts: Parts = {}) {
 // MAIL_DOMAIN.
 async function buildApp(logs?: string[], { canEmail = true } = {}) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+  useZodSchemas(app)
   await app.register(applyRoutes, { store, photos, verifyTurnstile, settings, sendEmail: canEmail ? sendEmail : null })
   return app
 }
@@ -264,6 +266,13 @@ describe('POST /api/applications', () => {
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },
+      // Malformed, rather than only invalid, which the form never sends, but still explained in French.
+      { parts: { artist: 'null' }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
+      { parts: { application: 'null' }, error: 'Choisissez au moins une date.' },
+      { parts: { application: { ...fields(), timeSlots: '18:00-22:00' } }, error: 'Les plages horaires sont invalides.' },
+      { parts: { application: { ...fields(), prestations: undefined } }, error: 'Les prestations sont invalides.' },
+      { parts: { application: { ...fields(), otherPrestation: 42 } }, error: 'La prestation « Autre » est invalide.' },
+      { parts: { application: { ...fields(), details: null } }, error: 'Le champ « Questions ou détails » est invalide.' },
     ]
     for (const { parts, error } of invalid) {
       const response = await apply(app, parts)
