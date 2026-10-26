@@ -6,15 +6,15 @@ At `/admin/candidatures`: the artists' applications for a set, for the team to g
 list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a few words.
 
 The section lists every application, the most recently received first, with when it was received ("reçue le"), the
-artist, their first few dates, the prestations and the status. Buttons above the list show only the applications with
-a status, with how many there are of each.
+artist, their city and genres, their first few dates, the prestations and the status. Buttons above the list show only
+the applications with a status, with how many there are of each.
 
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist,
 like in [Artistes](artistes.md), their prestations, their questions or details, and the days the artist would like to
 play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the applications with a day in
-December, or a Thursday. Clicking "Reçue le", "Artiste", "Dates" (by the first day the artist would like to play) or
-"Statut" (nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that column, and clicking it again sorts
-it the other way around. The status buttons count the applications the search finds.
+December, or a Thursday. Clicking "Reçue le", "Artiste", "Ville" (by city, then country), "Dates" (by the first day the
+artist would like to play) or "Statut" (nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that
+column, and clicking it again sorts it the other way around. The status buttons count the applications the search finds.
 
 Under the list, a line says that who the applications artists send are emailed to is chosen in
 [Configuration](configuration.md), and links to it.
@@ -43,6 +43,6 @@ if it refuses what the form accepted, the form shows the server's message.
 - `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/status` and
   `DELETE /api/admin/applications/:id`, for an application's page.
 - `POST /api/admin/applications`, for "nouvelle candidature".
-- `GET /api/admin/artists`, for the artists' names in the list, to search the applications by them, and to pick the
-  artist of a new application.
+- `GET /api/admin/artists`, for the artists' names, cities and genres in the list, to search the applications by them,
+  and to pick the artist of a new application.
 - `GET /api/admin/artists/:id`, for the artist on an application's page.

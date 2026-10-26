@@ -3,8 +3,9 @@ import { prestationName } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistKind, GenreId } from '../../artist-profile'
+import { compareText } from './list'
 
-// How the admin sections show what the API returns, and search it.
+// How the admin sections show what the API returns, search it and sort it.
 
 export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', collective: 'collectif' }
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
@@ -64,6 +65,11 @@ export function countryOf({ country }: { country: string }): string {
 // E.g. "Québec, Canada", or only the city or the country, when the other one is left out.
 export function place(artist: { city: string; country: string }): string {
   return [artist.city, countryOf(artist)].filter(Boolean).join(', ') || MISSING
+}
+
+// Sorts places by city, then country, for the lists. What's left out comes first.
+export function comparePlaces(a: { city: string; country: string }, b: { city: string; country: string }): number {
+  return compareText(a.city, b.city) || compareText(countryOf(a), countryOf(b))
 }
 
 // E.g. "techno, ambient", most important first.

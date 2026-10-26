@@ -285,12 +285,14 @@ describe('An artist’s page', () => {
     '/api/admin/applications?artist=artist-1': { ok: true, applications: APPLICATIONS },
   }
 
-  it('lists their applications without sorting them, since there are few', async () => {
+  it('lists their applications, without sorting them since there are few, or the columns about the artist', async () => {
     mockFetch(AURORE_PAGE)
     renderAt('/admin/artistes/artist-1')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(within(screen.getByRole('table')).queryAllByRole('button')).toHaveLength(0)
+    // They're all theirs, so nothing about the artist is listed.
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 

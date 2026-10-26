@@ -340,6 +340,11 @@
   white-space: nowrap;
 }
 
+/* An application's days, in the list, wrap between them rather than within one. */
+.admin-day {
+  white-space: nowrap;
+}
+
 .admin-status-new {
   font-weight: 700;
 }

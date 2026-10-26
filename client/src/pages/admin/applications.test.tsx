@@ -29,8 +29,9 @@ function artist(id: string, name: string): Artist {
   }
 }
 
-const AURORE = artist('artist-1', 'Aurore')
-const BRUME = artist('artist-2', 'Brume')
+const AURORE: Artist = { ...artist('artist-1', 'Aurore'), genres: ['techno', 'ambient'] }
+// An admin left out her city and genres.
+const BRUME: Artist = { ...artist('artist-2', 'Brume'), city: '', genres: [] }
 const ARTISTS = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] } }
 
 const APPLICATION: Application = {
@@ -97,11 +98,12 @@ describe('The list of applications', () => {
     renderAt('/admin/candidatures')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    // Brume's genres are left out, and so is her city, which leaves her country.
     expect(rows()).toEqual([
-      ['8 octobre 2026', 'Aurore', '29 oct. 2026', 'Vinyl', 'faite'],
-      ['7 octobre 2026', 'Brume', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
-      ['6 octobre 2026', 'Aurore', '12 nov. 2026', 'Full Band', 'retenue'],
-      ['28 mars 2026', 'Aurore', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
+      ['8 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '29 oct. 2026', 'Vinyl', 'faite'],
+      ['7 octobre 2026', 'Brume', 'Canada', '-', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
+      ['6 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '12 nov. 2026', 'Full Band', 'retenue'],
+      ['28 mars 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
     ])
     // There's nothing more to do about an application that's done, so it's greyed out like a rejected one.
     expect(screen.getByRole('cell', { name: 'faite' })).toHaveClass('admin-status-done')
@@ -142,7 +144,8 @@ describe('The list of applications', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
-    expect(rows().map((row) => row[1])).toEqual(['artiste inconnu', 'artiste inconnu', 'artiste inconnu', 'artiste inconnu'])
+    // Their places and genres are unknown too, rather than left out.
+    expect(rows().map((row) => row.slice(1, 4))).toEqual(Array(4).fill(['artiste inconnu', '', '']))
   })
 
   it('says when there are no applications', async () => {
@@ -253,8 +256,9 @@ describe('Sorting the list of applications', () => {
 
     const header = await screen.findByRole('columnheader', { name: 'Reçue le' })
     expect(header).toHaveAttribute('aria-sort', 'descending')
-    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le ↓', 'Artiste', 'Dates', 'Prestations', 'Statut'])
-    // There's no order to prestations.
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le ↓', 'Artiste', 'Ville', 'Genres', 'Dates', 'Prestations', 'Statut'])
+    // There's no order to genres or prestations.
+    expect(within(screen.getByRole('columnheader', { name: 'Genres' })).queryByRole('button')).not.toBeInTheDocument()
     expect(within(screen.getByRole('columnheader', { name: 'Prestations' })).queryByRole('button')).not.toBeInTheDocument()
 
     fireEvent.click(within(header).getByRole('button'))
@@ -284,12 +288,26 @@ describe('Sorting the list of applications', () => {
     ])
   })
 
+  it('sorts the applications by their artists’ places, those left out first', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ville' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?tri=ville&ordre=asc$/)
+    expect(rows().map((row) => [row[0], row[2]])).toEqual([
+      ['7 octobre 2026', 'Canada'],
+      ['8 octobre 2026', 'Montréal, Canada'],
+      ['6 octobre 2026', 'Montréal, Canada'],
+      ['28 mars 2026', 'Montréal, Canada'],
+    ])
+  })
+
   it('sorts the applications by the first day their artists would like to play', async () => {
     mockFetch(LISTED)
     renderAt('/admin/candidatures?tri=recue&ordre=asc')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Dates' }))
-    expect(rows().map((row) => row[2])).toEqual(['29 oct. 2026', '5 nov. 2026', '12 nov. 2026', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)'])
+    expect(rows().map((row) => row[4])).toEqual(['29 oct. 2026', '5 nov. 2026', '12 nov. 2026', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)'])
   })
 
   it('sorts the applications by status, in the order they usually go through them', async () => {
@@ -297,7 +315,7 @@ describe('Sorting the list of applications', () => {
     renderAt('/admin/candidatures')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Statut' }))
-    expect(rows().map((row) => row[4])).toEqual(['nouvelle', 'retenue', 'faite', 'refusée'])
+    expect(rows().map((row) => row[6])).toEqual(['nouvelle', 'retenue', 'faite', 'refusée'])
   })
 })
 

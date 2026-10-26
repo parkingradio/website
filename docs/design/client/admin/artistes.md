@@ -15,8 +15,9 @@ photo" in its place, so that the team notices), their links rebuilt from the pro
 applied by themselves) and who last changed them. A button changes the artist in a form in its place. The form shows the
 artist's photo with an × that removes it once the artist is saved, and a photo that's chosen replaces it, shown in its
 place with an × that takes it back. Under it, their applications are listed like in [Candidatures](candidatures.md),
-with a button to create another one. At the bottom, the artist can be deleted for good, with their photo, if they have
-one, and applications, after confirming.
+with a button to create another one. Since they're all the artist's, the list doesn't show the artist, their city or
+genres, and since they're few, it can't be searched, filtered or sorted. At the bottom, the artist can be deleted for
+good, with their photo, if they have one, and applications, after confirming.
 
 ## Adding an artist
 

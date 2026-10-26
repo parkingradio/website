@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
@@ -13,10 +13,12 @@ import {
   STATUS_PLURALS,
   artistSearchFields,
   byWhom,
+  comparePlaces,
   dateFormat,
   describePrestations,
   formatDay,
   formatShortDay,
+  genreNames,
   place,
 } from './describe'
 import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
@@ -39,21 +41,24 @@ function BackToApplications() {
 
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
 // them.
-type ApplicationColumn = 'recue' | 'artiste' | 'dates' | 'statut'
+type ApplicationColumn = 'recue' | 'artiste' | 'ville' | 'dates' | 'statut'
 
 function applicationColumns(artists: Map<string, Artist>): Record<ApplicationColumn, SortColumn<Application>> {
   const name = (application: Application) => artists.get(application.artistId)?.name ?? ''
+  // An unknown artist has no city or country, like an artist whose place is left out.
+  const placeOf = (application: Application) => artists.get(application.artistId) ?? { city: '', country: '' }
   return {
     recue: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
     artiste: { compare: (a, b) => compareText(name(a), name(b)) },
+    ville: { compare: (a, b) => comparePlaces(placeOf(a), placeOf(b)) },
     // By the first day the artist would like to play.
     dates: { compare: (a, b) => a.dates[0].localeCompare(b.dates[0]) },
     statut: { compare: (a, b) => APPLICATION_STATUSES.indexOf(a.status) - APPLICATION_STATUSES.indexOf(b.status) },
   }
 }
 
-// Applications, as listed in this section, or on an artist's page, where `artists` is left out since they're all theirs.
-// The columns sort the list when there's `sorting`.
+// Applications, as listed in this section, or on an artist's page, where `artists` is left out since they're all theirs,
+// and so are the columns about the artist. The columns sort the list when there's `sorting`.
 export function ApplicationsTable({
   applications,
   artists,
@@ -76,7 +81,13 @@ export function ApplicationsTable({
       <thead>
         <tr>
           {header('recue', 'Reçue le')}
-          {artists && header('artiste', 'Artiste')}
+          {artists && (
+            <>
+              {header('artiste', 'Artiste')}
+              {header('ville', 'Ville')}
+              <th>Genres</th>
+            </>
+          )}
           {header('dates', 'Dates')}
           <th>Prestations</th>
           {header('statut', 'Statut')}
@@ -85,18 +96,29 @@ export function ApplicationsTable({
       <tbody>
         {applications.map((application) => {
           const more = application.dates.length - LISTED_DATES
+          // Unknown when the artists couldn't be loaded, which leaves their place and genres blank rather than left out.
+          const artist = artists?.get(application.artistId)
           return (
             <tr key={application.id}>
               <td>
                 <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.receivedAt))}</Link>
               </td>
               {artists && (
-                <td>
-                  <Link to={`/admin/artistes/${application.artistId}`}>{artists.get(application.artistId)?.name ?? 'artiste inconnu'}</Link>
-                </td>
+                <>
+                  <td>
+                    <Link to={`/admin/artistes/${application.artistId}`}>{artist?.name ?? 'artiste inconnu'}</Link>
+                  </td>
+                  <td>{artist && place(artist)}</td>
+                  <td>{artist && genreNames(artist.genres)}</td>
+                </>
               )}
               <td>
-                {application.dates.slice(0, LISTED_DATES).map(formatShortDay).join(', ')}
+                {application.dates.slice(0, LISTED_DATES).map((day, i) => (
+                  <Fragment key={day}>
+                    {i > 0 && ', '}
+                    <span className="admin-day">{formatShortDay(day)}</span>
+                  </Fragment>
+                ))}
                 {more > 0 && ` (+${more})`}
               </td>
               <td>{describePrestations(application)}</td>
@@ -141,7 +163,7 @@ function applicationSearchFields(application: Application): string[] {
 function ApplicationsList({ query }: { query: string }) {
   const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
-  // Without the artists, the applications are still listed, without their names.
+  // Without the artists, the applications are still listed, without their names, places and genres.
   const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
   const sorting = useSort(applicationColumns(byId), 'recue')
   const [params, change] = useQueryParams()

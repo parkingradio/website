@@ -6,7 +6,7 @@ import { ARTIST_KINDS, LINK_SITES } from '../../artist-profile'
 import type { Artist } from '../../artist-profile'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
-import { KIND_LABELS, MISSING, artistSearchFields, byWhom, countryOf, dateFormat, genreNames, photoUrl, place } from './describe'
+import { KIND_LABELS, MISSING, artistSearchFields, byWhom, comparePlaces, dateFormat, genreNames, photoUrl, place } from './describe'
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
@@ -14,12 +14,11 @@ import { SearchField, SortHeader } from './list-controls'
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
 // bring in an application that came through the Google Form.
 
-// The columns the list of artists can be sorted by: artists come before collectives, and places are sorted by city, then
-// country. What's left out comes first.
+// The columns the list of artists can be sorted by, where artists come before collectives.
 const ARTIST_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Artist>> = {
   nom: { compare: (a, b) => compareText(a.name, b.name) },
   type: { compare: (a, b) => ARTIST_KINDS.indexOf(a.kind) - ARTIST_KINDS.indexOf(b.kind) },
-  ville: { compare: (a, b) => compareText(a.city, b.city) || compareText(countryOf(a), countryOf(b)) },
+  ville: { compare: comparePlaces },
 }
 
 function BackToArtists() {
