@@ -6,8 +6,8 @@ import type { ComboboxOption } from './combobox'
 // How an artist's profile is shown and checked in the browser, by the admin pages and by the "Appliquer" form alike.
 //
 // The forms check profiles as the server does, to say what's wrong right away, with a copy of the server's rules: its
-// lists, limits, link parsing and messages (see server/src/artist-profile.ts), which must be changed together with these.
-// The server's are the ones that count: when they disagree, the server's message shows.
+// lists, limits, link parsing and messages (see server/src/artists/profile.ts), which must be changed together with
+// these. The server's are the ones that count: when they disagree, the server's message shows.
 
 export type Artist = Schema<'Artist'>
 export type ArtistKind = Schema<'ArtistKind'>
@@ -47,7 +47,7 @@ export const COUNTRIES = everyOne<Country>()([
 ])
 
 // The genres' names, in French, in the order the admin pages list them (the "Appliquer" form groups them: see
-// GENRE_GROUPS in pages/appliquer/choices.ts). The server emails them too (see server/src/application-emails.ts), and
+// GENRE_GROUPS in pages/appliquer/choices.ts). The server emails them too (see server/src/applications/emails.ts), and
 // they must be changed together.
 const GENRE_NAMES: Record<GenreId, string> = {
   house: 'house',

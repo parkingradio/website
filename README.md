@@ -29,6 +29,10 @@ The app is an npm-workspaces monorepo: `client` (Vite + React), `server` (Fastif
 the API are generated from the server's schemas (see "Testing and building" below, and
 [docs/design](docs/design/README.md)).
 
+The server's code, in `server/src`, has a folder for each area of the [server's design](docs/design/server/README.md),
+with `applications` for the applications part of `artists.md`, and `site` for serving the client, `/healthz` and
+`/api/config`. What the areas share is in `core`, `api` and `db`.
+
 ### Prerequisites
 
 - Node.js, matching the version in `.nvmrc` (use `nvm use` if you have nvm installed)

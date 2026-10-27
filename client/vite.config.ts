@@ -8,7 +8,7 @@ import react from '@vitejs/plugin-react'
 // README). It's read the way the server reads it (`node --env-file`): what's set takes precedence over the file.
 const envFile = path.join(import.meta.dirname, '../.env')
 const env = { ...(existsSync(envFile) ? parseEnv(readFileSync(envFile, 'utf8')) : {}), ...process.env }
-// The checkout's server (see `port` in server/src/config.ts).
+// The checkout's server (see `port` in server/src/core/config.ts).
 const server = `http://localhost:${env.SERVER_PORT || env.PORT || 3000}`
 
 // https://vite.dev/config/

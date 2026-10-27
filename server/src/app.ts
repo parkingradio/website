@@ -1,30 +1,30 @@
 import type { FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
-import type { AdminsStore } from './admins.js'
-import { useZodSchemas } from './api-schemas.js'
-import type { ApplicationsStore } from './applications.js'
-import type { ApplicationsSettingsStore } from './applications-settings.js'
-import type { ApplyStore } from './apply.js'
-import type { ArtistsStore, Photos } from './artists.js'
-import type { Queryable } from './db.js'
-import type { SendEmail } from './email.js'
-import type { FeaturesStore } from './features.js'
-import type { OnAirStore } from './on-air.js'
-import type { RadioSettingsStore } from './radio-settings.js'
-import type { SoundCloudClient, SoundCloudCredentials } from './soundcloud.js'
-import type { SoundCloudCredentialsStore } from './soundcloud-credentials.js'
-import type { TurnstileVerifier } from './turnstile.js'
-import { adminRoutes } from './routes/admin.js'
-import { applicationsRoutes } from './routes/applications.js'
-import { applyRoutes } from './routes/apply.js'
-import { artistsRoutes } from './routes/artists.js'
-import { authRoutes } from './routes/auth.js'
-import { configRoutes } from './routes/config.js'
-import { eventsRoutes } from './routes/events.js'
-import { featuresRoutes } from './routes/features.js'
-import { healthRoutes } from './routes/health.js'
-import { notFoundRoutes } from './routes/not-found.js'
-import { radioRoutes } from './routes/radio.js'
+import { authRoutes } from './admins/auth-routes.js'
+import { adminRoutes } from './admins/routes.js'
+import type { AdminsStore } from './admins/store.js'
+import { useZodSchemas } from './api/schemas.js'
+import { applyRoutes } from './applications/apply-routes.js'
+import type { ApplyStore } from './applications/apply-store.js'
+import { applicationsRoutes } from './applications/routes.js'
+import type { ApplicationsSettingsStore } from './applications/settings.js'
+import type { ApplicationsStore } from './applications/store.js'
+import type { TurnstileVerifier } from './applications/turnstile.js'
+import { artistsRoutes } from './artists/routes.js'
+import type { ArtistsStore, Photos } from './artists/store.js'
+import type { SendEmail } from './core/email.js'
+import type { Queryable } from './db/connection.js'
+import { eventsRoutes } from './events/routes.js'
+import { featuresRoutes } from './features/routes.js'
+import type { FeaturesStore } from './features/store.js'
+import type { OnAirStore } from './radio/on-air.js'
+import { radioRoutes } from './radio/routes.js'
+import type { RadioSettingsStore } from './radio/settings.js'
+import type { SoundCloudClient, SoundCloudCredentials } from './radio/soundcloud.js'
+import type { SoundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
+import { healthRoutes } from './site/health.js'
+import { notFoundRoutes } from './site/not-found.js'
+import { configRoutes } from './site/runtime-config.js'
 
 // What the routes use to handle requests: the database, the stores built on it, and the services the server talks to.
 export type Dependencies = {
@@ -48,7 +48,7 @@ export type Dependencies = {
   verifyTurnstile: TurnstileVerifier
 }
 
-// Registers every route of the server, other than the client's (see spa.ts). The routes only use `deps` to handle
+// Registers every route of the server, other than the client's (see site/spa.ts). The routes only use `deps` to handle
 // requests, so that generate-openapi.ts can register them without a database.
 export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   useZodSchemas(app)

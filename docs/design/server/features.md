@@ -11,7 +11,7 @@ Pages read the flags in the `features` field of [`GET /api/config`](README.md#ge
 were off when they can't know whether it's on (see [Feature flags](../client/architecture.md#feature-flags)). For that
 reason, "off" always has to be the safe option: the old version, or the one that relies the least on our own server.
 
-The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` in `server/src/features.ts`):
+The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` in `server/src/features/store.ts`):
 
 | Id | What it switches on |
 |---|---|

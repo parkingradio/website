@@ -268,8 +268,8 @@ function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
 // be read through its private link, which ends with its secret, e.g.
 // "https://soundcloud.com/parkingdotradio/sets/rotation/s-AbC123". Parameters, e.g. "?si=...", are allowed.
 //
-// This is a copy of the server's `playlistLink` (server/src/routes/radio.ts), which decides: it lets the page say that a
-// link isn't to a playlist without asking for a preview.
+// This is a copy of the server's `playlistLink` (server/src/radio/routes.ts), which decides: it lets the page say that
+// a link isn't to a playlist without asking for a preview.
 const PLAYLIST_LINK = /^\s*https?:\/\/(?:www\.)?soundcloud\.com(\/[^/?#\s]+\/sets\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?\s*$/
 
 // The playlist `link` leads to, as a link without anything that doesn't identify the playlist, or null if it isn't a link

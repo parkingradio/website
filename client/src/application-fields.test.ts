@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { checkApplication, checkReceivedAt, isDay, isTime } from './application-fields'
 import type { ApplicationFields } from './application-fields'
 
-// The client's copy of the server's rules for applications (see server/src/application-fields.ts), which the forms check
-// as the server does.
+// The client's copy of the server's rules for applications (see server/src/applications/fields.ts), which the forms
+// check as the server does.
 
 function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
   return {

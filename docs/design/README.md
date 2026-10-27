@@ -16,7 +16,7 @@ say what pages do, and link to the server documents for why.
 
 The code implements these documents, and has to match them: when they disagree, including with comments in the code,
 the documents win. The lists and rules that the server documents name in the server's code (e.g. `GENRES`, or the
-`ArtistProfile` schema, in `server/src/artist-profile.ts`) are part of the design by reference.
+`ArtistProfile` schema, in `server/src/artists/profile.ts`) are part of the design by reference.
 
 The API's OpenAPI document, `server/openapi.json`, is generated from the schemas that the server's routes validate their
 requests and responses with, and the client's types are generated from it (`npm run generate:api`). Both are checked

@@ -5,7 +5,7 @@ import type { FieldErrors } from './checks'
 // How an application is shown and checked in the browser, by the admin pages and by the "Appliquer" form alike.
 //
 // The forms check applications as the server does, to say what's wrong right away, with a copy of the server's rules: its
-// lists, limits and messages (see server/src/application-fields.ts), which must be changed together with these. The
+// lists, limits and messages (see server/src/applications/fields.ts), which must be changed together with these. The
 // server's are the ones that count: when they disagree, the server's message shows.
 
 export type Application = Schema<'Application'>
@@ -15,7 +15,7 @@ export type PrestationId = Schema<'PrestationId'>
 export type ApplicationStatus = Schema<'ApplicationStatus'>
 
 // The prestations' names, in French, in the order of the server's list, which is the order applications list them in.
-// The server emails them too (see server/src/application-emails.ts), and they must be changed together.
+// The server emails them too (see server/src/applications/emails.ts), and they must be changed together.
 const PRESTATION_NAMES: Record<PrestationId, string> = {
   dj: 'DJ',
   vinyl: 'Vinyl',

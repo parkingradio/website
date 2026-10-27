@@ -1,10 +1,10 @@
-import { adminsStore, createAdmin } from './admins.js'
-import { isEmailAddress } from './artist-profile.js'
-import { config } from './config.js'
-import { db } from './db.js'
+import { adminsStore, createAdmin } from './admins/store.js'
+import { isEmailAddress } from './artists/profile.js'
+import { config } from './core/config.js'
+import { db } from './db/connection.js'
 
 // The create-admin command: invites an admin and prints the invite link, whether they're a new admin, one who hasn't
-// accepted their invite yet, or one who has, whose password the link then resets. See createAdmin in admins.ts.
+// accepted their invite yet, or one who has, whose password the link then resets. See createAdmin in admins/store.ts.
 //
 // It runs with the server's configuration, against the server's database: in production, inside the server's container
 // (see tools/create-admin), and in development, with `npm run create-admin -w server -- <email>`.

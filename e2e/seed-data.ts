@@ -8,7 +8,7 @@ import type { components } from '../client/src/api/schema.d.ts'
 // A profile, as the server returns it, which is also how it can be sent, as it's already cleaned up.
 export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto'>
 
-// The longest bio the server takes (see BIO_MAX_LENGTH in server/src/artist-profile.ts).
+// The longest bio the server takes (see BIO_MAX_LENGTH in server/src/artists/profile.ts).
 const BIO_MAX_LENGTH = 5000
 
 export type SeedArtist = {

@@ -7,7 +7,7 @@ import { byWhom } from '../describe'
 
 // The credentials of the SoundCloud app the radio reads playlists through, in the configuration section.
 
-// How long each credential can be. The server's schema says so too (see server/src/routes/radio.ts), and decides.
+// How long each credential can be. The server's schema says so too (see server/src/radio/routes.ts), and decides.
 const CREDENTIAL_MAX_LENGTH = 200
 
 // What the secret field shows once a secret is saved, since the secret itself is never sent back.

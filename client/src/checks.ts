@@ -1,7 +1,7 @@
 // Helpers for the client's copies of the server's rules (see artist-profile.ts and application-fields.ts). What's wrong is
 // said in French, since artists see it.
 //
-// They're copies of how the server checks text (see `text` and `line` in server/src/artist-profile.ts), and must be
+// They're copies of how the server checks text (see `text` and `line` in server/src/artists/profile.ts), and must be
 // changed together with it.
 
 // The cleaned-up value of a field, or what's wrong with it.

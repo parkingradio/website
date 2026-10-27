@@ -27,9 +27,10 @@ export type SeedOptions = {
   credentials: Credentials
 }
 
-// Where the seed's requests come from, as far as the server's rate limits are concerned (see client-address.ts): one
-// address for the admin's requests, apart from the developer's browser, and one for each artist who applies through the form,
-// since an address can only apply a few times an hour. They're in 192.0.2.0/24, apart from those the tests use.
+// Where the seed's requests come from, as far as the server's rate limits are concerned (see
+// server/src/api/client-address.ts): one address for the admin's requests, apart from the developer's browser, and one
+// for each artist who applies through the form, since an address can only apply a few times an hour. They're in
+// 192.0.2.0/24, apart from those the tests use.
 const LOGIN_ADDRESS = '192.0.2.1'
 const formAddress = (nth: number) => `192.0.2.${10 + nth}`
 
@@ -218,7 +219,7 @@ if (import.meta.main) {
     console.error('seed: MAIL_DOMAIN is set, so the server would send emails: seed without it')
     process.exit(1)
   }
-  // The port the dev server listens on (see `port` in server/src/config.ts).
+  // The port the dev server listens on (see `port` in server/src/core/config.ts).
   const url = `http://localhost:${process.env.SERVER_PORT || process.env.PORT || 3000}`
   const healthy = await fetch(`${url}/healthz`).then((response) => response.ok, () => false)
   if (!healthy) {

@@ -9,7 +9,7 @@ import { FieldError } from '../fields'
 
 // Who the applications artists send are emailed to, in the configuration section.
 
-// The most the server takes (see server/src/routes/applications.ts), which must be changed together with it.
+// The most the server takes (see server/src/applications/routes.ts), which must be changed together with it.
 const MAX_RECIPIENTS = 10
 
 export function Recipients() {

@@ -114,7 +114,7 @@ Each of a playlist's tracks is one of:
 
 | Request field | Type | |
 |---|---|---|
-| `link` | string | A link to a SoundCloud playlist (see `playlistLink` in `server/src/routes/radio.ts`), e.g. `https://soundcloud.com/parkingdotradio/sets/rotation`, or a private one's private link. Parameters, e.g. `?si=...`, are allowed |
+| `link` | string | A link to a SoundCloud playlist (see `playlistLink` in `server/src/radio/routes.ts`), e.g. `https://soundcloud.com/parkingdotradio/sets/rotation`, or a private one's private link. Parameters, e.g. `?si=...`, are allowed |
 
 | Response field | Type | |
 |---|---|---|

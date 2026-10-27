@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { checkProfile, linkSite, parseLink, pickedPhotoError } from './artist-profile'
 import type { Profile, LinkSiteId } from './artist-profile'
 
-// The client's copy of the server's rules for profiles (see server/src/artist-profile.ts), which the forms check as the
-// server does.
+// The client's copy of the server's rules for profiles (see server/src/artists/profile.ts), which the forms check as
+// the server does.
 
 // What `checkProfile` returns of a valid profile, or throws the first error, as the server would answer.
 function validateProfile(sent: unknown, options?: { lenient?: boolean }): Profile {

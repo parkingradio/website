@@ -33,8 +33,9 @@ export const test = base.extend<Options>({
     const origin = new URL(baseURL!).origin
     await context.route((url) => url.origin !== origin, (route) => route.abort('blockedbyclient'))
 
-    // The server tells clients apart by CF-Connecting-IP, which Cloudflare sets in production (see client-address.ts).
-    // Each test gets an address of its own, so that tests don't share rate limits, e.g. the one on logins.
+    // The server tells clients apart by CF-Connecting-IP, which Cloudflare sets in production (see
+    // server/src/api/client-address.ts). Each test gets an address of its own, so that tests don't share rate limits,
+    // e.g. the one on logins.
     await context.setExtraHTTPHeaders({ 'CF-Connecting-IP': clientAddress(testInfo.workerIndex, testsInWorker++) })
 
     await use(context)
