@@ -1,7 +1,7 @@
 # Candidatures
 
 At `/admin/candidatures`: the artists' applications for a set, for the team to go through (see
-[Applications](../../server/artists.md#applications)). Each application's status is shown as "nouvelle" (new), "retenue"
+[Applications](../../server/applications.md)). Each application's status is shown as "nouvelle" (new), "retenue"
 (accepted), "planifiée" (scheduled), "faite" (done) or "refusée" (rejected). What the artist would do is picked from a
 list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a few words.
 
@@ -34,7 +34,7 @@ Form: a form with the artist, picked from those in the "Artistes" section, the d
 if it's left empty), then the application itself. An artist's page leads to it with that artist picked already. The
 application form says what's wrong with each field once it's left, like the artist form (see
 [Artistes](artistes.md)): it checks the application as the server does (see
-[Applications](../../server/artists.md#applications)), for immediate feedback. The server's check is the one that counts:
+[Applications](../../server/applications.md)), for immediate feedback. The server's check is the one that counts:
 if it refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints

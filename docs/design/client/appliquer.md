@@ -3,7 +3,7 @@
 This page is the form artists fill in to apply for a slot at Parking Radio. What it collects is reused in the
 rest of Parking Radio's workflow, so it avoids free-form text wherever it can: answers are picked from lists,
 and links are reduced to profile names. The form checks the artist's profile and application as the server does (see
-[Profiles](../server/artists.md#profiles) and [Applications](../server/artists.md#applications)), for immediate
+[Profiles](../server/artists.md#profiles) and [Applications](../server/applications.md)), for immediate
 feedback. The server checks them again, and its check is the one that counts: if it refuses what the form accepted, the form
 shows the server's message. On top of those, it sets limits of its own, which the server doesn't (admins can bring in applications
 that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`.
@@ -46,14 +46,14 @@ they update as the fields are fixed.
 Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without
 them having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't
 be sent until Turnstile has vouched for the artist, and it gets a new token whenever an application is refused, since
-Cloudflare only checks each token once (see [Applying](../server/artists.md#applying)). The widget uses the site key
-from the configuration (see [Configuration](architecture.md#configuration)).
+Cloudflare only checks each token once (see [Applying](../server/applications.md#applying)). The widget uses the site
+key from the configuration (see [Configuration](architecture.md#configuration)).
 
 When an artist sends the form, it goes to `POST /api/applications`, which creates the artist and their application, and
-sends the emails about it (see [Applying](../server/artists.md#applying) and [Emails](../server/artists.md#emails)).
-Once it's sent, the form thanks the artist and says where the confirmation went. Otherwise, it shows the server's error,
-e.g. when an artist already has that email address: the form is only for new artists for now. Artists we already know
-will apply again from a different page, which isn't designed yet.
+sends the emails about it (see [Applying](../server/applications.md#applying) and
+[Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist and says where the confirmation
+went. Otherwise, it shows the server's error, e.g. when an artist already has that email address: the form is only for
+new artists for now. Artists we already know will apply again from a different page, which isn't designed yet.
 
 Until the `nouveau-formulaire-candidature` feature flag is turned on (see
 [Feature flags](architecture.md#feature-flags)), the page shows the original Google Form instead, and it goes back to it

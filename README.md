@@ -30,8 +30,7 @@ the API are generated from the server's schemas (see "Testing and building" belo
 [docs/design](docs/design/README.md)).
 
 The server's code, in `server/src`, has a folder for each area of the [server's design](docs/design/server/README.md),
-with `applications` for the applications part of `artists.md`, and `site` for serving the client, `/healthz` and
-`/api/config`. What the areas share is in `core`, `api` and `db`.
+plus `site` for serving the client, `/healthz` and `/api/config`. What the areas share is in `core`, `api` and `db`.
 
 ### Prerequisites
 

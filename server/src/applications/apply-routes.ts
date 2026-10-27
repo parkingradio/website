@@ -18,8 +18,8 @@ import type { ApplicationsSettingsStore } from './settings.js'
 import { InvalidApplication, validateApplication } from './store.js'
 import type { TurnstileVerifier } from './turnstile.js'
 
-// The public endpoint where new artists apply for a set (see docs/design/server/artists.md). Artists see its errors, so
-// they're in French.
+// The public endpoint where new artists apply for a set (see docs/design/server/applications.md). Artists see its
+// errors, so they're in French.
 
 // Enough for an artist to retry a few times after errors, but low enough to stop a flood of applications.
 export const APPLICATIONS_PER_WINDOW = 5

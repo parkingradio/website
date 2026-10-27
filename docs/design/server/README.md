@@ -48,7 +48,7 @@ a session.
 | Response field | Type | |
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
-| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` asks for (see [Applying](artists.md#applying)) |
+| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` asks for (see [Applying](applications.md#applying)) |
 | `features` | object | Whether each feature flag is on (`true`) or off (`false`), by id, e.g. `{"some-flag": true}`. A flag that isn't there is off (see [Features](features.md)) |
 
 The response is never cached (`Cache-Control: no-store`), so that switching a feature flag takes effect for every page
@@ -82,15 +82,15 @@ the request failing.
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Changing an artist's profile, or replacing or removing their photo |
 | [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications |
-| [`GET /api/admin/applications`](artists.md#get-apiadminapplicationsartistid-admin) | admin | Every application, or an artist's |
-| [`GET /api/admin/applications/:id`](artists.md#get-apiadminapplicationsid-admin) | admin | An application |
-| [`POST /api/admin/applications`](artists.md#post-apiadminapplications-admin) | admin | Creating an application for an artist |
-| [`PUT /api/admin/applications/:id`](artists.md#put-apiadminapplicationsid-admin) | admin | Changing an application |
-| [`PUT /api/admin/applications/:id/status`](artists.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
-| [`DELETE /api/admin/applications/:id`](artists.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |
-| [`POST /api/applications`](artists.md#post-apiapplications) | public | A new artist applying, with their profile and maybe a photo |
-| [`GET /api/admin/applications/recipients`](artists.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
-| [`PUT /api/admin/applications/recipients`](artists.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
+| [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistid-admin) | admin | Every application, or an artist's |
+| [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
+| [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist |
+| [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Changing an application |
+| [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
+| [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |
+| [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist applying, with their profile and maybe a photo |
+| [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
+| [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

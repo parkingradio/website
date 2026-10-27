@@ -2,10 +2,11 @@ import { z } from 'zod'
 import { Day, dayWith } from '../api/formats.js'
 import { line, text } from '../artists/profile.js'
 
-// An application's fields: the lists and rules every application has to follow (see docs/design/server/artists.md), as
-// the zod schemas the server checks applications with, which openapi.json is generated from. These rules only make sure
-// the data is valid: suggestions and limits, like which dates or time slots to offer, are up to the forms. The server
-// explains what's wrong with an application in French, because artists see its messages.
+// An application's fields: the lists and rules every application has to follow (see
+// docs/design/server/applications.md), as the zod schemas the server checks applications with, which openapi.json is
+// generated from. These rules only make sure the data is valid: suggestions and limits, like which dates or time slots
+// to offer, are up to the forms. The server explains what's wrong with an application in French, because artists see
+// its messages.
 //
 // The client has its own copy of these rules, for its forms to say what's wrong right away (see
 // client/src/application-fields.ts): they must be changed together. These are the ones that count.

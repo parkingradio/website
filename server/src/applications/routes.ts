@@ -8,7 +8,7 @@ import { NoSuchArtist } from './store.js'
 import type { ApplicationsStore, StoredApplication } from './store.js'
 
 // Admin routes for applications: create, view, change, accept or reject, and delete them, and choose who the ones artists
-// send are emailed to (see docs/design/server/artists.md).
+// send are emailed to (see docs/design/server/applications.md).
 
 // An application, as the endpoints return it: its fields, as they were saved, and what the server knows of it.
 const Application = z
