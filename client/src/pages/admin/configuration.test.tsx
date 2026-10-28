@@ -38,7 +38,7 @@ describe('The configuration section', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Configuration' })).toBeInTheDocument())
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
       'Envoi des candidatures par e-mail',
-      'Application SoundCloud',
+      'Connexion SoundCloud',
       'Features',
     ])
     await screen.findByText('Aucune feature pour le moment.')

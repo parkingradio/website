@@ -12,7 +12,7 @@ export function Configuration() {
       <h2>Envoi des candidatures par e-mail</h2>
       <Recipients />
 
-      <h2>Application SoundCloud</h2>
+      <h2>Connexion SoundCloud</h2>
       <SoundCloudCredentials />
 
       <h2>Features</h2>

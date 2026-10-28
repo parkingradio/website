@@ -3,7 +3,7 @@
 At `/admin/configuration`: the settings that change what the site does. From top to bottom, it shows:
 
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
-- "Application SoundCloud": the credentials of the SoundCloud app the radio reads its playlist through.
+- "Connexion SoundCloud": the credentials of the SoundCloud app the radio reads its playlist through.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -15,7 +15,7 @@ addresses, each typed then added with + (or Enter) and removed with its ×, like
 [Artistes](artistes.md#adding-an-artist)). Each change is saved right away. It also says which admin last changed them,
 and when.
 
-## Application SoundCloud
+## Connexion SoundCloud
 
 The credentials of the SoundCloud app the radio reads its playlist through (see
 [The SoundCloud app](../../server/radio.md#the-soundcloud-app)). It says that they're found in the apps of the
@@ -41,5 +41,5 @@ retired flag is removed too.
 - `GET /api/admin/applications/recipients` and `PUT /api/admin/applications/recipients`, for "Envoi des candidatures
   par e-mail".
 - `GET /api/admin/radio/credentials`, `POST /api/admin/radio/credentials/check` and
-  `PUT /api/admin/radio/credentials`, for "Application SoundCloud".
+  `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".
