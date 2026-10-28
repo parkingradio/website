@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import type { BoundFunctions, queries } from '@testing-library/react'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { GENRES } from '../artist-profile'
 import { requestsTo } from '../test-utils'
@@ -109,36 +110,59 @@ beforeEach(() => {
 // letters, so that the days of février, août and décembre are found too.
 const CALENDAR_DAY = /^\w{3} \d+ \p{L}+ \d{4}$/u
 
-function type(label: string | RegExp, value: string) {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+type Queries = BoundFunctions<typeof queries>
+
+// The part of the form with this title, to look for its fields in. A query over the whole form takes tens of milliseconds
+// in jsdom, which goes through the whole page for the labels and styles of each of its many buttons (genres, days).
+function part(title: string): Queries {
+  return within(screen.getByRole('heading', { level: 2, name: title }).closest('section')!)
 }
 
-// Types in a search field, then picks an option from its list (which may take a while, and a request, to show up).
-async function pick(label: RegExp, query: string, option: RegExp) {
-  const input = screen.getByLabelText(label)
-  fireEvent.focus(input)
-  fireEvent.change(input, { target: { value: query } })
-  fireEvent.mouseDown(await screen.findByRole('option', { name: option }))
+// Types `value` in a text field.
+function type(label: string | RegExp, value: string, scope: Queries = screen) {
+  fireEvent.change(scope.getByRole('textbox', { name: label }), { target: { value } })
+}
+
+// Types in a search field, then picks an option from its list (which may take a request to show up).
+//
+// The city's suggestions are only searched once the artist stops typing: rather than wait for that, the timer that
+// searches is run right away, whatever its delay. Real timers come back before looking for the option, whose polling
+// uses them. Coming back to real timers also stops faking the date, so this can't be used once the date is faked.
+async function pick(label: RegExp, query: string, option: RegExp, scope: Queries = screen) {
+  const input = scope.getByRole('combobox', { name: label })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: query } })
+    await act(() => vi.runOnlyPendingTimersAsync())
+  } finally {
+    vi.useRealTimers()
+  }
+  fireEvent.mouseDown(await scope.findByRole('option', { name: option }))
 }
 
 // Picks Lévis from GeoNames' suggestions, unless given a city to type instead.
 async function fillIn({ city }: { city?: string } = {}) {
-  fireEvent.click(screen.getByRole('radio', { name: /^Artiste/ }))
-  type(/Nom d'artiste/, 'DJ Test')
-  await pick(/^Pays/, 'canada', /^Canada/)
-  if (city) type(/^Ville/, city)
-  else await pick(/^Ville/, 'levis', /^Lévis/)
-  fireEvent.click(screen.getByRole('button', { name: 'techno' }))
+  const artist = part("L'artiste")
+  fireEvent.click(artist.getByRole('radio', { name: /^Artiste/ }))
+  type(/Nom d'artiste/, 'DJ Test', artist)
+  await pick(/^Pays/, 'canada', /^Canada/, artist)
+  if (city) fireEvent.change(artist.getByRole('combobox', { name: /^Ville/ }), { target: { value: city } })
+  else await pick(/^Ville/, 'levis', /^Lévis/, artist)
+  fireEvent.click(artist.getByRole('button', { name: 'techno' }))
+  const presentation = part('Présentation')
   const photo = new File(['fake'], 'presse.jpg', { type: 'image/jpeg' })
   fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [photo] } })
-  type(/^Bio/, 'Une bio.')
-  type('SoundCloud', 'https://soundcloud.com/parkingdotradio/wobbla')
-  fireEvent.click(screen.getByLabelText('DJ'))
-  type(/Adresse e-mail/, 'artiste@example.com')
-  type(/Numéro de téléphone/, '418 555-0123')
-  fireEvent.click(screen.getAllByRole('button', { name: CALENDAR_DAY }).find((day) => !day.hasAttribute('disabled'))!)
-  fireEvent.click(screen.getByLabelText('18 h – 22 h'))
-  fireEvent.click(screen.getByLabelText('11 h – 15 h'))
+  type(/^Bio/, 'Une bio.', presentation)
+  type('SoundCloud', 'https://soundcloud.com/parkingdotradio/wobbla', presentation)
+  fireEvent.click(part('Prestation').getByRole('checkbox', { name: 'DJ' }))
+  const contact = part('Contact')
+  type(/Adresse e-mail/, 'artiste@example.com', contact)
+  type(/Numéro de téléphone/, '418 555-0123', contact)
+  const dates = part('Dates')
+  fireEvent.click(dates.getAllByRole('button', { name: CALENDAR_DAY }).find((day) => !day.hasAttribute('disabled'))!)
+  fireEvent.click(dates.getByRole('checkbox', { name: '18 h – 22 h' }))
+  fireEvent.click(dates.getByRole('checkbox', { name: '11 h – 15 h' }))
 }
 
 describe('Appliquer', () => {
@@ -291,21 +315,23 @@ describe('Appliquer', () => {
 
   it('asks a collective for its artists, up to 4, and tells it about the flyer', async () => {
     renderForm()
+    const artist = part("L'artiste")
     expect(screen.queryByText(/nous demandons aux collectifs de produire un flyer/)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: /^Collectif/ }))
-    expect(screen.getByRole('radio', { name: /^Collectif/ })).toHaveAccessibleName(expect.stringContaining("plage d'environ 4 h"))
-    expect(screen.getByLabelText(/Nom du collectif/)).toBeInTheDocument()
-    expect(screen.getByText(/nous demandons aux collectifs de produire un flyer/)).toBeInTheDocument()
+    const collective = artist.getByRole('radio', { name: /^Collectif/ })
+    fireEvent.click(collective)
+    expect(collective).toHaveAccessibleName(expect.stringContaining("plage d'environ 4 h"))
+    expect(artist.getByRole('textbox', { name: /Nom du collectif/ })).toBeInTheDocument()
+    expect(artist.getByText(/nous demandons aux collectifs de produire un flyer/)).toBeInTheDocument()
 
-    type('Artiste 1 du collectif', 'Zefra')
-    for (let i = 0; i < 3; ++i) fireEvent.click(screen.getByRole('button', { name: /ajouter un artiste/ }))
-    expect(screen.queryByRole('button', { name: /ajouter un artiste/ })).not.toBeInTheDocument()
-    type('Artiste 3 du collectif', 'Mlle Zed')
-    fireEvent.click(screen.getByRole('button', { name: "Enlever l'artiste 2" }))
+    type('Artiste 1 du collectif', 'Zefra', artist)
+    for (let i = 0; i < 3; ++i) fireEvent.click(artist.getByRole('button', { name: /ajouter un artiste/ }))
+    expect(artist.queryByRole('button', { name: /ajouter un artiste/ })).not.toBeInTheDocument()
+    type('Artiste 3 du collectif', 'Mlle Zed', artist)
+    fireEvent.click(artist.getByRole('button', { name: "Enlever l'artiste 2" }))
 
     await fillIn()
     // fillIn() picks "Artiste": go back to the collective, whose artists are kept.
-    fireEvent.click(screen.getByRole('radio', { name: /^Collectif/ }))
+    fireEvent.click(collective)
     await send()
     expect(sentParts().artist).toMatchObject({ kind: 'collective', name: 'DJ Test', members: ['Zefra', 'Mlle Zed'] })
   })
