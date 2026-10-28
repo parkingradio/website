@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AcceptInvite } from './accept-invite'
 import { AdminLayout } from './layout'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 function submit(password: string, confirmPassword = password) {
   fireEvent.change(screen.getByLabelText('Mot de passe'), { target: { value: password } })
@@ -37,7 +37,7 @@ describe('AcceptInvite', () => {
     mockFetch({
       '/api/auth/accept-invite': { ok: true },
       // Not logged in yet.
-      '/api/admin/me': { ok: false, error: 'Unauthorized' },
+      '/api/admin/me': UNAUTHORIZED,
     })
     renderAcceptInvite()
 

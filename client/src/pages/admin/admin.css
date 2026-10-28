@@ -119,6 +119,11 @@
   overflow-wrap: anywhere;
 }
 
+/* When logging out fails, under the button. */
+.admin-session .admin-error {
+  margin: 0;
+}
+
 /* The login and password forms stand alone in the middle of the page. */
 .admin-auth {
   max-width: 360px;
@@ -635,8 +640,13 @@ dl.admin-record {
 
   .admin-session {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     padding-left: 0;
+  }
+
+  .admin-session .admin-error {
+    flex-basis: 100%;
   }
 
   /* On a line of its own, under the toolbar's button. */

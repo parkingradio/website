@@ -39,9 +39,9 @@ describe('zodRoutes', () => {
       const api = zodRoutes(app, 'Failed')
       api.get('/public', { schema: { response: { 200: Ok } } }, handler)
       api.get('/public/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: Ok } } }, handler)
-      api.get('/admin', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
+      api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
       api.put(
-        '/admin/:id',
+        '/api/admin/thing/:id',
         { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok, 404: ApiError } } },
         handler,
       )
@@ -50,18 +50,18 @@ describe('zodRoutes', () => {
     expect(statuses('/public')).toEqual(['200', '500'])
     expect(statuses('/public/:id')).toEqual(['200', '400', '500'])
     // Admin GETs can't fail with 403 (see requireAuth).
-    expect(statuses('/admin')).toEqual(['200', '401', '500'])
-    expect(statuses('/admin/:id')).toEqual(['200', '400', '401', '403', '404', '500'])
+    expect(statuses('/api/admin/thing')).toEqual(['200', '401', '500'])
+    expect(statuses('/api/admin/thing/:id')).toEqual(['200', '400', '401', '403', '404', '500'])
   })
 
   it('checks the session of admin routes before anything else, for HEAD too', async () => {
     const { app } = await buildApp((app) => {
       const api = zodRoutes(app, 'Failed')
-      api.get('/admin', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
-      api.put('/admin', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
+      api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
+      api.put('/api/admin/thing', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
     })
     for (const request of [{ method: 'GET' }, { method: 'HEAD' }, { method: 'PUT', payload: { on: 'yes' } }] as const) {
-      expect((await app.inject({ url: '/admin', ...request })).statusCode).toBe(401)
+      expect((await app.inject({ url: '/api/admin/thing', ...request })).statusCode).toBe(401)
     }
   })
 
@@ -71,10 +71,17 @@ describe('zodRoutes', () => {
       ['need a schema', (app) => zodRoutes(app, 'Failed').get('/', handler)],
       [
         'one route per method',
-        (app) => zodRoutes(app, 'Failed').route({ method: ['GET', 'PUT'], url: '/', config: { admin: true }, schema: {}, handler }),
+        (app) => zodRoutes(app, 'Failed').route({ method: ['GET', 'PUT'], url: '/api/admin/thing', config: { admin: true }, schema: {}, handler }),
       ],
       // Without zodRoutes, nothing would check the session.
       ['only works for the routes of zodRoutes', (app) => app.get('/', { config: { admin: true } }, handler)],
+      // The client takes a 401 from a route under /api/admin/ to mean that the session ended.
+      ['admin routes are those under /api/admin/', (app) => app.get('/api/admin/thing', handler)],
+      ['admin routes are those under /api/admin/', (app) => zodRoutes(app, 'Failed').get('/api/admin/thing', { schema: {} }, handler)],
+      [
+        'admin routes are those under /api/admin/',
+        (app) => zodRoutes(app, 'Failed').get('/api/thing', { config: { admin: true }, schema: {} }, handler),
+      ],
     ]
     for (const [error, routes] of refused) {
       await expect(buildApp(routes)).rejects.toThrow(error)

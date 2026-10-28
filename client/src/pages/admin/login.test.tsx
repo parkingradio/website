@@ -39,4 +39,14 @@ describe('Login', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid email or password'))
     expect(onLogin).not.toHaveBeenCalled()
   })
+
+  it('shows its notice rather than the message the page was opened with', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/admin', state: { message: 'Mot de passe enregistré.' } }]}>
+        <Login onLogin={vi.fn()} notice="La session a pris fin." />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('La session a pris fin.')).toBeInTheDocument()
+    expect(screen.queryByText('Mot de passe enregistré.')).not.toBeInTheDocument()
+  })
 })

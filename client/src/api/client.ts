@@ -12,7 +12,8 @@ import type { components, paths } from './schema'
 //     const result = await api.POST('/api/admin/artists', { body: { artist, photo }, bodySerializer: formData })
 //
 // Calls never throw: they return the response with `ok: true` if it succeeded, or else an `ApiError`, including for
-// failures that never reach the server, which say so (see `Failure`).
+// failures that never reach the server, which say so (see `Failure`). An admin request that fails with 401 also tells
+// `onSessionEnded`'s listeners.
 
 // A schema of the API, by name, e.g. `Schema<'Feature'>`.
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
@@ -58,20 +59,38 @@ export type Data<M extends Method, Path extends PathsWith<M>> = MethodResponse<C
 // What a request sends as its body, e.g. `Body<'post', '/api/admin/artists'>`.
 export type Body<M extends Method, Path extends PathsWith<M>> = NonNullable<RequestBodyOption<paths[Path][M]>['body']>
 
-async function settle<Data>(request: Promise<{ data?: Data; error?: unknown; response: Response }>): Promise<Result<Data>> {
+const sessionEndedListeners = new Set<() => void>()
+
+// Calls `listener` whenever an admin request fails with 401, until the function it returns is called. Admin endpoints,
+// those under /api/admin/, only ever fail with 401 when there's no session (see docs/design/server/README.md), so this
+// tells that the session ended, e.g. when it expired. Listeners are called before the request's promise resolves, and
+// mustn't throw, since the request would then throw too.
+export function onSessionEnded(listener: () => void): () => void {
+  sessionEndedListeners.add(listener)
+  return () => sessionEndedListeners.delete(listener)
+}
+
+async function settle<Data>(
+  request: Promise<{ data?: Data; error?: unknown; response: Response }>,
+  admin: boolean,
+): Promise<Result<Data>> {
+  let settled: Awaited<typeof request>
   try {
-    const { data, error, response } = await request
-    if (response.ok) return { ...data, ok: true } as Data & { ok: true }
-    const message = (error as Partial<ApiError> | undefined)?.error
-    return typeof message === 'string' ? { ok: false, error: message } : { ok: false, error: 'Erreur inconnue', fromServer: false }
+    settled = await request
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error), fromServer: false }
   }
+  const { data, error, response } = settled
+  if (response.ok) return { ...data, ok: true } as Data & { ok: true }
+  // Outside the `try`, so that a listener that throws isn't taken for a request that failed.
+  if (admin && response.status === 401) sessionEndedListeners.forEach((listener) => listener())
+  const message = (error as Partial<ApiError> | undefined)?.error
+  return typeof message === 'string' ? { ok: false, error: message } : { ok: false, error: 'Erreur inconnue', fromServer: false }
 }
 
 function method<M extends Method>(name: M) {
   return <Path extends PathsWith<M>>(path: Path, ...[init]: InitParam<Init<M, Path>>) =>
-    settle(client.request(name, path, init as never)) as Promise<Result<Data<M, Path>>>
+    settle(client.request(name, path, init as never), path.startsWith('/api/admin/')) as Promise<Result<Data<M, Path>>>
 }
 
 export const api = { GET: method('get'), PUT: method('put'), POST: method('post'), DELETE: method('delete') }

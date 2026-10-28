@@ -11,9 +11,11 @@ The server provides the API under `/api`, which this directory specifies, and se
   `error`, a message meant for people, in English unless it's shown to the public. Successful responses have `ok` set
   to `true`, except for those of `GET /api/config`, `GET /api/events`, `GET /api/radio` and
   `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error.
-- **Admin endpoints.** Endpoints marked "admin" require an admin's session (see [Sessions](admins.md#sessions)), and
-  fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid one. Admin requests other than `GET` that a
-  browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail with 403.
+- **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
+  (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
+  one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
+  requests other than `GET` that a browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail
+  with 403.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
   address: the one Cloudflare puts in `CF-Connecting-IP` in production, since requests reach the server through
   Cloudflare and nginx. Over the limit, they get a 429 error.

@@ -5,13 +5,15 @@ import { api } from '../../api/client'
 
 type Status = { kind: 'idle' | 'sending' } | { kind: 'error'; message: string }
 
-// Shown by the admin pages in their place while logged out. `onLogin` gets the logged-in admin's email.
-export function Login({ onLogin }: { onLogin: (email: string) => void }) {
+// Shown by the admin pages in their place while logged out. `onLogin` gets the logged-in admin's email. `notice` explains
+// why the form is shown, e.g. that the session ended, and replaces the message the page was opened with, e.g. from
+// accepting an invite.
+export function Login({ onLogin, notice }: { onLogin: (email: string) => void; notice?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const location = useLocation()
-  const message = (location.state as { message?: string } | null)?.message
+  const message = notice ?? (location.state as { message?: string } | null)?.message
 
   const login = async (event: FormEvent) => {
     event.preventDefault()
@@ -24,7 +26,11 @@ export function Login({ onLogin }: { onLogin: (email: string) => void }) {
   return (
     <div className="admin-auth">
       <h1>Connexion</h1>
-      {message && <p className="admin-notice">{message}</p>}
+      {message && (
+        <p className="admin-notice" role="status">
+          {message}
+        </p>
+      )}
       <form className="admin-form" onSubmit={login}>
         <label>
           Courriel

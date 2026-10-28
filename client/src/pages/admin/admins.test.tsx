@@ -146,9 +146,9 @@ describe('Admins', () => {
   })
 
   it("says so when the admins can't be loaded", async () => {
-    mockFetch({ '/api/admin/admins': { ok: false, error: 'Unauthorized' } })
+    mockFetch({ '/api/admin/admins': { ok: false, error: 'Boom' } })
     render(<Admins />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Les admins n'ont pas pu être chargés : Unauthorized")
+    expect(await screen.findByRole('alert')).toHaveTextContent("Les admins n'ont pas pu être chargés : Boom")
   })
 })

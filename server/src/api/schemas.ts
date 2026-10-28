@@ -80,10 +80,14 @@ export function useZodSchemas(app: FastifyInstance) {
     })
     return new Error(issues.join(', '))
   })
-  // `config.admin` is only enforced for the routes of zodRoutes, so it mustn't go unnoticed anywhere else.
   app.addHook('onRoute', function (route) {
+    // `config.admin` is only enforced for the routes of zodRoutes, so it mustn't go unnoticed anywhere else.
     if (route.config?.admin && !this.hasDecorator('zodRoutes')) {
       throw new Error(`${route.method} ${route.url}: \`config.admin\` only works for the routes of zodRoutes`)
+    }
+    // Clients tell admin routes by their path, e.g. to take a 401 to mean that the session ended.
+    if (Boolean(route.config?.admin) !== route.url.startsWith('/api/admin/')) {
+      throw new Error(`${route.method} ${route.url}: admin routes are those under /api/admin/, and only those`)
     }
   })
 }

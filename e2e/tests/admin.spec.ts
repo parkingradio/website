@@ -1,4 +1,4 @@
-import { test, expect, admin, adminMenu, logIn } from './fixtures.ts'
+import { test, expect, admin, adminMenu, logIn, submitLogin } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists, which goes through every layer: a form with a photo, the
 // database, the private bucket and back, then removing the photo, and searching the seeded artists.
@@ -30,6 +30,29 @@ test.describe('logging in', () => {
     await logIn(page, { at: '/admin/artistes' })
     await expect(page.getByRole('heading', { name: 'Artistes' })).toBeVisible()
     await expect(page).toHaveURL('/admin/artistes')
+  })
+
+  test('a session that ends while a page is open leads back to the login form, then to the page', async ({ page }) => {
+    await logIn(page, { at: '/admin/artistes' })
+    await expect(page.getByRole('heading', { name: 'Artistes' })).toBeVisible()
+
+    // Logging out in another tab ends the session of both.
+    const other = await page.context().newPage()
+    await other.goto('/admin')
+    await adminMenu(other).getByRole('button', { name: 'se déconnecter' }).click()
+    await expect(other.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+
+    await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
+    await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
+    await expect(page.getByText('La session a pris fin. Connectez-vous à nouveau pour continuer.')).toBeVisible()
+    await expect(page).toHaveURL('/admin/candidatures')
+
+    await submitLogin(page)
+    await expect(page.getByRole('heading', { level: 1, name: 'Candidatures' })).toBeVisible()
+    await expect(page).toHaveURL('/admin/candidatures')
+    // Once the applications and the artists are loaded.
+    await expect(page.getByRole('group', { name: 'Statut' })).toBeVisible()
+    await expect(page.getByRole('alert')).toBeHidden()
   })
 })
 

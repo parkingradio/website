@@ -64,6 +64,11 @@ function clientAddress(worker: number, nth: number): string {
 // admin unless told otherwise.
 export async function logIn(page: Page, { at = '/admin', email = admin.email, password = admin.password } = {}) {
   await page.goto(at)
+  await submitLogin(page, { email, password })
+}
+
+// Sends the login form that the page shows, as the admin unless told otherwise.
+export async function submitLogin(page: Page, { email = admin.email, password = admin.password } = {}) {
   await page.getByLabel('Courriel').fill(email)
   await page.getByLabel('Mot de passe').fill(password)
   await page.getByRole('button', { name: 'se connecter' }).click()
