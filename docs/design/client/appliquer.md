@@ -47,17 +47,14 @@ Above the button that sends the form, a Cloudflare Turnstile checks that the art
 them having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't
 be sent until Turnstile has vouched for the artist, and it gets a new token whenever an application is refused, since
 Cloudflare only checks each token once (see [Applying](../server/applications.md#applying)). The widget uses the site
-key from the configuration (see [Configuration](architecture.md#configuration)).
+key from the configuration (see [Configuration](architecture.md#configuration)), so the widget only shows once the page
+has the configuration, and the form can't be sent when it can't be fetched: it then says so, and to reload the page.
 
 When an artist sends the form, it goes to `POST /api/applications`, which creates the artist and their application, and
 sends the emails about it (see [Applying](../server/applications.md#applying) and
 [Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist and says where the confirmation
 went. Otherwise, it shows the server's error, e.g. when an artist already has that email address: the form is only for
 new artists for now. Artists we already know will apply again from a different page, which isn't designed yet.
-
-Until the `nouveau-formulaire-candidature` feature flag is turned on (see
-[Feature flags](architecture.md#feature-flags)), the page shows the original Google Form instead, and it goes back to it
-when the flag is turned off, e.g. if the form has a problem.
 
 ## Endpoints
 

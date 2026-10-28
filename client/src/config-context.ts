@@ -31,7 +31,10 @@ export function useFeature(id: Schema<'FeatureId'>): boolean | undefined {
   return state.kind === 'loaded' && state.config.features[id] === true
 }
 
-/** Cloudflare Turnstile's site key, for the "Appliquer" form: undefined until the configuration is fetched. */
+/**
+ * Cloudflare Turnstile's site key, for the "Appliquer" form: undefined until the configuration is fetched, or if it
+ * can't be.
+ */
 export function useTurnstileSiteKey(): string | undefined {
   const state = use(ConfigContext)
   return state.kind === 'loaded' ? state.config.turnstileSiteKey : undefined

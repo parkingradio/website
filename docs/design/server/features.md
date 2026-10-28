@@ -1,8 +1,7 @@
 # Features
 
 Feature flags are switches that admins turn on and off, to change what the site does without deploying it again.
-They're meant for going back to the old version of something, e.g. the original Google Form in place of the new
-"Appliquer" form if it has a problem.
+They're meant for going back to the old version of something if the new one has a problem.
 
 ## Flags
 
@@ -15,12 +14,11 @@ The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` 
 
 | Id | What it switches on |
 |---|---|
-| `nouveau-formulaire-candidature` | The new "Appliquer" form (see [Appliquer](../client/appliquer.md)) |
 | `nouveau-lecteur` | The shared player (see [Player](../client/player.md)) |
 
 Retiring a flag takes removing it from this list and from `FEATURES`, and from the admin pages (see
 [Configuration](../client/admin/configuration.md#features)). The server ignores what it saved for flags that aren't
-listed.
+listed. A retired flag's id isn't reused, since what was saved for it would apply to the new flag.
 
 ## `GET /api/admin/features` (admin)
 

@@ -12,7 +12,7 @@ import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
 
 // The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
-// bring in an application that came through the Google Form.
+// bring in an artist who applied through the original Google Form.
 
 // The columns the list of artists can be sorted by, where artists come before collectives.
 const ARTIST_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Artist>> = {

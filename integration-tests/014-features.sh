@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Checks feature flags against a real database, with the flags of the new "Appliquer" form and of the new player:
+# Checks feature flags against a real database, with the flag of the new player:
 # - `GET /api/config` reads them from the database, off until they're turned on, and is never cached
 # - the admin endpoints require a session
 # - turning a flag on or off is saved, and shows in `GET /api/config` right away
@@ -8,14 +8,12 @@
 
 source "$(dirname "$0")/lib.sh"
 
-readonly FLAG='nouveau-formulaire-candidature'
-# The other flag, which switching FLAG leaves alone.
-readonly OTHER='nouveau-lecteur'
+readonly FLAG='nouveau-lecteur'
 
 echo "  the configuration has every flag, off until it's turned on, and is never cached"
 request "${BASE_URL}/api/config"
 expect_status 200
-expect_body_contains "\"features\":{\"${FLAG}\":false,\"${OTHER}\":false}"
+expect_body_contains "\"features\":{\"${FLAG}\":false}"
 expect_header 'Cache-Control' 'no-store'
 
 echo "  the admin endpoints require a session"
@@ -38,18 +36,18 @@ switch() {
 echo "  admins see every flag"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/features"
 expect_status 200
-expect_body_contains "{\"ok\":true,\"features\":[{\"id\":\"${FLAG}\",\"enabled\":false,\"updatedBy\":null,\"updatedAt\":null},{\"id\":\"${OTHER}\",\"enabled\":false,\"updatedBy\":null,\"updatedAt\":null}]}"
+expect_body_contains "{\"ok\":true,\"features\":[{\"id\":\"${FLAG}\",\"enabled\":false,\"updatedBy\":null,\"updatedAt\":null}]}"
 
 echo "  a flag that's turned on is on for every page loaded after that, and so is one turned off"
 switch "$FLAG" true
 expect_status 200
 expect_body_contains "\"enabled\":true,\"updatedBy\":\"${ADMIN_EMAIL}\""
 request "${BASE_URL}/api/config"
-expect_body_contains "\"features\":{\"${FLAG}\":true,\"${OTHER}\":false}"
+expect_body_contains "\"features\":{\"${FLAG}\":true}"
 switch "$FLAG" false
 expect_status 200
 request "${BASE_URL}/api/config"
-expect_body_contains "\"features\":{\"${FLAG}\":false,\"${OTHER}\":false}"
+expect_body_contains "\"features\":{\"${FLAG}\":false}"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/features"
 expect_body_contains "\"enabled\":false,\"updatedBy\":\"${ADMIN_EMAIL}\""
 

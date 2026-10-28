@@ -2757,7 +2757,6 @@ export interface components {
             assetsDomain: string;
             turnstileSiteKey: string;
             features: {
-                "nouveau-formulaire-candidature"?: boolean;
                 "nouveau-lecteur"?: boolean;
             };
         };
@@ -2788,7 +2787,7 @@ export interface components {
             updatedAt: string | null;
         };
         /** @enum {string} */
-        FeatureId: "nouveau-formulaire-candidature" | "nouveau-lecteur";
+        FeatureId: "nouveau-lecteur";
         /** @enum {string} */
         GenreId: "house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber";
         LeftOutTrack: {

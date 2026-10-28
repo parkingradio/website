@@ -33,20 +33,19 @@ const turnstile = {
   remove: vi.fn<TurnstileApi['remove']>(),
 }
 
-// With our own form, unless its feature flag is given.
-function renderForm(state: ConfigState = configWith(true)) {
-  render(
+const LOADED: ConfigState = { kind: 'loaded', config: { assetsDomain: 'assets.example.test', turnstileSiteKey: SITE_KEY, features: {} } }
+
+function page(state: ConfigState) {
+  return (
     <ConfigContext value={state}>
       <Appliquer />
-    </ConfigContext>,
+    </ConfigContext>
   )
 }
 
-function configWith(newForm: boolean): ConfigState {
-  return {
-    kind: 'loaded',
-    config: { assetsDomain: 'assets.example.test', turnstileSiteKey: SITE_KEY, features: { 'nouveau-formulaire-candidature': newForm } },
-  }
+// Once the configuration has been fetched, unless told otherwise.
+function renderForm(state: ConfigState = LOADED) {
+  return render(page(state))
 }
 
 // The applications that were sent, oldest first.
@@ -143,24 +142,24 @@ async function fillIn({ city }: { city?: string } = {}) {
 }
 
 describe('Appliquer', () => {
-  it('shows the Google Form until our own form is turned on, and nothing until that is known', () => {
-    const { unmount } = render(
-      <ConfigContext value={{ kind: 'loading' }}>
-        <Appliquer />
-      </ConfigContext>,
-    )
-    expect(screen.queryByTitle('Parking Radio Appliquer')).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Appliquer' })).not.toBeInTheDocument()
-    unmount()
+  it('shows the form before the configuration has been fetched, and Turnstile once it has', () => {
+    const { rerender } = renderForm({ kind: 'loading' })
+    expect(screen.getByRole('heading', { name: 'Appliquer' })).toBeInTheDocument()
+    expect(turnstile.render).not.toHaveBeenCalled()
 
-    renderForm(configWith(false))
-    expect(screen.getByTitle('Parking Radio Appliquer')).toHaveAttribute('src', expect.stringContaining('docs.google.com/forms'))
-    expect(screen.queryByRole('heading', { name: 'Appliquer' })).not.toBeInTheDocument()
+    rerender(page(LOADED))
+    expect(turnstile.render).toHaveBeenCalledOnce()
+    expect(turnstile.render.mock.calls[0][1]).toMatchObject({ sitekey: SITE_KEY })
   })
 
-  it("shows the Google Form when the configuration can't be fetched", () => {
+  it("can't send the application when the configuration can't be fetched, since Turnstile needs it", async () => {
     renderForm({ kind: 'failed' })
-    expect(screen.getByTitle('Parking Radio Appliquer')).toBeInTheDocument()
+    await fillIn()
+    await send()
+
+    expect(turnstile.render).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Le formulaire ne peut pas être envoyé pour le moment. Rechargez la page.')
+    expect(applications()).toEqual([])
   })
 
   it('shows what is missing when sending an empty form, without sending it', async () => {

@@ -6,13 +6,12 @@ import type { Locator, Page } from '@playwright/test'
 // The pages the navigation bar links to, with what shows that each one is there: their heading, or what they embed. The
 // home page comes last, since the tests start there. The merch link opens another site, so it isn't here.
 //
-// What the pages embed is blocked (see fixtures.ts), but the frame is still there. "Appliquer" embeds the Google Form
-// while the flag of the new form is off, which it is until an admin turns it on.
+// What the pages embed is blocked (see fixtures.ts), but the frame is still there.
 const PAGES: { link: string; path: string; content: (page: Page) => Locator }[] = [
   { link: 'archives', path: '/archives', content: (page) => page.getByTitle('Parking Radio Archives') },
   { link: 'programmation', path: '/programmation', content: (page) => page.getByRole('heading', { name: 'Programmation' }) },
   { link: 'synth meetups', path: '/synth-meetups', content: (page) => page.getByRole('heading', { name: 'dates à venir' }) },
-  { link: 'appliquer', path: '/appliquer', content: (page) => page.getByTitle('Parking Radio Appliquer') },
+  { link: 'appliquer', path: '/appliquer', content: (page) => page.getByRole('heading', { name: 'Appliquer' }) },
   { link: 'contribuer', path: '/contribuer', content: (page) => page.getByTitle('Parking Radio Contribuer') },
   { link: 'parking.radio', path: '/', content: (page) => page.getByTitle('Parking Radio Discord') },
 ]

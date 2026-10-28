@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { jsonBody, mockFetch, requestsTo } from '../../../test-utils'
 import { Features } from './features'
 
-// There are no flags for now, so these tests use flags of their own.
+// These tests use flags of their own, so that they don't depend on which flags there are.
 vi.mock('../describe', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../describe')>()),
   FEATURE_LABELS: {

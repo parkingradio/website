@@ -954,9 +954,6 @@
           "features": {
             "type": "object",
             "properties": {
-              "nouveau-formulaire-candidature": {
-                "type": "boolean"
-              },
               "nouveau-lecteur": {
                 "type": "boolean"
               }
@@ -1363,7 +1360,6 @@
       "FeatureId": {
         "type": "string",
         "enum": [
-          "nouveau-formulaire-candidature",
           "nouveau-lecteur"
         ]
       },

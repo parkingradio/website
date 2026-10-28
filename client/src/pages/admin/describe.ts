@@ -26,10 +26,6 @@ export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
 
 // What each feature flag is: its name, and what turning it on does (see docs/design/server/features.md).
 export const FEATURE_LABELS: Record<Schema<'FeatureId'>, { name: string; description: string }> = {
-  'nouveau-formulaire-candidature': {
-    name: 'Nouveau formulaire de candidature',
-    description: 'La page « Appliquer » montre le formulaire du site plutôt que le Google Form.',
-  },
   'nouveau-lecteur': {
     name: 'Nouveau lecteur',
     description:

@@ -26,7 +26,7 @@ import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader } from './list-controls'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
-// deleted, and creating one by hand, e.g. to bring in an application that came through the Google Form.
+// deleted, and creating one by hand, e.g. to bring in one that came through the original Google Form.
 
 // How many of an application's dates the list shows, before saying how many more there are.
 const LISTED_DATES = 3

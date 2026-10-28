@@ -8,8 +8,8 @@ import { featureFlags } from '../db/schema.js'
 // The flags, in the order the admin pages show them. Adding a flag takes adding its id here, then its name on the admin
 // pages (FEATURE_LABELS in the client), which gets the ids from openapi.json, once it's regenerated with
 // `npm run generate:api`. Removing one from here retires it: the server ignores what it saved for flags that aren't
-// listed.
-export const FEATURES = ['nouveau-formulaire-candidature', 'nouveau-lecteur'] as const
+// listed. A retired flag's id isn't reused, since what was saved for it would apply to the new flag.
+export const FEATURES = ['nouveau-lecteur'] as const
 
 export const FeatureId = z.enum(FEATURES).meta({ id: 'FeatureId' })
 export type FeatureId = z.infer<typeof FeatureId>

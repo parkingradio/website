@@ -28,7 +28,7 @@ describe('useAssetUrl', () => {
 })
 
 describe('useFeature', () => {
-  // There are no flags for now, so these tests use flags of their own.
+  // These tests use flags of their own, so that they don't depend on which flags there are.
   function Feature({ id }: { id: string }) {
     const enabled = useFeature(id as Schema<'FeatureId'>)
     return <span data-testid={id}>{enabled === undefined ? '(pending)' : enabled ? 'on' : 'off'}</span>
