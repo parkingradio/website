@@ -7,10 +7,14 @@ The server provides the API under `/api`, which this directory specifies, and se
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
   response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. One
   exception: in production, nginx itself refuses requests whose body is over 12 MB, with a 413 that isn't JSON.
-- **Errors.** A request that fails gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and
-  `error`, a message meant for people, in English unless it's shown to the public. Successful responses have `ok` set
-  to `true`, except for those of `GET /api/config`, `GET /api/events`, `GET /api/radio` and
-  `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error.
+- **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid
+  JSON), gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and `error`, a message meant for
+  people, in English unless it's shown to the public. The only exception is [`GET /healthz`](#get-healthz), which fails
+  with `{"ok": false}` alone. An unexpected failure gets a 500 whose message only says that something went wrong: what
+  went wrong is logged, but without the personal data it could include, e.g. the values of a failed database query.
+  Successful responses have `ok` set to `true`, except for those of `GET /api/config`, `GET /api/events`,
+  `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error, whatever the
+  request's body.
 - **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
   (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
@@ -33,8 +37,8 @@ Requests and responses are described field by field. A field whose type says "or
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
 `HEAD` request outside `/api` and `/assets`, where the build's files are. The app then shows the page for that path.
 This includes paths that aren't one of the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)),
-since the server doesn't know which pages the app has. Other requests for paths that don't exist, and files that don't
-exist under `/assets`, get a 404 error.
+since the server doesn't know which pages the app has. Other requests for paths that don't exist, whatever their body,
+and files that don't exist under `/assets`, get a 404 error.
 
 ## `GET /healthz`
 

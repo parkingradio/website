@@ -3,6 +3,7 @@ import path from 'node:path'
 import Fastify from 'fastify'
 import type { FastifyBaseLogger } from 'fastify'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
+import { frameworkErrors } from './api/errors.js'
 import { registerRoutes } from './app.js'
 import { config } from './core/config.js'
 import { db } from './db/connection.js'
@@ -24,7 +25,9 @@ import { featuresStore } from './features/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
 const loggerInstance: FastifyBaseLogger = logger
-const app = Fastify({ loggerInstance })
+// Errors are sent as an `ApiError` even when Fastify raises them before routing a request, e.g. for a URL that isn't
+// valid: the error handler set by registerRoutes takes care of the others.
+const app = Fastify({ loggerInstance, frameworkErrors })
 app.addHook('onClose', () => db.$client.end())
 
 try {

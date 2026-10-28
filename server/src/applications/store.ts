@@ -1,5 +1,5 @@
 import { desc, eq } from 'drizzle-orm'
-import { violatesConstraint } from '../api/query-errors.js'
+import { violatesConstraint } from '../api/errors.js'
 import type { Queryable } from '../db/connection.js'
 import { applications } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'

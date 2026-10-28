@@ -164,7 +164,7 @@ function parseLineup(event: RaEvent): string[] {
 }
 
 export async function eventsRoutes(app: FastifyInstance) {
-  const api = zodRoutes(app, 'Failed to handle a request for the events')
+  const api = zodRoutes(app)
 
   // The outcome of the last fetch from RA, successful or not, kept for CACHE_TTL_MS so that RA is asked at
   // most that often. Failures are kept too, so that a broken RA isn't retried on every request. A failure

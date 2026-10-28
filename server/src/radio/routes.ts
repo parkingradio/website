@@ -239,9 +239,9 @@ export async function radioRoutes(
   app: FastifyInstance,
   { soundcloud: newClient, credentials: credentialsStore, onAir, settings: settingsStore }: RadioOptions,
 ) {
-  // The credentials, and a private playlist's secret, are values of the queries that save them, which zodRoutes keeps
-  // out of the logs and responses.
-  const api = zodRoutes(app, 'Failed to handle a request about the radio')
+  // The credentials, and a private playlist's secret, are values of the queries that save them, which the app's error
+  // handler keeps out of the logs and responses (see `useApiErrors`).
+  const api = zodRoutes(app)
 
   // The secrets of the private tracks of the playlists read, by track id, as they were last read.
   const trackSecrets = new Map<string, string>()

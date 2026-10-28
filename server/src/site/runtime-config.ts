@@ -20,7 +20,7 @@ const Config = z
 // Environment-specific values the client needs, and which features are on. Public on purpose: none of this is
 // sensitive, and the client has to be able to read it before it has a session.
 export async function configRoutes(app: FastifyInstance, { store }: { store: Pick<FeaturesStore, 'load'> }) {
-  const api = zodRoutes(app, 'Failed to handle a request for the configuration')
+  const api = zodRoutes(app)
 
   api.get(
     '/api/config',

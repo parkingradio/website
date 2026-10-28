@@ -22,7 +22,7 @@ function feature({ id, enabled, updatedBy, updatedAt }: StoredFeature): z.infer<
 }
 
 export async function featuresRoutes(app: FastifyInstance, { store }: { store: FeaturesStore }) {
-  const api = zodRoutes(app, 'Failed to handle a request about feature flags')
+  const api = zodRoutes(app)
 
   api.get(
     '/api/admin/features',

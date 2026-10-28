@@ -119,8 +119,7 @@ type ApplicationsOptions = {
 }
 
 export async function applicationsRoutes(app: FastifyInstance, { store, settings }: ApplicationsOptions) {
-  // An application's details can contain the artist's personal data.
-  const api = zodRoutes(app, 'Failed to handle a request about applications')
+  const api = zodRoutes(app)
   // The messages of these routes' schemas are whole sentences, e.g. in French for applications, which are sent as they are.
   app.setSchemaErrorFormatter(firstIssue)
 

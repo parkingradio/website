@@ -365,7 +365,7 @@ describe('POST /api/applications', () => {
     expect(stored.size).toBe(0)
   })
 
-  it("keeps the artist's personal data out of the logs and the response when the database fails", async () => {
+  it("keeps the artist's personal data out of the logs and the response when the database fails, saying so in French", async () => {
     const cause = Object.assign(new Error('terminating connection due to administrator command'), { code: '57P01' })
     const query = 'insert into "artists" ("email", "phone") values ($1, $2)'
     vi.mocked(store.apply).mockRejectedValueOnce(new DrizzleQueryError(query, ['artiste@example.com', '418 555-0123'], cause))
@@ -373,8 +373,9 @@ describe('POST /api/applications', () => {
     const app = await buildApp(logs)
     const response = await apply(app)
     expect(response.statusCode).toBe(500)
-    expect(response.json()).toEqual({ ok: false, error: 'Internal server error' })
+    expect(response.json()).toEqual({ ok: false, error: 'Une erreur est survenue. Réessayez plus tard.' })
     expect(logs.join('')).toContain('57P01')
+    expect(logs.join('')).toContain('Failed to handle POST /api/applications')
     expect(logs.join('')).not.toContain('artiste@example.com')
     expect(logs.join('')).not.toContain('418 555-0123')
   })

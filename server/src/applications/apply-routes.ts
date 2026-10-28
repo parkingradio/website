@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import { z } from 'zod'
 import { clientAddress, visitorAddress } from '../api/client-address.js'
+import { useApiErrors } from '../api/errors.js'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { PhotoForm } from '../artists/photo-form.js'
@@ -26,6 +27,7 @@ export const APPLICATIONS_PER_WINDOW = 5
 const APPLICATIONS_WINDOW = '1 hour'
 
 const INVALID_REQUEST: z.infer<typeof ApiError> = { ok: false, error: 'Candidature invalide.' }
+const INTERNAL_ERROR = 'Une erreur est survenue. Réessayez plus tard.'
 const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }
 const TURNSTILE_REFUSED: z.infer<typeof ApiError> = { ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }
 const TURNSTILE_UNAVAILABLE: z.infer<typeof ApiError> = {
@@ -111,11 +113,13 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
   // Needed by `readPhotoForm`, which sets its own limits.
   await app.register(multipart)
 
-  // The rate limit's error already has a French message. Other errors that Fastify or a plugin raises get the generic
-  // one.
-  const api = zodRoutes(app, 'Failed to save an application sent by an artist', (error) =>
-    error.statusCode === 429 ? error.message : INVALID_REQUEST.error,
-  )
+  // The errors that Fastify or a plugin raises are in French too, like the route's own: the rate limit's already has a
+  // French message, other 4xx get the generic one, and unexpected errors say that something went wrong.
+  useApiErrors(app, {
+    clientError: (error) => (error.statusCode === 429 ? error.message : INVALID_REQUEST.error),
+    internalError: INTERNAL_ERROR,
+  })
+  const api = zodRoutes(app)
 
   api.post(
     '/api/applications',
@@ -124,7 +128,7 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         rateLimit: {
           max: APPLICATIONS_PER_WINDOW,
           timeWindow: APPLICATIONS_WINDOW,
-          // The plugin throws this error, and the error handler set by `zodRoutes` sends its message.
+          // The plugin throws this error, and the error handler set above sends its message.
           errorResponseBuilder: () =>
             Object.assign(new Error('Trop de candidatures envoyées depuis votre connexion. Réessayez plus tard.'), { statusCode: 429 }),
         },

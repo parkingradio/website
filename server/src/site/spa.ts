@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import fastifyStatic from '@fastify/static'
+import { NOT_FOUND } from '../api/errors.js'
 import { notFoundRoutes } from './not-found.js'
 
 // Vite emits the build's files under /assets, with a hash of their content in their names. A given URL
@@ -39,6 +40,6 @@ export async function spaRoutes(app: FastifyInstance, { root }: SpaOptions) {
     if (request.method === 'GET' || request.method === 'HEAD') {
       return reply.sendFile('index.html')
     }
-    return reply.code(404).send({ ok: false, error: 'Not found' })
+    return reply.code(404).send(NOT_FOUND)
   })
 }

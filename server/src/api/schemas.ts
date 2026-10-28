@@ -1,9 +1,9 @@
-import type { FastifyError, FastifyInstance, FastifySchemaValidationError, RouteOptions } from 'fastify'
+import type { FastifyInstance, FastifySchemaValidationError, RouteOptions } from 'fastify'
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { checksOrigin, requireAuth } from '../admins/auth.js'
-import { keepQueryValuesPrivate } from './query-errors.js'
+import { useApiErrors } from './errors.js'
 
 // What the routes' zod schemas share. The schemas validate requests and responses, and openapi.json is generated from
 // them (see generate-openapi.ts).
@@ -69,7 +69,11 @@ function addGenericErrors(route: RouteOptions) {
 
 // Lets routes declare zod schemas: requests that don't match theirs are rejected with 400, and responses that don't
 // match the schema of their status fail with 500 rather than being sent, so that openapi.json tells the truth.
+//
+// It also sets the app's error handler (see `useApiErrors`), so every app, tests' included, sends its errors as an
+// `ApiError`.
 export function useZodSchemas(app: FastifyInstance) {
+  useApiErrors(app)
   app.setValidatorCompiler(validatorCompiler)
   app.setSerializerCompiler(serializerCompiler)
   // E.g. "`enabled`: Invalid input: expected boolean, received string", or "body: Invalid input: ..." for the whole body.
@@ -99,11 +103,8 @@ export function useZodSchemas(app: FastifyInstance) {
 export const firstIssue = (errors: FastifySchemaValidationError[]) => new Error(errors[0].message)
 
 // The routes of a plugin, declared with zod schemas. Their responses get the generic errors, and admin routes check the
-// session (see `addGenericErrors`). Their errors are sent as an `ApiError` (see api/query-errors.ts), which also logs
-// `message` for unexpected ones. `clientError` can choose the message of the 4xx errors that Fastify or a plugin
-// raises, e.g. to have it in French.
-export function zodRoutes(app: FastifyInstance, message: string, clientError?: (error: FastifyError) => string) {
-  keepQueryValuesPrivate(app, message, clientError)
+// session (see `addGenericErrors`).
+export function zodRoutes(app: FastifyInstance) {
   // Unless a parent plugin already did, since its routes are this plugin's too.
   if (!app.hasDecorator('zodRoutes')) {
     app.decorate('zodRoutes', true)

@@ -36,7 +36,7 @@ describe('zodRoutes', () => {
 
   it("adds the errors that routes can fail with because of what they are to the routes' responses", async () => {
     const { statuses } = await buildApp((app) => {
-      const api = zodRoutes(app, 'Failed')
+      const api = zodRoutes(app)
       api.get('/public', { schema: { response: { 200: Ok } } }, handler)
       api.get('/public/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: Ok } } }, handler)
       api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
@@ -56,7 +56,7 @@ describe('zodRoutes', () => {
 
   it('checks the session of admin routes before anything else, for HEAD too', async () => {
     const { app } = await buildApp((app) => {
-      const api = zodRoutes(app, 'Failed')
+      const api = zodRoutes(app)
       api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
       api.put('/api/admin/thing', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
     })
@@ -67,20 +67,20 @@ describe('zodRoutes', () => {
 
   it('refuses routes that would leave their errors out of their responses', async () => {
     const refused: [string, (app: FastifyInstance) => void][] = [
-      ['rather than using requireAuth', (app) => zodRoutes(app, 'Failed').get('/', { preHandler: requireAuth, schema: {} }, handler)],
-      ['need a schema', (app) => zodRoutes(app, 'Failed').get('/', handler)],
+      ['rather than using requireAuth', (app) => zodRoutes(app).get('/', { preHandler: requireAuth, schema: {} }, handler)],
+      ['need a schema', (app) => zodRoutes(app).get('/', handler)],
       [
         'one route per method',
-        (app) => zodRoutes(app, 'Failed').route({ method: ['GET', 'PUT'], url: '/api/admin/thing', config: { admin: true }, schema: {}, handler }),
+        (app) => zodRoutes(app).route({ method: ['GET', 'PUT'], url: '/api/admin/thing', config: { admin: true }, schema: {}, handler }),
       ],
       // Without zodRoutes, nothing would check the session.
       ['only works for the routes of zodRoutes', (app) => app.get('/', { config: { admin: true } }, handler)],
       // The client takes a 401 from a route under /api/admin/ to mean that the session ended.
       ['admin routes are those under /api/admin/', (app) => app.get('/api/admin/thing', handler)],
-      ['admin routes are those under /api/admin/', (app) => zodRoutes(app, 'Failed').get('/api/admin/thing', { schema: {} }, handler)],
+      ['admin routes are those under /api/admin/', (app) => zodRoutes(app).get('/api/admin/thing', { schema: {} }, handler)],
       [
         'admin routes are those under /api/admin/',
-        (app) => zodRoutes(app, 'Failed').get('/api/thing', { config: { admin: true }, schema: {} }, handler),
+        (app) => zodRoutes(app).get('/api/thing', { config: { admin: true }, schema: {} }, handler),
       ],
     ]
     for (const [error, routes] of refused) {
@@ -91,7 +91,7 @@ describe('zodRoutes', () => {
   it('only sends timestamps that are ISO 8601 dates and times', async () => {
     let at = ''
     const { app } = await buildApp((app) => {
-      zodRoutes(app, 'Failed').get('/at', { schema: { response: { 200: z.object({ at: Timestamp }) } } }, async () => ({ at }))
+      zodRoutes(app).get('/at', { schema: { response: { 200: z.object({ at: Timestamp }) } } }, async () => ({ at }))
     })
     const statuses: Record<string, number> = {}
     for (at of ['2026-10-09T16:30:00.000Z', '2026-10-09T12:30:00-04:00', 'yesterday', '2026-10-09']) {
@@ -103,7 +103,7 @@ describe('zodRoutes', () => {
   it('only sends days that exist', async () => {
     let day = ''
     const { app } = await buildApp((app) => {
-      zodRoutes(app, 'Failed').get('/day', { schema: { response: { 200: z.object({ day: Day }) } } }, async () => ({ day }))
+      zodRoutes(app).get('/day', { schema: { response: { 200: z.object({ day: Day }) } } }, async () => ({ day }))
     })
     const statuses: Record<string, number> = {}
     for (day of ['2026-10-09', '2028-02-29', '2026-02-29', '2026-13-45', '2026-10-09T16:30:00.000Z']) {

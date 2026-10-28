@@ -6,7 +6,7 @@ import type { AdminArtistProfile, ArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { artists } from '../db/schema.js'
-import { violatesConstraint } from '../api/query-errors.js'
+import { violatesConstraint } from '../api/errors.js'
 import { isUuid } from '../db/uuid.js'
 
 // Checks the profiles and photos sent for artists against the rules in artists/profile.ts, keeps artists in the

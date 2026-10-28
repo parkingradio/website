@@ -105,7 +105,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   // Needed by `readPhotoForm`, which sets its own limits.
   await app.register(multipart)
 
-  const api = zodRoutes(app, 'Failed to handle a request about artists')
+  const api = zodRoutes(app)
 
   api.get(
     '/api/admin/artists',

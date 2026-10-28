@@ -4,7 +4,8 @@ import type { FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 
 const { selectResult, dbState } = vi.hoisted(() => ({
-  selectResult: { rows: [] as Record<string, unknown>[] },
+  // `failure`, when set, is what selecting fails with.
+  selectResult: { rows: [] as Record<string, unknown>[], failure: null as Error | null },
   dbState: {
     updatedPasswordHashes: [] as string[],
     updatedSessionVersions: [] as unknown[],
@@ -17,7 +18,7 @@ vi.mock('../db/connection.js', () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => Promise.resolve(selectResult.rows),
+        where: () => (selectResult.failure ? Promise.reject(selectResult.failure) : Promise.resolve(selectResult.rows)),
       }),
     }),
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -46,7 +47,7 @@ vi.mock('../db/connection.js', () => ({
   },
 }))
 
-import { eq } from 'drizzle-orm'
+import { DrizzleQueryError, eq } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { db } from '../db/connection.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth-routes.js'
@@ -60,6 +61,7 @@ describe('auth routes', () => {
 
   beforeEach(() => {
     selectResult.rows = []
+    selectResult.failure = null
     dbState.updatedPasswordHashes = []
     dbState.updatedSessionVersions = []
     dbState.deleteCallCount = 0
@@ -71,8 +73,9 @@ describe('auth routes', () => {
     process.env = { ...originalEnv }
   })
 
-  async function buildApp() {
-    const app = Fastify()
+  // If `logs` is given, every line the app logs is added to it.
+  async function buildApp(logs?: string[]) {
+    const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
     useZodSchemas(app)
     await app.register(fastifyCookie)
     acceptSessions(app)
@@ -160,6 +163,24 @@ describe('auth routes', () => {
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error })
       }
+    })
+
+    it('keeps the email out of the logs and the response when the database fails', async () => {
+      const cause = Object.assign(new Error('terminating connection due to administrator command'), { code: '57P01' })
+      selectResult.failure = new DrizzleQueryError('select ... where lower("email") = lower($1)', ['admin@example.com'], cause)
+      const logs: string[] = []
+      const app = await buildApp(logs)
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'admin@example.com', password: 'whatever' },
+      })
+
+      expect(response.statusCode).toBe(500)
+      expect(response.json()).toEqual({ ok: false, error: 'Internal server error' })
+      expect(logs.join('')).toContain('57P01')
+      expect(logs.join('')).not.toContain('admin@example.com')
     })
 
     describe('rate limiting', () => {

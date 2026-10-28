@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
 import type { AdminsStore, InviteOutcome, StoredAdmin } from './store.js'
@@ -200,6 +201,20 @@ describe('admin routes', () => {
       expect(response.statusCode).toBe(500)
       expect(response.json()).toEqual({ ok: false, error: 'Server is not configured to send email' })
       expect(store.invite).not.toHaveBeenCalled()
+    })
+
+    it("keeps the invited admin's email out of the logs and the response when the database fails", async () => {
+      const cause = Object.assign(new Error('terminating connection due to administrator command'), { code: '57P01' })
+      const query = 'insert into "users" ("email") values ($1)'
+      vi.mocked(store.invite).mockRejectedValueOnce(new DrizzleQueryError(query, ['new-admin@example.com'], cause))
+      const logs: string[] = []
+      const app = await buildApp({ logs })
+      const response = await request(app, 'POST', '/api/admin/invite', { email: 'new-admin@example.com' })
+      expect(response.statusCode).toBe(500)
+      expect(response.json()).toEqual({ ok: false, error: 'Internal server error' })
+      expect(logs.join('')).toContain('57P01')
+      expect(logs.join('')).not.toContain('new-admin@example.com')
+      expect(send).not.toHaveBeenCalled()
     })
 
     it('still succeeds when the email fails to send', async () => {

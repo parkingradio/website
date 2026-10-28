@@ -50,7 +50,7 @@ type AdminOptions = {
 }
 
 export async function adminRoutes(app: FastifyInstance, { store, sendEmail, origin }: AdminOptions) {
-  const api = zodRoutes(app, 'Failed to handle a request about admins')
+  const api = zodRoutes(app)
 
   api.get(
     '/api/admin/admins',

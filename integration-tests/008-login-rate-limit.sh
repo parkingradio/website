@@ -13,7 +13,7 @@ done
 
 login 203.0.113.1 nobody@integration.test guess
 expect_status 429
-expect_body_contains 'Too many login attempts'
+expect_body '^\{"ok":false,"error":"Too many login attempts, try again in [^"]+"\}$'
 
 login 203.0.113.2 nobody@integration.test guess
 expect_status 401

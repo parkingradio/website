@@ -22,14 +22,14 @@ const LOGIN_WINDOW = '15 minutes'
 const LoggedIn = z.object({ ok: z.literal(true), email: z.string() }).meta({ id: 'LoggedIn' })
 
 export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }) {
-  const api = zodRoutes(app, 'Failed to handle a request about sessions')
+  const api = zodRoutes(app)
   // Only routes that opt in through `config.rateLimit` are limited.
   await app.register(rateLimit, { global: false, keyGenerator: clientAddress })
 
   const loginRateLimit: RateLimitOptions = {
     max: LOGIN_ATTEMPTS_PER_WINDOW,
     timeWindow: LOGIN_WINDOW,
-    // The plugin throws this error, and the error handler set by `zodRoutes` sends its message.
+    // The plugin throws this error, and the app's error handler sends its message (see `useApiErrors`).
     errorResponseBuilder: (_request, context) =>
       Object.assign(new Error(`Too many login attempts, try again in ${context.after}`), { statusCode: 429 }),
   }
