@@ -1,7 +1,6 @@
 /* The player's bar, at the bottom of every page. It's the last thing in the layout, so that it takes its own room at the
    end of the page rather than hiding it, and sticks to the bottom of the screen above the rest of the page. Coming after
-   the page, it's drawn over it without a z-index, which leaves it under what's drawn over the page, like the navigation
-   bar and its drawer, or the Synth Meetups lightbox. */
+   the page, it's drawn over it without a z-index (see .page in layout.css), and under the navigation bar's drawer. */
 .player {
   position: sticky;
   bottom: 0;

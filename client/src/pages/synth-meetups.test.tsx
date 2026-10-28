@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../api/client'
 import { mockFetch, requestsTo } from '../test-utils'
@@ -51,15 +51,26 @@ describe('SynthMeetups', () => {
 
   it('expands a poster into a lightbox on click, and closes it on a second click', () => {
     render(<SynthMeetups />)
-    expect(screen.getAllByRole('img')).toHaveLength(10) // banner + 9 thumbnails
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getAllByRole('button')[0])
-    const lightboxImage = screen.getAllByRole('img').at(-1)
-    expect(lightboxImage).toBeVisible()
-    expect(screen.getAllByRole('img')).toHaveLength(11) // + the lightbox image
+    fireEvent.click(screen.getByRole('button', { name: /23 septembre 2026/ }))
+    const lightbox = screen.getByRole('dialog', { name: 'Affiche du synth meetup du 23 septembre 2026' })
+    const image = within(lightbox).getByRole('img', { name: 'Affiche du synth meetup du 23 septembre 2026' })
+    expect(image).toBeVisible()
 
-    fireEvent.click(lightboxImage!)
-    expect(screen.getAllByRole('img')).toHaveLength(10) // back to banner + 9 thumbnails
+    fireEvent.click(image)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(lightbox).toBeEmptyDOMElement()
+  })
+
+  it('closes the lightbox when the browser closes it, e.g. on Escape', () => {
+    render(<SynthMeetups />)
+    fireEvent.click(screen.getByRole('button', { name: /23 septembre 2026/ }))
+    const lightbox = screen.getByRole('dialog')
+
+    act(() => (lightbox as HTMLDialogElement).close())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(lightbox).toBeEmptyDOMElement()
   })
 
   it('lists the upcoming synth meetups from the server, soonest first, linking to RA', async () => {

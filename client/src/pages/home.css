@@ -1,10 +1,8 @@
 /* The home page, as the combined widget it was ported from looked (see home.tsx). */
 
-/* Its parts' z-indexes, like the schedule's over the video, stay among themselves, below what's drawn over the page
-   (the navigation bar and its drawer, the player's bar), as they did in the widget's iframe. So does what's too wide for the
-   screen, like the radio bar on phones once it plays, which scrolls sideways without the rest of the page. */
+/* What's too wide for the screen, like the radio bar on phones once it plays, scrolls sideways without the rest of the
+   page, as it did in the widget's iframe. */
 .home {
-  isolation: isolate;
   overflow-x: auto;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   background: #fff;

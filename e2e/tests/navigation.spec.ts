@@ -82,7 +82,7 @@ async function scrollDown(page: Page, path: string, content: Locator) {
 }
 
 // Whether what's at the top of the screen is the navigation bar, rather than the page scrolled under it, or drawn over it.
-const barOnTop = (page: Page) => page.evaluate(() => document.elementFromPoint(innerWidth / 2, 10)?.closest('nav') !== null)
+const barOnTop = (page: Page) => page.evaluate(() => !!document.elementFromPoint(innerWidth / 2, 10)?.closest('nav'))
 
 test('the navigation bar stays at the top of the screen, over the page, as it scrolls', async ({ page, hasDrawer }) => {
   await scrollDown(page, '/', page.getByTitle('Parking Radio Discord'))
@@ -95,6 +95,17 @@ test('the navigation bar stays at the top of the screen, over the page, as it sc
       .poll(() => page.evaluate(() => document.elementFromPoint(innerWidth - 5, innerHeight - 5)?.className))
       .toBe('menu-backdrop')
   }
+})
+
+test('nothing on the page is drawn over the navigation bar, whatever its z-index', async ({ page }) => {
+  await page.goto('/synth-meetups')
+  await expect(page.getByRole('heading', { name: 'dates à venir' })).toBeVisible()
+  await page.locator('main').evaluate((main) => {
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 2147483647'
+    main.append(overlay)
+  })
+  expect(await barOnTop(page)).toBe(true)
 })
 
 test('the navigation bar scrolls away on very short screens', async ({ page }) => {

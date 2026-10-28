@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAssetUrl } from '../config-context'
 import { useApi } from '../api/use-api'
 import { RA_PROMOTER_URL } from '../events'
@@ -44,6 +44,8 @@ const POSTERS = [
   },
 ]
 
+type Poster = (typeof POSTERS)[number]
+
 const NDI_URL = 'https://ndi.video/tools/'
 
 const dateFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -84,16 +86,15 @@ function UpcomingDates() {
 
 export function SynthMeetups() {
   const assetUrl = useAssetUrl()
-  const [expandedPoster, setExpandedPoster] = useState<(typeof POSTERS)[number] | null>(null)
+  const [expandedPoster, setExpandedPoster] = useState<Poster | null>(null)
+  // The lightbox is a modal dialog, which the browser draws over everything, closes with Escape, and keeps the focus in
+  // while it's open. It's closed rather than removed, so that the browser gives the focus back to where it was before.
+  const lightbox = useRef<HTMLDialogElement>(null)
 
-  useEffect(() => {
-    if (!expandedPoster) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setExpandedPoster(null)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [expandedPoster])
+  const expand = (poster: Poster) => {
+    setExpandedPoster(poster)
+    lightbox.current?.showModal()
+  }
 
   return (
     <div className="synth-meetups">
@@ -156,7 +157,7 @@ export function SynthMeetups() {
           <button
             key={poster.key}
             className="poster-thumb"
-            onClick={() => setExpandedPoster(poster)}
+            onClick={() => expand(poster)}
             aria-label={`Voir en grand: ${poster.alt}`}
           >
             <img src={assetUrl(poster.key)} alt={poster.alt} />
@@ -164,11 +165,15 @@ export function SynthMeetups() {
         ))}
       </div>
 
-      {expandedPoster && (
-        <div className="lightbox" onClick={() => setExpandedPoster(null)}>
-          <img src={assetUrl(expandedPoster.key)} alt={expandedPoster.alt} />
-        </div>
-      )}
+      <dialog
+        ref={lightbox}
+        className="lightbox"
+        aria-label={expandedPoster?.alt}
+        onClick={() => lightbox.current?.close()}
+        onClose={() => setExpandedPoster(null)}
+      >
+        {expandedPoster && <img src={assetUrl(expandedPoster.key)} alt={expandedPoster.alt} />}
+      </dialog>
     </div>
   )
 }
