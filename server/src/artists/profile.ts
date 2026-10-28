@@ -315,17 +315,19 @@ const NO_GENRE = 'Choisissez au moins un genre.'
 const NO_LINK = 'Ajoutez au moins un lien.'
 const BAD_LINK = 'Un des liens est invalide.'
 
-// A text, trimmed, then up to `maxLength` characters. `field` names it in the error when it's too long, e.g. "La bio",
-// and `missing` is the error when it isn't a string, or when it's empty unless it `canBeEmpty`. openapi.json would read
-// as applying its lengths to what's sent, so the description says they apply after the cleanup. Applications' text fields
-// follow the same rules (see applications/fields.ts). The client has its own copy (see checkText and checkLine in
-// client/src/checks.ts), and they must be changed together.
+// A text, trimmed, then up to `maxLength` characters, and refused if it has the NUL character, which the database can't
+// store. `field` names it in the error when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when it
+// isn't a string, or when it's empty unless it `canBeEmpty`. openapi.json would read as applying its lengths to what's
+// sent, so the description says they apply after the cleanup. Applications' text fields follow the same rules (see
+// applications/fields.ts). The client has its own copy (see checkText and checkLine in client/src/checks.ts), and they
+// must be changed together.
 export function text(field: string, maxLength: number, missing: string, { canBeEmpty = false, singleLine = false } = {}) {
   let schema = z.string({ error: missing })
   // Each run of spaces, tabs or line breaks in a single line, e.g. a name, becomes a single space.
   if (singleLine) schema = schema.overwrite((value) => value.replace(/\s+/g, ' '))
   schema = schema.trim()
   if (!canBeEmpty) schema = schema.min(1, missing)
+  schema = schema.refine((value) => !value.includes('\0'), `${field} contient un caractère invalide.`)
   const cleaned = singleLine ? 'Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed' : 'Trimmed'
   const length = canBeEmpty ? `up to ${maxLength}` : `between 1 and ${maxLength}`
   return schema.max(maxLength, `${field} dépasse ${maxLength} caractères.`).meta({ description: `${cleaned}, then ${length} characters` })

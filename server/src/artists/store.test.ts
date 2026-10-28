@@ -194,6 +194,11 @@ describe('validateProfile', () => {
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
   })
 
+  it("refuses text with the NUL character, which the database can't store, before checking its length", () => {
+    expect(error({ kind: 'collective', members: ['A', '\0'] })).toBe("Le nom d'un artiste du collectif contient un caractère invalide.")
+    expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio contient un caractère invalide.')
+  })
+
   describe('as admins send it', () => {
     const ADMIN = AdminArtistProfile
     // What admins can leave out, as it's saved when they do.

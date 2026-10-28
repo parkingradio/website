@@ -5,7 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
-import { ApiError, Day, Ok, Timestamp, useZodSchemas, zodRoutes } from './schemas.js'
+import { ApiError, Day, Ok, Timestamp, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
 
@@ -110,5 +110,51 @@ describe('zodRoutes', () => {
       statuses[day] = (await app.inject({ method: 'GET', url: '/day' })).statusCode
     }
     expect(statuses).toEqual({ '2026-10-09': 200, '2028-02-29': 200, '2026-02-29': 500, '2026-13-45': 500, '2026-10-09T16:30:00.000Z': 500 })
+  })
+})
+
+describe('the NUL character', () => {
+  // A route that echoes what it was sent, once it's validated.
+  async function echo(formatter?: typeof firstIssue) {
+    const { app } = await buildApp((app) => {
+      if (formatter) app.setSchemaErrorFormatter(formatter)
+      zodRoutes(app).post(
+        '/echo/:id',
+        {
+          schema: {
+            params: z.object({ id: z.string() }),
+            querystring: z.object({ q: z.string().optional() }),
+            body: z.object({ count: z.number().optional(), tags: z.array(z.string()).optional(), links: z.record(z.string(), z.string()).optional() }),
+            response: { 200: z.object({ ok: z.literal(true), body: z.unknown() }) },
+          },
+        },
+        async (request) => ({ ok: true as const, body: request.body }),
+      )
+    })
+    return async (url: string, payload: object) => {
+      const response = await app.inject({ method: 'POST', url, payload })
+      return { status: response.statusCode, body: response.json() }
+    }
+  }
+
+  it('is refused wherever the request sends it, without quoting the key that has it', async () => {
+    const send = await echo()
+    const refused = (where: string) => ({ status: 400, body: { ok: false, error: `${where}: Text can't contain the NUL character` } })
+    expect(await send('/echo/1', { tags: ['a', 'b\0'] })).toEqual(refused('`tags.1`'))
+    expect(await send('/echo/1', { links: { 'a\0': 'b' } })).toEqual(refused('`links`'))
+    expect(await send('/echo/a%00b', {})).toEqual(refused('`id`'))
+    expect(await send('/echo/1?q=%00', {})).toEqual(refused('`q`'))
+  })
+
+  it("is only refused in what the schema keeps, and not when it's only written as an escape", async () => {
+    const send = await echo()
+    expect(await send('/echo/1?other=%00', { other: '\0', tags: ['\\u0000'] })).toEqual({ status: 200, body: { ok: true, body: { tags: ['\\u0000'] } } })
+  })
+
+  it("comes after the schema's own errors, in the format of the route's errors", async () => {
+    const send = await echo()
+    expect((await send('/echo/1', { count: 'x', tags: ['\0'] })).body.error).toMatch(/^`count`: /)
+    const sendFirstIssue = await echo(firstIssue)
+    expect((await sendFirstIssue('/echo/1', { tags: ['\0'] })).body.error).toBe("Text can't contain the NUL character")
   })
 })

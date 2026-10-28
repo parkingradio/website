@@ -7,6 +7,8 @@ The server provides the API under `/api`, which this directory specifies, and se
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
   response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. One
   exception: in production, nginx itself refuses requests whose body is over 12 MB, with a 413 that isn't JSON.
+- **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
+  store: requests with it fail with 400 rather than having it removed.
 - **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid
   JSON), gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and `error`, a message meant for
   people, in English unless it's shown to the public. The only exception is [`GET /healthz`](#get-healthz), which fails

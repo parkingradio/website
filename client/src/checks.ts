@@ -11,11 +11,12 @@ export type Checked<T> = { value: T; error?: undefined } | { value?: undefined; 
 // the server's checks, which answer with the first error. Fields that are fine are left out.
 export type FieldErrors<T> = Partial<Record<keyof T, string>>
 
-// The text in `value`, trimmed. `field` names it in the error when it's too long, e.g. "La bio", and `missing` is the
-// error when there's none, if it's required.
+// The text in `value`, trimmed, and refused if it has the NUL character, like the server does. `field` names it in the
+// error when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when there's none, if it's required.
 export function checkText(value: unknown, field: string, maxLength: number, missing: string | null): Checked<string> {
   const trimmed = typeof value === 'string' ? value.trim() : ''
   if (!trimmed && missing) return { error: missing }
+  if (trimmed.includes('\0')) return { error: `${field} contient un caractère invalide.` }
   if (trimmed.length > maxLength) return { error: `${field} dépasse ${maxLength} caractères.` }
   return { value: trimmed }
 }

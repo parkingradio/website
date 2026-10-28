@@ -88,6 +88,7 @@ describe('validateApplication', () => {
     expect(validateApplication(fields({ details: '  Une question ?\n' })).details).toBe('Une question ?')
     expect(validateApplication(fields({ details: 'x'.repeat(2000) })).details).toHaveLength(2000)
     expect(() => validateApplication(fields({ details: 'x'.repeat(2001) }))).toThrow('Le champ « Questions ou détails » dépasse 2000 caractères.')
+    expect(() => validateApplication(fields({ details: 'Une\0question' }))).toThrow('Le champ « Questions ou détails » contient un caractère invalide.')
   })
 
   it('refuses anything but an object, with the error of the dates', () => {

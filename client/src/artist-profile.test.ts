@@ -200,6 +200,11 @@ describe('checkProfile, as the server answers', () => {
     expect(error({ phone: '1'.repeat(41) })).toBe('Le numéro de téléphone dépasse 40 caractères.')
   })
 
+  it('refuses text with the NUL character, which the server refuses, before checking its length', () => {
+    expect(error({ kind: 'collective', members: ['A', '\0'] })).toBe("Le nom d'un artiste du collectif contient un caractère invalide.")
+    expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio contient un caractère invalide.')
+  })
+
   describe('leniently', () => {
     const LENIENT = { lenient: true }
     // What admins can leave out, as it's saved when they do.

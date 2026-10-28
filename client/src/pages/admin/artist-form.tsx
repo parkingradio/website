@@ -272,7 +272,8 @@ function MembersField({
   onLeave,
 }: GroupProps<string[]> & { members: string[]; entry: string; onEntryChange: (entry: string) => void }) {
   const pin = () => {
-    // The input's maxLength keeps the name short enough, so there's nothing else that can be wrong with it.
+    // The input's maxLength keeps the name short enough; a name with the NUL character, which the server refuses, is
+    // dropped.
     const { value } = checkLine(entry, "Le nom d'un artiste du collectif", NAME_MAX_LENGTH, null)
     if (value && !members.some((member) => member.toLowerCase() === value.toLowerCase())) onChange([...members, value])
     onEntryChange('')

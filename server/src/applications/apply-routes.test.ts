@@ -266,6 +266,8 @@ describe('POST /api/applications', () => {
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },
+      // Which the database can't store.
+      { parts: { application: fields({ details: 'Une\0question' }) }, error: 'Le champ « Questions ou détails » contient un caractère invalide.' },
       // Malformed, rather than only invalid, which the form never sends, but still explained in French.
       { parts: { artist: 'null' }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
       { parts: { application: 'null' }, error: 'Choisissez au moins une date.' },

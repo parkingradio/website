@@ -67,14 +67,44 @@ function addGenericErrors(route: RouteOptions) {
   route.schema = { ...route.schema, response: { ...errors, ...(route.schema.response as object | undefined) } }
 }
 
+// The path to the first string in `value` that has the NUL character, or to the first object with a key that has it,
+// or undefined when there's none. Objects without entries, e.g. a Date, have none.
+function pathToNul(value: unknown): (string | number)[] | undefined {
+  if (typeof value === 'string') return value.includes('\0') ? [] : undefined
+  if (typeof value !== 'object' || value === null) return undefined
+  for (const [key, item] of Array.isArray(value) ? value.entries() : Object.entries(value)) {
+    if (String(key).includes('\0')) return []
+    const found = pathToNul(item)
+    if (found) return [key, ...found]
+  }
+  return undefined
+}
+
+const NUL_ERROR = "Text can't contain the NUL character"
+
+// Validates requests against their zod schema, then refuses those that send the NUL character, which the database can't
+// store, anywhere in what the schema keeps (it drops the fields it doesn't know). Only once the schema accepted them, so
+// that its own errors come first, e.g. the French ones of `text` in artists/profile.ts.
+const refusingNul: typeof validatorCompiler = (route) => {
+  const validate = validatorCompiler(route)
+  return (data) => {
+    const result = validate(data) as { error?: FastifySchemaValidationError[]; value?: unknown }
+    if (result.error) return result
+    const path = pathToNul(result.value)
+    if (!path) return result
+    return { error: [{ keyword: 'custom', instancePath: `/${path.join('/')}`, schemaPath: '#', params: {}, message: NUL_ERROR }] }
+  }
+}
+
 // Lets routes declare zod schemas: requests that don't match theirs are rejected with 400, and responses that don't
-// match the schema of their status fail with 500 rather than being sent, so that openapi.json tells the truth.
+// match the schema of their status fail with 500 rather than being sent, so that openapi.json tells the truth. Requests
+// that send the NUL character are rejected with 400 too (see `refusingNul`).
 //
 // It also sets the app's error handler (see `useApiErrors`), so every app, tests' included, sends its errors as an
 // `ApiError`.
 export function useZodSchemas(app: FastifyInstance) {
   useApiErrors(app)
-  app.setValidatorCompiler(validatorCompiler)
+  app.setValidatorCompiler(refusingNul)
   app.setSerializerCompiler(serializerCompiler)
   // E.g. "`enabled`: Invalid input: expected boolean, received string", or "body: Invalid input: ..." for the whole body.
   app.setSchemaErrorFormatter((errors, dataVar) => {

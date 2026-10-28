@@ -17,7 +17,7 @@ post_json() {
     request --header "CF-Connecting-IP: ${IP}" --header 'Content-Type: application/json' "$@" "${BASE_URL}${path}"
 }
 
-echo "  a body that isn't valid JSON, or doesn't match what the endpoint takes, or is too large"
+echo "  a body that isn't valid JSON, or doesn't match what the endpoint takes, has the NUL character, or is too large"
 post_json /api/auth/login --data '{"email": "admin@integration.test", '
 expect_status 400
 expect_body "$API_ERROR"
@@ -25,6 +25,11 @@ expect_body "$API_ERROR"
 post_json /api/auth/login --data '{"email": "admin@integration.test", "password": 12345678}'
 expect_status 400
 expect_body '^\{"ok":false,"error":"`password`: [^"]+"\}$'
+
+# Which the database can't store, rather than a 500 for the query that fails.
+post_json /api/auth/login --data '{"email": "admin\u0000@integration.test", "password": "x"}'
+expect_status 400
+expect_body '^\{"ok":false,"error":"`email`: Text can'"'"'t contain the NUL character"\}$'
 
 # Over the 1 MiB that the server takes.
 too_large() {
