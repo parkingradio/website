@@ -71,7 +71,7 @@ Creates an application for an existing artist. The request has the application's
 | Request field | Type | |
 |---|---|---|
 | `artistId` | string | The id of the artist who's applying |
-| `receivedAt` | string, optional | When the artist sent the application: a date and time with its offset from UTC, e.g. `"2026-03-28T14:03:00Z"` or `"2026-03-28T10:03:00-04:00"`, which can't be in the future. Now if it's left out |
+| `receivedAt` | string, optional | When the artist sent the application: a date and time with its offset from UTC, e.g. `"2026-03-28T14:03:00Z"` or `"2026-03-28T10:03:00-04:00"`, which can't be in the future. Now if it's left out (it can't be null) |
 
 | Response field | Type | |
 |---|---|---|
@@ -143,7 +143,7 @@ Errors are in French, since artists see them:
 |---|---|
 | 400 | The profile, application or photo isn't valid, the request is malformed, or Turnstile refused the token |
 | 409 | An artist with that email already exists |
-| 413 | The photo is larger than 10 MB, or the request is too large to be an application |
+| 413 | The photo is larger than 10 MB, or the request isn't `multipart/form-data` and is too large (see [Conventions](README.md#conventions)) |
 | 429 | The client sent too many requests |
 | 502 | Cloudflare couldn't be reached, or couldn't check the token |
 
@@ -154,7 +154,8 @@ server's address (see [Conventions](README.md#conventions)):
 
 - To the recipients chosen by admins (see `GET /api/admin/applications/recipients`): everything the artist sent,
   except their photo, which admins can see with the artist. Replying to it answers the artist. When nobody was chosen,
-  it isn't sent: applications are only saved, and confirmed to the artist.
+  it isn't sent: applications are only saved, and confirmed to the artist. When the recipients can't be read, it's as
+  if nobody was chosen.
 - To the artist: a confirmation that the application was received. Replying to it answers the recipients, if there
   are any. It goes to whatever address the application has, so it doesn't repeat anything the artist wrote: otherwise,
   anyone could have the server send their own text to any address.
@@ -176,7 +177,7 @@ Who applications sent with `POST /api/applications` are emailed to (see [Emails]
 
 | Request field | Type | |
 |---|---|---|
-| `recipients` | list of strings | Email addresses, up to 10. They're trimmed, and blanks and duplicates (ignoring upper and lower case) are dropped. Empty means nobody |
+| `recipients` | list of strings | Email addresses, up to 10, each one like an artist's (see [Profiles](artists.md#profiles)). They're trimmed, and blanks and duplicates (ignoring upper and lower case) are dropped. Empty means nobody |
 
 Replaces the recipients, and responds like `GET /api/admin/applications/recipients`. Fails with 400 if `recipients`
-isn't a list of strings, if one of them isn't an email address, or if there are more than 10.
+isn't a list of strings, if one of them isn't an email address like an artist's, or if there are more than 10.

@@ -247,10 +247,7 @@ function ChangePlaylist({ onChosen }: { onChosen: () => void }) {
           <PlaylistTracks playlist={step.playlist} onAir={null} />
           {step.playlist.tracks.some((track) => track.kind === 'rotation') ? (
             <>
-              <p>
-                La radio passera tout de suite au début de cette playlist. Les auditeurs qui écoutent une piste pourront
-                la finir.
-              </p>
+              <p>La radio passera tout de suite au début de cette playlist (sans couper les auditeurs en cours).</p>
               <button type="button" className="radio-choose" onClick={choose} disabled={step.kind === 'choosing'}>
                 jouer cette playlist
               </button>

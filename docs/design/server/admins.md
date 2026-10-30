@@ -13,7 +13,8 @@ who forgot their password a link to choose a new one.
 Admins invite others by email. The invite links to the client's `/accept-invite?token=<token>` page (see
 [Accepting an invite](../client/admin/admins.md#accepting-an-invite)), which sets the admin's password with
 `POST /api/auth/accept-invite`. An invite lasts 24 hours and can only be used once. Inviting an address again replaces
-its earlier invite. Invites can't be sent when `MAIL_DOMAIN` isn't set (see [Conventions](README.md#conventions)).
+its earlier invite, but keeps when and by whom the admin was first invited. Invites can't be sent when `MAIL_DOMAIN`
+isn't set (see [Conventions](README.md#conventions)).
 
 ## Sessions
 

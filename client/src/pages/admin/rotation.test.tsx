@@ -233,6 +233,9 @@ describe('Rotation', () => {
     expect(within(previewBox()).getByRole('link', { name: 'Other' })).toHaveAttribute('href', LINK)
     expect(within(previewBox()).getByText(/^Playlist privée de/)).toBeInTheDocument()
     expect(rows(previewBox())).toEqual(['H · 2026-09-13', 'I · 2026-09-13'])
+    expect(
+      within(previewBox()).getByText('La radio passera tout de suite au début de cette playlist (sans couper les auditeurs en cours).'),
+    ).toBeInTheDocument()
     expect(requestsTo('POST', '/api/admin/radio/preview').map(jsonBody)).toEqual([{ link: LINK }])
 
     fireEvent.click(screen.getByRole('button', { name: 'jouer cette playlist' }))

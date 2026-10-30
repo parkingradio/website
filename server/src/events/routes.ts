@@ -152,15 +152,15 @@ function categorize(title: string): Event['category'] {
   return /\bsynth meetups?\b/i.test(title) ? 'synth-meetup' : 'other'
 }
 
+// The lines of the event's Line-up text, or its tagged artists when it has none.
 function parseLineup(event: RaEvent): string[] {
-  if (!event.lineup) return event.artists.map((artist) => artist.name)
   // Strip the tags before decoding, so that an escaped "&lt;" in a name isn't mistaken for a tag.
-  const lines = decodeHTML(event.lineup.replace(/<[^>]*>/g, ''))
+  const lines = decodeHTML((event.lineup ?? '').replace(/<[^>]*>/g, ''))
     .split('\n')
     // RA leaves non-breaking spaces after tagged artists, which trim() handles.
     .map((line) => line.trim())
     .filter((line) => line !== '')
-  return [...new Set(lines)]
+  return lines.length > 0 ? [...new Set(lines)] : event.artists.map((artist) => artist.name)
 }
 
 export async function eventsRoutes(app: FastifyInstance) {

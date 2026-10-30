@@ -12,8 +12,10 @@ At `/admin/configuration`: the settings that change what the site does. From top
 
 Chooses who the applications artists send are emailed to (see [Emails](../../server/applications.md#emails)): email
 addresses, each typed then added with + (or Enter) and removed with its ×, like a collective's artists (see
-[Artistes](artistes.md#adding-an-artist)). Each change is saved right away. It also says which admin last changed them,
-and when.
+[Artistes](artistes.md#adding-an-artist)). It says how many there can be (see
+[`PUT /api/admin/applications/recipients`](../../server/applications.md#put-apiadminapplicationsrecipients-admin)).
+Each change is saved right away. It also says which admin last changed them, and when. While there are none, it says
+that applications aren't emailed to anyone, but are still listed in [Candidatures](candidatures.md).
 
 ## Connexion SoundCloud
 

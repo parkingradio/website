@@ -10,9 +10,11 @@ At `/admin/admins`: manages who can access the admin pages (see [Admins](../../s
 
 ## Accepting an invite
 
-The invite links to `/accept-invite`, where the new admin chooses their password, after which they can log in. So does
-the link `tools/create-admin` gives (see [Roles](../../server/admins.md#roles)). The page is outside `/admin`, and
-doesn't require being logged in.
+The invite links to `/accept-invite`, where the new admin chooses their password (see
+[`POST /api/auth/accept-invite`](../../server/admins.md#post-apiauthaccept-invite) for what it has to be), typing it
+twice. Once it's saved, the page leads to the login form at `/admin`, which says that it was saved. The link
+`tools/create-admin` gives also leads to `/accept-invite` (see [Roles](../../server/admins.md#roles)). The page is
+outside `/admin`, and doesn't require being logged in.
 
 ## Endpoints
 

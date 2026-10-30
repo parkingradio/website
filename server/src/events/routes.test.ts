@@ -131,6 +131,17 @@ describe('GET /api/events', () => {
     expect(past[0].lineup).toEqual(['Tagged Only'])
   })
 
+  it('falls back to the tagged artists when the Line-up text has nothing but blank lines and tags', async () => {
+    const blank = { ...raEvent, lineup: '<artist id="1"></artist>\u00a0\n \n', artists: [{ name: 'Tagged Only' }] }
+    const promoter = { ...raResponse.data.promoter, upcoming: [blank] }
+    fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
+    const app = await buildApp()
+
+    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+
+    expect(upcoming[0].lineup).toEqual(['Tagged Only'])
+  })
+
   it('decodes HTML entities in the Line-up text', async () => {
     const lineup = 'Andr&eacute;e\nL&#233;a &#x26; Zo&euml;\nDJ &lt;3\nR&amp;lt;B\nMoon&nbsp;Child&nbsp;\n'
     const promoter = { ...raResponse.data.promoter, upcoming: [{ ...raEvent, lineup }] }

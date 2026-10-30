@@ -18,10 +18,11 @@ The fields are (* means mandatory):
 - "Artistes du collectif" (*, for a collective only): the names of the 1 to 4 artists representing it.
 - "Pays" (*): a search field over every country, by its French name. Canada, the US, France, Belgium and
   Switzerland come first. Only a country from the list counts.
-- "Ville" (*): free-form text. As the artist types, it suggests the chosen country's cities of at least 5000
-  inhabitants, with their province or state, from GeoNames' free web service (called directly by the browser, with
-  the `parkingradio` account). Only the city's name is sent. GeoNames is only a convenience: when it's unavailable,
-  the field works as plain text. As GeoNames' terms ask, the bottom of the page credits it.
+- "Ville" (*): free-form text, which can only be typed once a country is picked, and is emptied when the country
+  changes. As the artist types, it suggests the chosen country's cities of at least 5000 inhabitants, with their
+  province or state, from GeoNames' free web service (called directly by the browser, with the `parkingradio`
+  account). Only the city's name is sent. GeoNames is only a convenience: when it's unavailable, the field works as
+  plain text. As GeoNames' terms ask, the bottom of the page credits it.
 - "Genres musicaux" (*): 1 to 3 genres from a list grouped by family, in order: the first one is the artist's
   main genre.
 - "Photo": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a good
@@ -40,21 +41,25 @@ The fields are (* means mandatory):
   18 h – 22 h), for all the chosen dates. None means any of them. They're sent as the times they start and end.
 - "Questions ou détails": free-form text.
 
-Errors only show once the artist tries to send the form, which brings them to the first field to fix. After that,
-they update as the fields are fixed.
+A link's error shows as soon as it's pasted or its field is left. Other errors only show once the artist tries to send
+the form, which brings them to the first field to fix. After that, they update as the fields are fixed, and the form
+says how many are left to fix.
 
-Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without
-them having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't
-be sent until Turnstile has vouched for the artist, and it gets a new token whenever an application is refused, since
-Cloudflare only checks each token once (see [Applying](../server/applications.md#applying)). The widget uses the site
-key from the configuration (see [Configuration](architecture.md#configuration)), so the widget only shows once the page
-has the configuration, and the form can't be sent when it can't be fetched: it then says so, and to reload the page.
+Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without them
+having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't be sent
+until Turnstile has vouched for the artist (the form says so if they try), and it gets a new token whenever an
+application is refused, since Cloudflare only checks each token once (see
+[Applying](../server/applications.md#applying)). The widget uses the site key from the configuration (see
+[Configuration](architecture.md#configuration)), so the widget only shows once the page has the configuration, and the
+form can't be sent when it can't be fetched: it then says so, and to reload the page.
 
 When an artist sends the form, it goes to `POST /api/applications`, which creates the artist and their application, and
 sends the emails about it (see [Applying](../server/applications.md#applying) and
 [Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist and says where the confirmation
 went. Otherwise, it shows the server's error, e.g. when an artist already has that email address: the form is only for
-new artists for now. Artists we already know will apply again from a different page, which isn't designed yet.
+new artists for now. Artists we already know will apply again from a different page, which isn't designed yet. When
+the answer isn't the server's, e.g. the network failed, the form says that the application couldn't be sent, and to try
+again in a moment.
 
 ## Endpoints
 

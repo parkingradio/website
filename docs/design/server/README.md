@@ -5,26 +5,29 @@ The server provides the API under `/api`, which this directory specifies, and se
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. One
-  exception: in production, nginx itself refuses requests whose body is over 12 MB, with a 413 that isn't JSON.
+  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. A body of a
+  type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
+  are larger than any endpoint needs, with a 413. One exception: in production, nginx itself refuses requests whose
+  body is over 12 MB, with a 413 that isn't JSON.
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid
   JSON), gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and `error`, a message meant for
   people, in English unless it's shown to the public. The only exception is [`GET /healthz`](#get-healthz), which fails
-  with `{"ok": false}` alone. An unexpected failure gets a 500 whose message only says that something went wrong: what
-  went wrong is logged, but without the personal data it could include, e.g. the values of a failed database query.
-  Successful responses have `ok` set to `true`, except for those of `GET /api/config`, `GET /api/events`,
-  `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error, whatever the
-  request's body.
+  with `{"ok": false}` alone. An unexpected failure, e.g. the database's, gets a 500, unless the endpoint says
+  otherwise. Either way, its message only says that something went wrong: what went wrong is logged, but without the
+  personal data it could include, e.g. the values of a failed database query. Successful responses have `ok` set to
+  `true`, except for those of `GET /api/config`, `GET /api/events`, `GET /api/radio` and
+  `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error, whatever the request's body.
 - **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
   (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
   requests other than `GET` that a browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail
   with 403.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
-  address: the one Cloudflare puts in `CF-Connecting-IP` in production, since requests reach the server through
-  Cloudflare and nginx. Over the limit, they get a 429 error.
+  address: `CF-Connecting-IP` when it's there, or else the connection's. That header can be trusted since, in
+  production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by
+  their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -41,6 +44,9 @@ The server serves the client's build: its files as they are, and the app, with a
 This includes paths that aren't one of the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)),
 since the server doesn't know which pages the app has. Other requests for paths that don't exist, whatever their body,
 and files that don't exist under `/assets`, get a 404 error.
+
+The names of the files under `/assets` change with their content, so they can be cached for good. The app itself is
+checked again every time it's loaded, so that a deploy shows right away.
 
 ## `GET /healthz`
 

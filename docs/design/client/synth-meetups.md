@@ -8,7 +8,8 @@ collaborators. From top to bottom, it shows:
 - A short introduction to the meetups.
 - "dates à venir": the upcoming meetup dates (e.g. "mercredi 7 octobre 2026"), soonest first, each linking
   to its event on Resident Advisor. They're the upcoming events in the synth meetups category (see
-  [Events](../server/events.md)), so a meetup shows up here once it's created on RA.
+  [Events](../server/events.md)), so a meetup shows up here once it's created on RA. When there are none, it says
+  that no date is announced yet. When the events can't be loaded, it says so, and links to the promoter page on RA.
 - "mandat": the goals of the meetups.
 - "le plafond": how to show visuals on the studio's LED ceiling
 - "évènements passés": a gallery of past meetup posters, most recent first, as cropped portrait thumbnails.

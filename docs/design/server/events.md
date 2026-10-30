@@ -11,10 +11,11 @@ not, for 2 minutes, so RA is asked at most that often. In case RA's private API 
 possible to quickly notice the problem and get it fixed.
 
 RA has no notion of event categories, so the server derives one for each event from its title, so that the client
-doesn't have to guess from titles itself. For now, the only category is synth meetups (events titled "SYNTH MEETUPS" on
-RA); every other event is categorized as "other".
+doesn't have to guess from titles itself. For now, the only category is synth meetups (events whose title has "synth
+meetup" in it, whatever its case, e.g. "SYNTH MEETUPS" on RA); every other event is categorized as "other".
 
-An event's lineup is the "Line-up" text on the RA event, one act per line, or its tagged artists if that's empty.
+An event's lineup is the "Line-up" text on the RA event, as plain text, one act per line, without blank or repeated
+lines, or its tagged artists if that leaves nothing.
 
 ## `GET /api/events`
 
@@ -39,4 +40,4 @@ An event has:
 | `url` | string | The event's page on RA |
 | `flyer` | string or null | Full size, on images.ra.co |
 
-Fails with 502 when the events can't be read from RA.
+Fails with 502 when the events can't be read from RA, or when RA's list of upcoming events may have been cut short.

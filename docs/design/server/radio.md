@@ -7,7 +7,8 @@ The radio plays a rotation: the tracks of a SoundCloud playlist chosen on the ad
 The server reads the playlist through a SoundCloud app, whose credentials are entered on the admin pages (see
 [The SoundCloud app](#the-soundcloud-app)): until they are, it can't read any playlist, so the radio is off air. The
 server reads the playlist again every 5 minutes, so that changes made to it on SoundCloud get on the radio. If
-SoundCloud can't be reached, the radio goes on with what it read before.
+SoundCloud can't be reached, or none of the playlist's tracks can be played in full anymore, the radio goes on with what
+it read before.
 
 The playlist can be private, and so can a private playlist's tracks: they play like the others, and their private
 links aren't handed out to listeners. A private playlist can only be read through its private link, which ends with its
@@ -21,10 +22,11 @@ The radio isn't a live stream, but the server decides what's on air: it keeps th
 the database, and moves along the rotation as tracks end, so that every listener hears the same track at the same
 point. Adding sets to the playlist, or moving them, only affects the tracks after the one on air.
 
-Choosing another playlist changes what's on air right away: the new playlist starts from its first track. Listeners
-who are playing a track aren't cut off, though: they finish it, then play what's on air by then. The same goes for a
-track that's removed from the playlist. To make this possible, the server still hands out streams for tracks that left
-the rotation for as long as they last.
+Choosing another playlist changes what's on air right away: the new playlist starts from its first track. Choosing the
+playlist that's already on air doesn't take it back to its first track: it's only read again right away. Listeners who
+are playing a track when another playlist is chosen aren't cut off, though: they finish it, then play what's on air by
+then. The same goes for a track that's removed from the playlist. To make this possible, the server still hands out
+streams for tracks that left the rotation for as long as they last, unless the server restarts in the meantime.
 
 Each track's artist, event and date are read from its title on SoundCloud,
 `ARTIST | [EVENT @ ]parking.radio | YYYY.MM.DD`, where the date is a day that exists. A title that doesn't follow that
@@ -59,8 +61,9 @@ A track has:
 | `current` | object | The track on air: `track`, a track, and `startedAt`, when it went on air. It's played from the current time minus `startedAt`, and on air until `startedAt` plus its `durationMs`: ask again then for what's on air next |
 | `upcoming` | list of tracks | The next N tracks of the rotation, all of them by default. They can still change |
 
-Fails with 400 (`upcoming` isn't a whole number), 502 (the playlist can't be read from SoundCloud, e.g. because the
-credentials of the SoundCloud app haven't been entered yet) or 503 (no playlist has been chosen yet).
+Fails with 400 (`upcoming` isn't a whole number), 502 (the database can't be reached, or no rotation has been read
+from the playlist yet, e.g. because SoundCloud can't be reached, the credentials of the SoundCloud app haven't been
+entered yet, or none of its tracks can be played in full) or 503 (no playlist has been chosen yet).
 
 Since another playlist can be chosen at any time, a client playing a track has to stick with it until it ends, rather
 than switch to whatever `current` says when it asks for other reasons, e.g. to refresh `upcoming`.
@@ -73,7 +76,8 @@ than switch to whatever `current` says when it asks for other reasons, e.g. to r
 | `expiresAt` | string | When `url` stops working: the playlist has to be loaded by then. The audio it lists stays available for a while longer (about 2 hours), enough to play the track through |
 
 Only for tracks of the rotation, or tracks that just left it, for as long as they last. Fails with 404 (not a track of
-the rotation) or 502 (SoundCloud can't be reached).
+the rotation) or 502 (the rotation or the stream can't be read right now, e.g. SoundCloud or the database can't be
+reached).
 
 ## `GET /api/admin/radio` (admin)
 
@@ -131,7 +135,8 @@ there), 409 (the credentials of the SoundCloud app haven't been entered yet) or 
 | `link` | string | Like for the preview |
 
 Reads the rotation from the playlist at `link` from now on, and responds `{"ok": true}`: its first track goes on air
-right away. Fails like the preview, and with 400 when none of the playlist's tracks can be played in full.
+right away, unless it's the playlist already on air, which goes on where it is (see [The rotation](#the-rotation)).
+Fails like the preview, and with 400 when none of the playlist's tracks can be played in full.
 
 ## `GET /api/admin/radio/credentials` (admin)
 
