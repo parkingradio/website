@@ -25,6 +25,10 @@ export function checkCollectiveName(value: unknown): Checked<string> {
   return checkLine(value, 'Le nom du collectif', NAME_MAX_LENGTH, 'Indiquez le nom du collectif.')
 }
 
+export function checkDescription(value: unknown, { lenient = false } = {}): Checked<string> {
+  return checkText(value, 'La description', BIO_MAX_LENGTH, missingError(value, 'Écrivez quelques lignes de description.', { lenient }))
+}
+
 // A member, as it's sent: the id is what counts when there's both an id and a name.
 function checkMember(member: unknown): Checked<SentMember> {
   const sent: { id?: unknown; name?: unknown } = member !== null && typeof member === 'object' ? member : {}
@@ -52,8 +56,7 @@ export function checkCollectiveProfile(
   if (members.length === 0) errors.members ??= NO_MEMBER
   const country = check('country', checkCountry(collective.country, { lenient: true }))
   const city = check('city', checkCity(collective.city, { lenient: true }))
-  const missingDescription = missingError(collective.description, 'Écrivez quelques lignes de description.', { lenient: true })
-  const description = check('description', checkText(collective.description, 'La description', BIO_MAX_LENGTH, missingDescription))
+  const description = check('description', checkDescription(collective.description, { lenient: true }))
   const links = check('links', checkLinks(collective.links, { lenient: true }))
   const email = check('email', checkEmail(collective.email))
   const phone = check('phone', checkPhone(collective.phone, { lenient: true }))

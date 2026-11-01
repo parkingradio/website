@@ -114,9 +114,15 @@ function asArtist(changes: Partial<ApplicantProfile> = {}) {
   return { kind: 'artist', ...profile(changes) }
 }
 
-// A collective applying, as the form sends it.
-function asCollective(changes: Partial<ApplicantProfile> & { members?: unknown } = {}) {
-  return { kind: 'collective', members: ['Une', 'Deux'], ...profile({ name: 'Le Collectif', email: 'collectif@example.com', ...changes }) }
+// One of a collective's artists, as the form sends them.
+function member(name: string, changes: object = {}) {
+  return { name, country: 'FR', city: 'Lyon', genres: ['house'], bio: `La bio de ${name}.`, links: { instagram: `@${name.toLowerCase()}` }, ...changes }
+}
+
+// A collective applying, as the form sends it, with its artists.
+function asCollective(changes: object = {}) {
+  const { name, country, city, bio, links, email, phone } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
+  return { kind: 'collective', name, country, city, description: bio, links, email, phone, members: [member('Une'), member('Deux')], ...changes }
 }
 
 function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
@@ -132,16 +138,25 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
 
 // Other parts, after the usual ones: fields, or files when they have a file name.
 type ExtraPart = { name: string; value: string | Buffer; filename?: string }
-type Parts = { artist?: object | string; application?: object | string; turnstileToken?: string; photo?: Buffer | null; extra?: ExtraPart[] }
+type Parts = {
+  artist?: object | string
+  application?: object | string
+  turnstileToken?: string
+  photo?: Buffer | null
+  // The "memberPhoto" parts, in order, where null is an empty part.
+  memberPhotos?: (Buffer | null)[]
+  extra?: ExtraPart[]
+}
 
-// A multipart/form-data body, as applying takes it: the profile and the application as JSON, the token, and the photo.
+// A multipart/form-data body, as applying takes it: the profile and the application as JSON, the token, and the photos.
 // Parts set to undefined are left out.
 function multipart(parts: Parts = {}) {
-  const { artist, application, turnstileToken, photo, extra } = {
+  const { artist, application, turnstileToken, photo, memberPhotos, extra } = {
     artist: asArtist(),
     application: fields(),
     turnstileToken: 'token',
     photo: JPEG,
+    memberPhotos: [],
     extra: [],
     ...parts,
   }
@@ -158,13 +173,14 @@ function multipart(parts: Parts = {}) {
   field('artist', artist)
   field('application', application)
   field('turnstileToken', turnstileToken)
-  if (photo) {
+  const file = (name: string, body: Buffer) =>
     chunks.push(
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),
-      photo,
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),
+      body,
       Buffer.from('\r\n'),
     )
-  }
+  if (photo) file('photo', photo)
+  for (const memberPhoto of memberPhotos) file('memberPhoto', memberPhoto ?? Buffer.alloc(0))
   for (const { name, value, filename } of extra) {
     const file = filename ? `; filename="${filename}"\r\nContent-Type: application/octet-stream` : ''
     chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"${file}\r\n\r\n`), Buffer.from(value), Buffer.from('\r\n'))
@@ -255,9 +271,11 @@ describe('POST /api/applications', () => {
     expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
   })
 
-  it('adds the collective, which added itself, with its photo, its artists, as new artists with its genres, and its application', async () => {
+  it('adds the collective, which added itself, with its photo, its artists, with their profiles and photos, in order, and its application', async () => {
     const app = await buildApp()
-    const response = await apply(app, { artist: asCollective({ members: ['Une', ' Deux ', '', 'une', 42] }) })
+    const members = [member('Une'), member('Deux'), member('Trois', { links: { soundcloud: 'https://soundcloud.com/trois/sets/x' } })]
+    // Only the second artist has a photo, and the third one's part is left out.
+    const response = await apply(app, { artist: asCollective({ members }), memberPhotos: [null, PNG] })
 
     expect(response.statusCode).toBe(200)
     const { name, country, city, bio, email, phone } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
@@ -275,54 +293,104 @@ describe('POST /api/applications', () => {
         createdBy: null,
       }),
     ])
-    // Blank names and duplicates, whatever their case, are dropped, and so is what isn't a name.
-    const member = { country: '', city: '', genres: ['techno', 'acid'], bio: '', links: {}, email: null, phone: '', photoKey: null, photoType: null, createdBy: null }
-    expect(artists).toEqual([expect.objectContaining({ ...member, name: 'Une' }), expect.objectContaining({ ...member, name: 'Deux' })])
+    const saved = (name: string, photo: object, links: object) =>
+      expect.objectContaining({ ...member(name), links, email: null, phone: '', ...photo, createdBy: null })
+    const noPhoto = { photoKey: null, photoType: null }
+    expect(artists).toEqual([
+      saved('Une', noPhoto, { instagram: 'une' }),
+      saved('Deux', { photoKey: 'artists/photo-2.png', photoType: 'image/png' }, { instagram: 'deux' }),
+      saved('Trois', noPhoto, { soundcloud: 'trois' }),
+    ])
     expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
     expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
+    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
   })
 
-  it("refuses, in French, a collective whose email another collective has, whatever its case, and forgets the photo, but not one with an artist's", async () => {
+  it('takes any number of artists, but at least one', async () => {
+    const app = await buildApp()
+    const members = ['Une', 'Deux', 'Trois', 'Quatre', 'Cinq'].map((name) => member(name))
+    expect((await apply(app, { artist: asCollective({ members }) })).statusCode).toBe(200)
+    expect(artists).toHaveLength(5)
+
+    for (const none of [[], undefined, 'Une']) {
+      const response = await apply(app, { artist: asCollective({ email: 'autre@example.com', members: none }) })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Indiquez au moins un artiste du collectif.' })
+    }
+  })
+
+  it("refuses, in French, a collective whose email another collective has, whatever its case, and forgets every photo, but not one with an artist's", async () => {
     const app = await buildApp()
     expect((await apply(app, { artist: asCollective() })).statusCode).toBe(200)
-    const response = await apply(app, { artist: asCollective({ name: 'Un Autre', email: 'Collectif@Example.com' }), photo: PNG })
+    const response = await apply(app, { artist: asCollective({ name: 'Un Autre', email: 'Collectif@Example.com' }), photo: PNG, memberPhotos: [JPEG, PNG] })
 
     expect(response.statusCode).toBe(409)
     expect(response.json()).toEqual({ ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' })
     expect(collectives).toHaveLength(1)
+    expect(artists).toHaveLength(2)
     expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+    expect(photos.delete).toHaveBeenCalledTimes(3)
 
     expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)
     expect((await apply(app, { artist: asCollective({ email: 'artiste@example.com' }) })).statusCode).toBe(200)
   })
 
-  it("says what is wrong with a collective's name and artists as a collective's", async () => {
+  it("says what is wrong with a collective's profile, and which of its artists is wrong, without checking the token", async () => {
     const app = await buildApp()
     const invalid = [
-      { artist: asCollective({ name: '' }), error: 'Indiquez le nom du collectif.' },
-      { artist: asCollective({ name: 'x'.repeat(101) }), error: 'Le nom du collectif dépasse 100 caractères.' },
-      { artist: asCollective({ members: [] }), error: 'Indiquez au moins un artiste du collectif.' },
-      { artist: asCollective({ members: [' ', 42] }), error: 'Indiquez au moins un artiste du collectif.' },
-      { artist: asCollective({ members: 'Une' }), error: 'Indiquez au moins un artiste du collectif.' },
-      { artist: asCollective({ members: ['x'.repeat(101)] }), error: "Le nom d'un artiste du collectif dépasse 100 caractères." },
-      // The other fields are an artist's.
-      { artist: asCollective({ genres: [] }), error: 'Choisissez au moins un genre.' },
-      { artist: { ...asArtist(), kind: 'duo' }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
+      { parts: { artist: asCollective({ name: '' }) }, error: 'Indiquez le nom du collectif.' },
+      { parts: { artist: asCollective({ name: 'x'.repeat(101) }) }, error: 'Le nom du collectif dépasse 100 caractères.' },
+      // Which admins can leave out, but a collective that applies can't.
+      { parts: { artist: asCollective({ country: '' }) }, error: 'Choisissez le pays.' },
+      { parts: { artist: asCollective({ description: '' }) }, error: 'Écrivez quelques lignes de description.' },
+      { parts: { artist: asCollective({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
+      { parts: { artist: asCollective({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
+      // An artist's errors say which one it is, counting from 1.
+      { parts: { artist: asCollective({ members: [member('Une'), member('Deux', { city: ' ' })] }) }, error: 'Artiste 2 : Indiquez la ville.' },
+      { parts: { artist: asCollective({ members: [member('Une', { genres: [] })] }) }, error: 'Artiste 1 : Choisissez au moins un genre.' },
+      { parts: { artist: asCollective({ members: [member('Une'), 'Deux'] }) }, error: "Artiste 2 : Indiquez le nom d'artiste." },
+      {
+        parts: { artist: asCollective({ members: [member('Une'), member('Deux', { links: { soundcloud: 'https://instagram.com/x' } })] }) },
+        error: "Artiste 2 : SoundCloud : ce n'est pas une adresse SoundCloud.",
+      },
+      { parts: { artist: asCollective(), memberPhotos: [JPEG, Buffer.from('%PDF-1.7')] }, error: 'Artiste 2 : La photo doit être en JPEG, PNG ou WebP.' },
+      { parts: { artist: asCollective(), photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
+      { parts: { artist: { ...asCollective(), kind: 'duo' } }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
     ]
-    for (const { artist, error } of invalid) {
-      const response = await apply(app, { artist })
+    for (const { parts, error } of invalid) {
+      const response = await apply(app, parts)
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error })
     }
+    expect(verifyTurnstile).not.toHaveBeenCalled()
     expect(store.applyAsCollective).not.toHaveBeenCalled()
   })
 
-  it("ignores an artist's members", async () => {
+  it("refuses more photos of artists than the collective has, and an artist's, as malformed", async () => {
     const app = await buildApp()
-    expect((await apply(app, { artist: { ...asArtist(), members: ['Une'] } })).statusCode).toBe(200)
+    for (const parts of [{ artist: asCollective(), memberPhotos: [null, null, JPEG] }, { artist: asCollective(), memberPhotos: [null, null, null] }, { memberPhotos: [JPEG] }]) {
+      const response = await apply(app, parts)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Candidature invalide.' })
+    }
+    expect(verifyTurnstile).not.toHaveBeenCalled()
+  })
+
+  it("ignores an artist's other fields, e.g. those an older form sent", async () => {
+    const app = await buildApp()
+    expect((await apply(app, { artist: { ...asArtist(), members: [] } })).statusCode).toBe(200)
     expect(artists).toHaveLength(1)
     expect(artists[0]).not.toHaveProperty('members')
     expect(collectives).toHaveLength(0)
+  })
+
+  it('forgets the photos already stored when one of them cannot be', async () => {
+    photos.store.mockImplementationOnce(photos.store.getMockImplementation()!).mockRejectedValueOnce(new Error('S3 is down'))
+    const app = await buildApp()
+    expect((await apply(app, { artist: asCollective(), memberPhotos: [JPEG, PNG] })).statusCode).toBe(500)
+    expect(photos.store).toHaveBeenCalledTimes(2)
+    expect(stored.size).toBe(0)
+    expect(store.applyAsCollective).not.toHaveBeenCalled()
   })
 
   it('only checks whether the artist already exists once Turnstile vouches for the token', async () => {
@@ -358,8 +426,8 @@ describe('POST /api/applications', () => {
       { parts: { artist: asArtist({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
       { parts: { artist: asArtist({ email: 'pas une adresse' }) }, error: 'Indiquez une adresse e-mail valide.' },
       // Which admins can leave out, but artists can't.
-      { parts: { artist: asArtist({ country: '' }) }, error: 'Choisissez votre pays.' },
-      { parts: { artist: asArtist({ city: '' }) }, error: 'Indiquez votre ville.' },
+      { parts: { artist: asArtist({ country: '' }) }, error: 'Choisissez le pays.' },
+      { parts: { artist: asArtist({ city: '' }) }, error: 'Indiquez la ville.' },
       { parts: { artist: asArtist({ genres: [] }) }, error: 'Choisissez au moins un genre.' },
       { parts: { artist: asArtist({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
       { parts: { artist: asArtist({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
@@ -395,6 +463,30 @@ describe('POST /api/applications', () => {
     expect(response.json()).toEqual({ ok: false, error: 'La photo dépasse 10 Mo.' })
     expect(verifyTurnstile).not.toHaveBeenCalled()
     expect(store.apply).not.toHaveBeenCalled()
+  })
+
+  it("says which artist's photo is over the size limit", async () => {
+    const app = await buildApp()
+    const response = await apply(app, { artist: asCollective(), memberPhotos: [JPEG, Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)])] })
+    expect(response.statusCode).toBe(413)
+    expect(response.json()).toEqual({ ok: false, error: 'Artiste 2 : La photo dépasse 10 Mo.' })
+    expect(verifyTurnstile).not.toHaveBeenCalled()
+  })
+
+  it('refuses more files or fields than it reads, and a field that is too long', async () => {
+    const app = await buildApp()
+    const refused = [
+      await apply(app, { extra: Array.from({ length: 10 }, (_, i) => ({ name: `file${i}`, value: 'x', filename: 'x.bin' })) }),
+      await apply(app, { extra: Array.from({ length: 8 }, (_, i) => ({ name: `field${i}`, value: 'x' })) }),
+      await apply(app, { artist: asArtist({ bio: 'x'.repeat(256 * 1024) }) }),
+    ]
+    for (const response of refused) {
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Candidature invalide.' })
+    }
+    // Room for 4 artists with the longest bios, of characters of 3 bytes each.
+    const members = ['Une', 'Deux', 'Trois', 'Quatre'].map((name) => member(name, { bio: '€'.repeat(5000) }))
+    expect((await apply(app, { artist: asCollective({ members, description: '€'.repeat(5000) }) })).statusCode).toBe(200)
   })
 
   it('rejects malformed requests', async () => {
@@ -508,6 +600,7 @@ describe('POST /api/applications', () => {
       const [toRecipients, confirmation] = sendEmail.mock.calls.map(([email]) => email)
       expect(toRecipients).toMatchObject({ to: recipients, replyTo: ['collectif@example.com'], subject: 'Nouvelle candidature : Le Collectif' })
       expect(toRecipients.text).toContain('Artistes du collectif : Une, Deux')
+      expect(toRecipients.text).toContain('Artiste 2 : Deux\nVille : Lyon, France\nGenres : house\nLiens :\n  Instagram : https://instagram.com/deux\nBio :\nLa bio de Deux.')
       expect(confirmation).toMatchObject({ to: ['collectif@example.com'], replyTo: recipients })
     })
 

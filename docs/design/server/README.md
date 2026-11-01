@@ -8,7 +8,7 @@ The server provides the API under `/api`, which this directory specifies, and se
   response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. A body of a
   type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
   are larger than any endpoint needs, with a 413. One exception: in production, nginx itself refuses requests whose
-  body is over 12 MB, with a 413 that isn't JSON.
+  body is over 52 MB, with a 413 that isn't JSON: that's room for a collective's application with 5 photos.
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid

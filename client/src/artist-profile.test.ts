@@ -40,7 +40,7 @@ describe('parseLink', () => {
   it("refuses the addresses of the sites' own pages, e.g. a post or an event, rather than a profile", () => {
     const notAProfile = (id: LinkSiteId, raw: string) => parse(id, raw).error
     for (const raw of ['instagram.com/p/C8xYzAbCdEf/', 'https://www.instagram.com/reel/abc/', 'instagram.com/stories/x/1', 'instagram.com/explore']) {
-      expect(notAProfile('instagram', raw)).toBe("copiez l'adresse de votre page de profil, qui commence par instagram.com/")
+      expect(notAProfile('instagram', raw)).toBe("copiez l'adresse de la page de profil, qui commence par instagram.com/")
     }
     for (const raw of ['soundcloud.com/discover', 'soundcloud.com/search?q=techno', 'soundcloud.com/you/library']) {
       expect(notAProfile('soundcloud', raw)).toContain('soundcloud.com/')
@@ -50,7 +50,7 @@ describe('parseLink', () => {
     expect(notAProfile('ra', 'ra.co/promoters/183980')).toContain('ra.co/dj/')
     expect(notAProfile('spotify', 'open.spotify.com/album/4Z8W4fKeB5YxbusRsdQVPb')).toContain('spotify.com/artist/')
     for (const raw of ['https://www.bandcamp.com', 'daily.bandcamp.com/features/x', 'bandcamp.com/hauterive']) {
-      expect(notAProfile('bandcamp', raw)).toBe("copiez l'adresse de votre page de profil, qui finit par .bandcamp.com")
+      expect(notAProfile('bandcamp', raw)).toBe("copiez l'adresse de la page de profil, qui finit par .bandcamp.com")
     }
     // Nor can they be typed as profile names.
     expect(notAProfile('instagram', 'p')).toBe("ce nom de profil Instagram n'est pas valide")
@@ -68,7 +68,7 @@ describe('parseLink', () => {
   it("explains what's wrong", () => {
     expect(parse('soundcloud', 'https://instagram.com/foo').error).toBe("ce n'est pas une adresse SoundCloud")
     expect(parse('soundcloud', 'https://on.soundcloud.com/AbC12').error).toContain('lien court')
-    expect(parse('soundcloud', 'soundcloud.com').error).toBe('il manque votre nom de profil')
+    expect(parse('soundcloud', 'soundcloud.com').error).toBe('il manque le nom de profil')
     expect(parse('instagram', 'bad name!').error).toBe("ce nom de profil Instagram n'est pas valide")
     expect(parse('youtube', 'https://www.youtube.com/channel/UCxyz').error).toContain('youtube.com/@')
     expect(parse('spotify', 'abc').error).toContain("n'est pas valide")
@@ -127,12 +127,12 @@ describe('checkProfile, as the server answers', () => {
   })
 
   it('needs a profile', () => {
-    expect(() => validateProfile(undefined)).toThrow("Indiquez votre nom d'artiste.")
-    expect(() => validateProfile('DJ Test')).toThrow("Indiquez votre nom d'artiste.")
+    expect(() => validateProfile(undefined)).toThrow("Indiquez le nom d'artiste.")
+    expect(() => validateProfile('DJ Test')).toThrow("Indiquez le nom d'artiste.")
   })
 
   it('needs a name', () => {
-    expect(error({ name: ' ' })).toBe("Indiquez votre nom d'artiste.")
+    expect(error({ name: ' ' })).toBe("Indiquez le nom d'artiste.")
     expect(error({ name: 'x'.repeat(101) })).toBe("Le nom d'artiste dépasse 100 caractères.")
   })
 
@@ -147,10 +147,10 @@ describe('checkProfile, as the server answers', () => {
   })
 
   it('checks the country, and that there is a city', () => {
-    expect(error({ country: 'XX' as never })).toBe('Choisissez votre pays.')
-    expect(error({ city: '  ' })).toBe('Indiquez votre ville.')
-    expect(error({ city: undefined })).toBe('Indiquez votre ville.')
-    expect(error({ city: { name: 'Québec' } as never })).toBe('Indiquez votre ville.')
+    expect(error({ country: 'XX' as never })).toBe('Choisissez le pays.')
+    expect(error({ city: '  ' })).toBe('Indiquez la ville.')
+    expect(error({ city: undefined })).toBe('Indiquez la ville.')
+    expect(error({ city: { name: 'Québec' } as never })).toBe('Indiquez la ville.')
     expect(error({ city: 'x'.repeat(101) })).toBe('La ville dépasse 100 caractères.')
   })
 
@@ -210,8 +210,8 @@ describe('checkProfile, as the server answers', () => {
     })
 
     it('still checks what is there', () => {
-      expect(error({ country: 'XX' as never }, LENIENT)).toBe('Choisissez votre pays.')
-      expect(error({ country: 42 as never }, LENIENT)).toBe('Choisissez votre pays.')
+      expect(error({ country: 'XX' as never }, LENIENT)).toBe('Choisissez le pays.')
+      expect(error({ country: 42 as never }, LENIENT)).toBe('Choisissez le pays.')
       expect(error({ city: 'x'.repeat(101) }, LENIENT)).toBe('La ville dépasse 100 caractères.')
       expect(error({ genres: ['polka' as never] }, LENIENT)).toBe("Un des genres n'est pas dans la liste.")
       expect(error({ links: { soundcloud: 'https://instagram.com/foo' } }, LENIENT)).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
@@ -223,7 +223,7 @@ describe('checkProfile, as the server answers', () => {
     })
 
     it('does not take a field of another type for one that is left out, which would lose it', () => {
-      expect(error({ city: 42 as never }, LENIENT)).toBe('Indiquez votre ville.')
+      expect(error({ city: 42 as never }, LENIENT)).toBe('Indiquez la ville.')
       expect(error({ genres: 'techno' as never }, LENIENT)).toBe('Choisissez au moins un genre.')
       expect(error({ links: '@parking.radio' as never }, LENIENT)).toBe('Ajoutez au moins un lien.')
       expect(error({ phone: 4185550123 as never }, LENIENT)).toBe('Indiquez votre numéro de téléphone.')
@@ -232,7 +232,7 @@ describe('checkProfile, as the server answers', () => {
     })
 
     it('still needs everything else', () => {
-      expect(error({ name: '' }, LENIENT)).toBe("Indiquez votre nom d'artiste.")
+      expect(error({ name: '' }, LENIENT)).toBe("Indiquez le nom d'artiste.")
     })
   })
 })
@@ -241,12 +241,12 @@ describe('checkProfile, for forms', () => {
   it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
     expect(checkProfile({ country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' })).toEqual({
       errors: {
-        name: "Indiquez votre nom d'artiste.",
-        country: 'Choisissez votre pays.',
-        city: 'Indiquez votre ville.',
+        name: "Indiquez le nom d'artiste.",
+        country: 'Choisissez le pays.',
+        city: 'Indiquez la ville.',
         genres: 'Choisissez au moins un genre.',
         bio: 'Écrivez quelques lignes de bio.',
-        links: 'SoundCloud : il manque votre nom de profil.',
+        links: 'SoundCloud : il manque le nom de profil.',
         email: 'Indiquez une adresse e-mail valide.',
         phone: 'Indiquez votre numéro de téléphone.',
       },

@@ -22,7 +22,6 @@ export type SeedArtist = {
 }
 
 type ApplicationFields = components['schemas']['ApplicationFields']
-type GenreId = components['schemas']['GenreId']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
 
 export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
@@ -468,19 +467,31 @@ export type CollectiveProfile = Omit<
   'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'members'
 >
 
+// One of the artists a collective applied with through the "Appliquer" form, as it sent them, and the colour of their
+// photo, for those who have one.
+export type SeedMember = { profile: components['schemas']['ApplicantMember']; photo?: string }
+
 export type SeedCollective = {
   profile: CollectiveProfile
-  // Its members, in order: artists of SEED_ARTISTS, by their email, or by their name for those without one, and new
-  // artists, by their name, whom the server creates along with the collective.
-  members: ({ seeded: string } | { name: string })[]
-  // For a collective that applied through the "Appliquer" form, which created it along with its first application, the
-  // genres it sent, which its artists, all new ones, got. Otherwise, an admin added it, and its applications.
-  form?: { genres: GenreId[] }
   // The colour of its photo, for collectives that have one.
   photo?: string
-  // Its applications, which an admin added.
+  // Its applications, which an admin added, but the first one of a collective that applied through the form.
   applications: SeedApplication[]
-}
+} & (
+  | {
+      // For a collective that an admin added, with its applications, its members, in order: artists of SEED_ARTISTS, by
+      // their email, or by their name for those without one, and new artists, by their name, whom the server creates
+      // along with the collective.
+      members: ({ seeded: string } | { name: string })[]
+      form?: undefined
+    }
+  | {
+      // For a collective that applied through the "Appliquer" form, which created it along with its first application,
+      // and its artists, all new ones, the artists it applied with, in order.
+      form: SeedMember[]
+      members?: undefined
+    }
+)
 
 // Seeded after the artists, whom they have as members.
 export const SEED_COLLECTIVES: SeedCollective[] = [
@@ -524,9 +535,27 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
       email: 'soeurs.ondes@example.com',
       phone: '418 555-0103',
     },
-    members: [{ name: 'Ondine' }, { name: 'Marée' }, { name: 'Écume' }],
     photo: '#a23b72',
-    form: { genres: ['ambient', 'experimental'] },
+    form: [
+      {
+        profile: {
+          name: 'Ondine',
+          country: 'CA',
+          city: 'Québec',
+          genres: ['ambient', 'experimental'],
+          bio: 'Des nappes qui durent des heures.',
+          links: { bandcamp: 'ondine-synth' },
+        },
+        photo: '#f18f01',
+      },
+      {
+        profile: { name: 'Marée', country: 'CA', city: 'Lévis', genres: ['experimental'], bio: 'Des séquenceurs et des marées.', links: { instagram: 'maree.modulaire' } },
+      },
+      {
+        profile: { name: 'Écume', country: 'FR', city: 'Brest', genres: ['ambient', 'noise'], bio: 'Bruit blanc et ressac.', links: { soundcloud: 'ecume-bruit' } },
+        photo: '#c73e1d',
+      },
+    ],
     applications: [application([90], 'scheduled', { timeSlots: [MIDDAY], prestations: ['live-performance'], otherPrestation: 'Synthé modulaire' })],
   },
   {
@@ -539,8 +568,23 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
       email: 'beton@example.com',
       phone: '514 555-0104',
     },
-    members: [{ name: 'Mathis' }, { name: 'Rosalie' }, { name: 'Kofi' }, { name: 'Yasmine' }],
-    form: { genres: ['hard-techno', 'ebm-industrial'] },
+    // Only its second artist has a photo.
+    form: [
+      { profile: { name: 'Mathis', country: 'CA', city: 'Montréal', genres: ['hard-techno'], bio: 'Toujours plus vite.', links: { soundcloud: 'mathis-beton' } } },
+      {
+        profile: {
+          name: 'Rosalie',
+          country: 'CA',
+          city: 'Laval',
+          genres: ['ebm-industrial', 'hard-techno'],
+          bio: 'EBM, industriel et basses saturées.',
+          links: { instagram: 'rosalie.beton' },
+        },
+        photo: '#3b1f2b',
+      },
+      { profile: { name: 'Kofi', country: 'CA', city: 'Montréal', genres: ['hard-techno'], bio: 'Des sets de six heures.', links: { ra: 'kofibeton' } } },
+      { profile: { name: 'Yasmine', country: 'BE', city: 'Bruxelles', genres: ['ebm-industrial'], bio: 'Bruxelles, 150 BPM.', links: { soundcloud: 'yasmine-beton' } } },
+    ],
     applications: [
       application([30, 31], 'accepted', { timeSlots: [EVENING] }),
       application([-60], 'done', { timeSlots: [EVENING], receivedDaysAgo: 150 }),

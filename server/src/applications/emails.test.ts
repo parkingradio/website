@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { ApplicantProfile } from '../artists/profile.js'
-import { newMember } from '../collectives/store.js'
 import type { Applied } from './applicant.js'
 import { applicationEmails, describeApplication } from './emails.js'
 import type { ApplicationFields } from './fields.js'
@@ -23,12 +22,16 @@ function artist(changes: Partial<ApplicantProfile> = {}): Applied {
   return { artist: profile(changes) }
 }
 
-// A collective, as it's saved when it applies.
+// A collective, as it's saved when it applies, with its artists.
 function collective(): Applied {
-  const { bio, genres, ...rest } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
+  const { name, country, city, bio, links, email, phone } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
+  const member = (name: string, changes: Partial<ApplicantProfile>) => ({ ...profile({ name, ...changes }), email: null, phone: '' })
   return {
-    collective: { ...rest, description: bio },
-    members: [newMember('Une', null, genres), newMember('Deux', null, ['ebm-industrial', 'acid'])],
+    collective: { name, country, city, description: bio, links, email, phone },
+    members: [
+      member('Une', { country: 'FR', city: 'Lyon', genres: ['acid'], bio: 'La bio de Une.', links: { bandcamp: 'une' } }),
+      member('Deux', { genres: ['house', 'disco'], bio: 'La bio\nde Deux.', links: { web: 'https://deux.example.com' } }),
+    ],
   }
 }
 
@@ -77,24 +80,48 @@ describe('describeApplication', () => {
     )
   })
 
-  it("describes a collective, its artists and their genres, its contact and its description", () => {
-    const text = describeApplication(collective(), fields())
-    expect(text).toMatch(
-      new RegExp(
-        [
-          '^Collectif : Le Collectif',
-          'Artistes du collectif : Une, Deux',
-          'Ville : Québec, Canada',
-          // Each one once.
-          'Genres : techno, EBM / industriel, acid',
-          'E-mail du contact : collectif@example.com',
-          'Téléphone du contact : 418 555-0123',
-          '',
-        ].join('\n'),
-      ),
+  it("describes a collective, its contact and its description, then each of its artists' profiles", () => {
+    expect(describeApplication(collective(), fields({ details: '' }))).toBe(
+      [
+        'Collectif : Le Collectif',
+        'Artistes du collectif : Une, Deux',
+        'Ville : Québec, Canada',
+        // Each artist's genres are theirs, and the collective has none of its own.
+        'E-mail du contact : collectif@example.com',
+        'Téléphone du contact : 418 555-0123',
+        '',
+        'Liens :',
+        '  SoundCloud : https://soundcloud.com/parkingdotradio',
+        '  Instagram : https://instagram.com/parking.radio',
+        '',
+        'Dates souhaitées :',
+        '  vendredi 8 janvier 2027',
+        '  vendredi 15 janvier 2027',
+        'Plages horaires : 14:00 à 18:00, 18:00 à 22:00',
+        'Type de prestation : DJ, Vinyl, autre : Synthé modulaire',
+        '',
+        'Description :',
+        'Une bio.\nSur deux lignes.',
+        '',
+        'Artiste 1 : Une',
+        'Ville : Lyon, France',
+        'Genres : acid',
+        'Liens :',
+        '  Bandcamp : https://une.bandcamp.com',
+        'Bio :',
+        'La bio de Une.',
+        '',
+        'Artiste 2 : Deux',
+        'Ville : Québec, Canada',
+        'Genres : house, disco',
+        'Liens :',
+        '  Site web : https://deux.example.com',
+        'Bio :',
+        'La bio\nde Deux.',
+      ].join('\n'),
     )
-    expect(text).toContain('\nDescription :\nUne bio.\nSur deux lignes.\n')
-    expect(text).not.toContain('Bio :')
+    // The collective's questions come before its artists' profiles.
+    expect(describeApplication(collective(), fields())).toContain('\nUne bio.\nSur deux lignes.\n\nQuestions ou détails :\nUne question ?\n\nArtiste 1 : Une\n')
   })
 
   it('says when any time works, and leaves out what the artist left blank', () => {

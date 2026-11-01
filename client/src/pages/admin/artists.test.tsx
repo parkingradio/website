@@ -737,7 +737,7 @@ describe('Adding an artist', () => {
     expect(document.querySelectorAll('.admin-field-error')).toHaveLength(0)
     fireEvent.click(submitButton("ajouter l'artiste"))
 
-    expect(errorOf(screen.getByLabelText("Nom d'artiste"))).toBe("Indiquez votre nom d'artiste.")
+    expect(errorOf(screen.getByLabelText("Nom d'artiste"))).toBe("Indiquez le nom d'artiste.")
     expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez une adresse e-mail valide.')
     // Admins can leave these out, unlike artists, and the photo is optional.
     expect(errorOf(screen.getByLabelText('Ville'))).toBeNull()
@@ -776,7 +776,7 @@ describe('Adding an artist', () => {
     fireEvent.change(soundcloud, { target: { value: 'https://soundcloud.com/discover' } })
     expect(errorOf(soundcloud)).toBeNull()
     fireEvent.blur(soundcloud)
-    expect(errorOf(soundcloud)).toBe("copiez l'adresse de votre page de profil, qui commence par soundcloud.com/")
+    expect(errorOf(soundcloud)).toBe("copiez l'adresse de la page de profil, qui commence par soundcloud.com/")
     // The field's own error, that there's no link, isn't shown on top.
     expect(screen.queryByText('Ajoutez au moins un lien.')).not.toBeInTheDocument()
 

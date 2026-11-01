@@ -8,48 +8,68 @@ import type { Photos, SentPhoto } from './store.js'
 // Reading requests that send a photo with a few fields, e.g. a profile, and serving photos, for the routes of artists,
 // collectives and applications.
 
-// The contents of a multipart/form-data request that sends a photo with a few fields: the fields, as they were sent,
-// and the photo from the "photo" part, if there's one.
-export type PhotoForm = { fields: Record<string, unknown>; photo: Buffer | undefined }
+// The contents of a multipart/form-data request that sends a photo with a few fields: the fields, as they were sent, the
+// photo from the "photo" part, if there's one, and, for a request that reads them, the photos of a collective's artists,
+// from the "memberPhoto" parts, in order, where an empty part is no photo.
+export type PhotoForm = { fields: Record<string, unknown>; photo: Buffer | undefined; memberPhotos: (Buffer | undefined)[] }
 
-// The photo can be up to PHOTO_MAX_BYTES. There's room for a few more fields and files than a route reads, e.g. a
-// form's submit button.
-const LIMITS = { files: 5, fileSize: PHOTO_MAX_BYTES, fields: 10, fieldSize: 64 * 1024 }
+// What a request with a photo can send. The photo can be up to PHOTO_MAX_BYTES. There's room for a few more fields and
+// files than a route reads, e.g. a form's submit button.
+export type FormLimits = { files: number; fields: number; fieldSize: number }
+const LIMITS: FormLimits = { files: 5, fields: 10, fieldSize: 64 * 1024 }
 
-// Reads a PhotoForm from `request`. The route must have registered the multipart plugin. Files other than the photo are
-// ignored. Returns "too-large" if the photo is over PHOTO_MAX_BYTES, and "malformed" if the request isn't actually
-// multipart/form-data, has more fields or files than LIMITS allows, or has more than one photo.
-export async function readPhotoForm(request: FastifyRequest): Promise<PhotoForm | 'malformed' | 'too-large'> {
+// Reads a PhotoForm from `request`. The route must have registered the multipart plugin. Files other than the photos it
+// reads are ignored: with `memberPhotos`, the "memberPhoto" parts are read too. Every photo it reads stays in memory until
+// the request is done, which `limits` bounds. Returns `{ tooLarge }` if a photo is over PHOTO_MAX_BYTES, with the index
+// of the "memberPhoto" part when it's one of them, or undefined for the "photo" part, and "malformed" if the request
+// isn't actually multipart/form-data, has more fields or files than `limits` allows, a field larger than it allows, or
+// more than one "photo" part.
+export async function readPhotoForm(
+  request: FastifyRequest,
+  { limits = LIMITS, memberPhotos: readMemberPhotos = false }: { limits?: FormLimits; memberPhotos?: boolean } = {},
+): Promise<PhotoForm | 'malformed' | { tooLarge: number | undefined }> {
   if (!request.isMultipart()) return 'malformed'
 
   const fields: Record<string, unknown> = {}
   let photo: Buffer | undefined
   let photoParts = 0
+  const memberPhotos: (Buffer | undefined)[] = []
+  // The "memberPhoto" part being read, if it's one of them, for the error when it's too large.
+  let member: number | undefined
   try {
-    for await (const part of request.parts({ limits: LIMITS })) {
-      if (part.type === 'file' && part.fieldname === 'photo') {
-        // Only the first photo is kept, because each photo stays in memory until the request is done. Any other photo
-        // is still read, and thrown away. Otherwise the rest of the request would never be read, and the connection
-        // couldn't be used for the next request.
+    for await (const part of request.parts({ limits: { ...limits, fileSize: PHOTO_MAX_BYTES } })) {
+      if (part.type === 'field') {
+        // A field larger than `fieldSize` is cut short, rather than refused.
+        if (part.valueTruncated) return 'malformed'
+        fields[part.fieldname] = part.value
+      } else if (part.fieldname === 'photo') {
+        // Only the first photo is kept. Any other one is still read, and thrown away: otherwise the rest of the request
+        // would never be read, and the connection couldn't be used for the next request.
         if (++photoParts > 1) {
           part.file.resume()
           continue
         }
-        // A form whose file input was left empty still sends the part, without any content.
-        const body = await part.toBuffer()
-        if (body.length > 0) photo = body
-      } else if (part.type === 'file') {
-        part.file.resume() // drain anything unexpected
+        photo = await nonEmpty(part.toBuffer())
+      } else if (part.fieldname === 'memberPhoto' && readMemberPhotos) {
+        member = memberPhotos.length
+        memberPhotos.push(await nonEmpty(part.toBuffer()))
+        member = undefined
       } else {
-        fields[part.fieldname] = part.value
+        part.file.resume() // drain anything unexpected
       }
     }
   } catch (error) {
-    if (error instanceof request.server.multipartErrors.RequestFileTooLargeError) return 'too-large'
+    if (error instanceof request.server.multipartErrors.RequestFileTooLargeError) return { tooLarge: member }
     request.log.info({ err: error }, 'Malformed multipart request')
     return 'malformed'
   }
-  return photoParts > 1 ? 'malformed' : { fields, photo }
+  return photoParts > 1 ? 'malformed' : { fields, photo, memberPhotos }
+}
+
+// A form whose file input was left empty still sends the part, without any content, which is no photo.
+async function nonEmpty(body: Promise<Buffer>): Promise<Buffer | undefined> {
+  const read = await body
+  return read.length > 0 ? read : undefined
 }
 
 // The value of a field sent as JSON, or undefined when it isn't JSON. The multipart plugin has already parsed it when
@@ -75,8 +95,8 @@ export async function readProfileForm<Schema extends z.ZodType>(
   schema: Schema,
 ): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string }> {
   const form = await readPhotoForm(request)
-  if (form === 'too-large') return { status: 413, error: PHOTO_TOO_LARGE }
   if (form === 'malformed') return INVALID_REQUEST
+  if ('tooLarge' in form) return { status: 413, error: PHOTO_TOO_LARGE }
   const sent = jsonField(form.fields[part])
   if (sent === undefined) return INVALID_REQUEST
   try {

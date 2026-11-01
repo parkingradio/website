@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../../artist-profile'
 
-type Props = { value: File | null; onChange: (file: File | null) => void; invalid: boolean }
+// `id` is the button's, which the label points at: "photo" unless there are several photo fields on the page.
+type Props = { value: File | null; onChange: (file: File | null) => void; invalid: boolean; id?: string }
 
-export function PhotoField({ value, onChange, invalid }: Props) {
+export function PhotoField({ value, onChange, invalid, id = 'photo' }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   // The address of the photo picked, to show it, made when it's picked and released once it's replaced or the form is
@@ -24,7 +25,7 @@ export function PhotoField({ value, onChange, invalid }: Props) {
   return (
     <div className={invalid ? 'photo invalid' : 'photo'}>
       {preview ? (
-        <img src={preview} alt="Aperçu de votre photo" />
+        <img src={preview} alt="Aperçu de la photo" />
       ) : (
         <div className="photo-empty" aria-hidden="true">
           photo
@@ -42,7 +43,7 @@ export function PhotoField({ value, onChange, invalid }: Props) {
           accept={PHOTO_TYPES.join(',')}
           onChange={(event) => pick(event.target.files?.[0] ?? null)}
         />
-        <button ref={button} id="photo" type="button" aria-invalid={invalid || undefined} onClick={() => input.current?.click()}>
+        <button ref={button} id={id} type="button" aria-invalid={invalid || undefined} onClick={() => input.current?.click()}>
           {value ? 'changer de photo' : 'choisir une photo'}
         </button>
         {value && (

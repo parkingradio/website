@@ -6,12 +6,12 @@ import { clientAddress, visitorAddress } from '../api/client-address.js'
 import { useApiErrors } from '../api/errors.js'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
-import type { PhotoForm } from '../artists/photo-form.js'
+import type { FormLimits, PhotoForm } from '../artists/photo-form.js'
 import { PHOTO_TOO_LARGE, PhotoFile } from '../artists/profile.js'
-import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists/store.js'
-import type { Photos, SentPhoto, StoredPhoto } from '../artists/store.js'
+import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto } from '../artists/store.js'
+import type { PhotoFolder, Photos, SentPhoto, StoredPhoto } from '../artists/store.js'
 import type { Email, SendEmail } from '../core/email.js'
-import { Applicant, applied as savedAs } from './applicant.js'
+import { Applicant, applied, memberError, validateApplicant } from './applicant.js'
 import type { Applied } from './applicant.js'
 import type { ApplyStore } from './apply-store.js'
 import { applicationEmails } from './emails.js'
@@ -37,32 +37,71 @@ const TURNSTILE_UNAVAILABLE: z.infer<typeof ApiError> = {
   error: "La vérification anti-robot n'a pas pu être faite. Réessayez dans quelques minutes.",
 }
 
-// What applying sends, as multipart/form-data. The route reads it itself (see `validated`), checking the profile and the
+// What applying sends, as multipart/form-data. The route reads it itself (see `validated`), checking who applies and the
 // application against these schemas, but in its own order, with its own errors: before the token, which can only be
 // checked once.
 const ApplyForm = z.object({
   artist: Applicant,
   application: ApplicationFields,
   photo: PhotoFile.optional(),
+  memberPhoto: z.array(PhotoFile).optional().meta({
+    description:
+      "For a collective, its artists' photos, a part each, in the order of its artists, where an empty part is no photo. " +
+      'Those after the last photo can be left out',
+  }),
   turnstileToken: z.string().meta({ description: 'The token the Turnstile widget gave the page' }),
 })
 
-// Checks who applies, the photo and the application that were sent. Returns what to save of them, or the error for the
+// What the request can send (see `readPhotoForm`): the photos of a collective and a few of its artists, and room for a
+// few other fields and files. The profiles are in a single field, which bounds how many artists a collective can send.
+const LIMITS: FormLimits = { files: 10, fields: 10, fieldSize: 256 * 1024 }
+
+// Who applies, as they're saved, and the photos they sent: an artist's or a collective's, and for a collective, each of
+// its artists', in order.
+type Sent = { applied: Applied; photo: SentPhoto | null; memberPhotos: (SentPhoto | null)[]; application: ApplicationFields }
+
+// Checks who applies, the photos and the application that were sent. Returns what to save of them, or the error for the
 // first one that isn't valid.
-function validated(form: PhotoForm): { applied: Applied; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
+function validated(form: PhotoForm): Sent | z.infer<typeof ApiError> {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
   try {
-    return {
-      applied: savedAs(validateProfile(sentArtist, Applicant)),
-      photo: validatePhoto(form.photo),
-      application: validateApplication(sentApplication),
-    }
+    const applicant = applied(validateApplicant(sentArtist))
+    const members = 'members' in applicant ? applicant.members.length : 0
+    // A photo for an artist the collective doesn't have.
+    if (form.memberPhotos.length > members) return INVALID_REQUEST
+    const photo = validatePhoto(form.photo)
+    const memberPhotos = Array.from({ length: members }, (_, index) => {
+      try {
+        return validatePhoto(form.memberPhotos[index])
+      } catch (error) {
+        throw error instanceof InvalidProfile ? new InvalidProfile(memberError(index, error.message)) : error
+      }
+    })
+    return { applied: applicant, photo, memberPhotos, application: validateApplication(sentApplication) }
   } catch (error) {
     if (!(error instanceof InvalidProfile || error instanceof InvalidApplication)) throw error
     return { ok: false, error: error.message }
   }
+}
+
+// Stores the photos that were sent, one at a time, each in its folder, and returns where, as artists and collectives keep
+// them. If one can't be stored, those that were are deleted, and the error is thrown: storing them all at once would
+// leave those still being stored behind.
+async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, sent: { photo: SentPhoto | null; folder: PhotoFolder }[]) {
+  const stored: StoredPhoto[] = []
+  try {
+    for (const { photo, folder } of sent) stored.push(await storePhoto(photos, photo, folder))
+  } catch (error) {
+    await forgetPhotos(photos, log, stored)
+    throw error
+  }
+  return stored
+}
+
+async function forgetPhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, stored: StoredPhoto[]) {
+  await Promise.all(stored.map(({ photoKey }) => forgetPhoto(photos, log, photoKey)))
 }
 
 type EmailOptions = {
@@ -76,7 +115,7 @@ type EmailOptions = {
 async function emailApplication(
   log: FastifyBaseLogger,
   { settings, sendEmail }: EmailOptions,
-  sent: { applied: Applied; application: ApplicationFields },
+  sent: Pick<Sent, 'applied' | 'application'>,
 ) {
   if (!sendEmail) {
     log.warn('Not emailing the application: MAIL_DOMAIN is not set')
@@ -147,14 +186,17 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
       },
     },
     async (request, reply) => {
-      const form = await readPhotoForm(request)
-      if (form === 'too-large') return reply.status(413).send({ ok: false, error: PHOTO_TOO_LARGE })
+      const form = await readPhotoForm(request, { limits: LIMITS, memberPhotos: true })
       if (form === 'malformed') return reply.status(400).send(INVALID_REQUEST)
+      if ('tooLarge' in form) {
+        const error = form.tooLarge === undefined ? PHOTO_TOO_LARGE : memberError(form.tooLarge, PHOTO_TOO_LARGE)
+        return reply.status(413).send({ ok: false, error })
+      }
       const sent = validated(form)
       if ('error' in sent) return reply.status(400).send(sent)
 
-      // This comes after the checks above because Cloudflare only accepts each token once. That way, if the profile,
-      // application or photo isn't valid, the artist can fix it and send it again with the same token.
+      // This comes after the checks above because Cloudflare only accepts each token once. That way, if a profile, the
+      // application or a photo isn't valid, the artist can fix it and send it again with the same token.
       const token = typeof form.fields.turnstileToken === 'string' ? form.fields.turnstileToken : ''
       const verified = await verifyTurnstile(token, visitorAddress(request)).catch((error: unknown) => {
         request.log.error({ err: error }, 'Failed to check a Turnstile token with Cloudflare')
@@ -176,22 +218,31 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         'artist' in applied
           ? {
               folder: 'artists' as const,
-              save: (photo: StoredPhoto) => store.apply({ ...applied.artist, ...photo }, application),
+              save: ([photo]: StoredPhoto[]) => store.apply({ ...applied.artist, ...photo }, application),
               taken: EMAIL_TAKEN,
               done: 'An artist applied',
             }
           : {
               folder: 'collectives' as const,
-              save: (photo: StoredPhoto) => store.applyAsCollective({ ...applied.collective, ...photo }, applied.members, application),
+              // Its artists' photos become theirs.
+              save: ([photo, ...memberPhotos]: StoredPhoto[]) =>
+                store.applyAsCollective(
+                  { ...applied.collective, ...photo },
+                  applied.members.map((member, index) => ({ ...member, ...memberPhotos[index] })),
+                  application,
+                ),
               taken: COLLECTIVE_EMAIL_TAKEN,
               done: 'A collective applied',
             }
-      const photo = await storePhoto(photos, sent.photo, how.folder)
+      const stored = await storePhotos(photos, request.log, [
+        { photo: sent.photo, folder: how.folder },
+        ...sent.memberPhotos.map((photo) => ({ photo, folder: 'artists' as const })),
+      ])
       let ids: Awaited<ReturnType<typeof how.save>>
       try {
-        ids = await how.save(photo)
+        ids = await how.save(stored)
       } catch (error) {
-        await forgetPhoto(photos, request.log, photo.photoKey)
+        await forgetPhotos(photos, request.log, stored)
         if (error instanceof EmailTaken) return reply.status(409).send(how.taken)
         throw error
       }

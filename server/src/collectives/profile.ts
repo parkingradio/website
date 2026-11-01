@@ -70,5 +70,9 @@ function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
 // first error is what the server answers.
 export const AdminCollectiveProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminCollectiveProfile' })
 
+// A collective's profile, as it sends it when it applies (see `Applicant` in applications/applicant.ts), with nothing left
+// out. Its members are artists who apply with it, rather than members as admins send them.
+export const ApplicantCollectiveProfile = profile({ canLeaveOut: false }).omit({ members: true })
+
 export type CollectiveProfile = z.output<typeof AdminCollectiveProfile>
 export type SentMember = CollectiveProfile['members'][number]

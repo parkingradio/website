@@ -31,7 +31,7 @@ function references(value: unknown, found = new Set<string>()): Set<string> {
   return found
 }
 
-type Schema = { $ref?: string; type?: unknown; properties?: Record<string, Schema> }
+type Schema = { $ref?: string; type?: unknown; properties?: Record<string, Schema>; items?: Schema }
 type Operation = { requestBody?: { content: Record<string, { schema: Schema; encoding?: object }> } }
 type Document = { paths?: Record<string, Record<string, Operation>>; components?: { schemas?: Record<string, Schema> } }
 
@@ -77,7 +77,8 @@ function withoutUnusedComponents(document: Document): Document {
 }
 
 // Says that the parts of multipart/form-data requests (see `FastifySchema.multipart`) that aren't text or files, e.g. a
-// profile, are JSON. That's what OpenAPI assumes of an object anyway, but not every tool knows that a reference is one.
+// profile, are JSON. That's what OpenAPI assumes of an object anyway, but not every tool knows that a reference is one. A
+// list of files, e.g. a collective's artists' photos, is a part for each file.
 function withJsonParts(document: Document): Document {
   const schemas = document.components?.schemas ?? {}
   for (const operations of Object.values(document.paths ?? {})) {
@@ -86,7 +87,7 @@ function withJsonParts(document: Document): Document {
       if (!form) continue
       const json = Object.entries(form.schema.properties ?? {}).filter(([, part]) => {
         const schema = part.$ref ? schemas[part.$ref.replace('#/components/schemas/', '')] : part
-        return schema?.type !== 'string'
+        return schema?.type !== 'string' && !(schema?.type === 'array' && schema.items?.type === 'string')
       })
       if (json.length > 0) form.encoding = Object.fromEntries(json.map(([name]) => [name, { contentType: 'application/json' }]))
     }

@@ -76,6 +76,7 @@ function sentParts() {
     artist: JSON.parse(body.get('artist') as string),
     application: JSON.parse(body.get('application') as string),
     photo: body.get('photo') as File | null,
+    memberPhotos: body.getAll('memberPhoto') as File[],
     turnstileToken: body.get('turnstileToken'),
   }
 }
@@ -165,6 +166,53 @@ async function fillIn({ city }: { city?: string } = {}) {
   fireEvent.click(dates.getByRole('checkbox', { name: '11 h – 15 h' }))
 }
 
+// The profile of the nth artist of the collective, when it's shown, whose legend is "Artiste <n>", followed by their name
+// once it's typed.
+function memberProfile(n: number) {
+  return screen.getByRole('group', { name: new RegExp(`^Artiste ${n}( —|$)`) })
+}
+
+// Picks a photo with the file input in `scope`, which only the button that opens it shows.
+function pickPhoto(scope: HTMLElement, photo: File) {
+  fireEvent.change(scope.querySelector('input[type=file]')!, { target: { files: [photo] } })
+}
+
+// Fills the profile of the nth artist of the collective, which is shown.
+async function fillInMember(n: number, name: string, { photo }: { photo?: File } = {}) {
+  const element = memberProfile(n)
+  const profile = within(element)
+  type(/Nom d'artiste/, name, profile)
+  await pick(/^Pays/, 'france', /^France/, profile)
+  fireEvent.change(profile.getByRole('combobox', { name: /^Ville/ }), { target: { value: 'Lyon' } })
+  fireEvent.click(profile.getByRole('button', { name: 'house' }))
+  if (photo) pickPhoto(element, photo)
+  type(/^Bio/, `La bio de ${name}.`, profile)
+  type('SoundCloud', name.toLowerCase(), profile)
+}
+
+// The tabs of the collective's artists, and the buttons that add and take them out.
+function memberTabs(): Queries {
+  return within(screen.getByRole('group', { name: 'Artistes du collectif' }))
+}
+
+// The tab of the nth artist of the collective, with their name and whether their profile is complete.
+function memberTab(n: number, state?: string) {
+  return memberTabs().getByRole('button', { name: new RegExp(`^Artiste ${n}( — [^,]*)?, ${state ?? ''}`) })
+}
+
+function addMember() {
+  fireEvent.click(memberTabs().getByRole('button', { name: /ajouter un artiste/ }))
+}
+
+// Fills the form as a collective, with its first artist, but not their profile: the rest is filled in like fillIn's.
+async function fillInCollective() {
+  await fillIn()
+  const collective = part("L'artiste")
+  fireEvent.click(collective.getByRole('radio', { name: /^Collectif/ }))
+  type(/Nom du collectif/, 'Le Collectif', collective)
+  type(/^Description/, 'Une description.')
+}
+
 describe('Appliquer', () => {
   it('shows the form before the configuration has been fetched, and Turnstile once it has', () => {
     const { rerender } = renderForm({ kind: 'loading' })
@@ -196,7 +244,7 @@ describe('Appliquer', () => {
     expect(screen.getByText('Choisissez au moins une date.')).toBeInTheDocument()
     expect(screen.getByText('Choisissez au moins un type de prestation.')).toBeInTheDocument()
     // Which admins can leave out, but artists can't.
-    for (const missing of ['Choisissez votre pays.', 'Indiquez votre ville.', 'Choisissez au moins un genre.', 'Ajoutez au moins un lien.', 'Indiquez votre numéro de téléphone.']) {
+    for (const missing of ['Choisissez le pays.', 'Indiquez la ville.', 'Choisissez au moins un genre.', 'Ajoutez au moins un lien.', 'Indiquez votre numéro de téléphone.']) {
       expect(screen.getByText(missing)).toBeInTheDocument()
     }
     expect(applications()).toEqual([])
@@ -242,10 +290,11 @@ describe('Appliquer', () => {
   it('sends the prestations by their ids, in the order of the list, and the other one', async () => {
     renderForm()
     await fillIn()
-    fireEvent.click(screen.getByLabelText('Full Band'))
-    fireEvent.click(screen.getByLabelText('Performance Live'))
-    fireEvent.click(screen.getByLabelText('Autre'))
-    type('Autre type de prestation', ' Synthé modulaire ')
+    const prestation = part('Prestation')
+    fireEvent.click(prestation.getByLabelText('Full Band'))
+    fireEvent.click(prestation.getByLabelText('Performance Live'))
+    fireEvent.click(prestation.getByLabelText('Autre'))
+    type('Autre type de prestation', ' Synthé modulaire ', prestation)
     await send()
 
     expect(sentParts().application).toMatchObject({ prestations: ['dj', 'live-performance', 'full-band'], otherPrestation: 'Synthé modulaire' })
@@ -254,13 +303,14 @@ describe('Appliquer', () => {
   it('takes "Autre" alone, once it says what it is', async () => {
     renderForm()
     await fillIn()
-    fireEvent.click(screen.getByLabelText('DJ'))
-    fireEvent.click(screen.getByLabelText('Autre'))
+    const prestation = part('Prestation')
+    fireEvent.click(prestation.getByLabelText('DJ'))
+    fireEvent.click(prestation.getByLabelText('Autre'))
     await send()
-    expect(screen.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
+    expect(prestation.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
     expect(applications()).toEqual([])
 
-    type('Autre type de prestation', 'B2B')
+    type('Autre type de prestation', 'B2B', prestation)
     await send()
     expect(sentParts().application).toMatchObject({ prestations: [], otherPrestation: 'B2B' })
   })
@@ -312,27 +362,160 @@ describe('Appliquer', () => {
     ])
   })
 
-  it('asks a collective for its artists, up to 4, and tells it about the flyer', async () => {
+  it("asks a collective for its own profile and each of its artists', with their photos, then sends them", async () => {
     renderForm()
-    const artist = part("L'artiste")
     expect(screen.queryByText(/nous demandons aux collectifs de produire un flyer/)).not.toBeInTheDocument()
-    const collective = artist.getByRole('radio', { name: /^Collectif/ })
-    fireEvent.click(collective)
-    expect(collective).toHaveAccessibleName(expect.stringContaining("plage d'environ 4 h"))
-    expect(artist.getByRole('textbox', { name: /Nom du collectif/ })).toBeInTheDocument()
-    expect(artist.getByText(/nous demandons aux collectifs de produire un flyer/)).toBeInTheDocument()
+    await fillInCollective()
+    const collective = part('Le collectif')
+    expect(collective.getByRole('radio', { name: /^Collectif/ })).toHaveAccessibleName(expect.stringContaining("plage d'environ 4 h"))
+    expect(collective.getByText(/nous demandons aux collectifs de produire un flyer/)).toBeInTheDocument()
+    // Its genres are its artists'.
+    expect(collective.queryByText(/le premier est votre genre principal/)).not.toBeInTheDocument()
+    expect(part('Contact').getByText(/La personne-contact du collectif/)).toBeInTheDocument()
+    expect(part('Prestation')).toBeTruthy()
 
-    type('Artiste 1 du collectif', 'Zefra', artist)
-    for (let i = 0; i < 3; ++i) fireEvent.click(artist.getByRole('button', { name: /ajouter un artiste/ }))
-    expect(artist.queryByRole('button', { name: /ajouter un artiste/ })).not.toBeInTheDocument()
-    type('Artiste 3 du collectif', 'Mlle Zed', artist)
-    fireEvent.click(artist.getByRole('button', { name: "Enlever l'artiste 2" }))
-
-    await fillIn()
-    // fillIn() picks "Artiste": go back to the collective, whose artists are kept.
-    fireEvent.click(collective)
+    await fillInMember(1, 'Une')
+    fireEvent.click(memberTabs().getByRole('button', { name: '+ ajouter un artiste (1 / 4)' }))
+    const photo = new File(['deux'], 'deux.png', { type: 'image/png' })
+    await fillInMember(2, 'Deux', { photo })
     await send()
-    expect(sentParts().artist).toMatchObject({ kind: 'collective', name: 'DJ Test', members: ['Zefra', 'Mlle Zed'] })
+
+    expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
+    const { artist, photo: collectivePhoto, memberPhotos } = sentParts()
+    const member = (name: string) => ({ name, country: 'FR', city: 'Lyon', genres: ['house'], bio: `La bio de ${name}.`, links: { soundcloud: name.toLowerCase() } })
+    expect(artist).toEqual({
+      kind: 'collective',
+      name: 'Le Collectif',
+      country: 'CA',
+      city: 'Lévis',
+      description: 'Une description.',
+      links: { soundcloud: 'parkingdotradio' },
+      email: 'artiste@example.com',
+      phone: '418 555-0123',
+      members: [member('Une'), member('Deux')],
+    })
+    expect(collectivePhoto?.name).toBe('presse.jpg')
+    // A part for each artist, an empty one for an artist without a photo.
+    expect(memberPhotos.map((sent) => sent.size)).toEqual([0, photo.size])
+    expect(memberPhotos[1].name).toBe('deux.png')
+  })
+
+  it('sends no photos of artists for a collective that has none, or once it applies as an artist again', async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une', { photo: new File(['une'], 'une.png', { type: 'image/png' }) })
+    fireEvent.click(part('Le collectif').getByRole('radio', { name: /^Artiste/ }))
+    await send()
+    expect(sentParts().artist).toMatchObject({ kind: 'artist', name: 'Le Collectif', bio: 'Une description.' })
+    expect(sentParts().memberPhotos).toEqual([])
+  })
+
+  it('has 1 to 4 artists, as tabs that say whether their profile is complete, and focuses the profile of one added', async () => {
+    renderForm()
+    await fillInCollective()
+    expect(memberTab(1, 'à compléter')).toHaveAttribute('aria-current', 'true')
+    // There's always one.
+    expect(memberTabs().queryByRole('button', { name: /^Enlever/ })).not.toBeInTheDocument()
+
+    await fillInMember(1, 'Une')
+    expect(memberTab(1, 'complet')).toHaveAccessibleName('Artiste 1 — Une, complet')
+    for (let n = 2; n <= 4; ++n) {
+      fireEvent.click(memberTabs().getByRole('button', { name: `+ ajouter un artiste (${n - 1} / 4)` }))
+      expect(memberTab(n, 'à compléter')).toHaveAttribute('aria-current', 'true')
+      expect(within(memberProfile(n)).getByRole('textbox', { name: /Nom d'artiste/ })).toHaveFocus()
+    }
+    expect(memberTabs().queryByRole('button', { name: /ajouter un artiste/ })).not.toBeInTheDocument()
+    // Only the profile of the artist selected shows.
+    expect(screen.getAllByRole('group', { name: /^Artiste \d/ })).toHaveLength(1)
+    fireEvent.click(memberTab(1))
+    expect(memberProfile(1)).toBeVisible()
+    expect(within(memberProfile(1)).getByRole('textbox', { name: /Nom d'artiste/ })).toHaveValue('Une')
+  })
+
+  it('takes out an artist, after confirming once their profile has something, and keeps each photo with its artist', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    onTestFinished(() => confirm.mockRestore())
+    renderForm()
+    await fillInCollective()
+    const photos = ['une', 'deux', 'trois'].map((name) => new File([name], `${name}.png`, { type: 'image/png' }))
+    await fillInMember(1, 'Une', { photo: photos[0] })
+    addMember()
+    await fillInMember(2, 'Deux', { photo: photos[1] })
+    addMember()
+    await fillInMember(3, 'Trois', { photo: photos[2] })
+    // An empty one goes without asking.
+    addMember()
+    fireEvent.click(memberTabs().getByRole('button', { name: 'Enlever Artiste 4 du collectif' }))
+    expect(confirm).not.toHaveBeenCalled()
+    // The one before the last one, which was selected, is selected, and focused.
+    expect(memberTab(3)).toHaveFocus()
+
+    fireEvent.click(memberTab(2))
+    fireEvent.click(memberTabs().getByRole('button', { name: 'Enlever Artiste 2 — Deux du collectif' }))
+    expect(confirm).toHaveBeenCalledWith('Enlever Artiste 2 — Deux du collectif ? Sa fiche sera effacée.')
+    // The one after it takes its place.
+    expect(memberTab(2)).toHaveAccessibleName('Artiste 2 — Trois, complet')
+    expect(memberTab(2)).toHaveFocus()
+    await send()
+
+    expect(sentParts().artist.members.map((member: { name: string }) => member.name)).toEqual(['Une', 'Trois'])
+    expect(sentParts().memberPhotos.map((photo) => photo.name)).toEqual(['une.png', 'trois.png'])
+  })
+
+  it('keeps the artist selected when one before them is taken out', async () => {
+    renderForm()
+    await fillInCollective()
+    addMember()
+    addMember()
+    type(/Nom d'artiste/, 'Trois', within(memberProfile(3)))
+    // The first one is empty, so it goes without asking.
+    fireEvent.click(memberTabs().getByRole('button', { name: 'Enlever Artiste 1 du collectif' }))
+    expect(memberTab(2)).toHaveAccessibleName('Artiste 2 — Trois, à compléter')
+    expect(memberTab(2)).toHaveAttribute('aria-current', 'true')
+    expect(memberTab(2)).toHaveFocus()
+    expect(within(memberProfile(2)).getByRole('textbox', { name: /Nom d'artiste/ })).toHaveValue('Trois')
+  })
+
+  it("keeps what an artist's profile shows while another one is shown", async () => {
+    renderForm()
+    await fillInCollective()
+    fireEvent.click(within(memberProfile(1)).getByRole('button', { name: '+ Mixcloud' }))
+    addMember()
+    fireEvent.click(memberTab(1))
+    expect(within(memberProfile(1)).getByRole('textbox', { name: 'Mixcloud' })).toBeInTheDocument()
+  })
+
+  it("shows what is wrong in each artist's profile, bringing the artist to the first one", async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une')
+    addMember()
+    addMember()
+    type(/Nom d'artiste/, 'Trois', within(memberProfile(3)))
+    fireEvent.click(memberTab(1))
+    await send()
+
+    // Each field to fix in their profiles counts.
+    expect(await screen.findByRole('alert')).toHaveTextContent('11 champs sont à remplir ou à corriger.')
+    expect(memberTab(1, 'complet')).toBeInTheDocument()
+    expect(memberTab(3, 'à corriger')).toBeInTheDocument()
+    // The second artist's profile is shown, with what's wrong in it, and the first field to fix has the focus.
+    expect(memberTab(2, 'à corriger')).toHaveAttribute('aria-current', 'true')
+    const profile = within(memberProfile(2))
+    expect(profile.getByRole('textbox', { name: /Nom d'artiste/ })).toHaveFocus()
+    for (const error of ["Indiquez le nom d'artiste.", 'Choisissez le pays.', 'Indiquez la ville.', 'Choisissez au moins un genre.', 'Écrivez quelques lignes de bio.']) {
+      expect(profile.getByText(error)).toBeInTheDocument()
+    }
+    expect(applications()).toEqual([])
+  })
+
+  it("shows the server's error about one of the artists", async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une')
+    fetchMock.mockImplementationOnce(() => refused('Artiste 1 : Indiquez la ville.'))
+    await send()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Artiste 1 : Indiquez la ville.')
   })
 
   it('finds countries whatever their accents, case, hyphens and apostrophes', async () => {
@@ -479,9 +662,9 @@ describe('Appliquer', () => {
   it('sends the application without a photo, once the one picked is removed', async () => {
     renderForm()
     await fillIn()
-    expect(screen.getByRole('img', { name: 'Aperçu de votre photo' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Aperçu de la photo' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
-    expect(screen.queryByRole('img', { name: 'Aperçu de votre photo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Aperçu de la photo' })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/^Photo/)).toHaveTextContent('choisir une photo')
     // The button that was clicked is gone, so the focus moves to the one that picks a photo.
     expect(screen.getByLabelText(/^Photo/)).toHaveFocus()

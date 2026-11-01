@@ -265,9 +265,9 @@ describe('artists routes', () => {
       const app = await buildApp()
       const errors = async (artist: unknown) => (await create(app, JSON.stringify(artist), null)).json()
       for (const artist of [null, 'DJ Test', 42, [], {}]) {
-        expect(await errors(artist)).toEqual({ ok: false, error: "Indiquez votre nom d'artiste." })
+        expect(await errors(artist)).toEqual({ ok: false, error: "Indiquez le nom d'artiste." })
       }
-      expect(await errors(profile({ name: 42 as never }))).toEqual({ ok: false, error: "Indiquez votre nom d'artiste." })
+      expect(await errors(profile({ name: 42 as never }))).toEqual({ ok: false, error: "Indiquez le nom d'artiste." })
       expect(await errors(profile({ phone: 4185550123 as never }))).toEqual({ ok: false, error: 'Indiquez votre numéro de téléphone.' })
       expect(await errors(profile({ links: { myspace: 'dj' } as never }))).toEqual({ ok: false, error: 'Un des liens est invalide.' })
       expect(rows).toHaveLength(0)

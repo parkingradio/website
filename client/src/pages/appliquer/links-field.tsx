@@ -11,12 +11,14 @@ type Props = {
   showErrors: boolean
   // Whether the links are wrong as a whole, e.g. when there's none.
   invalid: boolean
+  // Put before the fields' ids, when there are several sets of links on the page.
+  idPrefix?: string
 }
 
 // One field per site, showing the site's address around the profile name. What's typed is reduced to what's kept, e.g.
 // an address to the profile name, as soon as it's pasted, or else when leaving the field. Until then, an address shows
 // without the site's address around it, which would show twice. A paste that can't be read says why right away.
-export function LinksField({ values, onChange, showErrors, invalid }: Props) {
+export function LinksField({ values, onChange, showErrors, invalid, idPrefix = '' }: Props) {
   // The fields shown on top of the default ones.
   const [shown, setShown] = useState<LinkSiteId[]>([])
   const [left, setLeft] = useState<Set<LinkSiteId>>(new Set())
@@ -41,7 +43,7 @@ export function LinksField({ values, onChange, showErrors, invalid }: Props) {
           return (
             <div key={site.id} className={showError ? 'link bad' : value ? 'link ok' : 'link'}>
               <div className="link-head">
-                <label htmlFor={`link-${site.id}`}>{site.name}</label>
+                <label htmlFor={`${idPrefix}link-${site.id}`}>{site.name}</label>
                 {!DEFAULT_LINK_SITES.includes(site.id) && (
                   <button
                     type="button"
@@ -60,7 +62,7 @@ export function LinksField({ values, onChange, showErrors, invalid }: Props) {
               <div className={site.profile ? 'affix' : 'affix full'}>
                 {affixes && site.prefix && <span className="prefix">{site.prefix}</span>}
                 <input
-                  id={`link-${site.id}`}
+                  id={`${idPrefix}link-${site.id}`}
                   type="text"
                   autoComplete="off"
                   spellCheck={false}

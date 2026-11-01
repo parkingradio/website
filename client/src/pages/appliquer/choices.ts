@@ -1,5 +1,6 @@
 import type { PrestationId } from '../../application-fields'
 import type { ApplicantKind } from '../../applicant'
+import { countryOptions } from '../../artist-profile'
 import type { GenreId, LinkSiteId } from '../../artist-profile'
 
 // What the "Appliquer" form offers, and the limits it sets, on top of the rules that every profile and application has to
@@ -9,6 +10,7 @@ import type { GenreId, LinkSiteId } from '../../artist-profile'
 // An artist usually gets an hour of a time slot in the programmation, a collective a whole one, which is about 4 hours.
 // Once their date is confirmed, collectives make their own flyer.
 export const SLOT_HOURS: Record<ApplicantKind, number> = { artist: 1, collective: 4 }
+// A collective has 1 to MAX_MEMBERS artists, each with their profile.
 export const MAX_MEMBERS = 4
 
 export const MAX_GENRES = 3
@@ -38,6 +40,8 @@ export const DEFAULT_LINK_SITES: LinkSiteId[] = ['soundcloud', 'instagram', 'web
 
 // Listed first among the countries.
 export const PRIORITY_COUNTRIES = ['CA', 'US', 'FR', 'BE', 'CH']
+// Every country, with their codes, e.g. to find the United States by typing "US".
+export const COUNTRY_OPTIONS = countryOptions(PRIORITY_COUNTRIES).map((option) => ({ ...option, detail: option.key }))
 
 // The programmation's time slots, in Québec time. A collective takes a whole slot, an artist an hour of one. They're
 // sent as the times they start and end.

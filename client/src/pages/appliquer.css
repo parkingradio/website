@@ -1091,51 +1091,112 @@
   box-shadow: none;
 }
 
-/* a collective's artists */
+/* a collective's artists: tabs, above the profile of the one selected */
 
-.appliquer .members {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 1.25rem;
-}
-
-.appliquer .member {
+.appliquer .member-tablist {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* A tab: the button that selects the artist, and the one that takes them out of the collective. */
+.appliquer .member-tab {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 15rem;
+  margin-bottom: -1px;
+  border: 1px solid var(--black);
+  background: var(--paper);
+}
+
+/* Open onto the profile under it. */
+.appliquer .member-tab[data-selected] {
+  position: relative;
+  z-index: 1;
+  border-bottom-color: var(--paper);
+}
+
+.appliquer .member-tab-select {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.appliquer .member-number {
-  flex: none;
-  width: 1.2em;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.appliquer .member-remove {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 4px 6px 10px;
+  border: 0;
   background: none;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.appliquer .member-remove:hover {
-  border-color: var(--black);
+.appliquer .member-tab:not([data-selected]):hover {
+  background: var(--hover);
 }
 
-.appliquer .member-remove svg {
-  width: 10px;
-  height: 10px;
+.appliquer .member-tab[data-selected] .member-tab-select {
+  font-weight: 700;
 }
 
-.appliquer .add-member {
-  align-self: flex-start;
-  margin-top: 4px;
+.appliquer .member-tab b {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+}
+
+.appliquer .member-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appliquer .member-state {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.appliquer .member-tab.done .member-state {
+  color: var(--ink);
+}
+
+.appliquer .member-tab.invalid {
+  border-color: var(--error);
+}
+
+.appliquer .member-tab.invalid[data-selected] {
+  border-bottom-color: var(--paper);
+}
+
+.appliquer .member-tab.invalid .member-state {
+  color: var(--error);
+}
+
+.appliquer .member-tab-remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.appliquer .member-tab-remove:hover {
+  color: var(--ink);
+}
+
+.appliquer .member-tab-remove svg {
+  width: 9px;
+  height: 9px;
+}
+
+.appliquer .member-tab-add {
+  margin-bottom: 3px;
   padding: 2px 8px;
   border: 1px dashed var(--black);
   background: none;
@@ -1143,9 +1204,16 @@
   cursor: pointer;
 }
 
-.appliquer .add-member:hover {
+.appliquer .member-tab-add:hover {
   border-style: solid;
   background: var(--hover);
+}
+
+.appliquer .member-panel {
+  min-width: 0;
+  margin: 0;
+  padding: 1rem 10px 1.1rem;
+  border: 1px solid var(--black);
 }
 
 .appliquer .flyer-note {
@@ -1158,8 +1226,7 @@
 }
 
 @media (max-width: 760px) {
-  .appliquer .applicant-types,
-  .appliquer .members {
+  .appliquer .applicant-types {
     grid-template-columns: 1fr;
   }
 

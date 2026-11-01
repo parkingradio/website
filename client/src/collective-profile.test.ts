@@ -65,7 +65,7 @@ describe('checkCollectiveProfile, as the server answers', () => {
   })
 
   it('still checks what is there, with the description’s own messages', () => {
-    expect(error({ country: 'XX' })).toBe('Choisissez votre pays.')
+    expect(error({ country: 'XX' })).toBe('Choisissez le pays.')
     expect(error({ description: 'x'.repeat(5001) })).toBe('La description dépasse 5000 caractères.')
     expect(error({ description: 'a\0' })).toBe('La description contient un caractère invalide.')
     expect(error({ links: { soundcloud: 'https://instagram.com/ondes' } })).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")

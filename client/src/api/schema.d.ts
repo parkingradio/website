@@ -2799,6 +2799,8 @@ export interface paths {
                          * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
                          */
                         photo?: Blob;
+                        /** @description For a collective, its artists' photos, a part each, in the order of its artists, where an empty part is no photo. Those after the last photo can be left out */
+                        memberPhoto?: Blob[];
                         /** @description The token the Turnstile widget gave the page */
                         turnstileToken: string;
                     };
@@ -3128,8 +3130,33 @@ export interface components {
             kind: "collective";
             /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
             name: string;
-            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
-            members: string[];
+            country: components["schemas"]["Country"];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            city: string;
+            /** @description Trimmed, then between 1 and 5000 characters */
+            description: string;
+            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            links: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            };
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
+            phone: string;
+            /** @description In order, at least one */
+            members: components["schemas"]["ApplicantMember"][];
+        };
+        ApplicantMember: {
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
             country: components["schemas"]["Country"];
             /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
             city: string;
@@ -3148,10 +3175,6 @@ export interface components {
                 spotify?: string;
                 tiktok?: string;
             };
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
-            phone: string;
         };
         Application: {
             id: string;

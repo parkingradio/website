@@ -2,7 +2,6 @@ import { asc, eq, inArray, sql } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import { EmailTaken, artistsStore } from '../artists/store.js'
 import type { ArtistsStore, StoredPhoto } from '../artists/store.js'
-import type { GenreId } from '../artists/profile.js'
 import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
@@ -70,14 +69,14 @@ async function lockMembers(tx: Queryable, members: SentMember[]) {
   if (found.length < ids.length) throw new InvalidMember(NO_SUCH_MEMBER)
 }
 
-// A new member of a collective, known only by their name, as the artist to create: everything but their name, and the
-// `genres` they're given, is left out, as admins can leave it out (see `AdminArtistProfile` in artists/profile.ts).
-export function newMember(name: string, createdBy: string | null, genres: GenreId[] = []): Parameters<ArtistsStore['create']>[0] {
+// A new member of a collective, known only by their name, as the artist to create: everything but their name is left
+// out, as admins can leave it out (see `AdminArtistProfile` in artists/profile.ts).
+function newMember(name: string, createdBy: string | null): Parameters<ArtistsStore['create']>[0] {
   return {
     name,
     country: '',
     city: '',
-    genres,
+    genres: [],
     bio: '',
     links: {},
     email: null,

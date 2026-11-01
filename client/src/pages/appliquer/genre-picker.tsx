@@ -2,10 +2,11 @@ import { genreName } from '../../artist-profile'
 import type { GenreId } from '../../artist-profile'
 import { GENRE_GROUPS, MAX_GENRES } from './choices'
 
-type Props = { value: GenreId[]; onChange: (genres: GenreId[]) => void; invalid: boolean }
+// `whose` says whose main genre the first one is, e.g. "son" for one of a collective's artists.
+type Props = { value: GenreId[]; onChange: (genres: GenreId[]) => void; invalid: boolean; whose?: string }
 
 // Up to MAX_GENRES genres, in the order they're picked: the first one is the artist's main genre.
-export function GenrePicker({ value, onChange, invalid }: Props) {
+export function GenrePicker({ value, onChange, invalid, whose = 'votre' }: Props) {
   const full = value.length >= MAX_GENRES
   const toggle = (genre: GenreId) =>
     onChange(value.includes(genre) ? value.filter((picked) => picked !== genre) : full ? value : [...value, genre])
@@ -14,7 +15,7 @@ export function GenrePicker({ value, onChange, invalid }: Props) {
     <>
       {/* Focusable, so that the form can bring the artist here when no genre is picked. */}
       <div className={invalid ? 'genres-picked invalid' : 'genres-picked'} aria-invalid={invalid || undefined} tabIndex={-1}>
-        {value.length === 0 && <span className="placeholder">cliquez sur un genre ci-dessous · le premier choisi sera votre genre principal</span>}
+        {value.length === 0 && <span className="placeholder">cliquez sur un genre ci-dessous · le premier choisi sera {whose} genre principal</span>}
         {value.map((genre, index) => (
           <button key={genre} type="button" onClick={() => toggle(genre)} aria-label={`Enlever ${genreName(genre)}`}>
             <b>{index + 1}</b>

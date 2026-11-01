@@ -37,6 +37,16 @@ describe('api', () => {
     expect(form.has('removePhoto')).toBe(false)
   })
 
+  it('sends a list of files with `formData` as a part for each, in order', async () => {
+    mockFetch({ 'POST /api/applications': { ok: true } })
+    const photos = [new Blob(), new File(['photo'], 'photo.png', { type: 'image/png' })]
+    const body = { artist: { kind: 'artist' }, application: {}, memberPhoto: photos, turnstileToken: 'token' }
+    await api.POST('/api/applications', { body: body as never, bodySerializer: formData })
+    const form = requestsTo('POST', '/api/applications')[0].body as FormData
+    expect(form.getAll('memberPhoto').map((file) => (file as File).size)).toEqual([0, 5])
+    expect(form.getAll('memberPhoto')[1]).toBe(photos[1])
+  })
+
   it('only sends a multipart/form-data body with `formData`', () => {
     const typeCheck = () => {
       const artist = { kind: 'artist' as const, name: 'Aurore', bio: 'Une bio.', email: 'aurore@example.com' }

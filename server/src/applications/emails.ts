@@ -1,5 +1,5 @@
 import { LINK_SITES } from '../artists/profile.js'
-import type { ApplicantProfile, GenreId } from '../artists/profile.js'
+import type { GenreId, Profile } from '../artists/profile.js'
 import type { Email } from '../core/email.js'
 import type { Applied } from './applicant.js'
 import type { ApplicationFields, PrestationId } from './fields.js'
@@ -71,44 +71,66 @@ const PRESTATION_NAMES: Record<PrestationId, string> = {
   'full-band': 'Full Band',
 }
 
-// The profile that's described, the same way for an artist and for a collective: the collective's are its contact's
-// email and phone, and its description.
-function described(applied: Applied): ApplicantProfile {
-  if ('artist' in applied) return applied.artist
-  const { collective, members } = applied
-  // Its artists', since a collective has none of its own, each one once.
-  const genres = [...new Set(members.flatMap((member) => member.genres))]
-  return { ...collective, genres, bio: collective.description }
+function place({ city, country }: Pick<Profile, 'city' | 'country'>): string {
+  return `Ville : ${city}, ${countryNames.of(country) ?? country}`
 }
 
-// Who applied, as they were saved, and their application, as plain text: everything that was sent but the photo, which
-// isn't emailed, since it's on the admin pages.
+function genres(profile: Pick<Profile, 'genres'>): string {
+  return `Genres : ${profile.genres.map((id) => GENRE_NAMES[id]).join(', ')}`
+}
+
+function links(profile: Pick<Profile, 'links'>): string[] {
+  return ['Liens :', ...LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)]
+}
+
+// Who applied, as they were saved, and their application, as plain text: everything that was sent but the photos, which
+// aren't emailed, since they're on the admin pages. For a collective, that's its own profile and its application, then
+// each of its artists' profiles.
 export function describeApplication(applied: Applied, application: ApplicationFields): string {
-  const collective = 'collective' in applied
-  const profile = described(applied)
-  const genres = profile.genres.map((id) => GENRE_NAMES[id])
   const prestations = application.prestations.map((id) => PRESTATION_NAMES[id])
   if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
-  const links = LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)
-  return [
-    collective ? `Collectif : ${profile.name}` : `Artiste : ${profile.name}`,
-    ...('collective' in applied ? [`Artistes du collectif : ${applied.members.map((member) => member.name).join(', ')}`] : []),
-    `Ville : ${profile.city}, ${countryNames.of(profile.country) ?? profile.country}`,
-    `Genres : ${genres.join(', ')}`,
-    `${collective ? 'E-mail du contact' : 'E-mail'} : ${profile.email}`,
-    `${collective ? 'Téléphone du contact' : 'Téléphone'} : ${profile.phone}`,
-    '',
-    'Liens :',
-    ...links,
+  const sent = [
     '',
     'Dates souhaitées :',
     ...application.dates.map((date) => `  ${dayFormat.format(new Date(date))}`),
     `Plages horaires : ${application.timeSlots.length === 0 ? 'à toute heure' : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}`,
     `Type de prestation : ${prestations.join(', ') || '—'}`,
+  ]
+  const details = application.details ? ['', 'Questions ou détails :', application.details] : []
+
+  if ('artist' in applied) {
+    const { artist } = applied
+    return [
+      `Artiste : ${artist.name}`,
+      place(artist),
+      genres(artist),
+      `E-mail : ${artist.email}`,
+      `Téléphone : ${artist.phone}`,
+      '',
+      ...links(artist),
+      ...sent,
+      '',
+      'Bio :',
+      artist.bio,
+      ...details,
+    ].join('\n')
+  }
+  const { collective, members } = applied
+  return [
+    `Collectif : ${collective.name}`,
+    `Artistes du collectif : ${members.map((member) => member.name).join(', ')}`,
+    place(collective),
+    `E-mail du contact : ${collective.email}`,
+    `Téléphone du contact : ${collective.phone}`,
     '',
-    collective ? 'Description :' : 'Bio :',
-    profile.bio,
-    ...(application.details ? ['', 'Questions ou détails :', application.details] : []),
+    ...links(collective),
+    ...sent,
+    '',
+    'Description :',
+    collective.description,
+    // Before its artists' profiles, so that they don't read as the last artist's.
+    ...details,
+    ...members.flatMap((member, index) => ['', `Artiste ${index + 1} : ${member.name}`, place(member), genres(member), ...links(member), 'Bio :', member.bio]),
   ].join('\n')
 }
 
@@ -128,7 +150,7 @@ export function applicationEmails({
   recipients: string[]
 }): { toRecipients: Email | null; confirmation: Email } {
   const anyone = recipients.length > 0
-  const { name, email } = described(applied)
+  const { name, email } = 'artist' in applied ? applied.artist : applied.collective
   return {
     toRecipients: anyone
       ? {

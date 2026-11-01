@@ -95,14 +95,18 @@ function method<M extends Method>(name: M) {
 
 export const api = { GET: method('get'), PUT: method('put'), POST: method('post'), DELETE: method('delete') }
 
-// Sends a body as multipart/form-data (see `api`): each of its fields as a part, files as they are, and anything else
-// that isn't text, e.g. a profile, as JSON, in a field rather than a file. Fields that are undefined are left out. The
-// browser sets the Content-Type, since it says where the parts start.
+// Sends a body as multipart/form-data (see `api`): each of its fields as a part, files as they are, a list of files as a
+// part for each, in order (none for an empty list), and anything else that isn't text, e.g. a profile, as JSON, in a field rather than a file.
+// Fields that are undefined are left out. The browser sets the Content-Type, since it says where the parts start.
 export function formData(body: Record<string, unknown>): FormData {
   const form = new FormData()
   for (const [name, value] of Object.entries(body)) {
     if (value === undefined) continue
-    form.append(name, value instanceof Blob ? value : typeof value === 'string' ? value : JSON.stringify(value))
+    if (Array.isArray(value) && value.every((item) => item instanceof Blob)) {
+      for (const file of value) form.append(name, file)
+    } else {
+      form.append(name, value instanceof Blob ? value : typeof value === 'string' ? value : JSON.stringify(value))
+    }
   }
   return form
 }

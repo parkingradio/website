@@ -1,4 +1,4 @@
-import { test, expect, admin, adminMenu, logIn, submitLogin } from './fixtures.ts'
+import { test, expect, admin, adminMenu, logIn, submitLogin, PHOTO } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
 // photo, the database, the private bucket and back, then removing the photo, searching the seeded artists and
@@ -56,12 +56,6 @@ test.describe('logging in', () => {
     await expect(page.getByRole('alert')).toBeHidden()
   })
 })
-
-// The smallest PNG there is: one transparent pixel. The server tells a photo's type from its first bytes.
-const PHOTO = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-  'base64',
-)
 
 test('an artist is added, shown, has their photo removed, and is deleted', async ({ page }, testInfo) => {
   // Tests run side by side on the same database, where artists' emails must be unique. Their names are too, so that the
@@ -188,8 +182,8 @@ test("a collective's application is listed with its city and its artists' genres
 })
 
 // With Collectif Béton, which applied through the "Appliquer" form (see seed-data.ts), which created its artists, with
-// the genres it sent.
-test('a collective that applied through the form has its artists, with its genres, and its applications', async ({ page }) => {
+// their profiles and the photo of the second one.
+test('a collective that applied through the form has its artists, with their profiles, and its applications', async ({ page }) => {
   await logIn(page, { at: '/admin/artistes' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('collectif beton')
   await page.getByRole('link', { name: 'Collectif Béton', exact: true }).click()
@@ -204,6 +198,8 @@ test('a collective that applied through the form has its artists, with its genre
   await members.getByText('Rosalie').click()
   await expect(page.getByRole('heading', { name: 'Rosalie', exact: true })).toBeVisible()
   await expect(page.getByText(/^artiste, inscrit par le formulaire/)).toBeVisible()
+  await expect(page.getByText('EBM, industriel et basses saturées.')).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Photo de Rosalie' })).toBeVisible()
 })
 
 test('a collective is added with an artist picked and one added by name, shown, changed, and deleted without its artists', async ({

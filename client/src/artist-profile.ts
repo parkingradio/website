@@ -286,14 +286,14 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
       if (host !== domain && !host.endsWith(`.${domain}`)) return { error: `ce n'est pas une adresse ${site.name}` }
       // E.g. bandcamp.com/<artist> or daily.bandcamp.com, rather than the artist's own subdomain.
       value = host === domain ? '' : host.slice(0, -domain.length - 1).replace(/^www\./, '')
-      if (!value || isReserved(site, value)) return { error: `copiez l'adresse de votre page de profil, qui finit par .${domain}` }
+      if (!value || isReserved(site, value)) return { error: `copiez l'adresse de la page de profil, qui finit par .${domain}` }
     } else {
-      if (host === site.shortLinkHost) return { error: 'lien court : copiez plutôt l’adresse de votre page de profil' }
+      if (host === site.shortLinkHost) return { error: 'lien court : copiez plutôt l’adresse de la page de profil' }
       if (!site.host?.test(host)) return { error: `ce n'est pas une adresse ${site.name}` }
-      if (url.pathname === '/') return { error: 'il manque votre nom de profil' }
+      if (url.pathname === '/') return { error: 'il manque le nom de profil' }
       // E.g. a post, a track or an event, rather than the profile itself.
       const match = site.path?.exec(url.pathname)
-      if (!match || isReserved(site, match[1])) return { error: `copiez l'adresse de votre page de profil, qui commence par ${site.prefix}` }
+      if (!match || isReserved(site, match[1])) return { error: `copiez l'adresse de la page de profil, qui commence par ${site.prefix}` }
       try {
         value = decodeURIComponent(match[1])
       } catch {
@@ -305,7 +305,7 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
     value = value.replace(/^@/, '')
   }
 
-  if (!value) return { error: 'il manque votre nom de profil' }
+  if (!value) return { error: 'il manque le nom de profil' }
   return profile.test(value) && !isReserved(site, value) ? { value } : { error: `ce nom de profil ${site.name} n'est pas valide` }
 }
 
@@ -328,11 +328,31 @@ export function missingError(value: unknown, error: string, { lenient = false } 
 export function checkCountry(value: unknown, { lenient = false } = {}): Checked<Country | ''> {
   const country = COUNTRIES.find((code) => code === value)
   if (country) return { value: country }
-  return leftOut(value, typeof value === 'string' && !value.trim(), lenient) ? { value: '' } : { error: 'Choisissez votre pays.' }
+  return leftOut(value, typeof value === 'string' && !value.trim(), lenient) ? { value: '' } : { error: 'Choisissez le pays.' }
 }
 
 export function checkCity(value: unknown, { lenient = false } = {}): Checked<string> {
-  return checkLine(value, 'La ville', CITY_MAX_LENGTH, missingError(value, 'Indiquez votre ville.', { lenient }))
+  return checkLine(value, 'La ville', CITY_MAX_LENGTH, missingError(value, 'Indiquez la ville.', { lenient }))
+}
+
+export function checkArtistName(value: unknown): Checked<string> {
+  return checkLine(value, "Le nom d'artiste", NAME_MAX_LENGTH, "Indiquez le nom d'artiste.")
+}
+
+// Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
+export function checkGenres(value: unknown, { lenient = false } = {}): Checked<GenreId[]> {
+  const genres: GenreId[] = []
+  for (const sentGenre of Array.isArray(value) ? value : []) {
+    const genre = GENRES.find((id) => id === sentGenre)
+    if (!genre) return { error: "Un des genres n'est pas dans la liste." }
+    if (!genres.includes(genre)) genres.push(genre)
+  }
+  if (genres.length === 0 && !leftOut(value, Array.isArray(value), lenient)) return { error: 'Choisissez au moins un genre.' }
+  return { value: genres }
+}
+
+export function checkBio(value: unknown, { lenient = false } = {}): Checked<string> {
+  return checkText(value, 'La bio', BIO_MAX_LENGTH, missingError(value, 'Écrivez quelques lignes de bio.', { lenient }))
 }
 
 // In the order of LINK_SITES, then links to other sites, like the server, which says what's wrong with the first.
@@ -379,20 +399,12 @@ export function checkProfile(
   const artist: Partial<Record<keyof Profile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
   const { errors, check } = fieldChecker<Profile>()
 
-  const name = check('name', checkLine(artist.name, "Le nom d'artiste", NAME_MAX_LENGTH, "Indiquez votre nom d'artiste."))
+  const name = check('name', checkArtistName(artist.name))
   const country = check('country', checkCountry(artist.country, { lenient }))
   const city = check('city', checkCity(artist.city, { lenient }))
 
-  // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
-  const genres: GenreId[] = []
-  for (const sentGenre of Array.isArray(artist.genres) ? artist.genres : []) {
-    const genre = GENRES.find((id) => id === sentGenre)
-    if (!genre) errors.genres ??= "Un des genres n'est pas dans la liste."
-    else if (!genres.includes(genre)) genres.push(genre)
-  }
-  if (genres.length === 0 && !leftOut(artist.genres, Array.isArray(artist.genres), lenient)) errors.genres ??= 'Choisissez au moins un genre.'
-
-  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, missingError(artist.bio, 'Écrivez quelques lignes de bio.', { lenient })))
+  const genres = check('genres', checkGenres(artist.genres, { lenient }))
+  const bio = check('bio', checkBio(artist.bio, { lenient }))
   const links = check('links', checkLinks(artist.links, { lenient }))
   const email = check('email', checkEmail(artist.email, { lenient }))
   const phone = check('phone', checkPhone(artist.phone, { lenient }))

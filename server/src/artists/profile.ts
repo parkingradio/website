@@ -35,7 +35,7 @@ const COUNTRIES = [
   'TL', 'TM', 'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY', 'UZ', 'VA', 'VC', 'VE', 'VG', 'VI',
   'VN', 'VU', 'WF', 'WS', 'XK', 'YE', 'YT', 'ZA', 'ZM', 'ZW',
 ] as const
-const NO_COUNTRY = 'Choisissez votre pays.'
+const NO_COUNTRY = 'Choisissez le pays.'
 export const Country = z.enum(COUNTRIES, { error: NO_COUNTRY }).meta({ id: 'Country' })
 export type Country = z.infer<typeof Country>
 
@@ -280,14 +280,14 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
       if (host !== domain && !host.endsWith(`.${domain}`)) return { error: `ce n'est pas une adresse ${site.name}` }
       // E.g. bandcamp.com/<artist> or daily.bandcamp.com, rather than the artist's own subdomain.
       value = host === domain ? '' : host.slice(0, -domain.length - 1).replace(/^www\./, '')
-      if (!value || isReserved(site, value)) return { error: `copiez l'adresse de votre page de profil, qui finit par .${domain}` }
+      if (!value || isReserved(site, value)) return { error: `copiez l'adresse de la page de profil, qui finit par .${domain}` }
     } else {
-      if (host === site.shortLinkHost) return { error: 'lien court : copiez plutôt l’adresse de votre page de profil' }
+      if (host === site.shortLinkHost) return { error: 'lien court : copiez plutôt l’adresse de la page de profil' }
       if (!site.host?.test(host)) return { error: `ce n'est pas une adresse ${site.name}` }
-      if (url.pathname === '/') return { error: 'il manque votre nom de profil' }
+      if (url.pathname === '/') return { error: 'il manque le nom de profil' }
       // E.g. a post, a track or an event, rather than the profile itself.
       const match = site.path?.exec(url.pathname)
-      if (!match || isReserved(site, match[1])) return { error: `copiez l'adresse de votre page de profil, qui commence par ${site.prefix}` }
+      if (!match || isReserved(site, match[1])) return { error: `copiez l'adresse de la page de profil, qui commence par ${site.prefix}` }
       try {
         value = decodeURIComponent(match[1])
       } catch {
@@ -299,7 +299,7 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
     value = value.replace(/^@/, '')
   }
 
-  if (!value) return { error: 'il manque votre nom de profil' }
+  if (!value) return { error: 'il manque le nom de profil' }
   return profile.test(value) && !isReserved(site, value) ? { value } : { error: `ce nom de profil ${site.name} n'est pas valide` }
 }
 
@@ -346,7 +346,7 @@ export function country({ canLeaveOut }: { canLeaveOut: boolean }) {
 }
 
 export function city({ canLeaveOut }: { canLeaveOut: boolean }) {
-  const city = line('La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.', { canBeEmpty: canLeaveOut })
+  const city = line('La ville', CITY_MAX_LENGTH, 'Indiquez la ville.', { canBeEmpty: canLeaveOut })
   return canLeaveOut ? orLeftOut(city, '') : city
 }
 
@@ -405,9 +405,11 @@ export function links({ canLeaveOut }: { canLeaveOut: boolean }) {
   return canLeaveOut ? orLeftOut(object, {} as Links) : object.refine((links) => Object.keys(links).length > 0, NO_LINK)
 }
 
+// The error of a profile that's missing everything, starting with the name.
+export const NO_NAME = "Indiquez le nom d'artiste."
+
 // The profile of an artist, as it's sent, with what admins `canLeaveOut`.
 function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
-  const NO_NAME = "Indiquez votre nom d'artiste."
   const bio = text('La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.', { canBeEmpty: canLeaveOut })
   // Most important first. Duplicates are dropped, keeping the first.
   const genres = z.array(GenreId, { error: NO_GENRE }).overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))

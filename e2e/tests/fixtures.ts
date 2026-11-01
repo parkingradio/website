@@ -51,6 +51,9 @@ export const test = base.extend<Options>({
 
 export { expect, admin }
 
+// The smallest PNG there is: one transparent pixel. The server tells a photo's type from its first bytes.
+export const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
+
 // The address of a worker's nth test, in 198.18.0.0/15, which is reserved for testing. No other worker of the run has
 // the same index, and a retry runs in a new worker, so no two tests share an address. The range has room for 256
 // workers of 512 tests each, far more than a run has.

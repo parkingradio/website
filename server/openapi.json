@@ -471,16 +471,6 @@
                 "maxLength": 100,
                 "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
               },
-              "members": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "maxLength": 100,
-                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
-                },
-                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
-              },
               "country": {
                 "$ref": "#/components/schemas/Country"
               },
@@ -490,14 +480,7 @@
                 "maxLength": 100,
                 "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
               },
-              "genres": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/GenreId"
-                }
-              },
-              "bio": {
+              "description": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 5000,
@@ -548,21 +531,103 @@
                 "minLength": 1,
                 "maxLength": 40,
                 "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
+              },
+              "members": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ApplicantMember"
+                },
+                "description": "In order, at least one"
               }
             },
             "required": [
               "kind",
               "name",
-              "members",
               "country",
               "city",
-              "genres",
-              "bio",
+              "description",
               "links",
               "email",
-              "phone"
+              "phone",
+              "members"
             ]
           }
+        ]
+      },
+      "ApplicantMember": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+          },
+          "country": {
+            "$ref": "#/components/schemas/Country"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+          },
+          "genres": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenreId"
+            }
+          },
+          "bio": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Trimmed, then between 1 and 5000 characters"
+          },
+          "links": {
+            "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+            "type": "object",
+            "properties": {
+              "soundcloud": {
+                "type": "string"
+              },
+              "instagram": {
+                "type": "string"
+              },
+              "web": {
+                "type": "string"
+              },
+              "bandcamp": {
+                "type": "string"
+              },
+              "mixcloud": {
+                "type": "string"
+              },
+              "ra": {
+                "type": "string"
+              },
+              "youtube": {
+                "type": "string"
+              },
+              "spotify": {
+                "type": "string"
+              },
+              "tiktok": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "country",
+          "city",
+          "genres",
+          "bio",
+          "links"
         ]
       },
       "Application": {
@@ -5028,6 +5093,15 @@
                     "type": "string",
                     "format": "binary",
                     "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  },
+                  "memberPhoto": {
+                    "description": "For a collective, its artists' photos, a part each, in the order of its artists, where an empty part is no photo. Those after the last photo can be left out",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary",
+                      "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    }
                   },
                   "turnstileToken": {
                     "type": "string",

@@ -111,9 +111,9 @@ application doesn't exist.
 
 A new artist or collective applies with `POST /api/applications`. For an artist applying alone, it creates the artist,
 with their profile and photo, if they sent one, and their application. For a collective, it creates the collective,
-with its profile and photo, if it sent one, an artist for each of its artists, and its application, which belongs to the
-collective (see [`POST /api/applications`](#post-apiapplications)). Everything it creates has a null `createdBy`, since
-nobody on the team created it.
+with its profile and photo, if it sent one, an artist for each of its artists, with their profiles and photos, and its
+application, which belongs to the collective (see [`POST /api/applications`](#post-apiapplications)). Everything it
+creates has a null `createdBy`, since nobody on the team created it.
 
 Anyone can call this endpoint, so it has two protections against bots and floods:
 
@@ -131,50 +131,57 @@ sent the request that this email belongs to an artist, or to a collective. To ma
 only checks the email after Turnstile has accepted the token.
 
 **When the page needs a new token.** Cloudflare only accepts each token once. To let artists fix their mistakes, the
-server checks the profile, the application and the photo before it sends the token to Cloudflare. So if the request
-fails because one of those isn't valid, the page can send it again with the same token. After any other error, the
-token may already be used up, and the page needs to get a new one from the widget.
+server checks the profile, each artist's profile for a collective, the application and all the photos before it sends
+the token to Cloudflare. So if the request fails because one of those isn't valid, the page can send it again with the
+same token. After any other error, the token may already be used up, and the page needs to get a new one from the
+widget.
 
 ## `POST /api/applications`
 
-A new artist or collective applies (see [Applying](#applying)). The request is `multipart/form-data`, with four parts:
+A new artist or collective applies (see [Applying](#applying)). The request is `multipart/form-data`, with these parts:
 
 | Part | |
 |---|---|
 | `artist` | Who applies, as JSON, in a field rather than a file: see below |
 | `application` | The application's fields, as JSON, the same way |
 | `photo` | The photo of the artist, or of the collective, which can be left out (see [Photos](artists.md#photos)) |
+| `memberPhoto` | For a collective, its artists' photos: one part for each of its artists, in their order, where an empty part is no photo. Those after the last photo can be left out |
 | `turnstileToken` | The token Turnstile gave the page |
 
-A few other fields or files, e.g. a form's submit button, are ignored. A second photo isn't: the request fails. On
-success, the response is `{"ok": true}`, and the emails are sent (see [Emails](#emails)).
+A few other fields or files, e.g. a form's submit button, are ignored. A second `photo` isn't, and neither is a
+`memberPhoto` part for an artist the collective doesn't have, or any from an artist applying alone: the request fails.
+On success, the response is `{"ok": true}`, and the emails are sent (see [Emails](#emails)).
 
-Who applies follows the `Applicant` schema of `server/src/applications/applicant.ts`, and has:
+The server reads at most 10 files and 10 fields, each file up to 10 MB and each field up to 256 KB: a request with more
+files or fields, or a longer field, fails as malformed. Since the profiles are all in the `artist` field, that bounds
+how many artists a collective can send at once. In production, the whole request also has to fit in nginx's limit,
+photos included (see [Conventions](README.md#conventions)).
 
-| Field | Type | |
-|---|---|---|
-| `kind` | `"artist"` or `"collective"` | Whether an artist applies alone, or a collective |
-| `name` | string | The artist's name, or the collective's, like an artist's (see [Profiles](artists.md#profiles)) |
-| `members` | list of strings | For a collective, the names of its artists, in order, each one like an artist's name: at least one, once what isn't a string, blank names and duplicates, whatever their case, are dropped. Ignored for an artist |
-| `country`, `city`, `genres`, `bio`, `links`, `email`, `phone` | | Like an artist's (see [Profiles](artists.md#profiles)), and none of them can be left out |
+Who applies follows the `Applicant` schema of `server/src/applications/applicant.ts`. `kind` says whether it's an artist
+applying alone (`"artist"`), or a collective (`"collective"`):
 
-The errors about a collective's name and its artists' names say so, e.g. "Indiquez le nom du collectif.": the others are
-an artist's. What the server creates from it is:
+- An artist sends their profile, with every field of an artist's profile (see [Profiles](artists.md#profiles)), none of
+  them left out.
+- A collective sends its profile, with every field of a collective's profile but its members (see
+  [Profiles](collectives.md#profiles)), none of them left out, the email and phone being its contact's. Its `members`
+  are its artists, in order, at least one, each with an artist's `name`, `country`, `city`, `genres`, `bio` and `links`,
+  none of them left out, but no email or phone: the team only reaches the collective's contact.
 
-- For an artist: the artist, whose profile is all of the above but `kind` and `members`.
-- For a collective: the collective, whose profile has the name, country, city and links sent, the bio as its
-  description, and the email and phone as its contact's (see [Profiles](collectives.md#profiles)). Its members are its
-  artists, in order, each one a new artist, even when another artist has that name, with only that name and the genres
-  sent, and everything else left out, as admins can (see [Profiles](artists.md#profiles)): a collective has no genres of
-  its own, since its genres are its artists'. The photo is the collective's.
+Other fields are ignored. What the server creates from it is:
 
-Errors are in French, since artists see them:
+- For an artist: the artist, with their profile and their photo.
+- For a collective: the collective, with its profile and its photo. Its members are its artists, in order, each one a
+  new artist, even when another artist has that name, with their profile, without an email or a phone, and the photo
+  sent for them, which is theirs. A collective has no genres of its own, since its genres are its artists'.
+
+Errors are in French, since artists see them. An error about one of a collective's artists starts with which one it is,
+counting from 1 in their order, e.g. "Artiste 2 : Indiquez la ville.":
 
 | Status | When |
 |---|---|
-| 400 | The profile, application or photo isn't valid, the request is malformed, or Turnstile refused the token |
+| 400 | A profile, the application or a photo isn't valid, the request is malformed (including a `memberPhoto` part too many), or Turnstile refused the token |
 | 409 | An artist applying alone has the email of an artist who already exists, or a collective the contact email of a collective that already exists |
-| 413 | The photo is larger than 10 MB, or the request isn't `multipart/form-data` and is too large (see [Conventions](README.md#conventions)) |
+| 413 | A photo is larger than 10 MB, which is answered while the request is read, before anything else, or the request isn't `multipart/form-data` and is too large (see [Conventions](README.md#conventions)) |
 | 429 | The client sent too many requests |
 | 502 | Cloudflare couldn't be reached, or couldn't check the token |
 
@@ -184,8 +191,9 @@ Once an application sent with `POST /api/applications` is saved, the server send
 server's address (see [Conventions](README.md#conventions)):
 
 - To the recipients chosen by admins (see `GET /api/admin/applications/recipients`): the profile and the application,
-  as they were saved, i.e. everything that was sent, except the photo, which admins can see on the admin pages. For a
-  collective, that's the collective's profile, with its contact's email and phone, its artists' names and their genres.
+  as they were saved, i.e. everything that was sent, except the photos, which admins can see on the admin pages. For a
+  collective, that's the collective's profile, with its contact's email and phone, and its application, then each of
+  its artists' profiles.
   Replying to it answers the artist, or the collective's contact. When nobody was chosen, it isn't sent: applications
   are only saved, and confirmed. When the recipients can't be read, it's as if nobody was chosen.
 - To the artist, or the collective's contact: a confirmation that the application was received. Replying to it answers

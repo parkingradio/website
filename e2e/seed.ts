@@ -8,7 +8,7 @@ import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { components, paths } from '../client/src/api/schema.d.ts'
 import { SEED_ARTISTS, SEED_COLLECTIVES } from './seed-data.ts'
-import type { Profile, SeedApplication, SeedArtist, SeedCollective } from './seed-data.ts'
+import type { Profile, SeedApplication, SeedArtist, SeedCollective, SeedMember } from './seed-data.ts'
 
 export type Credentials = { email: string; password: string }
 
@@ -20,7 +20,6 @@ type ApplicationsResponse = paths['/api/admin/applications']['get']['responses']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
-type GenreId = components['schemas']['GenreId']
 type ApiError = components['schemas']['ApiError']
 
 export type SeedOptions = {
@@ -38,7 +37,7 @@ const LOGIN_ADDRESS = '192.0.2.1'
 const formAddress = (nth: number) => `192.0.2.${10 + nth}`
 
 // The token Cloudflare's test site key gives, which its test secret key accepts.
-const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
+export const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -83,7 +82,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       continue
     }
     let collectiveId = collective.form ? undefined : await addCollective(server, collective, artistIds)
-    if (collective.form) await apply(server, applicant(collective, collective.form), collective, formAddress(applied++))
+    if (collective.form) await apply(server, applicant(collective, collective.form), collective, formAddress(applied++), collective.form)
     try {
       if (collectiveId === undefined) {
         // Applying through the form created the collective along with its first application.
@@ -151,8 +150,8 @@ async function addArtist(server: Server, artist: SeedArtist): Promise<string> {
 }
 
 // Adds the collective as an admin would, with its members: the seeded artists' ids, by `seedKey`, in `artistIds`, and
-// returns its id.
-async function addCollective(server: Server, collective: SeedCollective, artistIds: Map<string, string>): Promise<string> {
+// new ones, by name, and returns its id.
+async function addCollective(server: Server, collective: Extract<SeedCollective, { form?: undefined }>, artistIds: Map<string, string>): Promise<string> {
   const members = collective.members.map((member) => {
     if ('name' in member) return member
     const artist = SEED_ARTISTS.find(({ profile }) => (profile.email ?? profile.name) === member.seeded)
@@ -166,24 +165,27 @@ async function addCollective(server: Server, collective: SeedCollective, artistI
   return (await server.call<CollectiveResponse>('POST', '/api/admin/collectives', form)).collective.id
 }
 
-// Who a collective that applies through the form is, as the form sends it: its profile, with its artists' names, and the
-// `genres` it sends for them.
-function applicant(collective: SeedCollective, { genres }: { genres: GenreId[] }) {
-  const { description, ...profile } = collective.profile
-  const members = collective.members.map((member) => {
-    if ('seeded' in member) throw new Error(`${profile.name} applies through the form, so its artists can only be new ones`)
-    return member.name
-  })
-  return { kind: 'collective', ...profile, members, genres, bio: description }
+// Who a collective that applies through the form is, as the form sends it: its profile, with the artists it applies with.
+function applicant(collective: SeedCollective, members: SeedMember[]) {
+  return { kind: 'collective', ...collective.profile, members: members.map((member) => member.profile) }
 }
 
-// Has an artist or a collective apply through the form, from `address`, as `applicant`, with their photo and their first
-// application.
-async function apply(server: Server, applicant: object, { photo: colour, applications }: SeedArtist | SeedCollective, address: string): Promise<void> {
+// Has an artist or a collective apply through the form, from `address`, as `applicant`, with their photo, the photos of
+// the collective's `members`, if any, and their first application.
+async function apply(
+  server: Server,
+  applicant: object,
+  { photo: colour, applications }: SeedArtist | SeedCollective,
+  address: string,
+  members: SeedMember[] = [],
+): Promise<void> {
   const form = new FormData()
   form.set('artist', JSON.stringify(applicant))
   form.set('application', JSON.stringify(applicationFields(applications[0])))
   if (colour) form.set('photo', photo(colour), 'photo.png')
+  // A part for each artist, up to the last one with a photo, and an empty one for an artist without a photo.
+  const last = members.findLastIndex((member) => member.photo)
+  for (const member of members.slice(0, last + 1)) form.append('memberPhoto', member.photo ? photo(member.photo) : new Blob(), 'photo.png')
   form.set('turnstileToken', TURNSTILE_TOKEN)
   // Without the session: artists don't have one.
   await request(server.url, 'POST', '/api/applications', form, { 'CF-Connecting-IP': address })
