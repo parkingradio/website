@@ -134,9 +134,9 @@ Since nothing was applied, deploying the previous image again brings the site ba
 there before deploying again.
 
 Once a migration has succeeded, though, an older image may not work with the database anymore: its server finds no
-migration to apply, but its queries can need what the migration removed. For instance, after `0007_legacy_collectives`,
-which turns the artists whose `kind` was `collective` into collectives and removes `kind` and `members`, every query an
-older server makes on artists fails. A problem found after such a migration is fixed forward, with a new image. Before
+migration to apply, but its queries can need what the migration removed. For instance, after `0004_collectives`, which
+turns the artists whose `kind` was `collective` into collectives and removes `kind` and `members`, every query an older
+server makes on artists fails. A problem found after such a migration is fixed forward, with a new image. Before
 deploying a migration like this one, which removes something older images need, take a manual snapshot of the database,
 and wait for it to be ready:
 
