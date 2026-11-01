@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import { normalize } from './normalize'
 import './combobox.css'
 
 // `detail` is shown next to the label, e.g. a city's region.
@@ -27,17 +28,6 @@ type ComboboxProps = {
       text: { value: string; onChange: (value: string) => void }
     }
 )
-
-// For matching what's typed whatever its case, accents, hyphens, apostrophes and dots, e.g. "etats unis" with
-// "États-Unis", or "cote d ivoire" with "Côte d’Ivoire".
-function normalize(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/[-'’.\s]+/g, ' ')
-    .trim()
-}
 
 // The options whose label contains `query`, those that start with it first, or whose key is `query`, e.g. "FR".
 function matching(options: ComboboxOption[], query: string): ComboboxOption[] {

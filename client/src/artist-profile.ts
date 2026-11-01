@@ -1,5 +1,5 @@
 import type { Schema } from './api/client'
-import { checkLine, checkText, everyOne } from './checks'
+import { checkLine, checkText, everyOne, fieldChecker } from './checks'
 import type { Checked, FieldErrors } from './checks'
 import type { ComboboxOption } from './combobox'
 
@@ -312,6 +312,62 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
   return profile.test(value) && !isReserved(site, value) ? { value } : { error: `ce nom de profil ${site.name} n'est pas valide` }
 }
 
+// For a field admins can leave out (with `lenient`), from which nothing was read, whether it can be taken for one that's
+// left out: it's absent, or of its type (`ofItsType`). One of another type, e.g. a phone sent as a number, would
+// otherwise be lost.
+function leftOut(value: unknown, ofItsType: boolean, lenient: boolean): boolean {
+  return lenient && (value === undefined || value === null || ofItsType)
+}
+
+// The error for a text field that's missing, or null if admins can leave it out (with `lenient`) and it is.
+export function missingError(value: unknown, error: string, { lenient = false } = {}): string | null {
+  return leftOut(value, typeof value === 'string', lenient) ? null : error
+}
+
+// The checks of the fields that artists' and collectives' profiles share. With `lenient`, for the admin pages, they can
+// be left out, and are then "", or empty links. What's there still has to be valid.
+
+// One of COUNTRIES. Only a blank one can be taken for one that's left out: any other string isn't a country.
+export function checkCountry(value: unknown, { lenient = false } = {}): Checked<Country | ''> {
+  const country = COUNTRIES.find((code) => code === value)
+  if (country) return { value: country }
+  return leftOut(value, typeof value === 'string' && !value.trim(), lenient) ? { value: '' } : { error: 'Choisissez votre pays.' }
+}
+
+export function checkCity(value: unknown, { lenient = false } = {}): Checked<string> {
+  return checkLine(value, 'La ville', CITY_MAX_LENGTH, missingError(value, 'Indiquez votre ville.', { lenient }))
+}
+
+// In the order of LINK_SITES, then links to other sites, like the server, which says what's wrong with the first.
+export function checkLinks(value: unknown, { lenient = false } = {}): Checked<ArtistLinks> {
+  const links: ArtistLinks = {}
+  const order = (id: string) => {
+    const index = LINK_SITES.findIndex((site) => site.id === id)
+    return index < 0 ? LINK_SITES.length : index
+  }
+  const sent = Object.entries(value !== null && typeof value === 'object' ? value : {})
+  for (const [id, raw] of sent.sort(([a], [b]) => order(a) - order(b))) {
+    const site = linkSite(id)
+    if (!site || typeof raw !== 'string') return { error: 'Un des liens est invalide.' }
+    const parsed = parseLink(site, raw)
+    if (parsed.error) return { error: `${site.name} : ${parsed.error}.` }
+    if (parsed.value) links[site.id] = parsed.value
+  }
+  if (Object.keys(links).length === 0 && !leftOut(value, typeof value === 'object', lenient)) return { error: 'Ajoutez au moins un lien.' }
+  return { value: links }
+}
+
+// An email address, or "" when it's left out.
+export function checkEmail(value: unknown, { lenient = false } = {}): Checked<string> {
+  const checked = checkLine(value, "L'adresse e-mail", EMAIL_MAX_LENGTH, missingError(value, 'Indiquez votre adresse e-mail.', { lenient }))
+  return checked.value && !isEmailAddress(checked.value) ? { error: 'Indiquez une adresse e-mail valide.' } : checked
+}
+
+export function checkPhone(value: unknown, { lenient = false } = {}): Checked<string> {
+  const checked = checkLine(value, 'Le numéro de téléphone', PHONE_MAX_LENGTH, missingError(value, 'Indiquez votre numéro de téléphone.', { lenient }))
+  return checked.value && !isPhoneNumber(checked.value) ? { error: 'Indiquez un numéro de téléphone valide.' } : checked
+}
+
 // Checks a profile as it's being filled in a form, and returns what the server would save of it: trimmed, without blank
 // entries, and with links reduced to profile names. If it isn't valid, returns what's wrong with each field instead, for
 // the form to show each error by its field. For links, that's the first link that's wrong, in the order of the sites, or that there's none.
@@ -324,17 +380,7 @@ export function checkProfile(
   { lenient = false } = {},
 ): { profile: Profile; errors?: undefined } | { profile?: undefined; errors: FieldErrors<Profile> } {
   const artist: Partial<Record<keyof Profile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
-  const errors: FieldErrors<Profile> = {}
-  // The value of a field, or an empty one if it's wrong, after noting why.
-  const check = (field: keyof Profile, checked: Checked<string>): string => {
-    if (checked.error !== undefined) errors[field] ??= checked.error
-    return checked.value ?? ''
-  }
-  // For a field admins can leave out, from which nothing was read, whether it can be taken for one that's left out: it's
-  // absent, or of its type (`ofItsType`). One of another type, e.g. a phone sent as a number, would otherwise be lost.
-  const leftOut = (value: unknown, ofItsType: boolean) => lenient && (value === undefined || value === null || ofItsType)
-  // The error for a text field that's missing, or null if admins can leave it out and it is.
-  const missing = (value: unknown, error: string) => (leftOut(value, typeof value === 'string') ? null : error)
+  const { errors, check } = fieldChecker<Profile>()
 
   const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
   if (!kind) errors.kind = 'Indiquez si vous postulez comme artiste ou comme collectif.'
@@ -352,12 +398,8 @@ export function checkProfile(
   }
   if (collective && members.length === 0) errors.members ??= 'Indiquez au moins un artiste du collectif.'
 
-  // Undefined when it isn't one of COUNTRIES, and "" when it was left out. Only a blank one can be: any other string
-  // isn't a country.
-  const blankCountry = typeof artist.country === 'string' && !artist.country.trim()
-  const country = COUNTRIES.find((code) => code === artist.country) ?? (leftOut(artist.country, blankCountry) ? '' : undefined)
-  if (country === undefined) errors.country = 'Choisissez votre pays.'
-  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, missing(artist.city, 'Indiquez votre ville.')))
+  const country = check('country', checkCountry(artist.country, { lenient }))
+  const city = check('city', checkCity(artist.city, { lenient }))
 
   // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
   const genres: GenreId[] = []
@@ -366,37 +408,15 @@ export function checkProfile(
     if (!genre) errors.genres ??= "Un des genres n'est pas dans la liste."
     else if (!genres.includes(genre)) genres.push(genre)
   }
-  if (genres.length === 0 && !leftOut(artist.genres, Array.isArray(artist.genres))) errors.genres ??= 'Choisissez au moins un genre.'
+  if (genres.length === 0 && !leftOut(artist.genres, Array.isArray(artist.genres), lenient)) errors.genres ??= 'Choisissez au moins un genre.'
 
-  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, missing(artist.bio, 'Écrivez quelques lignes de bio.')))
-
-  // In the order of LINK_SITES, then links to other sites, like the server, which says what's wrong with the first.
-  const links: ArtistLinks = {}
-  const order = (id: string) => {
-    const index = LINK_SITES.findIndex((site) => site.id === id)
-    return index < 0 ? LINK_SITES.length : index
-  }
-  const sentLinks = Object.entries(artist.links !== null && typeof artist.links === 'object' ? artist.links : {})
-  for (const [id, raw] of sentLinks.sort(([a], [b]) => order(a) - order(b))) {
-    const site = linkSite(id)
-    if (!site || typeof raw !== 'string') {
-      errors.links ??= 'Un des liens est invalide.'
-      continue
-    }
-    const { value, error } = parseLink(site, raw)
-    if (error) errors.links ??= `${site.name} : ${error}.`
-    else if (value) links[site.id] = value
-  }
-  if (Object.keys(links).length === 0 && !leftOut(artist.links, typeof artist.links === 'object')) errors.links ??= 'Ajoutez au moins un lien.'
-
+  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, missingError(artist.bio, 'Écrivez quelques lignes de bio.', { lenient })))
+  const links = check('links', checkLinks(artist.links, { lenient }))
   // Admins can't leave out a collective's email.
-  const emailMissing = collective ? 'Indiquez votre adresse e-mail.' : missing(artist.email, 'Indiquez votre adresse e-mail.')
-  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, emailMissing))
-  if (email && !isEmailAddress(email)) errors.email = 'Indiquez une adresse e-mail valide.'
-  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, missing(artist.phone, 'Indiquez votre numéro de téléphone.')))
-  if (phone && !isPhoneNumber(phone)) errors.phone = 'Indiquez un numéro de téléphone valide.'
+  const email = check('email', checkEmail(artist.email, { lenient: lenient && !collective }))
+  const phone = check('phone', checkPhone(artist.phone, { lenient }))
 
-  if (!kind || country === undefined || Object.keys(errors).length > 0) return { errors }
+  if (!kind || Object.keys(errors).length > 0) return { errors }
   return { profile: { kind, name, members, country, city, genres, bio, links, email: email || null, phone } }
 }
 

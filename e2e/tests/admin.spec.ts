@@ -1,7 +1,8 @@
 import { test, expect, admin, adminMenu, logIn, submitLogin } from './fixtures.ts'
 
-// The admin pages: logging in and out, managing artists, which goes through every layer: a form with a photo, the
-// database, the private bucket and back, then removing the photo, and searching the seeded artists.
+// The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
+// photo, the database, the private bucket and back, then removing the photo, and searching the seeded artists and
+// collectives.
 
 test.describe('logging in', () => {
   test('a wrong password is refused, and the login form stays', async ({ page }) => {
@@ -106,7 +107,7 @@ test('an artist is added, shown, has their photo removed, and is deleted', async
   await page.getByRole('button', { name: "supprimer l'artiste" }).click()
   await expect(page).toHaveURL('/admin/artistes')
   // Once the list is loaded, rather than while it's loading.
-  await expect(page.getByRole('table').or(page.getByText('Aucun artiste.'))).toBeVisible()
+  await expect(page.getByRole('table').or(page.getByText('Aucun artiste ni collectif.'))).toBeVisible()
   await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
 })
 
@@ -128,4 +129,97 @@ test('artists are searched whatever the accents and a typo, and the search is st
   await expect(search).toHaveValue('clementime brulee')
   await expect(searched).toBeVisible()
   await expect(other).toBeHidden()
+})
+
+// With the seeded collectives (see seed-data.ts): Onde Commune, whose genres are its artists', and Les Nuits Basses, one of
+// whose artists the server created with it.
+test('collectives are listed and searched with the artists, and lead to their artists, who lead back to them', async ({ page }) => {
+  await logIn(page, { at: '/admin/artistes' })
+  const onde = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Onde Commune', exact: true }) })
+  // Each artist's first genre, then each one's second, and so on.
+  await expect(onde).toContainText('collectif')
+  await expect(onde).toContainText('techno, deep house, afrobeat, acid, afro house, minimal, amapiano')
+
+  // A collective is found by its artists' names, along with the artist.
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('sable mouvant')
+  await expect(page.getByRole('link', { name: 'Sable Mouvant', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Les Nuits Basses', exact: true })).toBeVisible()
+  await expect(onde).toBeHidden()
+
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('')
+  await onde.getByRole('link').click()
+  await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Photo de Onde Commune', exact: true })).toHaveJSProperty('naturalWidth', 64)
+  const members = page.locator('dt', { hasText: 'Artistes du collectif' }).locator('+ dd').getByRole('link')
+  await expect(members).toHaveText(['Clémentine Brûlée', 'Fréquence Boréale', 'Kwame Asante'])
+
+  await members.getByText('Kwame Asante').click()
+  await expect(page.getByRole('heading', { name: 'Kwame Asante', exact: true })).toBeVisible()
+  const collectives = page.locator('dt', { hasText: 'Collectifs' }).locator('+ dd').getByRole('link')
+  await expect(collectives).toHaveText(['Les Nuits Basses', 'Onde Commune'])
+})
+
+test('a collective is added with an artist picked and one added by name, shown, changed, and deleted without its artists', async ({
+  page,
+}, testInfo) => {
+  // Like the artist above, everything the test creates has a name of its own, and so do its artists, so that the test
+  // doesn't change the seeded artists, and finds its own.
+  const unique = `${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`
+  const name = `Collectif e2e ${unique}`
+  const known = `Membre connu e2e ${unique}`
+  const added = `Membre ajouté e2e ${unique}`
+
+  await logIn(page)
+  // The test's own artist is added through the API, with the session, once there's one.
+  await expect(adminMenu(page)).toBeVisible()
+  const created = await page.request.post('/api/admin/artists', { multipart: { artist: JSON.stringify({ kind: 'artist', name: known }) } })
+  expect(created.ok()).toBe(true)
+  const knownId: string = (await created.json()).artist.id
+
+  await adminMenu(page).getByRole('link', { name: 'artistes' }).click()
+  await page.getByRole('link', { name: 'ajouter un collectif' }).click()
+  await expect(page.getByRole('heading', { name: 'Nouveau collectif' })).toBeVisible()
+  await page.getByLabel('Nom du collectif').fill(name)
+  await page.getByRole('combobox', { name: 'Ajouter un artiste connu' }).fill(known)
+  await page.getByRole('option', { name: known, exact: true }).click()
+  await page.getByLabel('Ajouter un nouvel artiste').fill(added)
+  await page.getByRole('button', { name: 'ajouter ce nouvel artiste au collectif' }).click()
+  await page.getByRole('button', { name: `monter ${added}` }).click()
+  await page.getByLabel('Adresse e-mail du contact').fill(`e2e-${unique}@example.com`)
+  await page.getByLabel('Photo').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: PHOTO })
+  await page.getByRole('button', { name: 'ajouter le collectif' }).click()
+
+  // Its page, with its artists in order, the one added by name created by the server.
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: `Photo de ${name}`, exact: true })).toHaveJSProperty('naturalWidth', 1)
+  const members = page.locator('dt', { hasText: 'Artistes du collectif' }).locator('+ dd').getByRole('link')
+  await expect(members).toHaveText([added, known])
+  const addedId = (await members.first().getAttribute('href'))!.split('/').pop()!
+  const collectivePage = page.url()
+
+  // Their pages lead back to it.
+  await members.getByText(known).click()
+  await expect(page.getByRole('heading', { name: known, exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute('href', new URL(collectivePage).pathname)
+  await page.goBack()
+
+  await page.getByRole('button', { name: 'modifier' }).click()
+  await page.getByRole('button', { name: `retirer ${added}` }).click()
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(members).toHaveText([known])
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'supprimer le collectif' }).click()
+  await expect(page).toHaveURL('/admin/artistes')
+  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
+
+  // Its artists stay, out of it.
+  await page.goto(`/admin/artistes/${addedId}`)
+  await expect(page.getByRole('heading', { name: added, exact: true })).toBeVisible()
+  await page.goto(`/admin/artistes/${knownId}`)
+  await expect(page.getByRole('heading', { name: known, exact: true })).toBeVisible()
+  await expect(page.getByText('Collectifs', { exact: true })).toBeHidden()
+
+  for (const id of [knownId, addedId]) expect((await page.request.delete(`/api/admin/artists/${id}`)).ok()).toBe(true)
 })

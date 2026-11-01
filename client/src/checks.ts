@@ -11,6 +11,17 @@ export type Checked<T> = { value: T; error?: undefined } | { value?: undefined; 
 // the server's checks, which answer with the first error. Fields that are fine are left out.
 export type FieldErrors<T> = Partial<Record<keyof T, string>>
 
+// What's wrong with each field of a profile that's being checked, and `check`, which notes what's wrong with a field, if
+// anything, and returns its value. Its value is only meaningful once there are no errors at all, which is when it's read.
+export function fieldChecker<T>() {
+  const errors: FieldErrors<T> = {}
+  const check = <V>(field: keyof T, checked: Checked<V>): V => {
+    if (checked.error !== undefined) errors[field] ??= checked.error
+    return checked.value as V
+  }
+  return { errors, check }
+}
+
 // The text in `value`, trimmed, and refused if it has the NUL character, like the server does. `field` names it in the
 // error when it's too long or has a NUL, e.g. "La bio", and `missing` is the error when there's none, if it's required.
 export function checkText(value: unknown, field: string, maxLength: number, missing: string | null): Checked<string> {

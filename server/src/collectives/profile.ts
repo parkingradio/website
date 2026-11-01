@@ -6,6 +6,9 @@ import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, NO_MEMBER, city, country, emailAddress
 // with artists' profiles (see artists/profile.ts), and explain what's wrong in French like them, except for the errors
 // about members' ids, which only admins can see (see `NO_SUCH_MEMBER`). Two collectives can't have the same email
 // address, whatever its case, but a collective can have an artist's.
+//
+// The client has its own copy of these rules, for its form to say what's wrong right away (see
+// client/src/collective-profile.ts): they must be changed together. These are the ones that count.
 
 // The errors about a member's id, which are in English, since only admins send ids. A member that isn't an artist,
 // including an id that isn't a string, and a member that's a collective of its own, i.e. an artist whose `kind` is

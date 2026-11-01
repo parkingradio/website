@@ -1,38 +1,85 @@
 # Artistes
 
-At `/admin/artistes`: the artists Parking Radio knows of (see [Artists](../../server/artists.md)).
+At `/admin/artistes`: the artists and collectives Parking Radio knows of (see [Artists](../../server/artists.md) and
+[Collectives](../../server/collectives.md)).
 
-The section lists every artist, by name, with which of the two they are (artist or collective), their city and genres. A
-field above the list searches the artists (see [Searching lists](layout.md#searching-lists)) by their name (and a
-collective's artists), email address, phone number, city, country, genres and the profile names of their links, but not
-their bio, which would match too many searches. Clicking "Nom", "Type" (artists before collectives) or "Ville" (by city,
-then country) sorts the list by that column, and clicking it again sorts it the other way around.
+The section lists every artist and every collective together, by name, with which of the two they are (artist or
+collective), their city and genres. Until they're migrated, the artists whose `kind` is "collective", as collectives
+were before they had their own profiles, are listed as collectives too. A collective's genres are its members' (see
+[A collective's genres](#a-collectives-genres)). A field above the list searches it (see
+[Searching lists](layout.md#searching-lists)) by name, email address, phone number, city, country, genres and the
+profile names of links, and a collective also by its artists' names, but not by bio or description, which would match
+too many searches. Clicking "Nom", "Type" (artists before collectives) or "Ville" (by city, then country) sorts the list
+by that column, and clicking it again sorts it the other way around.
+
+## A collective's genres
+
+A collective has no genres of its own: wherever the admin pages show or search a collective's genres, they're its
+members': every member's first genre, in the order of the members, then every member's second genre, and so on, each
+genre only once, so that the first ones are still the most important.
 
 ## An artist's page
 
 Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo (or "Pas de
-photo" in its place, so that the team notices), their links rebuilt from the profile names, who added them (or that they
-applied by themselves) and who last changed them. A button changes the artist in a form in its place. The form shows the
-artist's photo with an × that removes it once the artist is saved, and a photo that's chosen replaces it, shown in its
-place with an × that takes it back. Under it, their applications are listed like in [Candidatures](candidatures.md),
-with a button to create another one. Since they're all the artist's, the list doesn't show the artist, their city or
-genres, and since they're few, it can't be searched, filtered or sorted. At the bottom, the artist can be deleted for
-good, with their photo, if they have one, and applications, after confirming.
+photo" in its place, so that the team notices), their links rebuilt from the profile names, the collectives they're in,
+linking to them, who added them (or that they applied by themselves) and who last changed them. A button changes the
+artist in a form in its place. The form shows the artist's photo with an × that removes it once the artist is saved, and
+a photo that's chosen replaces it, shown in its place with an × that takes it back. Under it, their applications are
+listed like in [Candidatures](candidatures.md), with a button to create another one. Since they're all the artist's, the
+list doesn't show the artist, their city or genres, and since they're few, it can't be searched, filtered or sorted. At
+the bottom, the artist can be deleted for good, with their photo, if they have one, and applications, after confirming.
+They're then taken out of their collectives, which stay.
+
+## A collective's page
+
+Clicking a collective opens its page at `/admin/artistes/collectifs/<id>` (`/admin/artistes/collectifs` leads to the
+list), with everything about it, its photo (or "Pas de photo"), its links, its artists in order, each linking to their
+page (or that it has none, which happens once its artists are deleted), its genres, who added it (or that it applied by
+itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
+artist's. At the bottom, the collective can be deleted for good, with its photo, if it has one, after confirming. Its
+artists stay.
 
 ## Adding an artist
 
-"ajouter un artiste" adds an artist by hand, at `/admin/artistes/nouveau`, with the same form. In it, a collective's
-artists are typed one by one and pinned with a "+" button (or Enter): only the names pinned are kept, so the form isn't
-sent while a name is left typed without being pinned. Genres are tags to click, which pins them in order of importance,
-and the country is typed, with the matching countries suggested, of which one has to be picked, "Pays inconnu" leaving
-it out. It starts on Canada. Each field says what's wrong with it once it's left: the form checks the profile as the
-server does for admins (see [Profiles](../../server/artists.md#profiles)), for immediate feedback. The server's check is
-the one that counts: if it refuses what the form accepted, the form shows the server's message.
+"ajouter un artiste" adds an artist by hand, at `/admin/artistes/nouveau`, with the same form. Genres are tags to click,
+which pins them in order of importance, and the country is typed, with the matching countries suggested, of which one
+has to be picked, "Pays inconnu" leaving it out. It starts on Canada. Each field says what's wrong with it once it's
+left: the form checks the profile as the server does for admins (see [Profiles](../../server/artists.md#profiles)), for
+immediate feedback. The server's check is the one that counts: if it refuses what the form accepted, the form shows the
+server's message.
+
+The form only adds artists: collectives are added with "ajouter un collectif". Until they're migrated, the artists whose
+`kind` is "collective" can still be changed, including the names of their artists, which are typed one by one and pinned
+with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left typed without
+being pinned.
+
+## Adding a collective
+
+"ajouter un collectif" adds a collective by hand, at `/admin/artistes/collectifs/nouveau`, with the same form as the
+collective's page. It works like the artist form (see [Adding an artist](#adding-an-artist)), and checks the profile as
+the server does for admins (see [Profiles](../../server/collectives.md#profiles)), so the contact's email is required.
+It has no genres, which are the artists'.
+
+Its artists are in order, at least one, and can be reordered and removed. Each one is either:
+
+- an artist picked from those in this section, other than the collective's artists already and the artists whose
+  `kind` is "collective", which can't be members (see [Members](../../server/collectives.md#members)), or
+- a new artist, whose name is typed in "Ajouter un nouvel artiste", then added with a "+" button (or Enter), and whom
+  the server creates with that name only when the collective is saved. The form isn't sent while a name is left typed
+  without being added. While the name typed is that of one of the collective's artists, whatever its case and accents,
+  the form says so, and the name can't be added. Otherwise, while it's that of an artist in this section (other than a
+  collective), the form says so too, since picking them would avoid a duplicate.
 
 ## Endpoints
 
-- `GET /api/admin/artists`, for the list.
+- `GET /api/admin/artists` and `GET /api/admin/collectives`, for the list.
 - `GET /api/admin/artists/:id`, `PUT /api/admin/artists/:id` and `DELETE /api/admin/artists/:id`, for an artist's page.
 - `GET /api/admin/artists/:id/photo`, for their photo.
 - `GET /api/admin/applications?artist=<id>`, for their applications.
 - `POST /api/admin/artists`, for "ajouter un artiste".
+- `GET /api/admin/collectives/:id`, `PUT /api/admin/collectives/:id` and `DELETE /api/admin/collectives/:id`, for a
+  collective's page.
+- `GET /api/admin/collectives/:id/photo`, for its photo.
+- `GET /api/admin/artists`, on a collective's page and in "ajouter un collectif", for its genres and to pick its
+  artists.
+- `POST /api/admin/collectives`, for "ajouter un collectif".

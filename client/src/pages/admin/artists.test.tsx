@@ -4,9 +4,11 @@ import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist, Profile } from '../../artist-profile'
+import type { Collective } from '../../collective-profile'
 import { mockFetch, requestsTo } from '../../test-utils'
 
-const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
+// Logged in, and without collectives, unless a test says otherwise.
+const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' }, '/api/admin/collectives': { ok: true, collectives: [] } }
 
 beforeEach(() => {
   // jsdom has neither, and the form uses both to show the photo picked.
@@ -45,6 +47,39 @@ const BRUME: Artist = {
   city: 'Lyon',
   genres: ['house'],
   email: 'brume@example.com',
+}
+
+const CYAN: Artist = {
+  ...AURORE,
+  id: 'artist-3',
+  name: 'Cyan',
+  city: 'Bruxelles',
+  country: 'BE',
+  genres: ['electro', 'techno', 'house'],
+  links: { instagram: 'cyan.sons' },
+  email: 'cyan@courriel.test',
+  phone: '+32 2 555 01 23',
+}
+
+// A collective, whose genres are its artists'.
+const ONDES: Collective = {
+  id: 'collective-1',
+  hasPhoto: false,
+  createdAt: '2026-10-02T16:00:00.000Z',
+  createdBy: 'admin@example.com',
+  name: 'Ondes',
+  members: [
+    { id: 'artist-1', name: 'Aurore' },
+    { id: 'artist-3', name: 'Cyan' },
+  ],
+  country: 'CA',
+  city: 'Québec',
+  description: 'Une description.',
+  links: { instagram: 'vagues.qc' },
+  email: 'ondes@example.com',
+  phone: '418 222 3344',
+  updatedBy: null,
+  updatedAt: null,
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
@@ -122,6 +157,7 @@ describe('The list of artists', () => {
     ])
     expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
     expect(screen.getByRole('link', { name: 'ajouter un artiste' })).toHaveAttribute('href', '/admin/artistes/nouveau')
+    expect(screen.getByRole('link', { name: 'ajouter un collectif' })).toHaveAttribute('href', '/admin/artistes/collectifs/nouveau')
     // Their applications are on their pages.
     expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(0)
   })
@@ -143,11 +179,35 @@ describe('The list of artists', () => {
     ])
   })
 
-  it('says when there are no artists', async () => {
+  it('lists the collectives with the artists, by name, with their artists’ genres, and links each one to its page', async () => {
+    const empty: Collective = { ...ONDES, id: 'collective-2', name: 'Aube', members: [], city: '', country: '' }
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, CYAN] },
+      '/api/admin/collectives': { ok: true, collectives: [ONDES, empty] },
+    })
+    renderAt('/admin/artistes')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(rows()).toEqual([
+      // Without artists, it has no genres.
+      ['Aube', 'collectif', '-', '-'],
+      ['Aurore', 'artiste', 'Montréal, Canada', 'techno, ambient'],
+      ['Brume', 'collectif', 'Lyon, France', 'house'],
+      ['Cyan', 'artiste', 'Bruxelles, Belgique', 'électro, techno, house'],
+      // Each artist's first genre, then each one's second, and so on.
+      ['Ondes', 'collectif', 'Québec, Canada', 'techno, électro, ambient, house'],
+    ])
+    expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+    // Brume is an artist whose `kind` is "collective", as collectives were before they had their own profiles.
+    expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
+  })
+
+  it('says when there are no artists or collectives', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] } })
     renderAt('/admin/artistes')
 
-    await waitFor(() => expect(screen.getByText('Aucun artiste.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Aucun artiste ni collectif.')).toBeInTheDocument())
   })
 
   it('says when the artists could not be loaded', async () => {
@@ -156,24 +216,21 @@ describe('The list of artists', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
   })
+
+  it('says when the collectives could not be loaded', async () => {
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE] }, '/api/admin/collectives': { ok: false, error: 'Boom' } })
+    renderAt('/admin/artistes')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom"))
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
 })
 
 describe('Searching the list of artists', () => {
-  const CYAN: Artist = {
-    ...AURORE,
-    id: 'artist-3',
-    name: 'Cyan',
-    country: 'BE',
-    city: 'Bruxelles',
-    genres: ['electro'],
-    links: { instagram: 'cyan.sons' },
-    email: 'cyan@courriel.test',
-    phone: '+32 2 555 01 23',
-    bio: 'Fan de Montréal.',
-  }
+  const CYAN_SEARCHED: Artist = { ...CYAN, genres: ['electro'], bio: 'Fan de Montréal.' }
 
   beforeEach(() => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, { ...BRUME, members: ['Élise', 'Bo'] }, CYAN] } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [AURORE, { ...BRUME, members: ['Élise', 'Bo'] }, CYAN_SEARCHED] } })
     renderAt('/admin/artistes')
   })
 
@@ -213,7 +270,7 @@ describe('Searching the list of artists', () => {
 
   it('says when no artist matches, and lists them all again once the search is cleared', async () => {
     await expectSearch('zzzzzz', [])
-    expect(screen.getByText('Aucun artiste ne correspond à la recherche.')).toBeInTheDocument()
+    expect(screen.getByText('Aucun artiste ni collectif ne correspond à la recherche.')).toBeInTheDocument()
     await expectSearch('', ['Aurore', 'Brume', 'Cyan'])
   })
 
@@ -229,6 +286,45 @@ describe('Searching the list of artists', () => {
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?recherche=lyon$/)
     await expectSearch('', ['Aurore', 'Brume', 'Cyan'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes$/)
+  })
+})
+
+describe('Searching the collectives', () => {
+  const BRISE: Collective = {
+    ...ONDES,
+    id: 'collective-2',
+    name: 'Brise',
+    members: [{ id: 'artist-1', name: 'Aurore' }],
+    city: 'Gaspé',
+    links: {},
+    email: 'brise@example.com',
+    phone: '',
+  }
+
+  beforeEach(() => {
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/artists': { ok: true, artists: [AURORE, CYAN] },
+      '/api/admin/collectives': { ok: true, collectives: [ONDES, BRISE] },
+    })
+    renderAt('/admin/artistes')
+  })
+
+  it('finds a collective by its artists’ names, along with the artists themselves', async () => {
+    await expectSearch('cyan', ['Cyan', 'Ondes'])
+    await expectSearch('aurore', ['Aurore', 'Brise', 'Ondes'])
+  })
+
+  it('finds a collective by its artists’ genres', async () => {
+    await expectSearch('electro', ['Cyan', 'Ondes'])
+  })
+
+  it('finds a collective by where it is from, its links, email and phone, but not its description', async () => {
+    await expectSearch('gaspe', ['Brise'])
+    await expectSearch('vagues.qc', ['Ondes'])
+    await expectSearch('brise@example.com', ['Brise'])
+    await expectSearch('4182223344', ['Ondes'])
+    await expectSearch('description', [])
   })
 })
 
@@ -258,6 +354,16 @@ describe('Sorting the list of artists', () => {
     expect(screen.getByRole('columnheader', { name: 'Nom' })).not.toHaveAttribute('aria-sort')
     // Artists of the same type stay by name.
     expect(names()).toEqual(['Aurore', 'Dora', 'Brume', 'Cyan'])
+  })
+
+  it('sorts collectives of both kinds after the artists, by name', async () => {
+    mockFetch({ ...ARTISTS, '/api/admin/collectives': { ok: true, collectives: [{ ...ONDES, name: 'Bise' }] } })
+    renderAt('/admin/artistes')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Type' }))
+    expect(names()).toEqual(['Aurore', 'Dora', 'Bise', 'Brume', 'Cyan'])
+    fireEvent.click(screen.getByRole('button', { name: 'Type' }))
+    expect(names()).toEqual(['Bise', 'Brume', 'Cyan', 'Aurore', 'Dora'])
   })
 
   it('sorts artists by city, those without one first', async () => {
@@ -310,6 +416,9 @@ describe('An artist’s page', () => {
     expect(screen.getByText('techno, ambient')).toBeInTheDocument()
     expect(screen.getByText(/^Première ligne/)).toHaveTextContent('Première ligne. Deuxième ligne.')
     expect(screen.queryByText('Artistes du collectif')).not.toBeInTheDocument()
+    // She's in no collective.
+    expect(screen.queryByText('Collectifs')).not.toBeInTheDocument()
+    expect(screen.queryByText(/retiré de ses collectifs/)).not.toBeInTheDocument()
 
     await waitFor(() => expect(screen.getAllByRole('link', { name: '5 octobre 2026' })).toHaveLength(2))
     expect(screen.getAllByRole('link', { name: '5 octobre 2026' })[0]).toHaveAttribute('href', '/admin/candidatures/application-1')
@@ -341,6 +450,20 @@ describe('An artist’s page', () => {
     await waitFor(() => expect(screen.getByText('Ana, Bo')).toBeInTheDocument())
     expect(screen.getByText(/^collectif, inscrit/)).toHaveTextContent('collectif, inscrit par le formulaire « appliquer » le 1 octobre 2026.')
     expect(screen.getByText('Aucune candidature.')).toBeInTheDocument()
+  })
+
+  it('lists the collectives they are in, linking to them, and says that deleting them takes them out', async () => {
+    const collectives = [
+      { id: 'collective-2', name: 'Brise' },
+      { id: 'collective-1', name: 'Ondes' },
+    ]
+    mockFetch({ ...AURORE_PAGE, '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, collectives } } })
+    renderAt('/admin/artistes/artist-1')
+
+    const links = await screen.findAllByRole('link', { name: /^(Brise|Ondes)$/ })
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/admin/artistes/collectifs/collective-2', '/admin/artistes/collectifs/collective-1'])
+    expect(screen.getByText('Collectifs', { selector: 'dt' })).toBeInTheDocument()
+    expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent("L'artiste sera aussi retiré de ses collectifs, qui restent.")
   })
 
   it('changes the artist, keeping their photo unless another one is chosen', async () => {
@@ -544,6 +667,60 @@ describe('Deleting an artist before their applications are loaded', () => {
   })
 })
 
+describe('Changing an artist whose kind is "collective", as collectives were before they had their own profiles', () => {
+  const BRUME_PAGE = {
+    ...LOGGED_IN,
+    '/api/admin/artists/artist-2': { ok: true, artist: BRUME },
+    '/api/admin/applications?artist=artist-2': { ok: true, applications: [] },
+  }
+
+  it('pins the artists of the collective, and sends those pinned', async () => {
+    mockFetch({ ...BRUME_PAGE, 'PUT /api/admin/artists/artist-2': { ok: false, error: 'Stop' } })
+    renderAt('/admin/artistes/artist-2')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    expect(screen.getByLabelText('collectif')).toBeChecked()
+    expect(screen.getByLabelText('Nom du collectif')).toHaveValue('Brume')
+    const member = screen.getByLabelText("Nom d'un artiste du collectif")
+    const add = screen.getByRole('button', { name: 'ajouter cet artiste au collectif' })
+    for (const name of ['  ', 'ana', 'Cy']) {
+      fireEvent.change(member, { target: { value: name } })
+      fireEvent.click(add)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'retirer Bo' }))
+    expect(within(member.closest('fieldset')!).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Ana×', 'Cy×'])
+
+    // A name left in the input would be lost, so it stops the form from being sent until it's pinned or cleared.
+    fireEvent.change(member, { target: { value: 'Dee' } })
+    fireEvent.blur(member)
+    expect(screen.getByText("« Dee » n'est pas ajouté : appuyer sur + pour l'ajouter.")).toBeInTheDocument()
+    fireEvent.click(submitButton('enregistrer'))
+    expect(member).toHaveFocus()
+    expect(requestsTo('PUT', '/api/admin/artists/artist-2')).toHaveLength(0)
+    fireEvent.keyDown(member, { key: 'Enter' })
+    expect(screen.queryByText(/n'est pas ajouté/)).not.toBeInTheDocument()
+
+    fireEvent.click(submitButton('enregistrer'))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/artists/artist-2')).toHaveLength(1))
+    expect(sent(requestsTo('PUT', '/api/admin/artists/artist-2')[0]).profile).toMatchObject({ kind: 'collective', members: ['Ana', 'Cy', 'Dee'] })
+  })
+
+  it("needs the collective's email, unlike an artist's", async () => {
+    mockFetch(BRUME_PAGE)
+    renderAt('/admin/artistes/artist-2')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Adresse e-mail'), { target: { value: '' } })
+    fireEvent.click(submitButton('enregistrer'))
+    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez votre adresse e-mail.')
+
+    // Until it's changed into an artist.
+    fireEvent.click(screen.getByLabelText('artiste'))
+    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBeNull()
+    expect(screen.queryByLabelText("Nom d'un artiste du collectif")).not.toBeInTheDocument()
+  })
+})
+
 describe('Adding an artist', () => {
   const NEW = { ...LOGGED_IN }
 
@@ -560,13 +737,9 @@ describe('Adding an artist', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Nouvel artiste' })).toBeInTheDocument())
     expect(screen.getByLabelText('Photo')).not.toBeRequired()
     expect(screen.queryByRole('button', { name: 'retirer la photo' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('collectif'))
-    fireEvent.change(screen.getByLabelText('Nom du collectif'), { target: { value: 'Brume' } })
-    const member = screen.getByLabelText("Nom d'un artiste du collectif")
-    fireEvent.change(member, { target: { value: 'Ana' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter cet artiste au collectif' }))
-    fireEvent.change(member, { target: { value: 'Bo' } })
-    fireEvent.keyDown(member, { key: 'Enter' })
+    // Collectives are added with their own form.
+    expect(screen.queryByRole('group', { name: 'Type' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText("Nom d'artiste"), { target: { value: 'Brume' } })
     const country = screen.getByRole('combobox', { name: 'Pays' })
     fireEvent.change(country, { target: { value: 'fran' } })
     fireEvent.keyDown(country, { key: 'Enter' })
@@ -589,9 +762,9 @@ describe('Adding an artist', () => {
     const { profile, photo } = sent(request)
     // What's saved of it, e.g. the profile name rather than the address of the Instagram profile.
     expect(profile).toEqual({
-      kind: 'collective',
+      kind: 'artist',
       name: 'Brume',
-      members: ['Ana', 'Bo'],
+      members: [],
       country: 'FR',
       city: 'Lyon',
       genres: ['house', 'techno'],
@@ -614,7 +787,7 @@ describe('Adding an artist', () => {
     })
     renderAt('/admin/artistes/nouveau')
 
-    await screen.findByLabelText('collectif')
+    await screen.findByLabelText("Nom d'artiste")
     fillValidArtist()
     fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [] } })
     fireEvent.click(submitButton("ajouter l'artiste"))
@@ -627,14 +800,12 @@ describe('Adding an artist', () => {
     mockFetch(NEW)
     renderAt('/admin/artistes/nouveau')
 
-    fireEvent.click(await screen.findByLabelText('collectif'))
+    fireEvent.change(await screen.findByLabelText('Adresse e-mail'), { target: { value: 'brume@' } })
     expect(document.querySelectorAll('.admin-field-error')).toHaveLength(0)
     fireEvent.click(submitButton("ajouter l'artiste"))
 
-    expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indiquez le nom du collectif.')
-    expect(errorOf(screen.getByLabelText("Nom d'un artiste du collectif"))).toBe('Indiquez au moins un artiste du collectif.')
-    // Unlike an artist's.
-    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez votre adresse e-mail.')
+    expect(errorOf(screen.getByLabelText("Nom d'artiste"))).toBe("Indiquez votre nom d'artiste.")
+    expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez une adresse e-mail valide.')
     // Admins can leave these out, unlike artists, and the photo is optional.
     expect(errorOf(screen.getByLabelText('Ville'))).toBeNull()
     expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBeNull()
@@ -643,7 +814,7 @@ describe('Adding an artist', () => {
     expect(errorOf(screen.getByLabelText('Téléphone'))).toBeNull()
     expect(errorOf(screen.getByLabelText('Photo'))).toBeNull()
     // The first field to fix gets the focus.
-    await waitFor(() => expect(screen.getByLabelText('Nom du collectif')).toHaveFocus())
+    await waitFor(() => expect(screen.getByLabelText("Nom d'artiste")).toHaveFocus())
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
   })
 
@@ -687,7 +858,7 @@ describe('Adding an artist', () => {
     mockFetch(NEW)
     renderAt('/admin/artistes/nouveau')
 
-    await screen.findByLabelText('collectif')
+    await screen.findByLabelText("Nom d'artiste")
     fillValidArtist()
     fireEvent.change(screen.getByLabelText('Instagram'), { target: { value: 'https://soundcloud.com/aurore' } })
     fireEvent.click(submitButton("ajouter l'artiste"))
@@ -707,7 +878,7 @@ describe('Adding an artist', () => {
     })
     renderAt('/admin/artistes/nouveau')
 
-    await screen.findByLabelText('collectif')
+    await screen.findByLabelText("Nom d'artiste")
     fireEvent.change(screen.getByLabelText("Nom d'artiste"), { target: { value: 'Aurore' } })
     const country = screen.getByRole('combobox', { name: 'Pays' })
     fireEvent.change(country, { target: { value: 'inconnu' } })
@@ -734,43 +905,12 @@ describe('Adding an artist', () => {
     mockFetch({ ...NEW, 'POST /api/admin/artists': { ok: false, error: 'Stop' } })
     renderAt('/admin/artistes/nouveau')
 
-    await screen.findByLabelText('collectif')
+    await screen.findByLabelText("Nom d'artiste")
     fillValidArtist()
     fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'aurore', { type: '' })] } })
     fireEvent.click(submitButton("ajouter l'artiste"))
 
     await waitFor(() => expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(1))
-  })
-
-  it('pins the artists of a collective, and sends those pinned', async () => {
-    mockFetch({ ...NEW, 'POST /api/admin/artists': { ok: false, error: 'Stop' } })
-    renderAt('/admin/artistes/nouveau')
-
-    await screen.findByLabelText('collectif')
-    fillValidArtist()
-    fireEvent.click(screen.getByLabelText('collectif'))
-    const member = screen.getByLabelText("Nom d'un artiste du collectif")
-    const add = screen.getByRole('button', { name: 'ajouter cet artiste au collectif' })
-    for (const name of ['Ana', '  ', 'ana', 'Bo', 'Cy']) {
-      fireEvent.change(member, { target: { value: name } })
-      fireEvent.click(add)
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'retirer Bo' }))
-    expect(within(member.closest('fieldset')!).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Ana×', 'Cy×'])
-
-    // A name left in the input would be lost, so it stops the form from being sent until it's pinned or cleared.
-    fireEvent.change(member, { target: { value: 'Dee' } })
-    fireEvent.blur(member)
-    expect(screen.getByText("« Dee » n'est pas ajouté : appuyer sur + pour l'ajouter.")).toBeInTheDocument()
-    fireEvent.click(submitButton("ajouter l'artiste"))
-    expect(member).toHaveFocus()
-    expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
-    fireEvent.keyDown(member, { key: 'Enter' })
-    expect(screen.queryByText(/n'est pas ajouté/)).not.toBeInTheDocument()
-
-    fireEvent.click(submitButton("ajouter l'artiste"))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(1))
-    expect(sent(requestsTo('POST', '/api/admin/artists')[0]).profile.members).toEqual(['Ana', 'Cy', 'Dee'])
   })
 
   it('pins genres by clicking them, most important first, and unpins them the same way', async () => {

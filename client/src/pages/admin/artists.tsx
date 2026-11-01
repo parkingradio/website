@@ -2,34 +2,59 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
-import { ARTIST_KINDS, LINK_SITES } from '../../artist-profile'
-import type { Artist } from '../../artist-profile'
+import type { Artist, GenreId } from '../../artist-profile'
+import type { Collective } from '../../collective-profile'
 import { ArtistForm } from './artist-form'
 import { ApplicationsTable } from './applications'
-import { KIND_LABELS, MISSING, artistSearchFields, byWhom, comparePlaces, dateFormat, genreNames, photoUrl, place } from './describe'
+import {
+  ENTRY_KIND_LABELS,
+  KIND_LABELS,
+  MISSING,
+  addedBy,
+  artistEntryKind,
+  artistSearchFields,
+  byWhom,
+  collectiveSearchFields,
+  comparePlaces,
+  entryPath,
+  genreNames,
+  membersGenres,
+  photoUrl,
+  place,
+} from './describe'
+import type { EntryKind } from './describe'
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
+import { BackToArtists, LinksList, LoadFailure, PhotoOrNone } from './profile-details'
 
-// The artists section: every artist, each one's page, where they're changed or deleted, and adding one by hand, e.g. to
-// bring in an artist who applied through the original Google Form.
+// The artists section: every artist and collective, each artist's page, where they're changed or deleted, and adding one
+// by hand, e.g. to bring in an artist who applied through the original Google Form. Collectives' pages are in
+// collectives.tsx.
 
-// The columns the list of artists can be sorted by, where artists come before collectives.
-const ARTIST_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Artist>> = {
+// An artist or a collective, as the list shows, searches and sorts them.
+type Entry = { kind: EntryKind; id: string; name: string; city: string; country: string; genres: GenreId[]; searchFields: string[] }
+
+// The columns the list can be sorted by, where artists come before collectives.
+const ENTRY_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Entry>> = {
   nom: { compare: (a, b) => compareText(a.name, b.name) },
-  type: { compare: (a, b) => ARTIST_KINDS.indexOf(a.kind) - ARTIST_KINDS.indexOf(b.kind) },
+  type: { compare: (a, b) => Number(a.kind !== 'artist') - Number(b.kind !== 'artist') },
   ville: { compare: comparePlaces },
 }
 
-function BackToArtists() {
-  return (
-    <Link to="/admin/artistes" className="admin-back">
-      ← tous les artistes
-    </Link>
-  )
+// Every artist and collective, by name.
+function entries(artists: Artist[], collectives: Collective[]): Entry[] {
+  const byId = new Map(artists.map((artist) => [artist.id, artist]))
+  return [
+    ...artists.map((artist): Entry => ({ ...artist, kind: artistEntryKind(artist), searchFields: artistSearchFields(artist) })),
+    ...collectives.map((collective): Entry => {
+      const genres = membersGenres(collective.members, byId)
+      return { ...collective, kind: 'collective', genres, searchFields: collectiveSearchFields(collective, genres) }
+    }),
+  ].sort((a, b) => compareText(a.name, b.name))
 }
 
-// Every artist.
+// Every artist and collective.
 export function ArtistsPage() {
   const { query, setQuery } = useSearchQuery()
   return (
@@ -39,6 +64,9 @@ export function ArtistsPage() {
         <Link to="/admin/artistes/nouveau" className="admin-button">
           ajouter un artiste
         </Link>
+        <Link to="/admin/artistes/collectifs/nouveau" className="admin-button">
+          ajouter un collectif
+        </Link>
         <SearchField query={query} onChange={setQuery} />
       </div>
       <ArtistsList query={query} />
@@ -46,24 +74,38 @@ export function ArtistsPage() {
   )
 }
 
-// Every artist, by name unless they're sorted otherwise, or those `query` finds.
+// Every artist and collective, by name unless they're sorted otherwise, or those `query` finds.
 function ArtistsList({ query }: { query: string }) {
   const artists = useApi('/api/admin/artists')
-  const sorting = useSort(ARTIST_COLUMNS, 'nom')
+  const collectives = useApi('/api/admin/collectives')
+  const sorting = useSort(ENTRY_COLUMNS, 'nom')
 
-  if (artists.kind === 'loading') return null
-  if (artists.kind === 'error') {
+  if (artists.kind === 'error' || collectives.kind === 'error') {
     return (
-      <p className="admin-error" role="alert">
-        Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
-      </p>
+      <>
+        {artists.kind === 'error' && (
+          <p className="admin-error" role="alert">
+            Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
+          </p>
+        )}
+        {collectives.kind === 'error' && (
+          <p className="admin-error" role="alert">
+            Les collectifs n'ont pas pu être chargés&nbsp;: {collectives.message}
+          </p>
+        )}
+      </>
     )
   }
+  if (artists.kind === 'loading' || collectives.kind === 'loading') return null
 
-  const all = artists.value.artists
-  const listed = sorting.sorted(search(all, query, artistSearchFields))
+  const all = entries(artists.value.artists, collectives.value.collectives)
+  const listed = sorting.sorted(search(all, query, (entry) => entry.searchFields))
   if (listed.length === 0) {
-    return <p className="admin-placeholder">{all.length === 0 ? 'Aucun artiste.' : 'Aucun artiste ne correspond à la recherche.'}</p>
+    return (
+      <p className="admin-placeholder">
+        {all.length === 0 ? 'Aucun artiste ni collectif.' : 'Aucun artiste ni collectif ne correspond à la recherche.'}
+      </p>
+    )
   }
   return (
     <table className="admin-table">
@@ -82,14 +124,14 @@ function ArtistsList({ query }: { query: string }) {
         </tr>
       </thead>
       <tbody>
-        {listed.map((artist) => (
-          <tr key={artist.id}>
+        {listed.map((entry) => (
+          <tr key={`${entry.kind}:${entry.id}`}>
             <td>
-              <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link>
+              <Link to={entryPath(entry.kind, entry.id)}>{entry.name}</Link>
             </td>
-            <td>{KIND_LABELS[artist.kind]}</td>
-            <td>{place(artist)}</td>
-            <td>{genreNames(artist.genres)}</td>
+            <td>{ENTRY_KIND_LABELS[entry.kind]}</td>
+            <td>{place(entry)}</td>
+            <td>{genreNames(entry.genres)}</td>
           </tr>
         ))}
       </tbody>
@@ -114,16 +156,7 @@ function ArtistById({ id }: { id: string }) {
   const navigate = useNavigate()
 
   if (loaded.kind === 'loading') return <BackToArtists />
-  if (loaded.kind === 'error') {
-    return (
-      <>
-        <BackToArtists />
-        <p className="admin-error" role="alert">
-          L'artiste n'a pas pu être chargé&nbsp;: {loaded.message}
-        </p>
-      </>
-    )
-  }
+  if (loaded.kind === 'error') return <LoadFailure>L'artiste n'a pas pu être chargé&nbsp;: {loaded.message}</LoadFailure>
   const artist = changed ?? loaded.value.artist
 
   if (editing) {
@@ -168,11 +201,7 @@ function ArtistById({ id }: { id: string }) {
     <>
       <BackToArtists />
       <h1>{artist.name}</h1>
-      <p className="admin-meta">
-        {KIND_LABELS[artist.kind]},{' '}
-        {byWhom('ajouté', artist.createdBy, artist.createdAt) ??
-          `inscrit par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(artist.createdAt))}.`}
-      </p>
+      <p className="admin-meta">{addedBy(KIND_LABELS[artist.kind], artist)}</p>
       {artist.updatedBy && <p className="admin-meta">{byWhom('Modifié', artist.updatedBy, artist.updatedAt)}</p>}
 
       <div className="admin-toolbar">
@@ -201,7 +230,10 @@ function ArtistById({ id }: { id: string }) {
         ))}
 
       <h2>Supprimer</h2>
-      <p>L'artiste{theirPhoto} et ses candidatures seront supprimés pour de bon.</p>
+      <p>
+        L'artiste{theirPhoto} et ses candidatures seront supprimés pour de bon.
+        {artist.collectives.length > 0 && " L'artiste sera aussi retiré de ses collectifs, qui restent."}
+      </p>
       {error && (
         <p className="admin-error" role="alert">
           {error}
@@ -216,20 +248,28 @@ function ArtistById({ id }: { id: string }) {
 
 // Everything about an artist: their photo, or that they have none, then their profile.
 function ArtistDetails({ artist }: { artist: Artist }) {
-  // The sites the artist has a link to, in the order of LINK_SITES.
-  const linkSites = LINK_SITES.filter((site) => artist.links[site.id])
   return (
     <div className="admin-record">
-      {artist.hasPhoto ? (
-        <img src={photoUrl(artist)} alt={`Photo de ${artist.name}`} />
-      ) : (
-        <div className="admin-no-photo">Pas de photo</div>
-      )}
+      <PhotoOrNone url={artist.hasPhoto ? photoUrl('artists', artist) : null} name={artist.name} />
       <dl>
         {artist.kind === 'collective' && (
           <>
             <dt>Artistes du collectif</dt>
             <dd>{artist.members.join(', ')}</dd>
+          </>
+        )}
+        {artist.collectives.length > 0 && (
+          <>
+            <dt>Collectifs</dt>
+            <dd>
+              <ul>
+                {artist.collectives.map((collective) => (
+                  <li key={collective.id}>
+                    <Link to={entryPath('collective', collective.id)}>{collective.name}</Link>
+                  </li>
+                ))}
+              </ul>
+            </dd>
           </>
         )}
         <dt>Ville</dt>
@@ -238,20 +278,7 @@ function ArtistDetails({ artist }: { artist: Artist }) {
         <dd>{genreNames(artist.genres)}</dd>
         <dt>Liens</dt>
         <dd>
-          {linkSites.length > 0 ? (
-            <ul>
-              {linkSites.map((site) => (
-                <li key={site.id}>
-                  {site.name}&nbsp;:{' '}
-                  <a href={site.url(artist.links[site.id]!)} target="_blank" rel="noreferrer">
-                    {artist.links[site.id]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            MISSING
-          )}
+          <LinksList links={artist.links} />
         </dd>
         <dt>Adresse e-mail</dt>
         <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>

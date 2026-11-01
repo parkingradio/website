@@ -16,6 +16,7 @@ import { Calendrier } from './pages/admin/calendrier'
 import { Rotation } from './pages/admin/rotation'
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
 import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
+import { CollectivePage, NewCollectivePage } from './pages/admin/collectives'
 import { Configuration } from './pages/admin/configuration'
 
 function App() {
@@ -44,6 +45,10 @@ function App() {
               <Route path="artistes" element={<ArtistsPage />} />
               <Route path="artistes/nouveau" element={<NewArtistPage />} />
               <Route path="artistes/:id" element={<ArtistPage />} />
+              {/* Collectives are listed with the artists. This keeps the address of their pages from being an artist's. */}
+              <Route path="artistes/collectifs" element={<Navigate to="/admin/artistes" replace />} />
+              <Route path="artistes/collectifs/nouveau" element={<NewCollectivePage />} />
+              <Route path="artistes/collectifs/:id" element={<CollectivePage />} />
               <Route path="configuration" element={<Configuration />} />
               {/* The feature flags moved to the configuration section. This keeps older links working. */}
               <Route path="features" element={<Navigate to="/admin/configuration" replace />} />
