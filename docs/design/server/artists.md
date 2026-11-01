@@ -1,22 +1,23 @@
 # Artists
 
-The artists Parking Radio knows of, which are the artists who applied. Their applications for a set are in
-[Applications](applications.md).
+The artists Parking Radio knows of: mostly artists who applied, and a few that the team only knows by name. Their
+applications for a set are in [Applications](applications.md).
 
 ## Profiles
 
 An artist is an artist or a collective. Each one has a profile, and maybe a photo, and is a row of the `artists` table
-(`server/src/db/schema.ts`). An artist is known by their email: two artists can't have the same one, whatever its case.
+(`server/src/db/schema.ts`).
 
 The rules a profile has to follow are the schemas of `server/src/artists/profile.ts` (`ArtistProfile`, and
 `AdminArtistProfile` for admins), and the server checks every profile it's sent against them. The server explains
 what's wrong with a profile or a photo in French, unlike its other admin errors, because artists see the same messages
 when they apply.
 
-Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, links or
-phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't always
-ask for them. What's left out is stored as an empty string, or an empty list or object. `POST /api/applications`
-requires all of them.
+Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, bio, links,
+email or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't
+always ask for them, or whom they only know by name. Only a collective's email can't be left out, since it's how the
+team reaches the collective. What's left out is stored as an empty string, or an empty list or object, except the email,
+which is null, so that any number of artists can be without one. `POST /api/applications` requires all of them.
 
 A profile has:
 
@@ -28,9 +29,9 @@ A profile has:
 | `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` (one of `COUNTRIES` in `server/src/artists/profile.ts`), or `""` when an admin left it out |
 | `city` | string | As the artist wrote it. Up to 100 characters, or `""` when an admin left it out |
 | `genres` | list of strings | The ids of at least one of `GENRES` in `server/src/artists/profile.ts` (e.g. `"drum-and-bass"`), most important first, or none when an admin left them out |
-| `bio` | string | Up to 5000 characters |
+| `bio` | string | Up to 5000 characters, or `""` when an admin left it out |
 | `links` | object | By site (`soundcloud`, `instagram`, `web`, `bandcamp`, `mixcloud`, `ra`, `youtube`, `spotify`, `tiktok`), at least one, or none when an admin left them out: see below |
-| `email` | string | What the artist is known by. Up to 200 characters |
+| `email` | string or null | Up to 200 characters, or null when an admin left it out. Two artists can't have the same one, whatever its case |
 | `phone` | string | At least 7 digits. Up to 40 characters, or `""` when an admin left it out |
 
 Links are stored as profile names, which the server reduces what was typed or pasted to: e.g.

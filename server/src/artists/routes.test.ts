@@ -17,9 +17,9 @@ const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
 
-// Like the database, which knows artists by their email whatever its case.
-function emailTaken(email: string, except?: string) {
-  return rows.some((row) => row.id !== except && row.email.toLowerCase() === email.toLowerCase())
+// Like the database, where two artists can't have the same email whatever its case, but any number can have none.
+function emailTaken(email: string | null, except?: string) {
+  return email !== null && rows.some((row) => row.id !== except && row.email?.toLowerCase() === email.toLowerCase())
 }
 
 const store: ArtistsStore = {
@@ -79,7 +79,7 @@ function profile(changes: Partial<Profile> = {}): Profile {
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
-const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' }
 
 // A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, the photo, and whether to
 // remove the photo.
@@ -219,11 +219,31 @@ describe('artists routes', () => {
       expect(photos.store).not.toHaveBeenCalled()
     })
 
-    it('adds an artist without a country, city, genres, links or phone, e.g. one who applied through the original Google Form', async () => {
+    it('adds an artist without a country, city, genres, bio, links, email or phone, e.g. one who applied through the original Google Form', async () => {
       const app = await buildApp()
       const response = await create(app, profile(LEFT_OUT), null)
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject(LEFT_OUT)
+      expect(rows[0]).toMatchObject(LEFT_OUT)
+    })
+
+    it('adds any number of artists without an email, whether it is left out, null or blank', async () => {
+      const app = await buildApp()
+      // JSON leaves out undefined fields.
+      for (const sent of [{ ...profile(), email: undefined }, profile({ email: null }), { ...profile(), email: '  ' }]) {
+        const response = await create(app, sent, null)
+        expect(response.statusCode).toBe(200)
+        expect(response.json().artist.email).toBeNull()
+      }
+      expect(rows.map((row) => row.email)).toEqual([null, null, null])
+    })
+
+    it("still needs a collective's email", async () => {
+      const app = await buildApp()
+      const response = await create(app, profile({ kind: 'collective', members: ['A'], email: null }), null)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Indiquez votre adresse e-mail.' })
+      expect(rows).toHaveLength(0)
     })
 
     it('refuses an email another artist has, whatever its case, and forgets the photo', async () => {
@@ -440,12 +460,21 @@ describe('artists routes', () => {
       expect(photos.delete).not.toHaveBeenCalled()
     })
 
-    it("takes out the artist's country, city, genres, links and phone", async () => {
+    it("takes out the artist's country, city, genres, bio, links, email and phone", async () => {
       const app = await buildApp()
       await create(app)
       const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(LEFT_OUT), null)
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject(LEFT_OUT)
+    })
+
+    it('frees the email it takes out for another artist', async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', { ...profile(), email: ' ' }, null)).json().artist.email).toBeNull()
+      const response = await create(app, profile({ name: 'Autre DJ' }), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist.email).toBe('artiste@example.com')
     })
 
     it('keeps the photo when the photo sent is empty, as a form sends when no file was chosen', async () => {

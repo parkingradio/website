@@ -80,8 +80,9 @@ export const soundcloudCredentials = pgTable(
   (table) => [check('soundcloud_credentials_single_row', sql`${table.id} = 1`)],
 )
 
-// Artists, known by their email address whatever its case. See the profile's schemas in artists/profile.ts for what
-// each field may contain. Admins can leave out the country, city, genres, links and phone, which are then empty.
+// Artists. Two of them can't have the same email address, whatever its case. See the profile's schemas in
+// artists/profile.ts for what each field may contain. Admins can leave out the country, city, genres, bio, links and
+// phone, which are then empty, and the email, which is then null.
 export const artists = pgTable(
   'artists',
   {
@@ -89,7 +90,7 @@ export const artists = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // The email of the admin who added the artist, or null when they added themselves, by applying.
     createdBy: text('created_by'),
-    email: text('email').notNull(),
+    email: text('email'),
     kind: text('kind').$type<ArtistKind>().notNull(),
     name: text('name').notNull(), // or the collective's name
     members: text('members').array().notNull(), // a collective's artists; empty for an artist

@@ -8,7 +8,7 @@ import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { PhotoForm } from '../artists/photo-form.js'
 import { ArtistProfile, PHOTO_TOO_LARGE, PhotoFile } from '../artists/profile.js'
-import type { Profile } from '../artists/profile.js'
+import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
 import type { Email, SendEmail } from '../core/email.js'
@@ -47,7 +47,7 @@ const ApplyForm = z.object({
 
 // Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
 // the first one that isn't valid.
-function validated(form: PhotoForm): { profile: Profile; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
+function validated(form: PhotoForm): { profile: ApplicantProfile; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
@@ -70,7 +70,7 @@ type EmailOptions = {
 async function emailApplication(
   log: FastifyBaseLogger,
   { settings, sendEmail }: EmailOptions,
-  sent: { profile: Profile; application: ApplicationFields },
+  sent: { profile: ApplicantProfile; application: ApplicationFields },
 ) {
   if (!sendEmail) {
     log.warn('Not emailing the application: MAIL_DOMAIN is not set')

@@ -8,7 +8,7 @@ import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { components, paths } from '../client/src/api/schema.d.ts'
 import { SEED_ARTISTS } from './seed-data.ts'
-import type { SeedApplication, SeedArtist } from './seed-data.ts'
+import type { Profile, SeedApplication, SeedArtist } from './seed-data.ts'
 
 export type Credentials = { email: string; password: string }
 
@@ -39,16 +39,17 @@ const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-// Seeds every artist of SEED_ARTISTS whose email isn't taken yet, whatever its case, with their applications, and returns
-// the names of those seeded and skipped.
+// Seeds every artist of SEED_ARTISTS who isn't there yet, with their applications, and returns the names of those seeded
+// and skipped. An artist is there when another one has their email, whatever its case, or, for an artist without one,
+// when another one without an email has their name, whatever its case.
 export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[] }> {
   const server = await logIn(url, credentials)
-  const taken = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map((artist) => artist.email.toLowerCase()))
+  const there = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map(seedKey))
   const seeded: string[] = []
   const skipped: string[] = []
   let applied = 0
   for (const artist of SEED_ARTISTS) {
-    if (taken.has(artist.profile.email.toLowerCase())) {
+    if (there.has(seedKey(artist.profile))) {
       skipped.push(artist.profile.name)
       continue
     }
@@ -63,12 +64,17 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       }
       for (const application of artist.form ? artist.applications.slice(1) : artist.applications) await addApplication(server, artistId, application)
     } catch (error) {
-      // Otherwise every later seed would skip the artist, because their email is taken.
+      // Otherwise every later seed would skip the artist, because they're there.
       throw new Error(`${messageOf(error)}\n${artist.profile.name} was left incomplete. To seed them again, delete them first.`, { cause: error })
     }
     seeded.push(artist.profile.name)
   }
   return { seeded, skipped }
+}
+
+// What tells whether an artist is there already (see `seed`).
+function seedKey({ email, name }: Pick<Profile, 'email' | 'name'>): string {
+  return email ? `email:${email.toLowerCase()}` : `name:${name.toLowerCase()}`
 }
 
 type Server = {
@@ -128,7 +134,7 @@ async function apply(server: Server, artist: SeedArtist, address: string): Promi
 // The id of an artist who applied through the form, and of the application they sent, which the form doesn't return.
 async function findApplied(server: Server, artist: SeedArtist): Promise<{ artistId: string; applicationId: string }> {
   const { artists } = await server.call<ArtistsResponse>('GET', '/api/admin/artists')
-  const added = artists.find((added) => added.email.toLowerCase() === artist.profile.email.toLowerCase())
+  const added = artists.find((added) => seedKey(added) === seedKey(artist.profile))
   if (!added) throw new Error(`${artist.profile.name} applied, but wasn't added`)
   const { applications } = await server.call<ApplicationsResponse>('GET', `/api/admin/applications?artist=${added.id}`)
   return { artistId: added.id, applicationId: applications[0].id }

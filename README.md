@@ -74,7 +74,8 @@ npm run seed
 
 It goes through the server's API, as an admin of its own, `seed@example.com`, whom it creates with `create-admin`, and
 who is then listed among the admins. You still log in as your own admin. Seeding again only adds the artists who aren't
-there, by their email, so to seed an artist again, delete them first. It doesn't change any setting, e.g. feature flags.
+there, by their email, or by their name for those without one, so to seed an artist again, delete them first. It
+doesn't change any setting, e.g. feature flags.
 
 A few artists apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the Turnstile test keys
 from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send emails.

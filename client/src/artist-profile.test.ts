@@ -171,6 +171,7 @@ describe('checkProfile, as the server answers', () => {
 
   it('needs a bio', () => {
     expect(error({ bio: '' })).toBe('Écrivez quelques lignes de bio.')
+    expect(error({ bio: undefined })).toBe('Écrivez quelques lignes de bio.')
     expect(error({ bio: 'x'.repeat(5000) })).toBeNull()
     expect(error({ bio: 'x'.repeat(5001) })).toBe('La bio dépasse 5000 caractères.')
   })
@@ -189,6 +190,8 @@ describe('checkProfile, as the server answers', () => {
   })
 
   it('checks the email address and phone number', () => {
+    expect(error({ email: ' ' })).toBe('Indiquez votre adresse e-mail.')
+    expect(error({ email: null })).toBe('Indiquez votre adresse e-mail.')
     expect(error({ email: 'pas-une-adresse' })).toBe('Indiquez une adresse e-mail valide.')
     // Addresses with a name, or several of them, which would send emails to someone else too.
     for (const email of ['Nom <artiste@example.com>', 'artiste@example.com, autre@example.com', 'a"b@example.com', 'a@example.com;b@example.com']) {
@@ -208,13 +211,16 @@ describe('checkProfile, as the server answers', () => {
   describe('leniently', () => {
     const LENIENT = { lenient: true }
     // What admins can leave out, as it's saved when they do.
-    const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+    const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' }
 
-    it('takes a profile without a country, city, genres, links or phone', () => {
-      expect(validateProfile({ ...valid(), ...LEFT_OUT, country: ' ', city: ' ', phone: ' ' }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
-      // Left out entirely, as well as empty.
-      const leftOut = { country: undefined, city: undefined, genres: undefined, links: undefined, phone: undefined }
+    it('takes a profile without a country, city, genres, bio, links, email or phone', () => {
+      const blank = { ...LEFT_OUT, country: ' ', city: ' ', bio: ' \n ', email: ' ', phone: ' ' }
+      expect(validateProfile({ ...valid(), ...blank }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
+      // Left out entirely, or null, as well as empty.
+      const leftOut = { country: undefined, city: undefined, genres: undefined, bio: undefined, links: undefined, email: undefined, phone: undefined }
       expect(validateProfile({ ...valid(), ...leftOut }, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
+      const nulls = { country: null, city: null, genres: null, bio: null, links: null, email: null, phone: null }
+      expect(validateProfile({ ...valid(), ...nulls } as never, LENIENT)).toEqual({ ...valid(), ...LEFT_OUT })
       expect(validateProfile({ ...valid(), links: { soundcloud: '' } }, LENIENT).links).toEqual({})
     })
 
@@ -225,6 +231,10 @@ describe('checkProfile, as the server answers', () => {
       expect(error({ genres: ['polka' as never] }, LENIENT)).toBe("Un des genres n'est pas dans la liste.")
       expect(error({ links: { soundcloud: 'https://instagram.com/foo' } }, LENIENT)).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
       expect(error({ phone: '123' }, LENIENT)).toBe('Indiquez un numéro de téléphone valide.')
+      expect(error({ bio: 'x'.repeat(5001) }, LENIENT)).toBe('La bio dépasse 5000 caractères.')
+      expect(error({ email: 'pas-une-adresse' }, LENIENT)).toBe('Indiquez une adresse e-mail valide.')
+      expect(error({ email: `${'a'.repeat(190)}@example.com` }, LENIENT)).toBe("L'adresse e-mail dépasse 200 caractères.")
+      expect(validateProfile({ ...valid(), email: ' artiste@example.com ' }, LENIENT).email).toBe('artiste@example.com')
     })
 
     it('does not take a field of another type for one that is left out, which would lose it', () => {
@@ -232,14 +242,19 @@ describe('checkProfile, as the server answers', () => {
       expect(error({ genres: 'techno' as never }, LENIENT)).toBe('Choisissez au moins un genre.')
       expect(error({ links: '@parking.radio' as never }, LENIENT)).toBe('Ajoutez au moins un lien.')
       expect(error({ phone: 4185550123 as never }, LENIENT)).toBe('Indiquez votre numéro de téléphone.')
+      expect(error({ bio: ['Une bio.'] as never }, LENIENT)).toBe('Écrivez quelques lignes de bio.')
+      expect(error({ email: 42 as never }, LENIENT)).toBe('Indiquez votre adresse e-mail.')
     })
 
     it('still needs everything else', () => {
       expect(error({ kind: undefined }, LENIENT)).toContain('comme artiste ou comme collectif')
       expect(error({ name: '' }, LENIENT)).toBe("Indiquez votre nom d'artiste.")
       expect(error({ kind: 'collective', members: [] }, LENIENT)).toBe('Indiquez au moins un artiste du collectif.')
-      expect(error({ bio: '' }, LENIENT)).toBe('Écrivez quelques lignes de bio.')
-      expect(error({ email: '' }, LENIENT)).toBe('Indiquez votre adresse e-mail.')
+      // A collective's email, unlike an artist's.
+      for (const email of ['', ' ', null, undefined]) {
+        expect(error({ kind: 'collective', members: ['A'], email } as never, LENIENT)).toBe('Indiquez votre adresse e-mail.')
+      }
+      expect(error({ kind: 'collective', members: ['A'], email: 'pas-une-adresse' }, LENIENT)).toBe('Indiquez une adresse e-mail valide.')
     })
   })
 })

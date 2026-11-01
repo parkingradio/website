@@ -30,8 +30,8 @@ function artist(id: string, name: string): Artist {
 }
 
 const AURORE: Artist = { ...artist('artist-1', 'Aurore'), genres: ['techno', 'ambient'] }
-// An admin left out her city and genres.
-const BRUME: Artist = { ...artist('artist-2', 'Brume'), city: '', genres: [] }
+// An admin left out her city, genres and email.
+const BRUME: Artist = { ...artist('artist-2', 'Brume'), city: '', genres: [], email: null }
 const ARTISTS = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] } }
 
 const APPLICATION: Application = {
@@ -586,6 +586,8 @@ describe('Creating an application', () => {
 
     const picked = await screen.findByLabelText('Artiste')
     expect(picked).toHaveValue('artist-2')
+    // By name, and email when they have one.
+    expect(within(picked).getAllByRole('option').map((option) => option.textContent)).toEqual(['choisir un artiste…', 'Aurore (aurore@example.com)', 'Brume'])
     // Received now, unless said otherwise.
     expect(screen.getByLabelText('Reçue le')).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
@@ -594,6 +596,8 @@ describe('Creating an application', () => {
     fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/candidatures/application-4'))
+    // Her email was left out.
+    await waitFor(() => expect(screen.getByText('Adresse e-mail', { selector: 'dt' }).nextElementSibling).toHaveTextContent(/^-$/))
     expect(jsonBody(requestsTo('POST', '/api/admin/applications')[0])).toEqual({
       artistId: 'artist-2',
       dates: ['2026-12-10'],

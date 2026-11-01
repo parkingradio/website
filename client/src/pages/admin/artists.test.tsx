@@ -47,7 +47,7 @@ const BRUME: Artist = {
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
-const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], links: {}, phone: '' }
+const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' }
 
 function application(id: string, artistId: string, changes: Partial<Application> = {}): Application {
   return {
@@ -324,7 +324,7 @@ describe('An artist’s page', () => {
     renderAt('/admin/artistes/artist-1')
 
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Aurore' })).toBeInTheDocument())
-    for (const term of ['Ville', 'Genres', 'Liens', 'Téléphone']) {
+    for (const term of ['Ville', 'Genres', 'Liens', 'Adresse e-mail', 'Téléphone', 'Bio']) {
       expect(screen.getByText(term, { selector: 'dt' }).nextElementSibling).toHaveTextContent(/^-$/)
     }
   })
@@ -373,6 +373,24 @@ describe('An artist’s page', () => {
     expect(photo).toBeNull()
     expect(removePhoto).toBeNull()
     expect(screen.getByText(/^Modifié par/)).toHaveTextContent(/^Modifié par other@example.com le 6 octobre 2026/)
+  })
+
+  it("takes out the artist's bio and email, which are then sent empty and null", async () => {
+    const changed: Artist = { ...AURORE, bio: '', email: null, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
+    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: changed } })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: ' ' } })
+    fireEvent.change(screen.getByLabelText('Adresse e-mail'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByText(/^Modifié par/)).toBeInTheDocument())
+    expect(sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0]).profile).toMatchObject({ bio: '', email: null })
+    expect(screen.getByText('Adresse e-mail', { selector: 'dt' }).nextElementSibling).toHaveTextContent(/^-$/)
+    // An artist without an email is changed with the field empty.
+    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('')
   })
 
   it('checks another photo, if one is chosen', async () => {
@@ -614,11 +632,12 @@ describe('Adding an artist', () => {
 
     expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indiquez le nom du collectif.')
     expect(errorOf(screen.getByLabelText("Nom d'un artiste du collectif"))).toBe('Indiquez au moins un artiste du collectif.')
-    expect(errorOf(screen.getByLabelText('Bio'))).toBe('Écrivez quelques lignes de bio.')
+    // Unlike an artist's.
     expect(errorOf(screen.getByLabelText('Adresse e-mail'))).toBe('Indiquez votre adresse e-mail.')
     // Admins can leave these out, unlike artists, and the photo is optional.
     expect(errorOf(screen.getByLabelText('Ville'))).toBeNull()
     expect(errorOf(screen.getByRole('group', { name: 'Tous les genres' }))).toBeNull()
+    expect(errorOf(screen.getByLabelText('Bio'))).toBeNull()
     expect(errorOf(screen.getByLabelText('SoundCloud'))).toBeNull()
     expect(errorOf(screen.getByLabelText('Téléphone'))).toBeNull()
     expect(errorOf(screen.getByLabelText('Photo'))).toBeNull()
@@ -677,7 +696,7 @@ describe('Adding an artist', () => {
     expect(requestsTo('POST', '/api/admin/artists')).toHaveLength(0)
   })
 
-  it('adds an artist without a country, city, genres, links or phone, e.g. one who applied through the original Google Form', async () => {
+  it('adds an artist without a country, city, genres, bio, links, email or phone, e.g. one who applied through the original Google Form', async () => {
     const added: Artist = { ...AURORE, id: 'artist-3', ...LEFT_OUT }
     mockFetch({
       ...NEW,
@@ -693,8 +712,6 @@ describe('Adding an artist', () => {
     fireEvent.change(country, { target: { value: 'inconnu' } })
     fireEvent.mouseDown(screen.getByRole('option', { name: 'Pays inconnu' }))
     expect(country).toHaveValue('Pays inconnu')
-    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Une bio.' } })
-    fireEvent.change(screen.getByLabelText('Adresse e-mail'), { target: { value: 'aurore@example.com' } })
     fireEvent.click(submitButton("ajouter l'artiste"))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/artistes/artist-3'))
@@ -705,9 +722,9 @@ describe('Adding an artist', () => {
       country: '',
       city: '',
       genres: [],
-      bio: 'Une bio.',
+      bio: '',
       links: {},
-      email: 'aurore@example.com',
+      email: null,
       phone: '',
     })
   })

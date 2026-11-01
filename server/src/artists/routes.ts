@@ -25,7 +25,7 @@ const Artist = z
     genres: z.array(GenreId),
     bio: z.string(),
     links: ArtistLinks,
-    email: z.string(),
+    email: z.string().nullable(),
     phone: z.string(),
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),

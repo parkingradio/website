@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Body } from '../../api/client'
+import type { Body, Schema } from '../../api/client'
 import {
   ARTIST_KINDS,
   BIO_MAX_LENGTH,
@@ -69,14 +69,15 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   if (photoProblem) errors.photo = photoProblem
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () => {
     // What's saved of the profile, e.g. without the members of an artist who was a collective at first. There's one,
-    // since there are no errors by then.
-    return onSubmit({ artist: checked.profile!, photo: photo ?? undefined, removePhoto: !photo && removePhoto ? 'true' : undefined })
+    // since there are no errors by then, and a collective's has an email, which its type doesn't say.
+    const artist = checked.profile! as Schema<'AdminArtistProfile'>
+    return onSubmit({ artist, photo: photo ?? undefined, removePhoto: !photo && removePhoto ? 'true' : undefined })
   })
   const update = (changes: Partial<Profile>) => setProfile((profile) => ({ ...profile, ...changes }))
 
   // The props of the input of a field of the profile that's a single value.
   const input = (field: 'name' | 'city' | 'bio' | 'email' | 'phone') => ({
-    value: profile[field],
+    value: profile[field] ?? '',
     'aria-invalid': shown(field) ? true : undefined,
     onChange: (event: { target: { value: string } }) => update({ [field]: event.target.value }),
     onBlur: leave(field),
@@ -129,7 +130,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
       <GenresField genres={profile.genres} onChange={(genres) => update({ genres })} error={shown('genres')} onLeave={leave('genres')} />
 
       <Labeled label="Bio" error={shown('bio')}>
-        <textarea {...input('bio')} rows={8} maxLength={BIO_MAX_LENGTH} required />
+        <textarea {...input('bio')} rows={8} maxLength={BIO_MAX_LENGTH} />
       </Labeled>
 
       <LinksField
@@ -140,7 +141,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
       />
 
       <Labeled label="Adresse e-mail" error={shown('email')}>
-        <input type="email" {...input('email')} maxLength={EMAIL_MAX_LENGTH} required />
+        <input type="email" {...input('email')} maxLength={EMAIL_MAX_LENGTH} />
       </Labeled>
 
       <Labeled label="Téléphone" error={shown('phone')}>

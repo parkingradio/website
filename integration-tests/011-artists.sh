@@ -4,7 +4,7 @@
 # photos, so this is what covers the artists table, emails being unique whatever their case, artists listed by name,
 # the transaction that changes an artist, profiles read back from the database, and photos kept on disk, then deleted,
 # or no photo at all. It also covers profiles that leave out what only admins can leave out, as the database keeps
-# them.
+# them, including any number of artists without an email.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -122,16 +122,37 @@ expect_body_contains '"hasPhoto":false'
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
 
-echo "  an artist is added without a country, city, genres, links or phone, and read back that way"
-artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Partiel","members":[],"country":"","city":"","genres":[],
-"bio":"Une bio.","links":{},"email":"partiel@integration.test","phone":""}'
+echo "  an artist is added without a country, city, genres, bio, links, email or phone, and read back that way"
+readonly PARTIAL='{"kind":"artist","name":"DJ Partiel","members":[],"country":"","city":"","genres":[],"bio":"","links":{},
+"email":"","phone":""}'
+artist POST "${BASE_URL}/api/admin/artists" "$PARTIAL"
 expect_status 200
 id="$(body_id)"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
-expect_body_contains '"country":"","city":"","genres":[],"bio":"Une bio.","links":{},"email":"partiel@integration.test","phone":""'
-request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
+expect_body_contains '"country":"","city":"","genres":[],"bio":"","links":{},"email":null,"phone":""'
+
+echo "  another artist can be without an email too"
+artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Anonyme"}'
 expect_status 200
+expect_body_contains '"email":null'
+anonymous="$(body_id)"
+
+echo "  an artist's email is taken out, which frees it for another artist"
+artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/libre@integration.test}"
+expect_status 200
+freed="$(body_id)"
+artist PUT "${BASE_URL}/api/admin/artists/${freed}" "${PROFILE/\"artiste@integration.test\"/null}"
+expect_status 200
+expect_body_contains '"email":null'
+artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/LIBRE@integration.test}"
+expect_status 200
+expect_body_contains '"email":"LIBRE@integration.test"'
+taker="$(body_id)"
+for removed in "$id" "$anonymous" "$freed" "$taker"; do
+    request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${removed}"
+    expect_status 200
+done
 
 echo "  an artist that doesn't exist can't be viewed, changed or deleted"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${NOBODY}"

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './profile.js'
-import type { AdminArtistProfile, ArtistProfile, Profile } from './profile.js'
+import type { AdminArtistProfile, ApplicantProfile, ArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { artists } from '../db/schema.js'
@@ -17,6 +17,8 @@ export class InvalidProfile extends Error {}
 
 // Checks a profile against `schema`, which says who sent it, and returns what's saved of it. Throws an InvalidProfile,
 // saying what's wrong with the first field that's wrong, otherwise.
+export function validateProfile(sent: unknown, schema: typeof ArtistProfile): ApplicantProfile
+export function validateProfile(sent: unknown, schema: typeof AdminArtistProfile): Profile
 export function validateProfile(sent: unknown, schema: typeof ArtistProfile | typeof AdminArtistProfile): Profile {
   const result = schema.safeParse(sent)
   if (!result.success) throw new InvalidProfile(result.error.issues[0].message)

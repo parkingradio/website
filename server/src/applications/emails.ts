@@ -1,5 +1,5 @@
 import { LINK_SITES } from '../artists/profile.js'
-import type { GenreId, Profile } from '../artists/profile.js'
+import type { ApplicantProfile, GenreId } from '../artists/profile.js'
 import type { Email } from '../core/email.js'
 import type { ApplicationFields, PrestationId } from './fields.js'
 
@@ -71,7 +71,7 @@ const PRESTATION_NAMES: Record<PrestationId, string> = {
 
 // Everything the artist sent but their photo, as plain text. The photo isn't emailed: it's on the artist's page, on the
 // admin pages.
-export function describeApplication(profile: Profile, application: ApplicationFields): string {
+export function describeApplication(profile: ApplicantProfile, application: ApplicationFields): string {
   const collective = profile.kind === 'collective'
   const genres = profile.genres.map((id) => GENRE_NAMES[id])
   const prestations = application.prestations.map((id) => PRESTATION_NAMES[id])
@@ -109,7 +109,7 @@ export function applicationEmails({
   application,
   recipients,
 }: {
-  profile: Profile
+  profile: ApplicantProfile
   application: ApplicationFields
   recipients: string[]
 }): { toRecipients: Email | null; confirmation: Email } {

@@ -103,7 +103,7 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
             <option value="">choisir un artiste…</option>
             {artists.all.map((artist) => (
               <option key={artist.id} value={artist.id}>
-                {artist.name} ({artist.email})
+                {artist.email ? `${artist.name} (${artist.email})` : artist.name}
               </option>
             ))}
           </select>

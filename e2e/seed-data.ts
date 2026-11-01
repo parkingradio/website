@@ -41,8 +41,9 @@ function collective(profile: Omit<Profile, 'kind'>): Profile {
   return { kind: 'collective', ...profile }
 }
 
-// What admins can leave out of a profile, left out, as for artists brought in from the original Google Form.
-const LEFT_OUT = { country: '', city: '', genres: [], links: {}, phone: '' } satisfies Partial<Profile>
+// What admins can leave out of a profile, left out, as for artists brought in from the original Google Form, or whom
+// they only know by name.
+const LEFT_OUT = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' } satisfies Partial<Profile>
 
 function application(days: number[], status: ApplicationStatus, fields: Partial<SeedApplication> = {}): SeedApplication {
   return { days, status, timeSlots: [], prestations: ['dj'], otherPrestation: '', details: '', ...fields }
@@ -237,6 +238,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'noe.lavigne@example.com',
     }),
     applications: [application([-200], 'done', { receivedDaysAgo: 300 })],
+  },
+  {
+    // Known only by name.
+    profile: artist({ name: 'Marée Basse', ...LEFT_OUT }),
+    applications: [application([-180], 'done', { receivedDaysAgo: 280 })],
   },
   {
     profile: artist({

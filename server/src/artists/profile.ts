@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // An artist's profile: the lists and rules every profile has to follow (see docs/design/server/artists.md), as the zod
-// schemas the server checks profiles with, which openapi.json is generated from. An artist is known by their email
+// schemas the server checks profiles with, which openapi.json is generated from. Two artists can't have the same email
 // address, whatever its case. The server explains what's wrong with a profile in French, because artists see its
 // messages: every error that a profile can get has its message here.
 //
@@ -338,9 +338,19 @@ export function line(field: string, maxLength: number, missing: string, options:
   return text(field, maxLength, missing, { ...options, singleLine: true })
 }
 
-// The fields admins can leave out are absent, null or empty, and are then saved empty.
+// The fields admins can leave out are absent, null or empty, and are then saved as `empty`.
 function orLeftOut<Schema extends z.ZodType, Empty>(schema: Schema, empty: Empty) {
-  return schema.nullish().transform((value) => value ?? empty)
+  return schema.nullish().transform((value) => value || empty)
+}
+
+// An email address, unless admins `canLeaveOut` it: it's then absent, null or blank, and saved as null rather than
+// empty, so that any number of artists can be without one while emails stay unique.
+function email({ canLeaveOut }: { canLeaveOut: boolean }) {
+  const address = line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.', { canBeEmpty: canLeaveOut }).refine(
+    (value) => !value || isEmailAddress(value),
+    'Indiquez une adresse e-mail valide.',
+  )
+  return canLeaveOut ? orLeftOut(address, null) : address
 }
 
 // A link, as it was typed or pasted, which is reduced to the profile name (see `parseLink`), or undefined when it's
@@ -407,6 +417,7 @@ function profileOf(kind: ArtistKind, { canLeaveOut }: { canLeaveOut: boolean }) 
         .transform((): string[] => [])
         .meta({ description: 'Ignored: only a collective has members' })
   const city = line('La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.', { canBeEmpty: canLeaveOut })
+  const bio = text('La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.', { canBeEmpty: canLeaveOut })
   // Most important first. Duplicates are dropped, keeping the first.
   const genres = z.array(GenreId, { error: NO_GENRE }).overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))
   const phone = line('Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.', { canBeEmpty: canLeaveOut }).refine(
@@ -422,9 +433,10 @@ function profileOf(kind: ArtistKind, { canLeaveOut }: { canLeaveOut: boolean }) 
       : Country,
     city: canLeaveOut ? orLeftOut(city, '') : city,
     genres: canLeaveOut ? orLeftOut(genres, []) : genres.min(1, NO_GENRE),
-    bio: text('La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.'),
+    bio: canLeaveOut ? orLeftOut(bio, '') : bio,
     links: links({ canLeaveOut }),
-    email: line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.').refine(isEmailAddress, 'Indiquez une adresse e-mail valide.'),
+    // A collective is reached at its email even when admins add it.
+    email: email({ canLeaveOut: canLeaveOut && !collective }),
     phone: canLeaveOut ? orLeftOut(phone, '') : phone,
   })
 }
@@ -434,15 +446,17 @@ function profile(options: { canLeaveOut: boolean }) {
 }
 
 // A profile, as artists send it when they apply (see `POST /api/applications`), and as admins send it: they can leave
-// out the country, city, genres, links and phone, since they bring in artists who applied elsewhere, e.g. through the
-// original Google Form, which didn't always ask for them. What's there still has to be valid. Both are cleaned up as
-// they're checked, and the first error is what the server answers.
+// out the country, city, genres, bio, links, email (but not a collective's) and phone, since they bring in artists who
+// applied elsewhere, e.g. through the original Google Form, which didn't always ask for them, or whom they only know by
+// name. What's there still has to be valid. Both are cleaned up as they're checked, and the first error is what the server answers.
 export const ArtistProfile = profile({ canLeaveOut: false }).meta({ id: 'ArtistProfile' })
 export const AdminArtistProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminArtistProfile' })
 
 // What's saved of a profile, whoever sent it: an artist's or a collective's, as a single type.
 type Saved = z.output<typeof AdminArtistProfile>
 export type Profile = Pick<Saved, keyof Saved>
+// What's saved of a profile that an artist sent when they applied, which always has an email address.
+export type ApplicantProfile = Profile & { email: string }
 
 // The links of a profile, as they're saved: by site, the profile name, or the address for "web".
 export const ArtistLinks = z

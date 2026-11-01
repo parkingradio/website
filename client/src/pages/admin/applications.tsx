@@ -376,9 +376,7 @@ function ArtistSummary({ artist }: { artist: Artist }) {
       <dt>Ville</dt>
       <dd>{place(artist)}</dd>
       <dt>Adresse e-mail</dt>
-      <dd>
-        <a href={`mailto:${artist.email}`}>{artist.email}</a>
-      </dd>
+      <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>
       <dt>Téléphone</dt>
       <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
     </dl>

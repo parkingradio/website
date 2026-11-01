@@ -2565,8 +2565,7 @@ export interface components {
             country?: (components["schemas"]["Country"] | string) | null;
             city?: string | null;
             genres?: components["schemas"]["GenreId"][] | null;
-            /** @description Trimmed, then between 1 and 5000 characters */
-            bio: string;
+            bio?: string | null;
             links?: {
                 soundcloud?: string;
                 instagram?: string;
@@ -2578,8 +2577,7 @@ export interface components {
                 spotify?: string;
                 tiktok?: string;
             } | null;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
+            email?: string | null;
             phone?: string | null;
         } | {
             /** @constant */
@@ -2591,8 +2589,7 @@ export interface components {
             country?: (components["schemas"]["Country"] | string) | null;
             city?: string | null;
             genres?: components["schemas"]["GenreId"][] | null;
-            /** @description Trimmed, then between 1 and 5000 characters */
-            bio: string;
+            bio?: string | null;
             links?: {
                 soundcloud?: string;
                 instagram?: string;
@@ -2666,7 +2663,7 @@ export interface components {
             genres: components["schemas"]["GenreId"][];
             bio: string;
             links: components["schemas"]["ArtistLinks"];
-            email: string;
+            email: string | null;
             phone: string;
             updatedBy: string | null;
             updatedAt: string | null;

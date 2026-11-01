@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { Profile } from '../artists/profile.js'
+import type { ApplicantProfile } from '../artists/profile.js'
 import { applicationEmails, describeApplication } from './emails.js'
 import type { ApplicationFields } from './fields.js'
 
-function profile(changes: Partial<Profile> = {}): Profile {
+function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {
     kind: 'artist',
     name: 'DJ Test',

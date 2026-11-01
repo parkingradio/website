@@ -316,9 +316,9 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
 // entries, and with links reduced to profile names. If it isn't valid, returns what's wrong with each field instead, for
 // the form to show each error by its field. For links, that's the first link that's wrong, in the order of the sites, or that there's none.
 //
-// With `lenient`, for the admin pages, the country, city, genres, links and phone can be left out, as the server lets
-// admins do. What's there still has to be valid. A country that's left out is "", and so is a city or phone, and genres
-// and links are empty.
+// With `lenient`, for the admin pages, the country, city, genres, bio, links, email (but not a collective's) and phone can
+// be left out, as the server lets admins do. What's there still has to be valid. A country that's left out is "", and so
+// is a city, bio or phone, genres and links are empty, and an email is null.
 export function checkProfile(
   sent: unknown,
   { lenient = false } = {},
@@ -333,6 +333,8 @@ export function checkProfile(
   // For a field admins can leave out, from which nothing was read, whether it can be taken for one that's left out: it's
   // absent, or of its type (`ofItsType`). One of another type, e.g. a phone sent as a number, would otherwise be lost.
   const leftOut = (value: unknown, ofItsType: boolean) => lenient && (value === undefined || value === null || ofItsType)
+  // The error for a text field that's missing, or null if admins can leave it out and it is.
+  const missing = (value: unknown, error: string) => (leftOut(value, typeof value === 'string') ? null : error)
 
   const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
   if (!kind) errors.kind = 'Indiquez si vous postulez comme artiste ou comme collectif.'
@@ -355,8 +357,7 @@ export function checkProfile(
   const blankCountry = typeof artist.country === 'string' && !artist.country.trim()
   const country = COUNTRIES.find((code) => code === artist.country) ?? (leftOut(artist.country, blankCountry) ? '' : undefined)
   if (country === undefined) errors.country = 'Choisissez votre pays.'
-  const cityMissing = leftOut(artist.city, typeof artist.city === 'string') ? null : 'Indiquez votre ville.'
-  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, cityMissing))
+  const city = check('city', checkLine(artist.city, 'La ville', CITY_MAX_LENGTH, missing(artist.city, 'Indiquez votre ville.')))
 
   // Duplicates are dropped, keeping the first, so that the order still says which genres matter most.
   const genres: GenreId[] = []
@@ -367,7 +368,7 @@ export function checkProfile(
   }
   if (genres.length === 0 && !leftOut(artist.genres, Array.isArray(artist.genres))) errors.genres ??= 'Choisissez au moins un genre.'
 
-  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.'))
+  const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, missing(artist.bio, 'Écrivez quelques lignes de bio.')))
 
   // In the order of LINK_SITES, then links to other sites, like the server, which says what's wrong with the first.
   const links: ArtistLinks = {}
@@ -388,14 +389,15 @@ export function checkProfile(
   }
   if (Object.keys(links).length === 0 && !leftOut(artist.links, typeof artist.links === 'object')) errors.links ??= 'Ajoutez au moins un lien.'
 
-  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.'))
+  // Admins can't leave out a collective's email.
+  const emailMissing = collective ? 'Indiquez votre adresse e-mail.' : missing(artist.email, 'Indiquez votre adresse e-mail.')
+  const email = check('email', checkLine(artist.email, "L'adresse e-mail", EMAIL_MAX_LENGTH, emailMissing))
   if (email && !isEmailAddress(email)) errors.email = 'Indiquez une adresse e-mail valide.'
-  const phoneMissing = leftOut(artist.phone, typeof artist.phone === 'string') ? null : 'Indiquez votre numéro de téléphone.'
-  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, phoneMissing))
+  const phone = check('phone', checkLine(artist.phone, 'Le numéro de téléphone', PHONE_MAX_LENGTH, missing(artist.phone, 'Indiquez votre numéro de téléphone.')))
   if (phone && !isPhoneNumber(phone)) errors.phone = 'Indiquez un numéro de téléphone valide.'
 
   if (!kind || country === undefined || Object.keys(errors).length > 0) return { errors }
-  return { profile: { kind, name, members, country, city, genres, bio, links, email, phone } }
+  return { profile: { kind, name, members, country, city, genres, bio, links, email: email || null, phone } }
 }
 
 // The photo is optional: a JPEG, PNG or WebP image of up to PHOTO_MAX_BYTES, whose type the server tells from its

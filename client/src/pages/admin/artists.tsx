@@ -254,13 +254,11 @@ function ArtistDetails({ artist }: { artist: Artist }) {
           )}
         </dd>
         <dt>Adresse e-mail</dt>
-        <dd>
-          <a href={`mailto:${artist.email}`}>{artist.email}</a>
-        </dd>
+        <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>
         <dt>Téléphone</dt>
         <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
         <dt>Bio</dt>
-        <dd className="admin-text">{artist.bio}</dd>
+        <dd className="admin-text">{artist.bio || MISSING}</dd>
       </dl>
     </div>
   )

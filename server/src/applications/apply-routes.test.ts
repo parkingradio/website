@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
-import type { Profile } from '../artists/profile.js'
+import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
 import type { SentPhoto, StoredArtist } from '../artists/store.js'
 import { EmailNotSent } from '../core/email.js'
@@ -22,10 +22,10 @@ const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
 
-// Like the database, which knows artists by their email whatever its case.
+// Like the database, where two artists can't have the same email, whatever its case.
 const store: ApplyStore = {
   apply: vi.fn<ApplyStore['apply']>(async (artist, fields) => {
-    if (artists.some((other) => other.email.toLowerCase() === artist.email.toLowerCase())) throw new EmailTaken()
+    if (artists.some((other) => other.email?.toLowerCase() === artist.email.toLowerCase())) throw new EmailTaken()
     const applicant: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...artist }
     artists.push(applicant)
     const now = new Date()
@@ -74,7 +74,7 @@ const sendEmail = vi.fn<SendEmail>(async () => {})
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
-function profile(changes: Partial<Profile> = {}): Profile {
+function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {
     kind: 'artist',
     name: 'DJ Test',
@@ -263,6 +263,8 @@ describe('POST /api/applications', () => {
       { parts: { artist: profile({ genres: [] }) }, error: 'Choisissez au moins un genre.' },
       { parts: { artist: profile({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
       { parts: { artist: profile({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
+      { parts: { artist: profile({ bio: '' }) }, error: 'Écrivez quelques lignes de bio.' },
+      { parts: { artist: profile({ email: '' }) }, error: 'Indiquez votre adresse e-mail.' },
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },

@@ -197,14 +197,15 @@ export function Appliquer() {
     }
 
     setStatus({ state: 'sending' })
+    // Without `lenient`, `checkProfile` only returns what artists can send, e.g. with a country and an email, which its
+    // type doesn't say.
+    const artist = profile as Schema<'ArtistProfile'>
     const sent = await api.POST('/api/applications', {
-      // Without `lenient`, `checkProfile` only returns what artists can send, e.g. with a country, which its type doesn't
-      // say.
-      body: { artist: profile as Schema<'ArtistProfile'>, application, photo: form.photo ?? undefined, turnstileToken },
+      body: { artist, application, photo: form.photo ?? undefined, turnstileToken },
       bodySerializer: formData,
     })
     if (sent.ok) {
-      setStatus({ state: 'sent', email: profile.email })
+      setStatus({ state: 'sent', email: artist.email })
       return
     }
     // The server explains what's wrong in French, e.g. that an artist already has that email address. Otherwise, the
