@@ -136,7 +136,7 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
 }
 
 // The collective's artists, in order, each of whom can be moved up or down or removed, then the two ways of adding one:
-// picking one of the known artists, or typing the name of a new one (`entry`), then adding it with + or Enter. Only the
+// picking one of the other known artists, or typing the name of a new one (`entry`), then adding it with + or Enter. Only the
 // names added are sent, so a name left typed is an error, which the form says. A name that's a member's already can't be
 // added again.
 function MembersField({
@@ -164,10 +164,14 @@ function MembersField({
     }
   }, [members, artists, pickerId, entryId])
 
-  // Other than the collective's artists.
-  const options = (artists ?? [])
-    .filter((artist) => !members.some((member) => 'id' in member && member.id === artist.id))
-    .map((artist) => ({ key: artist.id, label: artist.name, detail: detailOf(artist) }))
+  // The collective's artists are there too, so that typing one of their names finds them, but they can't be picked.
+  const options = (artists ?? []).map((artist) => ({
+    key: artist.id,
+    label: artist.name,
+    ...(members.some((member) => 'id' in member && member.id === artist.id)
+      ? { detail: 'déjà dans le collectif', disabled: true }
+      : { detail: detailOf(artist) }),
+  }))
   // A name left typed is what's wrong with the members, if anything is, or else that there are none.
   const pending = entry.trim() !== ''
   // A member with the name typed, or else an artist, who could be picked rather than having another one created.

@@ -11,14 +11,14 @@ type Props = {
   showErrors: boolean
   // Whether the links are wrong as a whole, e.g. when there's none.
   invalid: boolean
-  // Put before the fields' ids, when there are several sets of links on the page.
-  idPrefix?: string
+  // Put before the fields' ids, since there are several sets of links on the page.
+  idPrefix: string
 }
 
 // One field per site, showing the site's address around the profile name. What's typed is reduced to what's kept, e.g.
 // an address to the profile name, as soon as it's pasted, or else when leaving the field. Until then, an address shows
 // without the site's address around it, which would show twice. A paste that can't be read says why right away.
-export function LinksField({ values, onChange, showErrors, invalid, idPrefix = '' }: Props) {
+export function LinksField({ values, onChange, showErrors, invalid, idPrefix }: Props) {
   // The fields shown on top of the default ones.
   const [shown, setShown] = useState<LinkSiteId[]>([])
   const [left, setLeft] = useState<Set<LinkSiteId>>(new Set())

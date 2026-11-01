@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from '../../artist-profile'
 
-// `id` is the button's, which the label points at: "photo" unless there are several photo fields on the page.
-type Props = { value: File | null; onChange: (file: File | null) => void; invalid: boolean; id?: string }
+// `id` is the button's, which the label points at.
+type Props = { value: File | null; onChange: (file: File | null) => void; invalid: boolean; id: string }
 
-export function PhotoField({ value, onChange, invalid, id = 'photo' }: Props) {
+export function PhotoField({ value, onChange, invalid, id }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   // The address of the photo picked, to show it, made when it's picked and released once it's replaced or the form is

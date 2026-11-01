@@ -59,7 +59,8 @@ It has no genres, which are the artists'.
 
 Its artists are in order, at least one, and can be reordered and removed. Each one is either:
 
-- an artist picked from those in this section, other than the collective's artists already, or
+- an artist picked from those in this section, other than the collective's artists already, which are offered too,
+  greyed out and marked "déjà dans le collectif", but can't be picked, or
 - a new artist, whose name is typed in "Ajouter un nouvel artiste", then added with a "+" button (or Enter), and whom
   the server creates with that name only when the collective is saved. The form isn't sent while a name is left typed
   without being added. While the name typed is that of one of the collective's artists, whatever its case and accents,

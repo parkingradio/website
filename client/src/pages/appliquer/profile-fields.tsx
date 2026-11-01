@@ -1,19 +1,114 @@
-import { CITY_MAX_LENGTH } from '../../artist-profile'
+import { CITY_MAX_LENGTH, NAME_MAX_LENGTH } from '../../artist-profile'
 import type { GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { APPLY_BIO_MAX_LENGTH, COUNTRY_OPTIONS, MAX_GENRES } from './choices'
 import { GenrePicker } from './genre-picker'
 import { useCitySuggestions } from './geonames'
+import { LinksField } from './links-field'
+import { PhotoField } from './photo-field'
+import { fieldId } from './profile'
+import type { Profile } from './profile'
 
-// The fields of a profile that an artist alone and each of a collective's artists both have, with the same rules.
+// An artist's profile, which an artist applying alone and each of a collective's artists both fill in, with the same
+// fields and rules: their identity (`IdentityFields`), then their presentation (`PresentationFields`).
+
+type ProfileErrors = Partial<Record<keyof Profile, string>>
+
+type IdentityProps = {
+  idPrefix: string
+  profile: Profile
+  onChange: (changes: Partial<Profile>) => void
+  errors: ProfileErrors
+  // What the browser can fill the name with, e.g. "nickname" for the visitor's own, rather than nothing.
+  nameAutoComplete?: string
+}
+
+// "Nom d'artiste", "Pays", "Ville" and "Genres musicaux".
+export function IdentityFields({ idPrefix, profile, onChange, errors, nameAutoComplete = 'off' }: IdentityProps) {
+  return (
+    <>
+      <div className="field wide">
+        <label htmlFor={fieldId(idPrefix, 'nom')}>
+          Nom d'artiste <span className="required">*</span>
+        </label>
+        <input
+          id={fieldId(idPrefix, 'nom')}
+          type="text"
+          maxLength={NAME_MAX_LENGTH}
+          autoComplete={nameAutoComplete}
+          aria-invalid={errors.name ? true : undefined}
+          value={profile.name}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
+        <FieldError message={errors.name} />
+      </div>
+      <PlaceFields
+        idPrefix={idPrefix}
+        country={profile.country}
+        city={profile.city}
+        onChange={onChange}
+        errors={errors}
+        cityPlaceholder="nom de la ville"
+      />
+      <GenresField value={profile.genres} onChange={(genres) => onChange({ genres })} error={errors.genres} />
+    </>
+  )
+}
+
+type PresentationProps = {
+  idPrefix: string
+  profile: Profile
+  onChange: (changes: Partial<Profile>) => void
+  errors: ProfileErrors
+  // Show every link's error, not only those of the fields that were left (set once the form was sent).
+  showErrors: boolean
+  // A collective's presentation, which has a description rather than a bio.
+  collective?: boolean
+}
+
+// "Photo", "Bio" and "Liens".
+export function PresentationFields({ idPrefix, profile, onChange, errors, showErrors, collective = false }: PresentationProps) {
+  return (
+    <>
+      <div className="field wide">
+        <label htmlFor={fieldId(idPrefix, 'photo')}>
+          Photo <span className="hint">— une photo de presse en bonne qualité pour notre site web</span>
+        </label>
+        <PhotoField id={fieldId(idPrefix, 'photo')} value={profile.photo} onChange={(photo) => onChange({ photo })} invalid={!!errors.photo} />
+        <FieldError message={errors.photo} />
+      </div>
+      <BioField
+        id={fieldId(idPrefix, 'bio')}
+        label={collective ? 'Description' : 'Bio'}
+        placeholder={collective ? 'Quelques lignes sur le collectif.' : "Quelques lignes sur l'artiste ou le projet."}
+        value={profile.bio}
+        onChange={(bio) => onChange({ bio })}
+        error={errors.bio}
+      />
+      <fieldset className={errors.links ? 'field wide invalid' : 'field wide'}>
+        <legend>
+          Liens <span className="required">*</span> <span className="hint">— au moins un</span>
+        </legend>
+        <LinksField
+          idPrefix={idPrefix}
+          values={profile.links}
+          onChange={(links) => onChange({ links })}
+          showErrors={showErrors}
+          invalid={!!errors.links}
+        />
+        <FieldError message={errors.links} />
+      </fieldset>
+    </>
+  )
+}
 
 export function FieldError({ message }: { message: string | undefined }) {
   return message ? <span className="error">{message}</span> : null
 }
 
 type PlaceProps = {
-  // The fields' ids.
-  ids: { country: string; city: string }
+  // What the fields' ids start with (see `fieldId`).
+  idPrefix: string
   country: string | null
   city: string
   onChange: (place: { country: string | null; city: string }) => void
@@ -23,8 +118,9 @@ type PlaceProps = {
 }
 
 // "Pays" and "Ville": the city can only be typed once a country is picked, and suggests that country's cities.
-export function PlaceFields({ ids, country, city, onChange, errors, cityPlaceholder }: PlaceProps) {
+export function PlaceFields({ idPrefix, country, city, onChange, errors, cityPlaceholder }: PlaceProps) {
   const citySuggestions = useCitySuggestions(country, city)
+  const ids = { country: fieldId(idPrefix, 'pays'), city: fieldId(idPrefix, 'ville') }
   return (
     <>
       <div className="field">
@@ -65,26 +161,22 @@ type GenresProps = {
   value: GenreId[]
   onChange: (genres: GenreId[]) => void
   error: string | undefined
-  // Whose main genre the first one is, e.g. "votre", or "son" for one of a collective's artists.
-  whose: string
 }
 
 // "Genres musicaux": 1 to MAX_GENRES, in order.
-export function GenresField({ value, onChange, error, whose }: GenresProps) {
+function GenresField({ value, onChange, error }: GenresProps) {
   return (
     <fieldset className={error ? 'field wide invalid' : 'field wide'}>
       <legend className="genres-legend">
         <span>
           Genres musicaux <span className="required">*</span>{' '}
-          <span className="hint">
-            — jusqu'à {MAX_GENRES}, dans l'ordre : le premier est {whose} genre principal
-          </span>
+          <span className="hint">— jusqu'à {MAX_GENRES}, dans l'ordre : le premier est le genre principal</span>
         </span>
         <span className={value.length >= MAX_GENRES ? 'count full' : 'count'} aria-live="polite">
           {value.length} / {MAX_GENRES}
         </span>
       </legend>
-      <GenrePicker value={value} onChange={onChange} invalid={!!error} whose={whose} />
+      <GenrePicker value={value} onChange={onChange} invalid={!!error} />
       <FieldError message={error} />
     </fieldset>
   )
@@ -100,7 +192,7 @@ type TextProps = {
 }
 
 // A bio, or a collective's description, up to APPLY_BIO_MAX_LENGTH.
-export function BioField({ id, label, placeholder, value, onChange, error }: TextProps) {
+function BioField({ id, label, placeholder, value, onChange, error }: TextProps) {
   return (
     <div className="field wide">
       <label htmlFor={id}>

@@ -346,13 +346,49 @@ describe('A collective’s page', () => {
 
     await edit()
     fireEvent.click(picker())
-    // Other than its artists.
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['DoraBrise'])
+    // Its artists are shown, but can't be picked.
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Auroredéjà dans le collectif',
+      'Cyandéjà dans le collectif',
+      'DoraBrise',
+    ])
+    expect(screen.getAllByRole('option', { name: /déjà dans le collectif/ }).map((option) => option.getAttribute('aria-disabled'))).toEqual([
+      'true',
+      'true',
+    ])
+    expect(screen.getByRole('option', { name: /^Dora/ })).not.toHaveAttribute('aria-disabled')
     fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
     fireEvent.change(picker(), { target: { value: 'cy' } })
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['CyanBruxelles, Belgique'])
     fireEvent.keyDown(picker(), { key: 'Enter' })
     expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+  })
+
+  it("finds the collective's artists by their name, but doesn't add them again, whether clicked, entered or typed", async () => {
+    mockFetch(ONDES_PAGE)
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await edit()
+    fireEvent.click(picker())
+    fireEvent.change(picker(), { target: { value: 'aurore' } })
+    const aurore = screen.getByRole('option', { name: /^Aurore/ })
+    expect(aurore).toHaveTextContent('Auroredéjà dans le collectif')
+    expect(aurore).toHaveAttribute('aria-disabled', 'true')
+    expect(aurore).toHaveAttribute('aria-selected', 'false')
+    expect(picker()).not.toHaveAttribute('aria-activedescendant')
+
+    fireEvent.mouseMove(aurore, { screenX: 1, screenY: 1 })
+    expect(picker()).not.toHaveAttribute('aria-activedescendant')
+    fireEvent.mouseDown(aurore)
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    fireEvent.keyDown(picker(), { key: 'Enter' })
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+
+    // Nor by leaving the field with their whole name typed.
+    fireEvent.change(picker(), { target: { value: 'Aurore' } })
+    fireEvent.blur(picker())
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+    expect(picker()).toHaveValue('')
   })
 
   it('says when a new artist has the name of a known one', async () => {

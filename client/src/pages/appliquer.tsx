@@ -6,17 +6,17 @@ import type { ApplicationFields, PrestationId } from '../application-fields'
 import { checkApplicant } from '../applicant'
 import type { ApplicantErrors, ApplicantKind } from '../applicant'
 import { LINK_SITES, NAME_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
-import type { GenreId, LinkSiteId } from '../artist-profile'
+import type { LinkSiteId } from '../artist-profile'
 import { useTurnstileSiteKey } from '../config-context'
 import { MAX_MEMBERS, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './appliquer/choices'
 import type { TimeSlotId } from './appliquer/choices'
 import { DatePicker } from './appliquer/date-picker'
-import { LinksField } from './appliquer/links-field'
 import { emptyMember } from './appliquer/members'
 import type { Member, MemberErrors } from './appliquer/members'
 import { MembersField } from './appliquer/members-field'
-import { PhotoField } from './appliquer/photo-field'
-import { BioField, FieldError, GenresField, PlaceFields } from './appliquer/profile-fields'
+import { fieldId } from './appliquer/profile'
+import type { Profile } from './appliquer/profile'
+import { FieldError, IdentityFields, PlaceFields, PresentationFields } from './appliquer/profile-fields'
 import { Turnstile } from './appliquer/turnstile'
 import './appliquer.css'
 
@@ -24,24 +24,20 @@ import './appliquer.css'
 // each of its artists', and their application to `POST /api/applications`. It checks them as the server does (see
 // `checkApplicant` and `checkApplication`), and sets a few limits of its own (see appliquer/choices.ts).
 
+// What the ids of the fields of the profile of who applies start with, an artist's or a collective's, whose fields that
+// both have keep their ids when switching between the two.
+const PROFILE_ID_PREFIX = 'artiste-'
+
 const KIND_OPTIONS: { kind: ApplicantKind; title: string; text: string }[] = [
   { kind: 'artist', title: 'Artiste', text: 'Vous jouez seul·e (ou en b2b) pendant une heure, dans une plage de notre programmation.' },
   { kind: 'collective', title: 'Collectif', text: "Vous prenez en main une plage entière avec votre line-up d'artistes." },
 ]
 
-type Form = {
+// The profile of who applies, an artist's or a collective's, whose `bio` is its description and whose genres aren't sent.
+type Form = Profile & {
   kind: ApplicantKind | null
-  name: string
   // A collective's artists, each with their profile (an empty one to start with).
   members: Member[]
-  country: string | null
-  city: string
-  genres: GenreId[]
-  photo: File | null
-  // An artist's bio, or a collective's description.
-  bio: string
-  // What the artist typed for each site, as is.
-  links: Partial<Record<LinkSiteId, string>>
   prestations: PrestationId[]
   // "Autre" is checked, with what the artist wrote next to it.
   otherChecked: boolean
@@ -108,6 +104,11 @@ function checked(form: Form) {
   const applicant = checkApplicant(artist)
   const fields = checkApplication(application)
   const errors: Partial<Record<Field, string>> = { ...applicant.errors, ...fields.errors }
+  // A collective's description is the form's `bio`.
+  if (errors.description) {
+    errors.bio = errors.description
+    delete errors.description
+  }
   if (errors.links) errors.links = linksError(errors.links, form.links)
   const photo = pickedPhotoError(form.photo)
   if (photo) errors.photo = photo
@@ -180,6 +181,7 @@ export function Appliquer() {
     setStatus((current) => (current.state === 'failed' ? { state: 'editing' } : current))
   }
   const update = <K extends keyof Form>(key: K, value: Form[K]) => edit((current) => ({ ...current, [key]: value }))
+  const change = (changes: Partial<Form>) => edit((current) => ({ ...current, ...changes }))
   const result = checked(form)
   const errors = attempts > 0 ? result.errors : {}
   const errorCount = attempts > 0 ? result.count : 0
@@ -276,79 +278,64 @@ export function Appliquer() {
               </div>
               <FieldError message={errors.kind} />
             </fieldset>
-            <div className="field wide">
-              <label htmlFor="artist-name">
-                {collective ? 'Nom du collectif' : "Nom d'artiste"} <span className="required">*</span>
-              </label>
-              <input
-                id="artist-name"
-                type="text"
-                maxLength={NAME_MAX_LENGTH}
-                autoComplete="nickname"
-                aria-invalid={errors.name ? true : undefined}
-                value={form.name}
-                onChange={(event) => update('name', event.target.value)}
-              />
-              <FieldError message={errors.name} />
-            </div>
-            <PlaceFields
-              // Not "country" and "city", which Safari takes as address fields to fill from the visitor's contact card,
-              // on top of the countries and cities suggested here.
-              ids={{ country: 'artiste-pays', city: 'artiste-ville' }}
-              country={form.country}
-              city={form.city}
-              onChange={(place) => edit((current) => ({ ...current, ...place }))}
-              errors={errors}
-              cityPlaceholder={collective ? 'où le collectif est basé' : 'nom de votre ville'}
-            />
             {collective ? (
-              <fieldset className={errors.members ? 'field wide invalid' : 'field wide'}>
-                <legend>
-                  Artistes du collectif <span className="required">*</span>{' '}
-                  <span className="hint">— jusqu'à {MAX_MEMBERS}, chacun·e avec sa fiche</span>
-                </legend>
-                <MembersField
-                  members={form.members}
-                  onChange={(members) => update('members', members)}
-                  selected={memberTab}
-                  onSelect={setMemberTab}
-                  memberErrors={result.memberErrors}
-                  showErrors={attempts > 0}
+              <>
+                <div className="field wide">
+                  <label htmlFor={fieldId(PROFILE_ID_PREFIX, 'nom')}>
+                    Nom du collectif <span className="required">*</span>
+                  </label>
+                  <input
+                    id={fieldId(PROFILE_ID_PREFIX, 'nom')}
+                    type="text"
+                    maxLength={NAME_MAX_LENGTH}
+                    autoComplete="nickname"
+                    aria-invalid={errors.name ? true : undefined}
+                    value={form.name}
+                    onChange={(event) => update('name', event.target.value)}
+                  />
+                  <FieldError message={errors.name} />
+                </div>
+                <PlaceFields
+                  idPrefix={PROFILE_ID_PREFIX}
+                  country={form.country}
+                  city={form.city}
+                  onChange={change}
+                  errors={errors}
+                  cityPlaceholder="où le collectif est basé"
                 />
-                <FieldError message={errors.members} />
-                <p className="flyer-note">
-                  <strong>Takeovers&nbsp;:</strong> nous demandons aux collectifs de produire un flyer (carte blanche).
-                </p>
-              </fieldset>
+                <fieldset className={errors.members ? 'field wide invalid' : 'field wide'}>
+                  <legend>
+                    Artistes du collectif <span className="required">*</span>{' '}
+                    <span className="hint">— jusqu'à {MAX_MEMBERS}, chacun·e avec sa fiche</span>
+                  </legend>
+                  <MembersField
+                    members={form.members}
+                    onChange={(members) => update('members', members)}
+                    selected={memberTab}
+                    onSelect={setMemberTab}
+                    memberErrors={result.memberErrors}
+                    showErrors={attempts > 0}
+                  />
+                  <FieldError message={errors.members} />
+                  <p className="flyer-note">
+                    <strong>Takeovers&nbsp;:</strong> nous demandons aux collectifs de produire un flyer (carte blanche).
+                  </p>
+                </fieldset>
+              </>
             ) : (
-              <GenresField value={form.genres} onChange={(genres) => update('genres', genres)} error={errors.genres} whose="votre" />
+              <IdentityFields idPrefix={PROFILE_ID_PREFIX} profile={form} onChange={change} errors={errors} nameAutoComplete="nickname" />
             )}
           </Part>
 
           <Part number="02" title="Présentation">
-            <div className="field wide">
-              <label htmlFor="photo">
-                Photo <span className="hint">— une photo de presse en bonne qualité pour notre site web</span>
-              </label>
-              <PhotoField value={form.photo} onChange={(photo) => update('photo', photo)} invalid={!!errors.photo} />
-              <FieldError message={errors.photo} />
-            </div>
-            <BioField
-              id="bio"
-              label={collective ? 'Description' : 'Bio'}
-              placeholder={collective ? 'Quelques lignes sur le collectif.' : 'Quelques lignes sur vous ou votre projet.'}
-              value={form.bio}
-              onChange={(bio) => update('bio', bio)}
-              error={errors.bio ?? errors.description}
+            <PresentationFields
+              idPrefix={PROFILE_ID_PREFIX}
+              profile={form}
+              onChange={change}
+              errors={errors}
+              showErrors={attempts > 0}
+              collective={collective}
             />
-            <fieldset className={errors.links ? 'field wide invalid' : 'field wide'}>
-              <legend>
-                Liens <span className="required">*</span>{' '}
-                <span className="hint">— au moins un</span>
-              </legend>
-              <LinksField values={form.links} onChange={(links) => update('links', links)} showErrors={attempts > 0} invalid={!!errors.links} />
-              <FieldError message={errors.links} />
-            </fieldset>
           </Part>
 
           <Part number="03" title="Prestation" note="Cochez tout ce qui s'applique.">

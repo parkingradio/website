@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { NAME_MAX_LENGTH } from '../../artist-profile'
 import { MAX_MEMBERS } from './choices'
-import { LinksField } from './links-field'
 import { emptyMember } from './members'
 import type { Member, MemberErrors } from './members'
-import { PhotoField } from './photo-field'
-import { BioField, FieldError, GenresField, PlaceFields } from './profile-fields'
+import { fieldId } from './profile'
+import { IdentityFields, PresentationFields } from './profile-fields'
 
 // The artists of a collective, each with their profile, as tabs above the profile of the one selected (see "Artistes du
 // collectif" in docs/design/client/appliquer.md).
@@ -51,7 +49,7 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
     const member = emptyMember(Math.max(...members.map((other) => other.key)) + 1)
     onChange([...members, member])
     onSelect(members.length)
-    focus.current = () => document.getElementById(fieldId(member, 'nom'))
+    focus.current = () => document.getElementById(fieldId(idPrefix(member), 'nom'))
   }
 
   const remove = (index: number) => {
@@ -133,8 +131,9 @@ function profileId(member: Member): string {
   return `membre-${member.key}`
 }
 
-function fieldId(member: Member, field: string): string {
-  return `membre-${member.key}-${field}`
+// What the ids of the fields of a member's profile start with.
+function idPrefix(member: Member): string {
+  return `${profileId(member)}-`
 }
 
 type ProfileProps = {
@@ -148,65 +147,13 @@ type ProfileProps = {
 
 // A member's profile: the same fields as an artist who applies alone, in the same order, without the email and phone.
 function MemberProfile({ member, label, hidden, errors, showErrors, onChange }: ProfileProps) {
-  const id = (field: string) => fieldId(member, field)
-  const update = <K extends keyof Member>(key: K, value: Member[K]) => onChange({ ...member, [key]: value })
-
+  const update = (changes: Partial<Member>) => onChange({ ...member, ...changes })
   return (
     <fieldset className="member-panel" id={profileId(member)} hidden={hidden}>
       <legend className="visually-hidden">{label}</legend>
       <div className="fields">
-        <div className="field wide">
-          <label htmlFor={id('nom')}>
-            Nom d'artiste <span className="required">*</span>
-          </label>
-          <input
-            id={id('nom')}
-            type="text"
-            maxLength={NAME_MAX_LENGTH}
-            autoComplete="off"
-            aria-invalid={errors.name ? true : undefined}
-            value={member.name}
-            onChange={(event) => update('name', event.target.value)}
-          />
-          <FieldError message={errors.name} />
-        </div>
-        <PlaceFields
-          ids={{ country: id('pays'), city: id('ville') }}
-          country={member.country}
-          city={member.city}
-          onChange={(place) => onChange({ ...member, ...place })}
-          errors={errors}
-          cityPlaceholder="nom de sa ville"
-        />
-        <GenresField value={member.genres} onChange={(genres) => update('genres', genres)} error={errors.genres} whose="son" />
-        <div className="field wide">
-          <label htmlFor={id('photo')}>
-            Photo <span className="hint">— une photo de presse en bonne qualité pour notre site web</span>
-          </label>
-          <PhotoField id={id('photo')} value={member.photo} onChange={(photo) => update('photo', photo)} invalid={!!errors.photo} />
-          <FieldError message={errors.photo} />
-        </div>
-        <BioField
-          id={id('bio')}
-          label="Bio"
-          placeholder="Quelques lignes sur cet·te artiste."
-          value={member.bio}
-          onChange={(bio) => update('bio', bio)}
-          error={errors.bio}
-        />
-        <fieldset className={errors.links ? 'field wide invalid' : 'field wide'}>
-          <legend>
-            Liens <span className="required">*</span> <span className="hint">— au moins un</span>
-          </legend>
-          <LinksField
-            idPrefix={id('')}
-            values={member.links}
-            onChange={(links) => update('links', links)}
-            showErrors={showErrors}
-            invalid={!!errors.links}
-          />
-          <FieldError message={errors.links} />
-        </fieldset>
+        <IdentityFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={errors} />
+        <PresentationFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={errors} showErrors={showErrors} />
       </div>
     </fieldset>
   )

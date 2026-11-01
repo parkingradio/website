@@ -370,7 +370,9 @@ describe('Appliquer', () => {
     expect(collective.getByRole('radio', { name: /^Collectif/ })).toHaveAccessibleName(expect.stringContaining("plage d'environ 4 h"))
     expect(collective.getByText(/nous demandons aux collectifs de produire un flyer/)).toBeInTheDocument()
     // Its genres are its artists'.
-    expect(collective.queryByText(/le premier est votre genre principal/)).not.toBeInTheDocument()
+    const genres = collective.getAllByRole('group', { name: /^Genres musicaux/ })
+    expect(genres).toHaveLength(1)
+    expect(memberProfile(1)).toContainElement(genres[0])
     expect(part('Contact').getByText(/La personne-contact du collectif/)).toBeInTheDocument()
     expect(part('Prestation')).toBeTruthy()
 
@@ -406,7 +408,14 @@ describe('Appliquer', () => {
     await fillInMember(1, 'Une', { photo: new File(['une'], 'une.png', { type: 'image/png' }) })
     fireEvent.click(part('Le collectif').getByRole('radio', { name: /^Artiste/ }))
     await send()
-    expect(sentParts().artist).toMatchObject({ kind: 'artist', name: 'Le Collectif', bio: 'Une description.' })
+    expect(sentParts().artist).toMatchObject({
+      kind: 'artist',
+      name: 'Le Collectif',
+      country: 'CA',
+      city: 'Lévis',
+      genres: ['techno'],
+      bio: 'Une description.',
+    })
     expect(sentParts().memberPhotos).toEqual([])
   })
 
@@ -483,6 +492,41 @@ describe('Appliquer', () => {
     addMember()
     fireEvent.click(memberTab(1))
     expect(within(memberProfile(1)).getByRole('textbox', { name: 'Mixcloud' })).toBeInTheDocument()
+  })
+
+  it("asks for an artist's profile in the same neutral words, whether they apply alone or with a collective", async () => {
+    // What a profile's fields say to fill them in: their placeholders and hints.
+    const prompts = (elements: HTMLElement[]) =>
+      elements.flatMap((element) =>
+        [...element.querySelectorAll('[placeholder], .hint, .placeholder')].map((prompt) => prompt.getAttribute('placeholder') ?? prompt.textContent),
+      )
+    renderForm()
+    const artist = part("L'artiste")
+    fireEvent.click(artist.getByRole('radio', { name: /^Artiste/ }))
+    await pick(/^Pays/, 'canada', /^Canada/, artist)
+    const alone = prompts(["L'artiste", 'Présentation'].map((title) => screen.getByRole('heading', { level: 2, name: title }).closest('section')!))
+    expect(alone).toEqual(
+      expect.arrayContaining([
+        'nom de la ville',
+        "— jusqu'à 3, dans l'ordre : le premier est le genre principal",
+        'cliquez sur un genre ci-dessous · le premier choisi sera le genre principal',
+        "Quelques lignes sur l'artiste ou le projet.",
+      ]),
+    )
+    for (const prompt of alone) expect(prompt).not.toMatch(/\b(vous|votre|vos|son|sa|ses)\b/i)
+
+    fireEvent.click(artist.getByRole('radio', { name: /^Collectif/ }))
+    await pick(/^Pays/, 'france', /^France/, within(memberProfile(1)))
+    expect(prompts([memberProfile(1)])).toEqual(alone)
+  })
+
+  it('says when the collective has no description', async () => {
+    renderForm()
+    fireEvent.click(part("L'artiste").getByRole('radio', { name: /^Collectif/ }))
+    await send()
+    const description = part('Présentation').getByRole('textbox', { name: /^Description/ })
+    expect(description).toHaveAttribute('aria-invalid', 'true')
+    expect(part('Présentation').getByText('Écrivez quelques lignes de description.')).toBeInTheDocument()
   })
 
   it("shows what is wrong in each artist's profile, bringing the artist to the first one", async () => {
