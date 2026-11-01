@@ -5,7 +5,8 @@
 # collectives whatever their case, collectives listed by name, members kept in order, members created by name, the
 # checks on members that take the database (artists who exist, and aren't collectives of their own, on both sides),
 # artists returning their collectives, what deleting an artist or a collective does to the other, a collective's photo
-# kept on disk, then deleted, and changing a collective while one of its members is deleted.
+# kept on disk, then deleted, changing a collective while one of its members is deleted, and listing a collective's
+# members as artists, in its order.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -42,11 +43,6 @@ expect_no_artist() {
     if printf '%s' "$BODY" | grep -Fq "\"name\":\"$1\""; then fail "expected no artist named $1"; fi
 }
 
-# sql <query> -- run a query in the database, and print its result, without headers or alignment.
-sql() {
-    docker exec "$PG" psql --quiet --no-align --tuples-only --username parking_radio --dbname parking_radio --command "$1"
-}
-
 # wait_for_sql <query> -- wait, for up to 10 seconds, for the query to return true.
 wait_for_sql() {
     for _ in $(seq 1 100); do
@@ -56,9 +52,10 @@ wait_for_sql() {
     fail "timed out waiting for: $1"
 }
 
-# first_id -- the first "id" in the body of the last request, e.g. that of the collective rather than its members'.
-first_id() {
-    printf '%s' "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
+# artist_ids -- the ids of the artists in the body of the last request, in order, on one line, without those of the
+# collectives they're in.
+artist_ids() {
+    printf '%s' "$BODY" | grep -o '"id":"[^"]*","createdAt"' | cut -d'"' -f4 | tr '\n' ' '
 }
 
 # profile_with <email> <member>... -- a collective's profile, as JSON, with this email and these members: each one the id
@@ -180,6 +177,19 @@ expect_body_contains '"kind":"artist","name":"Cyan","members":[],"country":"","c
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains "\"collectives\":[{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}]"
 
+echo "  a collective's members are listed as artists, in its order, and a collective that doesn't exist has none"
+admin GET "${ARTISTS}?collective=${ondes}"
+expect_status 200
+[ "$(artist_ids)" = "${cyan} ${brume} " ] || { _show_body; fail "expected Cyan, then Brume"; }
+expect_body_contains "\"collectives\":[{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}]"
+for id in "$NOBODY" not-a-uuid "$legacy"; do
+    admin GET "${ARTISTS}?collective=${id}"
+    expect_status 200
+    expect_body_contains '"artists":[]'
+done
+admin GET "${ARTISTS}?collective=${ondes}&collective=${aube}"
+expect_status 400
+
 echo "  the photo is replaced, then removed, and deleted each time"
 send collective PUT "${COLLECTIVES}/${ondes}" "$(profile "$brume")" "${FILES}/photo.png"
 expect_status 200
@@ -201,6 +211,8 @@ expect_status 200
 admin GET "${COLLECTIVES}/${aube}"
 expect_status 200
 expect_body_contains '"members":[]'
+admin GET "${ARTISTS}?collective=${aube}"
+expect_body_contains '"artists":[]'
 
 echo "  changing a collective while one of its members is deleted doesn't deadlock"
 send artist POST "$ARTISTS" '{"kind":"artist","name":"Éphémère"}'

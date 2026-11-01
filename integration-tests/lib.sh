@@ -111,6 +111,16 @@ body_id() {
     body_field id
 }
 
+# first_id -- the first "id" in the body of the last request, e.g. that of a collective rather than its members'.
+first_id() {
+    printf '%s' "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
+}
+
+# sql <query> -- run a query in the database, and print its result, without headers or alignment.
+sql() {
+    docker exec "$PG" psql --quiet --no-align --tuples-only --username parking_radio --dbname parking_radio --command "$1"
+}
+
 # expect_status <code>
 expect_status() {
     if [ "$STATUS" != "$1" ]; then

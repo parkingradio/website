@@ -4,10 +4,12 @@
 # where we check:
 # - the applications table, and that the database takes every status
 # - that dates come back from the database as "YYYY-MM-DD"
-# - that an application can only belong to an artist who exists
+# - that an application belongs to either an artist or a collective who exists, which the database checks too
 # - that applications are listed by when they were received, the most recent first, and that an application was received
 #   when it was created unless an admin said otherwise
-# - that deleting an artist deletes their applications
+# - applications listed by artist or by collective
+# - that deleting an artist deletes their applications, but not those of their collectives, and that deleting a
+#   collective deletes its applications
 # - the applications_settings table, and that who applications are emailed to is saved, and replaced
 
 source "$(dirname "$0")/lib.sh"
@@ -34,6 +36,12 @@ json() {
 application() {
     printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"%s}' \
         "$1" "${2:-}" "${3:+,$3}"
+}
+
+# application_of <collective id> [<more JSON fields>] -- an application for that collective, as JSON.
+application_of() {
+    printf '{"collectiveId":"%s","dates":["2027-02-01"],"timeSlots":[],"prestations":["full-band"],"otherPrestation":"","details":""%s}' \
+        "$1" "${2:+,$2}"
 }
 
 # The artist who applies.
@@ -138,10 +146,61 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
 done
 
-echo "  deleting an artist deletes their applications"
+echo "  an application is created for a collective, which has to exist, rather than for an artist"
+request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Les Candidats\",\"members\":[{\"id\":\"${artist}\"}],
+\"email\":\"collectif@integration.test\"}" "${BASE_URL}/api/admin/collectives"
+expect_status 200
+collective="$(first_id)"
+json POST "${BASE_URL}/api/admin/applications" "$(application_of "$collective")"
+expect_status 200
+theirs="$(body_id)"
+expect_body_contains "\"artistId\":null,\"collectiveId\":\"${collective}\""
+for id in "$NOBODY" not-a-uuid "$artist"; do
+    json POST "${BASE_URL}/api/admin/applications" "$(application_of "$id")"
+    expect_status 400
+    expect_body_contains 'No such collective'
+done
+json POST "${BASE_URL}/api/admin/applications" "$(application_of "$collective" "\"artistId\":\"${artist}\"")"
+expect_status 400
+expect_body_contains 'An application belongs to either an artist or a collective'
+
+echo "  the database refuses an application with neither an artist nor a collective, or both"
+neither="insert into applications (dates, time_slots, prestations, other_prestation, details)
+    values ('{2027-01-15}', '[]', '{}', '', '')"
+both="update applications set artist_id = '${artist}' where id = '${theirs}'"
+# Through a file rather than $(...), where the ERR trap would report the query failing, which is what's expected.
+readonly REFUSED="$(mktemp)"
+trap 'rm -f "$PHOTO" "$REFUSED"' EXIT
+for query in "$neither" "$both"; do
+    status=0
+    sql "$query" >"$REFUSED" 2>&1 || status=$?
+    [ "$status" != 0 ] || fail "expected the database to refuse: ${query}"
+    grep -q applications_owner "$REFUSED" || fail "expected applications_owner to refuse: ${query}, but got: $(cat "$REFUSED")"
+done
+
+echo "  applications are listed by collective, and its applications aren't its artists'"
+json GET "${BASE_URL}/api/admin/applications?collective=${collective}"
+expect_status 200
+[ "$(printf '%s' "$BODY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4 | tr '\n' ' ')" = "${theirs} " ] || { _show_body; fail "expected only the collective's application"; }
+json GET "${BASE_URL}/api/admin/applications?artist=${artist}"
+if printf '%s' "$BODY" | grep -Fq "$theirs"; then fail "expected the collective's application not to be the artist's"; fi
+json GET "${BASE_URL}/api/admin/applications?collective=${NOBODY}"
+expect_body_contains '"applications":[]'
+json GET "${BASE_URL}/api/admin/applications?artist=${artist}&collective=${collective}"
+expect_status 400
+
+echo "  deleting an artist deletes their applications, but not those of their collectives"
 json DELETE "${BASE_URL}/api/admin/artists/${artist}"
 expect_status 200
 json GET "${BASE_URL}/api/admin/applications/${second}"
+expect_status 404
+json GET "${BASE_URL}/api/admin/applications/${theirs}"
+expect_status 200
+
+echo "  deleting a collective deletes its applications"
+json DELETE "${BASE_URL}/api/admin/collectives/${collective}"
+expect_status 200
+json GET "${BASE_URL}/api/admin/applications/${theirs}"
 expect_status 404
 
 echo "  nobody gets applications by email until they're chosen, and they're saved, then replaced"

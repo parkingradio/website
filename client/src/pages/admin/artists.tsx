@@ -2,38 +2,34 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
-import type { Artist, GenreId } from '../../artist-profile'
+import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ArtistForm } from './artist-form'
-import { ApplicationsTable } from './applications'
+import { OwnApplications } from './applications'
 import {
   ENTRY_KIND_LABELS,
   KIND_LABELS,
   MISSING,
   addedBy,
-  artistEntryKind,
-  artistSearchFields,
+  artistEntry,
   byWhom,
-  collectiveSearchFields,
+  collectiveEntry,
+  deletedWith,
   comparePlaces,
   entryPath,
   genreNames,
-  membersGenres,
   photoUrl,
   place,
 } from './describe'
-import type { EntryKind } from './describe'
+import type { Entry } from './describe'
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { BackToArtists, LinksList, LoadFailure, PhotoOrNone } from './profile-details'
+import { ArtistsFailure, BackToArtists, CollectivesFailure, LinksList, LoadFailure, PhotoOrNone } from './profile-details'
 
 // The artists section: every artist and collective, each artist's page, where they're changed or deleted, and adding one
 // by hand, e.g. to bring in an artist who applied through the original Google Form. Collectives' pages are in
 // collectives.tsx.
-
-// An artist or a collective, as the list shows, searches and sorts them.
-type Entry = { kind: EntryKind; id: string; name: string; city: string; country: string; genres: GenreId[]; searchFields: string[] }
 
 // The columns the list can be sorted by, where artists come before collectives.
 const ENTRY_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Entry>> = {
@@ -45,13 +41,7 @@ const ENTRY_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Entry>> = {
 // Every artist and collective, by name.
 function entries(artists: Artist[], collectives: Collective[]): Entry[] {
   const byId = new Map(artists.map((artist) => [artist.id, artist]))
-  return [
-    ...artists.map((artist): Entry => ({ ...artist, kind: artistEntryKind(artist), searchFields: artistSearchFields(artist) })),
-    ...collectives.map((collective): Entry => {
-      const genres = membersGenres(collective.members, byId)
-      return { ...collective, kind: 'collective', genres, searchFields: collectiveSearchFields(collective, genres) }
-    }),
-  ].sort((a, b) => compareText(a.name, b.name))
+  return [...artists.map(artistEntry), ...collectives.map((collective) => collectiveEntry(collective, byId))].sort((a, b) => compareText(a.name, b.name))
 }
 
 // Every artist and collective.
@@ -83,16 +73,8 @@ function ArtistsList({ query }: { query: string }) {
   if (artists.kind === 'error' || collectives.kind === 'error') {
     return (
       <>
-        {artists.kind === 'error' && (
-          <p className="admin-error" role="alert">
-            Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
-          </p>
-        )}
-        {collectives.kind === 'error' && (
-          <p className="admin-error" role="alert">
-            Les collectifs n'ont pas pu être chargés&nbsp;: {collectives.message}
-          </p>
-        )}
+        {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+        {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       </>
     )
   }
@@ -131,7 +113,7 @@ function ArtistsList({ query }: { query: string }) {
             </td>
             <td>{ENTRY_KIND_LABELS[entry.kind]}</td>
             <td>{place(entry)}</td>
-            <td>{genreNames(entry.genres)}</td>
+            <td>{entry.genres && genreNames(entry.genres)}</td>
           </tr>
         ))}
       </tbody>
@@ -183,9 +165,7 @@ function ArtistById({ id }: { id: string }) {
   const count = applications.kind === 'loaded' ? applications.value.applications.length : null
   const theirPhoto = artist.hasPhoto ? ', sa photo' : ''
   const remove = async () => {
-    // Their applications are mentioned unless it's known that there are none.
-    const theirApplications = count === 0 ? '' : ` et ses candidatures${count ? ` (${count})` : ''}`
-    if (!window.confirm(`Supprimer définitivement ${artist.name}${theirPhoto}${theirApplications} ?`)) return
+    if (!window.confirm(`Supprimer définitivement ${deletedWith(artist.name, artist.hasPhoto, count)} ?`)) return
     setBusy(true)
     setError(null)
     const result = await api.DELETE('/api/admin/artists/{id}', { params: { path: { id } } })
@@ -211,23 +191,7 @@ function ArtistById({ id }: { id: string }) {
       </div>
       <ArtistDetails artist={artist} />
 
-      <h2>Candidatures</h2>
-      <div className="admin-toolbar">
-        <Link to={`/admin/candidatures/nouvelle?artiste=${artist.id}`} className="admin-button">
-          nouvelle candidature
-        </Link>
-      </div>
-      {applications.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
-        </p>
-      )}
-      {applications.kind === 'loaded' &&
-        (applications.value.applications.length === 0 ? (
-          <p className="admin-placeholder">Aucune candidature.</p>
-        ) : (
-          <ApplicationsTable applications={applications.value.applications} />
-        ))}
+      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?artiste=${artist.id}`} />
 
       <h2>Supprimer</h2>
       <p>

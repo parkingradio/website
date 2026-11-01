@@ -103,8 +103,8 @@ describe('Admin pages', () => {
   })
 
   it('shows the login form when the session ends while a page is open, then the page, loaded anew, once logged in', async () => {
-    // Both of the section's requests fail, as they would once the session ended.
-    mockFetch({ ...LOGGED_IN, '/api/admin/applications': UNAUTHORIZED, '/api/admin/artists': UNAUTHORIZED })
+    // Every request of the section fails, as they would once the session ended.
+    mockFetch({ ...LOGGED_IN, '/api/admin/applications': UNAUTHORIZED, '/api/admin/artists': UNAUTHORIZED, '/api/admin/collectives': UNAUTHORIZED })
     renderAt('/admin/candidatures')
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
@@ -116,6 +116,7 @@ describe('Admin pages', () => {
       ...LOGGED_IN,
       '/api/admin/applications': { ok: true, applications: [] },
       '/api/admin/artists': { ok: true, artists: [] },
+      '/api/admin/collectives': { ok: true, collectives: [] },
       '/api/auth/login': { ok: true, email: 'admin@example.com' },
     })
     logIn()

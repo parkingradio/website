@@ -61,12 +61,14 @@ It's kept in the app's private S3 bucket, or in a local directory in development
 the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the bucket's previous versions
 for as long as the database's backups are kept, like the artist's row, and is gone for good after that.
 
-## `GET /api/admin/artists` (admin)
+## `GET /api/admin/artists[?collective=<id>]` (admin)
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `artists` | list of artists | By name, whatever its case |
+| `artists` | list of artists | By name, whatever its case, or, with `collective`, only that collective's members, in the collective's order. An unknown collective has none |
+
+Fails with 400 if `collective` is given more than once.
 
 ## `GET /api/admin/artists/:id` (admin)
 
@@ -107,5 +109,5 @@ collective into a collective (see [Members](collectives.md#members)), and with 4
 
 ## `DELETE /api/admin/artists/:id` (admin)
 
-Deletes an artist, their photo if they have one and their applications, takes them out of their collectives, and
-responds `{"ok": true}`. Fails with 404 when there's no such artist.
+Deletes an artist, their photo if they have one and their own applications, but not those of their collectives, takes
+them out of their collectives, and responds `{"ok": true}`. Fails with 404 when there's no such artist.

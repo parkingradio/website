@@ -1,8 +1,10 @@
 # Applications
 
 An application says when the artist would like to play and what they'd do. Applications are stored in the
-`applications` table (`server/src/db/schema.ts`). Each one belongs to an artist, and is deleted when the artist is
-deleted.
+`applications` table (`server/src/db/schema.ts`). Each one belongs to either an artist or a
+[collective](collectives.md), never both, and is deleted when its artist or collective is deleted. An application has
+the same fields either way: for a collective's, "the artist" below means the collective, and the fields describe its
+show as a whole, e.g. its prestations aren't each member's.
 
 The server checks every application against the rules in `server/src/applications/fields.ts` (the `ApplicationFields`
 schema). These rules only make sure the data is valid: every field below has to be there, with its type, even when it's
@@ -13,8 +15,8 @@ Applications are created in two ways:
 
 - A new artist applies with `POST /api/applications`, which creates the artist and their application together (see
   [Applying](#applying)).
-- An admin creates an application, for an artist who already exists, e.g. to bring in one that came by email, or
-  through the original Google Form.
+- An admin creates an application, for an artist or a collective who already exists, e.g. to bring in one that came
+  by email, or through the original Google Form.
 
 An application has these fields:
 
@@ -34,7 +36,8 @@ The endpoints below also return these fields:
 | Field | Type | |
 |---|---|---|
 | `id` | string | |
-| `artistId` | string | The artist who applied |
+| `artistId` | string or null | The artist who applied, or null for a collective's application |
+| `collectiveId` | string or null | The collective that applied, or null for an artist's application |
 | `receivedAt` | string | When the artist sent the application, which isn't always when it was created: one that came by email, or through the original Google Form, can be brought in long after. For one sent through `POST /api/applications`, that's when it was created. For one an admin created, it's what the admin said, or else when it was created. Admins can change it either way |
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
@@ -46,14 +49,14 @@ Every application starts as `"new"`, then is `"accepted"` or `"rejected"` as an 
 `"scheduled"` once a date has been set with the artist, then `"done"` once they've played. That's only the usual order:
 admins can change a status to any other.
 
-## `GET /api/admin/applications[?artist=<id>]` (admin)
+## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications. An unknown artist has none |
+| `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications, and with `collective`, only that collective's. An unknown artist or collective has none |
 
-Fails with 400 if `artist` is given more than once.
+Fails with 400 if `artist` or `collective` is given more than once, or if both are given.
 
 ## `GET /api/admin/applications/:id` (admin)
 
@@ -66,11 +69,12 @@ Fails with 404 if the application doesn't exist.
 
 ## `POST /api/admin/applications` (admin)
 
-Creates an application for an existing artist. The request has the application's fields, plus:
+Creates an application for an existing artist or collective. The request has the application's fields, plus:
 
 | Request field | Type | |
 |---|---|---|
-| `artistId` | string | The id of the artist who's applying |
+| `artistId` | string, optional | The id of the artist who's applying |
+| `collectiveId` | string, optional | The id of the collective that's applying |
 | `receivedAt` | string, optional | When the artist sent the application: a date and time with its offset from UTC, e.g. `"2026-03-28T14:03:00Z"` or `"2026-03-28T10:03:00-04:00"`, which can't be in the future. Now if it's left out (it can't be null) |
 
 | Response field | Type | |
@@ -78,14 +82,16 @@ Creates an application for an existing artist. The request has the application's
 | `ok` | `true` | |
 | `application` | application | The new application |
 
-Fails with 400 if the application or `receivedAt` isn't valid (with a message in French), or the artist doesn't exist.
+Exactly one of `artistId` and `collectiveId` has to be there (neither can be null). Fails with 400 if the application
+or `receivedAt` isn't valid (with a message in French), or else if there's neither or both, or if the one that's there
+isn't the id of an artist or a collective that exists (in English, since only admins send ids).
 
 ## `PUT /api/admin/applications/:id` (admin)
 
-Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`,
-and leaving `receivedAt` out keeps the one the application has. The artist and the status don't change. The response
-is the same as for `POST /api/admin/applications`, with the updated application. Fails with 400 if the application or
-`receivedAt` isn't valid, or 404 if it doesn't exist.
+Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`
+or `collectiveId`, and leaving `receivedAt` out keeps the one the application has. The artist or collective and the
+status don't change. The response is the same as for `POST /api/admin/applications`, with the updated application.
+Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
 
 ## `PUT /api/admin/applications/:id/status` (admin)
 
@@ -98,7 +104,8 @@ Changes an application's status. The response is the same as for `POST /api/admi
 
 ## `DELETE /api/admin/applications/:id` (admin)
 
-Deletes an application, and responds `{"ok": true}`. The artist stays. Fails with 404 if the application doesn't exist.
+Deletes an application, and responds `{"ok": true}`. The artist or the collective stays. Fails with 404 if the
+application doesn't exist.
 
 ## Applying
 

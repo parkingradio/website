@@ -89,6 +89,7 @@ function application(id: string, artistId: string, changes: Partial<Application>
   return {
     id,
     artistId,
+    collectiveId: null,
     receivedAt: '2026-10-05T16:00:00.000Z',
     createdAt: '2026-10-05T16:00:00.000Z',
     createdBy: 'admin@example.com',

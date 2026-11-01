@@ -90,12 +90,19 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     {
       config: { admin: true },
       schema: {
-        summary: 'Every artist, by name',
+        summary: "Every artist, by name, or a collective's, in its order",
         tags: ['Artists'],
+        querystring: z.object({
+          collective: z
+            // The field's name comes before the message (see `useZodSchemas`).
+            .string({ error: 'Must be a single id' })
+            .optional()
+            .meta({ description: "Only this collective's members, in its order. An unknown collective has none" }),
+        }),
         response: { 200: z.object({ ok: z.literal(true), artists: z.array(Artist) }) },
       },
     },
-    async () => ({ ok: true as const, artists: (await store.list()).map(artist) }),
+    async (request) => ({ ok: true as const, artists: (await store.list(request.query.collective)).map(artist) }),
   )
 
   api.get(

@@ -1225,10 +1225,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every artist, by name */
+        /** Every artist, by name, or a collective's, in its order */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Only this collective's members, in its order. An unknown collective has none */
+                    collective?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1246,6 +1249,15 @@ export interface paths {
                             ok: true;
                             artists: components["schemas"]["Artist"][];
                         };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Default Response */
@@ -2165,12 +2177,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every application, or an artist's, the most recently received first */
+        /** Every application, or an artist's or a collective's, the most recently received first */
         get: {
             parameters: {
                 query?: {
-                    /** @description Only this artist's applications. An unknown artist has none */
+                    /** @description Only this artist's applications. An unknown artist has none. Not with `collective` */
                     artist?: string;
+                    /** @description Only this collective's applications. An unknown collective has none. Not with `artist` */
+                    collective?: string;
                 };
                 header?: never;
                 path?: never;
@@ -2221,7 +2235,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Creates an application for an artist */
+        /** Creates an application for an artist or a collective */
         post: {
             parameters: {
                 query?: never;
@@ -2247,7 +2261,10 @@ export interface paths {
                          * @description A date and time with its offset from UTC, which can be left without seconds. Not in the future
                          */
                         receivedAt?: string;
-                        artistId: string;
+                        /** @description The artist who applies. Not with `collectiveId` */
+                        artistId?: string;
+                        /** @description The collective that applies. Not with `artistId` */
+                        collectiveId?: string;
                     };
                 };
             };
@@ -3110,7 +3127,10 @@ export interface components {
         };
         Application: {
             id: string;
-            artistId: string;
+            /** @description The artist who applied, or null for a collective's application */
+            artistId: string | null;
+            /** @description The collective that applied, or null for an artist's application */
+            collectiveId: string | null;
             /** Format: date-time */
             receivedAt: string;
             /** Format: date-time */

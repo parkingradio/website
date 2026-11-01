@@ -13,6 +13,7 @@ import type { Profile, SeedApplication, SeedArtist, SeedCollective } from './see
 export type Credentials = { email: string; password: string }
 
 type ArtistResponse = paths['/api/admin/artists']['post']['responses'][200]['content']['application/json']
+type CollectiveResponse = paths['/api/admin/collectives']['post']['responses'][200]['content']['application/json']
 type ArtistsResponse = paths['/api/admin/artists']['get']['responses'][200]['content']['application/json']
 type CollectivesResponse = paths['/api/admin/collectives']['get']['responses'][200]['content']['application/json']
 type ApplicationsResponse = paths['/api/admin/applications']['get']['responses'][200]['content']['application/json']
@@ -64,7 +65,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
         artistId = applied.artistId
         await setStatus(server, applied.applicationId, artist.applications[0].status)
       }
-      for (const application of artist.form ? artist.applications.slice(1) : artist.applications) await addApplication(server, artistId, application)
+      for (const application of artist.form ? artist.applications.slice(1) : artist.applications) await addApplication(server, { artistId }, application)
     } catch (error) {
       // Otherwise every later seed would skip the artist, because they're there.
       throw new Error(`${messageOf(error)}\n${artist.profile.name} was left incomplete. To seed them again, delete them first.`, { cause: error })
@@ -80,7 +81,12 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       skipped.push(collective.profile.name)
       continue
     }
-    await addCollective(server, collective, artistIds)
+    const collectiveId = await addCollective(server, collective, artistIds)
+    try {
+      for (const application of collective.applications) await addApplication(server, { collectiveId }, application)
+    } catch (error) {
+      throw new Error(`${messageOf(error)}\n${collective.profile.name} was left incomplete. To seed it again, delete it first.`, { cause: error })
+    }
     seeded.push(collective.profile.name)
   }
   return { seeded, skipped }
@@ -134,8 +140,9 @@ async function addArtist(server: Server, artist: SeedArtist): Promise<string> {
   return (await server.call<ArtistResponse>('POST', '/api/admin/artists', form)).artist.id
 }
 
-// Adds the collective as an admin would, with its members: the seeded artists' ids, by `seedKey`, in `artistIds`.
-async function addCollective(server: Server, collective: SeedCollective, artistIds: Map<string, string>): Promise<void> {
+// Adds the collective as an admin would, with its members: the seeded artists' ids, by `seedKey`, in `artistIds`, and
+// returns its id.
+async function addCollective(server: Server, collective: SeedCollective, artistIds: Map<string, string>): Promise<string> {
   const members = collective.members.map((member) => {
     if ('name' in member) return member
     const artist = SEED_ARTISTS.find(({ profile }) => (profile.email ?? profile.name) === member.seeded)
@@ -146,7 +153,7 @@ async function addCollective(server: Server, collective: SeedCollective, artistI
   const form = new FormData()
   form.set('collective', JSON.stringify({ ...collective.profile, members }))
   if (collective.photo) form.set('photo', photo(collective.photo), 'photo.png')
-  await server.call('POST', '/api/admin/collectives', form)
+  return (await server.call<CollectiveResponse>('POST', '/api/admin/collectives', form)).collective.id
 }
 
 // Has the artist apply through the form, from `address`, with their first application.
@@ -169,9 +176,9 @@ async function findApplied(server: Server, artist: SeedArtist): Promise<{ artist
   return { artistId: added.id, applicationId: applications[0].id }
 }
 
-// Adds an application for the artist, as an admin would, with its status.
-async function addApplication(server: Server, artistId: string, application: SeedApplication): Promise<void> {
-  const body: NewApplication = { ...applicationFields(application), artistId }
+// Adds an application for the artist or the collective, as an admin would, with its status.
+async function addApplication(server: Server, owner: { artistId: string } | { collectiveId: string }, application: SeedApplication): Promise<void> {
+  const body: NewApplication = { ...applicationFields(application), ...owner }
   if (application.receivedDaysAgo !== undefined) body.receivedAt = new Date(Date.now() - application.receivedDaysAgo * DAY_MS).toISOString()
   const { id } = (await server.call<ApplicationResponse>('POST', '/api/admin/applications', body)).application
   await setStatus(server, id, application.status)

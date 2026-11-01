@@ -35,6 +35,7 @@ const store: ApplyStore = {
       createdAt: now,
       createdBy: null,
       artistId: applicant.id,
+      collectiveId: null,
       updatedBy: null,
       updatedAt: null,
       status: 'new',

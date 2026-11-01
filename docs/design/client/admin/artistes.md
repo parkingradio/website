@@ -36,8 +36,9 @@ Clicking a collective opens its page at `/admin/artistes/collectifs/<id>` (`/adm
 list), with everything about it, its photo (or "Pas de photo"), its links, its artists in order, each linking to their
 page (or that it has none, which happens once its artists are deleted), its genres, who added it (or that it applied by
 itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
-artist's. At the bottom, the collective can be deleted for good, with its photo, if it has one, after confirming. Its
-artists stay.
+artist's. Under it, its applications are listed like an artist's, with a button to create another one. At the bottom,
+the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
+stay, and so do their own applications.
 
 ## Adding an artist
 
@@ -80,6 +81,8 @@ Its artists are in order, at least one, and can be reordered and removed. Each o
 - `GET /api/admin/collectives/:id`, `PUT /api/admin/collectives/:id` and `DELETE /api/admin/collectives/:id`, for a
   collective's page.
 - `GET /api/admin/collectives/:id/photo`, for its photo.
-- `GET /api/admin/artists`, on a collective's page and in "ajouter un collectif", for its genres and to pick its
-  artists.
+- `GET /api/admin/artists?collective=<id>`, for its genres, again each time it's saved.
+- `GET /api/admin/applications?collective=<id>`, for its applications.
+- `GET /api/admin/artists`, in a collective's form and in "ajouter un collectif", to pick its artists, each time the
+  form opens.
 - `POST /api/admin/collectives`, for "ajouter un collectif".

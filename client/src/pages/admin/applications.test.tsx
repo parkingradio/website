@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist } from '../../artist-profile'
+import type { Collective } from '../../collective-profile'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
@@ -33,11 +34,33 @@ function artist(id: string, name: string): Artist {
 const AURORE: Artist = { ...artist('artist-1', 'Aurore'), genres: ['techno', 'ambient'] }
 // An admin left out her city, genres and email.
 const BRUME: Artist = { ...artist('artist-2', 'Brume'), city: '', genres: [], email: null }
-const ARTISTS = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] } }
+// A collective, of Brume and Aurore, whose genres are theirs.
+const ONDES: Collective = {
+  id: 'collective-1',
+  hasPhoto: false,
+  createdAt: '2026-10-01T16:00:00.000Z',
+  createdBy: 'admin@example.com',
+  name: 'Ondes',
+  members: [
+    { id: 'artist-2', name: 'Brume' },
+    { id: 'artist-1', name: 'Aurore' },
+  ],
+  country: 'CA',
+  city: 'Québec',
+  description: '',
+  links: {},
+  email: 'ondes@example.com',
+  phone: '',
+  updatedBy: null,
+  updatedAt: null,
+}
+// Who applications can be for: the artists, and the collectives.
+const ARTISTS = { '/api/admin/artists': { ok: true, artists: [AURORE, BRUME] }, '/api/admin/collectives': { ok: true, collectives: [ONDES] } }
 
 const APPLICATION: Application = {
   id: 'application-1',
   artistId: 'artist-1',
+  collectiveId: null,
   receivedAt: '2026-10-05T16:00:00.000Z',
   createdAt: '2026-10-05T16:00:00.000Z',
   createdBy: 'admin@example.com',
@@ -68,7 +91,7 @@ function CurrentPath() {
 }
 
 function renderAt(path: string) {
-  render(
+  return render(
     // Without transitions, like the app (see main.tsx).
     <MemoryRouter initialEntries={[path]} useTransitions={false}>
       <App />
@@ -139,14 +162,67 @@ describe('The list of applications', () => {
     expect(rows()).toHaveLength(4)
   })
 
+  it('lists the applications of collectives, with their cities and their artists’ genres, saying that they are collectives', async () => {
+    // An artist whose `kind` is "collective", as collectives were before they had their own profiles.
+    const legacy: Artist = { ...artist('artist-3', 'Nébuleuse'), kind: 'collective', members: ['Ana'], genres: ['house'] }
+    const applications = [
+      { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1' },
+      { ...APPLICATION, id: 'application-6', artistId: 'artist-3' },
+    ]
+    mockFetch({
+      ...LOGGED_IN,
+      ...ARTISTS,
+      '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, legacy] },
+      '/api/admin/applications': { ok: true, applications },
+    })
+    renderAt('/admin/candidatures')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(rows().map((row) => row.slice(1, 4))).toEqual([
+      ['Ondes (collectif)', 'Québec, Canada', 'techno, ambient'],
+      ['Nébuleuse (collectif)', 'Montréal, Canada', 'house'],
+    ])
+    expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+    expect(screen.getByRole('link', { name: 'Nébuleuse' })).toHaveAttribute('href', '/admin/artistes/artist-3')
+  })
+
+  it('lists the applications without their collectives when those could not be loaded', async () => {
+    const applications = [{ ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1' }, APPLICATION]
+    mockFetch({
+      ...LOGGED_IN,
+      ...ARTISTS,
+      '/api/admin/collectives': { ok: false, error: 'Boom' },
+      '/api/admin/applications': { ok: true, applications },
+    })
+    renderAt('/admin/candidatures')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
+    expect(rows().map((row) => row.slice(1, 4))).toEqual([
+      ['collectif inconnu', '', ''],
+      ['Aurore', 'Montréal, Canada', 'techno, ambient'],
+    ])
+    expect(screen.getByRole('link', { name: 'collectif inconnu' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+  })
+
   it('lists the applications without their artists when those could not be loaded', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
     renderAt('/admin/candidatures')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
     // Their places and genres are unknown too, rather than left out.
     expect(rows().map((row) => row.slice(1, 4))).toEqual(Array(4).fill(['artiste inconnu', '', '']))
+  })
+
+  it("leaves a collective's genres blank, rather than left out, when the artists could not be loaded", async () => {
+    const applications = [{ ...APPLICATION, artistId: null, collectiveId: 'collective-1' }]
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications } })
+    renderAt('/admin/candidatures')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
+    expect(rows().map((row) => row.slice(1, 4))).toEqual([['Ondes (collectif)', 'Québec, Canada', '']])
   })
 
   it('says when there are no applications', async () => {
@@ -176,6 +252,17 @@ describe('Searching the list of applications', () => {
 
     await expectSearch('brume', ['7 octobre 2026'])
     await expectSearch('aurore@example.com', ['8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
+  })
+
+  it('finds the applications of collectives by the collective, its artists’ names and their genres', async () => {
+    const collectives = { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1', receivedAt: '2026-10-09T16:00:00.000Z' }
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [collectives, ...SEARCHED] } })
+    renderAt('/admin/candidatures')
+
+    await expectSearch('ondes', ['9 octobre 2026'])
+    await expectSearch('quebec', ['9 octobre 2026'])
+    await expectSearch('brume', ['9 octobre 2026', '7 octobre 2026'])
+    await expectSearch('ambient', ['9 octobre 2026', '8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
   })
 
   it('finds applications by their prestations and details', async () => {
@@ -289,6 +376,17 @@ describe('Sorting the list of applications', () => {
     ])
   })
 
+  it('sorts the applications of collectives by their names, with those of artists', async () => {
+    const collectives = { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1', receivedAt: '2026-10-09T16:00:00.000Z' }
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [collectives, ...APPLICATIONS] } })
+    renderAt('/admin/candidatures')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Artiste' }))
+    expect(rows().map((row) => row[1])).toEqual(['Aurore', 'Aurore', 'Aurore', 'Brume', 'Ondes (collectif)'])
+    fireEvent.click(screen.getByRole('button', { name: 'Ville' }))
+    expect(rows().map((row) => row[2])).toEqual(['Canada', 'Montréal, Canada', 'Montréal, Canada', 'Montréal, Canada', 'Québec, Canada'])
+  })
+
   it('sorts the applications by their artists’ places, those left out first', async () => {
     mockFetch(LISTED)
     renderAt('/admin/candidatures')
@@ -363,8 +461,11 @@ describe('An application’s page', () => {
     // It was received the day it was created, which is said once.
     expect(screen.queryByText(/^Reçue le/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'nouvelle' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 2, name: 'Artiste' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
+    expect(screen.getByText('Genres', { selector: 'dt' }).nextElementSibling).toHaveTextContent('techno, ambient')
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')
+    expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent("La candidature sera supprimée pour de bon. L'artiste reste.")
     expect(screen.getByText('jeudi 10 décembre 2026')).toBeInTheDocument()
     expect(screen.getByText('jeudi 14 janvier 2027')).toBeInTheDocument()
     expect(screen.getByText('18:00 à 22:00')).toBeInTheDocument()
@@ -565,6 +666,54 @@ describe('An application’s page', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/))
   })
 
+  describe('of a collective', () => {
+    const OF_ONDES = { ...APPLICATION, artistId: null, collectiveId: 'collective-1' }
+    const COLLECTIVE_PAGE = {
+      ...LOGGED_IN,
+      '/api/admin/applications/application-1': { ok: true, application: OF_ONDES },
+      '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
+      '/api/admin/artists?collective=collective-1': { ok: true, artists: [BRUME, AURORE] },
+    }
+    const described = (term: string) => screen.getByText(term, { selector: 'dt' }).nextElementSibling
+
+    it('shows who the collective is, with its artists and their genres', async () => {
+      mockFetch(COLLECTIVE_PAGE)
+      renderAt('/admin/candidatures/application-1')
+
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Ondes' })).toBeInTheDocument())
+      expect(screen.getByRole('heading', { level: 2, name: 'Collectif' })).toBeInTheDocument()
+      expect(described('Nom')).toHaveTextContent('Ondes (collectif)')
+      expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+      expect(described('Ville')).toHaveTextContent('Québec, Canada')
+      expect(described('Genres de ses artistes')).toHaveTextContent('techno, ambient')
+      expect(within(described('Artistes du collectif') as HTMLElement).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+        '/admin/artistes/artist-2',
+        '/admin/artistes/artist-1',
+      ])
+      expect(screen.getByRole('link', { name: 'ondes@example.com' })).toHaveAttribute('href', 'mailto:ondes@example.com')
+      expect(described('Téléphone du contact')).toHaveTextContent(/^-$/)
+      expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent('La candidature sera supprimée pour de bon. Le collectif reste.')
+      expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
+    })
+
+    it('shows the collective without its genres when its artists could not be loaded', async () => {
+      mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/artists?collective=collective-1': { ok: false, error: 'Boom' } })
+      renderAt('/admin/candidatures/application-1')
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
+      expect(described('Genres de ses artistes')).toHaveTextContent(/^$/)
+      expect(described('Ville')).toHaveTextContent('Québec, Canada')
+    })
+
+    it('says when the collective could not be loaded', async () => {
+      mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/collectives/collective-1': { ok: false, error: 'No such collective' } })
+      renderAt('/admin/candidatures/application-1')
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Le collectif n'a pas pu être chargé : No such collective"))
+      expect(screen.getByRole('heading', { level: 1, name: 'Candidature' })).toBeInTheDocument()
+    })
+  })
+
   it('says when the application could not be loaded', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/applications/nope': { ok: false, error: 'No such application' } })
     renderAt('/admin/candidatures/nope')
@@ -585,10 +734,12 @@ describe('Creating an application', () => {
     })
     renderAt('/admin/candidatures/nouvelle?artiste=artist-2')
 
-    const picked = await screen.findByLabelText('Artiste')
-    expect(picked).toHaveValue('artist-2')
-    // By name, and email when they have one.
-    expect(within(picked).getAllByRole('option').map((option) => option.textContent)).toEqual(['choisir un artiste…', 'Aurore (aurore@example.com)', 'Brume'])
+    const picked = await screen.findByRole('combobox', { name: 'Artiste ou collectif' })
+    expect(picked).toHaveValue('Brume')
+    // By name, with their email, or else where they're from, and collectives say so.
+    fireEvent.click(picked)
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Auroreaurore@example.com', 'BrumeCanada', 'Ondescollectif, ondes@example.com'])
+    fireEvent.keyDown(picked, { key: 'Escape' })
     // Received now, unless said otherwise.
     expect(screen.getByLabelText('Reçue le')).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
@@ -609,6 +760,50 @@ describe('Creating an application', () => {
     })
   })
 
+  it('creates an application for the collective it was started from, or one picked, without an artist', async () => {
+    const created = { ...APPLICATION, id: 'application-4', artistId: null, collectiveId: 'collective-1' }
+    mockFetch({
+      ...LOGGED_IN,
+      ...ARTISTS,
+      'POST /api/admin/applications': { ok: true, application: created },
+      '/api/admin/applications/application-4': { ok: true, application: created },
+      '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
+      '/api/admin/artists?collective=collective-1': { ok: true, artists: [BRUME, AURORE] },
+    })
+    renderAt('/admin/candidatures/nouvelle?collectif=collective-1')
+
+    expect(await screen.findByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue('Ondes')
+    fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Ondes' })).toBeInTheDocument())
+    expect(jsonBody(requestsTo('POST', '/api/admin/applications')[0])).toEqual({
+      collectiveId: 'collective-1',
+      dates: ['2026-12-10'],
+      timeSlots: [],
+      prestations: [],
+      otherPrestation: '',
+      details: '',
+    })
+  })
+
+  it('creates an application for a collective picked by its name', async () => {
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, 'POST /api/admin/applications': { ok: false, error: 'Boom' } })
+    renderAt('/admin/candidatures/nouvelle?artiste=artist-1')
+
+    const picker = await screen.findByRole('combobox', { name: 'Artiste ou collectif' })
+    fireEvent.change(picker, { target: { value: 'ond' } })
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Ondes/ }))
+    expect(picker).toHaveValue('Ondes')
+    fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
+
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(1))
+    const sent = jsonBody(requestsTo('POST', '/api/admin/applications')[0])
+    expect(sent).toMatchObject({ collectiveId: 'collective-1' })
+    expect(sent).not.toHaveProperty('artistId')
+  })
+
   it('sends when the application was received, if a day was picked', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, 'POST /api/admin/applications': { ok: true, application: APPLICATION } })
     renderAt('/admin/candidatures/nouvelle?artiste=artist-1')
@@ -624,21 +819,33 @@ describe('Creating an application', () => {
     })
   })
 
-  it('picks no artist when started from an unknown one, and needs one to be picked', async () => {
-    mockFetch({ ...LOGGED_IN, ...ARTISTS })
-    renderAt('/admin/candidatures/nouvelle?artiste=gone')
+  it('picks nobody when started from an unknown artist or collective, and needs one to be picked', async () => {
+    for (const path of ['/admin/candidatures/nouvelle?artiste=gone', '/admin/candidatures/nouvelle?collectif=artist-1']) {
+      mockFetch({ ...LOGGED_IN, ...ARTISTS })
+      const { unmount } = renderAt(path)
 
-    expect(await screen.findByLabelText('Artiste')).toHaveValue('')
-    fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
-    fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
-    expect(screen.getByText("Choisissez l'artiste.")).toBeInTheDocument()
-    expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(0)
+      expect(await screen.findByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue('')
+      fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
+      fireEvent.click(screen.getByRole('button', { name: 'créer la candidature' }))
+      expect(screen.getByText("Choisissez l'artiste ou le collectif.")).toBeInTheDocument()
+      expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(0)
+      unmount()
+    }
   })
 
-  it('asks to add the artist first when there is none', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] } })
+  it('asks to add the artist or the collective first when there is none', async () => {
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: [] }, '/api/admin/collectives': { ok: true, collectives: [] } })
     renderAt('/admin/candidatures/nouvelle')
 
-    await waitFor(() => expect(screen.getByRole('link', { name: "ajoutez d'abord l'artiste" })).toHaveAttribute('href', '/admin/artistes/nouveau'))
+    await waitFor(() => expect(screen.getByRole('link', { name: "l'artiste" })).toHaveAttribute('href', '/admin/artistes/nouveau'))
+    expect(screen.getByRole('link', { name: 'le collectif' })).toHaveAttribute('href', '/admin/artistes/collectifs/nouveau')
+  })
+
+  it('says when the collectives could not be loaded, rather than offering only the artists', async () => {
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/collectives': { ok: false, error: 'Boom' } })
+    renderAt('/admin/candidatures/nouvelle')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom"))
+    expect(screen.queryByRole('button', { name: 'créer la candidature' })).not.toBeInTheDocument()
   })
 })

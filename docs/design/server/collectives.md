@@ -29,7 +29,8 @@ A profile has:
 | `email` | string | The contact's, like an artist's, but never left out. Two collectives can't have the same one, whatever its case |
 | `phone` | string | The contact's, like an artist's |
 
-A collective has no genres of its own: its genres are its members'.
+A collective has no genres of its own: its genres are its members', whom
+[`GET /api/admin/artists?collective=<id>`](artists.md#get-apiadminartistscollectiveid-admin) returns.
 
 Emails are unique among collectives, and among artists, but not across both: a collective's contact is often one of
 its members, who may also apply alone, with the same email. So a person can't be the contact of two collectives.
@@ -120,5 +121,6 @@ when there's no such collective.
 
 ## `DELETE /api/admin/collectives/:id` (admin)
 
-Deletes a collective, and its photo if it has one, but not its members, and responds `{"ok": true}`. Fails with 404
+Deletes a collective, its photo if it has one and its [applications](applications.md), but not its members, and
+responds `{"ok": true}`. Fails with 404
 when there's no such collective.

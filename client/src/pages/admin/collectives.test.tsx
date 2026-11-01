@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
+import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import { mockFetch, requestsTo } from '../../test-utils'
@@ -65,10 +66,32 @@ const ONDES: Collective = {
   updatedAt: null,
 }
 
+// Its page: the collective, its artists, for its genres, its applications, and every artist, for its form.
 const ONDES_PAGE = {
   ...LOGGED_IN,
   '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
+  '/api/admin/artists?collective=collective-1': { ok: true, artists: [AURORE, CYAN] },
+  '/api/admin/applications?collective=collective-1': { ok: true, applications: [] },
   '/api/admin/artists': { ok: true, artists: ARTISTS },
+}
+
+const APPLICATION: Application = {
+  id: 'application-1',
+  artistId: null,
+  collectiveId: 'collective-1',
+  receivedAt: '2026-10-05T16:00:00.000Z',
+  createdAt: '2026-10-05T16:00:00.000Z',
+  createdBy: 'admin@example.com',
+  dates: ['2026-12-10'],
+  timeSlots: [],
+  prestations: ['dj', 'full-band'],
+  otherPrestation: '',
+  details: '',
+  updatedBy: null,
+  updatedAt: null,
+  status: 'accepted',
+  statusUpdatedBy: null,
+  statusUpdatedAt: null,
 }
 
 function CurrentPath() {
@@ -94,6 +117,12 @@ function sent(request: RequestInit) {
     photo: form.get('photo'),
     removePhoto: form.get('removePhoto'),
   }
+}
+
+// Opens the collective's form, once its page is shown, and waits for it, once it has loaded the artists.
+async function edit() {
+  fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+  await screen.findByLabelText('Nom du collectif')
 }
 
 // What a term of the collective's page says.
@@ -146,8 +175,26 @@ describe('A collective’s page', () => {
     // It's in the artists section.
     expect(screen.getByRole('link', { name: 'artistes' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: '← tous les artistes' })).toHaveAttribute('href', '/admin/artistes')
-    // Its applications come later.
-    expect(screen.queryByRole('heading', { name: 'Candidatures' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?collectif=collective-1')
+    expect(screen.getByText('Aucune candidature.')).toBeInTheDocument()
+  })
+
+  it('lists its applications, without the collective', async () => {
+    mockFetch({ ...ONDES_PAGE, '/api/admin/applications?collective=collective-1': { ok: true, applications: [APPLICATION] } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
+    expect(within(table).getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
+    expect(within(table).getByText('DJ, Full Band')).toBeInTheDocument()
+  })
+
+  it('says when its applications could not be loaded', async () => {
+    mockFetch({ ...ONDES_PAGE, '/api/admin/applications?collective=collective-1': { ok: false, error: 'Boom' } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom"))
+    expect(described('Genres de ses artistes')).toHaveTextContent('techno, électro, ambient, house')
   })
 
   it('says when it has no artists, e.g. once they were deleted, and that it applied by itself', async () => {
@@ -170,7 +217,17 @@ describe('A collective’s page', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Le collectif n'a pas pu être chargé : No such collective"))
   })
 
-  it('shows the collective when the artists could not be loaded, without its genres, and only adds new artists', async () => {
+  it('shows the collective when its artists could not be loaded, without its genres', async () => {
+    mockFetch({ ...ONDES_PAGE, '/api/admin/artists?collective=collective-1': { ok: false, error: 'Boom' } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
+    expect(screen.getByRole('heading', { level: 1, name: 'Ondes' })).toBeInTheDocument()
+    expect(described('Genres de ses artistes')).toHaveTextContent(/^$/)
+    expect(within(described('Artistes du collectif') as HTMLElement).getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('only adds new artists when every artist could not be loaded for its form', async () => {
     const changed: Collective = { ...ONDES, members: [...ONDES.members, { id: 'artist-5', name: 'Élise' }] }
     mockFetch({
       ...ONDES_PAGE,
@@ -179,12 +236,7 @@ describe('A collective’s page', () => {
     })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
-    expect(screen.getByRole('heading', { level: 1, name: 'Ondes' })).toBeInTheDocument()
-    expect(described('Genres de ses artistes')).toHaveTextContent(/^$/)
-    expect(within(described('Artistes du collectif') as HTMLElement).getAllByRole('link')).toHaveLength(2)
-
-    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    await edit()
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
     expect(picker()).toBeDisabled()
     expect(picker()).toHaveAttribute('placeholder', "les artistes n'ont pas pu être chargés")
@@ -204,10 +256,10 @@ describe('A collective’s page', () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     mockFetch({
       ...ONDES_PAGE,
-      '/api/admin/artists': { ok: false, error: 'Boom' },
+      '/api/admin/artists?collective=collective-1': { ok: false, error: 'Boom' },
       'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed },
     })
     addNew('Élise')
@@ -218,15 +270,27 @@ describe('A collective’s page', () => {
     expect(described('Genres de ses artistes')).toHaveTextContent(/^$/)
   })
 
-  it('does not load the artists again when the collective is saved without new artists', async () => {
-    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, name: 'Ondes 2' } } })
+  it('loads its artists again whenever it is saved, and every artist whenever its form opens', async () => {
+    const changed: Collective = { ...ONDES, name: 'Ondes 2', members: [...ONDES.members, { id: 'artist-4', name: 'Dora' }] }
+    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('button', { name: 'modifier' })
+    expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
+    await edit()
     pick('Dora')
+    mockFetch({
+      ...ONDES_PAGE,
+      '/api/admin/artists?collective=collective-1': { ok: true, artists: [AURORE, CYAN, { ...DORA, genres: ['jazz'] }] },
+      'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Ondes 2' })).toBeInTheDocument())
+    // An artist picked brings their genres.
+    await waitFor(() => expect(described('Genres de ses artistes')).toHaveTextContent('techno, électro, jazz, ambient, house'))
+    expect(requestsTo('GET', '/api/admin/artists?collective=collective-1')).toHaveLength(1)
+    expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
+    await edit()
     expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(1)
   })
 
@@ -238,12 +302,12 @@ describe('A collective’s page', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Artistes' })).toBeInTheDocument()
   })
 
-  it('changes the collective, its artists picked or added by name, in order, then loads the artists again', async () => {
+  it('changes the collective, its artists picked or added by name, in order', async () => {
     const changed: Collective = { ...ONDES, name: 'Ondes 2', updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
     mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     expect(screen.getByLabelText('Nom du collectif')).toHaveValue('Ondes')
     expect(screen.getByLabelText('Adresse e-mail du contact')).toHaveValue('ondes@example.com')
     expect(screen.getByRole('img', { name: 'Photo actuelle' }).getAttribute('src')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=/)
@@ -278,15 +342,13 @@ describe('A collective’s page', () => {
     expect(photo).toBeNull()
     expect(removePhoto).toBeNull()
     expect(screen.getByText(/^Modifié par/)).toHaveTextContent(/^Modifié par other@example.com le 6 octobre 2026/)
-    // The artists added by name are new artists, among its artists' genres and those that can be picked.
-    expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(2)
   })
 
   it('picks among the artists who can be members, telling apart those without an email', async () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     fireEvent.click(picker())
     // Neither its artists, nor Brume, who's a collective.
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['DoraBrise'])
@@ -301,7 +363,7 @@ describe('A collective’s page', () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     fireEvent.change(newArtist(), { target: { value: 'dora' } })
     expect(screen.getByText(/^Un artiste s'appelle déjà/)).toHaveTextContent(
       "Un artiste s'appelle déjà « Dora » : le choisir parmi les artistes connus évite de créer un doublon.",
@@ -318,7 +380,7 @@ describe('A collective’s page', () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     // An artist it has, rather than one to pick.
     addNew('aurore')
     expect(screen.getByText(/est déjà parmi/)).toHaveTextContent('« Aurore » est déjà parmi les artistes du collectif.')
@@ -342,7 +404,7 @@ describe('A collective’s page', () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     pick('Dora')
     const button = (name: string) => screen.getByRole('button', { name })
     fireEvent.click(button('descendre Aurore'))
@@ -365,7 +427,7 @@ describe('A collective’s page', () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     fireEvent.click(screen.getByRole('button', { name: 'retirer Aurore' }))
     fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -387,7 +449,7 @@ describe('A collective’s page', () => {
     })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     const email = screen.getByLabelText('Adresse e-mail du contact')
     fireEvent.change(email, { target: { value: ' ' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -407,30 +469,30 @@ describe('A collective’s page', () => {
     mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, hasPhoto: false } } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await edit()
     fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Pas de photo')).toBeInTheDocument())
     expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).removePhoto).toBe('true')
-    // No artist was created.
-    expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(1)
   })
 
-  it('deletes the collective once confirmed, but not its artists, and goes back to the list', async () => {
+  it('deletes the collective and its applications once confirmed, but not its artists, and goes back to the list', async () => {
     mockFetch({
       ...ONDES_PAGE,
+      '/api/admin/applications?collective=collective-1': { ok: true, applications: [APPLICATION, { ...APPLICATION, id: 'application-2' }] },
       'DELETE /api/admin/collectives/collective-1': { ok: true },
       '/api/admin/collectives': { ok: true, collectives: [] },
     })
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    expect(await screen.findByText(/^Le collectif et sa photo seront supprimés/)).toHaveTextContent(
-      'Le collectif et sa photo seront supprimés pour de bon. Ses artistes restent.',
+    expect(await screen.findByText(/^Le collectif, sa photo et ses candidatures seront supprimés/)).toHaveTextContent(
+      'Le collectif, sa photo et ses candidatures seront supprimés pour de bon. Ses artistes restent, avec leurs propres candidatures.',
     )
+    await screen.findByRole('table')
     fireEvent.click(screen.getByRole('button', { name: 'supprimer le collectif' }))
-    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement Ondes et sa photo ? Ses artistes restent.')
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement Ondes, sa photo et ses candidatures (2) ? Ses artistes restent.')
     expect(requestsTo('DELETE', '/api/admin/collectives/collective-1')).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'supprimer le collectif' }))
@@ -438,12 +500,15 @@ describe('A collective’s page', () => {
     expect(requestsTo('DELETE', '/api/admin/collectives/collective-1')).toHaveLength(1)
   })
 
-  it('says what deleting a collective without a photo does', async () => {
+  it('says what deleting a collective without a photo or applications does', async () => {
     mockFetch({ ...ONDES_PAGE, '/api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, hasPhoto: false } } })
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    expect(await screen.findByText(/^Le collectif sera supprimé/)).toHaveTextContent('Le collectif sera supprimé pour de bon. Ses artistes restent.')
+    expect(await screen.findByText(/^Le collectif et ses candidatures/)).toHaveTextContent(
+      'Le collectif et ses candidatures seront supprimés pour de bon. Ses artistes restent, avec leurs propres candidatures.',
+    )
+    await screen.findByText('Aucune candidature.')
     fireEvent.click(screen.getByRole('button', { name: 'supprimer le collectif' }))
     expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement Ondes ? Ses artistes restent.')
   })

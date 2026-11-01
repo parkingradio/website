@@ -104,6 +104,29 @@ export function membersGenres(members: { id: string }[], artists: Map<string, Ar
   return genres
 }
 
+// The names of a collective's genres, from its `members`' (see `membersGenres`), or null when they're unknown, e.g.
+// because its members couldn't be loaded.
+export function collectiveGenreNames(collective: Collective, members: Artist[] | null): string | null {
+  return members && genreNames(membersGenres(collective.members, new Map(members.map((artist) => [artist.id, artist]))))
+}
+
+// Who an application is for: an artist, including those whose `kind` is "collective" until they're migrated, or a
+// collective.
+export type Owner = { kind: 'artist' | 'collective'; id: string }
+
+// There's always one of them (see docs/design/server/applications.md).
+export function applicationOwner({ artistId, collectiveId }: { artistId: string | null; collectiveId: string | null }): Owner {
+  return collectiveId !== null ? { kind: 'collective', id: collectiveId } : { kind: 'artist', id: artistId! }
+}
+
+// What tells an artist apart from others with the same name, in the lists they're picked from: their email, or else where
+// they're from, or else their collectives.
+export function detailOf(artist: Artist): string | null {
+  if (artist.email) return artist.email
+  if (artist.city || artist.country) return place(artist)
+  return artist.collectives.map((collective) => collective.name).join(', ') || null
+}
+
 // What an artist or a collective is searched by, in the lists: their `names`, how to reach them, where they're from, their
 // genres and the profile names of their links, but not their bio or description, which would match too many searches.
 // Their phone number is there with its digits only too, so that it's found however it's typed.
@@ -118,13 +141,27 @@ function searchFields(
 }
 
 // What an artist is searched by, and a collective whose `kind` is "collective", by its artists' names too.
-export function artistSearchFields(artist: Artist): string[] {
+function artistSearchFields(artist: Artist): string[] {
   return searchFields([artist.name, ...artist.members], artist, artist.genres)
 }
 
 // What a collective is searched by, with its artists' names and `genres`.
-export function collectiveSearchFields(collective: Collective, genres: GenreId[]): string[] {
+function collectiveSearchFields(collective: Collective, genres: GenreId[]): string[] {
   return searchFields([collective.name, ...collective.members.map((member) => member.name)], collective, genres)
+}
+
+// An artist or a collective, as the lists show, search and sort them. A collective's genres are null when they're
+// unknown, i.e. when the artists couldn't be loaded.
+export type Entry = { kind: EntryKind; id: string; name: string; city: string; country: string; genres: GenreId[] | null; searchFields: string[] }
+
+export function artistEntry(artist: Artist): Entry {
+  return { ...artist, kind: artistEntryKind(artist), searchFields: artistSearchFields(artist) }
+}
+
+// A collective, whose genres are those of its members among `artists`, or unknown when they couldn't be loaded (null).
+export function collectiveEntry(collective: Collective, artists: Map<string, Artist> | null): Entry {
+  const genres = artists && membersGenres(collective.members, artists)
+  return { ...collective, kind: 'collective', genres, searchFields: collectiveSearchFields(collective, genres ?? []) }
 }
 
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long' })
@@ -142,6 +179,18 @@ export function formatDay(day: string): string {
 // E.g. "7 oct. 2026".
 export function formatShortDay(day: string): string {
   return shortDayFormat.format(new Date(day))
+}
+
+// E.g. "Aurore, sa photo et ses candidatures".
+function enumerate(items: string[]): string {
+  return items.length > 1 ? `${items.slice(0, -1).join(', ')} et ${items.at(-1)}` : (items[0] ?? '')
+}
+
+// What deleting an artist or a collective named `name` deletes with them: their photo if they have one, and their
+// applications, by how many there are (`count`), unless it's known that there are none, e.g. "Aurore, sa photo et ses
+// candidatures (2)".
+export function deletedWith(name: string, hasPhoto: boolean, count: number | null): string {
+  return enumerate([name, ...(hasPhoto ? ['sa photo'] : []), ...(count === 0 ? [] : [`ses candidatures${count ? ` (${count})` : ''}`])])
 }
 
 // "Ajouté par X le ...", or the like: who did something and when, if anyone did.

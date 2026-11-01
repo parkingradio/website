@@ -70,8 +70,9 @@ export class MemberCantBeCollective extends Error {}
 // The artists, as the admin pages manage them. Each method that's about one artist returns null when there's no such
 // artist, which is the case of any id that isn't a UUID.
 export type ArtistsStore = {
-  // By name, whatever its case.
-  list(): Promise<StoredArtist[]>
+  // By name, whatever its case, or only the members of the collective with `collectiveId`, in its order: none when
+  // there's no such collective.
+  list(collectiveId?: string): Promise<StoredArtist[]>
   get(id: string): Promise<StoredArtist | null>
   // `createdBy` is the email of the admin who adds the artist, or null if the artist adds themselves by applying.
   // Throws an EmailTaken.
@@ -109,8 +110,19 @@ async function withCollectives(db: Queryable, row: ArtistRow): Promise<StoredArt
 
 export function artistsStore(db: Queryable): ArtistsStore {
   return {
-    async list() {
-      const rows = await db.select().from(artists).orderBy(asc(sql`lower(${artists.name})`))
+    async list(collectiveId) {
+      if (collectiveId !== undefined && !isUuid(collectiveId)) return []
+      const rows =
+        collectiveId === undefined
+          ? await db.select().from(artists).orderBy(asc(sql`lower(${artists.name})`))
+          : (
+              await db
+                .select({ artist: artists })
+                .from(collectiveMembers)
+                .innerJoin(artists, eq(artists.id, collectiveMembers.artistId))
+                .where(eq(collectiveMembers.collectiveId, collectiveId))
+                .orderBy(asc(collectiveMembers.position))
+            ).map((member) => member.artist)
       const found = await collectivesOf(db)
       return rows.map((row) => ({ ...row, collectives: found.get(row.id) ?? [] }))
     },

@@ -1,26 +1,36 @@
 import { Fragment, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
+import type { Loaded } from '../../api/use-api'
 import { APPLICATION_STATUSES } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
+import type { Collective } from '../../collective-profile'
 import { ApplicationForm } from './application-form'
 import {
+  ENTRY_KIND_LABELS,
   KIND_LABELS,
   MISSING,
   STATUS_LABELS,
   STATUS_PLURALS,
-  artistSearchFields,
+  applicationOwner,
+  artistEntry,
   byWhom,
+  collectiveEntry,
+  collectiveGenreNames,
   comparePlaces,
   dateFormat,
   describePrestations,
+  entryPath,
   formatDay,
   formatShortDay,
   genreNames,
   place,
 } from './describe'
+import type { Entry, Owner } from './describe'
+import { ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
 import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader } from './list-controls'
@@ -39,14 +49,29 @@ function BackToApplications() {
   )
 }
 
+// Who applications are for, artists and collectives, by the address of their page, which tells them apart.
+type Owners = Map<string, Entry>
+
+// Without the `artists`, which couldn't be loaded, the collectives' genres are unknown.
+function owners(artists: Artist[] | null, collectives: Collective[]): Owners {
+  const byId = artists && new Map(artists.map((artist) => [artist.id, artist]))
+  const entries = [...(artists ?? []).map(artistEntry), ...collectives.map((collective) => collectiveEntry(collective, byId))]
+  return new Map(entries.map((entry) => [entryPath(entry.kind, entry.id), entry]))
+}
+
+function ownerOf(application: Application, owners: Owners): Entry | undefined {
+  const { kind, id } = applicationOwner(application)
+  return owners.get(entryPath(kind, id))
+}
+
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
 // them.
 type ApplicationColumn = 'recue' | 'artiste' | 'ville' | 'dates' | 'statut'
 
-function applicationColumns(artists: Map<string, Artist>): Record<ApplicationColumn, SortColumn<Application>> {
-  const name = (application: Application) => artists.get(application.artistId)?.name ?? ''
-  // An unknown artist has no city or country, like an artist whose place is left out.
-  const placeOf = (application: Application) => artists.get(application.artistId) ?? { city: '', country: '' }
+function applicationColumns(owners: Owners): Record<ApplicationColumn, SortColumn<Application>> {
+  const name = (application: Application) => ownerOf(application, owners)?.name ?? ''
+  // An unknown artist or collective has no city or country, like one whose place is left out.
+  const placeOf = (application: Application) => ownerOf(application, owners) ?? { city: '', country: '' }
   return {
     recue: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
     artiste: { compare: (a, b) => compareText(name(a), name(b)) },
@@ -57,15 +82,15 @@ function applicationColumns(artists: Map<string, Artist>): Record<ApplicationCol
   }
 }
 
-// Applications, as listed in this section, or on an artist's page, where `artists` is left out since they're all theirs,
-// and so are the columns about the artist. The columns sort the list when there's `sorting`.
+// Applications, as listed in this section, or on an artist's or a collective's page, where `owners` is left out since
+// they're all theirs, and so are the columns about them. The columns sort the list when there's `sorting`.
 export function ApplicationsTable({
   applications,
-  artists,
+  owners,
   sorting,
 }: {
   applications: Application[]
-  artists?: Map<string, Artist>
+  owners?: Owners
   sorting?: Sorting<ApplicationColumn>
 }) {
   const header = (column: ApplicationColumn, label: string) =>
@@ -81,7 +106,7 @@ export function ApplicationsTable({
       <thead>
         <tr>
           {header('recue', 'Reçue le')}
-          {artists && (
+          {owners && (
             <>
               {header('artiste', 'Artiste')}
               {header('ville', 'Ville')}
@@ -96,20 +121,21 @@ export function ApplicationsTable({
       <tbody>
         {applications.map((application) => {
           const more = application.dates.length - LISTED_DATES
-          // Unknown when the artists couldn't be loaded, which leaves their place and genres blank rather than left out.
-          const artist = artists?.get(application.artistId)
+          // Unknown when the artists or the collectives couldn't be loaded, which leaves their place and genres blank
+          // rather than left out, like a collective's genres when only the artists couldn't be.
+          const owner = owners && ownerOf(application, owners)
           return (
             <tr key={application.id}>
               <td>
                 <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.receivedAt))}</Link>
               </td>
-              {artists && (
+              {owners && (
                 <>
                   <td>
-                    <Link to={`/admin/artistes/${application.artistId}`}>{artist?.name ?? 'artiste inconnu'}</Link>
+                    <OwnerName application={application} owner={owner} />
                   </td>
-                  <td>{artist && place(artist)}</td>
-                  <td>{artist && genreNames(artist.genres)}</td>
+                  <td>{owner && place(owner)}</td>
+                  <td>{owner?.genres && genreNames(owner.genres)}</td>
                 </>
               )}
               <td>
@@ -128,6 +154,45 @@ export function ApplicationsTable({
         })}
       </tbody>
     </table>
+  )
+}
+
+// Who an application is for, linking to their page, followed by "(collectif)" for a collective.
+function OwnerName({ application, owner }: { application: Application; owner: Entry | undefined }) {
+  if (!owner) {
+    const { kind, id } = applicationOwner(application)
+    return <Link to={entryPath(kind, id)}>{kind === 'collective' ? 'collectif inconnu' : 'artiste inconnu'}</Link>
+  }
+  return (
+    <>
+      <Link to={entryPath(owner.kind, owner.id)}>{owner.name}</Link>
+      {owner.kind !== 'artist' && ` (${ENTRY_KIND_LABELS[owner.kind]})`}
+    </>
+  )
+}
+
+// The applications of an artist or a collective, on their page, with a link to `newPath`, which creates another one.
+export function OwnApplications({ applications, newPath }: { applications: Loaded<{ applications: Application[] }>; newPath: string }) {
+  return (
+    <>
+      <h2>Candidatures</h2>
+      <div className="admin-toolbar">
+        <Link to={newPath} className="admin-button">
+          nouvelle candidature
+        </Link>
+      </div>
+      {applications.kind === 'error' && (
+        <p className="admin-error" role="alert">
+          Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
+        </p>
+      )}
+      {applications.kind === 'loaded' &&
+        (applications.value.applications.length === 0 ? (
+          <p className="admin-placeholder">Aucune candidature.</p>
+        ) : (
+          <ApplicationsTable applications={applications.value.applications} />
+        ))}
+    </>
   )
 }
 
@@ -152,7 +217,7 @@ export function ApplicationsPage() {
   )
 }
 
-// What an application is searched by, besides its artist (see `artistSearchFields`): its prestations, details, and the days
+// What an application is searched by, besides its artist or collective (see `Entry`): its prestations, details, and the days
 // the artist would like to play, written out, e.g. "jeudi 10 décembre 2026", so that "décembre" or "jeudi" finds them.
 function applicationSearchFields(application: Application): string[] {
   return [describePrestations(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
@@ -163,9 +228,13 @@ function applicationSearchFields(application: Application): string[] {
 function ApplicationsList({ query }: { query: string }) {
   const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
-  // Without the artists, the applications are still listed, without their names, places and genres.
-  const byId = new Map(artists.kind === 'loaded' ? artists.value.artists.map((artist) => [artist.id, artist]) : [])
-  const sorting = useSort(applicationColumns(byId), 'recue')
+  const collectives = useApi('/api/admin/collectives')
+  // Without the artists or the collectives, the applications are still listed, without their names, places and genres.
+  const byKey = owners(
+    artists.kind === 'loaded' ? artists.value.artists : null,
+    collectives.kind === 'loaded' ? collectives.value.collectives : [],
+  )
+  const sorting = useSort(applicationColumns(byKey), 'recue')
   const [params, change] = useQueryParams()
   const status = APPLICATION_STATUSES.find((status) => status === params.get('statut')) ?? null
 
@@ -176,13 +245,10 @@ function ApplicationsList({ query }: { query: string }) {
       </p>
     )
   }
-  if (applications.kind === 'loading' || artists.kind === 'loading') return null
+  if (applications.kind === 'loading' || artists.kind === 'loading' || collectives.kind === 'loading') return null
 
   const all = applications.value.applications
-  const found = search(all, query, (application) => {
-    const artist = byId.get(application.artistId)
-    return [...(artist ? artistSearchFields(artist) : []), ...applicationSearchFields(application)]
-  })
+  const found = search(all, query, (application) => [...(ownerOf(application, byKey)?.searchFields ?? []), ...applicationSearchFields(application)])
   const withStatus = (applications: Application[]) => (status ? applications.filter((application) => application.status === status) : applications)
   const listed = sorting.sorted(withStatus(found))
   const filters: { status: ApplicationStatus | null; label: string }[] = [
@@ -199,15 +265,12 @@ function ApplicationsList({ query }: { query: string }) {
           </button>
         ))}
       </div>
-      {artists.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
-        </p>
-      )}
+      {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+      {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       {listed.length === 0 ? (
         <p className="admin-placeholder">{withStatus(all).length === 0 ? 'Aucune candidature.' : 'Aucune candidature ne correspond à la recherche.'}</p>
       ) : (
-        <ApplicationsTable applications={listed} artists={byId} sorting={sorting} />
+        <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} />
       )}
     </>
   )
@@ -234,11 +297,68 @@ function ApplicationById({ id }: { id: string }) {
       </>
     )
   }
-  return <LoadedApplication loaded={loaded.value.application} />
+  const application = loaded.value.application
+  const owner = applicationOwner(application)
+  return owner.kind === 'collective' ? (
+    <CollectiveApplication loaded={application} collectiveId={owner.id} />
+  ) : (
+    <ArtistApplication loaded={application} artistId={owner.id} />
+  )
 }
 
-function LoadedApplication({ loaded }: { loaded: Application }) {
-  const artist = useApi('/api/admin/artists/{id}', { params: { path: { id: loaded.artistId } } })
+// An artist's application, with who the artist is.
+function ArtistApplication({ loaded, artistId }: { loaded: Application; artistId: string }) {
+  const artist = useApi('/api/admin/artists/{id}', { params: { path: { id: artistId } } })
+  return (
+    <LoadedApplication
+      loaded={loaded}
+      name={artist.kind === 'loaded' ? artist.value.artist.name : null}
+      stays="L'artiste reste."
+      owner={
+        <>
+          <h2>Artiste</h2>
+          {artist.kind === 'error' && (
+            <p className="admin-error" role="alert">
+              L'artiste n'a pas pu être chargé&nbsp;: {artist.message}
+            </p>
+          )}
+          {artist.kind === 'loaded' && <ArtistSummary artist={artist.value.artist} />}
+        </>
+      }
+    />
+  )
+}
+
+// A collective's application, with what the collective is, and its artists, for its genres.
+function CollectiveApplication({ loaded, collectiveId }: { loaded: Application; collectiveId: string }) {
+  const collective = useApi('/api/admin/collectives/{id}', { params: { path: { id: collectiveId } } })
+  const members = useApi('/api/admin/artists', { params: { query: { collective: collectiveId } } })
+  return (
+    <LoadedApplication
+      loaded={loaded}
+      name={collective.kind === 'loaded' ? collective.value.collective.name : null}
+      stays="Le collectif reste."
+      owner={
+        <>
+          <h2>Collectif</h2>
+          {collective.kind === 'error' && (
+            <p className="admin-error" role="alert">
+              Le collectif n'a pas pu être chargé&nbsp;: {collective.message}
+            </p>
+          )}
+          {members.kind === 'error' && <ArtistsFailure message={members.message} />}
+          {collective.kind === 'loaded' && members.kind !== 'loading' && (
+            <CollectiveSummary collective={collective.value.collective} members={members.kind === 'loaded' ? members.value.artists : null} />
+          )}
+        </>
+      }
+    />
+  )
+}
+
+// An application, with `owner`, the section about who it's for, whose `name` is null until it's known, and who `stays` once
+// it's deleted.
+function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application; name: string | null; owner: ReactNode; stays: string }) {
   // The application as the last change left it, which replaces the one loaded.
   const [application, setApplication] = useState(loaded)
   const [editing, setEditing] = useState(false)
@@ -246,7 +366,6 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const params = { path: { id: application.id } }
-  const name = artist.kind === 'loaded' ? artist.value.artist.name : null
   const title = <h1>{name ? `Candidature de ${name}` : 'Candidature'}</h1>
 
   if (editing) {
@@ -321,13 +440,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
         </p>
       )}
 
-      <h2>Artiste</h2>
-      {artist.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          L'artiste n'a pas pu être chargé&nbsp;: {artist.message}
-        </p>
-      )}
-      {artist.kind === 'loaded' && <ArtistSummary artist={artist.value.artist} />}
+      {owner}
 
       <h2>Candidature</h2>
       <div className="admin-toolbar">
@@ -357,7 +470,7 @@ function LoadedApplication({ loaded }: { loaded: Application }) {
       </dl>
 
       <h2>Supprimer</h2>
-      <p>La candidature sera supprimée pour de bon. L'artiste reste.</p>
+      <p>La candidature sera supprimée pour de bon. {stays}</p>
       <button type="button" onClick={remove} disabled={busy}>
         supprimer la candidature
       </button>
@@ -375,6 +488,8 @@ function ArtistSummary({ artist }: { artist: Artist }) {
       </dd>
       <dt>Ville</dt>
       <dd>{place(artist)}</dd>
+      <dt>Genres</dt>
+      <dd>{genreNames(artist.genres)}</dd>
       <dt>Adresse e-mail</dt>
       <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>
       <dt>Téléphone</dt>
@@ -383,34 +498,70 @@ function ArtistSummary({ artist }: { artist: Artist }) {
   )
 }
 
-// Creating an application, for the artist in the `artiste` query parameter at first, if any.
+// Who a collective is, its artists, with their genres, unless the `members` couldn't be loaded, which leaves them blank,
+// and how to reach its contact. Everything else is on its page.
+function CollectiveSummary({ collective, members }: { collective: Collective; members: Artist[] | null }) {
+  return (
+    <dl className="admin-record">
+      <dt>Nom</dt>
+      <dd>
+        <Link to={entryPath('collective', collective.id)}>{collective.name}</Link> ({ENTRY_KIND_LABELS.collective})
+      </dd>
+      <dt>Ville</dt>
+      <dd>{place(collective)}</dd>
+      <dt>Genres de ses artistes</dt>
+      <dd>{collectiveGenreNames(collective, members)}</dd>
+      <dt>Artistes du collectif</dt>
+      <dd>
+        <MembersList members={collective.members} />
+      </dd>
+      <dt>Adresse e-mail du contact</dt>
+      <dd>
+        <a href={`mailto:${collective.email}`}>{collective.email}</a>
+      </dd>
+      <dt>Téléphone du contact</dt>
+      <dd>{collective.phone ? <a href={`tel:${collective.phone}`}>{collective.phone}</a> : MISSING}</dd>
+    </dl>
+  )
+}
+
+// Creating an application, for the artist in the `artiste` query parameter, or the collective in `collectif`, at first,
+// if any.
 export function NewApplicationPage() {
   const artists = useApi('/api/admin/artists')
+  const collectives = useApi('/api/admin/collectives')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const initialArtist = searchParams.get('artiste')
+  const initialCollective = searchParams.get('collectif')
 
   let content
-  if (artists.kind === 'loading') {
+  if (artists.kind === 'loading' || collectives.kind === 'loading') {
     content = null
-  } else if (artists.kind === 'error') {
+  } else if (artists.kind === 'error' || collectives.kind === 'error') {
     content = (
-      <p className="admin-error" role="alert">
-        Les artistes n'ont pas pu être chargés&nbsp;: {artists.message}
-      </p>
+      <>
+        {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+        {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
+      </>
     )
-  } else if (artists.value.artists.length === 0) {
+  } else if (artists.value.artists.length === 0 && collectives.value.collectives.length === 0) {
     content = (
       <p className="admin-placeholder">
-        Une candidature est celle d'un artiste&nbsp;: <Link to="/admin/artistes/nouveau">ajoutez d'abord l'artiste</Link>.
+        Une candidature est celle d'un artiste ou d'un collectif&nbsp;: ajoutez d'abord{' '}
+        <Link to="/admin/artistes/nouveau">l'artiste</Link> ou <Link to="/admin/artistes/collectifs/nouveau">le collectif</Link>.
       </p>
     )
   } else {
+    const initial: Owner | null =
+      initialArtist !== null ? { kind: 'artist', id: initialArtist } : initialCollective !== null ? { kind: 'collective', id: initialCollective } : null
     content = (
       <ApplicationForm
-        artists={{ all: artists.value.artists, initial: searchParams.get('artiste') }}
+        owners={{ artists: artists.value.artists, collectives: collectives.value.collectives, initial }}
         submitLabel="créer la candidature"
-        onSubmit={async (fields, artistId) => {
-          const result = await api.POST('/api/admin/applications', { body: { ...fields, artistId } })
+        onSubmit={async (fields, owner) => {
+          const body = { ...fields, ...(owner.kind === 'artist' ? { artistId: owner.id } : { collectiveId: owner.id }) }
+          const result = await api.POST('/api/admin/applications', { body })
           if (!result.ok) return `La candidature n'a pas pu être créée : ${result.error}`
           navigate(`/admin/candidatures/${result.application.id}`)
           return null

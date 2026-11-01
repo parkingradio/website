@@ -21,24 +21,37 @@ export function validateApplication(sent: unknown): ApplicationFields {
 
 export type StoredApplication = typeof applications.$inferSelect
 
-// Thrown when creating an application for an artist that doesn't exist.
+// Thrown when creating an application for an artist or a collective that doesn't exist.
 export class NoSuchArtist extends Error {}
+export class NoSuchCollective extends Error {}
+
+// Who an application belongs to: an artist or a collective, by their id.
+export type ApplicationOwner = { artistId: string; collectiveId?: undefined } | { collectiveId: string; artistId?: undefined }
 
 // Where applications are stored. Methods that take an application's id return null if it doesn't exist, including
 // when the id isn't a UUID.
 export type ApplicationsStore = {
-  // The most recently received first, then the most recently created. With `artistId`, only that artist's applications.
-  list(artistId?: string): Promise<StoredApplication[]>
+  // The most recently received first, then the most recently created. With an owner, only their applications.
+  list(owner?: ApplicationOwner): Promise<StoredApplication[]>
   get(id: string): Promise<StoredApplication | null>
   // `createdBy` is the email of the admin who creates the application, or null if the artist sends it themselves.
-  // `receivedAt` is when the artist sent it, now if it's left out. Throws a NoSuchArtist.
-  create(application: ApplicationFields & { artistId: string; createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
+  // `receivedAt` is when the artist sent it, now if it's left out. Throws a NoSuchArtist or a NoSuchCollective.
+  create(application: ApplicationFields & ApplicationOwner & { createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
   // Replaces the application's fields, and `receivedAt` unless it's left out, and returns the updated application.
   update(id: string, changes: ApplicationFields & { receivedAt?: Date; updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
   // Changes the application's status, and returns the updated application.
   setStatus(id: string, change: { status: ApplicationStatus; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
   // Returns false if the application didn't exist.
   delete(id: string): Promise<boolean>
+}
+
+function ownerId(owner: ApplicationOwner): string {
+  return owner.artistId !== undefined ? owner.artistId : owner.collectiveId
+}
+
+// The condition on the applications of `owner`.
+function ownedBy(owner: ApplicationOwner) {
+  return owner.artistId !== undefined ? eq(applications.artistId, owner.artistId) : eq(applications.collectiveId, owner.collectiveId)
 }
 
 export function applicationsStore(db: Queryable): ApplicationsStore {
@@ -49,12 +62,12 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
   }
 
   return {
-    async list(artistId) {
-      if (artistId !== undefined && !isUuid(artistId)) return []
+    async list(owner) {
+      if (owner && !isUuid(ownerId(owner))) return []
       return db
         .select()
         .from(applications)
-        .where(artistId === undefined ? undefined : eq(applications.artistId, artistId))
+        .where(owner && ownedBy(owner))
         .orderBy(desc(applications.receivedAt), desc(applications.createdAt))
     },
 
@@ -65,12 +78,15 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
     },
 
     async create(application) {
-      if (!isUuid(application.artistId)) throw new NoSuchArtist()
+      const noSuchOwner = () => (application.artistId !== undefined ? new NoSuchArtist() : new NoSuchCollective())
+      if (!isUuid(ownerId(application))) throw noSuchOwner()
       try {
         const [row] = await db.insert(applications).values(application).returning()
         return row
       } catch (error) {
-        if (violatesConstraint(error, 'applications_artist_id_artists_id_fk')) throw new NoSuchArtist()
+        if (violatesConstraint(error, 'applications_artist_id_artists_id_fk') || violatesConstraint(error, 'applications_collective_id_collectives_id_fk')) {
+          throw noSuchOwner()
+        }
         throw error
       }
     },

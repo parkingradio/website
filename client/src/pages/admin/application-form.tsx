@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { Body } from '../../api/client'
 import {
   DETAILS_MAX_LENGTH,
@@ -13,7 +13,13 @@ import {
 import type { ApplicationFields, TimeSlot } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Checked } from '../../checks'
+import type { Collective } from '../../collective-profile'
+import { Combobox } from '../../combobox'
+import type { ComboboxOption } from '../../combobox'
 import { leaving, useCheckedForm } from './checked-form'
+import { ENTRY_KIND_LABELS, artistEntryKind, detailOf, entryPath } from './describe'
+import type { Owner } from './describe'
+import { compareText } from './list'
 import { FieldError, FormActions, Labeled } from './fields'
 
 // A form for an application's fields, to create an application or change one. Each field is checked as the server checks
@@ -25,18 +31,35 @@ type ApplicationChanges = Body<'put', '/api/admin/applications/{id}'>
 
 const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], otherPrestation: '', details: '' }
 
-type Field = keyof ApplicationFields | 'artist' | 'receivedAt'
+type Field = keyof ApplicationFields | 'owner' | 'receivedAt'
 
 type ApplicationFormProps = {
   // The application to change, with when it was received, or nothing for a new one.
   application?: ApplicationChanges
-  // For a new application: the artists it can be for, and the one picked at first, if any.
-  artists?: { all: Artist[]; initial: string | null }
+  // For a new application: the artists and collectives it can be for, and the one picked at first, if any.
+  owners?: { artists: Artist[]; collectives: Collective[]; initial: Owner | null }
   submitLabel: string
-  // Sends the application, with the artist picked for a new one, and returns the error, if it failed. `receivedAt` is
-  // left out unless the day it was received was picked, or changed.
-  onSubmit: (fields: ApplicationChanges, artistId: string) => Promise<string | null>
+  // Sends the application, with who it's for for a new one, and returns the error, if it failed. `receivedAt` is left out
+  // unless the day it was received was picked, or changed.
+  onSubmit: (fields: ApplicationChanges, owner: Owner) => Promise<string | null>
   onCancel?: () => void
+}
+
+// The artists and collectives a new application can be for, by name, where collectives say so, like those whose `kind` is
+// "collective", until they're migrated.
+function ownerOptions(artists: Artist[], collectives: Collective[]): (ComboboxOption & { owner: Owner })[] {
+  const collective = (detail: string | null) => [ENTRY_KIND_LABELS.collective, detail].filter(Boolean).join(', ')
+  return [
+    ...artists.map((artist) => ({
+      label: artist.name,
+      detail: artistEntryKind(artist) === 'artist' ? detailOf(artist) : collective(detailOf(artist)),
+      owner: { kind: 'artist' as const, id: artist.id },
+    })),
+    ...collectives.map((other) => ({ label: other.name, detail: collective(other.email), owner: { kind: 'collective' as const, id: other.id } })),
+  ]
+    // Keyed by the address of their page, which tells artists and collectives apart.
+    .map((option) => ({ ...option, key: entryPath(option.owner.kind, option.owner.id) }))
+    .sort((a, b) => compareText(a.label, b.label))
 }
 
 // The day of `instant` (ISO 8601), as "YYYY-MM-DD", in the browser's time zone, where the admin pages show dates.
@@ -60,9 +83,12 @@ function checkReceivedDay(day: string, initialDay: string): Checked<string | und
   return error === null ? { value: receivedAt.toISOString() } : { error }
 }
 
-export function ApplicationForm({ application = EMPTY, artists, submitLabel, onSubmit, onCancel }: ApplicationFormProps) {
-  // An artist that isn't one of those listed, e.g. from an outdated link, isn't picked.
-  const [artistId, setArtistId] = useState(artists?.all.find((artist) => artist.id === artists.initial)?.id ?? '')
+export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSubmit, onCancel }: ApplicationFormProps) {
+  const ownerId = useId()
+  const options = owners ? ownerOptions(owners.artists, owners.collectives) : []
+  // An artist or a collective that isn't one of those listed, e.g. from an outdated link, isn't picked.
+  const [ownerPicked, setOwnerPicked] = useState(owners?.initial ? entryPath(owners.initial.kind, owners.initial.id) : null)
+  const owner = options.find((option) => option.key === ownerPicked)?.owner
   // The day the application was received, as "YYYY-MM-DD", or empty for a new one, which was received now.
   const initialDay = application.receivedAt ? localDay(application.receivedAt) : ''
   const [receivedDay, setReceivedDay] = useState(initialDay)
@@ -85,9 +111,10 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
   }
   const { value: receivedAt, error: receivedAtError } = checkReceivedDay(receivedDay, initialDay)
   const errors: Partial<Record<Field, string>> = { ...checkApplication(fields).errors }
-  if (artists && !artistId) errors.artist = "Choisissez l'artiste."
+  if (owners && !owner) errors.owner = "Choisissez l'artiste ou le collectif."
   if (receivedAtError) errors.receivedAt = receivedAtError
-  const { form, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit({ ...fields, receivedAt }, artistId))
+  // There's an owner for a new application, since there are no errors by then.
+  const { form, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit({ ...fields, receivedAt }, owner!))
 
   const changeSlot = (index: number, changes: Partial<TimeSlot>) =>
     setTimeSlots(timeSlots.map((slot, i) => (i === index ? { ...slot, ...changes } : slot)))
@@ -97,17 +124,20 @@ export function ApplicationForm({ application = EMPTY, artists, submitLabel, onS
 
   return (
     <form ref={form} className="admin-form admin-form-wide" onSubmit={submit} noValidate>
-      {artists && (
-        <Labeled label="Artiste" error={shown('artist')}>
-          <select value={artistId} aria-invalid={shown('artist') ? true : undefined} onChange={(event) => setArtistId(event.target.value)} onBlur={leave('artist')}>
-            <option value="">choisir un artiste…</option>
-            {artists.all.map((artist) => (
-              <option key={artist.id} value={artist.id}>
-                {artist.email ? `${artist.name} (${artist.email})` : artist.name}
-              </option>
-            ))}
-          </select>
-        </Labeled>
+      {owners && (
+        <div className="admin-field">
+          <label htmlFor={ownerId}>Artiste ou collectif</label>
+          <Combobox
+            id={ownerId}
+            options={options}
+            selected={ownerPicked}
+            onSelect={setOwnerPicked}
+            onBlur={leave('owner')}
+            invalid={!!shown('owner')}
+            placeholder="choisir un artiste ou un collectif…"
+          />
+          <FieldError message={shown('owner')} />
+        </div>
       )}
 
       <Labeled label="Reçue le" error={shown('receivedAt')}>

@@ -90,7 +90,7 @@ the request failing.
 | [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the radio reads playlists through |
 | [`PUT /api/admin/radio/credentials`](radio.md#put-apiadminradiocredentials-admin) | admin | Entering the credentials of that SoundCloud app |
 | [`POST /api/admin/radio/credentials/check`](radio.md#post-apiadminradiocredentialscheck-admin) | admin | Whether SoundCloud accepts credentials, without saving them |
-| [`GET /api/admin/artists`](artists.md#get-apiadminartists-admin) | admin | Every artist |
+| [`GET /api/admin/artists`](artists.md#get-apiadminartistscollectiveid-admin) | admin | Every artist, or a collective's |
 | [`GET /api/admin/artists/:id`](artists.md#get-apiadminartistsid-admin) | admin | An artist |
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
@@ -101,10 +101,10 @@ the request failing.
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
 | [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Changing a collective's profile and members, or replacing or removing its photo |
-| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective and its photo, but not its members |
-| [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistid-admin) | admin | Every application, or an artist's |
+| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective, its photo and its applications, but not its members |
+| [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
-| [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist |
+| [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
 | [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Changing an application |
 | [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
 | [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |

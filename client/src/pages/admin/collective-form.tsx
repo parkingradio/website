@@ -7,7 +7,7 @@ import { checkCollectiveProfile } from '../../collective-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import { normalize } from '../../normalize'
-import { photoUrl, place } from './describe'
+import { detailOf, photoUrl } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 import { CountryField, LinksField, PhotoField } from './profile-fields'
@@ -31,7 +31,7 @@ function memberNamed(members: Member[], name: string): Member | undefined {
   return members.find((member) => normalize(member.name) === normalize(name))
 }
 
-type CollectiveFormProps = {
+export type CollectiveFormProps = {
   // The collective to change, or nothing for a new one.
   collective?: Collective
   // Every artist, of whom members are picked, or null when they couldn't be loaded, which leaves only adding new ones.
@@ -133,14 +133,6 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
       <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
   )
-}
-
-// What tells an artist apart from others with the same name, in the list they're picked from: their email, or else where
-// they're from, or else their collectives.
-function detailOf(artist: Artist): string | null {
-  if (artist.email) return artist.email
-  if (artist.city || artist.country) return place(artist)
-  return artist.collectives.map((collective) => collective.name).join(', ') || null
 }
 
 // The collective's artists, in order, each of whom can be moved up or down or removed, then the two ways of adding one:

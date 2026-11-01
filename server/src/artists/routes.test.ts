@@ -11,8 +11,10 @@ import { artistsRoutes } from './routes.js'
 import { EmailTaken, MemberCantBeCollective } from './store.js'
 import type { ArtistsStore, PhotoFolder, SentPhoto, StoredArtist } from './store.js'
 
-// The artists, as the database would keep them, and the photos, as the bucket would.
+// The artists, as the database would keep them, the ids of each collective's members, in order, and the photos, as the
+// bucket would keep them.
 let rows: StoredArtist[] = []
+let members = new Map<string, string[]>()
 const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
@@ -23,7 +25,10 @@ function emailTaken(email: string | null, except?: string) {
 }
 
 const store: ArtistsStore = {
-  list: async () => [...rows].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+  list: async (collectiveId) =>
+    collectiveId === undefined
+      ? [...rows].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+      : (members.get(collectiveId) ?? []).map((id) => rows.find((row) => row.id === id)!),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
   create: vi.fn<ArtistsStore['create']>(async (artist) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
@@ -131,6 +136,7 @@ describe('artists routes', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
+    members = new Map()
     stored.clear()
     nextId = 0
     nextPhoto = 0
@@ -399,6 +405,25 @@ describe('artists routes', () => {
       const response = await get(app, '/api/admin/artists')
       expect(response.statusCode).toBe(200)
       expect(response.json().artists.map((artist: { name: string }) => artist.name)).toEqual(['Ana', 'zoé'])
+    })
+
+    it("lists a collective's members, in its order, or none for an unknown collective", async () => {
+      const app = await buildApp()
+      await create(app, profile({ name: 'Ana', email: 'ana@example.com' }))
+      await create(app, profile({ name: 'zoé', email: 'zoe@example.com' }))
+      await create(app, profile({ name: 'Brume', email: 'brume@example.com' }))
+      members.set('collective-1', ['artist-2', 'artist-1'])
+      const response = await get(app, '/api/admin/artists?collective=collective-1')
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({ ok: true, artists: [rows[1], rows[0]].map((row) => expect.objectContaining({ id: row.id, name: row.name })) })
+      expect((await get(app, '/api/admin/artists?collective=collective-2')).json()).toEqual({ ok: true, artists: [] })
+    })
+
+    it('refuses more than one collective', async () => {
+      const app = await buildApp()
+      const response = await get(app, '/api/admin/artists?collective=collective-1&collective=collective-2')
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: '`collective`: Must be a single id' })
     })
   })
 

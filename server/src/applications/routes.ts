@@ -4,8 +4,8 @@ import { ApiError, ById, Day, Ok, Timestamp, firstIssue, zodRoutes } from '../ap
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
 import { ApplicationFields, ApplicationStatus, BAD_STATUS, PrestationId, ReceivedAt, TimeSlot } from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
-import { NoSuchArtist } from './store.js'
-import type { ApplicationsStore, StoredApplication } from './store.js'
+import { NoSuchArtist, NoSuchCollective } from './store.js'
+import type { ApplicationOwner, ApplicationsStore, StoredApplication } from './store.js'
 
 // Admin routes for applications: create, view, change, accept or reject, and delete them, and choose who the ones artists
 // send are emailed to (see docs/design/server/applications.md).
@@ -14,7 +14,8 @@ import type { ApplicationsStore, StoredApplication } from './store.js'
 const Application = z
   .object({
     id: z.string(),
-    artistId: z.string(),
+    artistId: z.string().nullable().meta({ description: "The artist who applied, or null for a collective's application" }),
+    collectiveId: z.string().nullable().meta({ description: "The collective that applied, or null for an artist's application" }),
     receivedAt: Timestamp,
     createdAt: Timestamp,
     createdBy: z.string().nullable(),
@@ -34,20 +35,36 @@ type Application = z.infer<typeof Application>
 
 const ApplicationResponse = z.object({ ok: z.literal(true), application: Application })
 
-// What admins send to change an application, and to create one, with the artist. Their errors are in French, like the
-// application's (see `firstIssue`), and are those of the first field that's wrong, in the order the fields are checked
-// in: the application's, when it was received, then the artist.
-const ApplicationChanges = ApplicationFields.extend({ receivedAt: ReceivedAt.optional() })
-const NewApplication = ApplicationChanges.extend({ artistId: z.string({ error: 'No such artist' }) })
-
 const NO_SUCH_APPLICATION: z.infer<typeof ApiError> = { ok: false, error: 'No such application' }
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
+const NO_SUCH_COLLECTIVE: z.infer<typeof ApiError> = { ok: false, error: 'No such collective' }
+const ONE_OWNER = 'An application belongs to either an artist or a collective: send either artistId or collectiveId'
+
+// What admins send to change an application, and to create one, with the artist or the collective it's for. Their errors
+// are those of the first field that's wrong (see `firstIssue`), in the order the fields are checked in: the
+// application's, when it was received, in French like the application's, then the artist or the collective, in English,
+// since only admins send ids.
+const ApplicationChanges = ApplicationFields.extend({ receivedAt: ReceivedAt.optional() })
+const NewApplication = ApplicationChanges.extend({
+  artistId: z.string({ error: NO_SUCH_ARTIST.error }).optional().meta({ description: 'The artist who applies. Not with `collectiveId`' }),
+  collectiveId: z
+    .string({ error: NO_SUCH_COLLECTIVE.error })
+    .optional()
+    .meta({ description: 'The collective that applies. Not with `artistId`' }),
+}).refine((sent) => (sent.artistId === undefined) !== (sent.collectiveId === undefined), ONE_OWNER)
+
+// Who an application is for, from the ids that were sent, of which there's at most one, or nobody.
+function ownerOf(artistId: string | undefined, collectiveId: string | undefined): ApplicationOwner | undefined {
+  if (artistId !== undefined) return { artistId }
+  return collectiveId !== undefined ? { collectiveId } : undefined
+}
 
 // The fields are listed one by one, so that a column added to the table doesn't end up in the API unless it's added here.
 function application(row: StoredApplication): Application {
   return {
     id: row.id,
     artistId: row.artistId,
+    collectiveId: row.collectiveId,
     receivedAt: row.receivedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
@@ -128,18 +145,27 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
     {
       config: { admin: true },
       schema: {
-        summary: "Every application, or an artist's, the most recently received first",
+        summary: "Every application, or an artist's or a collective's, the most recently received first",
         tags: ['Applications'],
-        querystring: z.object({
-          artist: z
-            .string({ error: 'The artist must be a single id' })
-            .optional()
-            .meta({ description: "Only this artist's applications. An unknown artist has none" }),
-        }),
+        querystring: z
+          .object({
+            artist: z
+              .string({ error: 'The artist must be a single id' })
+              .optional()
+              .meta({ description: "Only this artist's applications. An unknown artist has none. Not with `collective`" }),
+            collective: z
+              .string({ error: 'The collective must be a single id' })
+              .optional()
+              .meta({ description: "Only this collective's applications. An unknown collective has none. Not with `artist`" }),
+          })
+          .refine((query) => query.artist === undefined || query.collective === undefined, 'Only one of artist and collective can be given'),
         response: { 200: z.object({ ok: z.literal(true), applications: z.array(Application) }) },
       },
     },
-    async (request) => ({ ok: true as const, applications: (await store.list(request.query.artist)).map(application) }),
+    async (request) => {
+      const owner = ownerOf(request.query.artist, request.query.collective)
+      return { ok: true as const, applications: (await store.list(owner)).map(application) }
+    },
   )
 
   // Fastify matches this path before `/api/admin/applications/:id`, and `recipients` isn't an application's id anyway.
@@ -190,18 +216,22 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
     {
       config: { admin: true },
       schema: {
-        summary: 'Creates an application for an artist',
+        summary: 'Creates an application for an artist or a collective',
         tags: ['Applications'],
         body: NewApplication,
         response: { 200: ApplicationResponse, 400: ApiError },
       },
     },
     async (request, reply) => {
+      const { artistId, collectiveId, ...fields } = request.body
+      // There's exactly one of them (see `NewApplication`).
+      const owner = ownerOf(artistId, collectiveId)!
       try {
-        const row = await store.create({ ...request.body, createdBy: request.user!.email })
+        const row = await store.create({ ...fields, ...owner, createdBy: request.user!.email })
         return { ok: true as const, application: application(row) }
       } catch (error) {
         if (error instanceof NoSuchArtist) return reply.status(400).send(NO_SUCH_ARTIST)
+        if (error instanceof NoSuchCollective) return reply.status(400).send(NO_SUCH_COLLECTIVE)
         throw error
       }
     },

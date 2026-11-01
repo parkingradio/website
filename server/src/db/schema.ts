@@ -163,8 +163,8 @@ export const collectiveMembers = pgTable(
   (table) => [primaryKey({ columns: [table.collectiveId, table.artistId] }), index('collective_members_artist_id_idx').on(table.artistId)],
 )
 
-// Artists' applications for a set. Each one belongs to an artist, and is deleted with them. See `ApplicationFields` in
-// applications/fields.ts for what each field can contain.
+// Applications for a set. Each one belongs to either an artist or a collective, never both, and is deleted with them.
+// See `ApplicationFields` in applications/fields.ts for what each field can contain.
 export const applications = pgTable(
   'applications',
   {
@@ -172,9 +172,9 @@ export const applications = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // The email of the admin who created the application, or null if the artist sent it themselves.
     createdBy: text('created_by'),
-    artistId: uuid('artist_id')
-      .notNull()
-      .references(() => artists.id, { onDelete: 'cascade' }),
+    // Exactly one of them isn't null (see `applications_owner` below).
+    artistId: uuid('artist_id').references(() => artists.id, { onDelete: 'cascade' }),
+    collectiveId: uuid('collective_id').references(() => collectives.id, { onDelete: 'cascade' }),
     // When the artist sent the application: when it was created, unless the admin who created it said otherwise, e.g.
     // for one that came by email.
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
@@ -194,6 +194,8 @@ export const applications = pgTable(
   },
   (table) => [
     index('applications_artist_id_idx').on(table.artistId),
+    index('applications_collective_id_idx').on(table.collectiveId),
+    check('applications_owner', sql`(${table.artistId} is null) <> (${table.collectiveId} is null)`),
     check('applications_status', oneOf(table.status, APPLICATION_STATUSES)),
   ],
 )

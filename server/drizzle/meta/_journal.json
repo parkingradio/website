@@ -43,6 +43,13 @@
       "when": 1793470796112,
       "tag": "0005_collectives",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793476770876,
+      "tag": "0006_applications_collectives",
+      "breakpoints": true
     }
   ]
 }

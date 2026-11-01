@@ -1,8 +1,8 @@
 import { test, expect, admin, adminMenu, logIn, submitLogin } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
-// photo, the database, the private bucket and back, then removing the photo, and searching the seeded artists and
-// collectives.
+// photo, the database, the private bucket and back, then removing the photo, searching the seeded artists and
+// collectives, and the applications of collectives.
 
 test.describe('logging in', () => {
   test('a wrong password is refused, and the login form stays', async ({ page }) => {
@@ -159,6 +159,34 @@ test('collectives are listed and searched with the artists, and lead to their ar
   await expect(collectives).toHaveText(['Les Nuits Basses', 'Onde Commune'])
 })
 
+// With the seeded application of Onde Commune (see seed-data.ts).
+test("a collective's application is listed with its city and its artists' genres, and on its page, which leads to another one", async ({
+  page,
+}) => {
+  await logIn(page, { at: '/admin/candidatures' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('onde commune')
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Onde Commune', exact: true }) })
+  await expect(row).toContainText('Onde Commune (collectif)')
+  await expect(row).toContainText('Montréal, Canada')
+  await expect(row).toContainText('techno, deep house, afrobeat, acid, afro house, minimal, amapiano')
+  await expect(row).toContainText('DJ, autre : B2B2B')
+
+  await row.getByRole('link').first().click()
+  await expect(page.getByRole('heading', { name: 'Candidature de Onde Commune', exact: true })).toBeVisible()
+  await expect(page.getByText('Nous aimerions jouer toute la soirée, chacun son tour.')).toBeVisible()
+  const genres = page.locator('dt', { hasText: 'Genres de ses artistes' }).locator('+ dd')
+  await expect(genres).toHaveText('techno, deep house, afrobeat, acid, afro house, minimal, amapiano')
+
+  await page.getByRole('link', { name: 'Onde Commune', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
+  await expect(page.getByRole('table').getByRole('row')).toHaveCount(2)
+  await expect(page.getByRole('table')).toContainText('DJ, autre : B2B2B')
+
+  await page.getByRole('link', { name: 'nouvelle candidature' }).click()
+  await expect(page.getByRole('heading', { name: 'Nouvelle candidature' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue('Onde Commune')
+})
+
 test('a collective is added with an artist picked and one added by name, shown, changed, and deleted without its artists', async ({
   page,
 }, testInfo) => {
@@ -208,11 +236,30 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await page.getByRole('button', { name: 'enregistrer' }).click()
   await expect(members).toHaveText([known])
 
+  // An application for it, from its page, which Candidatures lists until the collective is deleted.
+  await page.getByRole('link', { name: 'nouvelle candidature' }).click()
+  await expect(page.getByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue(name)
+  await page.getByLabel('Date 1').fill('2027-01-15')
+  await page.getByRole('button', { name: 'créer la candidature' }).click()
+  await expect(page.getByRole('heading', { name: `Candidature de ${name}`, exact: true })).toBeVisible()
+  const applicationPage = new URL(page.url()).pathname
+  const listed = page.locator(`a[href="${applicationPage}"]`)
+  await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
+  await expect(page.getByRole('row').filter({ has: listed })).toContainText(`${name} (collectif)`)
+  await page.goBack()
+  await page.getByRole('link', { name, exact: true }).click()
+  await expect(page.getByRole('table')).toContainText('15 janv. 2027')
+
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'supprimer le collectif' }).click()
   await expect(page).toHaveURL('/admin/artistes')
   await expect(page.getByRole('table')).toBeVisible()
   await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
+
+  // Its application is gone with it.
+  await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
+  await expect(page.getByRole('table')).toBeVisible()
+  await expect(listed).toHaveCount(0)
 
   // Its artists stay, out of it.
   await page.goto(`/admin/artistes/${addedId}`)

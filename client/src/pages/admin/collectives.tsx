@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import { OwnApplications } from './applications'
 import { CollectiveForm } from './collective-form'
-import { BackToArtists, LinksList, LoadFailure, PhotoOrNone } from './profile-details'
-import { MISSING, addedBy, byWhom, entryPath, genreNames, membersGenres, photoUrl, place } from './describe'
+import type { CollectiveFormProps } from './collective-form'
+import { ArtistsFailure, BackToArtists, LinksList, LoadFailure, MembersList, PhotoOrNone } from './profile-details'
+import { MISSING, addedBy, byWhom, collectiveGenreNames, deletedWith, entryPath, photoUrl, place } from './describe'
 
 // The pages of the artists section about collectives: a collective's page, where it's changed or deleted, and adding one
 // by hand. They're listed with the artists (see artists.tsx).
@@ -19,9 +21,10 @@ export function CollectivePage() {
 
 function CollectiveById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/collectives/{id}', { params: { path: { id } } })
-  // Loaded again once the collective is saved with new artists, which the server creates.
-  const [artistsVersion, setArtistsVersion] = useState(0)
-  const artists = useApi('/api/admin/artists', { version: artistsVersion })
+  // Its artists, for its genres, loaded again whenever the collective is saved, which can change them.
+  const [membersVersion, setMembersVersion] = useState(0)
+  const members = useApi('/api/admin/artists', { params: { query: { collective: id } }, version: membersVersion })
+  const applications = useApi('/api/admin/applications', { params: { query: { collective: id } } })
   // The collective as the last change left it, which replaces the one loaded.
   const [changed, setChanged] = useState<Collective | null>(null)
   const [editing, setEditing] = useState(false)
@@ -30,21 +33,16 @@ function CollectiveById({ id }: { id: string }) {
   const navigate = useNavigate()
 
   if (loaded.kind === 'error') return <LoadFailure>Le collectif n'a pas pu être chargé&nbsp;: {loaded.message}</LoadFailure>
-  if (loaded.kind === 'loading' || artists.kind === 'loading') return <BackToArtists />
+  if (loaded.kind === 'loading' || members.kind === 'loading') return <BackToArtists />
   const collective = changed ?? loaded.value.collective
-  // Without the artists, the collective is still shown, but its genres are unknown, and its artists can't be picked.
-  const known = artists.kind === 'loaded' ? artists.value.artists : null
-  const artistsFailure = artists.kind === 'error' && <ArtistsFailure message={artists.message} />
 
   if (editing) {
     return (
       <>
         <BackToArtists />
         <h1>{collective.name}</h1>
-        {artistsFailure}
-        <CollectiveForm
+        <CollectiveFormWithArtists
           collective={collective}
-          artists={known}
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
           onSubmit={async (body) => {
@@ -52,7 +50,7 @@ function CollectiveById({ id }: { id: string }) {
             if (!result.ok) return `Le collectif n'a pas pu être enregistré : ${result.error}`
             setChanged(result.collective)
             setEditing(false)
-            if (body.collective.members.some((member) => !('id' in member))) setArtistsVersion((version) => version + 1)
+            setMembersVersion((version) => version + 1)
             return null
           }}
         />
@@ -60,8 +58,9 @@ function CollectiveById({ id }: { id: string }) {
     )
   }
 
+  const count = applications.kind === 'loaded' ? applications.value.applications.length : null
   const remove = async () => {
-    if (!window.confirm(`Supprimer définitivement ${collective.name}${collective.hasPhoto ? ' et sa photo' : ''} ? Ses artistes restent.`)) return
+    if (!window.confirm(`Supprimer définitivement ${deletedWith(collective.name, collective.hasPhoto, count)} ? Ses artistes restent.`)) return
     setBusy(true)
     setError(null)
     const result = await api.DELETE('/api/admin/collectives/{id}', { params: { path: { id } } })
@@ -79,19 +78,21 @@ function CollectiveById({ id }: { id: string }) {
       <h1>{collective.name}</h1>
       <p className="admin-meta">{addedBy('collectif', collective)}</p>
       {collective.updatedBy && <p className="admin-meta">{byWhom('Modifié', collective.updatedBy, collective.updatedAt)}</p>}
-      {artistsFailure}
+      {members.kind === 'error' && <ArtistsFailure message={members.message} />}
 
       <div className="admin-toolbar">
         <button type="button" onClick={() => setEditing(true)}>
           modifier
         </button>
       </div>
-      <CollectiveDetails collective={collective} artists={known} />
+      <CollectiveDetails collective={collective} members={members.kind === 'loaded' ? members.value.artists : null} />
+
+      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collectif=${collective.id}`} />
 
       <h2>Supprimer</h2>
       <p>
-        {collective.hasPhoto ? 'Le collectif et sa photo seront supprimés' : 'Le collectif sera supprimé'} pour de bon. Ses artistes
-        restent.
+        Le collectif{collective.hasPhoto && ', sa photo'} et ses candidatures seront supprimés pour de bon. Ses artistes restent, avec
+        leurs propres candidatures.
       </p>
       {error && (
         <p className="admin-error" role="alert">
@@ -105,39 +106,35 @@ function CollectiveById({ id }: { id: string }) {
   )
 }
 
-function ArtistsFailure({ message }: { message: string }) {
+// The collective form, to change a collective or add one, with every artist to pick its artists from, loaded each time
+// it opens, so that they're current, and nothing until then. When they can't be loaded, it says so, and the form only
+// adds new artists.
+function CollectiveFormWithArtists(props: Omit<CollectiveFormProps, 'artists'>) {
+  const artists = useApi('/api/admin/artists')
+  if (artists.kind === 'loading') return null
   return (
-    <p className="admin-error" role="alert">
-      Les artistes n'ont pas pu être chargés&nbsp;: {message}
-    </p>
+    <>
+      {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+      <CollectiveForm {...props} artists={artists.kind === 'loaded' ? artists.value.artists : null} />
+    </>
   )
 }
 
 // Everything about a collective: its photo, or that it has none, then its profile, with its artists, linking to them, and
-// their genres, unless the `artists` couldn't be loaded, which leaves them blank.
-function CollectiveDetails({ collective, artists }: { collective: Collective; artists: Artist[] | null }) {
+// their genres, from its `members`, unless they couldn't be loaded, which leaves them blank.
+function CollectiveDetails({ collective, members }: { collective: Collective; members: Artist[] | null }) {
   return (
     <div className="admin-record">
       <PhotoOrNone url={collective.hasPhoto ? photoUrl('collectives', collective) : null} name={collective.name} />
       <dl>
         <dt>Artistes du collectif</dt>
         <dd>
-          {collective.members.length > 0 ? (
-            <ol>
-              {collective.members.map((member) => (
-                <li key={member.id}>
-                  <Link to={entryPath('artist', member.id)}>{member.name}</Link>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            'Aucun artiste.'
-          )}
+          <MembersList members={collective.members} />
         </dd>
         <dt>Ville</dt>
         <dd>{place(collective)}</dd>
         <dt>Genres de ses artistes</dt>
-        <dd>{artists && genreNames(membersGenres(collective.members, new Map(artists.map((artist) => [artist.id, artist]))))}</dd>
+        <dd>{collectiveGenreNames(collective, members)}</dd>
         <dt>Liens</dt>
         <dd>
           <LinksList links={collective.links} />
@@ -156,25 +153,20 @@ function CollectiveDetails({ collective, artists }: { collective: Collective; ar
 }
 
 export function NewCollectivePage() {
-  const artists = useApi('/api/admin/artists')
   const navigate = useNavigate()
   return (
     <>
       <BackToArtists />
       <h1>Nouveau collectif</h1>
-      {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
-      {artists.kind !== 'loading' && (
-        <CollectiveForm
-          artists={artists.kind === 'loaded' ? artists.value.artists : null}
-          submitLabel="ajouter le collectif"
-          onSubmit={async (body) => {
-            const result = await api.POST('/api/admin/collectives', { body, bodySerializer: formData })
-            if (!result.ok) return `Le collectif n'a pas pu être ajouté : ${result.error}`
-            navigate(entryPath('collective', result.collective.id))
-            return null
-          }}
-        />
-      )}
+      <CollectiveFormWithArtists
+        submitLabel="ajouter le collectif"
+        onSubmit={async (body) => {
+          const result = await api.POST('/api/admin/collectives', { body, bodySerializer: formData })
+          if (!result.ok) return `Le collectif n'a pas pu être ajouté : ${result.error}`
+          navigate(entryPath('collective', result.collective.id))
+          return null
+        }}
+      />
     </>
   )
 }

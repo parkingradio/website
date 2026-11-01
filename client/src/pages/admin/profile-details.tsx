@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import type { Schema } from '../../api/client'
 import { LINK_SITES } from '../../artist-profile'
 import type { ArtistLinks } from '../../artist-profile'
-import { MISSING } from './describe'
+import { MISSING, entryPath } from './describe'
 
 // What the pages of artists and collectives share.
 
@@ -23,6 +24,37 @@ export function LoadFailure({ children }: { children: ReactNode }) {
         {children}
       </p>
     </>
+  )
+}
+
+// That the artists, or the collectives, couldn't be loaded, and why.
+export function ArtistsFailure({ message }: { message: string }) {
+  return (
+    <p className="admin-error" role="alert">
+      Les artistes n'ont pas pu être chargés&nbsp;: {message}
+    </p>
+  )
+}
+
+export function CollectivesFailure({ message }: { message: string }) {
+  return (
+    <p className="admin-error" role="alert">
+      Les collectifs n'ont pas pu être chargés&nbsp;: {message}
+    </p>
+  )
+}
+
+// A collective's artists, in order, each linking to their page, or that it has none, which happens once they're deleted.
+export function MembersList({ members }: { members: Schema<'Reference'>[] }) {
+  if (members.length === 0) return 'Aucun artiste.'
+  return (
+    <ol>
+      {members.map((member) => (
+        <li key={member.id}>
+          <Link to={entryPath('artist', member.id)}>{member.name}</Link>
+        </li>
+      ))}
+    </ol>
   )
 }
 

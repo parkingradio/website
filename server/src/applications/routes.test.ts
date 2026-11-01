@@ -3,15 +3,16 @@ import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import fastifyCookie from '@fastify/cookie'
-import { NoSuchArtist } from './store.js'
+import { NoSuchArtist, NoSuchCollective } from './store.js'
 import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { applicationsRoutes } from './routes.js'
 
-// A fake database: the applications, and the ids of the artists who exist.
+// A fake database: the applications, and the ids of the artists and collectives that exist.
 let rows: StoredApplication[] = []
 const ARTISTS = ['artist-1', 'artist-2']
+const COLLECTIVES = ['collective-1']
 let nextId = 0
 // Each application is created a minute after the previous one, so that the tests can check "newest first".
 let clock = Date.parse('2026-10-07T16:00:00Z')
@@ -26,10 +27,14 @@ function change(id: string, changes: Partial<StoredApplication>) {
 }
 
 const store: ApplicationsStore = {
-  list: async (artistId) => rows.filter((row) => artistId === undefined || row.artistId === artistId).toReversed(),
+  list: async (owner) =>
+    rows
+      .filter((row) => owner === undefined || (owner.artistId !== undefined ? row.artistId === owner.artistId : row.collectiveId === owner.collectiveId))
+      .toReversed(),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
   create: vi.fn<ApplicationsStore['create']>(async ({ receivedAt, ...application }) => {
-    if (!ARTISTS.includes(application.artistId)) throw new NoSuchArtist()
+    if (application.artistId !== undefined && !ARTISTS.includes(application.artistId)) throw new NoSuchArtist()
+    if (application.collectiveId !== undefined && !COLLECTIVES.includes(application.collectiveId)) throw new NoSuchCollective()
     const createdAt = new Date((clock += 60_000))
     const row: StoredApplication = {
       id: `application-${++nextId}`,
@@ -40,6 +45,8 @@ const store: ApplicationsStore = {
       status: 'new',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
+      artistId: null,
+      collectiveId: null,
       ...application,
     }
     rows.push(row)
@@ -185,6 +192,7 @@ describe('applications routes', () => {
           // Sorted.
           dates: ['2026-12-10', '2027-01-15'],
           id: 'application-1',
+          collectiveId: null,
           // When it was created, since nothing else was said.
           receivedAt: rows[0].createdAt.toISOString(),
           createdAt: rows[0].createdAt.toISOString(),
@@ -240,10 +248,41 @@ describe('applications routes', () => {
 
     it('requires an artist that exists', async () => {
       const app = await buildApp()
-      for (const artistId of ['nobody', undefined, 42]) {
+      for (const artistId of ['nobody', null, 42]) {
         const response = await create(app, { artistId })
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: 'No such artist' })
+      }
+      expect(rows).toHaveLength(0)
+    })
+
+    it('creates the application for a collective', async () => {
+      const app = await buildApp()
+      const response = await create(app, { artistId: undefined, collectiveId: 'collective-1' })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().application).toMatchObject({ id: 'application-1', artistId: null, collectiveId: 'collective-1' })
+      expect(store.create).toHaveBeenCalledWith(expect.not.objectContaining({ artistId: expect.anything() }))
+    })
+
+    it('requires a collective that exists', async () => {
+      const app = await buildApp()
+      for (const collectiveId of ['nobody', null, 42]) {
+        const response = await create(app, { artistId: undefined, collectiveId })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'No such collective' })
+      }
+      expect(rows).toHaveLength(0)
+    })
+
+    it('requires either an artist or a collective, but not both', async () => {
+      const app = await buildApp()
+      for (const owner of [{ artistId: undefined }, { collectiveId: 'collective-1' }]) {
+        const response = await create(app, owner)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({
+          ok: false,
+          error: 'An application belongs to either an artist or a collective: send either artistId or collectiveId',
+        })
       }
       expect(rows).toHaveLength(0)
     })
@@ -289,6 +328,9 @@ describe('applications routes', () => {
       const response = await create(app, { artistId: 42, receivedAt: '2026-03-28', prestations: ['modular'] })
       expect(response.json()).toEqual({ ok: false, error: "Une des prestations n'est pas dans la liste." })
       expect((await create(app, { artistId: 42, receivedAt: '2026-03-28' })).json()).toEqual({ ok: false, error: 'La date de réception est invalide.' })
+      // Then what's wrong with each id, before there being both.
+      expect((await create(app, { artistId: 42, collectiveId: 42 })).json()).toEqual({ ok: false, error: 'No such artist' })
+      expect((await create(app, { collectiveId: 42 })).json()).toEqual({ ok: false, error: 'No such collective' })
     })
 
     it("keeps the application's details out of the logs and the response when the database fails", async () => {
@@ -323,6 +365,22 @@ describe('applications routes', () => {
       expect(twice.statusCode).toBe(400)
       expect(twice.json()).toEqual({ ok: false, error: 'The artist must be a single id' })
     })
+
+    it("lists only a collective's applications", async () => {
+      const app = await buildApp()
+      await create(app)
+      await create(app, { artistId: undefined, collectiveId: 'collective-1' })
+
+      const theirs = await send(app, 'GET', '/api/admin/applications?collective=collective-1')
+      expect(theirs.json().applications.map((row: { id: string }) => row.id)).toEqual(['application-2'])
+      expect((await send(app, 'GET', '/api/admin/applications?collective=nobody')).json()).toEqual({ ok: true, applications: [] })
+      const twice = await send(app, 'GET', '/api/admin/applications?collective=collective-1&collective=collective-2')
+      expect(twice.statusCode).toBe(400)
+      expect(twice.json()).toEqual({ ok: false, error: 'The collective must be a single id' })
+      const both = await send(app, 'GET', '/api/admin/applications?artist=artist-1&collective=collective-1')
+      expect(both.statusCode).toBe(400)
+      expect(both.json()).toEqual({ ok: false, error: 'Only one of artist and collective can be given' })
+    })
   })
 
   describe('GET /api/admin/applications/:id', () => {
@@ -346,13 +404,14 @@ describe('applications routes', () => {
       await create(app)
       await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
       const response = await send(app, 'PUT', '/api/admin/applications/application-1', {
-        ...application({ artistId: 'artist-2', timeSlots: [], prestations: ['live-performance'], otherPrestation: 'Visuels', details: '' }),
+        ...application({ artistId: 'artist-2', collectiveId: 'collective-1', timeSlots: [], prestations: ['live-performance'], otherPrestation: 'Visuels', details: '' }),
         status: 'rejected',
       })
 
       expect(response.statusCode).toBe(200)
       expect(response.json().application).toMatchObject({
         artistId: 'artist-1',
+        collectiveId: null,
         timeSlots: [],
         prestations: ['live-performance'],
         otherPrestation: 'Visuels',

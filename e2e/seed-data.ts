@@ -1,9 +1,9 @@
 import type { components } from '../client/src/api/schema.d.ts'
 
 // The data seed.ts fills a database with: artists, some with a photo, and their applications, and collectives of some of
-// them, with the variety the admin pages have to handle. It's the same every time it's seeded, except for days, which
-// are counted from the day it's seeded, so that the data always looks current: new applications are for the coming
-// months, and those that are done were for past days.
+// them, with their applications, with the variety the admin pages have to handle. It's the same every time it's seeded,
+// except for days, which are counted from the day it's seeded, so that the data always looks current: new applications
+// are for the coming months, and those that are done were for past days.
 
 // A profile, as the server returns it, which is also how it can be sent, as it's already cleaned up.
 export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'collectives'>
@@ -536,6 +536,8 @@ export type SeedCollective = {
   members: ({ seeded: string } | { name: string })[]
   // The colour of its photo, for collectives that have one.
   photo?: string
+  // Its applications, which an admin added.
+  applications: SeedApplication[]
 }
 
 // Seeded after the artists, whom they have as members. Unlike the artists whose `kind` is "collective", these are
@@ -553,6 +555,15 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     },
     members: [{ seeded: 'clementine@example.com' }, { seeded: 'boreale@example.com' }, { seeded: 'kwame@example.com' }],
     photo: '#ff7f51',
+    applications: [
+      application([58], 'accepted', {
+        timeSlots: [EVENING],
+        prestations: ['dj'],
+        otherPrestation: 'B2B2B',
+        details: 'Nous aimerions jouer toute la soirée, chacun son tour.',
+        receivedDaysAgo: 12,
+      }),
+    ],
   },
   {
     // With what admins can leave out left out, a member who's also in another collective, one who's known only by
@@ -560,5 +571,6 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     // email.
     profile: { name: 'Les Nuits Basses', country: '', city: '', description: '', links: {}, email: 'kwame@example.com', phone: '' },
     members: [{ seeded: 'kwame@example.com' }, { seeded: 'Marée Basse' }, { name: 'Sable Mouvant' }],
+    applications: [application([120], 'new', { prestations: ['live-performance'], receivedDaysAgo: 1 })],
   },
 ]

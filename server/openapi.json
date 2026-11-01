@@ -526,7 +526,18 @@
             "type": "string"
           },
           "artistId": {
-            "type": "string"
+            "description": "The artist who applied, or null for a collective's application",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collectiveId": {
+            "description": "The collective that applied, or null for an artist's application",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "receivedAt": {
             "type": "string",
@@ -608,6 +619,7 @@
         "required": [
           "id",
           "artistId",
+          "collectiveId",
           "receivedAt",
           "createdAt",
           "createdBy",
@@ -3227,9 +3239,20 @@
     },
     "/api/admin/artists": {
       "get": {
-        "summary": "Every artist, by name",
+        "summary": "Every artist, by name, or a collective's, in its order",
         "tags": [
           "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "collective",
+            "required": false,
+            "description": "Only this collective's members, in its order. An unknown collective has none"
+          }
         ],
         "responses": {
           "200": {
@@ -3257,6 +3280,16 @@
                     "artists"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -4375,7 +4408,7 @@
     },
     "/api/admin/applications": {
       "get": {
-        "summary": "Every application, or an artist's, the most recently received first",
+        "summary": "Every application, or an artist's or a collective's, the most recently received first",
         "tags": [
           "Applications"
         ],
@@ -4387,7 +4420,16 @@
             "in": "query",
             "name": "artist",
             "required": false,
-            "description": "Only this artist's applications. An unknown artist has none"
+            "description": "Only this artist's applications. An unknown artist has none. Not with `collective`"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "collective",
+            "required": false,
+            "description": "Only this collective's applications. An unknown collective has none. Not with `artist`"
           }
         ],
         "responses": {
@@ -4453,7 +4495,7 @@
         }
       },
       "post": {
-        "summary": "Creates an application for an artist",
+        "summary": "Creates an application for an artist or a collective",
         "tags": [
           "Applications"
         ],
@@ -4503,6 +4545,11 @@
                     "description": "A date and time with its offset from UTC, which can be left without seconds. Not in the future"
                   },
                   "artistId": {
+                    "description": "The artist who applies. Not with `collectiveId`",
+                    "type": "string"
+                  },
+                  "collectiveId": {
+                    "description": "The collective that applies. Not with `artistId`",
                     "type": "string"
                   }
                 },
@@ -4511,8 +4558,7 @@
                   "timeSlots",
                   "prestations",
                   "otherPrestation",
-                  "details",
-                  "artistId"
+                  "details"
                 ]
               }
             }
