@@ -7,7 +7,6 @@ import type { Collective } from '../../collective-profile'
 import { ArtistForm } from './artist-form'
 import { OwnApplications } from './applications'
 import {
-  ENTRY_KIND_LABELS,
   KIND_LABELS,
   MISSING,
   addedBy,
@@ -111,7 +110,7 @@ function ArtistsList({ query }: { query: string }) {
             <td>
               <Link to={entryPath(entry.kind, entry.id)}>{entry.name}</Link>
             </td>
-            <td>{ENTRY_KIND_LABELS[entry.kind]}</td>
+            <td>{KIND_LABELS[entry.kind]}</td>
             <td>{place(entry)}</td>
             <td>{entry.genres && genreNames(entry.genres)}</td>
           </tr>
@@ -181,7 +180,7 @@ function ArtistById({ id }: { id: string }) {
     <>
       <BackToArtists />
       <h1>{artist.name}</h1>
-      <p className="admin-meta">{addedBy(KIND_LABELS[artist.kind], artist)}</p>
+      <p className="admin-meta">{addedBy(KIND_LABELS.artist, artist)}</p>
       {artist.updatedBy && <p className="admin-meta">{byWhom('Modifié', artist.updatedBy, artist.updatedAt)}</p>}
 
       <div className="admin-toolbar">
@@ -216,12 +215,6 @@ function ArtistDetails({ artist }: { artist: Artist }) {
     <div className="admin-record">
       <PhotoOrNone url={artist.hasPhoto ? photoUrl('artists', artist) : null} name={artist.name} />
       <dl>
-        {artist.kind === 'collective' && (
-          <>
-            <dt>Artistes du collectif</dt>
-            <dd>{artist.members.join(', ')}</dd>
-          </>
-        )}
         {artist.collectives.length > 0 && (
           <>
             <dt>Collectifs</dt>

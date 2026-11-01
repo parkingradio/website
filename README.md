@@ -77,8 +77,9 @@ who is then listed among the admins. You still log in as your own admin. Seeding
 there, by their email, or by their name for those without one, and the collectives that aren't there, by their email,
 so to seed an artist or a collective again, delete them first. It doesn't change any setting, e.g. feature flags.
 
-A few artists apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the Turnstile test keys
-from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send emails.
+A few artists and collectives apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the
+Turnstile test keys from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send
+emails.
 
 ### Several checkouts
 
@@ -109,8 +110,9 @@ checked in: `npm run generate:api` regenerates them, and CI checks that they're 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need
 `npm run db:up`. The browser tests then seed it, as `npm run seed` does, and run against that data, while the
-integration tests start from an empty database. Seeding has some of its artists apply through the "Appliquer" form, so
-the browser tests need Cloudflare to be reachable.
+integration tests start from an empty database, except the one that checks a migration of existing data. Seeding has
+some of its artists and collectives apply through the "Appliquer" form, so the browser tests need Cloudflare to be
+reachable.
 
 Stop the local database with `npm run db:down` when you're done.
 

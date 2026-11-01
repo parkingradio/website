@@ -2781,7 +2781,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** A new artist applies, with their profile, their application and maybe a photo */
+        /** A new artist or collective applies, with their profile, their application and maybe a photo */
         post: {
             parameters: {
                 query?: never;
@@ -2792,7 +2792,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "multipart/form-data": {
-                        artist: components["schemas"]["ArtistProfile"];
+                        artist: components["schemas"]["Applicant"];
                         application: components["schemas"]["ApplicationFields"];
                         /**
                          * Format: binary
@@ -3043,12 +3043,8 @@ export interface components {
             you: boolean;
         };
         AdminArtistProfile: {
-            /** @constant */
-            kind: "artist";
             /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
             name: string;
-            /** @description Ignored: only a collective has members */
-            members?: unknown;
             country?: (components["schemas"]["Country"] | string) | null;
             city?: string | null;
             genres?: components["schemas"]["GenreId"][] | null;
@@ -3065,31 +3061,6 @@ export interface components {
                 tiktok?: string;
             } | null;
             email?: string | null;
-            phone?: string | null;
-        } | {
-            /** @constant */
-            kind: "collective";
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
-            name: string;
-            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
-            members: string[];
-            country?: (components["schemas"]["Country"] | string) | null;
-            city?: string | null;
-            genres?: components["schemas"]["GenreId"][] | null;
-            bio?: string | null;
-            links?: {
-                soundcloud?: string;
-                instagram?: string;
-                web?: string;
-                bandcamp?: string;
-                mixcloud?: string;
-                ra?: string;
-                youtube?: string;
-                spotify?: string;
-                tiktok?: string;
-            } | null;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
             phone?: string | null;
         };
         AdminCollectiveProfile: {
@@ -3124,6 +3095,63 @@ export interface components {
             /** @constant */
             ok: false;
             error: string;
+        };
+        Applicant: {
+            /** @constant */
+            kind: "artist";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            country: components["schemas"]["Country"];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            links: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            };
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
+            phone: string;
+        } | {
+            /** @constant */
+            kind: "collective";
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
+            members: string[];
+            country: components["schemas"]["Country"];
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            /** @description Trimmed, then between 1 and 5000 characters */
+            bio: string;
+            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            links: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            };
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
+            phone: string;
         };
         Application: {
             id: string;
@@ -3173,9 +3201,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             createdBy: string | null;
-            kind: components["schemas"]["ArtistKind"];
             name: string;
-            members: string[];
             country: components["schemas"]["Country"] | "";
             city: string;
             genres: components["schemas"]["GenreId"][];
@@ -3189,8 +3215,6 @@ export interface components {
             /** @description The collectives the artist is in, by name, whatever its case */
             collectives: components["schemas"]["Reference"][];
         };
-        /** @enum {string} */
-        ArtistKind: "artist" | "collective";
         ArtistLinks: {
             soundcloud?: string;
             instagram?: string;
@@ -3201,65 +3225,6 @@ export interface components {
             youtube?: string;
             spotify?: string;
             tiktok?: string;
-        };
-        ArtistProfile: {
-            /** @constant */
-            kind: "artist";
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
-            name: string;
-            /** @description Ignored: only a collective has members */
-            members?: unknown;
-            country: components["schemas"]["Country"];
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
-            city: string;
-            genres: components["schemas"]["GenreId"][];
-            /** @description Trimmed, then between 1 and 5000 characters */
-            bio: string;
-            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
-            links: {
-                soundcloud?: string;
-                instagram?: string;
-                web?: string;
-                bandcamp?: string;
-                mixcloud?: string;
-                ra?: string;
-                youtube?: string;
-                spotify?: string;
-                tiktok?: string;
-            };
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
-            phone: string;
-        } | {
-            /** @constant */
-            kind: "collective";
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
-            name: string;
-            /** @description At least one, once blank names and duplicates, whatever their case, are dropped */
-            members: string[];
-            country: components["schemas"]["Country"];
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
-            city: string;
-            genres: components["schemas"]["GenreId"][];
-            /** @description Trimmed, then between 1 and 5000 characters */
-            bio: string;
-            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
-            links: {
-                soundcloud?: string;
-                instagram?: string;
-                web?: string;
-                bandcamp?: string;
-                mixcloud?: string;
-                ra?: string;
-                youtube?: string;
-                spotify?: string;
-                tiktok?: string;
-            };
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters */
-            phone: string;
         };
         ChosenPlaylist: {
             url: string;

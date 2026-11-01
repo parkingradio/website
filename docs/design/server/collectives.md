@@ -42,7 +42,7 @@ A collective, as the endpoints below return it, is its profile, where `members` 
 |---|---|---|
 | `id` | string | |
 | `createdAt` | string | When the collective was added |
-| `createdBy` | string or null | The email of the admin who added the collective, or null when it added itself, by applying |
+| `createdBy` | string or null | The email of the admin who added the collective, or null when it added itself, by applying (see [Applying](applications.md#applying)) |
 | `updatedBy` | string or null | The email of the admin who last changed the collective. Changing its members' profiles, or deleting them, doesn't count |
 | `updatedAt` | string or null | When |
 | `hasPhoto` | boolean | Whether the collective has a photo |
@@ -62,11 +62,6 @@ Requests send the members as a list of objects, in order, each one either:
 Other fields are ignored, so that the members a collective returns can be sent back as they are: when there's both an
 `id` and a `name`, the `id` is what counts. An `id` that isn't a string, or isn't that of an artist, fails with 400
 (`"No such artist"`).
-
-An artist whose `kind` is `"collective"`, as collectives were before they had their own profiles, can't be a member, and
-a member can't become one: requests that would make one a member, or change a member's `kind` to `"collective"`, fail
-with 400 (`"A collective can't be a member of a collective"`, or `"An artist who is a member of a collective can't become
-a collective"`).
 
 Deleting an artist takes them out of their collectives, which can leave a collective without members: it stays as it
 is, but changing it then takes at least one member again.
@@ -108,7 +103,7 @@ Adds a collective, and creates the members it sends by name. It takes a request 
 | `ok` | `true` | |
 | `collective` | collective | As it was added |
 
-Fails with 400 (an invalid profile or photo, a member who can't be one, or a malformed request), 409 (another collective
+Fails with 400 (an invalid profile or photo, a member who isn't an artist, or a malformed request), 409 (another collective
 has that email) or 413 (a photo larger than 10 MB). When it fails, nothing is created.
 
 ## `PUT /api/admin/collectives/:id` (admin)

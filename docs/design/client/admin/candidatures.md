@@ -6,8 +6,7 @@ At `/admin/candidatures`: the applications of artists and collectives for a set,
 list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a few words.
 
 The section lists every application, the most recently received first, with when it was received ("reçue le"), the
-artist or the collective, followed by "(collectif)" for a collective, including those listed as collectives in
-[Artistes](artistes.md) until they're migrated, their city and genres (see
+artist or the collective, followed by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the prestations and the status.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each.

@@ -3,8 +3,8 @@ import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from './photo-form.js'
-import { AdminArtistProfile, ArtistKind, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
-import { EmailTaken, MemberCantBeCollective, forgetPhoto, storePhoto } from './store.js'
+import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
+import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
 import type { ArtistsStore, Photos, StoredArtist } from './store.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them (see docs/design/server/artists.md).
@@ -15,9 +15,7 @@ const Artist = z
     id: z.string(),
     createdAt: Timestamp,
     createdBy: z.string().nullable(),
-    kind: ArtistKind,
     name: z.string(),
-    members: z.array(z.string()),
     country: z.union([Country, z.literal('')]),
     city: z.string(),
     genres: z.array(GenreId),
@@ -47,19 +45,13 @@ const ArtistForm = NewArtistForm.extend({
 
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
 const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Another artist has this email address' }
-const MEMBER_CANT_BECOME_COLLECTIVE: z.infer<typeof ApiError> = {
-  ok: false,
-  error: "An artist who is a member of a collective can't become a collective",
-}
 
 function artist(row: StoredArtist): Artist {
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
-    kind: row.kind,
     name: row.name,
-    members: row.members,
     country: row.country,
     city: row.city,
     genres: row.genres,
@@ -190,7 +182,6 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       } catch (error) {
         await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
         if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
-        if (error instanceof MemberCantBeCollective) return reply.status(400).send(MEMBER_CANT_BECOME_COLLECTIVE)
         throw error
       }
       if (!changed) {

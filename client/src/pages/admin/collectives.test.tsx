@@ -21,9 +21,7 @@ function artist(id: string, name: string, changes: Partial<Artist> = {}): Artist
     hasPhoto: false,
     createdAt: '2026-10-01T16:00:00.000Z',
     createdBy: 'admin@example.com',
-    kind: 'artist',
     name,
-    members: [],
     country: 'CA',
     city: 'Montréal',
     genres: [],
@@ -39,12 +37,10 @@ function artist(id: string, name: string, changes: Partial<Artist> = {}): Artist
 }
 
 const AURORE = artist('artist-1', 'Aurore', { genres: ['techno', 'ambient'] })
-// An artist whose `kind` is "collective", as collectives were before they had their own profiles.
-const BRUME = artist('artist-2', 'Brume', { kind: 'collective', members: ['Ana'] })
 // Without an email, they're told apart by where they're from, or else by their collectives.
 const CYAN = artist('artist-3', 'Cyan', { email: null, city: 'Bruxelles', country: 'BE', genres: ['electro', 'house', 'techno'] })
 const DORA = artist('artist-4', 'Dora', { email: null, city: '', country: '', collectives: [{ id: 'collective-2', name: 'Brise' }] })
-const ARTISTS = [AURORE, BRUME, CYAN, DORA]
+const ARTISTS = [AURORE, CYAN, DORA]
 
 const ONDES: Collective = {
   id: 'collective-1',
@@ -350,7 +346,7 @@ describe('A collective’s page', () => {
 
     await edit()
     fireEvent.click(picker())
-    // Neither its artists, nor Brume, who's a collective.
+    // Other than its artists.
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['DoraBrise'])
     fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
     fireEvent.change(picker(), { target: { value: 'cy' } })
@@ -368,12 +364,12 @@ describe('A collective’s page', () => {
     expect(screen.getByText(/^Un artiste s'appelle déjà/)).toHaveTextContent(
       "Un artiste s'appelle déjà « Dora » : le choisir parmi les artistes connus évite de créer un doublon.",
     )
-    // Not for a collective.
-    fireEvent.change(newArtist(), { target: { value: 'Brume' } })
+    // Not for a name nobody has.
+    fireEvent.change(newArtist(), { target: { value: 'Élise' } })
     expect(screen.queryByText(/^Un artiste s'appelle déjà/)).not.toBeInTheDocument()
-    addNew('Brume')
+    addNew('Élise')
     addNew('  ')
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Brume (nouveau)↑↓×'])
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Élise (nouveau)↑↓×'])
   })
 
   it('does not add the name of one of its artists, and says so, keeping it typed', async () => {

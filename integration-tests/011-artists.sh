@@ -10,7 +10,7 @@ source "$(dirname "$0")/lib.sh"
 
 readonly IP=198.51.100.11
 readonly NOBODY=00000000-0000-4000-8000-000000000000
-readonly PROFILE='{"kind":"artist","name":"DJ Test","members":[],"country":"CA","city":"Québec","genres":["techno","acid"],
+readonly PROFILE='{"name":"DJ Test","country":"CA","city":"Québec","genres":["techno","acid"],
 "bio":"Une bio.","links":{"soundcloud":"https://soundcloud.com/parkingdotradio/wobbla"},
 "email":"artiste@integration.test","phone":"418 555-0123"}'
 
@@ -41,7 +41,7 @@ expect_status 200
 expect_body_contains '"artists":[]'
 
 echo "  an invalid profile is explained, in French"
-artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Test","country":"XX"}' "${PHOTOS}/photo.jpg"
+artist POST "${BASE_URL}/api/admin/artists" '{"name":"DJ Test","country":"XX"}' "${PHOTOS}/photo.jpg"
 expect_status 400
 expect_body_contains 'Choisissez votre pays.'
 
@@ -123,7 +123,7 @@ request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/art
 expect_status 200
 
 echo "  an artist is added without a country, city, genres, bio, links, email or phone, and read back that way"
-readonly PARTIAL='{"kind":"artist","name":"DJ Partiel","members":[],"country":"","city":"","genres":[],"bio":"","links":{},
+readonly PARTIAL='{"name":"DJ Partiel","country":"","city":"","genres":[],"bio":"","links":{},
 "email":"","phone":""}'
 artist POST "${BASE_URL}/api/admin/artists" "$PARTIAL"
 expect_status 200
@@ -133,7 +133,7 @@ expect_status 200
 expect_body_contains '"country":"","city":"","genres":[],"bio":"","links":{},"email":null,"phone":""'
 
 echo "  another artist can be without an email too"
-artist POST "${BASE_URL}/api/admin/artists" '{"kind":"artist","name":"DJ Anonyme"}'
+artist POST "${BASE_URL}/api/admin/artists" '{"name":"DJ Anonyme"}'
 expect_status 200
 expect_body_contains '"email":null'
 anonymous="$(body_id)"

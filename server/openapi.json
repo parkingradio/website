@@ -61,294 +61,137 @@
         "additionalProperties": false
       },
       "AdminArtistProfile": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "artist"
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
-              },
-              "members": {
-                "description": "Ignored: only a collective has members"
-              },
-              "country": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+          },
+          "country": {
+            "anyOf": [
+              {
                 "anyOf": [
                   {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Country"
-                      },
-                      {
-                        "type": "string",
-                        "pattern": "^\\s*$"
-                      }
-                    ]
+                    "$ref": "#/components/schemas/Country"
                   },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "city": {
-                "anyOf": [
                   {
                     "type": "string",
-                    "maxLength": 100,
-                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
-                  },
-                  {
-                    "type": "null"
+                    "pattern": "^\\s*$"
                   }
                 ]
               },
-              "genres": {
-                "anyOf": [
-                  {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/GenreId"
-                    }
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "bio": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 5000,
-                    "description": "Trimmed, then up to 5000 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "links": {
-                "anyOf": [
-                  {
-                    "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
-                    "type": "object",
-                    "properties": {
-                      "soundcloud": {
-                        "type": "string"
-                      },
-                      "instagram": {
-                        "type": "string"
-                      },
-                      "web": {
-                        "type": "string"
-                      },
-                      "bandcamp": {
-                        "type": "string"
-                      },
-                      "mixcloud": {
-                        "type": "string"
-                      },
-                      "ra": {
-                        "type": "string"
-                      },
-                      "youtube": {
-                        "type": "string"
-                      },
-                      "spotify": {
-                        "type": "string"
-                      },
-                      "tiktok": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "email": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 200,
-                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 200 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "phone": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 40,
-                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "kind",
-              "name"
             ]
           },
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
+          "city": {
+            "anyOf": [
+              {
                 "type": "string",
-                "const": "collective"
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
                 "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
               },
-              "members": {
-                "minItems": 1,
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "genres": {
+            "anyOf": [
+              {
                 "type": "array",
                 "items": {
-                  "type": "string",
-                  "maxLength": 100,
-                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
-                },
-                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
+                  "$ref": "#/components/schemas/GenreId"
+                }
               },
-              "country": {
-                "anyOf": [
-                  {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Country"
-                      },
-                      {
-                        "type": "string",
-                        "pattern": "^\\s*$"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "city": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 100,
-                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "genres": {
-                "anyOf": [
-                  {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/GenreId"
-                    }
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "bio": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 5000,
-                    "description": "Trimmed, then up to 5000 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "links": {
-                "anyOf": [
-                  {
-                    "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
-                    "type": "object",
-                    "properties": {
-                      "soundcloud": {
-                        "type": "string"
-                      },
-                      "instagram": {
-                        "type": "string"
-                      },
-                      "web": {
-                        "type": "string"
-                      },
-                      "bandcamp": {
-                        "type": "string"
-                      },
-                      "mixcloud": {
-                        "type": "string"
-                      },
-                      "ra": {
-                        "type": "string"
-                      },
-                      "youtube": {
-                        "type": "string"
-                      },
-                      "spotify": {
-                        "type": "string"
-                      },
-                      "tiktok": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "email": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
-              },
-              "phone": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 40,
-                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "kind",
-              "name",
-              "members",
-              "email"
+            ]
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000,
+                "description": "Trimmed, then up to 5000 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "links": {
+            "anyOf": [
+              {
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 200 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
+        },
+        "required": [
+          "name"
         ]
       },
       "AdminCollectiveProfile": {
@@ -518,6 +361,209 @@
           "error"
         ],
         "additionalProperties": false
+      },
+      "Applicant": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "artist"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "country": {
+                "$ref": "#/components/schemas/Country"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "genres": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GenreId"
+                }
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "country",
+              "city",
+              "genres",
+              "bio",
+              "links",
+              "email",
+              "phone"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "collective"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "members": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                },
+                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
+              },
+              "country": {
+                "$ref": "#/components/schemas/Country"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+              },
+              "genres": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GenreId"
+                }
+              },
+              "bio": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 5000,
+                "description": "Trimmed, then between 1 and 5000 characters"
+              },
+              "links": {
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "members",
+              "country",
+              "city",
+              "genres",
+              "bio",
+              "links",
+              "email",
+              "phone"
+            ]
+          }
+        ]
       },
       "Application": {
         "type": "object",
@@ -746,17 +792,8 @@
               "null"
             ]
           },
-          "kind": {
-            "$ref": "#/components/schemas/ArtistKind"
-          },
           "name": {
             "type": "string"
-          },
-          "members": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           },
           "country": {
             "anyOf": [
@@ -825,9 +862,7 @@
           "id",
           "createdAt",
           "createdBy",
-          "kind",
           "name",
-          "members",
           "country",
           "city",
           "genres",
@@ -841,13 +876,6 @@
           "collectives"
         ],
         "additionalProperties": false
-      },
-      "ArtistKind": {
-        "type": "string",
-        "enum": [
-          "artist",
-          "collective"
-        ]
       },
       "ArtistLinks": {
         "type": "object",
@@ -881,212 +909,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "ArtistProfile": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "artist"
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
-              },
-              "members": {
-                "description": "Ignored: only a collective has members"
-              },
-              "country": {
-                "$ref": "#/components/schemas/Country"
-              },
-              "city": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
-              },
-              "genres": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/GenreId"
-                }
-              },
-              "bio": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 5000,
-                "description": "Trimmed, then between 1 and 5000 characters"
-              },
-              "links": {
-                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
-                "type": "object",
-                "properties": {
-                  "soundcloud": {
-                    "type": "string"
-                  },
-                  "instagram": {
-                    "type": "string"
-                  },
-                  "web": {
-                    "type": "string"
-                  },
-                  "bandcamp": {
-                    "type": "string"
-                  },
-                  "mixcloud": {
-                    "type": "string"
-                  },
-                  "ra": {
-                    "type": "string"
-                  },
-                  "youtube": {
-                    "type": "string"
-                  },
-                  "spotify": {
-                    "type": "string"
-                  },
-                  "tiktok": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              },
-              "email": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
-              },
-              "phone": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 40,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
-              }
-            },
-            "required": [
-              "kind",
-              "name",
-              "country",
-              "city",
-              "genres",
-              "bio",
-              "links",
-              "email",
-              "phone"
-            ]
-          },
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "collective"
-              },
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
-              },
-              "members": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "maxLength": 100,
-                  "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
-                },
-                "description": "At least one, once blank names and duplicates, whatever their case, are dropped"
-              },
-              "country": {
-                "$ref": "#/components/schemas/Country"
-              },
-              "city": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
-              },
-              "genres": {
-                "minItems": 1,
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/GenreId"
-                }
-              },
-              "bio": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 5000,
-                "description": "Trimmed, then between 1 and 5000 characters"
-              },
-              "links": {
-                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
-                "type": "object",
-                "properties": {
-                  "soundcloud": {
-                    "type": "string"
-                  },
-                  "instagram": {
-                    "type": "string"
-                  },
-                  "web": {
-                    "type": "string"
-                  },
-                  "bandcamp": {
-                    "type": "string"
-                  },
-                  "mixcloud": {
-                    "type": "string"
-                  },
-                  "ra": {
-                    "type": "string"
-                  },
-                  "youtube": {
-                    "type": "string"
-                  },
-                  "spotify": {
-                    "type": "string"
-                  },
-                  "tiktok": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              },
-              "email": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
-              },
-              "phone": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 40,
-                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 40 characters"
-              }
-            },
-            "required": [
-              "kind",
-              "name",
-              "members",
-              "country",
-              "city",
-              "genres",
-              "bio",
-              "links",
-              "email",
-              "phone"
-            ]
-          }
-        ]
       },
       "ChosenPlaylist": {
         "type": "object",
@@ -5185,7 +5007,7 @@
     },
     "/api/applications": {
       "post": {
-        "summary": "A new artist applies, with their profile, their application and maybe a photo",
+        "summary": "A new artist or collective applies, with their profile, their application and maybe a photo",
         "tags": [
           "Applications"
         ],
@@ -5197,7 +5019,7 @@
                 "type": "object",
                 "properties": {
                   "artist": {
-                    "$ref": "#/components/schemas/ArtistProfile"
+                    "$ref": "#/components/schemas/Applicant"
                   },
                   "application": {
                     "$ref": "#/components/schemas/ApplicationFields"

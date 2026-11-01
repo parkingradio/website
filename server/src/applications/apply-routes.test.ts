@@ -5,7 +5,8 @@ import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
-import type { SentPhoto, StoredArtist } from '../artists/store.js'
+import type { PhotoFolder, SentPhoto, StoredArtist } from '../artists/store.js'
+import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
 import { APPLICATIONS_PER_WINDOW, applyRoutes } from './apply-routes.js'
@@ -15,42 +16,61 @@ import type { ApplicationsSettingsStore } from './settings.js'
 import type { StoredApplication } from './store.js'
 import type { TurnstileVerifier } from './turnstile.js'
 
-// The artists and applications, as the database would keep them, and the photos, as the bucket would.
+// The artists, collectives and applications, as the database would keep them, with each collective's artists, and the
+// photos, as the bucket would.
 let artists: StoredArtist[] = []
+let collectives: (CollectiveRow & { members: string[] })[] = []
 let applications: StoredApplication[] = []
 const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
 
-// Like the database, where two artists can't have the same email, whatever its case.
+function addApplication(fields: ApplicationFields, owner: { artistId: string } | { collectiveId: string }): StoredApplication {
+  const now = new Date()
+  const application: StoredApplication = {
+    id: `application-${++nextId}`,
+    receivedAt: now,
+    createdAt: now,
+    createdBy: null,
+    artistId: null,
+    collectiveId: null,
+    updatedBy: null,
+    updatedAt: null,
+    status: 'new',
+    statusUpdatedBy: null,
+    statusUpdatedAt: null,
+    ...fields,
+    ...owner,
+  }
+  applications.push(application)
+  return application
+}
+
+function addArtist(artist: Parameters<ApplyStore['applyAsCollective']>[1][number]): StoredArtist {
+  const added: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, collectives: [], ...artist }
+  artists.push(added)
+  return added
+}
+
+// Like the database, where two artists can't have the same email, whatever its case, nor two collectives.
 const store: ApplyStore = {
   apply: vi.fn<ApplyStore['apply']>(async (artist, fields) => {
     if (artists.some((other) => other.email?.toLowerCase() === artist.email.toLowerCase())) throw new EmailTaken()
-    const applicant: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, collectives: [], ...artist }
-    artists.push(applicant)
-    const now = new Date()
-    const application: StoredApplication = {
-      id: `application-${++nextId}`,
-      receivedAt: now,
-      createdAt: now,
-      createdBy: null,
-      artistId: applicant.id,
-      collectiveId: null,
-      updatedBy: null,
-      updatedAt: null,
-      status: 'new',
-      statusUpdatedBy: null,
-      statusUpdatedAt: null,
-      ...fields,
-    }
-    applications.push(application)
-    return { artistId: applicant.id, applicationId: application.id }
+    const applicant = addArtist(artist)
+    return { artistId: applicant.id, applicationId: addApplication(fields, { artistId: applicant.id }).id }
+  }),
+  applyAsCollective: vi.fn<ApplyStore['applyAsCollective']>(async (collective, members, fields) => {
+    if (collectives.some((other) => other.email.toLowerCase() === collective.email.toLowerCase())) throw new EmailTaken()
+    const id = `collective-${++nextId}`
+    const added = members.map(addArtist).map((artist) => artist.id)
+    collectives.push({ id, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...collective, members: added })
+    return { collectiveId: id, applicationId: addApplication(fields, { collectiveId: id }).id }
   }),
 }
 
 const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto) => {
-    const key = `artists/photo-${++nextPhoto}.${type.split('/')[1]}`
+  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
+    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
     stored.set(key, body)
     return key
   }),
@@ -77,9 +97,7 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
 function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {
-    kind: 'artist',
     name: 'DJ Test',
-    members: [],
     country: 'CA',
     city: 'Québec',
     genres: ['techno', 'acid'],
@@ -89,6 +107,16 @@ function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
     phone: '418 555-0123',
     ...changes,
   }
+}
+
+// An artist applying alone, as the form sends them.
+function asArtist(changes: Partial<ApplicantProfile> = {}) {
+  return { kind: 'artist', ...profile(changes) }
+}
+
+// A collective applying, as the form sends it.
+function asCollective(changes: Partial<ApplicantProfile> & { members?: unknown } = {}) {
+  return { kind: 'collective', members: ['Une', 'Deux'], ...profile({ name: 'Le Collectif', email: 'collectif@example.com', ...changes }) }
 }
 
 function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
@@ -110,7 +138,7 @@ type Parts = { artist?: object | string; application?: object | string; turnstil
 // Parts set to undefined are left out.
 function multipart(parts: Parts = {}) {
   const { artist, application, turnstileToken, photo, extra } = {
-    artist: profile(),
+    artist: asArtist(),
     application: fields(),
     turnstileToken: 'token',
     photo: JPEG,
@@ -167,6 +195,7 @@ async function apply(app: App, parts?: Parts, address = `203.0.113.${++nextAddre
 describe('POST /api/applications', () => {
   beforeEach(() => {
     artists = []
+    collectives = []
     applications = []
     stored.clear()
     nextId = 0
@@ -216,7 +245,7 @@ describe('POST /api/applications', () => {
   it('refuses, in French, an artist who already exists, whatever the case of their email, and forgets the photo', async () => {
     const app = await buildApp()
     expect((await apply(app)).statusCode).toBe(200)
-    const response = await apply(app, { artist: profile({ email: 'Artiste@Example.com', name: 'Someone Else' }), photo: PNG })
+    const response = await apply(app, { artist: asArtist({ email: 'Artiste@Example.com', name: 'Someone Else' }), photo: PNG })
 
     expect(response.statusCode).toBe(409)
     expect(response.json()).toEqual({ ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' })
@@ -224,6 +253,76 @@ describe('POST /api/applications', () => {
     expect(artists[0]).toMatchObject({ name: 'DJ Test', photoKey: 'artists/photo-1.jpeg' })
     expect(applications).toHaveLength(1)
     expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+  })
+
+  it('adds the collective, which added itself, with its photo, its artists, as new artists with its genres, and its application', async () => {
+    const app = await buildApp()
+    const response = await apply(app, { artist: asCollective({ members: ['Une', ' Deux ', '', 'une', 42] }) })
+
+    expect(response.statusCode).toBe(200)
+    const { name, country, city, bio, email, phone } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
+    expect(collectives).toEqual([
+      expect.objectContaining({
+        name,
+        country,
+        city,
+        description: bio,
+        links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
+        email,
+        phone,
+        photoKey: 'collectives/photo-1.jpeg',
+        photoType: 'image/jpeg',
+        createdBy: null,
+      }),
+    ])
+    // Blank names and duplicates, whatever their case, are dropped, and so is what isn't a name.
+    const member = { country: '', city: '', genres: ['techno', 'acid'], bio: '', links: {}, email: null, phone: '', photoKey: null, photoType: null, createdBy: null }
+    expect(artists).toEqual([expect.objectContaining({ ...member, name: 'Une' }), expect.objectContaining({ ...member, name: 'Deux' })])
+    expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
+    expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
+  })
+
+  it("refuses, in French, a collective whose email another collective has, whatever its case, and forgets the photo, but not one with an artist's", async () => {
+    const app = await buildApp()
+    expect((await apply(app, { artist: asCollective() })).statusCode).toBe(200)
+    const response = await apply(app, { artist: asCollective({ name: 'Un Autre', email: 'Collectif@Example.com' }), photo: PNG })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' })
+    expect(collectives).toHaveLength(1)
+    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+
+    expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)
+    expect((await apply(app, { artist: asCollective({ email: 'artiste@example.com' }) })).statusCode).toBe(200)
+  })
+
+  it("says what is wrong with a collective's name and artists as a collective's", async () => {
+    const app = await buildApp()
+    const invalid = [
+      { artist: asCollective({ name: '' }), error: 'Indiquez le nom du collectif.' },
+      { artist: asCollective({ name: 'x'.repeat(101) }), error: 'Le nom du collectif dépasse 100 caractères.' },
+      { artist: asCollective({ members: [] }), error: 'Indiquez au moins un artiste du collectif.' },
+      { artist: asCollective({ members: [' ', 42] }), error: 'Indiquez au moins un artiste du collectif.' },
+      { artist: asCollective({ members: 'Une' }), error: 'Indiquez au moins un artiste du collectif.' },
+      { artist: asCollective({ members: ['x'.repeat(101)] }), error: "Le nom d'un artiste du collectif dépasse 100 caractères." },
+      // The other fields are an artist's.
+      { artist: asCollective({ genres: [] }), error: 'Choisissez au moins un genre.' },
+      { artist: { ...asArtist(), kind: 'duo' }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
+    ]
+    for (const { artist, error } of invalid) {
+      const response = await apply(app, { artist })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error })
+    }
+    expect(store.applyAsCollective).not.toHaveBeenCalled()
+  })
+
+  it("ignores an artist's members", async () => {
+    const app = await buildApp()
+    expect((await apply(app, { artist: { ...asArtist(), members: ['Une'] } })).statusCode).toBe(200)
+    expect(artists).toHaveLength(1)
+    expect(artists[0]).not.toHaveProperty('members')
+    expect(collectives).toHaveLength(0)
   })
 
   it('only checks whether the artist already exists once Turnstile vouches for the token', async () => {
@@ -256,16 +355,16 @@ describe('POST /api/applications', () => {
   it('explains, in French, what is wrong with an invalid profile, photo or application, without checking the token or storing anything', async () => {
     const app = await buildApp()
     const invalid = [
-      { parts: { artist: profile({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
-      { parts: { artist: profile({ email: 'pas une adresse' }) }, error: 'Indiquez une adresse e-mail valide.' },
+      { parts: { artist: asArtist({ links: { soundcloud: 'https://instagram.com/foo' } }) }, error: "SoundCloud : ce n'est pas une adresse SoundCloud." },
+      { parts: { artist: asArtist({ email: 'pas une adresse' }) }, error: 'Indiquez une adresse e-mail valide.' },
       // Which admins can leave out, but artists can't.
-      { parts: { artist: profile({ country: '' }) }, error: 'Choisissez votre pays.' },
-      { parts: { artist: profile({ city: '' }) }, error: 'Indiquez votre ville.' },
-      { parts: { artist: profile({ genres: [] }) }, error: 'Choisissez au moins un genre.' },
-      { parts: { artist: profile({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
-      { parts: { artist: profile({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
-      { parts: { artist: profile({ bio: '' }) }, error: 'Écrivez quelques lignes de bio.' },
-      { parts: { artist: profile({ email: '' }) }, error: 'Indiquez votre adresse e-mail.' },
+      { parts: { artist: asArtist({ country: '' }) }, error: 'Choisissez votre pays.' },
+      { parts: { artist: asArtist({ city: '' }) }, error: 'Indiquez votre ville.' },
+      { parts: { artist: asArtist({ genres: [] }) }, error: 'Choisissez au moins un genre.' },
+      { parts: { artist: asArtist({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
+      { parts: { artist: asArtist({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
+      { parts: { artist: asArtist({ bio: '' }) }, error: 'Écrivez quelques lignes de bio.' },
+      { parts: { artist: asArtist({ email: '' }) }, error: 'Indiquez votre adresse e-mail.' },
       { parts: { photo: Buffer.from('%PDF-1.7') }, error: 'La photo doit être en JPEG, PNG ou WebP.' },
       { parts: { application: fields({ dates: [] }) }, error: 'Choisissez au moins une date.' },
       { parts: { application: fields({ timeSlots: [{ start: '22:00', end: '18:00' }] }) }, error: 'Une des plages horaires est invalide.' },
@@ -305,7 +404,7 @@ describe('POST /api/applications', () => {
       await apply(app, { application: '{not json' }),
       await apply(app, { artist: undefined }),
       await apply(app, { application: undefined }),
-      await app.inject({ method: 'POST', url: '/api/applications', payload: { artist: profile(), application: fields() } }),
+      await app.inject({ method: 'POST', url: '/api/applications', payload: { artist: asArtist(), application: fields() } }),
       // A body that ends early.
       await app.inject({
         method: 'POST',
@@ -401,6 +500,17 @@ describe('POST /api/applications', () => {
       expect(toRecipients.text).toContain('SoundCloud : https://soundcloud.com/parkingdotradio')
     })
 
+    it("emails a collective's application as it was saved, and confirms it to its contact", async () => {
+      recipients = ['equipe@example.com']
+      const app = await buildApp()
+      expect((await apply(app, { artist: asCollective() })).statusCode).toBe(200)
+
+      const [toRecipients, confirmation] = sendEmail.mock.calls.map(([email]) => email)
+      expect(toRecipients).toMatchObject({ to: recipients, replyTo: ['collectif@example.com'], subject: 'Nouvelle candidature : Le Collectif' })
+      expect(toRecipients.text).toContain('Artistes du collectif : Une, Deux')
+      expect(confirmation).toMatchObject({ to: ['collectif@example.com'], replyTo: recipients })
+    })
+
     it.each([null, []])('only confirms the application to the artist when the recipients are %j', async (chosen) => {
       recipients = chosen
       const logs: string[] = []
@@ -462,7 +572,7 @@ describe('POST /api/applications', () => {
   describe('rate limiting', () => {
     // Each application from another artist, so that they would all be added.
     let nextArtist = 0
-    const another = () => ({ artist: profile({ email: `artiste-${++nextArtist}@example.com` }) })
+    const another = () => ({ artist: asArtist({ email: `artiste-${++nextArtist}@example.com` }) })
 
     it('refuses applications, in French, once an address has sent too many', async () => {
       const app = await buildApp()

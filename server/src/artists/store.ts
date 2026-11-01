@@ -3,7 +3,7 @@ import { asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './profile.js'
-import type { AdminArtistProfile, ApplicantProfile, ArtistProfile, Profile } from './profile.js'
+import type { AdminArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
@@ -19,7 +19,6 @@ export class InvalidProfile extends Error {}
 
 // Checks a profile, an artist's or a collective's, against `schema`, which says who sent it, and returns what's saved of
 // it. Throws an InvalidProfile, saying what's wrong with the first field that's wrong, otherwise.
-export function validateProfile(sent: unknown, schema: typeof ArtistProfile): ApplicantProfile
 export function validateProfile(sent: unknown, schema: typeof AdminArtistProfile): Profile
 export function validateProfile<Schema extends z.ZodType>(sent: unknown, schema: Schema): z.output<Schema>
 export function validateProfile(sent: unknown, schema: z.ZodType): unknown {
@@ -64,9 +63,6 @@ const NO_PHOTO: StoredPhoto = { photoKey: null, photoType: null }
 // another collective.
 export class EmailTaken extends Error {}
 
-// Thrown when changing an artist who's a member of a collective into a collective (see collectives/store.ts).
-export class MemberCantBeCollective extends Error {}
-
 // The artists, as the admin pages manage them. Each method that's about one artist returns null when there's no such
 // artist, which is the case of any id that isn't a UUID.
 export type ArtistsStore = {
@@ -74,12 +70,12 @@ export type ArtistsStore = {
   // there's no such collective.
   list(collectiveId?: string): Promise<StoredArtist[]>
   get(id: string): Promise<StoredArtist | null>
-  // `createdBy` is the email of the admin who adds the artist, or null if the artist adds themselves by applying.
+  // `createdBy` is the email of the admin who adds the artist, or null if they come through the form, applying alone or
+  // as one of a collective's artists.
   // Throws an EmailTaken.
   create(artist: Profile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
   // Replaces the artist's profile, and their photo when there's a new one, or nulls to remove it. Returns the artist as
-  // they were, so that a photo that was replaced or removed can be deleted, and as they are then. Throws an EmailTaken,
-  // or a MemberCantBeCollective.
+  // they were, so that a photo that was replaced or removed can be deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
     changes: Profile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
@@ -149,12 +145,6 @@ export function artistsStore(db: Queryable): ArtistsStore {
         return await db.transaction(async (tx) => {
           const [before] = await tx.select().from(artists).where(eq(artists.id, id)).for('update')
           if (!before) return null
-          // A collective's members are locked while it's saved (see collectives/store.ts), so a collective can't add
-          // the artist while this checks that they aren't in one.
-          if (changes.kind === 'collective') {
-            const [membership] = await tx.select().from(collectiveMembers).where(eq(collectiveMembers.artistId, id)).limit(1)
-            if (membership) throw new MemberCantBeCollective()
-          }
           const [after] = await tx.update(artists).set(changes).where(eq(artists.id, id)).returning()
           return { before, after: await withCollectives(tx, after) }
         })

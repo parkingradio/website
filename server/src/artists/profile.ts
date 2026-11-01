@@ -11,11 +11,6 @@ import { z } from 'zod'
 // Responses are checked against the lists below too (see artists/routes.ts), so taking a value out of one, e.g. a
 // genre, takes migrating the artists that have it: otherwise, every response with one of them fails with 500.
 
-// An artist usually gets an hour of a time slot in the radio's schedule, and a collective a whole slot.
-export const ARTIST_KINDS = ['artist', 'collective'] as const
-export const ArtistKind = z.enum(ARTIST_KINDS).meta({ id: 'ArtistKind' })
-export type ArtistKind = z.infer<typeof ArtistKind>
-
 export const NAME_MAX_LENGTH = 100
 const CITY_MAX_LENGTH = 100
 export const BIO_MAX_LENGTH = 5000
@@ -309,8 +304,6 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
 }
 
 // The errors that aren't about a field's length.
-const NO_KIND = 'Indiquez si vous postulez comme artiste ou comme collectif.'
-export const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
 const NO_GENRE = 'Choisissez au moins un genre.'
 const NO_LINK = 'Ajoutez au moins un lien.'
 const BAD_LINK = 'Un des liens est invalide.'
@@ -412,70 +405,40 @@ export function links({ canLeaveOut }: { canLeaveOut: boolean }) {
   return canLeaveOut ? orLeftOut(object, {} as Links) : object.refine((links) => Object.keys(links).length > 0, NO_LINK)
 }
 
-// The profile of an artist (or a collective, as `kind` says), as it's sent, with what admins `canLeaveOut`.
-function profileOf(kind: ArtistKind, { canLeaveOut }: { canLeaveOut: boolean }) {
-  const collective = kind === 'collective'
-  const name = collective
-    ? line('Le nom du collectif', NAME_MAX_LENGTH, 'Indiquez le nom du collectif.')
-    : line("Le nom d'artiste", NAME_MAX_LENGTH, "Indiquez votre nom d'artiste.")
-  // Only a collective lists its artists, at least one. What isn't a name is dropped, then blank names and duplicates,
-  // whatever their case.
-  const members = collective
-    ? z.preprocess(
-        (value) => (Array.isArray(value) ? value.filter((member) => typeof member === 'string') : value),
-        z
-          .array(line("Le nom d'un artiste du collectif", NAME_MAX_LENGTH, NO_MEMBER, { canBeEmpty: true }), { error: NO_MEMBER })
-          .overwrite((names) => {
-            const seen = new Set<string>()
-            return names.filter((name) => {
-              const key = name.toLowerCase()
-              if (!name || seen.has(key)) return false
-              seen.add(key)
-              return true
-            })
-          })
-          .min(1, NO_MEMBER)
-          .meta({ description: 'At least one, once blank names and duplicates, whatever their case, are dropped' }),
-      )
-    : z
-        .unknown()
-        .optional()
-        .transform((): string[] => [])
-        .meta({ description: 'Ignored: only a collective has members' })
+// The profile of an artist, as it's sent, with what admins `canLeaveOut`.
+function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
+  const NO_NAME = "Indiquez votre nom d'artiste."
   const bio = text('La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.', { canBeEmpty: canLeaveOut })
   // Most important first. Duplicates are dropped, keeping the first.
   const genres = z.array(GenreId, { error: NO_GENRE }).overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))
-  return z.object({
-    kind: z.literal(kind),
-    name,
-    members,
+  const fields = {
+    name: line("Le nom d'artiste", NAME_MAX_LENGTH, NO_NAME),
     country: country({ canLeaveOut }),
     city: city({ canLeaveOut }),
     genres: canLeaveOut ? orLeftOut(genres, []) : genres.min(1, NO_GENRE),
     bio: canLeaveOut ? orLeftOut(bio, '') : bio,
     links: links({ canLeaveOut }),
-    // A collective is reached at its email even when admins add it.
-    email: email({ canLeaveOut: canLeaveOut && !collective }),
+    email: email({ canLeaveOut }),
     phone: phone({ canLeaveOut }),
-  })
+  }
+  // Something other than an object is missing everything, starting with the name.
+  return z.object(fields, { error: NO_NAME })
 }
 
-function profile(options: { canLeaveOut: boolean }) {
-  return z.discriminatedUnion('kind', [profileOf('artist', options), profileOf('collective', options)], { error: NO_KIND })
-}
-
-// A profile, as artists send it when they apply (see `POST /api/applications`), and as admins send it: they can leave
-// out the country, city, genres, bio, links, email (but not a collective's) and phone, since they bring in artists who
-// applied elsewhere, e.g. through the original Google Form, which didn't always ask for them, or whom they only know by
-// name. What's there still has to be valid. Both are cleaned up as they're checked, and the first error is what the server answers.
-export const ArtistProfile = profile({ canLeaveOut: false }).meta({ id: 'ArtistProfile' })
+// A profile, as artists send it when they apply (see `Applicant` in applications/applicant.ts), and as admins send it:
+// they can leave out the country, city, genres, bio, links, email and phone, since they bring in artists who applied
+// elsewhere, e.g. through the original Google Form, which didn't always ask for them, or whom they only know by name.
+// What's there still has to be valid. Both are cleaned up as they're checked, and the first error is what the server
+// answers.
+// An artist's email is the same rule either way, but TypeScript can't tell that it's never left out: it's said again, in
+// the same place among the fields, since the first error is the one the server answers.
+export const ArtistProfile = profile({ canLeaveOut: false }).extend({ email: emailAddress() })
 export const AdminArtistProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminArtistProfile' })
 
-// What's saved of a profile, whoever sent it: an artist's or a collective's, as a single type.
-type Saved = z.output<typeof AdminArtistProfile>
-export type Profile = Pick<Saved, keyof Saved>
+// What's saved of a profile, whoever sent it.
+export type Profile = z.output<typeof AdminArtistProfile>
 // What's saved of a profile that an artist sent when they applied, which always has an email address.
-export type ApplicantProfile = Profile & { email: string }
+export type ApplicantProfile = z.output<typeof ArtistProfile>
 
 // The links of a profile, as they're saved: by site, the profile name, or the address for "web".
 export const ArtistLinks = z

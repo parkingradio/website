@@ -2,13 +2,12 @@ import type { Schema } from '../../api/client'
 import { prestationName } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
-import type { Artist, ArtistKind, ArtistLinks, GenreId } from '../../artist-profile'
+import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { compareText } from './list'
 
 // How the admin sections show what the API returns, search it and sort it.
 
-export const KIND_LABELS: Record<ArtistKind, string> = { artist: 'artiste', collective: 'collectif' }
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   new: 'nouvelle',
   accepted: 'retenue',
@@ -74,16 +73,10 @@ export function genreNames(genres: GenreId[]): string {
   return genres.map(genreName).join(', ') || MISSING
 }
 
-// Which of three an entry of the list of artists and collectives is: an artist, a collective, or an artist whose `kind` is
-// "collective", as collectives were before they had their own profiles, until they're migrated.
-export type EntryKind = 'artist' | 'legacy-collective' | 'collective'
+// Which of the two an entry of the list of artists and collectives is.
+export type EntryKind = 'artist' | 'collective'
 
-// Both kinds of collectives are collectives, as far as admins are concerned.
-export const ENTRY_KIND_LABELS: Record<EntryKind, string> = { artist: 'artiste', 'legacy-collective': 'collectif', collective: 'collectif' }
-
-export function artistEntryKind(artist: Artist): EntryKind {
-  return artist.kind === 'collective' ? 'legacy-collective' : 'artist'
-}
+export const KIND_LABELS: Record<EntryKind, string> = { artist: 'artiste', collective: 'collectif' }
 
 // The address of an entry's page.
 export function entryPath(kind: EntryKind, id: string): string {
@@ -110,9 +103,8 @@ export function collectiveGenreNames(collective: Collective, members: Artist[] |
   return members && genreNames(membersGenres(collective.members, new Map(members.map((artist) => [artist.id, artist]))))
 }
 
-// Who an application is for: an artist, including those whose `kind` is "collective" until they're migrated, or a
-// collective.
-export type Owner = { kind: 'artist' | 'collective'; id: string }
+// Who an application is for: an artist or a collective.
+export type Owner = { kind: EntryKind; id: string }
 
 // There's always one of them (see docs/design/server/applications.md).
 export function applicationOwner({ artistId, collectiveId }: { artistId: string | null; collectiveId: string | null }): Owner {
@@ -140,11 +132,6 @@ function searchFields(
   )
 }
 
-// What an artist is searched by, and a collective whose `kind` is "collective", by its artists' names too.
-function artistSearchFields(artist: Artist): string[] {
-  return searchFields([artist.name, ...artist.members], artist, artist.genres)
-}
-
 // What a collective is searched by, with its artists' names and `genres`.
 function collectiveSearchFields(collective: Collective, genres: GenreId[]): string[] {
   return searchFields([collective.name, ...collective.members.map((member) => member.name)], collective, genres)
@@ -155,7 +142,7 @@ function collectiveSearchFields(collective: Collective, genres: GenreId[]): stri
 export type Entry = { kind: EntryKind; id: string; name: string; city: string; country: string; genres: GenreId[] | null; searchFields: string[] }
 
 export function artistEntry(artist: Artist): Entry {
-  return { ...artist, kind: artistEntryKind(artist), searchFields: artistSearchFields(artist) }
+  return { ...artist, kind: 'artist', searchFields: searchFields([artist.name], artist, artist.genres) }
 }
 
 // A collective, whose genres are those of its members among `artists`, or unknown when they couldn't be loaded (null).

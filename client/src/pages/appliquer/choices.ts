@@ -1,5 +1,6 @@
 import type { PrestationId } from '../../application-fields'
-import type { ArtistKind, GenreId, LinkSiteId } from '../../artist-profile'
+import type { ApplicantKind } from '../../applicant'
+import type { GenreId, LinkSiteId } from '../../artist-profile'
 
 // What the "Appliquer" form offers, and the limits it sets, on top of the rules that every profile and application has to
 // follow (see artist-profile.ts and application-fields.ts). The server doesn't know about these: admins can
@@ -7,7 +8,7 @@ import type { ArtistKind, GenreId, LinkSiteId } from '../../artist-profile'
 
 // An artist usually gets an hour of a time slot in the programmation, a collective a whole one, which is about 4 hours.
 // Once their date is confirmed, collectives make their own flyer.
-export const SLOT_HOURS: Record<ArtistKind, number> = { artist: 1, collective: 4 }
+export const SLOT_HOURS: Record<ApplicantKind, number> = { artist: 1, collective: 4 }
 export const MAX_MEMBERS = 4
 
 export const MAX_GENRES = 3

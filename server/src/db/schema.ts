@@ -3,8 +3,7 @@ import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, 
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from '../applications/fields.js'
 import type { ApplicationStatus, PrestationId, TimeSlot } from '../applications/fields.js'
-import { ARTIST_KINDS } from '../artists/profile.js'
-import type { ArtistKind, Country, GenreId, LinkSiteId } from '../artists/profile.js'
+import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
@@ -88,12 +87,10 @@ export const artists = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    // The email of the admin who added the artist, or null when they added themselves, by applying.
+    // The email of the admin who added the artist, or null when they came through the form, alone or with a collective.
     createdBy: text('created_by'),
     email: text('email'),
-    kind: text('kind').$type<ArtistKind>().notNull(),
-    name: text('name').notNull(), // or the collective's name
-    members: text('members').array().notNull(), // a collective's artists; empty for an artist
+    name: text('name').notNull(),
     country: text('country').$type<Country | ''>().notNull(), // one of COUNTRIES, e.g. "CA", or "" when an admin left it out
     city: text('city').notNull(),
     genres: text('genres').array().$type<GenreId[]>().notNull(), // ids, most important first
@@ -110,7 +107,6 @@ export const artists = pgTable(
   },
   (table) => [
     uniqueIndex('artists_email_lower_idx').on(sql`lower(${table.email})`),
-    check('artists_kind', oneOf(table.kind, ARTIST_KINDS)),
     check('artists_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
   ],
 )
@@ -147,8 +143,7 @@ export const collectives = pgTable(
 )
 
 // The artists of each collective, in order. An artist can be in several collectives, but only once in each. Deleting a
-// collective or an artist deletes their memberships. Artists whose `kind` is "collective" can't be members (see
-// collectives/store.ts).
+// collective or an artist deletes their memberships.
 export const collectiveMembers = pgTable(
   'collective_members',
   {

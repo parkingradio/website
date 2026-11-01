@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ApplicantProfile } from '../artists/profile.js'
+import { newMember } from '../collectives/store.js'
+import type { Applied } from './applicant.js'
 import { applicationEmails, describeApplication } from './emails.js'
 import type { ApplicationFields } from './fields.js'
 
 function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {
-    kind: 'artist',
     name: 'DJ Test',
-    members: [],
     country: 'CA',
     city: 'Québec',
     genres: ['techno', 'ebm-industrial'],
@@ -16,6 +16,19 @@ function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
     email: 'artiste@example.com',
     phone: '418 555-0123',
     ...changes,
+  }
+}
+
+function artist(changes: Partial<ApplicantProfile> = {}): Applied {
+  return { artist: profile(changes) }
+}
+
+// A collective, as it's saved when it applies.
+function collective(): Applied {
+  const { bio, genres, ...rest } = profile({ name: 'Le Collectif', email: 'collectif@example.com' })
+  return {
+    collective: { ...rest, description: bio },
+    members: [newMember('Une', null, genres), newMember('Deux', null, ['ebm-industrial', 'acid'])],
   }
 }
 
@@ -35,7 +48,7 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
 
 describe('describeApplication', () => {
   it('describes everything the artist sent, in French', () => {
-    expect(describeApplication(profile(), fields())).toBe(
+    expect(describeApplication(artist(), fields())).toBe(
       [
         'Artiste : DJ Test',
         'Ville : Québec, Canada',
@@ -64,13 +77,28 @@ describe('describeApplication', () => {
     )
   })
 
-  it("names a collective's artists", () => {
-    const text = describeApplication(profile({ kind: 'collective', name: 'Le Collectif', members: ['Une', 'Deux'] }), fields())
-    expect(text).toMatch(/^Collectif : Le Collectif\nArtistes du collectif : Une, Deux\n/)
+  it("describes a collective, its artists and their genres, its contact and its description", () => {
+    const text = describeApplication(collective(), fields())
+    expect(text).toMatch(
+      new RegExp(
+        [
+          '^Collectif : Le Collectif',
+          'Artistes du collectif : Une, Deux',
+          'Ville : Québec, Canada',
+          // Each one once.
+          'Genres : techno, EBM / industriel, acid',
+          'E-mail du contact : collectif@example.com',
+          'Téléphone du contact : 418 555-0123',
+          '',
+        ].join('\n'),
+      ),
+    )
+    expect(text).toContain('\nDescription :\nUne bio.\nSur deux lignes.\n')
+    expect(text).not.toContain('Bio :')
   })
 
   it('says when any time works, and leaves out what the artist left blank', () => {
-    const text = describeApplication(profile(), fields({ timeSlots: [], prestations: [], otherPrestation: '', details: '' }))
+    const text = describeApplication(artist(), fields({ timeSlots: [], prestations: [], otherPrestation: '', details: '' }))
     expect(text).toContain('Plages horaires : à toute heure\nType de prestation : —\n')
     expect(text).not.toContain('Questions ou détails')
     expect(text.endsWith('Sur deux lignes.')).toBe(true)
@@ -79,17 +107,17 @@ describe('describeApplication', () => {
 
 describe('applicationEmails', () => {
   it('emails the recipients everything the artist sent, without their photo, and replies go to the artist', () => {
-    const { toRecipients } = applicationEmails({ profile: profile(), application: fields(), recipients: ['equipe@example.com'] })
+    const { toRecipients } = applicationEmails({ applied: artist(), application: fields(), recipients: ['equipe@example.com'] })
     expect(toRecipients).toEqual({
       to: ['equipe@example.com'],
       replyTo: ['artiste@example.com'],
       subject: 'Nouvelle candidature : DJ Test',
-      text: describeApplication(profile(), fields()),
+      text: describeApplication(artist(), fields()),
     })
   })
 
   it('confirms the application to the artist, with none of what they wrote, and replies go to the recipients', () => {
-    const { confirmation } = applicationEmails({ profile: profile(), application: fields(), recipients: ['equipe@example.com'] })
+    const { confirmation } = applicationEmails({ applied: artist(), application: fields(), recipients: ['equipe@example.com'] })
     expect(confirmation).toEqual({
       to: ['artiste@example.com'],
       replyTo: ['equipe@example.com'],
@@ -99,13 +127,18 @@ describe('applicationEmails', () => {
   })
 
   it('reminds collectives to make a flyer', () => {
-    const collective = profile({ kind: 'collective', members: ['Une'] })
-    const { confirmation } = applicationEmails({ profile: collective, application: fields(), recipients: [] })
+    const { confirmation } = applicationEmails({ applied: collective(), application: fields(), recipients: [] })
     expect(confirmation.text).toContain('nous demandons aux collectifs de produire un flyer')
   })
 
+  it("goes to a collective's contact, and replies to it too", () => {
+    const { toRecipients, confirmation } = applicationEmails({ applied: collective(), application: fields(), recipients: ['equipe@example.com'] })
+    expect(toRecipients).toMatchObject({ replyTo: ['collectif@example.com'], subject: 'Nouvelle candidature : Le Collectif' })
+    expect(confirmation.to).toEqual(['collectif@example.com'])
+  })
+
   it('only confirms the application when there are no recipients', () => {
-    const emails = applicationEmails({ profile: profile(), application: fields(), recipients: [] })
+    const emails = applicationEmails({ applied: artist(), application: fields(), recipients: [] })
     expect(emails.toRecipients).toBeNull()
     expect(emails.confirmation.replyTo).toBeUndefined()
   })

@@ -94,9 +94,7 @@ describe('parseLink', () => {
 
 describe('checkProfile, as the server answers', () => {
   const valid = (): Profile => ({
-    kind: 'artist',
     name: 'DJ Test',
-    members: [],
     country: 'CA',
     city: 'Québec',
     genres: ['techno', 'acid'],
@@ -116,12 +114,12 @@ describe('checkProfile, as the server answers', () => {
   }
 
   it('keeps fields that are a single line on a single line', () => {
-    const profile = validateProfile({ ...valid(), kind: 'collective', name: 'DJ\n  Test', members: ['Zefra\r\nMlle Zed'], city: 'Québec\t(QC)', bio: 'Une\n\nbio.' })
-    expect(profile).toMatchObject({ name: 'DJ Test', members: ['Zefra Mlle Zed'], city: 'Québec (QC)', bio: 'Une\n\nbio.' })
+    const profile = validateProfile({ ...valid(), name: 'DJ\n  Test', city: 'Québec\t(QC)', bio: 'Une\n\nbio.' })
+    expect(profile).toMatchObject({ name: 'DJ Test', city: 'Québec (QC)', bio: 'Une\n\nbio.' })
   })
 
-  it('returns what is saved of a valid profile', () => {
-    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ' })).toEqual({
+  it('returns what is saved of a valid profile, without what it does not have', () => {
+    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ', kind: 'collective', members: ['A'] })).toEqual({
       ...valid(),
       // Only the profile names are kept.
       links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
@@ -129,26 +127,13 @@ describe('checkProfile, as the server answers', () => {
   })
 
   it('needs a profile', () => {
-    expect(() => validateProfile(undefined)).toThrow('comme artiste ou comme collectif')
-    expect(() => validateProfile('DJ Test')).toThrow('comme artiste ou comme collectif')
-  })
-
-  it('needs to know whether it is an artist or a collective, and a collective needs at least one artist', () => {
-    expect(error({ kind: undefined })).toContain('comme artiste ou comme collectif')
-    expect(error({ kind: 'duo' as never })).toContain('comme artiste ou comme collectif')
-    expect(error({ kind: 'collective', members: [] })).toBe('Indiquez au moins un artiste du collectif.')
-    expect(error({ kind: 'collective', members: ['  '] })).toBe('Indiquez au moins un artiste du collectif.')
-    expect(error({ kind: 'collective', members: ['A', 'B', 'C', 'D', 'E'] })).toBeNull()
-    // Blank entries and duplicates are dropped, and an artist's members are ignored.
-    expect(validateProfile({ ...valid(), kind: 'collective', members: ['Zefra', ' Mlle Zed ', '', 'zefra'] }).members).toEqual(['Zefra', 'Mlle Zed'])
-    expect(validateProfile({ ...valid(), kind: 'artist', members: ['A'] }).members).toEqual([])
+    expect(() => validateProfile(undefined)).toThrow("Indiquez votre nom d'artiste.")
+    expect(() => validateProfile('DJ Test')).toThrow("Indiquez votre nom d'artiste.")
   })
 
   it('needs a name', () => {
     expect(error({ name: ' ' })).toBe("Indiquez votre nom d'artiste.")
-    expect(error({ kind: 'collective', members: ['A'], name: '' })).toBe('Indiquez le nom du collectif.')
     expect(error({ name: 'x'.repeat(101) })).toBe("Le nom d'artiste dépasse 100 caractères.")
-    expect(error({ kind: 'collective', members: ['x'.repeat(101)] })).toBe("Le nom d'un artiste du collectif dépasse 100 caractères.")
   })
 
   it('takes at least one genre from the list, dropping duplicates', () => {
@@ -204,7 +189,7 @@ describe('checkProfile, as the server answers', () => {
   })
 
   it('refuses text with the NUL character, which the server refuses, before checking its length', () => {
-    expect(error({ kind: 'collective', members: ['A', '\0'] })).toBe("Le nom d'un artiste du collectif contient un caractère invalide.")
+    expect(error({ name: 'A\0' })).toBe("Le nom d'artiste contient un caractère invalide.")
     expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio contient un caractère invalide.')
   })
 
@@ -247,24 +232,16 @@ describe('checkProfile, as the server answers', () => {
     })
 
     it('still needs everything else', () => {
-      expect(error({ kind: undefined }, LENIENT)).toContain('comme artiste ou comme collectif')
       expect(error({ name: '' }, LENIENT)).toBe("Indiquez votre nom d'artiste.")
-      expect(error({ kind: 'collective', members: [] }, LENIENT)).toBe('Indiquez au moins un artiste du collectif.')
-      // A collective's email, unlike an artist's.
-      for (const email of ['', ' ', null, undefined]) {
-        expect(error({ kind: 'collective', members: ['A'], email } as never, LENIENT)).toBe('Indiquez votre adresse e-mail.')
-      }
-      expect(error({ kind: 'collective', members: ['A'], email: 'pas-une-adresse' }, LENIENT)).toBe('Indiquez une adresse e-mail valide.')
     })
   })
 })
 
 describe('checkProfile, for forms', () => {
   it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
-    expect(checkProfile({ kind: 'collective', members: ['  '], country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' })).toEqual({
+    expect(checkProfile({ country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' })).toEqual({
       errors: {
-        name: 'Indiquez le nom du collectif.',
-        members: 'Indiquez au moins un artiste du collectif.',
+        name: "Indiquez votre nom d'artiste.",
         country: 'Choisissez votre pays.',
         city: 'Indiquez votre ville.',
         genres: 'Choisissez au moins un genre.',
@@ -278,9 +255,7 @@ describe('checkProfile, for forms', () => {
 
   it('returns the profile without errors when it is valid', () => {
     const { profile, errors } = checkProfile({
-      kind: 'artist',
       name: 'DJ Test',
-      members: ['ignored'],
       country: 'CA',
       city: 'Québec',
       genres: ['techno'],
@@ -290,7 +265,7 @@ describe('checkProfile, for forms', () => {
       phone: '418 555-0123',
     })
     expect(errors).toBeUndefined()
-    expect(profile).toMatchObject({ members: [], links: { instagram: 'parking.radio' } })
+    expect(profile).toMatchObject({ links: { instagram: 'parking.radio' } })
   })
 })
 

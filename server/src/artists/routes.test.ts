@@ -8,7 +8,7 @@ import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
-import { EmailTaken, MemberCantBeCollective } from './store.js'
+import { EmailTaken } from './store.js'
 import type { ArtistsStore, PhotoFolder, SentPhoto, StoredArtist } from './store.js'
 
 // The artists, as the database would keep them, the ids of each collective's members, in order, and the photos, as the
@@ -40,7 +40,6 @@ const store: ArtistsStore = {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
     if (emailTaken(changes.email, id)) throw new EmailTaken()
-    if (changes.kind === 'collective' && before.collectives.length > 0) throw new MemberCantBeCollective()
     const after = { ...before, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
@@ -70,9 +69,7 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
 function profile(changes: Partial<Profile> = {}): Profile {
   return {
-    kind: 'artist',
     name: 'DJ Test',
-    members: [],
     country: 'CA',
     city: 'Québec',
     genres: ['techno', 'acid'],
@@ -246,14 +243,6 @@ describe('artists routes', () => {
       expect(rows.map((row) => row.email)).toEqual([null, null, null])
     })
 
-    it("still needs a collective's email", async () => {
-      const app = await buildApp()
-      const response = await create(app, profile({ kind: 'collective', members: ['A'], email: null }), null)
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Indiquez votre adresse e-mail.' })
-      expect(rows).toHaveLength(0)
-    })
-
     it('refuses an email another artist has, whatever its case, and forgets the photo', async () => {
       const app = await buildApp()
       expect((await create(app)).statusCode).toBe(200)
@@ -276,10 +265,9 @@ describe('artists routes', () => {
       const app = await buildApp()
       const errors = async (artist: unknown) => (await create(app, JSON.stringify(artist), null)).json()
       for (const artist of [null, 'DJ Test', 42, [], {}]) {
-        expect(await errors(artist)).toEqual({ ok: false, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' })
+        expect(await errors(artist)).toEqual({ ok: false, error: "Indiquez votre nom d'artiste." })
       }
       expect(await errors(profile({ name: 42 as never }))).toEqual({ ok: false, error: "Indiquez votre nom d'artiste." })
-      expect(await errors(profile({ kind: 'collective', members: 'Zefra' as never }))).toEqual({ ok: false, error: 'Indiquez au moins un artiste du collectif.' })
       expect(await errors(profile({ phone: 4185550123 as never }))).toEqual({ ok: false, error: 'Indiquez votre numéro de téléphone.' })
       expect(await errors(profile({ links: { myspace: 'dj' } as never }))).toEqual({ ok: false, error: 'Un des liens est invalide.' })
       expect(rows).toHaveLength(0)
@@ -358,7 +346,7 @@ describe('artists routes', () => {
         await app.inject({
           method: 'POST',
           url: '/api/admin/artists',
-          payload: '--test-boundary\r\nContent-Disposition: form-data; name="artist"\r\n\r\n{"kind":',
+          payload: '--test-boundary\r\nContent-Disposition: form-data; name="artist"\r\n\r\n{"name":',
           headers: multipartHeaders,
           cookies,
         }),
@@ -640,17 +628,6 @@ describe('artists routes', () => {
       const response = await send(app, 'PUT', '/api/admin/artists/nobody', profile(), JPEG)
       expect(response.statusCode).toBe(404)
       expect(stored.size).toBe(0)
-    })
-
-    it("doesn't change a member of a collective into a collective, and forgets the photo", async () => {
-      const app = await buildApp()
-      await create(app)
-      rows[0].collectives = [{ id: 'collective-1', name: 'Ondes' }]
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ kind: 'collective', members: ['Ana'] }), PNG)
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: "An artist who is a member of a collective can't become a collective" })
-      expect(rows[0]).toMatchObject({ kind: 'artist', photoKey: 'artists/photo-1.jpeg' })
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
     })
 
     it('checks the profile and photo like when adding an artist', async () => {

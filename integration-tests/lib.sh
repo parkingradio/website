@@ -116,9 +116,10 @@ first_id() {
     printf '%s' "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
 }
 
-# sql <query> -- run a query in the database, and print its result, without headers or alignment.
+# sql <query> [<database>] -- run a query in the server's database, or another one of the same Postgres, and print its
+# result, without headers or alignment.
 sql() {
-    docker exec "$PG" psql --quiet --no-align --tuples-only --username parking_radio --dbname parking_radio --command "$1"
+    docker exec "$PG" psql --quiet --no-align --tuples-only --username parking_radio --dbname "${2:-parking_radio}" --command "$1"
 }
 
 # expect_status <code>

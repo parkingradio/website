@@ -6,7 +6,7 @@ import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
 import { EmailTaken } from '../artists/store.js'
 import type { PhotoFolder, SentPhoto } from '../artists/store.js'
-import { COLLECTIVE_AS_MEMBER, NO_SUCH_MEMBER } from './profile.js'
+import { NO_SUCH_MEMBER } from './profile.js'
 import { collectivesRoutes } from './routes.js'
 import { InvalidMember } from './store.js'
 import type { CollectivesStore, StoredCollective } from './store.js'
@@ -15,7 +15,7 @@ import type { CollectivesStore, StoredCollective } from './store.js'
 // would. How a profile and its photo are read from the request is shared with artists, and tested with them (see
 // artists/routes.test.ts).
 let rows: StoredCollective[] = []
-let artists: { id: string; name: string; kind: 'artist' | 'collective' }[] = []
+let artists: { id: string; name: string }[] = []
 const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
@@ -30,11 +30,10 @@ function members(sent: Parameters<CollectivesStore['create']>[0]['members']) {
   for (const member of sent) {
     const artist = 'id' in member ? artists.find((artist) => artist.id === member.id) : undefined
     if ('id' in member && !artist) throw new InvalidMember(NO_SUCH_MEMBER)
-    if (artist?.kind === 'collective') throw new InvalidMember(COLLECTIVE_AS_MEMBER)
   }
   return sent.map((member) => {
     if ('id' in member) return { id: member.id, name: artists.find((artist) => artist.id === member.id)!.name }
-    const artist = { id: `artist-${++nextId}`, name: member.name, kind: 'artist' as const }
+    const artist = { id: `artist-${++nextId}`, name: member.name }
     artists.push(artist)
     return { id: artist.id, name: artist.name }
   })
@@ -148,9 +147,8 @@ describe('collectives routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     artists = [
-      { id: 'artist-ana', name: 'Ana', kind: 'artist' },
-      { id: 'artist-brume', name: 'Brume', kind: 'artist' },
-      { id: 'artist-legacy', name: 'Ancien collectif', kind: 'collective' },
+      { id: 'artist-ana', name: 'Ana' },
+      { id: 'artist-brume', name: 'Brume' },
     ]
     stored.clear()
     nextId = 0
@@ -255,16 +253,11 @@ describe('collectives routes', () => {
       expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
     })
 
-    it('refuses a member who is not an artist, or a collective of their own, in English, and forgets the photo', async () => {
+    it('refuses a member who is not an artist, in English, and forgets the photo', async () => {
       const app = await buildApp()
-      for (const [id, error] of [
-        ['artist-nobody', NO_SUCH_MEMBER],
-        ['artist-legacy', COLLECTIVE_AS_MEMBER],
-      ]) {
-        const response = await create(app, profile({ members: [{ id: 'artist-ana' }, { id }] }), PNG)
-        expect(response.statusCode).toBe(400)
-        expect(response.json()).toEqual({ ok: false, error })
-      }
+      const response = await create(app, profile({ members: [{ id: 'artist-ana' }, { id: 'artist-nobody' }] }), PNG)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: NO_SUCH_MEMBER })
       expect(rows).toHaveLength(0)
       expect(stored.size).toBe(0)
     })
@@ -372,8 +365,8 @@ describe('collectives routes', () => {
       await create(app, profile({ email: 'autre@example.com' }), null)
       const taken = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ email: 'AUTRE@example.com' }), PNG)
       expect(taken.statusCode).toBe(409)
-      const invalid = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members: [{ id: 'artist-legacy' }] }), PNG)
-      expect(invalid.json()).toEqual({ ok: false, error: COLLECTIVE_AS_MEMBER })
+      const invalid = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members: [{ id: 'artist-nobody' }] }), PNG)
+      expect(invalid.json()).toEqual({ ok: false, error: NO_SUCH_MEMBER })
       const missing = await send(app, 'PUT', '/api/admin/collectives/nobody', profile(), PNG)
       expect(missing.statusCode).toBe(404)
       expect(missing.json()).toEqual({ ok: false, error: 'No such collective' })

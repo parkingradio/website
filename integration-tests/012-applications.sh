@@ -45,7 +45,7 @@ application_of() {
 }
 
 # The artist who applies.
-request --header "Cookie: ${cookie}" --form-string 'artist={"kind":"artist","name":"Candidate","members":[],"country":"CA",
+request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Candidate","country":"CA",
 "city":"Montréal","genres":["house"],"bio":"Une bio.","links":{"instagram":"@candidate"},
 "email":"candidate@integration.test","phone":"514 555-0123"}' --form "photo=@${PHOTO}" "${BASE_URL}/api/admin/artists"
 expect_status 200

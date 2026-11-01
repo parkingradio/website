@@ -1,12 +1,12 @@
 # Appliquer
 
-This page is the form artists fill in to apply for a slot at Parking Radio. What it collects is reused in the
-rest of Parking Radio's workflow, so it avoids free-form text wherever it can: answers are picked from lists,
-and links are reduced to profile names. The form checks the artist's profile and application as the server does (see
-[Profiles](../server/artists.md#profiles) and [Applications](../server/applications.md)), for immediate
-feedback. The server checks them again, and its check is the one that counts: if it refuses what the form accepted, the form
-shows the server's message. On top of those, it sets limits of its own, which the server doesn't (admins can bring in applications
-that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`.
+This page is the form artists fill in to apply for a slot at Parking Radio. What it collects is reused in the rest of
+Parking Radio's workflow, so it avoids free-form text wherever it can: answers are picked from lists, and links are
+reduced to profile names. The form checks the artist's profile and application as the server does (see
+[`POST /api/applications`](../server/applications.md#post-apiapplications) and [Applications](../server/applications.md)),
+for immediate feedback. The server checks them again, and its check is the one that counts: if it refuses what the form
+accepted, the form shows the server's message. On top of those, it sets limits of its own, which the server doesn't
+(admins can bring in applications that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`.
 
 The fields are (* means mandatory):
 
@@ -53,13 +53,13 @@ application is refused, since Cloudflare only checks each token once (see
 [Configuration](architecture.md#configuration)), so the widget only shows once the page has the configuration, and the
 form can't be sent when it can't be fetched: it then says so, and to reload the page.
 
-When an artist sends the form, it goes to `POST /api/applications`, which creates the artist and their application, and
-sends the emails about it (see [Applying](../server/applications.md#applying) and
+When an artist sends the form, it goes to `POST /api/applications`, which creates the artist, or the collective and its
+artists, and the application, and sends the emails about it (see [Applying](../server/applications.md#applying) and
 [Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist and says where the confirmation
-went. Otherwise, it shows the server's error, e.g. when an artist already has that email address: the form is only for
-new artists for now. Artists we already know will apply again from a different page, which isn't designed yet. When
-the answer isn't the server's, e.g. the network failed, the form says that the application couldn't be sent, and to try
-again in a moment.
+went. Otherwise, it shows the server's error, e.g. when an artist, or a collective, already has that email address: the
+form is only for new artists and collectives for now. Artists we already know will apply again from a different page,
+which isn't designed yet. When the answer isn't the server's, e.g. the network failed, the form says that the
+application couldn't be sent, and to try again in a moment.
 
 ## Endpoints
 

@@ -20,6 +20,7 @@ type ApplicationsResponse = paths['/api/admin/applications']['get']['responses']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
+type GenreId = components['schemas']['GenreId']
 type ApiError = components['schemas']['ApiError']
 
 export type SeedOptions = {
@@ -31,7 +32,7 @@ export type SeedOptions = {
 
 // Where the seed's requests come from, as far as the server's rate limits are concerned (see
 // server/src/api/client-address.ts): one address for the admin's requests, apart from the developer's browser, and one
-// for each artist who applies through the form, since an address can only apply a few times an hour. They're in
+// for each artist or collective who applies through the form, since an address can only apply a few times an hour. They're in
 // 192.0.2.0/24, apart from those the tests use.
 const LOGIN_ADDRESS = '192.0.2.1'
 const formAddress = (nth: number) => `192.0.2.${10 + nth}`
@@ -57,7 +58,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       continue
     }
     let artistId = artist.form ? undefined : await addArtist(server, artist)
-    if (artist.form) await apply(server, artist, formAddress(applied++))
+    if (artist.form) await apply(server, { kind: 'artist', ...artist.profile }, artist, formAddress(applied++))
     try {
       if (artistId === undefined) {
         // Applying through the form created the artist along with their first application.
@@ -81,9 +82,18 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       skipped.push(collective.profile.name)
       continue
     }
-    const collectiveId = await addCollective(server, collective, artistIds)
+    let collectiveId = collective.form ? undefined : await addCollective(server, collective, artistIds)
+    if (collective.form) await apply(server, applicant(collective, collective.form), collective, formAddress(applied++))
     try {
-      for (const application of collective.applications) await addApplication(server, { collectiveId }, application)
+      if (collectiveId === undefined) {
+        // Applying through the form created the collective along with its first application.
+        const applied = await findAppliedCollective(server, collective)
+        collectiveId = applied.collectiveId
+        await setStatus(server, applied.applicationId, collective.applications[0].status)
+      }
+      for (const application of collective.form ? collective.applications.slice(1) : collective.applications) {
+        await addApplication(server, { collectiveId }, application)
+      }
     } catch (error) {
       throw new Error(`${messageOf(error)}\n${collective.profile.name} was left incomplete. To seed it again, delete it first.`, { cause: error })
     }
@@ -156,12 +166,24 @@ async function addCollective(server: Server, collective: SeedCollective, artistI
   return (await server.call<CollectiveResponse>('POST', '/api/admin/collectives', form)).collective.id
 }
 
-// Has the artist apply through the form, from `address`, with their first application.
-async function apply(server: Server, artist: SeedArtist, address: string): Promise<void> {
+// Who a collective that applies through the form is, as the form sends it: its profile, with its artists' names, and the
+// `genres` it sends for them.
+function applicant(collective: SeedCollective, { genres }: { genres: GenreId[] }) {
+  const { description, ...profile } = collective.profile
+  const members = collective.members.map((member) => {
+    if ('seeded' in member) throw new Error(`${profile.name} applies through the form, so its artists can only be new ones`)
+    return member.name
+  })
+  return { kind: 'collective', ...profile, members, genres, bio: description }
+}
+
+// Has an artist or a collective apply through the form, from `address`, as `applicant`, with their photo and their first
+// application.
+async function apply(server: Server, applicant: object, { photo: colour, applications }: SeedArtist | SeedCollective, address: string): Promise<void> {
   const form = new FormData()
-  form.set('artist', JSON.stringify(artist.profile))
-  form.set('application', JSON.stringify(applicationFields(artist.applications[0])))
-  if (artist.photo) form.set('photo', photo(artist.photo), 'photo.png')
+  form.set('artist', JSON.stringify(applicant))
+  form.set('application', JSON.stringify(applicationFields(applications[0])))
+  if (colour) form.set('photo', photo(colour), 'photo.png')
   form.set('turnstileToken', TURNSTILE_TOKEN)
   // Without the session: artists don't have one.
   await request(server.url, 'POST', '/api/applications', form, { 'CF-Connecting-IP': address })
@@ -172,8 +194,21 @@ async function findApplied(server: Server, artist: SeedArtist): Promise<{ artist
   const { artists } = await server.call<ArtistsResponse>('GET', '/api/admin/artists')
   const added = artists.find((added) => seedKey(added) === seedKey(artist.profile))
   if (!added) throw new Error(`${artist.profile.name} applied, but wasn't added`)
-  const { applications } = await server.call<ApplicationsResponse>('GET', `/api/admin/applications?artist=${added.id}`)
-  return { artistId: added.id, applicationId: applications[0].id }
+  return { artistId: added.id, applicationId: await firstApplication(server, `artist=${added.id}`) }
+}
+
+// The id of a collective that applied through the form, and of the application it sent, which the form doesn't return.
+async function findAppliedCollective(server: Server, collective: SeedCollective): Promise<{ collectiveId: string; applicationId: string }> {
+  const { collectives } = await server.call<CollectivesResponse>('GET', '/api/admin/collectives')
+  const added = collectives.find((added) => added.email.toLowerCase() === collective.profile.email.toLowerCase())
+  if (!added) throw new Error(`${collective.profile.name} applied, but wasn't added`)
+  return { collectiveId: added.id, applicationId: await firstApplication(server, `collective=${added.id}`) }
+}
+
+// The id of the only application of whoever `query` says, e.g. "artist=<id>".
+async function firstApplication(server: Server, query: string): Promise<string> {
+  const { applications } = await server.call<ApplicationsResponse>('GET', `/api/admin/applications?${query}`)
+  return applications[0].id
 }
 
 // Adds an application for the artist or the collective, as an admin would, with its status.

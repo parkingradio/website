@@ -22,6 +22,7 @@ export type SeedArtist = {
 }
 
 type ApplicationFields = components['schemas']['ApplicationFields']
+type GenreId = components['schemas']['GenreId']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
 
 export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
@@ -31,14 +32,6 @@ export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
   // How many days before the day it's seeded the artist sent it, or when it's seeded if it's left out. Not for the
   // application sent through the form, which is received when it's sent.
   receivedDaysAgo?: number
-}
-
-function artist(profile: Omit<Profile, 'kind' | 'members'>): Profile {
-  return { kind: 'artist', members: [], ...profile }
-}
-
-function collective(profile: Omit<Profile, 'kind'>): Profile {
-  return { kind: 'collective', ...profile }
 }
 
 // What admins can leave out of a profile, left out, as for artists brought in from the original Google Form, or whom
@@ -66,7 +59,7 @@ const LONG_BIO = Array<string>(16)
 
 export const SEED_ARTISTS: SeedArtist[] = [
   {
-    profile: artist({
+    profile: {
       name: 'Clémentine Brûlée',
       country: 'CA',
       city: 'Montréal',
@@ -75,7 +68,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'clementine-brulee', instagram: 'clementine.brulee' },
       email: 'clementine@example.com',
       phone: '514 555-0101',
-    }),
+    },
     photo: '#e4572e',
     applications: [
       application([45, 52], 'new', { timeSlots: [EVENING], receivedDaysAgo: 2 }),
@@ -83,7 +76,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Clément Brûlé',
       country: 'FR',
       city: 'Lyon',
@@ -92,11 +85,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'clementbrule' },
       email: 'clement.brule@example.com',
       phone: '+33 6 12 34 56 78',
-    }),
+    },
     applications: [application([70], 'new', { prestations: ['dj', 'vinyl'], receivedDaysAgo: 5 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Fréquence Boréale',
       country: 'CA',
       city: 'Montréal',
@@ -115,7 +108,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       },
       email: 'boreale@example.com',
       phone: '438 555-0102',
-    }),
+    },
     photo: '#2e86ab',
     applications: [
       application([60, 61, 62, 67, 68, 69], 'accepted', {
@@ -127,46 +120,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: collective({
-      name: 'Les Sœurs Ondes',
-      members: ['Ondine', 'Marée', 'Écume'],
-      country: 'CA',
-      city: 'Québec',
-      genres: ['ambient', 'experimental'],
-      bio: 'Trois synthétiseurs modulaires, une table de mixage et beaucoup de réverbération.',
-      links: { bandcamp: 'soeursondes', instagram: 'soeurs.ondes' },
-      email: 'soeurs.ondes@example.com',
-      phone: '418 555-0103',
-    }),
-    photo: '#a23b72',
-    applications: [
-      application([90], 'scheduled', {
-        timeSlots: [MIDDAY],
-        prestations: ['live-performance'],
-        otherPrestation: 'Synthé modulaire',
-        receivedDaysAgo: 40,
-      }),
-    ],
-  },
-  {
-    profile: collective({
-      name: 'Collectif Béton',
-      members: ['Mathis', 'Rosalie', 'Kofi', 'Yasmine'],
-      country: 'CA',
-      city: 'Montréal',
-      genres: ['hard-techno', 'ebm-industrial'],
-      bio: 'Quatre DJ, une seule règle : jamais en dessous de 140 BPM.',
-      links: { instagram: 'collectif.beton', ra: 'collectifbeton' },
-      email: 'beton@example.com',
-      phone: '514 555-0104',
-    }),
-    applications: [
-      application([-60], 'done', { timeSlots: [EVENING], receivedDaysAgo: 150 }),
-      application([30, 31], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 10 }),
-    ],
-  },
-  {
-    profile: artist({
+    profile: {
       name: 'DJ Poutine',
       country: 'CA',
       city: 'Sherbrooke',
@@ -175,7 +129,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'djpoutine', tiktok: 'djpoutine' },
       email: 'DJ.Poutine@Example.com',
       phone: '819 555-0105',
-    }),
+    },
     photo: '#f18f01',
     form: true,
     applications: [
@@ -183,7 +137,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Mélisande',
       country: 'BE',
       city: 'Bruxelles',
@@ -192,12 +146,12 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'melisande.music', spotify: '0parkingradioseed00002' },
       email: 'melisande@example.org',
       phone: '+32 470 12 34 56',
-    }),
+    },
     form: true,
     applications: [application([100, 101, 102], 'new', { prestations: ['dj', 'live-performance'] })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Kwame Asante',
       country: 'GH',
       city: 'Accra',
@@ -206,13 +160,13 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'kwameasante', youtube: 'kwameasante' },
       email: 'kwame@example.com',
       phone: '+233 24 123 4567',
-    }),
+    },
     photo: '#3b1f2b',
     form: true,
     applications: [application([65], 'rejected', { timeSlots: [AFTERNOON], prestations: ['dj', 'rap'] })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Rosalie Tremblay',
       country: 'CA',
       city: 'Trois-Rivières',
@@ -221,7 +175,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'rosalie.tremblay' },
       email: 'rosalie.tremblay@example.com',
       phone: '819 555-0107',
-    }),
+    },
     form: true,
     applications: [
       application([55], 'accepted', {
@@ -231,52 +185,52 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Noé Lavigne',
       ...LEFT_OUT,
       bio: "Venu par l'ancien formulaire Google, qui ne demandait ni la ville ni les liens.",
       email: 'noe.lavigne@example.com',
-    }),
+    },
     applications: [application([-200], 'done', { receivedDaysAgo: 300 })],
   },
   {
     // Known only by name.
-    profile: artist({ name: 'Marée Basse', ...LEFT_OUT }),
+    profile: { name: 'Marée Basse', ...LEFT_OUT },
     applications: [application([-180], 'done', { receivedDaysAgo: 280 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Inès Ferreira',
       ...LEFT_OUT,
       city: 'Lisbonne',
       bio: 'Ville connue, pays inconnu.',
       email: 'ines.ferreira@example.com',
-    }),
+    },
     applications: [application([-150, -149], 'rejected', { receivedDaysAgo: 250 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Takeshi Mori',
       ...LEFT_OUT,
       country: 'JP',
       genres: ['ambient', 'downtempo'],
       bio: 'Pays connu, ville inconnue.',
       email: 'takeshi.mori@example.com',
-    }),
+    },
     applications: [application([-100], 'done', { prestations: ['live-performance'], receivedDaysAgo: 210 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Bassline Gaspésie',
       ...LEFT_OUT,
       links: { soundcloud: 'basslinegaspesie' },
       bio: 'Drum & bass depuis Gaspé.',
       email: 'bassline.gaspesie@example.com',
-    }),
+    },
     applications: [],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Amélie Côté',
       country: 'CA',
       city: 'Gatineau',
@@ -285,7 +239,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'ameliecote', mixcloud: 'ameliecote' },
       email: 'amelie.cote@example.com',
       phone: '819 555-0108',
-    }),
+    },
     photo: '#6a994e',
     applications: [
       application([20], 'scheduled', { timeSlots: [EVENING], receivedDaysAgo: 60 }),
@@ -294,7 +248,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Émile Gagnon',
       country: 'CA',
       city: 'Montréal',
@@ -303,13 +257,13 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'emilegagnon', youtube: 'emilegagnon', spotify: '0parkingradioseed00003' },
       email: 'emile.gagnon@example.com',
       phone: '514 555-0109',
-    }),
+    },
     applications: [
       application([40], 'new', { timeSlots: [AFTERNOON, EVENING], prestations: ['rap'], receivedDaysAgo: 1 }),
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Sofía Ramírez',
       country: 'MX',
       city: 'Ciudad de México',
@@ -318,12 +272,12 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'sofiaramirez', instagram: 'sofia.ramirez' },
       email: 'sofia.ramirez@example.com',
       phone: '+52 55 1234 5678',
-    }),
+    },
     photo: '#bc4b51',
     applications: [application([85, 86], 'new', { prestations: ['dj', 'vinyl'], receivedDaysAgo: 3 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Hugo Bellerose',
       country: 'CH',
       city: 'Genève',
@@ -332,11 +286,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { ra: 'hugobellerose' },
       email: 'hugo.bellerose@example.com',
       phone: '+41 79 123 45 67',
-    }),
+    },
     applications: [application([110], 'rejected', { receivedDaysAgo: 15 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Maya Chen',
       country: 'US',
       city: 'New York',
@@ -345,7 +299,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'mayachen', instagram: 'maya.chen', web: 'https://mayachen.example.com' },
       email: 'maya.chen@example.com',
       phone: '+1 718 555 0110',
-    }),
+    },
     photo: '#5b8e7d',
     applications: [
       application([35], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 25 }),
@@ -353,7 +307,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Léa Dubois',
       country: 'FR',
       city: 'Paris',
@@ -362,11 +316,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'leadubois' },
       email: 'lea.dubois@example.com',
       phone: '+33 7 98 76 54 32',
-    }),
+    },
     applications: [application([95], 'new', { receivedDaysAgo: 6 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Félix Ouellet',
       country: 'CA',
       city: 'Saguenay',
@@ -375,26 +329,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { bandcamp: 'felixouellet', instagram: 'felix.ouellet' },
       email: 'felix.ouellet@example.com',
       phone: '418 555-0111',
-    }),
+    },
     applications: [application([50], 'scheduled', { prestations: ['full-band'], receivedDaysAgo: 35 })],
   },
   {
-    profile: collective({
-      name: 'Radio Dub Laurentides',
-      members: ['Jah Pierre'],
-      country: 'CA',
-      city: 'Saint-Jérôme',
-      genres: ['reggae-dub', 'dancehall'],
-      bio: 'Un sound system, un seul membre, beaucoup de basses.',
-      links: { mixcloud: 'radiodublaurentides' },
-      email: 'dub.laurentides@example.com',
-      phone: '450 555-0112',
-    }),
-    photo: '#7d5ba6',
-    applications: [application([-10], 'done', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
-  },
-  {
-    profile: artist({
+    profile: {
       name: 'Zoé Nguyen',
       country: 'CA',
       city: 'Laval',
@@ -403,13 +342,13 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'zoe.nguyen', tiktok: 'zoenguyen' },
       email: 'zoe.nguyen@example.com',
       phone: '450 555-0113',
-    }),
+    },
     applications: [
       application([80], 'new', { prestations: ['live-performance'], otherPrestation: 'Chant', receivedDaysAgo: 7 }),
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Gabriel Roy',
       country: 'CA',
       city: 'Montréal',
@@ -418,11 +357,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'gabrielroy' },
       email: 'gabriel.roy@example.com',
       phone: '514 555-0114',
-    }),
+    },
     applications: [application([25], 'rejected', { receivedDaysAgo: 30 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Océane Lefebvre',
       country: 'CA',
       city: 'Montréal',
@@ -431,7 +370,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { bandcamp: 'oceanelefebvre' },
       email: 'oceane.lefebvre@example.com',
       phone: '514 555-0115',
-    }),
+    },
     photo: '#264653',
     applications: [
       application([105], 'new', {
@@ -443,7 +382,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     ],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Antoine Bergeron',
       country: 'CA',
       city: 'Longueuil',
@@ -452,11 +391,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'antoine.bergeron' },
       email: 'antoine.bergeron@example.com',
       phone: '450 555-0116',
-    }),
+    },
     applications: [application([-45], 'done', { timeSlots: [MIDDAY], receivedDaysAgo: 100 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Chloé Pelletier',
       country: 'CA',
       city: 'Rimouski',
@@ -465,11 +404,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'chloepelletier', bandcamp: 'chloepelletier' },
       email: 'chloe.pelletier@example.com',
       phone: '418 555-0117',
-    }),
+    },
     applications: [application([130, 131, 132], 'new', { timeSlots: [MIDDAY], receivedDaysAgo: 2 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Olivier Fortin',
       country: 'CA',
       city: 'Montréal',
@@ -478,11 +417,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { instagram: 'olivier.fortin' },
       email: 'olivier.fortin@example.com',
       phone: '514 555-0118',
-    }),
+    },
     applications: [application([15], 'accepted', { prestations: ['vinyl'], receivedDaysAgo: 45 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'Jeanne Morin',
       country: 'CA',
       city: 'Québec',
@@ -491,12 +430,12 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'jeannemorin' },
       email: 'jeanne.morin@example.com',
       phone: '418 555-0119',
-    }),
+    },
     photo: '#e9c46a',
     applications: [],
   },
   {
-    profile: artist({
+    profile: {
       name: 'DJ 2',
       country: 'CA',
       city: 'Montréal',
@@ -505,11 +444,11 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'dj-deux' },
       email: 'dj2@example.com',
       phone: '514 555-0120',
-    }),
+    },
     applications: [application([140], 'new', { receivedDaysAgo: 9 })],
   },
   {
-    profile: artist({
+    profile: {
       name: 'DJ 10',
       country: 'CA',
       city: 'Montréal',
@@ -518,7 +457,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       links: { soundcloud: 'dj-dix' },
       email: 'dj10@example.com',
       phone: '514 555-0121',
-    }),
+    },
     applications: [application([141], 'new', { receivedDaysAgo: 9 })],
   },
 ]
@@ -534,14 +473,16 @@ export type SeedCollective = {
   // Its members, in order: artists of SEED_ARTISTS, by their email, or by their name for those without one, and new
   // artists, by their name, whom the server creates along with the collective.
   members: ({ seeded: string } | { name: string })[]
+  // For a collective that applied through the "Appliquer" form, which created it along with its first application, the
+  // genres it sent, which its artists, all new ones, got. Otherwise, an admin added it, and its applications.
+  form?: { genres: GenreId[] }
   // The colour of its photo, for collectives that have one.
   photo?: string
   // Its applications, which an admin added.
   applications: SeedApplication[]
 }
 
-// Seeded after the artists, whom they have as members. Unlike the artists whose `kind` is "collective", these are
-// collectives of their own, with artists as members.
+// Seeded after the artists, whom they have as members.
 export const SEED_COLLECTIVES: SeedCollective[] = [
   {
     profile: {
@@ -572,5 +513,51 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     profile: { name: 'Les Nuits Basses', country: '', city: '', description: '', links: {}, email: 'kwame@example.com', phone: '' },
     members: [{ seeded: 'kwame@example.com' }, { seeded: 'Marée Basse' }, { name: 'Sable Mouvant' }],
     applications: [application([120], 'new', { prestations: ['live-performance'], receivedDaysAgo: 1 })],
+  },
+  {
+    profile: {
+      name: 'Les Sœurs Ondes',
+      country: 'CA',
+      city: 'Québec',
+      description: 'Trois synthétiseurs modulaires, une table de mixage et beaucoup de réverbération.',
+      links: { bandcamp: 'soeursondes', instagram: 'soeurs.ondes' },
+      email: 'soeurs.ondes@example.com',
+      phone: '418 555-0103',
+    },
+    members: [{ name: 'Ondine' }, { name: 'Marée' }, { name: 'Écume' }],
+    photo: '#a23b72',
+    form: { genres: ['ambient', 'experimental'] },
+    applications: [application([90], 'scheduled', { timeSlots: [MIDDAY], prestations: ['live-performance'], otherPrestation: 'Synthé modulaire' })],
+  },
+  {
+    profile: {
+      name: 'Collectif Béton',
+      country: 'CA',
+      city: 'Montréal',
+      description: 'Quatre DJ, une seule règle : jamais en dessous de 140 BPM.',
+      links: { instagram: 'collectif.beton', ra: 'collectifbeton' },
+      email: 'beton@example.com',
+      phone: '514 555-0104',
+    },
+    members: [{ name: 'Mathis' }, { name: 'Rosalie' }, { name: 'Kofi' }, { name: 'Yasmine' }],
+    form: { genres: ['hard-techno', 'ebm-industrial'] },
+    applications: [
+      application([30, 31], 'accepted', { timeSlots: [EVENING] }),
+      application([-60], 'done', { timeSlots: [EVENING], receivedDaysAgo: 150 }),
+    ],
+  },
+  {
+    profile: {
+      name: 'Radio Dub Laurentides',
+      country: 'CA',
+      city: 'Saint-Jérôme',
+      description: 'Un sound system, un seul membre, beaucoup de basses.',
+      links: { mixcloud: 'radiodublaurentides' },
+      email: 'dub.laurentides@example.com',
+      phone: '450 555-0112',
+    },
+    members: [{ name: 'Jah Pierre' }],
+    photo: '#7d5ba6',
+    applications: [application([-10], 'done', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
   },
 ]

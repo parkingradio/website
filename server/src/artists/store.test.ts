@@ -88,9 +88,7 @@ describe('parseLink', () => {
 
 describe('validateProfile', () => {
   const valid = (): Profile => ({
-    kind: 'artist',
     name: 'DJ Test',
-    members: [],
     country: 'CA',
     city: 'Québec',
     genres: ['techno', 'acid'],
@@ -110,12 +108,12 @@ describe('validateProfile', () => {
   }
 
   it('keeps fields that are a single line on a single line', () => {
-    const profile = validateProfile({ ...valid(), kind: 'collective', name: 'DJ\n  Test', members: ['Zefra\r\nMlle Zed'], city: 'Québec\t(QC)', bio: 'Une\n\nbio.' }, ArtistProfile)
-    expect(profile).toMatchObject({ name: 'DJ Test', members: ['Zefra Mlle Zed'], city: 'Québec (QC)', bio: 'Une\n\nbio.' })
+    const profile = validateProfile({ ...valid(), name: 'DJ\n  Test', city: 'Québec\t(QC)', bio: 'Une\n\nbio.' }, ArtistProfile)
+    expect(profile).toMatchObject({ name: 'DJ Test', city: 'Québec (QC)', bio: 'Une\n\nbio.' })
   })
 
-  it('returns what is saved of a valid profile', () => {
-    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ' }, ArtistProfile)).toEqual({
+  it('returns what is saved of a valid profile, without what it does not have', () => {
+    expect(validateProfile({ ...valid(), name: '  DJ Test ', city: ' Québec ', kind: 'collective', members: ['A'] }, ArtistProfile)).toEqual({
       ...valid(),
       // Only the profile names are kept.
       links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
@@ -123,26 +121,13 @@ describe('validateProfile', () => {
   })
 
   it('needs a profile', () => {
-    expect(() => validateProfile(undefined, ArtistProfile)).toThrow('comme artiste ou comme collectif')
-    expect(() => validateProfile('DJ Test', ArtistProfile)).toThrow('comme artiste ou comme collectif')
-  })
-
-  it('needs to know whether it is an artist or a collective, and a collective needs at least one artist', () => {
-    expect(error({ kind: undefined })).toContain('comme artiste ou comme collectif')
-    expect(error({ kind: 'duo' as never })).toContain('comme artiste ou comme collectif')
-    expect(error({ kind: 'collective', members: [] })).toBe('Indiquez au moins un artiste du collectif.')
-    expect(error({ kind: 'collective', members: ['  '] })).toBe('Indiquez au moins un artiste du collectif.')
-    expect(error({ kind: 'collective', members: ['A', 'B', 'C', 'D', 'E'] })).toBeNull()
-    // Blank entries and duplicates are dropped, and an artist's members are ignored.
-    expect(validateProfile({ ...valid(), kind: 'collective', members: ['Zefra', ' Mlle Zed ', '', 'zefra'] }, ArtistProfile).members).toEqual(['Zefra', 'Mlle Zed'])
-    expect(validateProfile({ ...valid(), kind: 'artist', members: ['A'] }, ArtistProfile).members).toEqual([])
+    expect(() => validateProfile(undefined, ArtistProfile)).toThrow()
+    expect(() => validateProfile('DJ Test', ArtistProfile)).toThrow()
   })
 
   it('needs a name', () => {
     expect(error({ name: ' ' })).toBe("Indiquez votre nom d'artiste.")
-    expect(error({ kind: 'collective', members: ['A'], name: '' })).toBe('Indiquez le nom du collectif.')
     expect(error({ name: 'x'.repeat(101) })).toBe("Le nom d'artiste dépasse 100 caractères.")
-    expect(error({ kind: 'collective', members: ['x'.repeat(101)] })).toBe("Le nom d'un artiste du collectif dépasse 100 caractères.")
   })
 
   it('takes at least one genre from the list, dropping duplicates', () => {
@@ -198,7 +183,7 @@ describe('validateProfile', () => {
   })
 
   it("refuses text with the NUL character, which the database can't store, before checking its length", () => {
-    expect(error({ kind: 'collective', members: ['A', '\0'] })).toBe("Le nom d'un artiste du collectif contient un caractère invalide.")
+    expect(error({ name: 'A\0' })).toBe("Le nom d'artiste contient un caractère invalide.")
     expect(error({ bio: `\0${'x'.repeat(5001)}` })).toBe('La bio contient un caractère invalide.')
   })
 
@@ -241,37 +226,24 @@ describe('validateProfile', () => {
     })
 
     it('still needs everything else', () => {
-      expect(error({ kind: undefined }, ADMIN)).toContain('comme artiste ou comme collectif')
       expect(error({ name: '' }, ADMIN)).toBe("Indiquez votre nom d'artiste.")
-      expect(error({ kind: 'collective', members: [] }, ADMIN)).toBe('Indiquez au moins un artiste du collectif.')
-      // A collective's email, unlike an artist's.
-      for (const email of ['', ' ', null, undefined]) {
-        expect(error({ kind: 'collective', members: ['A'], email }, ADMIN)).toBe('Indiquez votre adresse e-mail.')
-      }
-      expect(error({ kind: 'collective', members: ['A'], email: 'pas-une-adresse' }, ADMIN)).toBe('Indiquez une adresse e-mail valide.')
     })
   })
 })
 
 describe('the first error', () => {
   it('is that of the first field that is wrong, in the order of the profile', () => {
-    const sent = { kind: 'collective', members: ['  '], country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' }
-    expect(() => validateProfile(sent, ArtistProfile)).toThrow('Indiquez le nom du collectif.')
-    expect(() => validateProfile({ ...sent, name: 'Brume' }, ArtistProfile)).toThrow('Indiquez au moins un artiste du collectif.')
-    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'] }, ArtistProfile)).toThrow('Choisissez votre pays.')
-    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'], country: 'CA' }, ArtistProfile)).toThrow('Indiquez votre ville.')
-    expect(() => validateProfile({ ...sent, name: 'Brume', members: ['A'], country: 'CA', city: 'Q' }, ArtistProfile)).toThrow('Choisissez au moins un genre.')
+    const sent = { country: 'ZZ', genres: [], links: { soundcloud: 'https://soundcloud.com' }, email: 'x', phone: '' }
+    expect(() => validateProfile(sent, ArtistProfile)).toThrow("Indiquez votre nom d'artiste.")
+    expect(() => validateProfile({ ...sent, name: 'Brume' }, ArtistProfile)).toThrow('Choisissez votre pays.')
+    expect(() => validateProfile({ ...sent, name: 'Brume', country: 'CA' }, ArtistProfile)).toThrow('Indiquez votre ville.')
+    expect(() => validateProfile({ ...sent, name: 'Brume', country: 'CA', city: 'Q' }, ArtistProfile)).toThrow('Choisissez au moins un genre.')
   })
 
   // The messages a profile can get, other than for its links, which say which site is wrong.
   const MESSAGES = [
-    'Indiquez si vous postulez comme artiste ou comme collectif.',
     "Indiquez votre nom d'artiste.",
     "Le nom d'artiste dépasse 100 caractères.",
-    'Indiquez le nom du collectif.',
-    'Le nom du collectif dépasse 100 caractères.',
-    'Indiquez au moins un artiste du collectif.',
-    "Le nom d'un artiste du collectif dépasse 100 caractères.",
     'Choisissez votre pays.',
     'Indiquez votre ville.',
     'La ville dépasse 100 caractères.',
@@ -291,15 +263,13 @@ describe('the first error', () => {
   const isFrench = (message: string) => MESSAGES.includes(message) || /^(SoundCloud|Instagram|Site web|Bandcamp|Mixcloud|Resident Advisor|YouTube|Spotify|TikTok) : .+\.$/.test(message)
 
   it('is in French, whatever was sent instead of each field', () => {
-    const valid = { kind: 'artist', name: 'DJ Test', members: [], country: 'CA', city: 'Québec', genres: ['techno'], bio: 'Une bio.', links: { web: 'parking.radio' }, email: 'a@example.com', phone: '418 555-0123' }
+    const valid = { name: 'DJ Test', country: 'CA', city: 'Québec', genres: ['techno'], bio: 'Une bio.', links: { web: 'parking.radio' }, email: 'a@example.com', phone: '418 555-0123' }
     const anything = [undefined, null, '', ' ', 0, 42, true, [], {}, ['x'], [42], { a: 1 }, { soundcloud: 42 }, 'x'.repeat(6000)]
     for (const schema of [ArtistProfile, AdminArtistProfile]) {
-      for (const kind of ['artist', 'collective']) {
-        for (const field of Object.keys(valid)) {
-          for (const value of anything) {
-            const result = schema.safeParse({ ...valid, kind, members: ['A'], [field]: value })
-            if (!result.success) expect(result.error.issues[0].message).toSatisfy(isFrench)
-          }
+      for (const field of Object.keys(valid)) {
+        for (const value of anything) {
+          const result = schema.safeParse({ ...valid, [field]: value })
+          if (!result.success) expect(result.error.issues[0].message).toSatisfy(isFrench)
         }
       }
     }

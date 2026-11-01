@@ -13,8 +13,8 @@ French, like for [profiles](artists.md#profiles), because artists see them.
 
 Applications are created in two ways:
 
-- A new artist applies with `POST /api/applications`, which creates the artist and their application together (see
-  [Applying](#applying)).
+- A new artist or collective applies with `POST /api/applications`, which creates them and their application together
+  (see [Applying](#applying)).
 - An admin creates an application, for an artist or a collective who already exists, e.g. to bring in one that came
   by email, or through the original Google Form.
 
@@ -109,9 +109,11 @@ application doesn't exist.
 
 ## Applying
 
-A new artist applies with `POST /api/applications`, which creates the artist, with their profile and photo, if they
-sent one, and their application. The artist's `createdBy` and the application's are both null, since nobody on the team
-created them.
+A new artist or collective applies with `POST /api/applications`. For an artist applying alone, it creates the artist,
+with their profile and photo, if they sent one, and their application. For a collective, it creates the collective,
+with its profile and photo, if it sent one, an artist for each of its artists, and its application, which belongs to the
+collective (see [`POST /api/applications`](#post-apiapplications)). Everything it creates has a null `createdBy`, since
+nobody on the team created it.
 
 Anyone can call this endpoint, so it has two protections against bots and floods:
 
@@ -120,10 +122,13 @@ Anyone can call this endpoint, so it has two protections against bots and floods
   server then asks Cloudflare whether the token is valid.
 - **A rate limit.** Each client can send 5 requests per hour. Requests that fail count too.
 
-**Only new artists can apply this way.** If an artist with the same email already exists (ignoring upper and lower
-case), the request fails with 409 and nothing is created. Otherwise, anyone could take over an artist's profile just by
-typing their email. The downside is that the 409 tells whoever sent the request that this email belongs to an artist.
-To make that harder to abuse, the server only checks the email after Turnstile has accepted the token.
+**Only new artists and collectives can apply this way.** If an artist applying alone has the email of an artist who
+already exists, or a collective has the contact email of a collective that already exists (ignoring upper and lower
+case), the request fails with 409 and nothing is created. Otherwise, anyone could take over a profile just by typing its
+email. A collective can still have an artist's email, and an artist a collective's, since emails are only unique among
+artists, and among collectives (see [Profiles](collectives.md#profiles)). The downside is that the 409 tells whoever
+sent the request that this email belongs to an artist, or to a collective. To make that harder to abuse, the server
+only checks the email after Turnstile has accepted the token.
 
 **When the page needs a new token.** Cloudflare only accepts each token once. To let artists fix their mistakes, the
 server checks the profile, the application and the photo before it sends the token to Cloudflare. So if the request
@@ -132,24 +137,43 @@ token may already be used up, and the page needs to get a new one from the widge
 
 ## `POST /api/applications`
 
-A new artist applies (see [Applying](#applying)). The request is `multipart/form-data`, with four parts:
+A new artist or collective applies (see [Applying](#applying)). The request is `multipart/form-data`, with four parts:
 
 | Part | |
 |---|---|
-| `artist` | The artist's profile, with everything an admin could leave out (see [Profiles](artists.md#profiles)), as JSON, in a field rather than a file |
+| `artist` | Who applies, as JSON, in a field rather than a file: see below |
 | `application` | The application's fields, as JSON, the same way |
-| `photo` | The artist's photo, which can be left out (see [Photos](artists.md#photos)) |
+| `photo` | The photo of the artist, or of the collective, which can be left out (see [Photos](artists.md#photos)) |
 | `turnstileToken` | The token Turnstile gave the page |
 
 A few other fields or files, e.g. a form's submit button, are ignored. A second photo isn't: the request fails. On
 success, the response is `{"ok": true}`, and the emails are sent (see [Emails](#emails)).
+
+Who applies follows the `Applicant` schema of `server/src/applications/applicant.ts`, and has:
+
+| Field | Type | |
+|---|---|---|
+| `kind` | `"artist"` or `"collective"` | Whether an artist applies alone, or a collective |
+| `name` | string | The artist's name, or the collective's, like an artist's (see [Profiles](artists.md#profiles)) |
+| `members` | list of strings | For a collective, the names of its artists, in order, each one like an artist's name: at least one, once what isn't a string, blank names and duplicates, whatever their case, are dropped. Ignored for an artist |
+| `country`, `city`, `genres`, `bio`, `links`, `email`, `phone` | | Like an artist's (see [Profiles](artists.md#profiles)), and none of them can be left out |
+
+The errors about a collective's name and its artists' names say so, e.g. "Indiquez le nom du collectif.": the others are
+an artist's. What the server creates from it is:
+
+- For an artist: the artist, whose profile is all of the above but `kind` and `members`.
+- For a collective: the collective, whose profile has the name, country, city and links sent, the bio as its
+  description, and the email and phone as its contact's (see [Profiles](collectives.md#profiles)). Its members are its
+  artists, in order, each one a new artist, even when another artist has that name, with only that name and the genres
+  sent, and everything else left out, as admins can (see [Profiles](artists.md#profiles)): a collective has no genres of
+  its own, since its genres are its artists'. The photo is the collective's.
 
 Errors are in French, since artists see them:
 
 | Status | When |
 |---|---|
 | 400 | The profile, application or photo isn't valid, the request is malformed, or Turnstile refused the token |
-| 409 | An artist with that email already exists |
+| 409 | An artist applying alone has the email of an artist who already exists, or a collective the contact email of a collective that already exists |
 | 413 | The photo is larger than 10 MB, or the request isn't `multipart/form-data` and is too large (see [Conventions](README.md#conventions)) |
 | 429 | The client sent too many requests |
 | 502 | Cloudflare couldn't be reached, or couldn't check the token |
@@ -159,13 +183,14 @@ Errors are in French, since artists see them:
 Once an application sent with `POST /api/applications` is saved, the server sends two emails, in French, from the
 server's address (see [Conventions](README.md#conventions)):
 
-- To the recipients chosen by admins (see `GET /api/admin/applications/recipients`): everything the artist sent,
-  except their photo, which admins can see with the artist. Replying to it answers the artist. When nobody was chosen,
-  it isn't sent: applications are only saved, and confirmed to the artist. When the recipients can't be read, it's as
-  if nobody was chosen.
-- To the artist: a confirmation that the application was received. Replying to it answers the recipients, if there
-  are any. It goes to whatever address the application has, so it doesn't repeat anything the artist wrote: otherwise,
-  anyone could have the server send their own text to any address.
+- To the recipients chosen by admins (see `GET /api/admin/applications/recipients`): the profile and the application,
+  as they were saved, i.e. everything that was sent, except the photo, which admins can see on the admin pages. For a
+  collective, that's the collective's profile, with its contact's email and phone, its artists' names and their genres.
+  Replying to it answers the artist, or the collective's contact. When nobody was chosen, it isn't sent: applications
+  are only saved, and confirmed. When the recipients can't be read, it's as if nobody was chosen.
+- To the artist, or the collective's contact: a confirmation that the application was received. Replying to it answers
+  the recipients, if there are any. It goes to whatever address the application has, so it doesn't repeat anything the
+  artist wrote: otherwise, anyone could have the server send their own text to any address.
 
 Emails that can't be sent are only logged: the application is saved either way, and the request still succeeds.
 Applications that admins create aren't emailed.

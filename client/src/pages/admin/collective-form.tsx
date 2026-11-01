@@ -164,16 +164,16 @@ function MembersField({
     }
   }, [members, artists, pickerId, entryId])
 
-  // Neither the collective's artists, nor the artists whose `kind` is "collective", who can't be members.
+  // Other than the collective's artists.
   const options = (artists ?? [])
-    .filter((artist) => artist.kind === 'artist' && !members.some((member) => 'id' in member && member.id === artist.id))
+    .filter((artist) => !members.some((member) => 'id' in member && member.id === artist.id))
     .map((artist) => ({ key: artist.id, label: artist.name, detail: detailOf(artist) }))
   // A name left typed is what's wrong with the members, if anything is, or else that there are none.
   const pending = entry.trim() !== ''
   // A member with the name typed, or else an artist, who could be picked rather than having another one created.
   const member = pending ? memberNamed(members, entry) : undefined
   const namesake =
-    pending && !member ? artists?.find((artist) => artist.kind === 'artist' && normalize(artist.name) === normalize(entry)) : undefined
+    pending && !member ? artists?.find((artist) => normalize(artist.name) === normalize(entry)) : undefined
 
   const pick = (id: string) => {
     const artist = artists?.find((artist) => artist.id === id)

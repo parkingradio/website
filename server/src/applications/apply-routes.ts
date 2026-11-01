@@ -7,11 +7,12 @@ import { useApiErrors } from '../api/errors.js'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { PhotoForm } from '../artists/photo-form.js'
-import { ArtistProfile, PHOTO_TOO_LARGE, PhotoFile } from '../artists/profile.js'
-import type { ApplicantProfile } from '../artists/profile.js'
+import { PHOTO_TOO_LARGE, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from '../artists/store.js'
-import type { Photos, SentPhoto } from '../artists/store.js'
+import type { Photos, SentPhoto, StoredPhoto } from '../artists/store.js'
 import type { Email, SendEmail } from '../core/email.js'
+import { Applicant, applied as savedAs } from './applicant.js'
+import type { Applied } from './applicant.js'
 import type { ApplyStore } from './apply-store.js'
 import { applicationEmails } from './emails.js'
 import { ApplicationFields } from './fields.js'
@@ -19,7 +20,7 @@ import type { ApplicationsSettingsStore } from './settings.js'
 import { InvalidApplication, validateApplication } from './store.js'
 import type { TurnstileVerifier } from './turnstile.js'
 
-// The public endpoint where new artists apply for a set (see docs/design/server/applications.md). Artists see its
+// The public endpoint where new artists and collectives apply for a set (see docs/design/server/applications.md). Artists see its
 // errors, so they're in French.
 
 // Enough for an artist to retry a few times after errors, but low enough to stop a flood of applications.
@@ -29,6 +30,7 @@ const APPLICATIONS_WINDOW = '1 hour'
 const INVALID_REQUEST: z.infer<typeof ApiError> = { ok: false, error: 'Candidature invalide.' }
 const INTERNAL_ERROR = 'Une erreur est survenue. Réessayez plus tard.'
 const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' }
+const COLLECTIVE_EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' }
 const TURNSTILE_REFUSED: z.infer<typeof ApiError> = { ok: false, error: 'La vérification anti-robot a échoué. Réessayez.' }
 const TURNSTILE_UNAVAILABLE: z.infer<typeof ApiError> = {
   ok: false,
@@ -39,20 +41,24 @@ const TURNSTILE_UNAVAILABLE: z.infer<typeof ApiError> = {
 // application against these schemas, but in its own order, with its own errors: before the token, which can only be
 // checked once.
 const ApplyForm = z.object({
-  artist: ArtistProfile,
+  artist: Applicant,
   application: ApplicationFields,
   photo: PhotoFile.optional(),
   turnstileToken: z.string().meta({ description: 'The token the Turnstile widget gave the page' }),
 })
 
-// Checks the profile, photo and application that were sent. Returns the cleaned-up versions to save, or the error for
-// the first one that isn't valid.
-function validated(form: PhotoForm): { profile: ApplicantProfile; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
+// Checks who applies, the photo and the application that were sent. Returns what to save of them, or the error for the
+// first one that isn't valid.
+function validated(form: PhotoForm): { applied: Applied; photo: SentPhoto | null; application: ApplicationFields } | z.infer<typeof ApiError> {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
   if (sentArtist === undefined || sentApplication === undefined) return INVALID_REQUEST
   try {
-    return { profile: validateProfile(sentArtist, ArtistProfile), photo: validatePhoto(form.photo), application: validateApplication(sentApplication) }
+    return {
+      applied: savedAs(validateProfile(sentArtist, Applicant)),
+      photo: validatePhoto(form.photo),
+      application: validateApplication(sentApplication),
+    }
   } catch (error) {
     if (!(error instanceof InvalidProfile || error instanceof InvalidApplication)) throw error
     return { ok: false, error: error.message }
@@ -65,12 +71,12 @@ type EmailOptions = {
   sendEmail: SendEmail | null
 }
 
-// Emails the application to the recipients chosen on the admin pages, and confirms it to the artist. The application
-// is saved by then, so failures are only logged.
+// Emails the application to the recipients chosen on the admin pages, and confirms it to the artist, or the
+// collective's contact. The application is saved by then, so failures are only logged.
 async function emailApplication(
   log: FastifyBaseLogger,
   { settings, sendEmail }: EmailOptions,
-  sent: { profile: ApplicantProfile; application: ApplicationFields },
+  sent: { applied: Applied; application: ApplicationFields },
 ) {
   if (!sendEmail) {
     log.warn('Not emailing the application: MAIL_DOMAIN is not set')
@@ -134,7 +140,7 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         },
       },
       schema: {
-        summary: 'A new artist applies, with their profile, their application and maybe a photo',
+        summary: 'A new artist or collective applies, with their profile, their application and maybe a photo',
         tags: ['Applications'],
         multipart: ApplyForm,
         response: { 200: Ok, 400: ApiError, 409: ApiError, 413: ApiError, 429: ApiError, 502: ApiError },
@@ -162,19 +168,35 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         return reply.status(400).send(TURNSTILE_REFUSED)
       }
 
-      // Only new artists can apply here, so an existing email gets a 409. That tells the sender the email belongs to an
-      // artist, which is why it's only checked now: finding that out takes passing Turnstile, like applying does.
-      const photo = await storePhoto(photos, sent.photo, 'artists')
-      let applied: { artistId: string; applicationId: string }
+      // Only new artists and collectives can apply here, so an existing email gets a 409. That tells the sender the email
+      // belongs to an artist, or a collective, which is why it's only checked now: finding that out takes passing
+      // Turnstile, like applying does.
+      const { applied, application } = sent
+      const how =
+        'artist' in applied
+          ? {
+              folder: 'artists' as const,
+              save: (photo: StoredPhoto) => store.apply({ ...applied.artist, ...photo }, application),
+              taken: EMAIL_TAKEN,
+              done: 'An artist applied',
+            }
+          : {
+              folder: 'collectives' as const,
+              save: (photo: StoredPhoto) => store.applyAsCollective({ ...applied.collective, ...photo }, applied.members, application),
+              taken: COLLECTIVE_EMAIL_TAKEN,
+              done: 'A collective applied',
+            }
+      const photo = await storePhoto(photos, sent.photo, how.folder)
+      let ids: Awaited<ReturnType<typeof how.save>>
       try {
-        applied = await store.apply({ ...sent.profile, ...photo }, sent.application)
+        ids = await how.save(photo)
       } catch (error) {
         await forgetPhoto(photos, request.log, photo.photoKey)
-        if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
+        if (error instanceof EmailTaken) return reply.status(409).send(how.taken)
         throw error
       }
-      const log = request.log.child(applied)
-      log.info('An artist applied')
+      const log = request.log.child(ids)
+      log.info(how.done)
       // The application is saved, so nothing about its emails, even unexpected, can make the request fail.
       await emailApplication(log, { settings, sendEmail }, sent).catch((error: unknown) => {
         log.error({ err: error }, 'Failed to email an application')

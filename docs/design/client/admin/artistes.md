@@ -4,8 +4,7 @@ At `/admin/artistes`: the artists and collectives Parking Radio knows of (see [A
 [Collectives](../../server/collectives.md)).
 
 The section lists every artist and every collective together, by name, with which of the two they are (artist or
-collective), their city and genres. Until they're migrated, the artists whose `kind` is "collective", as collectives
-were before they had their own profiles, are listed as collectives too. A collective's genres are its members' (see
+collective), their city and genres. A collective's genres are its members' (see
 [A collective's genres](#a-collectives-genres)). A field above the list searches it (see
 [Searching lists](layout.md#searching-lists)) by name, email address, phone number, city, country, genres and the
 profile names of links, and a collective also by its artists' names, but not by bio or description, which would match
@@ -22,13 +21,13 @@ genre only once, so that the first ones are still the most important.
 
 Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo (or "Pas de
 photo" in its place, so that the team notices), their links rebuilt from the profile names, the collectives they're in,
-linking to them, who added them (or that they applied by themselves) and who last changed them. A button changes the
-artist in a form in its place. The form shows the artist's photo with an × that removes it once the artist is saved, and
-a photo that's chosen replaces it, shown in its place with an × that takes it back. Under it, their applications are
-listed like in [Candidatures](candidatures.md), with a button to create another one. Since they're all the artist's, the
-list doesn't show the artist, their city or genres, and since they're few, it can't be searched, filtered or sorted. At
-the bottom, the artist can be deleted for good, with their photo, if they have one, and applications, after confirming.
-They're then taken out of their collectives, which stay.
+linking to them, who added them (or that they came through the "Appliquer" form, alone or with a collective) and who
+last changed them. A button changes the artist in a form in its place. The form shows the artist's photo with an × that
+removes it once the artist is saved, and a photo that's chosen replaces it, shown in its place with an × that takes it
+back. Under it, their applications are listed like in [Candidatures](candidatures.md), with a button to create another
+one. Since they're all the artist's, the list doesn't show the artist, their city or genres, and since they're few, it
+can't be searched, filtered or sorted. At the bottom, the artist can be deleted for good, with their photo, if they have
+one, and applications, after confirming. They're then taken out of their collectives, which stay.
 
 ## A collective's page
 
@@ -49,10 +48,7 @@ left: the form checks the profile as the server does for admins (see [Profiles](
 immediate feedback. The server's check is the one that counts: if it refuses what the form accepted, the form shows the
 server's message.
 
-The form only adds artists: collectives are added with "ajouter un collectif". Until they're migrated, the artists whose
-`kind` is "collective" can still be changed, including the names of their artists, which are typed one by one and pinned
-with a "+" button (or Enter): only the names pinned are kept, so the form isn't sent while a name is left typed without
-being pinned.
+The form only adds artists: collectives are added with "ajouter un collectif".
 
 ## Adding a collective
 
@@ -63,13 +59,12 @@ It has no genres, which are the artists'.
 
 Its artists are in order, at least one, and can be reordered and removed. Each one is either:
 
-- an artist picked from those in this section, other than the collective's artists already and the artists whose
-  `kind` is "collective", which can't be members (see [Members](../../server/collectives.md#members)), or
+- an artist picked from those in this section, other than the collective's artists already, or
 - a new artist, whose name is typed in "Ajouter un nouvel artiste", then added with a "+" button (or Enter), and whom
   the server creates with that name only when the collective is saved. The form isn't sent while a name is left typed
   without being added. While the name typed is that of one of the collective's artists, whatever its case and accents,
-  the form says so, and the name can't be added. Otherwise, while it's that of an artist in this section (other than a
-  collective), the form says so too, since picking them would avoid a duplicate.
+  the form says so, and the name can't be added. Otherwise, while it's that of an artist in this section, the form says
+  so too, since picking them would avoid a duplicate.
 
 ## Endpoints
 

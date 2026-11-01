@@ -2,11 +2,12 @@ import { asc, eq, inArray, sql } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import { EmailTaken, artistsStore } from '../artists/store.js'
 import type { ArtistsStore, StoredPhoto } from '../artists/store.js'
+import type { GenreId } from '../artists/profile.js'
 import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { COLLECTIVE_AS_MEMBER, NO_SUCH_MEMBER } from './profile.js'
+import { NO_SUCH_MEMBER } from './profile.js'
 import type { CollectiveProfile, SentMember } from './profile.js'
 
 // Keeps collectives, and their members, in the database. Their photos are kept like artists' (see artists/store.ts).
@@ -15,7 +16,7 @@ import type { CollectiveProfile, SentMember } from './profile.js'
 export type CollectiveRow = typeof collectives.$inferSelect
 export type StoredCollective = CollectiveRow & { members: Reference[] }
 
-// Thrown when a collective's members can't be saved: its message, `NO_SUCH_MEMBER` or `COLLECTIVE_AS_MEMBER`, says why.
+// Thrown when a collective's members can't be saved, because one of them isn't an artist (`NO_SUCH_MEMBER`).
 export class InvalidMember extends Error {}
 
 // The collectives, as the admin pages manage them. Each method that's about one collective returns null when there's no
@@ -24,9 +25,9 @@ export type CollectivesStore = {
   // By name, whatever its case.
   list(): Promise<StoredCollective[]>
   get(id: string): Promise<StoredCollective | null>
-  // `createdBy` is the email of the admin who adds the collective. The members sent by name are created, as artists
-  // whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
-  create(collective: CollectiveProfile & StoredPhoto & { createdBy: string }): Promise<StoredCollective>
+  // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
+  // sent by name are created, as artists whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
+  create(collective: CollectiveProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredCollective>
   // Replaces the collective's profile and members, and its photo when there's a new one, or nulls to remove it. The
   // members sent by name are created, as artists whom `updatedBy` adds. Returns the collective as it was, so that a
   // photo that was replaced or removed can be deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
@@ -58,29 +59,25 @@ async function withMembers(db: Queryable, row: CollectiveRow): Promise<StoredCol
   return { ...row, members: (await membersOf(db, row.id)).get(row.id) ?? [] }
 }
 
-// Checks that the members sent by id are artists, rather than collectives of their own, and locks them until the
-// transaction `tx` ends (`for share`), so that they can't be deleted or become collectives until their memberships are
-// saved: changing an artist into a collective checks that they aren't a member while it holds the artist's row (see
-// artists/store.ts). Throws an InvalidMember otherwise.
+// Checks that the members sent by id are artists, and locks them until the transaction `tx` ends (`for share`), so that
+// they can't be deleted until their memberships are saved, which would then fail on the foreign key rather than with an
+// InvalidMember. Throws an InvalidMember otherwise.
 async function lockMembers(tx: Queryable, members: SentMember[]) {
   const ids = members.flatMap((member) => ('id' in member ? [member.id] : []))
   if (ids.length === 0) return
   if (!ids.every(isUuid)) throw new InvalidMember(NO_SUCH_MEMBER)
-  const found = await tx.select({ kind: artists.kind }).from(artists).where(inArray(artists.id, ids)).for('share')
+  const found = await tx.select({ id: artists.id }).from(artists).where(inArray(artists.id, ids)).for('share')
   if (found.length < ids.length) throw new InvalidMember(NO_SUCH_MEMBER)
-  if (found.some((artist) => artist.kind === 'collective')) throw new InvalidMember(COLLECTIVE_AS_MEMBER)
 }
 
-// A member sent by name, as the artist to create: everything but their name is left out, as admins can leave it out
-// (see `AdminArtistProfile` in artists/profile.ts).
-function newMember(name: string, createdBy: string): Parameters<ArtistsStore['create']>[0] {
+// A new member of a collective, known only by their name, as the artist to create: everything but their name, and the
+// `genres` they're given, is left out, as admins can leave it out (see `AdminArtistProfile` in artists/profile.ts).
+export function newMember(name: string, createdBy: string | null, genres: GenreId[] = []): Parameters<ArtistsStore['create']>[0] {
   return {
-    kind: 'artist',
     name,
-    members: [],
     country: '',
     city: '',
-    genres: [],
+    genres,
     bio: '',
     links: {},
     email: null,
@@ -93,7 +90,7 @@ function newMember(name: string, createdBy: string): Parameters<ArtistsStore['cr
 
 // Saves the members of the collective `collectiveId`, which has none, in order, once lockMembers has checked them. Those
 // sent by name are created first, as artists whom `createdBy` adds.
-async function addMembers(tx: Queryable, collectiveId: string, members: SentMember[], createdBy: string) {
+async function addMembers(tx: Queryable, collectiveId: string, members: SentMember[], createdBy: string | null) {
   const ids: string[] = []
   for (const member of members) {
     ids.push('id' in member ? member.id : (await artistsStore(tx).create(newMember(member.name, createdBy))).id)

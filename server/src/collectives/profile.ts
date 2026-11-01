@@ -1,21 +1,20 @@
 import { z } from 'zod'
-import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, NO_MEMBER, city, country, emailAddress, line, links, orLeftOut, phone, text } from '../artists/profile.js'
+import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, city, country, emailAddress, line, links, orLeftOut, phone, text } from '../artists/profile.js'
 
 // A collective's profile: the rules every collective's profile has to follow (see docs/design/server/collectives.md), as
 // the zod schemas the server checks them with, which openapi.json is generated from. They share most of their rules
-// with artists' profiles (see artists/profile.ts), and explain what's wrong in French like them, except for the errors
-// about members' ids, which only admins can see (see `NO_SUCH_MEMBER`). Two collectives can't have the same email
+// with artists' profiles (see artists/profile.ts), and explain what's wrong in French like them, except for the error
+// about a member's id, which only admins can see (see `NO_SUCH_MEMBER`). Two collectives can't have the same email
 // address, whatever its case, but a collective can have an artist's.
 //
 // The client has its own copy of these rules, for its form to say what's wrong right away (see
 // client/src/collective-profile.ts): they must be changed together. These are the ones that count.
 
-// The errors about a member's id, which are in English, since only admins send ids. A member that isn't an artist,
-// including an id that isn't a string, and a member that's a collective of its own, i.e. an artist whose `kind` is
-// "collective".
+// The error about a member's id that isn't an artist's, including an id that isn't a string, which is in English, since
+// only admins send ids.
 export const NO_SUCH_MEMBER = 'No such artist'
-export const COLLECTIVE_AS_MEMBER = "A collective can't be a member of a collective"
 
+export const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
 const NO_MEMBER_NAME = "Indiquez le nom de chaque artiste du collectif."
 
 // Whether a member, as it's sent, is an artist who exists, by their id, rather than one to create, by their name.

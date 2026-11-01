@@ -3,10 +3,9 @@
 # The admin routes for collectives work against a real database. The server's unit tests mock the database and the
 # photos, so this is what covers the collectives and collective_members tables: contact emails being unique among
 # collectives whatever their case, collectives listed by name, members kept in order, members created by name, the
-# checks on members that take the database (artists who exist, and aren't collectives of their own, on both sides),
-# artists returning their collectives, what deleting an artist or a collective does to the other, a collective's photo
-# kept on disk, then deleted, changing a collective while one of its members is deleted, and listing a collective's
-# members as artists, in its order.
+# check on members that takes the database (artists who exist), artists returning their collectives, what deleting an
+# artist or a collective does to the other, a collective's photo kept on disk, then deleted, changing a collective while
+# one of its members is deleted, and listing a collective's members as artists, in its order.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -91,15 +90,12 @@ admin GET "$COLLECTIVES"
 expect_status 200
 expect_body_contains '"collectives":[]'
 
-send artist POST "$ARTISTS" '{"kind":"artist","name":"Ana","email":"ana@collectives.test"}'
+send artist POST "$ARTISTS" '{"name":"Ana","email":"ana@collectives.test"}'
 expect_status 200
 ana="$(first_id)"
-send artist POST "$ARTISTS" '{"kind":"artist","name":"Brume"}'
+send artist POST "$ARTISTS" '{"name":"Brume"}'
 expect_status 200
 brume="$(first_id)"
-send artist POST "$ARTISTS" '{"kind":"collective","name":"Ancien Collectif","members":["Do"],"email":"ancien@collectives.test"}'
-expect_status 200
-legacy="$(first_id)"
 
 echo "  an invalid profile is explained, in French"
 send collective POST "$COLLECTIVES" "$(profile)" "${FILES}/photo.jpg"
@@ -145,24 +141,16 @@ expect_body '"name":"aube".*"name":"Les Ondes"'
 expect_body_contains "\"name\":\"aube\",\"members\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 expect_body_contains "\"name\":\"Les Ondes\",\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 
-echo "  a member has to be an artist who exists, rather than a collective, and nothing sent with them is kept"
+echo "  a member has to be an artist who exists, and nothing sent with them is kept"
 for member in "$NOBODY" not-a-uuid; do
     send collective PUT "${COLLECTIVES}/${ondes}" "$(profile name=Fantôme "$ana" "$member")" "${FILES}/photo.png"
     expect_status 400
     expect_body_contains '"error":"No such artist"'
 done
-send collective POST "$COLLECTIVES" "$(profile_with other@collectives.test name=Fantôme "$legacy")" "${FILES}/photo.png"
-expect_status 400
-expect_body_contains "A collective can't be a member of a collective"
 [ "$(photos_on_disk collectives)" = 1 ] || fail "expected the refused photos to be deleted"
 expect_no_artist Fantôme
 admin GET "${COLLECTIVES}/${ondes}"
 expect_body_contains "\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
-
-echo "  and a member can't become a collective"
-send artist PUT "${ARTISTS}/${brume}" '{"kind":"collective","name":"Brume","members":["Do"],"email":"brume@collectives.test"}'
-expect_status 400
-expect_body_contains "An artist who is a member of a collective can't become a collective"
 
 echo "  a member is added by name, which creates them as an artist, and the members are reordered"
 # The name that comes with Brume's id is ignored.
@@ -173,7 +161,7 @@ cyan="$(printf '%s' "$BODY" | grep -o '"id":"[^"]*","name":"Cyan"' | cut -d'"' -
 expect_body_contains "\"members\":[{\"id\":\"${cyan}\",\"name\":\"Cyan\"},{\"id\":\"${brume}\",\"name\":\"Brume\"}]"
 admin GET "${ARTISTS}/${cyan}"
 expect_status 200
-expect_body_contains '"kind":"artist","name":"Cyan","members":[],"country":"","city":"","genres":[],"bio":"","links":{},"email":null,"phone":""'
+expect_body_contains '"name":"Cyan","country":"","city":"","genres":[],"bio":"","links":{},"email":null,"phone":""'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains "\"collectives\":[{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}]"
 
@@ -182,7 +170,8 @@ admin GET "${ARTISTS}?collective=${ondes}"
 expect_status 200
 [ "$(artist_ids)" = "${cyan} ${brume} " ] || { _show_body; fail "expected Cyan, then Brume"; }
 expect_body_contains "\"collectives\":[{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}]"
-for id in "$NOBODY" not-a-uuid "$legacy"; do
+# An artist's id isn't a collective's.
+for id in "$NOBODY" not-a-uuid "$ana"; do
     admin GET "${ARTISTS}?collective=${id}"
     expect_status 200
     expect_body_contains '"artists":[]'
@@ -215,7 +204,7 @@ admin GET "${ARTISTS}?collective=${aube}"
 expect_body_contains '"artists":[]'
 
 echo "  changing a collective while one of its members is deleted doesn't deadlock"
-send artist POST "$ARTISTS" '{"kind":"artist","name":"Éphémère"}'
+send artist POST "$ARTISTS" '{"name":"Éphémère"}'
 passing="$(first_id)"
 send collective PUT "${COLLECTIVES}/${ondes}" "$(profile "$passing" "$brume")"
 expect_status 200
@@ -266,7 +255,7 @@ done
 
 admin DELETE "${COLLECTIVES}/${aube}"
 expect_status 200
-for removed in "$brume" "$cyan" "$legacy"; do
+for removed in "$brume" "$cyan"; do
     admin DELETE "${ARTISTS}/${removed}"
     expect_status 200
 done

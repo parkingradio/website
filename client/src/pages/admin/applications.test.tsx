@@ -15,9 +15,7 @@ function artist(id: string, name: string): Artist {
     hasPhoto: true,
     createdAt: '2026-10-01T16:00:00.000Z',
     createdBy: 'admin@example.com',
-    kind: 'artist',
     name,
-    members: [],
     country: 'CA',
     city: 'Montréal',
     genres: ['techno'],
@@ -163,27 +161,20 @@ describe('The list of applications', () => {
   })
 
   it('lists the applications of collectives, with their cities and their artists’ genres, saying that they are collectives', async () => {
-    // An artist whose `kind` is "collective", as collectives were before they had their own profiles.
-    const legacy: Artist = { ...artist('artist-3', 'Nébuleuse'), kind: 'collective', members: ['Ana'], genres: ['house'] }
     const applications = [
       { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1' },
-      { ...APPLICATION, id: 'application-6', artistId: 'artist-3' },
+      { ...APPLICATION, id: 'application-6', artistId: 'artist-1' },
     ]
-    mockFetch({
-      ...LOGGED_IN,
-      ...ARTISTS,
-      '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, legacy] },
-      '/api/admin/applications': { ok: true, applications },
-    })
+    mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications } })
     renderAt('/admin/candidatures')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows().map((row) => row.slice(1, 4))).toEqual([
       ['Ondes (collectif)', 'Québec, Canada', 'techno, ambient'],
-      ['Nébuleuse (collectif)', 'Montréal, Canada', 'house'],
+      ['Aurore', 'Montréal, Canada', 'techno, ambient'],
     ])
     expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
-    expect(screen.getByRole('link', { name: 'Nébuleuse' })).toHaveAttribute('href', '/admin/artistes/artist-3')
+    expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
   })
 
   it('lists the applications without their collectives when those could not be loaded', async () => {

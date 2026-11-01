@@ -50,6 +50,13 @@
       "when": 1793476770876,
       "tag": "0006_applications_collectives",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793480342568,
+      "tag": "0007_legacy_collectives",
+      "breakpoints": true
     }
   ]
 }

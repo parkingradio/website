@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AdminCollectiveProfile, COLLECTIVE_AS_MEMBER, NO_SUCH_MEMBER } from './profile.js'
+import { AdminCollectiveProfile, NO_SUCH_MEMBER } from './profile.js'
 
 // The rules in collectives/profile.ts, which every collective's profile has to follow. The server answers with the first
 // error. The rules it shares with artists' profiles are tested with them (see artists/store.test.ts).
@@ -83,7 +83,6 @@ describe('AdminCollectiveProfile', () => {
       for (const id of [42, null, {}, ['x']]) expect(error({ members: [{ id }] })).toBe(NO_SUCH_MEMBER)
       expect(error({ members: [{ id: 42, name: 'Ana' }] })).toBe(NO_SUCH_MEMBER)
       expect(NO_SUCH_MEMBER).toBe('No such artist')
-      expect(COLLECTIVE_AS_MEMBER).toBe("A collective can't be a member of a collective")
     })
 
     it('checks the name of an artist to create like an artist\'s, in French', () => {

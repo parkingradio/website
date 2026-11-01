@@ -18,8 +18,12 @@ export type CollectiveProfile = Omit<Collective, 'id' | 'createdAt' | 'createdBy
   members: SentMember[]
 }
 
-const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
+export const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
 const NO_MEMBER_NAME = 'Indiquez le nom de chaque artiste du collectif.'
+
+export function checkCollectiveName(value: unknown): Checked<string> {
+  return checkLine(value, 'Le nom du collectif', NAME_MAX_LENGTH, 'Indiquez le nom du collectif.')
+}
 
 // A member, as it's sent: the id is what counts when there's both an id and a name.
 function checkMember(member: unknown): Checked<SentMember> {
@@ -39,7 +43,7 @@ export function checkCollectiveProfile(
   const collective: Partial<Record<keyof CollectiveProfile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
   const { errors, check } = fieldChecker<CollectiveProfile>()
 
-  const name = check('name', checkLine(collective.name, 'Le nom du collectif', NAME_MAX_LENGTH, 'Indiquez le nom du collectif.'))
+  const name = check('name', checkCollectiveName(collective.name))
   const members: SentMember[] = []
   for (const sentMember of Array.isArray(collective.members) ? collective.members : []) {
     const member: SentMember | undefined = check('members', checkMember(sentMember))

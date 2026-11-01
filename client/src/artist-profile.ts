@@ -10,7 +10,6 @@ import type { ComboboxOption } from './combobox'
 // these. The server's are the ones that count: when they disagree, the server's message shows.
 
 export type Artist = Schema<'Artist'>
-export type ArtistKind = Schema<'ArtistKind'>
 export type Country = Schema<'Country'>
 export type GenreId = Schema<'GenreId'>
 export type ArtistLinks = Schema<'ArtistLinks'>
@@ -18,8 +17,6 @@ export type LinkSiteId = keyof ArtistLinks
 
 // A profile, as the server saves it, which is what `checkProfile` returns.
 export type Profile = Omit<Artist, 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'collectives'>
-
-export const ARTIST_KINDS = everyOne<ArtistKind>()(['artist', 'collective'])
 
 export const NAME_MAX_LENGTH = 100
 export const CITY_MAX_LENGTH = 100
@@ -372,8 +369,8 @@ export function checkPhone(value: unknown, { lenient = false } = {}): Checked<st
 // entries, and with links reduced to profile names. If it isn't valid, returns what's wrong with each field instead, for
 // the form to show each error by its field. For links, that's the first link that's wrong, in the order of the sites, or that there's none.
 //
-// With `lenient`, for the admin pages, the country, city, genres, bio, links, email (but not a collective's) and phone can
-// be left out, as the server lets admins do. What's there still has to be valid. A country that's left out is "", and so
+// With `lenient`, for the admin pages, the country, city, genres, bio, links, email and phone can be left out, as the
+// server lets admins do. What's there still has to be valid. A country that's left out is "", and so
 // is a city, bio or phone, genres and links are empty, and an email is null.
 export function checkProfile(
   sent: unknown,
@@ -382,22 +379,7 @@ export function checkProfile(
   const artist: Partial<Record<keyof Profile, unknown>> = sent !== null && typeof sent === 'object' ? sent : {}
   const { errors, check } = fieldChecker<Profile>()
 
-  const kind = ARTIST_KINDS.find((kind) => kind === artist.kind)
-  if (!kind) errors.kind = 'Indiquez si vous postulez comme artiste ou comme collectif.'
-  const collective = kind === 'collective'
-  const name = check(
-    'name',
-    checkLine(artist.name, collective ? 'Le nom du collectif' : "Le nom d'artiste", NAME_MAX_LENGTH, collective ? 'Indiquez le nom du collectif.' : "Indiquez votre nom d'artiste."),
-  )
-
-  // Only a collective lists its artists. Blank entries and duplicates, whatever their case, are dropped.
-  const members: string[] = []
-  for (const member of collective && Array.isArray(artist.members) ? artist.members : []) {
-    const memberName = check('members', checkLine(member, "Le nom d'un artiste du collectif", NAME_MAX_LENGTH, null))
-    if (memberName && !members.some((other) => other.toLowerCase() === memberName.toLowerCase())) members.push(memberName)
-  }
-  if (collective && members.length === 0) errors.members ??= 'Indiquez au moins un artiste du collectif.'
-
+  const name = check('name', checkLine(artist.name, "Le nom d'artiste", NAME_MAX_LENGTH, "Indiquez votre nom d'artiste."))
   const country = check('country', checkCountry(artist.country, { lenient }))
   const city = check('city', checkCity(artist.city, { lenient }))
 
@@ -412,12 +394,11 @@ export function checkProfile(
 
   const bio = check('bio', checkText(artist.bio, 'La bio', BIO_MAX_LENGTH, missingError(artist.bio, 'Écrivez quelques lignes de bio.', { lenient })))
   const links = check('links', checkLinks(artist.links, { lenient }))
-  // Admins can't leave out a collective's email.
-  const email = check('email', checkEmail(artist.email, { lenient: lenient && !collective }))
+  const email = check('email', checkEmail(artist.email, { lenient }))
   const phone = check('phone', checkPhone(artist.phone, { lenient }))
 
-  if (!kind || Object.keys(errors).length > 0) return { errors }
-  return { profile: { kind, name, members, country, city, genres, bio, links, email: email || null, phone } }
+  if (Object.keys(errors).length > 0) return { errors }
+  return { profile: { name, country, city, genres, bio, links, email: email || null, phone } }
 }
 
 // The photo is optional: a JPEG, PNG or WebP image of up to PHOTO_MAX_BYTES, whose type the server tells from its

@@ -217,7 +217,6 @@ describe('Appliquer', () => {
     expect(artist).toEqual({
       kind: 'artist',
       name: 'DJ Test',
-      members: [],
       country: 'CA',
       // Only the city's name.
       city: 'Lévis',

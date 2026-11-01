@@ -6,9 +6,7 @@ applications for a set are in [Applications](applications.md), and the collectiv
 
 ## Profiles
 
-Each artist has a profile, and maybe a photo, and is a row of the `artists` table (`server/src/db/schema.ts`). An
-artist's `kind` can also say that they're a collective, as collectives were before they had their own profiles, with
-their members' names: such an artist can't be a member of a collective (see [Members](collectives.md#members)).
+Each artist has a profile, and maybe a photo, and is a row of the `artists` table (`server/src/db/schema.ts`).
 
 The rules a profile has to follow are the schemas of `server/src/artists/profile.ts` (`ArtistProfile`, and
 `AdminArtistProfile` for admins), and the server checks every profile it's sent against them. The server explains
@@ -17,18 +15,15 @@ when they apply.
 
 Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, bio, links,
 email or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't
-always ask for them, or whom they only know by name. Only the email of an artist whose `kind` is `"collective"` can't
-be left out, since it's how the team reaches the collective. What's left out is stored as an empty string, or an empty
-list or object, except the email, which is null, so that any number of artists can be without one.
-`POST /api/applications` requires all of them.
+always ask for them, or whom they only know by name. What's left out is stored as an empty string, or an empty list or
+object, except the email, which is null, so that any number of artists can be without one. An artist applying alone
+with `POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
 
 A profile has:
 
 | Field | Type | |
 |---|---|---|
-| `kind` | `"artist"` or `"collective"` | An artist usually gets an hour of a time slot, a collective a whole slot |
-| `name` | string | The artist's name, or the collective's. Up to 100 characters |
-| `members` | list of strings | For a collective, the names of the artists representing it, at least one, each up to 100 characters. Empty for an artist |
+| `name` | string | Up to 100 characters |
 | `country` | string | ISO 3166-1 alpha-2 code, e.g. `"CA"` (one of `COUNTRIES` in `server/src/artists/profile.ts`), or `""` when an admin left it out |
 | `city` | string | As the artist wrote it. Up to 100 characters, or `""` when an admin left it out |
 | `genres` | list of strings | The ids of at least one of `GENRES` in `server/src/artists/profile.ts` (e.g. `"drum-and-bass"`), most important first, or none when an admin left them out |
@@ -48,7 +43,7 @@ An artist, as the endpoints below return them, is their profile with:
 |---|---|---|
 | `id` | string | |
 | `createdAt` | string | When the artist was added |
-| `createdBy` | string or null | The email of the admin who added the artist, or null when they added themselves, by applying |
+| `createdBy` | string or null | The email of the admin who added the artist, or null when they came through `POST /api/applications`, by applying alone or as one of the artists of a collective that applied |
 | `updatedBy` | string or null | The email of the admin who last changed the artist. Joining or leaving a collective doesn't count |
 | `updatedAt` | string or null | When |
 | `hasPhoto` | boolean | Whether the artist has a photo |
@@ -104,8 +99,7 @@ photo larger than 10 MB).
 Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`. With a photo, it replaces the
 artist's, which is deleted. Without one, the artist keeps theirs, unless there's also a `removePhoto` field set to
 `true`, which removes it, and deletes it. Responds like `POST /api/admin/artists`, with the artist as they are then,
-and fails like it, with 400 when there's both a photo and `removePhoto`, or when it would change a member of a
-collective into a collective (see [Members](collectives.md#members)), and with 404 when there's no such artist.
+and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404 when there's no such artist.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 

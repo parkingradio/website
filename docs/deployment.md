@@ -109,6 +109,47 @@ terraform -chdir=deployment/main apply -var="app_image_tag=..."          \
                                        -var="domain=parking.example.com"
 ```
 
+## Database migrations
+
+The server migrates the database when it starts, before it serves anything: it applies the migrations of
+`server/drizzle` that the database doesn't have yet, all of them in a single transaction. If one fails, none of them is
+applied, and the server exits, with the error in its log. Docker then restarts it (`restart: unless-stopped`), so it
+keeps trying and failing, which is harmless since every attempt is rolled back, and the deploy's wait for `/healthz`
+fails. The server's log is on the instance, which is only reachable through SSM, the way `tools/create-admin` reaches
+it:
+
+```sh
+export AWS_PROFILE=your-aws-profile
+instance=$(aws ec2 describe-instances --output text --query 'Reservations[].Instances[].InstanceId' \
+             --filters Name=tag:Name,Values=parking-radio-production Name=instance-state-name,Values=running)
+command=$(aws ssm send-command --output text --query Command.CommandId --instance-ids "$instance" \
+            --document-name AWS-RunShellScript \
+            --parameters '{"commands":["cd /opt/app && docker compose logs --tail 50 app"]}')
+aws ssm wait command-executed --command-id "$command" --instance-id "$instance"
+aws ssm get-command-invocation --output text --query StandardOutputContent \
+                               --command-id "$command" --instance-id "$instance"
+```
+
+Since nothing was applied, deploying the previous image again brings the site back, and the cause can be fixed from
+there before deploying again.
+
+Once a migration has succeeded, though, an older image may not work with the database anymore: its server finds no
+migration to apply, but its queries can need what the migration removed. For instance, after `0007_legacy_collectives`,
+which turns the artists whose `kind` was `collective` into collectives and removes `kind` and `members`, every query an
+older server makes on artists fails. A problem found after such a migration is fixed forward, with a new image. Before
+deploying a migration like this one, which removes something older images need, take a manual snapshot of the database,
+and wait for it to be ready:
+
+```sh
+aws rds create-db-snapshot --db-instance-identifier parking-radio-production \
+                           --db-snapshot-identifier parking-radio-production-before-<what>
+aws rds wait db-snapshot-available --db-snapshot-identifier parking-radio-production-before-<what>
+```
+
+Restoring that snapshot, or restoring the database to a point in time within the 7 days of automated backups, is a last
+resort rather than a way to roll back: either one creates a new database instance, outside Terraform, which then has to
+be swapped in by hand.
+
 ## Creating admins
 
 A new deployment has no admins. Once it's deployed, create the first one with `tools/create-admin`, which prints a link

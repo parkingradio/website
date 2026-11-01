@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { api, formData } from '../api/client'
-import type { Schema } from '../api/client'
 import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, prestationName } from '../application-fields'
 import type { ApplicationFields, PrestationId } from '../application-fields'
-import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, checkProfile, countryOptions, parseLink, pickedPhotoError } from '../artist-profile'
-import type { ArtistKind, Profile, GenreId, LinkSiteId } from '../artist-profile'
+import { checkApplicant } from '../applicant'
+import type { ApplicantKind } from '../applicant'
+import { CITY_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, countryOptions, parseLink, pickedPhotoError } from '../artist-profile'
+import type { Profile, GenreId, LinkSiteId } from '../artist-profile'
 import { Combobox } from '../combobox'
 import { useTurnstileSiteKey } from '../config-context'
 import { APPLY_BIO_MAX_LENGTH, MAX_GENRES, MAX_MEMBERS, PRIORITY_COUNTRIES, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './appliquer/choices'
@@ -19,19 +20,19 @@ import { Turnstile } from './appliquer/turnstile'
 import './appliquer.css'
 
 // The "Appliquer" page: the form artists fill in to apply for a set, which sends their profile and their application
-// to `POST /api/applications`. It checks them as the server does (see `checkProfile` and `checkApplication`), and sets
+// to `POST /api/applications`. It checks them as the server does (see `checkApplicant` and `checkApplication`), and sets
 // a few limits of its own (see appliquer/choices.ts).
 
 // With their codes, e.g. to find the United States by typing "US".
 const COUNTRY_OPTIONS = countryOptions(PRIORITY_COUNTRIES).map((option) => ({ ...option, detail: option.key }))
 
-const KIND_OPTIONS: { kind: ArtistKind; title: string; text: string }[] = [
+const KIND_OPTIONS: { kind: ApplicantKind; title: string; text: string }[] = [
   { kind: 'artist', title: 'Artiste', text: 'Vous jouez seul·e (ou en b2b) pendant une heure, dans une plage de notre programmation.' },
   { kind: 'collective', title: 'Collectif', text: "Vous prenez en main une plage entière avec votre line-up d'artistes." },
 ]
 
 type Form = {
-  kind: ArtistKind | null
+  kind: ApplicantKind | null
   name: string
   // A collective's artists, one field each (an empty one to start with).
   members: string[]
@@ -73,7 +74,7 @@ const EMPTY: Form = {
   details: '',
 }
 
-type Field = keyof Profile | keyof ApplicationFields | 'photo'
+type Field = keyof Profile | 'kind' | 'members' | keyof ApplicationFields | 'photo'
 
 // The profile and the application, as they're sent, before they're checked.
 function sent(form: Form) {
@@ -104,17 +105,17 @@ function sent(form: Form) {
 // the server would say, and what the form asks for on top of that. The server checks it all again.
 function checked(form: Form) {
   const { artist, application } = sent(form)
-  const profile = checkProfile(artist)
+  const applicant = checkApplicant(artist)
   const fields = checkApplication(application)
-  const errors: Partial<Record<Field, string>> = { ...profile.errors, ...fields.errors }
+  const errors: Partial<Record<Field, string>> = { ...applicant.errors, ...fields.errors }
   // A link that's wrong says why next to it, so the links as a whole only say to fix it, rather than say it again.
   if (errors.links && LINK_SITES.some((site) => parseLink(site, form.links[site.id] ?? '').error)) errors.links = 'Corrigez les liens en rouge.'
   const photo = pickedPhotoError(form.photo)
   if (photo) errors.photo = photo
   const prestation = prestationError(form.prestations, form.otherChecked ? form.otherPrestation : null)
   if (prestation) errors.prestations ??= prestation
-  if (profile.profile && fields.application && Object.keys(errors).length === 0) {
-    return { errors, profile: profile.profile, application: fields.application }
+  if (applicant.applicant && fields.application && Object.keys(errors).length === 0) {
+    return { errors, applicant: applicant.applicant, application: fields.application }
   }
   return { errors }
 }
@@ -181,8 +182,8 @@ export function Appliquer() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setAttempts((count) => count + 1)
-    const { profile, application } = result
-    if (!profile || !application) return
+    const { applicant, application } = result
+    if (!applicant || !application) return
     // Without the configuration, there's no Turnstile, so no token is coming.
     if (!turnstileSiteKey) {
       setStatus({ state: 'failed', error: 'Le formulaire ne peut pas être envoyé pour le moment. Rechargez la page.' })
@@ -197,15 +198,12 @@ export function Appliquer() {
     }
 
     setStatus({ state: 'sending' })
-    // Without `lenient`, `checkProfile` only returns what artists can send, e.g. with a country and an email, which its
-    // type doesn't say.
-    const artist = profile as Schema<'ArtistProfile'>
     const sent = await api.POST('/api/applications', {
-      body: { artist, application, photo: form.photo ?? undefined, turnstileToken },
+      body: { artist: applicant, application, photo: form.photo ?? undefined, turnstileToken },
       bodySerializer: formData,
     })
     if (sent.ok) {
-      setStatus({ state: 'sent', email: artist.email })
+      setStatus({ state: 'sent', email: applicant.email })
       return
     }
     // The server explains what's wrong in French, e.g. that an artist already has that email address. Otherwise, the

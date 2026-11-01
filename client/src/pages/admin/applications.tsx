@@ -10,7 +10,6 @@ import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ApplicationForm } from './application-form'
 import {
-  ENTRY_KIND_LABELS,
   KIND_LABELS,
   MISSING,
   STATUS_LABELS,
@@ -166,7 +165,7 @@ function OwnerName({ application, owner }: { application: Application; owner: En
   return (
     <>
       <Link to={entryPath(owner.kind, owner.id)}>{owner.name}</Link>
-      {owner.kind !== 'artist' && ` (${ENTRY_KIND_LABELS[owner.kind]})`}
+      {owner.kind === 'collective' && ` (${KIND_LABELS.collective})`}
     </>
   )
 }
@@ -484,7 +483,7 @@ function ArtistSummary({ artist }: { artist: Artist }) {
     <dl className="admin-record">
       <dt>Nom</dt>
       <dd>
-        <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link> ({KIND_LABELS[artist.kind]})
+        <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link> ({KIND_LABELS.artist})
       </dd>
       <dt>Ville</dt>
       <dd>{place(artist)}</dd>
@@ -505,7 +504,7 @@ function CollectiveSummary({ collective, members }: { collective: Collective; me
     <dl className="admin-record">
       <dt>Nom</dt>
       <dd>
-        <Link to={entryPath('collective', collective.id)}>{collective.name}</Link> ({ENTRY_KIND_LABELS.collective})
+        <Link to={entryPath('collective', collective.id)}>{collective.name}</Link> ({KIND_LABELS.collective})
       </dd>
       <dt>Ville</dt>
       <dd>{place(collective)}</dd>

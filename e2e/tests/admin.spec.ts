@@ -187,6 +187,25 @@ test("a collective's application is listed with its city and its artists' genres
   await expect(page.getByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue('Onde Commune')
 })
 
+// With Collectif Béton, which applied through the "Appliquer" form (see seed-data.ts), which created its artists, with
+// the genres it sent.
+test('a collective that applied through the form has its artists, with its genres, and its applications', async ({ page }) => {
+  await logIn(page, { at: '/admin/artistes' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('collectif beton')
+  await page.getByRole('link', { name: 'Collectif Béton', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Collectif Béton', exact: true })).toBeVisible()
+  await expect(page.getByText(/^collectif, inscrit par le formulaire/)).toBeVisible()
+  const members = page.locator('dt', { hasText: 'Artistes du collectif' }).locator('+ dd').getByRole('link')
+  await expect(members).toHaveText(['Mathis', 'Rosalie', 'Kofi', 'Yasmine'])
+  await expect(page.locator('dt', { hasText: 'Genres de ses artistes' }).locator('+ dd')).toHaveText('hard techno, EBM / industriel')
+  // The one it sent, and the one an admin added.
+  await expect(page.getByRole('table').getByRole('row')).toHaveCount(3)
+
+  await members.getByText('Rosalie').click()
+  await expect(page.getByRole('heading', { name: 'Rosalie', exact: true })).toBeVisible()
+  await expect(page.getByText(/^artiste, inscrit par le formulaire/)).toBeVisible()
+})
+
 test('a collective is added with an artist picked and one added by name, shown, changed, and deleted without its artists', async ({
   page,
 }, testInfo) => {

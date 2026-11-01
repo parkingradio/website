@@ -108,7 +108,7 @@ the request failing.
 | [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Changing an application |
 | [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
 | [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |
-| [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist applying, with their profile and maybe a photo |
+| [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
 | [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor |

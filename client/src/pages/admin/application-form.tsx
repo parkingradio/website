@@ -17,7 +17,7 @@ import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxOption } from '../../combobox'
 import { leaving, useCheckedForm } from './checked-form'
-import { ENTRY_KIND_LABELS, artistEntryKind, detailOf, entryPath } from './describe'
+import { KIND_LABELS, detailOf, entryPath } from './describe'
 import type { Owner } from './describe'
 import { compareText } from './list'
 import { FieldError, FormActions, Labeled } from './fields'
@@ -45,17 +45,15 @@ type ApplicationFormProps = {
   onCancel?: () => void
 }
 
-// The artists and collectives a new application can be for, by name, where collectives say so, like those whose `kind` is
-// "collective", until they're migrated.
+// The artists and collectives a new application can be for, by name, where collectives say so.
 function ownerOptions(artists: Artist[], collectives: Collective[]): (ComboboxOption & { owner: Owner })[] {
-  const collective = (detail: string | null) => [ENTRY_KIND_LABELS.collective, detail].filter(Boolean).join(', ')
   return [
-    ...artists.map((artist) => ({
-      label: artist.name,
-      detail: artistEntryKind(artist) === 'artist' ? detailOf(artist) : collective(detailOf(artist)),
-      owner: { kind: 'artist' as const, id: artist.id },
+    ...artists.map((artist) => ({ label: artist.name, detail: detailOf(artist), owner: { kind: 'artist' as const, id: artist.id } })),
+    ...collectives.map((collective) => ({
+      label: collective.name,
+      detail: `${KIND_LABELS.collective}, ${collective.email}`,
+      owner: { kind: 'collective' as const, id: collective.id },
     })),
-    ...collectives.map((other) => ({ label: other.name, detail: collective(other.email), owner: { kind: 'collective' as const, id: other.id } })),
   ]
     // Keyed by the address of their page, which tells artists and collectives apart.
     .map((option) => ({ ...option, key: entryPath(option.owner.kind, option.owner.id) }))

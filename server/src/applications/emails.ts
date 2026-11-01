@@ -1,10 +1,12 @@
 import { LINK_SITES } from '../artists/profile.js'
 import type { ApplicantProfile, GenreId } from '../artists/profile.js'
 import type { Email } from '../core/email.js'
+import type { Applied } from './applicant.js'
 import type { ApplicationFields, PrestationId } from './fields.js'
 
-// The emails sent when an artist applies through `POST /api/applications`: the application, to the recipients chosen on
-// the admin pages, and a confirmation, to the artist. Both are in French.
+// The emails sent when an artist or a collective applies through `POST /api/applications`: the application, to the
+// recipients chosen on the admin pages, and a confirmation, to the artist, or the collective's contact. Both are in
+// French.
 
 const countryNames = new Intl.DisplayNames(['fr'], { type: 'region' })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to stay the same day.
@@ -69,21 +71,32 @@ const PRESTATION_NAMES: Record<PrestationId, string> = {
   'full-band': 'Full Band',
 }
 
-// Everything the artist sent but their photo, as plain text. The photo isn't emailed: it's on the artist's page, on the
-// admin pages.
-export function describeApplication(profile: ApplicantProfile, application: ApplicationFields): string {
-  const collective = profile.kind === 'collective'
+// The profile that's described, the same way for an artist and for a collective: the collective's are its contact's
+// email and phone, and its description.
+function described(applied: Applied): ApplicantProfile {
+  if ('artist' in applied) return applied.artist
+  const { collective, members } = applied
+  // Its artists', since a collective has none of its own, each one once.
+  const genres = [...new Set(members.flatMap((member) => member.genres))]
+  return { ...collective, genres, bio: collective.description }
+}
+
+// Who applied, as they were saved, and their application, as plain text: everything that was sent but the photo, which
+// isn't emailed, since it's on the admin pages.
+export function describeApplication(applied: Applied, application: ApplicationFields): string {
+  const collective = 'collective' in applied
+  const profile = described(applied)
   const genres = profile.genres.map((id) => GENRE_NAMES[id])
   const prestations = application.prestations.map((id) => PRESTATION_NAMES[id])
   if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
   const links = LINK_SITES.filter((site) => profile.links[site.id]).map((site) => `  ${site.name} : ${site.url(profile.links[site.id]!)}`)
   return [
     collective ? `Collectif : ${profile.name}` : `Artiste : ${profile.name}`,
-    ...(collective ? [`Artistes du collectif : ${profile.members.join(', ')}`] : []),
+    ...('collective' in applied ? [`Artistes du collectif : ${applied.members.map((member) => member.name).join(', ')}`] : []),
     `Ville : ${profile.city}, ${countryNames.of(profile.country) ?? profile.country}`,
     `Genres : ${genres.join(', ')}`,
-    `E-mail : ${profile.email}`,
-    `Téléphone : ${profile.phone}`,
+    `${collective ? 'E-mail du contact' : 'E-mail'} : ${profile.email}`,
+    `${collective ? 'Téléphone du contact' : 'Téléphone'} : ${profile.phone}`,
     '',
     'Liens :',
     ...links,
@@ -93,45 +106,47 @@ export function describeApplication(profile: ApplicantProfile, application: Appl
     `Plages horaires : ${application.timeSlots.length === 0 ? 'à toute heure' : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}`,
     `Type de prestation : ${prestations.join(', ') || '—'}`,
     '',
-    'Bio :',
+    collective ? 'Description :' : 'Bio :',
     profile.bio,
     ...(application.details ? ['', 'Questions ou détails :', application.details] : []),
   ].join('\n')
 }
 
 // The emails for an application that was just saved. `toRecipients` is null when nobody was chosen to get them.
-// Replying to it answers the artist, and replying to the confirmation answers the recipients.
+// Replying to it answers the artist, or the collective's contact, and replying to the confirmation answers the
+// recipients.
 //
 // The confirmation goes to whatever address was typed in the application, so it only says what we wrote, and none of
 // what the artist did. Otherwise, anyone could have us send their own text to any address.
 export function applicationEmails({
-  profile,
+  applied,
   application,
   recipients,
 }: {
-  profile: ApplicantProfile
+  applied: Applied
   application: ApplicationFields
   recipients: string[]
 }): { toRecipients: Email | null; confirmation: Email } {
   const anyone = recipients.length > 0
+  const { name, email } = described(applied)
   return {
     toRecipients: anyone
       ? {
           to: recipients,
-          replyTo: [profile.email],
-          subject: `Nouvelle candidature : ${profile.name}`,
-          text: describeApplication(profile, application),
+          replyTo: [email],
+          subject: `Nouvelle candidature : ${name}`,
+          text: describeApplication(applied, application),
         }
       : null,
     confirmation: {
-      to: [profile.email],
+      to: [email],
       replyTo: anyone ? recipients : undefined,
       subject: 'parking.radio : nous avons bien reçu votre candidature',
       text: [
         'Bonjour,',
         '',
         "Merci pour votre candidature à parking.radio, nous l'avons bien reçue. Nous regardons les dates et nous vous recontacterons par e-mail.",
-        ...(profile.kind === 'collective'
+        ...('collective' in applied
           ? ['', 'Petit rappel pour les takeovers : nous demandons aux collectifs de produire un flyer (carte blanche).']
           : []),
       ].join('\n'),
