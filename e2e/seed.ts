@@ -7,13 +7,14 @@ import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { components, paths } from '../client/src/api/schema.d.ts'
-import { SEED_ARTISTS } from './seed-data.ts'
-import type { Profile, SeedApplication, SeedArtist } from './seed-data.ts'
+import { SEED_ARTISTS, SEED_COLLECTIVES } from './seed-data.ts'
+import type { Profile, SeedApplication, SeedArtist, SeedCollective } from './seed-data.ts'
 
 export type Credentials = { email: string; password: string }
 
 type ArtistResponse = paths['/api/admin/artists']['post']['responses'][200]['content']['application/json']
 type ArtistsResponse = paths['/api/admin/artists']['get']['responses'][200]['content']['application/json']
+type CollectivesResponse = paths['/api/admin/collectives']['get']['responses'][200]['content']['application/json']
 type ApplicationsResponse = paths['/api/admin/applications']['get']['responses'][200]['content']['application/json']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
@@ -39,9 +40,10 @@ const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-// Seeds every artist of SEED_ARTISTS who isn't there yet, with their applications, and returns the names of those seeded
-// and skipped. An artist is there when another one has their email, whatever its case, or, for an artist without one,
-// when another one without an email has their name, whatever its case.
+// Seeds every artist of SEED_ARTISTS who isn't there yet, with their applications, then every collective of
+// SEED_COLLECTIVES that isn't there yet, and returns the names of those seeded and skipped. An artist is there when
+// another one has their email, whatever its case, or, for an artist without one, when another one without an email has
+// their name, whatever its case. A collective is there when another one has its email, whatever its case.
 export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[] }> {
   const server = await logIn(url, credentials)
   const there = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map(seedKey))
@@ -68,6 +70,18 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
       throw new Error(`${messageOf(error)}\n${artist.profile.name} was left incomplete. To seed them again, delete them first.`, { cause: error })
     }
     seeded.push(artist.profile.name)
+  }
+
+  const artistIds = new Map((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map((artist) => [seedKey(artist), artist.id]))
+  const { collectives } = await server.call<CollectivesResponse>('GET', '/api/admin/collectives')
+  const emails = new Set(collectives.map((collective) => collective.email.toLowerCase()))
+  for (const collective of SEED_COLLECTIVES) {
+    if (emails.has(collective.profile.email.toLowerCase())) {
+      skipped.push(collective.profile.name)
+      continue
+    }
+    await addCollective(server, collective, artistIds)
+    seeded.push(collective.profile.name)
   }
   return { seeded, skipped }
 }
@@ -118,6 +132,21 @@ async function addArtist(server: Server, artist: SeedArtist): Promise<string> {
   form.set('artist', JSON.stringify(artist.profile))
   if (artist.photo) form.set('photo', photo(artist.photo), 'photo.png')
   return (await server.call<ArtistResponse>('POST', '/api/admin/artists', form)).artist.id
+}
+
+// Adds the collective as an admin would, with its members: the seeded artists' ids, by `seedKey`, in `artistIds`.
+async function addCollective(server: Server, collective: SeedCollective, artistIds: Map<string, string>): Promise<void> {
+  const members = collective.members.map((member) => {
+    if ('name' in member) return member
+    const artist = SEED_ARTISTS.find(({ profile }) => (profile.email ?? profile.name) === member.seeded)
+    const id = artist && artistIds.get(seedKey(artist.profile))
+    if (!id) throw new Error(`${collective.profile.name}: ${member.seeded} isn't an artist who was seeded`)
+    return { id }
+  })
+  const form = new FormData()
+  form.set('collective', JSON.stringify({ ...collective.profile, members }))
+  if (collective.photo) form.set('photo', photo(collective.photo), 'photo.png')
+  await server.call('POST', '/api/admin/collectives', form)
 }
 
 // Has the artist apply through the form, from `address`, with their first application.
@@ -234,7 +263,7 @@ if (import.meta.main) {
   }
   try {
     const { seeded, skipped } = await seed({ url, credentials: await seedAdmin(url) })
-    console.log(`Seeded ${seeded.length} artists, and skipped ${skipped.length} who were already there.`)
+    console.log(`Seeded ${seeded.length} artists and collectives, and skipped ${skipped.length} that were already there.`)
   } catch (error) {
     console.error(`seed: ${messageOf(error)}`)
     process.exitCode = 1

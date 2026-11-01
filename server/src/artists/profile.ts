@@ -16,9 +16,9 @@ export const ARTIST_KINDS = ['artist', 'collective'] as const
 export const ArtistKind = z.enum(ARTIST_KINDS).meta({ id: 'ArtistKind' })
 export type ArtistKind = z.infer<typeof ArtistKind>
 
-const NAME_MAX_LENGTH = 100
+export const NAME_MAX_LENGTH = 100
 const CITY_MAX_LENGTH = 100
-const BIO_MAX_LENGTH = 5000
+export const BIO_MAX_LENGTH = 5000
 export const EMAIL_MAX_LENGTH = 200
 const PHONE_MAX_LENGTH = 40
 const LINK_MAX_LENGTH = 200
@@ -310,7 +310,7 @@ function parseProfileName(site: LinkSite, profile: RegExp, value: string): { val
 
 // The errors that aren't about a field's length.
 const NO_KIND = 'Indiquez si vous postulez comme artiste ou comme collectif.'
-const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
+export const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
 const NO_GENRE = 'Choisissez au moins un genre.'
 const NO_LINK = 'Ajoutez au moins un lien.'
 const BAD_LINK = 'Un des liens est invalide.'
@@ -339,18 +339,44 @@ export function line(field: string, maxLength: number, missing: string, options:
 }
 
 // The fields admins can leave out are absent, null or empty, and are then saved as `empty`.
-function orLeftOut<Schema extends z.ZodType, Empty>(schema: Schema, empty: Empty) {
+export function orLeftOut<Schema extends z.ZodType, Empty>(schema: Schema, empty: Empty) {
   return schema.nullish().transform((value) => value || empty)
+}
+
+// The fields that artists' and collectives' profiles share, with what admins `canLeaveOut`.
+
+// The country, or "" when it's left out.
+export function country({ canLeaveOut }: { canLeaveOut: boolean }) {
+  return canLeaveOut
+    ? orLeftOut(z.union([Country, z.string().regex(/^\s*$/, NO_COUNTRY).transform(() => '' as const)], { error: NO_COUNTRY }), '' as const)
+    : Country
+}
+
+export function city({ canLeaveOut }: { canLeaveOut: boolean }) {
+  const city = line('La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.', { canBeEmpty: canLeaveOut })
+  return canLeaveOut ? orLeftOut(city, '') : city
+}
+
+export function phone({ canLeaveOut }: { canLeaveOut: boolean }) {
+  const phone = line('Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.', { canBeEmpty: canLeaveOut }).refine(
+    (phone) => !phone || isPhoneNumber(phone),
+    'Indiquez un numéro de téléphone valide.',
+  )
+  return canLeaveOut ? orLeftOut(phone, '') : phone
+}
+
+// An email address, or a blank one when it `canBeEmpty`. Unlike an artist's, a collective contact's is always required.
+export function emailAddress({ canBeEmpty = false } = {}) {
+  return line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.', { canBeEmpty }).refine(
+    (value) => !value || isEmailAddress(value),
+    'Indiquez une adresse e-mail valide.',
+  )
 }
 
 // An email address, unless admins `canLeaveOut` it: it's then absent, null or blank, and saved as null rather than
 // empty, so that any number of artists can be without one while emails stay unique.
 function email({ canLeaveOut }: { canLeaveOut: boolean }) {
-  const address = line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.', { canBeEmpty: canLeaveOut }).refine(
-    (value) => !value || isEmailAddress(value),
-    'Indiquez une adresse e-mail valide.',
-  )
-  return canLeaveOut ? orLeftOut(address, null) : address
+  return canLeaveOut ? orLeftOut(emailAddress({ canBeEmpty: true }), null) : emailAddress()
 }
 
 // A link, as it was typed or pasted, which is reduced to the profile name (see `parseLink`), or undefined when it's
@@ -370,7 +396,7 @@ function link(site: LinkSite) {
 type Links = Partial<Record<LinkSiteId, string>>
 
 // The links, by site, at least one unless admins `canLeaveOut` them. Blank ones are dropped.
-function links({ canLeaveOut }: { canLeaveOut: boolean }) {
+export function links({ canLeaveOut }: { canLeaveOut: boolean }) {
   const sites = Object.fromEntries(LINK_SITES.map((site) => [site.id, link(site)])) as Record<LinkSiteId, ReturnType<typeof link>>
   const sent = z
     // A link to another site isn't one of these, and anything other than an object isn't links at all.
@@ -378,7 +404,7 @@ function links({ canLeaveOut }: { canLeaveOut: boolean }) {
     .transform((links) => Object.fromEntries(Object.entries(links).filter(([, value]) => value)) as Links)
     .meta({
       description:
-        'By site, a link to the artist\'s profile or the profile name, or the address for "web". It\'s saved as the profile ' +
+        'By site, a link to the profile or the profile name, or the address for "web". It\'s saved as the profile ' +
         `name (or the address), which can't be longer than ${LINK_MAX_LENGTH} characters. Blank ones are dropped.`,
     })
   // An array is read as an object whose keys are its indexes, which aren't sites, and [] as no links.
@@ -416,28 +442,21 @@ function profileOf(kind: ArtistKind, { canLeaveOut }: { canLeaveOut: boolean }) 
         .optional()
         .transform((): string[] => [])
         .meta({ description: 'Ignored: only a collective has members' })
-  const city = line('La ville', CITY_MAX_LENGTH, 'Indiquez votre ville.', { canBeEmpty: canLeaveOut })
   const bio = text('La bio', BIO_MAX_LENGTH, 'Écrivez quelques lignes de bio.', { canBeEmpty: canLeaveOut })
   // Most important first. Duplicates are dropped, keeping the first.
   const genres = z.array(GenreId, { error: NO_GENRE }).overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))
-  const phone = line('Le numéro de téléphone', PHONE_MAX_LENGTH, 'Indiquez votre numéro de téléphone.', { canBeEmpty: canLeaveOut }).refine(
-    (phone) => !phone || isPhoneNumber(phone),
-    'Indiquez un numéro de téléphone valide.',
-  )
   return z.object({
     kind: z.literal(kind),
     name,
     members,
-    country: canLeaveOut
-      ? orLeftOut(z.union([Country, z.string().regex(/^\s*$/, NO_COUNTRY).transform(() => '' as const)], { error: NO_COUNTRY }), '' as const)
-      : Country,
-    city: canLeaveOut ? orLeftOut(city, '') : city,
+    country: country({ canLeaveOut }),
+    city: city({ canLeaveOut }),
     genres: canLeaveOut ? orLeftOut(genres, []) : genres.min(1, NO_GENRE),
     bio: canLeaveOut ? orLeftOut(bio, '') : bio,
     links: links({ canLeaveOut }),
     // A collective is reached at its email even when admins add it.
     email: email({ canLeaveOut: canLeaveOut && !collective }),
-    phone: canLeaveOut ? orLeftOut(phone, '') : phone,
+    phone: phone({ canLeaveOut }),
   })
 }
 

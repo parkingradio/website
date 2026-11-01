@@ -32,6 +32,10 @@ export const Ok = z.object({ ok: z.literal(true) }).meta({ id: 'Ok' })
 // The parameters of a path with an id, e.g. `/api/admin/artists/:id`.
 export const ById = z.object({ id: z.string() })
 
+// Another artist or collective, as responses name them: e.g. an artist's collectives, and a collective's members.
+export const Reference = z.object({ id: z.string(), name: z.string() }).meta({ id: 'Reference' })
+export type Reference = z.infer<typeof Reference>
+
 // Formats, e.g. `Timestamp`, which modules other than the routes' use too, e.g. the database's schema.
 export { Day, Timestamp } from './formats.js'
 

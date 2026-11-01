@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, linkSite, parseLink } from './profile.js'
 import type { LinkSiteId, Profile } from './profile.js'
-import { artistPhotos, validatePhoto, validateProfile } from './store.js'
+import { privatePhotos, validatePhoto, validateProfile } from './store.js'
 
 // The rules in artists/profile.ts, which every artist's profile has to follow. The server answers with the first error.
 
@@ -328,16 +328,16 @@ describe('validatePhoto', () => {
   })
 })
 
-describe('artistPhotos', () => {
+describe('privatePhotos', () => {
   const files = { put: vi.fn<PrivateFiles['put']>(), read: vi.fn<PrivateFiles['read']>(), delete: vi.fn<PrivateFiles['delete']>() }
 
-  it('stores each photo under a new key in artists/, with its type', async () => {
-    const photos = artistPhotos(files)
+  it('stores each photo under a new key in its folder, with its type', async () => {
+    const photos = privatePhotos(files)
     const body = Buffer.from('photo')
-    const first = await photos.store({ body, type: 'image/png' })
-    const second = await photos.store({ body, type: 'image/webp' })
+    const first = await photos.store({ body, type: 'image/png' }, 'artists')
+    const second = await photos.store({ body, type: 'image/webp' }, 'collectives')
     expect(first).toMatch(/^artists\/[0-9a-f-]{36}\.png$/)
-    expect(second).toMatch(/^artists\/[0-9a-f-]{36}\.webp$/)
+    expect(second).toMatch(/^collectives\/[0-9a-f-]{36}\.webp$/)
     expect(files.put).toHaveBeenCalledWith(first, body, 'image/png')
     expect(files.put).toHaveBeenCalledWith(second, body, 'image/webp')
   })

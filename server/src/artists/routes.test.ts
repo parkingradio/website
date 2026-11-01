@@ -8,8 +8,8 @@ import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
-import { EmailTaken } from './store.js'
-import type { ArtistsStore, SentPhoto, StoredArtist } from './store.js'
+import { EmailTaken, MemberCantBeCollective } from './store.js'
+import type { ArtistsStore, PhotoFolder, SentPhoto, StoredArtist } from './store.js'
 
 // The artists, as the database would keep them, and the photos, as the bucket would.
 let rows: StoredArtist[] = []
@@ -27,7 +27,7 @@ const store: ArtistsStore = {
   get: async (id) => rows.find((row) => row.id === id) ?? null,
   create: vi.fn<ArtistsStore['create']>(async (artist) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
-    const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, ...artist }
+    const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist }
     rows.push(row)
     return row
   }),
@@ -35,6 +35,7 @@ const store: ArtistsStore = {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
     if (emailTaken(changes.email, id)) throw new EmailTaken()
+    if (changes.kind === 'collective' && before.collectives.length > 0) throw new MemberCantBeCollective()
     const after = { ...before, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
@@ -47,8 +48,8 @@ const store: ArtistsStore = {
 }
 
 const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto) => {
-    const key = `artists/photo-${++nextPhoto}.${type.split('/')[1]}`
+  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
+    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
     stored.set(key, body)
     return key
   }),
@@ -204,9 +205,10 @@ describe('artists routes', () => {
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,
+          collectives: [],
         },
       })
-      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg' })
+      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg' }, 'artists')
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
     })
 
@@ -409,6 +411,14 @@ describe('artists routes', () => {
       expect(response.json()).toEqual({ ok: true, artist: created })
     })
 
+    it('returns the collectives the artist is in', async () => {
+      const app = await buildApp()
+      await create(app)
+      const collectives = [{ id: 'collective-1', name: 'Ondes' }]
+      rows[0].collectives = collectives
+      expect((await get(app, '/api/admin/artists/artist-1')).json().artist.collectives).toEqual(collectives)
+    })
+
     it('responds 404 for an artist that does not exist', async () => {
       const app = await buildApp()
       expect((await get(app, '/api/admin/artists/nobody')).statusCode).toBe(404)
@@ -605,6 +615,17 @@ describe('artists routes', () => {
       const response = await send(app, 'PUT', '/api/admin/artists/nobody', profile(), JPEG)
       expect(response.statusCode).toBe(404)
       expect(stored.size).toBe(0)
+    })
+
+    it("doesn't change a member of a collective into a collective, and forgets the photo", async () => {
+      const app = await buildApp()
+      await create(app)
+      rows[0].collectives = [{ id: 'collective-1', name: 'Ondes' }]
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ kind: 'collective', members: ['Ana'] }), PNG)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: "An artist who is a member of a collective can't become a collective" })
+      expect(rows[0]).toMatchObject({ kind: 'artist', photoKey: 'artists/photo-1.jpeg' })
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
     })
 
     it('checks the profile and photo like when adding an artist', async () => {

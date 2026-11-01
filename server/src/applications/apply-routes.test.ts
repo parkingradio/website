@@ -26,7 +26,7 @@ let nextPhoto = 0
 const store: ApplyStore = {
   apply: vi.fn<ApplyStore['apply']>(async (artist, fields) => {
     if (artists.some((other) => other.email?.toLowerCase() === artist.email.toLowerCase())) throw new EmailTaken()
-    const applicant: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...artist }
+    const applicant: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, collectives: [], ...artist }
     artists.push(applicant)
     const now = new Date()
     const application: StoredApplication = {

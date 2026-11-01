@@ -1539,7 +1539,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Deletes an artist, their photo and their applications */
+        /** Deletes an artist, their photo and their applications, and takes them out of their collectives */
         delete: {
             parameters: {
                 query?: never;
@@ -1620,6 +1620,476 @@ export interface paths {
             cookie?: never;
         };
         /** An artist's photo */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/collectives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every collective, by name */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            collectives: components["schemas"]["Collective"][];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Adds a collective, with or without a photo, and the members it names */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        collective: components["schemas"]["AdminCollectiveProfile"];
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         */
+                        photo?: Blob;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            collective: components["schemas"]["Collective"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/collectives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A collective */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            collective: components["schemas"]["Collective"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        /** Changes a collective's profile and members, and replaces or removes its photo */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        collective: components["schemas"]["AdminCollectiveProfile"];
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         */
+                        photo?: Blob;
+                        /** @description "true" removes the collective's photo, when there's no new one. Anything else keeps it */
+                        removePhoto?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            collective: components["schemas"]["Collective"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Deletes a collective and its photo, but not its members */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Ok"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/collectives/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A collective's photo */
         get: {
             parameters: {
                 query?: never;
@@ -2605,6 +3075,34 @@ export interface components {
             email: string;
             phone?: string | null;
         };
+        AdminCollectiveProfile: {
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+            name: string;
+            /** @description In order, at least one, once ids that are there twice are dropped. Each one is an artist who exists, by their `id`, or one to create, by their `name`, with everything else left out. Other fields are ignored, and the id is what counts when there are both */
+            members: ({
+                id: string;
+            } | {
+                /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters */
+                name: string;
+            })[];
+            country?: (components["schemas"]["Country"] | string) | null;
+            city?: string | null;
+            description?: string | null;
+            links?: {
+                soundcloud?: string;
+                instagram?: string;
+                web?: string;
+                bandcamp?: string;
+                mixcloud?: string;
+                ra?: string;
+                youtube?: string;
+                spotify?: string;
+                tiktok?: string;
+            } | null;
+            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
+            email: string;
+            phone?: string | null;
+        };
         ApiError: {
             /** @constant */
             ok: false;
@@ -2668,6 +3166,8 @@ export interface components {
             updatedBy: string | null;
             updatedAt: string | null;
             hasPhoto: boolean;
+            /** @description The collectives the artist is in, by name, whatever its case */
+            collectives: components["schemas"]["Reference"][];
         };
         /** @enum {string} */
         ArtistKind: "artist" | "collective";
@@ -2695,7 +3195,7 @@ export interface components {
             genres: components["schemas"]["GenreId"][];
             /** @description Trimmed, then between 1 and 5000 characters */
             bio: string;
-            /** @description By site, a link to the artist's profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
             links: {
                 soundcloud?: string;
                 instagram?: string;
@@ -2724,7 +3224,7 @@ export interface components {
             genres: components["schemas"]["GenreId"][];
             /** @description Trimmed, then between 1 and 5000 characters */
             bio: string;
-            /** @description By site, a link to the artist's profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
+            /** @description By site, a link to the profile or the profile name, or the address for "web". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped. */
             links: {
                 soundcloud?: string;
                 instagram?: string;
@@ -2749,6 +3249,24 @@ export interface components {
             chosenAt: string;
             playlist: components["schemas"]["RadioPlaylist"] | null;
             error: string | null;
+        };
+        Collective: {
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: string | null;
+            name: string;
+            /** @description In order */
+            members: components["schemas"]["Reference"][];
+            country: components["schemas"]["Country"] | "";
+            city: string;
+            description: string;
+            links: components["schemas"]["ArtistLinks"];
+            email: string;
+            phone: string;
+            updatedBy: string | null;
+            updatedAt: string | null;
+            hasPhoto: boolean;
         };
         Config: {
             assetsDomain: string;
@@ -2845,6 +3363,10 @@ export interface components {
             event: string | null;
             date: string | null;
             durationMs: number;
+        };
+        Reference: {
+            id: string;
+            name: string;
         };
         RotationTrack: {
             /** @constant */

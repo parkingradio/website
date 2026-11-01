@@ -164,7 +164,7 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
 
       // Only new artists can apply here, so an existing email gets a 409. That tells the sender the email belongs to an
       // artist, which is why it's only checked now: finding that out takes passing Turnstile, like applying does.
-      const photo = await storePhoto(photos, sent.photo)
+      const photo = await storePhoto(photos, sent.photo, 'artists')
       let applied: { artistId: string; applicationId: string }
       try {
         applied = await store.apply({ ...sent.profile, ...photo }, sent.application)

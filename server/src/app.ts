@@ -12,6 +12,8 @@ import type { ApplicationsStore } from './applications/store.js'
 import type { TurnstileVerifier } from './applications/turnstile.js'
 import { artistsRoutes } from './artists/routes.js'
 import type { ArtistsStore, Photos } from './artists/store.js'
+import { collectivesRoutes } from './collectives/routes.js'
+import type { CollectivesStore } from './collectives/store.js'
 import type { SendEmail } from './core/email.js'
 import type { Queryable } from './db/connection.js'
 import { eventsRoutes } from './events/routes.js'
@@ -41,6 +43,8 @@ export type Dependencies = {
   onAir: OnAirStore
   radioSettings: RadioSettingsStore
   artists: ArtistsStore
+  collectives: CollectivesStore
+  // Artists' and collectives' photos.
   photos: Photos
   applications: ApplicationsStore
   applicationsSettings: ApplicationsSettingsStore
@@ -66,6 +70,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     settings: deps.radioSettings,
   })
   await app.register(artistsRoutes, { store: deps.artists, photos: deps.photos })
+  await app.register(collectivesRoutes, { store: deps.collectives, photos: deps.photos })
   await app.register(applicationsRoutes, { store: deps.applications, settings: deps.applicationsSettings })
   await app.register(applyRoutes, {
     store: deps.apply,

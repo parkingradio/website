@@ -1,12 +1,14 @@
 # Artists
 
 The artists Parking Radio knows of: mostly artists who applied, and a few that the team only knows by name. Their
-applications for a set are in [Applications](applications.md).
+applications for a set are in [Applications](applications.md), and the collectives they're in in
+[Collectives](collectives.md).
 
 ## Profiles
 
-An artist is an artist or a collective. Each one has a profile, and maybe a photo, and is a row of the `artists` table
-(`server/src/db/schema.ts`).
+Each artist has a profile, and maybe a photo, and is a row of the `artists` table (`server/src/db/schema.ts`). An
+artist's `kind` can also say that they're a collective, as collectives were before they had their own profiles, with
+their members' names: such an artist can't be a member of a collective (see [Members](collectives.md#members)).
 
 The rules a profile has to follow are the schemas of `server/src/artists/profile.ts` (`ArtistProfile`, and
 `AdminArtistProfile` for admins), and the server checks every profile it's sent against them. The server explains
@@ -15,9 +17,10 @@ when they apply.
 
 Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, bio, links,
 email or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't
-always ask for them, or whom they only know by name. Only a collective's email can't be left out, since it's how the
-team reaches the collective. What's left out is stored as an empty string, or an empty list or object, except the email,
-which is null, so that any number of artists can be without one. `POST /api/applications` requires all of them.
+always ask for them, or whom they only know by name. Only the email of an artist whose `kind` is `"collective"` can't
+be left out, since it's how the team reaches the collective. What's left out is stored as an empty string, or an empty
+list or object, except the email, which is null, so that any number of artists can be without one.
+`POST /api/applications` requires all of them.
 
 A profile has:
 
@@ -46,9 +49,10 @@ An artist, as the endpoints below return them, is their profile with:
 | `id` | string | |
 | `createdAt` | string | When the artist was added |
 | `createdBy` | string or null | The email of the admin who added the artist, or null when they added themselves, by applying |
-| `updatedBy` | string or null | The email of the admin who last changed the artist |
+| `updatedBy` | string or null | The email of the admin who last changed the artist. Joining or leaving a collective doesn't count |
 | `updatedAt` | string or null | When |
 | `hasPhoto` | boolean | Whether the artist has a photo |
+| `collectives` | list of objects | The collectives the artist is in, with the `id` and `name` of each one, by name, whatever its case |
 
 ## Photos
 
@@ -98,9 +102,10 @@ photo larger than 10 MB).
 Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`. With a photo, it replaces the
 artist's, which is deleted. Without one, the artist keeps theirs, unless there's also a `removePhoto` field set to
 `true`, which removes it, and deletes it. Responds like `POST /api/admin/artists`, with the artist as they are then,
-and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404 when there's no such artist.
+and fails like it, with 400 when there's both a photo and `removePhoto`, or when it would change a member of a
+collective into a collective (see [Members](collectives.md#members)), and with 404 when there's no such artist.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 
-Deletes an artist, their photo if they have one and their applications, and responds `{"ok": true}`. Fails with 404
-when there's no such artist.
+Deletes an artist, their photo if they have one and their applications, takes them out of their collectives, and
+responds `{"ok": true}`. Fails with 404 when there's no such artist.

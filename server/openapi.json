@@ -136,7 +136,7 @@
               "links": {
                 "anyOf": [
                   {
-                    "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                    "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
                     "type": "object",
                     "properties": {
                       "soundcloud": {
@@ -285,7 +285,7 @@
               "links": {
                 "anyOf": [
                   {
-                    "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                    "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
                     "type": "object",
                     "properties": {
                       "soundcloud": {
@@ -349,6 +349,157 @@
               "email"
             ]
           }
+        ]
+      },
+      "AdminCollectiveProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+          },
+          "members": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100,
+                      "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ]
+                }
+              ]
+            },
+            "description": "In order, at least one, once ids that are there twice are dropped. Each one is an artist who exists, by their `id`, or one to create, by their `name`, with everything else left out. Other fields are ignored, and the id is what counts when there are both"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Country"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^\\s*$"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000,
+                "description": "Trimmed, then up to 5000 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "links": {
+            "anyOf": [
+              {
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "type": "object",
+                "properties": {
+                  "soundcloud": {
+                    "type": "string"
+                  },
+                  "instagram": {
+                    "type": "string"
+                  },
+                  "web": {
+                    "type": "string"
+                  },
+                  "bandcamp": {
+                    "type": "string"
+                  },
+                  "mixcloud": {
+                    "type": "string"
+                  },
+                  "ra": {
+                    "type": "string"
+                  },
+                  "youtube": {
+                    "type": "string"
+                  },
+                  "spotify": {
+                    "type": "string"
+                  },
+                  "tiktok": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "members",
+          "email"
         ]
       },
       "ApiError": {
@@ -649,6 +800,13 @@
           },
           "hasPhoto": {
             "type": "boolean"
+          },
+          "collectives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The collectives the artist is in, by name, whatever its case"
           }
         },
         "required": [
@@ -667,7 +825,8 @@
           "phone",
           "updatedBy",
           "updatedAt",
-          "hasPhoto"
+          "hasPhoto",
+          "collectives"
         ],
         "additionalProperties": false
       },
@@ -752,7 +911,7 @@
                 "description": "Trimmed, then between 1 and 5000 characters"
               },
               "links": {
-                "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
                 "type": "object",
                 "properties": {
                   "soundcloud": {
@@ -856,7 +1015,7 @@
                 "description": "Trimmed, then between 1 and 5000 characters"
               },
               "links": {
-                "description": "By site, a link to the artist's profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
                 "type": "object",
                 "properties": {
                   "soundcloud": {
@@ -957,6 +1116,97 @@
           "chosenAt",
           "playlist",
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "Collective": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "In order"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Country"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/ArtistLinks"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hasPhoto": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "createdBy",
+          "name",
+          "members",
+          "country",
+          "city",
+          "description",
+          "links",
+          "email",
+          "phone",
+          "updatedBy",
+          "updatedAt",
+          "hasPhoto"
         ],
         "additionalProperties": false
       },
@@ -1683,6 +1933,22 @@
           "event",
           "date",
           "durationMs"
+        ],
+        "additionalProperties": false
+      },
+      "Reference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ],
         "additionalProperties": false
       },
@@ -3372,7 +3638,7 @@
         }
       },
       "delete": {
-        "summary": "Deletes an artist, their photo and their applications",
+        "summary": "Deletes an artist, their photo and their applications, and takes them out of their collectives",
         "tags": [
           "Artists"
         ],
@@ -3455,6 +3721,580 @@
         "summary": "An artist's photo",
         "tags": [
           "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/collectives": {
+      "get": {
+        "summary": "Every collective, by name",
+        "tags": [
+          "Collectives"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collectives": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Collective"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collectives"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Adds a collective, with or without a photo, and the members it names",
+        "tags": [
+          "Collectives"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collective": {
+                    "$ref": "#/components/schemas/AdminCollectiveProfile"
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  }
+                },
+                "required": [
+                  "collective"
+                ]
+              },
+              "encoding": {
+                "collective": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/collectives/{id}": {
+      "get": {
+        "summary": "A collective",
+        "tags": [
+          "Collectives"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Changes a collective's profile and members, and replaces or removes its photo",
+        "tags": [
+          "Collectives"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "collective": {
+                    "$ref": "#/components/schemas/AdminCollectiveProfile"
+                  },
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                  },
+                  "removePhoto": {
+                    "description": "\"true\" removes the collective's photo, when there's no new one. Anything else keeps it",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "collective"
+                ]
+              },
+              "encoding": {
+                "collective": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deletes a collective and its photo, but not its members",
+        "tags": [
+          "Collectives"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/collectives/{id}/photo": {
+      "get": {
+        "summary": "A collective's photo",
+        "tags": [
+          "Collectives"
         ],
         "parameters": [
           {

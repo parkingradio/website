@@ -1,4 +1,4 @@
-import { SEED_ARTISTS } from '../seed-data.ts'
+import { SEED_ARTISTS, SEED_COLLECTIVES } from '../seed-data.ts'
 import { seed } from '../seed.ts'
 import { test, expect, admin } from './fixtures.ts'
 
@@ -8,6 +8,6 @@ test('the server is seeded, and seeding it again changes nothing', async ({ base
   test.skip(testInfo.project.name !== 'desktop', 'seeding is the same whatever the screen')
   expect(await seed({ url: baseURL!, credentials: admin })).toEqual({
     seeded: [],
-    skipped: SEED_ARTISTS.map((artist) => artist.profile.name),
+    skipped: [...SEED_ARTISTS, ...SEED_COLLECTIVES].map((seeded) => seeded.profile.name),
   })
 })

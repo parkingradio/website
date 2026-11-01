@@ -1,12 +1,12 @@
 import type { components } from '../client/src/api/schema.d.ts'
 
-// The data seed.ts fills a database with: artists, some with a photo, and their applications, with the variety the admin
-// pages have to handle. It's the same every time it's seeded, except for days, which are counted from the day it's
-// seeded, so that the data always looks current: new applications are for the coming months, and those that are done
-// were for past days.
+// The data seed.ts fills a database with: artists, some with a photo, and their applications, and collectives of some of
+// them, with the variety the admin pages have to handle. It's the same every time it's seeded, except for days, which
+// are counted from the day it's seeded, so that the data always looks current: new applications are for the coming
+// months, and those that are done were for past days.
 
 // A profile, as the server returns it, which is also how it can be sent, as it's already cleaned up.
-export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto'>
+export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'collectives'>
 
 // The longest bio the server takes (see BIO_MAX_LENGTH in server/src/artists/profile.ts).
 const BIO_MAX_LENGTH = 5000
@@ -520,5 +520,45 @@ export const SEED_ARTISTS: SeedArtist[] = [
       phone: '514 555-0121',
     }),
     applications: [application([141], 'new', { receivedDaysAgo: 9 })],
+  },
+]
+
+// A collective's profile, as the server returns it, without its members.
+export type CollectiveProfile = Omit<
+  components['schemas']['Collective'],
+  'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'members'
+>
+
+export type SeedCollective = {
+  profile: CollectiveProfile
+  // Its members, in order: artists of SEED_ARTISTS, by their email, or by their name for those without one, and new
+  // artists, by their name, whom the server creates along with the collective.
+  members: ({ seeded: string } | { name: string })[]
+  // The colour of its photo, for collectives that have one.
+  photo?: string
+}
+
+// Seeded after the artists, whom they have as members. Unlike the artists whose `kind` is "collective", these are
+// collectives of their own, with artists as members.
+export const SEED_COLLECTIVES: SeedCollective[] = [
+  {
+    profile: {
+      name: 'Onde Commune',
+      country: 'CA',
+      city: 'Montréal',
+      description: 'Trois DJ montréalais qui jouent ensemble, à tour de rôle, des nuits entières.',
+      links: { soundcloud: 'onde-commune', instagram: 'onde.commune' },
+      email: 'onde.commune@example.com',
+      phone: '514 555-0130',
+    },
+    members: [{ seeded: 'clementine@example.com' }, { seeded: 'boreale@example.com' }, { seeded: 'kwame@example.com' }],
+    photo: '#ff7f51',
+  },
+  {
+    // With what admins can leave out left out, a member who's also in another collective, one who's known only by
+    // name, and one whom the server creates with the collective. Its contact is one of its members, with the same
+    // email.
+    profile: { name: 'Les Nuits Basses', country: '', city: '', description: '', links: {}, email: 'kwame@example.com', phone: '' },
+    members: [{ seeded: 'kwame@example.com' }, { seeded: 'Marée Basse' }, { name: 'Sable Mouvant' }],
   },
 ]

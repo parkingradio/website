@@ -95,7 +95,13 @@ the request failing.
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Changing an artist's profile, or replacing or removing their photo |
-| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications |
+| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, and taking them out of their collectives |
+| [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
+| [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
+| [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
+| [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
+| [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Changing a collective's profile and members, or replacing or removing its photo |
+| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective and its photo, but not its members |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistid-admin) | admin | Every application, or an artist's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist |

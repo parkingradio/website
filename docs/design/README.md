@@ -30,6 +30,7 @@ implemented, while these documents are its design: when they disagree, these doc
 | [README](server/README.md) | Conventions every endpoint follows, how the server serves the client, `/healthz`, `/api/config`, emails, and the index of every endpoint |
 | [Radio](server/radio.md) | The radio's rotation, read from a SoundCloud playlist, and the SoundCloud app it's read through |
 | [Artists](server/artists.md) | Artists and their photos |
+| [Collectives](server/collectives.md) | Collectives, their members and their photos |
 | [Applications](server/applications.md) | Artists' applications, applying through the form, and the emails about them |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [Events](server/events.md) | Parking Radio's events, read from Resident Advisor |

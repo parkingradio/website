@@ -22,7 +22,8 @@ STACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_ID="$$-${RANDOM}"
 LABEL="parking-radio-integration"
 NETWORK="parking-radio-integration-${RUN_ID}"
-PG="parking-radio-integration-db-${RUN_ID}"
+# The database's container, for tests that need to hold locks in it.
+export PG="parking-radio-integration-db-${RUN_ID}"
 # The image built from the tree, when PARKING_RADIO_IMAGE isn't set.
 BUILT_IMAGE="parking-radio-integration:${RUN_ID}"
 

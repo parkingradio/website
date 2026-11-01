@@ -36,6 +36,13 @@
       "when": 1793468514749,
       "tag": "0004_artists_email_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793470796112,
+      "tag": "0005_collectives",
+      "breakpoints": true
     }
   ]
 }

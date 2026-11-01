@@ -26,6 +26,7 @@ function artist(id: string, name: string): Artist {
     phone: '514 555 0101',
     updatedBy: null,
     updatedAt: null,
+    collectives: [],
   }
 }
 

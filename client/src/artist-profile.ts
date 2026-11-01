@@ -17,7 +17,7 @@ export type ArtistLinks = Schema<'ArtistLinks'>
 export type LinkSiteId = keyof ArtistLinks
 
 // A profile, as the server saves it, which is what `checkProfile` returns.
-export type Profile = Omit<Artist, 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto'>
+export type Profile = Omit<Artist, 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'collectives'>
 
 export const ARTIST_KINDS = everyOne<ArtistKind>()(['artist', 'collective'])
 

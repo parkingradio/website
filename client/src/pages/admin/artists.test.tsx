@@ -31,6 +31,7 @@ const AURORE: Artist = {
   phone: '514 555 0101',
   updatedBy: null,
   updatedAt: null,
+  collectives: [],
 }
 
 const BRUME: Artist = {

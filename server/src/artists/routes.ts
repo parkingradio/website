@@ -1,13 +1,11 @@
-import { Readable } from 'node:stream'
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
-import { jsonField, readPhotoForm } from './photo-form.js'
-import { AdminArtistProfile, ArtistKind, ArtistLinks, Country, GenreId, PHOTO_TOO_LARGE, PHOTO_TYPES, PhotoFile } from './profile.js'
-import type { Profile } from './profile.js'
-import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto, validateProfile } from './store.js'
-import type { ArtistsStore, Photos, SentPhoto, StoredArtist } from './store.js'
+import { ApiError, ById, Ok, Reference, Timestamp, zodRoutes } from '../api/schemas.js'
+import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from './photo-form.js'
+import { AdminArtistProfile, ArtistKind, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
+import { EmailTaken, MemberCantBeCollective, forgetPhoto, storePhoto } from './store.js'
+import type { ArtistsStore, Photos, StoredArtist } from './store.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them (see docs/design/server/artists.md).
 
@@ -30,6 +28,7 @@ const Artist = z
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),
     hasPhoto: z.boolean(),
+    collectives: z.array(Reference).meta({ description: 'The collectives the artist is in, by name, whatever its case' }),
   })
   .meta({ id: 'Artist' })
 type Artist = z.infer<typeof Artist>
@@ -37,7 +36,7 @@ type Artist = z.infer<typeof Artist>
 const ArtistResponse = z.object({ ok: z.literal(true), artist: Artist })
 
 // What adding an artist sends, as multipart/form-data, and changing one with `removePhoto`. The route reads it itself
-// (see `readArtist`): only the profile is checked against its schema here.
+// (see `readProfileForm`): only the profile is checked against its schema here.
 const NewArtistForm = z.object({ artist: AdminArtistProfile, photo: PhotoFile.optional() })
 const ArtistForm = NewArtistForm.extend({
   removePhoto: z
@@ -46,14 +45,12 @@ const ArtistForm = NewArtistForm.extend({
     .meta({ description: '"true" removes the artist\'s photo, when there\'s no new one. Anything else keeps it' }),
 })
 
-// The photo, as it's read from where it's kept. Streams are sent as they are, rather than serialized, so it isn't
-// checked against this schema, which only says it's a file.
-const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
-
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
 const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Another artist has this email address' }
-const ARTIST_HAS_NO_PHOTO: z.infer<typeof ApiError> = { ok: false, error: 'This artist has no photo' }
-const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as const
+const MEMBER_CANT_BECOME_COLLECTIVE: z.infer<typeof ApiError> = {
+  ok: false,
+  error: "An artist who is a member of a collective can't become a collective",
+}
 
 function artist(row: StoredArtist): Artist {
   return {
@@ -73,26 +70,7 @@ function artist(row: StoredArtist): Artist {
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     hasPhoto: row.photoKey !== null,
-  }
-}
-
-// Reads the profile and photo from a request that adds or changes an artist, and checks them, along with the
-// "removePhoto" field, which only changing an artist reads. Only admins add and change artists here, so the profile is
-// an admin's (see `AdminArtistProfile`). Returns the checked profile and photo (null when there's none), or the error
-// to reply with when the request is malformed or invalid.
-async function readArtist(
-  request: FastifyRequest,
-): Promise<{ profile: Profile; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string }> {
-  const form = await readPhotoForm(request)
-  if (form === 'too-large') return { status: 413, error: PHOTO_TOO_LARGE }
-  if (form === 'malformed') return INVALID_REQUEST
-  const sent = jsonField(form.fields.artist)
-  if (sent === undefined) return INVALID_REQUEST
-  try {
-    return { profile: validateProfile(sent, AdminArtistProfile), photo: validatePhoto(form.photo), removePhoto: form.fields.removePhoto === 'true' }
-  } catch (error) {
-    if (!(error instanceof InvalidProfile)) throw error
-    return { status: 400, error: error.message }
+    collectives: row.collectives,
   }
 }
 
@@ -102,7 +80,7 @@ type ArtistsOptions = {
 }
 
 export async function artistsRoutes(app: FastifyInstance, { store, photos }: ArtistsOptions) {
-  // Needed by `readPhotoForm`, which sets its own limits.
+  // Needed by `readProfileForm`, which sets its own limits.
   await app.register(multipart)
 
   const api = zodRoutes(app)
@@ -141,32 +119,13 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
         summary: "An artist's photo",
         tags: ['Artists'],
         params: ById,
-        response: {
-          200: {
-            description:
-              'The photo, with the type it was checked to have. Browsers are told not to guess another ' +
-              '(`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)',
-            content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
-          },
-          404: ApiError,
-        },
+        response: { 200: PhotoResponse, 404: ApiError },
       },
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
-      if (!row.photoKey) return reply.status(404).send(ARTIST_HAS_NO_PHOTO)
-      const photo = await photos.read(row.photoKey)
-      if (!photo) {
-        request.log.error({ key: row.photoKey }, 'The photo of an artist is missing')
-        return reply.status(404).send({ ok: false, error: 'The photo of this artist is missing' })
-      }
-      // The type was checked from the photo's contents when it was sent, and browsers mustn't guess another.
-      return reply
-        .header('Content-Type', row.photoType!)
-        .header('X-Content-Type-Options', 'nosniff')
-        .header('Cache-Control', 'private, no-store')
-        .send(photo)
+      return sendPhoto(reply, request.log, photos, row, 'artist')
     },
   )
 
@@ -182,10 +141,11 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       },
     },
     async (request, reply) => {
-      const sent = await readArtist(request)
+      // Only admins add and change artists here, so the profile is an admin's.
+      const sent = await readProfileForm(request, 'artist', AdminArtistProfile)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
 
-      const photo = await storePhoto(photos, sent.photo)
+      const photo = await storePhoto(photos, sent.photo, 'artists')
       try {
         const row = await store.create({ ...sent.profile, ...photo, createdBy: request.user!.email })
         return { ok: true as const, artist: artist(row) }
@@ -210,18 +170,20 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       },
     },
     async (request, reply) => {
-      const sent = await readArtist(request)
+      // Only admins add and change artists here, so the profile is an admin's.
+      const sent = await readProfileForm(request, 'artist', AdminArtistProfile)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
       if (sent.photo && sent.removePhoto) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
 
       // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
-      const photo = sent.photo || sent.removePhoto ? await storePhoto(photos, sent.photo) : null
+      const photo = sent.photo || sent.removePhoto ? await storePhoto(photos, sent.photo, 'artists') : null
       let changed: Awaited<ReturnType<ArtistsStore['update']>>
       try {
         changed = await store.update(request.params.id, { ...sent.profile, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
       } catch (error) {
         await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
         if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
+        if (error instanceof MemberCantBeCollective) return reply.status(400).send(MEMBER_CANT_BECOME_COLLECTIVE)
         throw error
       }
       if (!changed) {
@@ -240,7 +202,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     {
       config: { admin: true },
       schema: {
-        summary: 'Deletes an artist, their photo and their applications',
+        summary: 'Deletes an artist, their photo and their applications, and takes them out of their collectives',
         tags: ['Artists'],
         params: ById,
         response: { 200: Ok, 404: ApiError },

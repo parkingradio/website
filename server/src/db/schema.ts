@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean, primaryKey } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from '../applications/fields.js'
 import type { ApplicationStatus, PrestationId, TimeSlot } from '../applications/fields.js'
@@ -113,6 +113,54 @@ export const artists = pgTable(
     check('artists_kind', oneOf(table.kind, ARTIST_KINDS)),
     check('artists_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
   ],
+)
+
+// Collectives, whose members are artists. Two of them can't have the same email address, whatever its case, but a
+// collective can have an artist's. See the profile's schema in collectives/profile.ts for what each field may contain.
+// Admins can leave out the country, city, description, links and phone, which are then empty.
+export const collectives = pgTable(
+  'collectives',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // The email of the admin who added the collective, or null when it added itself, by applying.
+    createdBy: text('created_by'),
+    name: text('name').notNull(),
+    country: text('country').$type<Country | ''>().notNull(), // one of COUNTRIES, e.g. "CA", or "" when an admin left it out
+    city: text('city').notNull(),
+    description: text('description').notNull(),
+    links: jsonb('links').$type<Partial<Record<LinkSiteId, string>>>().notNull(), // by site, profile names, or the address for "web"
+    email: text('email').notNull(), // the contact's
+    phone: text('phone').notNull(), // the contact's
+    // Where the photo is stored (see `Photos` in artists/store.ts), and its MIME type, as checked from its contents.
+    // Both null when the collective has no photo.
+    photoKey: text('photo_key'),
+    photoType: text('photo_type'),
+    // The email of the admin who last changed the collective, and when (null until then).
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('collectives_email_lower_idx').on(sql`lower(${table.email})`),
+    check('collectives_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
+  ],
+)
+
+// The artists of each collective, in order. An artist can be in several collectives, but only once in each. Deleting a
+// collective or an artist deletes their memberships. Artists whose `kind` is "collective" can't be members (see
+// collectives/store.ts).
+export const collectiveMembers = pgTable(
+  'collective_members',
+  {
+    collectiveId: uuid('collective_id')
+      .notNull()
+      .references(() => collectives.id, { onDelete: 'cascade' }),
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(), // the collective's members are in the order of their position
+  },
+  (table) => [primaryKey({ columns: [table.collectiveId, table.artistId] }), index('collective_members_artist_id_idx').on(table.artistId)],
 )
 
 // Artists' applications for a set. Each one belongs to an artist, and is deleted with them. See `ApplicationFields` in

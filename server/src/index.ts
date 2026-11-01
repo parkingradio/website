@@ -13,7 +13,8 @@ import { soundCloudClient } from './radio/soundcloud.js'
 import { soundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { onAirStore } from './radio/on-air.js'
 import { radioSettingsStore } from './radio/settings.js'
-import { artistPhotos, artistsStore } from './artists/store.js'
+import { artistsStore, privatePhotos } from './artists/store.js'
+import { collectivesStore } from './collectives/store.js'
 import { privateBucket } from './core/private-bucket.js'
 import { applicationsStore } from './applications/store.js'
 import { applicationsSettingsStore } from './applications/settings.js'
@@ -48,7 +49,8 @@ await registerRoutes(app, {
   onAir: onAirStore(db),
   radioSettings: radioSettingsStore(db),
   artists: artistsStore(db),
-  photos: artistPhotos(privateBucket(config.privateFiles)),
+  collectives: collectivesStore(db),
+  photos: privatePhotos(privateBucket(config.privateFiles)),
   applications: applicationsStore(db),
   applicationsSettings: applicationsSettingsStore(db),
   apply: applyStore(db),
