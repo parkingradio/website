@@ -10,12 +10,15 @@ type Answers = { channels?: unknown; playlistItems?: unknown }
 const CHANNEL = { items: [{ contentDetails: { relatedPlaylists: { uploads: 'UUuploads' } } }] }
 const LATEST = { items: [{ snippet: { resourceId: { videoId: 'latest' } } }] }
 
-// Returns the answers, which a test can change before the widget asks again.
+// Returns the answers, which a test can change before the widget asks again. The player's request for what's on air is
+// left unanswered.
 function stubYouTube(initial: Answers = {}) {
   const answers = { channels: CHANNEL, playlistItems: LATEST, ...initial }
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((input: string | Request) => {
+      const url = typeof input === 'string' ? input : input.url
+      if (url.endsWith('/api/radio?upcoming=0')) return new Promise(() => {})
       const answer = url.includes('/channels?')
         ? answers.channels
         : url.includes('/playlistItems?') && url.includes('playlistId=UUuploads')
@@ -39,23 +42,14 @@ const thumbnail = (id: string) => `https://i.ytimg.com/vi/${id}/maxresdefault.jp
 function renderWidget() {
   return render(
     <StrictMode>
-      <PlayerProvider enabled={false}>
+      <PlayerProvider>
         <YouTubeWidget />
       </PlayerProvider>
     </StrictMode>,
   )
 }
 
-// Where the widget and the legacy radio bar say they're playing.
-let channel: BroadcastChannel
-let messages: unknown[]
-beforeEach(() => {
-  messages = []
-  channel = new BroadcastChannel('parking_radio')
-  channel.onmessage = (e) => messages.push(e.data)
-})
 afterEach(() => {
-  channel.close()
   vi.useRealTimers()
 })
 
@@ -69,7 +63,7 @@ describe('YouTubeWidget', () => {
     expect(screen.queryByTitle('Parking Radio YouTube')).not.toBeInTheDocument()
   })
 
-  it('plays the video from its cover, and says so to the radio', async () => {
+  it('plays the video from its cover', async () => {
     stubYouTube()
     const { container } = renderWidget()
     await waitFor(() => expect(container.querySelector('.youtube-cover img')).toBeInTheDocument())
@@ -79,17 +73,6 @@ describe('YouTubeWidget', () => {
       'https://www.youtube.com/embed/latest?autoplay=1&rel=0&modestbranding=1',
     )
     expect(container.querySelector('.youtube-cover')).not.toBeInTheDocument()
-    await waitFor(() => expect(messages).toEqual(['yt_playing']))
-  })
-
-  it('goes back to the cover when the radio plays', async () => {
-    stubYouTube()
-    const { container } = renderWidget()
-    await waitFor(() => expect(container.querySelector('.youtube-cover img')).toBeInTheDocument())
-    fireEvent.click(container.querySelector('.youtube-cover')!)
-    channel.postMessage('audio_playing')
-    await waitFor(() => expect(screen.queryByTitle('Parking Radio YouTube')).not.toBeInTheDocument())
-    expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', 'https://i.ytimg.com/vi/latest/maxresdefault.jpg')
   })
 
   it('says "Hors direct" when the channel has no video', async () => {

@@ -2,8 +2,8 @@ import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import './rotation-banner.css'
 
-// The banner at the top of the home page while the new player is on: the artists of the radio's rotation, from the set
-// on air, once per set, scrolling like the legacy radio bar's marquee did (see legacy-radio.tsx).
+// The banner at the top of the home page: the artists of the radio's rotation, from the set on air, once per set,
+// scrolling from right to left in a loop.
 export function RotationBanner() {
   const radio = useApi('/api/radio')
   if (radio.kind === 'error') return null

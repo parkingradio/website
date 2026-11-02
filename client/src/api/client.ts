@@ -18,6 +18,10 @@ import type { components, paths } from './schema'
 // A schema of the API, by name, e.g. `Schema<'Feature'>`.
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
 
+// A feature flag's id. While there are no flags, the API's `FeatureId` is a schema that nothing matches (`{"not": {}}`),
+// which openapi-typescript makes `unknown` rather than `never`.
+export type FeatureId = unknown extends Schema<'FeatureId'> ? never : Schema<'FeatureId'>
+
 export type ApiError = Schema<'ApiError'>
 
 // Why a request failed: the server's error, or, with `fromServer` set to false, what went wrong when the server didn't

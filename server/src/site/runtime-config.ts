@@ -41,7 +41,9 @@ export async function configRoutes(app: FastifyInstance, { store }: { store: Pic
         request.log.error({ err: error }, 'Failed to load the feature flags: they are all off')
         return []
       })
-      const features = Object.fromEntries(stored.map(({ id, enabled }) => [id, enabled]))
+      // A cast, since `fromEntries` loses the ids, and the type allows no property at all while there are no flags. The
+      // ids are those of FEATURES, which are the only ones `load` returns.
+      const features = Object.fromEntries(stored.map(({ id, enabled }) => [id, enabled])) as z.infer<typeof Config>['features']
       return { assetsDomain: config.assetsDomain, turnstileSiteKey: config.turnstileSiteKey, features }
     },
   )

@@ -132,6 +132,14 @@ test('pages are reached by their URL too', async ({ page }) => {
   }
 })
 
+// The player's button, which every page has. The radio is off air here, since there's no SoundCloud app to read its
+// playlist through.
+test('the navigation bar says that the radio is off air', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('nav').getByRole('button', { name: 'hors ondes' })).toBeDisabled()
+  await expect(page.getByRole('region', { name: 'lecteur' })).toHaveCount(0)
+})
+
 test('unknown URLs show that there is no such page', async ({ page }) => {
   for (const path of ['/nope', '/archives/nope', '/admin/nope']) {
     await page.goto(path)

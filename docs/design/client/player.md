@@ -4,11 +4,6 @@ All pages share a single audio player, a black bar fixed at the bottom of the sc
 [Radio](../server/radio.md)). Since the app is a single-page application, it keeps playing while visitors move from
 page to page. The radio is called "en ondes" everywhere on the site.
 
-Until the `nouveau-lecteur` feature flag is turned on (see [Feature flags](architecture.md#feature-flags)), there's no
-player: neither the bar nor the navigation bar's button. The main page has a player of its own instead (see
-[Home](home.md)), which plays its own rotation, and which the shared player replaces while the flag is on: it comes back
-if the flag is turned off.
-
 ## Playing the radio
 
 The player plays what's on air, at the same position as every other listener: the sets of the rotation can't be played

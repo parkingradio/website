@@ -1120,11 +1120,7 @@
           },
           "features": {
             "type": "object",
-            "properties": {
-              "nouveau-lecteur": {
-                "type": "boolean"
-              }
-            },
+            "properties": {},
             "additionalProperties": false
           }
         },
@@ -1525,10 +1521,7 @@
         "additionalProperties": false
       },
       "FeatureId": {
-        "type": "string",
-        "enum": [
-          "nouveau-lecteur"
-        ]
+        "not": {}
       },
       "GenreId": {
         "type": "string",

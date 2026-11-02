@@ -1,9 +1,6 @@
 /* The home page, as the combined widget it was ported from looked (see home.tsx). */
 
-/* What's too wide for the screen, like the radio bar on phones once it plays, scrolls sideways without the rest of the
-   page, as it did in the widget's iframe. */
 .home {
-  overflow-x: auto;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   background: #fff;
   color: #000;

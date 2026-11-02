@@ -4,7 +4,7 @@ import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../test-utils'
 import { api, formData, onSessionEnded } from './client'
 import { useApi } from './use-api'
 
-const FEATURE = { id: 'nouveau-lecteur', enabled: true, updatedBy: 'admin@example.com', updatedAt: '2026-10-09T16:30:00.000Z' }
+const FEATURE = { id: 'some-flag', enabled: true, updatedBy: 'admin@example.com', updatedAt: '2026-10-09T16:30:00.000Z' }
 
 describe('api', () => {
   it('returns the response with `ok: true` when the request succeeds', async () => {
@@ -18,10 +18,10 @@ describe('api', () => {
   })
 
   it('sends the path parameters in the URL, and the body as JSON', async () => {
-    mockFetch({ 'PUT /api/admin/features/nouveau-lecteur': { ok: true, feature: FEATURE } })
-    const result = await api.PUT('/api/admin/features/{id}', { params: { path: { id: 'nouveau-lecteur' } }, body: { enabled: true } })
+    mockFetch({ 'PUT /api/admin/features/some-flag': { ok: true, feature: FEATURE } })
+    const result = await api.PUT('/api/admin/features/{id}', { params: { path: { id: 'some-flag' } }, body: { enabled: true } })
     expect(result).toEqual({ ok: true, feature: FEATURE })
-    const [request] = requestsTo('PUT', '/api/admin/features/nouveau-lecteur')
+    const [request] = requestsTo('PUT', '/api/admin/features/some-flag')
     expect(jsonBody(request)).toEqual({ enabled: true })
     expect(new Headers(request.headers).get('Content-Type')).toBe('application/json')
   })

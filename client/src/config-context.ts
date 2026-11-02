@@ -1,5 +1,5 @@
 import { createContext, use } from 'react'
-import type { Schema } from './api/client'
+import type { FeatureId, Schema } from './api/client'
 
 // Environment-specific values fetched from the server at runtime, and which features are on. ConfigProvider in
 // config.tsx does the fetching; this lives in its own file because a module exporting both a component and a hook
@@ -25,7 +25,7 @@ export function useAssetUrl(): (key: string) => string | undefined {
  * depends on a flag shows nothing until then, rather than one version of itself before switching to the other. When
  * the configuration can't be fetched, every flag is off, since off is the safe option.
  */
-export function useFeature(id: Schema<'FeatureId'>): boolean | undefined {
+export function useFeature(id: FeatureId): boolean | undefined {
   const state = use(ConfigContext)
   if (state.kind === 'loading') return undefined
   return state.kind === 'loaded' && state.config.features[id] === true

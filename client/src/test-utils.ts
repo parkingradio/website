@@ -25,8 +25,10 @@ export const UNAUTHORIZED: Body = { ok: false, error: 'Unauthorized' }
  * Stubs `fetch` to answer each of these URLs with its body: with a 401 status for `UNAUTHORIZED`, a 500 status when the
  * body is any other error, i.e. has `ok` set to `false`, and 200 otherwise, e.g. for endpoints whose responses don't
  * have `ok`. A URL can be preceded by a method, e.g. `PUT /api/thing`, to answer only that method, which takes
- * precedence over the URL alone. Any other URL fails the test, except `/api/config`, which ConfigProvider fetches
- * whenever the app is rendered.
+ * precedence over the URL alone. `/api/config`, which ConfigProvider fetches whenever the app is rendered, and what's on
+ * air, which the player asks for, are answered unless they're given: the radio is then off air. Any other URL makes
+ * `fetch` throw, which the typed client of api/client.ts turns into a failed request, as when the network fails, rather
+ * than failing the test.
  *
  * Requests can be made with a URL and options, or with a `Request`, like the typed client of api/client.ts
  * makes them, whose URL is then the part after the origin. The body of a request made with a FormData is that FormData.
@@ -34,6 +36,7 @@ export const UNAUTHORIZED: Body = { ok: false, error: 'Unauthorized' }
 export function mockFetch(bodies: Record<string, Body> = {}) {
   const all: Record<string, Body> = {
     '/api/config': { assetsDomain: 'assets.example.test', turnstileSiteKey: '1x00000000000000000000AA', features: {} },
+    '/api/radio?upcoming=0': { ok: false, error: 'No playlist has been chosen for the radio yet' },
     ...bodies,
   }
   vi.stubGlobal(

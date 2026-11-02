@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../../../api/client'
-import type { Schema } from '../../../api/client'
+import type { FeatureId, Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { FEATURE_LABELS, byWhom } from '../describe'
 
@@ -26,7 +26,7 @@ export function Features() {
         ) : (
           <ul className="admin-features">
             {loaded.value.features.map((feature) => (
-              <FeatureSwitch key={feature.id} loaded={feature} />
+              <FeatureSwitch key={feature.id as FeatureId} loaded={feature} />
             ))}
           </ul>
         ))}
@@ -36,16 +36,18 @@ export function Features() {
 
 // A flag, which is saved as soon as it's switched.
 function FeatureSwitch({ loaded }: { loaded: Schema<'Feature'> }) {
+  // The API's types can't tell that it's a FeatureId while there are no flags (see FeatureId).
+  const id = loaded.id as FeatureId
   const [feature, setFeature] = useState(loaded)
   const [busy, setBusy] = useState(false)
   // Why the flag couldn't be switched, if it couldn't.
   const [error, setError] = useState<string | null>(null)
-  const { name, description } = FEATURE_LABELS[feature.id]
+  const { name, description } = FEATURE_LABELS[id]
   const changed = byWhom(feature.enabled ? 'Activée' : 'Désactivée', feature.updatedBy, feature.updatedAt)
 
   const toggle = async (enabled: boolean) => {
     setBusy(true)
-    const result = await api.PUT('/api/admin/features/{id}', { params: { path: { id: feature.id } }, body: { enabled } })
+    const result = await api.PUT('/api/admin/features/{id}', { params: { path: { id } }, body: { enabled } })
     setBusy(false)
     setError(result.ok ? null : result.error)
     if (result.ok) setFeature(result.feature)

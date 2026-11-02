@@ -6,17 +6,11 @@ import './youtube.css'
 // recent video of Parking Radio's channel, behind a cover that plays it, or "Hors direct" when there's none. It's meant
 // to show the live stream when the channel is live, but doesn't detect it yet: the original tried, and never could.
 //
-// It pauses the radio when it plays, and the other way around: the player shared by every page directly, and the legacy
-// radio bar, while that one shows, through a BroadcastChannel (see legacy-radio.tsx).
+// It pauses the radio when it plays, and the radio playing stops it.
 
 export const API_KEY = 'AIzaSyBRcPalxY-XIncjXmTjbwj1RjrN2MTRKX8'
 export const CHANNEL_ID = 'UCvMw4qUIPPwkcZmBRRS0vNA'
 const POLL_MS = 60000
-
-// Shared with legacy-radio.tsx: each one says when it starts playing, and pauses when the other one does.
-const CHANNEL = 'parking_radio'
-const PLAYING = 'yt_playing'
-const OTHER_PLAYING = 'audio_playing'
 
 // What the widget shows. Until the channel's videos are known, it's the cover, without a video to play.
 type Video = { kind: 'unknown' } | { kind: 'offline' } | { kind: 'cover' | 'playing'; id: string }
@@ -30,33 +24,17 @@ export function YouTubeWidget() {
   const player = usePlayer()
   const [video, setVideoState] = useState<Video>({ kind: 'unknown' })
   const [error, setError] = useState<string | null>(null)
-  // What's shown, for the polling and the channel, which outlive renders.
+  // What's shown, for the polling, which outlives renders.
   const current = useRef(video)
-  const channel = useRef<BroadcastChannel | null>(null)
 
   const setVideo = useCallback((next: Video) => {
     current.current = next
     setVideoState(next)
   }, [])
 
-  // Goes back to the cover, when the radio starts playing.
-  const stopVideo = useCallback(() => {
-    const shown = current.current
-    if (shown.kind === 'playing') setVideo({ kind: 'cover', id: shown.id })
-  }, [setVideo])
-
   useEffect(() => {
     const stopped = new AbortController()
     const { signal } = stopped
-
-    try {
-      channel.current = new BroadcastChannel(CHANNEL)
-      channel.current.addEventListener('message', (e) => {
-        if (e.data === OTHER_PLAYING) stopVideo()
-      })
-    } catch {
-      // Without BroadcastChannel, the radio and the video just don't pause each other.
-    }
 
     // The first item the API answers `query` with, if any. Throws an error to show for the API's own errors, and when
     // the request fails.
@@ -98,22 +76,21 @@ export function YouTubeWidget() {
     return () => {
       stopped.abort()
       clearInterval(timer)
-      channel.current?.close()
-      channel.current = null
     }
-  }, [setVideo, stopVideo])
+  }, [setVideo])
 
-  // The radio starting to play stops the video. Playing the video pauses the radio first, so that doesn't stop it.
+  // The radio starting to play stops the video, which goes back to its cover. Playing the video pauses the radio first, so
+  // that doesn't stop it.
   const radioPlaying = player.playing !== null
   useEffect(() => {
-    if (radioPlaying) stopVideo()
-  }, [radioPlaying, stopVideo])
+    const shown = current.current
+    if (radioPlaying && shown.kind === 'playing') setVideo({ kind: 'cover', id: shown.id })
+  }, [radioPlaying, setVideo])
 
   const play = () => {
     if (video.kind !== 'cover') return
     player.pause()
     setVideo({ kind: 'playing', id: video.id })
-    channel.current?.postMessage(PLAYING)
   }
 
   return (

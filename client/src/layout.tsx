@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router'
-import { useAssetUrl, useFeature } from './config-context'
+import { useAssetUrl } from './config-context'
 import { LivePill } from './player/live-pill'
 import { PlayerProvider } from './player/player'
 import { PlayerBar } from './player/player-bar'
@@ -11,7 +11,6 @@ const MERCH_URL = 'https://parkingdotradio.bigcartel.com'
 
 export function Layout() {
   const assetUrl = useAssetUrl()
-  const newPlayer = useFeature('nouveau-lecteur') === true
   const location = useLocation()
   const navigationType = useNavigationType()
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -40,7 +39,7 @@ export function Layout() {
 
   return (
     // The player sits above the pages, so that it keeps playing from one page to the next.
-    <PlayerProvider enabled={newPlayer}>
+    <PlayerProvider>
       <div className="layout">
         <nav className={menuOpen ? 'navbar menu-open' : 'navbar'} onKeyDown={onKeyDown}>
           <button
@@ -77,7 +76,7 @@ export function Layout() {
               merch
             </a>
           </div>
-          {newPlayer && <LivePill />}
+          <LivePill />
           {/* Dims the page while the menu is open, so tapping anywhere outside the menu closes it
               (including over iframes, which would swallow a document-level click listener's events). */}
           <div className="menu-backdrop" aria-hidden="true" onClick={closeMenu} />
@@ -85,7 +84,7 @@ export function Layout() {
         <main className="page">
           <Outlet />
         </main>
-        {newPlayer && <PlayerBar />}
+        <PlayerBar />
       </div>
     </PlayerProvider>
   )

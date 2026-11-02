@@ -10,15 +10,14 @@ Pages read the flags in the `features` field of [`GET /api/config`](README.md#ge
 were off when they can't know whether it's on (see [Feature flags](../client/architecture.md#feature-flags)). For that
 reason, "off" always has to be the safe option: the old version, or the one that relies the least on our own server.
 
-The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` in `server/src/features/store.ts`):
+The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` in `server/src/features/store.ts`): none
+for now.
 
-| Id | What it switches on |
-|---|---|
-| `nouveau-lecteur` | The shared player (see [Player](../client/player.md)) |
+Retiring a flag takes moving it from this list to the retired flags below, and removing it from `FEATURES` and from the
+admin pages (see [Configuration](../client/admin/configuration.md#features)). The server ignores what it saved for flags
+that aren't listed. A retired flag's id isn't reused, since what was saved for it would apply to the new flag.
 
-Retiring a flag takes removing it from this list and from `FEATURES`, and from the admin pages (see
-[Configuration](../client/admin/configuration.md#features)). The server ignores what it saved for flags that aren't
-listed. A retired flag's id isn't reused, since what was saved for it would apply to the new flag.
+The retired flags are `nouveau-formulaire-candidature` and `nouveau-lecteur`.
 
 ## `GET /api/admin/features` (admin)
 

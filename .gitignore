@@ -16,3 +16,6 @@ private-bucket/
 # Playwright
 test-results/
 playwright-report/
+
+# TypeScript's incremental build caches, e.g. from `tsc -b`
+*.tsbuildinfo

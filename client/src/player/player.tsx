@@ -6,13 +6,13 @@ import { RadioPlayer } from './radio-player'
 
 /**
  * The audio player shared by every page: it's mounted once, above the pages, so that it keeps playing from one page to
- * the next. Nothing happens until it's `enabled`, i.e. until the `nouveau-lecteur` feature flag is on.
+ * the next.
  */
-export function PlayerProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+export function PlayerProvider({ children }: { children: ReactNode }) {
   const [player] = useState(() => new RadioPlayer())
   const state = useSyncExternalStore(player.subscribe, player.getState)
 
-  useEffect(() => (enabled ? player.connect() : undefined), [enabled, player])
+  useEffect(() => player.connect(), [player])
 
   const value = useMemo<Player>(
     () => ({

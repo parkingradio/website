@@ -84,9 +84,8 @@ const YOUTUBE = {
   },
 }
 
-function mockSite({ player = true, radio = onAir(KRAKA, 60) }: { player?: boolean; radio?: Body } = {}) {
+function mockSite({ radio = onAir(KRAKA, 60) }: { radio?: Body } = {}) {
   mockFetch({
-    '/api/config': { assetsDomain: 'assets.example.test', turnstileSiteKey: 'key', features: { 'nouveau-lecteur': player } },
     [RADIO_URL]: radio,
     ...streamOf(KRAKA),
     ...streamOf(NEBULO),
@@ -147,15 +146,6 @@ afterEach(() => {
 })
 
 describe('the player', () => {
-  it("doesn't show, or ask what's on air, while its feature flag is off", async () => {
-    mockSite({ player: false })
-    renderSite()
-    await waitFor(() => expect(requestsTo('GET', '/api/config')).toHaveLength(1))
-    expect(screen.queryByRole('region', { name: 'lecteur' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /en ondes/ })).not.toBeInTheDocument()
-    expect(requestsTo('GET', RADIO_URL)).toHaveLength(0)
-  })
-
   it("shows what's on air at the bottom of the page, and in the navigation bar", async () => {
     mockSite()
     renderSite()
@@ -165,6 +155,14 @@ describe('the player', () => {
     expect(bar).toHaveTextContent('HAUTE RIVE TAKEOVER')
     expect(bar).toHaveTextContent('rediffusion · 19 avril 2026')
     expect(screen.getByRole('button', { name: 'en ondes · kraka' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it("doesn't depend on the configuration", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFetch({ '/api/config': { ok: false, error: 'Boom' }, [RADIO_URL]: onAir(KRAKA, 60) })
+    renderSite()
+    expect(await screen.findByRole('region', { name: 'lecteur' })).toHaveTextContent('KRAKA')
+    expect(screen.getByRole('button', { name: 'en ondes · kraka' })).toBeInTheDocument()
   })
 
   it("says the radio is off air when what's on air can't be known", async () => {

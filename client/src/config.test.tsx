@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { Schema } from './api/client'
+import type { FeatureId } from './api/client'
 import { ConfigProvider } from './config'
 import { useAssetUrl, useFeature } from './config-context'
 import { mockFetch } from './test-utils'
@@ -30,7 +30,7 @@ describe('useAssetUrl', () => {
 describe('useFeature', () => {
   // These tests use flags of their own, so that they don't depend on which flags there are.
   function Feature({ id }: { id: string }) {
-    const enabled = useFeature(id as Schema<'FeatureId'>)
+    const enabled = useFeature(id as FeatureId)
     return <span data-testid={id}>{enabled === undefined ? '(pending)' : enabled ? 'on' : 'off'}</span>
   }
 

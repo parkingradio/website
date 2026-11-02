@@ -12,8 +12,8 @@ nothing a page shows, like the suggestions under a field, is drawn over them, ex
 purpose, like the Synth Meetups lightbox. On narrow screens like phones, the navigation links move into a drawer that
 slides in from the left, opened by a menu button to the left of the logo.
 
-While the `nouveau-lecteur` feature flag is on, it also has the player's "en ondes" button (see
-[Navigation bar button](player.md#navigation-bar-button)).
+The navigation bar also has the player's "en ondes" button (see [Navigation bar
+button](player.md#navigation-bar-button)).
 
 The "merch" entry isn't a page within the app: it's a direct external link to Parking Radio's Bigcartel store
 (`https://parkingdotradio.bigcartel.com`), which handles the merch catalog, checkout, and payment entirely on its own.
