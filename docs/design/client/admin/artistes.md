@@ -26,8 +26,13 @@ last changed them. A button changes the artist in a form in its place. The form 
 removes it once the artist is saved, and a photo that's chosen replaces it, shown in its place with an × that takes it
 back. Under it, their applications are listed like in [Candidatures](candidatures.md), with a button to create another
 one. Since they're all the artist's, the list doesn't show the artist, their city or genres, and since they're few, it
-can't be searched, filtered or sorted. At the bottom, the artist can be deleted for good, with their photo, if they have
-one, and applications, after confirming. They're then taken out of their collectives and their sets, which stay.
+can't be searched, filtered or sorted. Under them, the sets they played, whatever their status, but not the other sets
+of the same sessions, are listed like a session's sets (see [A session's page](sessions.md#a-sessions-page)), with
+their session's day ("Date") and name ("Session"), linking to its page, but without being changed there: their status
+is only shown. Sets are added in their session, so there's no button to add one, and the list can't be searched,
+filtered or sorted either. At the bottom, the artist can be deleted for good, with their photo, if they have one, and
+applications, after confirming. They're then taken out of their collectives and their sets, which stay, which the page
+says of those they have.
 
 ## A collective's page
 
@@ -35,9 +40,12 @@ Clicking a collective opens its page at `/admin/artistes/collectifs/<id>` (`/adm
 list), with everything about it, its photo (or "Pas de photo"), its links, its artists in order, each linking to their
 page (or that it has none, which happens once its artists are deleted), its genres, who added it (or that it applied by
 itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
-artist's. Under it, its applications are listed like an artist's, with a button to create another one. At the bottom,
-the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
-stay, and so do their own applications, and the sessions of its takeovers, without one.
+artist's. Under it, its applications are listed like an artist's, with a button to create another one, then the
+sessions of its takeovers, like in [Sessions](sessions.md) but without their takeover, with a button to add another one
+as its takeover ("nouvelle session"), and the list can't be searched, filtered or sorted either. At the bottom, the
+collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
+stay, and so do their own applications, and the sessions of its takeovers, without one, which the page says when it has
+some.
 
 ## Adding an artist
 
@@ -73,12 +81,14 @@ Its artists are in order, at least one, and can be reordered and removed. Each o
 - `GET /api/admin/artists/:id`, `PUT /api/admin/artists/:id` and `DELETE /api/admin/artists/:id`, for an artist's page.
 - `GET /api/admin/artists/:id/photo`, for their photo.
 - `GET /api/admin/applications?artist=<id>`, for their applications.
+- `GET /api/admin/sessions?artist=<id>`, for their sets.
 - `POST /api/admin/artists`, for "ajouter un artiste".
 - `GET /api/admin/collectives/:id`, `PUT /api/admin/collectives/:id` and `DELETE /api/admin/collectives/:id`, for a
   collective's page.
 - `GET /api/admin/collectives/:id/photo`, for its photo.
 - `GET /api/admin/artists?collective=<id>`, for its genres, again each time it's saved.
 - `GET /api/admin/applications?collective=<id>`, for its applications.
+- `GET /api/admin/sessions?takeover=<id>`, for the sessions of its takeovers.
 - `GET /api/admin/artists`, in a collective's form and in "ajouter un collectif", to pick its artists, each time the
   form opens.
 - `POST /api/admin/collectives`, for "ajouter un collectif".

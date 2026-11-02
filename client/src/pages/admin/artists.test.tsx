@@ -5,6 +5,7 @@ import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist, Profile } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import type { Session, StudioSet } from '../../session-fields'
 import { mockFetch, requestsTo } from '../../test-utils'
 
 // Logged in, and without collectives, unless a test says otherwise.
@@ -79,6 +80,41 @@ const ONDES: Collective = {
 }
 
 // What admins can leave out of a profile, as it's saved when they do.
+// A set, and its session, for the lists of an artist's sets.
+const STUB_SET: StudioSet = {
+  id: 'set-1',
+  performers: [{ id: 'artist-1', name: 'Aurore' }],
+  offsetMinutes: 0,
+  durationMinutes: 60,
+  start: '2026-11-15T02:00:00.000Z',
+  end: '2026-11-15T03:00:00.000Z',
+  prestations: ['dj'],
+  otherPrestation: '',
+  genres: [],
+  soundcloudTrack: null,
+  youtubeVideo: null,
+  createdAt: '2026-10-01T16:00:00.000Z',
+  createdBy: 'admin@example.com',
+  updatedBy: null,
+  updatedAt: null,
+  status: 'planned',
+  statusUpdatedBy: null,
+  statusUpdatedAt: null,
+}
+
+function stubSession(sets: StudioSet[]): Session {
+  return {
+    ...STUB_SET,
+    id: 'session-1',
+    durationMinutes: 180,
+    end: '2026-11-15T05:00:00.000Z',
+    takeover: { id: 'collective-1', name: 'Ondes' },
+    name: '',
+    raEvent: null,
+    sets,
+  }
+}
+
 const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' }
 
 function application(id: string, artistId: string, changes: Partial<Application> = {}): Application {
@@ -381,6 +417,7 @@ describe('An artist’s page', () => {
     ...LOGGED_IN,
     '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
     '/api/admin/applications?artist=artist-1': { ok: true, applications: APPLICATIONS },
+    '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [] },
   }
 
   it('lists their applications, without sorting them since there are few, or the columns about the artist', async () => {
@@ -421,6 +458,7 @@ describe('An artist’s page', () => {
       ...LOGGED_IN,
       '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, ...LEFT_OUT } },
       '/api/admin/applications?artist=artist-1': { ok: true, applications: [] },
+      '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [] },
     })
     renderAt('/admin/artistes/artist-1')
 
@@ -435,6 +473,7 @@ describe('An artist’s page', () => {
       ...LOGGED_IN,
       '/api/admin/artists/artist-2': { ok: true, artist: BRUME },
       '/api/admin/applications?artist=artist-2': { ok: true, applications: [] },
+      '/api/admin/sessions?artist=artist-2': { ok: true, sessions: [] },
     })
     renderAt('/admin/artistes/artist-2')
 
@@ -455,6 +494,41 @@ describe('An artist’s page', () => {
     expect(links.map((link) => link.getAttribute('href'))).toEqual(['/admin/artistes/collectifs/collective-2', '/admin/artistes/collectifs/collective-1'])
     expect(screen.getByText('Collectifs', { selector: 'dt' })).toBeInTheDocument()
     expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent("L'artiste sera aussi retiré de ses collectifs, qui restent.")
+  })
+
+  it("lists the sets they played, but not their sessions' other sets, only showing them, and says that deleting them takes them out", async () => {
+    // Cancelled, and with another artist, in a session that has another artist's set too.
+    const played: StudioSet = { ...STUB_SET, performers: [...STUB_SET.performers, { id: 'artist-2', name: 'Brume' }], status: 'cancelled' }
+    const other: StudioSet = { ...STUB_SET, id: 'set-2', performers: [{ id: 'artist-2', name: 'Brume' }], offsetMinutes: 60, start: '2026-11-15T03:00:00.000Z', end: '2026-11-15T04:00:00.000Z' }
+    mockFetch({ ...AURORE_PAGE, '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [stubSession([played, other])] } })
+    renderAt('/admin/artistes/artist-1')
+
+    const table = await screen.findByRole('table', { name: 'Sets' })
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
+    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'Takeover de Ondes', 'Aurore, Brume', 'DJ', '-', '', 'annulé']])
+    expect(within(table).getByRole('link', { name: 'Takeover de Ondes' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(table).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /set/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent("L'artiste sera aussi retiré de ses sets, qui restent.")
+  })
+
+  it.each([
+    [[{ id: 'collective-1', name: 'Ondes' }], [], "L'artiste sera aussi retiré de ses collectifs, qui restent."],
+    [[], [{ id: 'set-1' }], "L'artiste sera aussi retiré de ses sets, qui restent."],
+    [[{ id: 'collective-1', name: 'Ondes' }], [{ id: 'set-1' }], "L'artiste sera aussi retiré de ses collectifs et de ses sets, qui restent."],
+  ])('says what deleting the artist takes them out of, when they are in collectives (%j) and sets (%j)', async (collectives, sets, text) => {
+    mockFetch({
+      ...AURORE_PAGE,
+      '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, collectives } },
+      '/api/admin/sessions?artist=artist-1': { ok: true, sessions: sets.length > 0 ? [stubSession(sets.map(({ id }) => ({ ...STUB_SET, id })))] : [] },
+    })
+    renderAt('/admin/artistes/artist-1')
+
+    await waitFor(() => expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent(text))
   })
 
   it('changes the artist, keeping their photo unless another one is chosen', async () => {
@@ -647,6 +721,7 @@ describe('Deleting an artist before their applications are loaded', () => {
       ...LOGGED_IN,
       '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
       '/api/admin/applications?artist=artist-1': { ok: false, error: 'Boom' },
+      '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [] },
     })
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
     renderAt('/admin/artistes/artist-1')
@@ -666,6 +741,7 @@ describe('Adding an artist', () => {
       'POST /api/admin/artists': { ok: true, artist: added },
       '/api/admin/artists/artist-3': { ok: true, artist: added },
       '/api/admin/applications?artist=artist-3': { ok: true, applications: [] },
+      '/api/admin/sessions?artist=artist-3': { ok: true, sessions: [] },
     })
     renderAt('/admin/artistes/nouveau')
 
@@ -717,6 +793,7 @@ describe('Adding an artist', () => {
       'POST /api/admin/artists': { ok: true, artist: added },
       '/api/admin/artists/artist-3': { ok: true, artist: added },
       '/api/admin/applications?artist=artist-3': { ok: true, applications: [] },
+      '/api/admin/sessions?artist=artist-3': { ok: true, sessions: [] },
     })
     renderAt('/admin/artistes/nouveau')
 
@@ -808,6 +885,7 @@ describe('Adding an artist', () => {
       'POST /api/admin/artists': { ok: true, artist: added },
       '/api/admin/artists/artist-3': { ok: true, artist: added },
       '/api/admin/applications?artist=artist-3': { ok: true, applications: [] },
+      '/api/admin/sessions?artist=artist-3': { ok: true, sessions: [] },
     })
     renderAt('/admin/artistes/nouveau')
 

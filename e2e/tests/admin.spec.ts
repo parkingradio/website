@@ -173,8 +173,9 @@ test("a collective's application is listed with its city and its artists' genres
 
   await page.getByRole('link', { name: 'Onde Commune', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
-  await expect(page.getByRole('table').getByRole('row')).toHaveCount(2)
-  await expect(page.getByRole('table')).toContainText('DJ, autre : B2B2B')
+  const applications = page.getByRole('table', { name: 'Candidatures' })
+  await expect(applications.getByRole('row')).toHaveCount(2)
+  await expect(applications).toContainText('DJ, autre : B2B2B')
 
   await page.getByRole('link', { name: 'nouvelle candidature' }).click()
   await expect(page.getByRole('heading', { name: 'Nouvelle candidature' })).toBeVisible()
@@ -193,7 +194,7 @@ test('a collective that applied through the form has its artists, with their pro
   await expect(members).toHaveText(['Mathis', 'Rosalie', 'Kofi', 'Yasmine'])
   await expect(page.locator('dt', { hasText: 'Genres de ses artistes' }).locator('+ dd')).toHaveText('hard techno, EBM / industriel')
   // The one it sent, and the one an admin added.
-  await expect(page.getByRole('table').getByRole('row')).toHaveCount(3)
+  await expect(page.getByRole('table', { name: 'Candidatures' }).getByRole('row')).toHaveCount(3)
 
   await members.getByText('Rosalie').click()
   await expect(page.getByRole('heading', { name: 'Rosalie', exact: true })).toBeVisible()
@@ -263,7 +264,7 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await expect(page.getByRole('row').filter({ has: listed })).toContainText(`${name} (collectif)`)
   await page.goBack()
   await page.getByRole('link', { name, exact: true }).click()
-  await expect(page.getByRole('table')).toContainText('15 janv. 2027')
+  await expect(page.getByRole('table', { name: 'Candidatures' })).toContainText('15 janv. 2027')
 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'supprimer le collectif' }).click()

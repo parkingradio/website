@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { LINK_SITES, PHOTO_TYPES, parseLink } from '../../artist-profile'
-import type { ArtistLinks, LinkSiteId } from '../../artist-profile'
+import type { ReactNode } from 'react'
+import { GENRES, LINK_SITES, PHOTO_TYPES, parseLink } from '../../artist-profile'
+import type { ArtistLinks, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
-import { COUNTRY_OPTIONS } from './describe'
+import { COUNTRY_OPTIONS, genreName } from './describe'
 import { leaving } from './checked-form'
 import { FieldError } from './fields'
 
-// The fields that the forms for artists' and collectives' profiles share.
+// The fields that the forms for artists' and collectives' profiles share, and the genres, which sets' have too.
 
 // The props of a field made of several inputs, which is left once the focus leaves all of them.
 export type GroupProps<T> = {
@@ -168,3 +169,39 @@ export function LinksField({
     </fieldset>
   )
 }
+
+// Every genre, as a tag: clicking one pins it, or unpins it if it was. The genres pinned are listed first, in the order
+// they were pinned, which is their order of importance. `children` come before them, e.g. genres to suggest.
+export function GenresField({ genres, onChange, error, onLeave, children }: GroupProps<GenreId[]> & { genres: GenreId[]; children?: ReactNode }) {
+  const toggle = (genre: GenreId) => onChange(genres.includes(genre) ? genres.filter((other) => other !== genre) : [...genres, genre])
+  return (
+    <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
+      <legend>Genres</legend>
+      <p className="admin-hint">Le premier choisi est le genre principal.</p>
+      {children}
+      {genres.length > 0 && (
+        <ol className="admin-chosen">
+          {genres.map((genre, index) => (
+            <li key={genre}>
+              <b>{index + 1}</b>
+              {genreName(genre)}
+              <button type="button" aria-label={`retirer ${genreName(genre)}`} onClick={() => toggle(genre)}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {/* Focused when the genres are the first thing to fix, which is why it can be focused. */}
+      <div className="admin-tags" role="group" aria-label="Tous les genres" aria-invalid={error ? true : undefined} tabIndex={-1}>
+        {GENRES.map((genre) => (
+          <button key={genre} type="button" aria-pressed={genres.includes(genre)} onClick={() => toggle(genre)}>
+            {genreName(genre)}
+          </button>
+        ))}
+      </div>
+      <FieldError message={error} />
+    </fieldset>
+  )
+}
+

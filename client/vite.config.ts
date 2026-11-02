@@ -27,8 +27,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],
-    // The admin pages show dates and times in the browser's time zone, so the tests run in the one the admins are in,
-    // whatever the time zone of the machine running them.
+    // The admin pages show dates and times in the browser's time zone, except those of sessions and sets (see
+    // quebec-time.ts), so the tests run in the one the admins are in, whatever the time zone of the machine running them.
     env: { TZ: 'America/Toronto' },
   },
 })

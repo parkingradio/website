@@ -3,6 +3,9 @@
 The site is a single-page application: changing to another page does not require reloading the whole app. Another page
 opens at its top, except when going back or forward in the browser's history.
 
+The site declares French as its language. Times of day are shown and entered in the 24-hour format, e.g. "21 h 30": the
+time fields are the browser's own, which follow the page's language in the browsers that format them by it.
+
 ## Navigation bar
 
 All pages share a common navigation bar at the top, from which all pages can be reached. It stays at the top of the

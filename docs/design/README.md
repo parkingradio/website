@@ -54,6 +54,7 @@ implemented, while these documents are its design: when they disagree, these doc
 | [Calendrier](client/admin/calendrier.md) | The calendar of bookings |
 | [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Candidatures](client/admin/candidatures.md) | Going through applications |
+| [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
 | [Admins](client/admin/admins.md) | Who can access the admin pages |
 | [Configuration](client/admin/configuration.md) | The settings that change what the site does |

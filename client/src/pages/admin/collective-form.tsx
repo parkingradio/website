@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import type { Body } from '../../api/client'
 import { BIO_MAX_LENGTH, CITY_MAX_LENGTH, EMAIL_MAX_LENGTH, NAME_MAX_LENGTH, PHONE_MAX_LENGTH, pickedPhotoError } from '../../artist-profile'
 import type { Artist } from '../../artist-profile'
@@ -7,9 +7,10 @@ import { checkCollectiveProfile } from '../../collective-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import { normalize } from '../../normalize'
-import { detailOf, photoUrl } from './describe'
+import { artistOption, photoUrl } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
+import { OrderedList } from './ordered-list'
 import { CountryField, LinksField, PhotoField } from './profile-fields'
 import type { GroupProps } from './profile-fields'
 
@@ -150,28 +151,13 @@ function MembersField({
 }: GroupProps<Member[]> & { members: Member[]; artists: Artist[] | null; entry: string; onEntryChange: (entry: string) => void }) {
   const pickerId = useId()
   const entryId = useId()
-  const list = useRef<HTMLOListElement>(null)
-  // What gets the focus once the members change, since the button that changed them can be gone, disabled or moved,
-  // which loses it: a button of a member, by their key, or else the field that adds one.
-  const focusNext = useRef<{ key: string; action: 'up' | 'down' | 'remove' } | 'add' | null>(null)
-  useEffect(() => {
-    const next = focusNext.current
-    focusNext.current = null
-    if (next === 'add') document.getElementById(artists ? pickerId : entryId)?.focus()
-    else if (next) {
-      const item = Array.from(list.current?.children ?? []).find((item) => (item as HTMLElement).dataset.member === next.key)
-      item?.querySelector<HTMLElement>(`[data-action="${next.action}"]`)?.focus()
-    }
-  }, [members, artists, pickerId, entryId])
 
   // The collective's artists are there too, so that typing one of their names finds them, but they can't be picked.
-  const options = (artists ?? []).map((artist) => ({
-    key: artist.id,
-    label: artist.name,
-    ...(members.some((member) => 'id' in member && member.id === artist.id)
-      ? { detail: 'déjà dans le collectif', disabled: true }
-      : { detail: detailOf(artist) }),
-  }))
+  const options = (artists ?? []).map((artist) =>
+    members.some((member) => 'id' in member && member.id === artist.id)
+      ? { ...artistOption(artist), detail: 'déjà dans le collectif', disabled: true }
+      : artistOption(artist),
+  )
   // A name left typed is what's wrong with the members, if anything is, or else that there are none.
   const pending = entry.trim() !== ''
   // A member with the name typed, or else an artist, who could be picked rather than having another one created.
@@ -191,50 +177,19 @@ function MembersField({
     if (value) onChange([...members, { name: value }])
     onEntryChange('')
   }
-  const move = (index: number, by: number) => {
-    const moved = [...members]
-    ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
-    // The same arrow, unless the member is now at the end where it's disabled.
-    const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
-    const end = by < 0 ? 0 : members.length - 1
-    focusNext.current = { key: keyOf(members[index]), action: index + by === end ? other : arrow }
-    onChange(moved)
-  }
-  const remove = (index: number) => {
-    const next = members[index + 1]
-    focusNext.current = next ? { key: keyOf(next), action: 'remove' } : 'add'
-    onChange(members.filter((_, i) => i !== index))
-  }
 
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Artistes du collectif</legend>
       <p className="admin-hint">Dans leur ordre de présentation. Les genres du collectif sont ceux de ses artistes.</p>
-      {members.length > 0 && (
-        <ol ref={list} className="admin-chosen admin-members">
-          {members.map((member, index) => (
-            <li key={keyOf(member)} data-member={keyOf(member)}>
-              <b>{index + 1}</b>
-              {'id' in member ? member.name : `${member.name} (nouveau)`}
-              <button type="button" data-action="up" aria-label={`monter ${member.name}`} disabled={index === 0} onClick={() => move(index, -1)}>
-                ↑
-              </button>
-              <button
-                type="button"
-                data-action="down"
-                aria-label={`descendre ${member.name}`}
-                disabled={index === members.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                ↓
-              </button>
-              <button type="button" data-action="remove" aria-label={`retirer ${member.name}`} onClick={() => remove(index)}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
+      <OrderedList
+        items={members}
+        keyOf={keyOf}
+        label={(member) => ('id' in member ? member.name : `${member.name} (nouveau)`)}
+        name={(member) => member.name}
+        onChange={onChange}
+        nextFocus={artists ? pickerId : entryId}
+      />
       <div className="admin-field">
         <label htmlFor={pickerId}>Ajouter un artiste connu</label>
         <Combobox

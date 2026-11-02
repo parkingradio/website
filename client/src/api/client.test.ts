@@ -63,6 +63,14 @@ describe('api', () => {
     expect(await api.GET('/api/admin/features')).toEqual({ ok: false, error: 'Boom' })
   })
 
+  it("returns everything the server's error has, e.g. what's in the way of a 409", async () => {
+    mockFetch({ 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'Another set overlaps this one', session: null, set: null } })
+    const result = await api.PUT('/api/admin/sets/{id}/status', { params: { path: { id: 'set-1' } }, body: { status: 'planned' } })
+    expect(result).toEqual({ ok: false, error: 'Another set overlaps this one', session: null, set: null })
+    // Typed as the endpoint's errors.
+    if (!result.ok && 'set' in result) expect(result.set).toBeNull()
+  })
+
   it('tells that the session ended when an admin request fails with 401, before returning the error', async () => {
     mockFetch({ '/api/admin/features': UNAUTHORIZED })
     const listener = vi.fn()

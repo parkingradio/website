@@ -18,6 +18,7 @@ logged-in admin's email and a "se déconnecter" button:
 - [Calendrier](calendrier.md)
 - [Rotation radio](rotation.md)
 - [Candidatures](candidatures.md)
+- [Sessions](sessions.md)
 - [Artistes](artistes.md)
 - [Admins](admins.md)
 - [Configuration](configuration.md)
@@ -32,11 +33,11 @@ the country, when the other one is, and in place of a collective's genres when i
 
 ## Searching lists
 
-The lists of artists and collectives, and of applications (see [Artistes](artistes.md) and
-[Candidatures](candidatures.md)), find the entries that have every word searched for, in any of the fields searched,
-whatever their case and accents, and allowing for about one typo every 5 letters. The search and the order are kept in
-the page's address, along with the applications' status, so that going back to a list from one of its entries with the
-browser's back button finds it as it was.
+The lists of artists and collectives, of applications and of sessions (see [Artistes](artistes.md),
+[Candidatures](candidatures.md) and [Sessions](sessions.md)), find the entries that have every word searched for, in any
+of the fields searched, whatever their case and accents, and allowing for about one typo every 5 letters. The search and
+the order are kept in the page's address, along with the status of applications or sessions, so that going back to a
+list from one of its entries with the browser's back button finds it as it was.
 
 ## Endpoints
 

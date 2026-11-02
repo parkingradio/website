@@ -5,7 +5,8 @@ import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { byWhom } from '../describe'
 
-// The credentials of the SoundCloud app the radio reads playlists through, in the configuration section.
+// The credentials of the SoundCloud app the server reads SoundCloud through, for the radio's playlist and the tracks of
+// sets, in the configuration section.
 
 // How long each credential can be. The server's schema says so too (see server/src/radio/routes.ts), and decides.
 const CREDENTIAL_MAX_LENGTH = 200
@@ -75,8 +76,8 @@ function CredentialsForm({ loaded }: { loaded: Schema<'RadioCredentials'> }) {
   return (
     <>
       <p>
-        La radio lit sa playlist sur SoundCloud à travers une application SoundCloud, avec ses identifiants. Ils se trouvent
-        dans les{' '}
+        Le site lit SoundCloud à travers une application SoundCloud, avec ses identifiants&nbsp;: la playlist de la radio, et les
+        pistes des sets. Ils se trouvent dans les{' '}
         <a href="https://soundcloud.com/you/apps" target="_blank" rel="noreferrer">
           applications
         </a>{' '}
@@ -85,7 +86,10 @@ function CredentialsForm({ loaded }: { loaded: Schema<'RadioCredentials'> }) {
       {saved ? (
         <p className="admin-meta">{byWhom('Changés', saved.updatedBy, saved.updatedAt)}</p>
       ) : (
-        <p className="admin-placeholder">Aucun identifiant&nbsp;: la radio ne peut lire aucune playlist, elle est hors ondes.</p>
+        <p className="admin-placeholder">
+          Aucun identifiant&nbsp;: la radio ne peut lire aucune playlist, elle est hors ondes, et les liens SoundCloud des sets ne peuvent pas
+          être vérifiés.
+        </p>
       )}
       <form className="admin-form" onSubmit={save}>
         <label>

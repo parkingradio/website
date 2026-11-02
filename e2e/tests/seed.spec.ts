@@ -9,5 +9,6 @@ test('the server is seeded, and seeding it again changes nothing', async ({ base
   expect(await seed({ url: baseURL!, credentials: admin })).toEqual({
     seeded: [],
     skipped: [...SEED_ARTISTS, ...SEED_COLLECTIVES].map((seeded) => seeded.profile.name),
+    sessions: 0,
   })
 })

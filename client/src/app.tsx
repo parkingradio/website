@@ -17,6 +17,7 @@ import { Rotation } from './pages/admin/rotation'
 import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
 import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
 import { CollectivePage, NewCollectivePage } from './pages/admin/collectives'
+import { NewSessionPage, SessionPage, SessionsPage } from './pages/admin/sessions'
 import { Configuration } from './pages/admin/configuration'
 
 function App() {
@@ -42,6 +43,9 @@ function App() {
               <Route path="candidatures" element={<ApplicationsPage />} />
               <Route path="candidatures/nouvelle" element={<NewApplicationPage />} />
               <Route path="candidatures/:id" element={<ApplicationPage />} />
+              <Route path="sessions" element={<SessionsPage />} />
+              <Route path="sessions/nouvelle" element={<NewSessionPage />} />
+              <Route path="sessions/:id" element={<SessionPage />} />
               <Route path="artistes" element={<ArtistsPage />} />
               <Route path="artistes/nouveau" element={<NewArtistPage />} />
               <Route path="artistes/:id" element={<ArtistPage />} />

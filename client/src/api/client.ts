@@ -1,5 +1,5 @@
 import createClient from 'openapi-fetch'
-import type { ClientPathsWithMethod, MethodResponse, ParamsOption, RequestBodyOption } from 'openapi-fetch'
+import type { ClientPathsWithMethod, FetchResponse, MethodResponse, ParamsOption, RequestBodyOption } from 'openapi-fetch'
 import type { components, paths } from './schema'
 
 // The API, typed by schema.d.ts, which is generated from the server's openapi.json (`npm run generate:api` at the root).
@@ -11,9 +11,9 @@ import type { components, paths } from './schema'
 //
 //     const result = await api.POST('/api/admin/artists', { body: { artist, photo }, bodySerializer: formData })
 //
-// Calls never throw: they return the response with `ok: true` if it succeeded, or else an `ApiError`, including for
-// failures that never reach the server, which say so (see `Failure`). An admin request that fails with 401 also tells
-// `onSessionEnded`'s listeners.
+// Calls never throw: they return the response with `ok: true` if it succeeded, or else the server's error, as the
+// endpoint's schema says (see `ErrorOf`), or an `ApiError` for failures that never reach the server, which say so (see
+// `Failure`). An admin request that fails with 401 also tells `onSessionEnded`'s listeners.
 
 // A schema of the API, by name, e.g. `Schema<'Feature'>`.
 export type Schema<Name extends keyof components['schemas']> = components['schemas'][Name]
@@ -29,7 +29,9 @@ export type ApiError = Schema<'ApiError'>
 // artists see show a message of their own then, since this one isn't meant for them.
 export type Failure = ApiError & { fromServer?: false }
 
-export type Result<Data> = (Data & { ok: true }) | Failure
+// The response of a request that succeeded, or else the server's error, an `Error` for the errors the endpoint describes,
+// or a `Failure`.
+export type Result<Data, Error = never> = (Data & { ok: true }) | (Error & { fromServer?: undefined }) | Failure
 
 const client = createClient<paths>({
   // Absolute, since openapi-fetch builds a `Request`, which only accepts relative URLs in a browser, e.g. not in tests.
@@ -60,6 +62,11 @@ export type Init<M extends Method, Path extends PathsWith<M>> = ParamsOption<pat
 // The init is optional when nothing in it is required, e.g. for a path without parameters.
 export type InitParam<Init> = Record<string, never> extends Init ? [Init?] : [Init]
 export type Data<M extends Method, Path extends PathsWith<M>> = MethodResponse<Client, M, Path>
+// The errors an endpoint describes, e.g. the 409s of the sets' endpoints, with the other set.
+export type ErrorOf<M extends Method, Path extends PathsWith<M>> =
+  paths[Path][M] extends infer Operation extends Record<string | number, unknown>
+    ? NonNullable<FetchResponse<Operation, unknown, `${string}/${string}`>['error']>
+    : never
 // What a request sends as its body, e.g. `Body<'post', '/api/admin/artists'>`.
 export type Body<M extends Method, Path extends PathsWith<M>> = NonNullable<RequestBodyOption<paths[Path][M]>['body']>
 
@@ -77,7 +84,7 @@ export function onSessionEnded(listener: () => void): () => void {
 async function settle<Data>(
   request: Promise<{ data?: Data; error?: unknown; response: Response }>,
   admin: boolean,
-): Promise<Result<Data>> {
+): Promise<Result<Data, ApiError>> {
   let settled: Awaited<typeof request>
   try {
     settled = await request
@@ -88,13 +95,16 @@ async function settle<Data>(
   if (response.ok) return { ...data, ok: true } as Data & { ok: true }
   // Outside the `try`, so that a listener that throws isn't taken for a request that failed.
   if (admin && response.status === 401) sessionEndedListeners.forEach((listener) => listener())
+  // The server's error, with everything it has.
   const message = (error as Partial<ApiError> | undefined)?.error
-  return typeof message === 'string' ? { ok: false, error: message } : { ok: false, error: 'Erreur inconnue', fromServer: false }
+  return typeof message === 'string'
+    ? { ...(error as object), ok: false, error: message }
+    : { ok: false, error: 'Erreur inconnue', fromServer: false }
 }
 
 function method<M extends Method>(name: M) {
   return <Path extends PathsWith<M>>(path: Path, ...[init]: InitParam<Init<M, Path>>) =>
-    settle(client.request(name, path, init as never), path.startsWith('/api/admin/')) as Promise<Result<Data<M, Path>>>
+    settle(client.request(name, path, init as never), path.startsWith('/api/admin/')) as Promise<Result<Data<M, Path>, ErrorOf<M, Path>>>
 }
 
 export const api = { GET: method('get'), PUT: method('put'), POST: method('post'), DELETE: method('delete') }

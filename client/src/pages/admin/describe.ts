@@ -4,9 +4,17 @@ import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import { QUEBEC_TIME_ZONE, quebecDayAndTime } from '../../quebec-time'
+import type { Session, SessionStatus, StudioSet } from '../../session-fields'
+import type { ComboboxOption } from '../../combobox'
 import { compareText } from './list'
 
 // How the admin sections show what the API returns, search it and sort it.
+
+// A session's status, the same in the plural, e.g. for the filters of the list of sessions, and a set's.
+export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = { planned: 'planifiée', done: 'jouée', cancelled: 'annulée' }
+export const SESSION_STATUS_PLURALS: Record<SessionStatus, string> = { planned: 'planifiées', done: 'jouées', cancelled: 'annulées' }
+export const SET_STATUS_LABELS: Record<SessionStatus, string> = { planned: 'planifié', done: 'joué', cancelled: 'annulé' }
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   new: 'nouvelle',
@@ -107,10 +115,20 @@ export function applicationOwner({ artistId, collectiveId }: { artistId: string 
 
 // What tells an artist apart from others with the same name, in the lists they're picked from: their email, or else where
 // they're from, or else their collectives.
-export function detailOf(artist: Artist): string | null {
+function detailOf(artist: Artist): string | null {
   if (artist.email) return artist.email
   if (artist.city || artist.country) return place(artist)
   return artist.collectives.map((collective) => collective.name).join(', ') || null
+}
+
+// An artist, or a collective, as an option of the lists they're picked from, keyed by their id, with what tells them apart
+// from others with the same name.
+export function artistOption(artist: Artist): ComboboxOption {
+  return { key: artist.id, label: artist.name, detail: detailOf(artist) }
+}
+
+export function collectiveOption(collective: Collective): ComboboxOption {
+  return { key: collective.id, label: collective.name, detail: collective.email }
 }
 
 // What an artist or a collective is searched by, in the lists: their `names`, how to reach them, where they're from, their
@@ -183,4 +201,109 @@ export function byWhom(verb: string, who: string | null, when: string | null): s
 // Who added an artist or a collective, or that they applied by themselves, e.g. "collectif, ajouté par …".
 export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: string | null; createdAt: string }): string {
   return `${kind}, ${byWhom('ajouté', createdBy, createdAt) ?? `inscrit par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(createdAt))}.`}`
+}
+
+// Sessions' and sets' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
+// and their names (see docs/design/client/admin/sessions.md).
+const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
+const longQuebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
+
+// What's shown in place of the day of a session whose date isn't known yet.
+const UNDATED = 'date à déterminer'
+
+// E.g. "sam. 14 nov. 2026", the day of `instant` (ISO 8601) in Québec.
+function formatQuebecDay(instant: string): string {
+  return quebecDayFormat.format(new Date(instant))
+}
+
+// E.g. "samedi 14 novembre 2026".
+export function formatLongQuebecDay(instant: string): string {
+  return longQuebecDayFormat.format(new Date(instant))
+}
+
+// E.g. "21 h", or "21 h 30", for `minutes` (of a day, or of a duration).
+function hoursAndMinutes(minutes: number): string {
+  return `${Math.floor(minutes / 60)} h${minutes % 60 === 0 ? '' : ` ${String(minutes % 60).padStart(2, '0')}`}`
+}
+
+// E.g. "21 h", or "21 h 30", the time of `instant` in Québec.
+function formatQuebecTime(instant: string): string {
+  const [hours, minutes] = quebecDayAndTime(new Date(instant)).time.split(':').map(Number)
+  return hoursAndMinutes(hours * 60 + minutes)
+}
+
+// E.g. "1 h", "1 h 30" or "45 min".
+export function formatDuration(minutes: number): string {
+  return minutes < 60 ? `${minutes} min` : hoursAndMinutes(minutes)
+}
+
+// How long after its session's start a set starts, in a session without a date, e.g. "+0 h", "+1 h" or "+1 h 30".
+function formatOffset(minutes: number): string {
+  return `+${hoursAndMinutes(minutes)}`
+}
+
+// Whether an instant is on a later day than another, in Québec.
+function laterDay(start: string, end: string): boolean {
+  return quebecDayAndTime(new Date(start)).day !== quebecDayAndTime(new Date(end)).day
+}
+
+type SessionTimes = Pick<Session, 'start' | 'end' | 'durationMinutes'>
+
+// E.g. "sam. 14 nov. 2026", or "date à déterminer".
+export function sessionDay({ start }: Pick<Session, 'start'>): string {
+  return start === null ? UNDATED : formatQuebecDay(start)
+}
+
+// E.g. "samedi 14 novembre 2026", or "date à déterminer".
+export function sessionLongDay({ start }: Pick<Session, 'start'>): string {
+  return start === null ? UNDATED : formatLongQuebecDay(start)
+}
+
+// E.g. "21 h – 1 h", or how long a session without a date lasts, e.g. "4 h".
+export function sessionHours({ start, end, durationMinutes }: SessionTimes): string {
+  return start === null || end === null ? formatDuration(durationMinutes) : `${formatQuebecTime(start)} – ${formatQuebecTime(end)}`
+}
+
+// E.g. "de 21 h à 1 h le lendemain", or "qui dure 4 h" for a session without a date.
+export function sessionWithin({ start, end, durationMinutes }: SessionTimes): string {
+  if (start === null || end === null) return `qui dure ${formatDuration(durationMinutes)}`
+  return `de ${formatQuebecTime(start)} à ${formatQuebecTime(end)}${laterDay(start, end) ? ' le lendemain' : ''}`
+}
+
+// E.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
+export function sessionWhen(session: SessionTimes): string {
+  return session.start === null ? UNDATED : `${sessionLongDay(session)}, ${sessionWithin(session)}`
+}
+
+// What a session is called: its name, or else its takeover, or else its day.
+export function sessionTitle(session: Pick<Session, 'name' | 'takeover' | 'start'>): string {
+  if (session.name) return session.name
+  if (session.takeover) return `Takeover de ${session.takeover.name}`
+  return session.start === null ? 'Session sans date' : `Session du ${formatLongQuebecDay(session.start)}`
+}
+
+// A session as it's named along with others, with its day after its name or its takeover, e.g. "HAUTE RIVE TAKEOVER, sam.
+// 14 nov. 2026".
+export function sessionName(session: Pick<Session, 'name' | 'takeover' | 'start'>): string {
+  return session.name || session.takeover ? `${sessionTitle(session)}, ${sessionDay(session)}` : sessionTitle(session)
+}
+
+// E.g. "21 h – 22 h", "+0 h – +1 h" in a session without a date, or "horaire à déterminer (1 h)" for a set whose place
+// isn't known.
+export function setHours(set: Pick<StudioSet, 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>): string {
+  if (set.start !== null && set.end !== null) return `${formatQuebecTime(set.start)} – ${formatQuebecTime(set.end)}`
+  // A set with an offset has a duration.
+  if (set.offsetMinutes !== null) return `${formatOffset(set.offsetMinutes)} – ${formatOffset(set.offsetMinutes + set.durationMinutes!)}`
+  return `horaire à déterminer${set.durationMinutes === null ? '' : ` (${formatDuration(set.durationMinutes)})`}`
+}
+
+// What a set is called: e.g. "Set de Aurore, Brume et Écume", or "Set" once its performers are all deleted.
+export function setTitle(set: Pick<StudioSet, 'performers'>): string {
+  return set.performers.length > 0 ? `Set de ${enumerate(set.performers.map((performer) => performer.name))}` : 'Set'
+}
+
+// A set as it's named on its session's page, e.g. "Set de Aurore, 21 h – 22 h", or outside it, with its session, e.g.
+// "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
+export function setName(set: StudioSet, session?: Pick<Session, 'name' | 'takeover' | 'start'>): string {
+  return [setTitle(set), ...(session ? [sessionName(session)] : []), setHours(set)].join(', ')
 }

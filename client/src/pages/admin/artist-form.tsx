@@ -4,18 +4,16 @@ import {
   BIO_MAX_LENGTH,
   CITY_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
-  GENRES,
   NAME_MAX_LENGTH,
   PHONE_MAX_LENGTH,
   checkProfile,
   pickedPhotoError,
 } from '../../artist-profile'
-import type { Artist, Profile, GenreId } from '../../artist-profile'
-import { genreName, photoUrl } from './describe'
-import { leaving, useCheckedForm } from './checked-form'
-import { FieldError, FormActions, Labeled } from './fields'
-import { CountryField, LinksField, PhotoField } from './profile-fields'
-import type { GroupProps } from './profile-fields'
+import type { Artist, Profile } from '../../artist-profile'
+import { photoUrl } from './describe'
+import { useCheckedForm } from './checked-form'
+import { FormActions, Labeled } from './fields'
+import { CountryField, GenresField, LinksField, PhotoField } from './profile-fields'
 
 // A form for an artist's profile and photo, to add an artist or change one. Each field is checked as the server checks it
 // for admins (see `checkProfile`), and says what's wrong once it's been left, or once the form is sent. The server's
@@ -126,38 +124,3 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
     </form>
   )
 }
-
-// Every genre, as a tag: clicking one pins it, or unpins it if it was. The genres pinned are listed first, in the order
-// they were pinned, which is their order of importance.
-function GenresField({ genres, onChange, error, onLeave }: GroupProps<GenreId[]> & { genres: GenreId[] }) {
-  const toggle = (genre: GenreId) => onChange(genres.includes(genre) ? genres.filter((other) => other !== genre) : [...genres, genre])
-  return (
-    <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
-      <legend>Genres</legend>
-      <p className="admin-hint">Le premier choisi est le genre principal.</p>
-      {genres.length > 0 && (
-        <ol className="admin-chosen">
-          {genres.map((genre, index) => (
-            <li key={genre}>
-              <b>{index + 1}</b>
-              {genreName(genre)}
-              <button type="button" aria-label={`retirer ${genreName(genre)}`} onClick={() => toggle(genre)}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
-      {/* Focused when the genres are the first thing to fix, which is why it can be focused. */}
-      <div className="admin-tags" role="group" aria-label="Tous les genres" aria-invalid={error ? true : undefined} tabIndex={-1}>
-        {GENRES.map((genre) => (
-          <button key={genre} type="button" aria-pressed={genres.includes(genre)} onClick={() => toggle(genre)}>
-            {genreName(genre)}
-          </button>
-        ))}
-      </div>
-      <FieldError message={error} />
-    </fieldset>
-  )
-}
-

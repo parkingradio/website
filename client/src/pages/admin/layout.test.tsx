@@ -50,6 +50,7 @@ describe('Admin pages', () => {
       ['calendrier', '/admin/calendrier'],
       ['rotation radio', '/admin/rotation'],
       ['candidatures', '/admin/candidatures'],
+      ['sessions', '/admin/sessions'],
       ['artistes', '/admin/artistes'],
       ['admins', '/admin/admins'],
       ['configuration', '/admin/configuration'],

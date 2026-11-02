@@ -6,6 +6,7 @@ import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { OwnApplications } from './applications'
 import { CollectiveForm } from './collective-form'
+import { OwnSessions } from './sessions'
 import type { CollectiveFormProps } from './collective-form'
 import { ArtistsFailure, BackToArtists, LinksList, LoadFailure, MembersList, PhotoOrNone } from './profile-details'
 import { MISSING, addedBy, byWhom, collectiveGenreNames, deletedWith, entryPath, photoUrl, place } from './describe'
@@ -25,6 +26,7 @@ function CollectiveById({ id }: { id: string }) {
   const [membersVersion, setMembersVersion] = useState(0)
   const members = useApi('/api/admin/artists', { params: { query: { collective: id } }, version: membersVersion })
   const applications = useApi('/api/admin/applications', { params: { query: { collective: id } } })
+  const sessions = useApi('/api/admin/sessions', { params: { query: { takeover: id } } })
   // The collective as the last change left it, which replaces the one loaded.
   const [changed, setChanged] = useState<Collective | null>(null)
   const [editing, setEditing] = useState(false)
@@ -89,10 +91,13 @@ function CollectiveById({ id }: { id: string }) {
 
       <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collectif=${collective.id}`} />
 
+      <OwnSessions sessions={sessions} newPath={`/admin/sessions/nouvelle?takeover=${collective.id}`} />
+
       <h2>Supprimer</h2>
       <p>
         Le collectif{collective.hasPhoto && ', sa photo'} et ses candidatures seront supprimés pour de bon. Ses artistes restent, avec
         leurs propres candidatures.
+        {sessions.kind === 'loaded' && sessions.value.sessions.length > 0 && ' Les sessions de ses takeovers restent, sans takeover.'}
       </p>
       {error && (
         <p className="admin-error" role="alert">

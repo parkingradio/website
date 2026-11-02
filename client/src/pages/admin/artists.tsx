@@ -6,6 +6,7 @@ import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ArtistForm } from './artist-form'
 import { OwnApplications } from './applications'
+import { OwnSets } from './sessions'
 import {
   KIND_LABELS,
   MISSING,
@@ -129,6 +130,7 @@ export function ArtistPage() {
 function ArtistById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/artists/{id}', { params: { path: { id } } })
   const applications = useApi('/api/admin/applications', { params: { query: { artist: id } } })
+  const sessions = useApi('/api/admin/sessions', { params: { query: { artist: id } } })
   // The artist as the last change left them, which replaces the one loaded.
   const [changed, setChanged] = useState<Artist | null>(null)
   const [editing, setEditing] = useState(false)
@@ -163,6 +165,12 @@ function ArtistById({ id }: { id: string }) {
 
   const count = applications.kind === 'loaded' ? applications.value.applications.length : null
   const theirPhoto = artist.hasPhoto ? ', sa photo' : ''
+  // What deleting the artist takes them out of, once it's known that they have some.
+  const takenOutOf = [
+    ...(artist.collectives.length > 0 ? ['ses collectifs'] : []),
+    // The sessions where they played a set.
+    ...(sessions.kind === 'loaded' && sessions.value.sessions.length > 0 ? ['ses sets'] : []),
+  ]
   const remove = async () => {
     if (!window.confirm(`Supprimer définitivement ${deletedWith(artist.name, artist.hasPhoto, count)} ?`)) return
     setBusy(true)
@@ -192,10 +200,12 @@ function ArtistById({ id }: { id: string }) {
 
       <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?artiste=${artist.id}`} />
 
+      <OwnSets sessions={sessions} artistId={artist.id} />
+
       <h2>Supprimer</h2>
       <p>
         L'artiste{theirPhoto} et ses candidatures seront supprimés pour de bon.
-        {artist.collectives.length > 0 && " L'artiste sera aussi retiré de ses collectifs, qui restent."}
+        {takenOutOf.length > 0 && ` L'artiste sera aussi retiré de ${takenOutOf.join(' et de ')}, qui restent.`}
       </p>
       {error && (
         <p className="admin-error" role="alert">

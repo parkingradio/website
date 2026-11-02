@@ -2,13 +2,11 @@ import { useId, useState } from 'react'
 import type { Body } from '../../api/client'
 import {
   DETAILS_MAX_LENGTH,
-  OTHER_PRESTATION_MAX_LENGTH,
   PRESTATIONS,
   checkApplication,
   checkReceivedAt,
   isDay,
   isTime,
-  prestationName,
 } from '../../application-fields'
 import type { ApplicationFields, TimeSlot } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
@@ -17,10 +15,10 @@ import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxOption } from '../../combobox'
 import { leaving, useCheckedForm } from './checked-form'
-import { KIND_LABELS, detailOf, entryPath } from './describe'
+import { KIND_LABELS, artistOption, collectiveOption, entryPath } from './describe'
 import type { Owner } from './describe'
 import { compareText } from './list'
-import { FieldError, FormActions, Labeled } from './fields'
+import { FieldError, FormActions, Labeled, PrestationsField } from './fields'
 
 // A form for an application's fields, to create an application or change one. Each field is checked as the server checks
 // it (see `checkApplication`), and says what's wrong once it's been left, or once the form is sent. The server's error is
@@ -48,9 +46,9 @@ type ApplicationFormProps = {
 // The artists and collectives a new application can be for, by name, where collectives say so.
 function ownerOptions(artists: Artist[], collectives: Collective[]): (ComboboxOption & { owner: Owner })[] {
   return [
-    ...artists.map((artist) => ({ label: artist.name, detail: detailOf(artist), owner: { kind: 'artist' as const, id: artist.id } })),
+    ...artists.map((artist) => ({ ...artistOption(artist), owner: { kind: 'artist' as const, id: artist.id } })),
     ...collectives.map((collective) => ({
-      label: collective.name,
+      ...collectiveOption(collective),
       detail: `${KIND_LABELS.collective}, ${collective.email}`,
       owner: { kind: 'collective' as const, id: collective.id },
     })),
@@ -204,31 +202,14 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
         <FieldError message={shown('timeSlots')} />
       </fieldset>
 
-      <fieldset className="admin-fields">
-        <legend>Type de prestation</legend>
-        <div className="admin-choices">
-          {PRESTATIONS.map((id) => (
-            <label key={id}>
-              <input
-                type="checkbox"
-                checked={prestations.includes(id)}
-                onChange={(event) => setPrestations(event.target.checked ? [...prestations, id] : prestations.filter((other) => other !== id))}
-              />
-              {prestationName(id)}
-            </label>
-          ))}
-        </div>
-        <Labeled label="Autre" error={shown('otherPrestation')}>
-          <input
-            placeholder="en quelques mots"
-            value={otherPrestation}
-            maxLength={OTHER_PRESTATION_MAX_LENGTH}
-            aria-invalid={shown('otherPrestation') ? true : undefined}
-            onChange={(event) => setOtherPrestation(event.target.value)}
-            onBlur={leave('otherPrestation')}
-          />
-        </Labeled>
-      </fieldset>
+      <PrestationsField
+        prestations={prestations}
+        otherPrestation={otherPrestation}
+        onChange={setPrestations}
+        onOtherChange={setOtherPrestation}
+        error={shown('otherPrestation')}
+        onLeave={leave('otherPrestation')}
+      />
 
       <Labeled label="Questions ou détails" error={shown('details')}>
         <textarea

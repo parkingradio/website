@@ -3,7 +3,7 @@
 At `/admin/configuration`: the settings that change what the site does. From top to bottom, it shows:
 
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
-- "Connexion SoundCloud": the credentials of the SoundCloud app the radio reads its playlist through.
+- "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -19,10 +19,11 @@ that applications aren't emailed to anyone, but are still listed in [Candidature
 
 ## Connexion SoundCloud
 
-The credentials of the SoundCloud app the radio reads its playlist through (see
-[The SoundCloud app](../../server/radio.md#the-soundcloud-app)). It says that they're found in the apps of the
-SoundCloud account it belongs to, linking to them (`https://soundcloud.com/you/apps`). It shows which admin last changed
-the credentials, and when, or that the radio is off air until they're entered.
+The credentials of the SoundCloud app the server reads SoundCloud through: the radio's playlist, and the tracks of
+[sets](sessions.md) (see [The SoundCloud app](../../server/radio.md#the-soundcloud-app)). It says that they're found in the
+apps of the SoundCloud account it belongs to, linking to them (`https://soundcloud.com/you/apps`). It shows which admin
+last changed the credentials, and when, or, until they're entered, that the radio is off air, and that sets' SoundCloud
+links can't be checked.
 
 Under that, a form replaces the credentials: the client ID, filled in with the current one, and the secret. The secret
 is never sent back once it's entered, so its field only shows dots in its place, and it has to be typed to replace

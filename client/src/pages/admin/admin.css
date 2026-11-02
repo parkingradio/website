@@ -40,7 +40,8 @@
 
 /* Pills, like the navbar's links and the programmation page's buttons. Menu links are black when selected,
    and buttons when hovered. A form's submit button is always black, since it's the main thing to do on the
-   page. */
+   page. Rows' buttons overflow into their cells' padding by as much as their vertical padding and border (see
+   `.admin-table-controls`). */
 .admin button,
 .admin-links a {
   padding: 4.5px 10px;
@@ -345,6 +346,22 @@
   white-space: nowrap;
 }
 
+/* A table whose rows have buttons, e.g. a set's status: they're on the row's first line, with their text in line with
+   the row's, since their vertical padding and border (see `.admin button`) overflow into the cell's padding. */
+.admin-table-controls td .admin-filters {
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+
+.admin-table-controls td button {
+  margin-block: calc(-4.5px - 1px);
+}
+
+/* A row's last buttons, e.g. "modifier" and "×", side by side. */
+.admin-table-controls td:last-child {
+  white-space: nowrap;
+}
+
 /* An application's days, in the list, wrap between them rather than within one. */
 .admin-day {
   white-space: nowrap;
@@ -357,6 +374,11 @@
 /* Applications there's nothing more to do about. */
 .admin-status-done,
 .admin-status-rejected {
+  color: #666;
+}
+
+/* Sets that won't be played. */
+.admin-set-cancelled {
   color: #666;
 }
 
@@ -498,6 +520,22 @@ dl.admin-record {
   gap: 0.4rem;
 }
 
+/* A session's day and the times it starts and ends, a set's times, or the hours and minutes of a duration, side by
+   side. */
+.admin-form .admin-times {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.admin-form .admin-times label {
+  align-self: auto;
+}
+
+/* The hours and minutes of a duration. */
+.admin-form .admin-duration input {
+  width: 5rem;
+}
+
 /* A field, with what's wrong with it under it. */
 .admin-field {
   display: flex;
@@ -567,7 +605,7 @@ dl.admin-record {
   gap: 0.5rem;
 }
 
-/* Chosen genres, or a collective's artists, in order, each with the button that removes it. */
+/* Chosen genres, or a collective's artists or a set's performers, in order, each with the button that removes it. */
 .admin-chosen {
   display: flex;
   flex-wrap: wrap;
@@ -590,8 +628,8 @@ dl.admin-record {
   border: none;
 }
 
-/* A collective's artists, one per line, since they're moved up and down. */
-.admin-members {
+/* Picks in order, e.g. a collective's artists, one per line, since they're moved up and down. */
+.admin-ordered {
   flex-direction: column;
   align-items: flex-start;
 }

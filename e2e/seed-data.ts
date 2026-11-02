@@ -1,9 +1,10 @@
 import type { components } from '../client/src/api/schema.d.ts'
 
-// The data seed.ts fills a database with: artists, some with a photo, and their applications, and collectives of some of
-// them, with their applications, with the variety the admin pages have to handle. It's the same every time it's seeded,
-// except for days, which are counted from the day it's seeded, so that the data always looks current: new applications
-// are for the coming months, and those that are done were for past days.
+// The data seed.ts fills a database with: artists, some with a photo, and their applications, collectives of some of
+// them, with their applications, and sessions and their sets, with the variety the admin pages have to handle. It's the
+// same every time it's seeded, except for days, which are counted from the day it's seeded, so that the data always
+// looks current: new applications and planned sessions are for the coming months, and those that are done were for past
+// days.
 
 // A profile, as the server returns it, which is also how it can be sent, as it's already cleaned up.
 export type Profile = Omit<components['schemas']['Artist'], 'id' | 'createdAt' | 'createdBy' | 'updatedBy' | 'updatedAt' | 'hasPhoto' | 'collectives'>
@@ -603,5 +604,120 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     members: [{ name: 'Jah Pierre' }],
     photo: '#7d5ba6',
     applications: [application([-10], 'done', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
+  },
+]
+
+type Status = components['schemas']['SessionStatus']
+type SetFields = components['schemas']['SetFields']
+
+export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
+  Partial<Pick<SetFields, 'prestations' | 'otherPrestation' | 'genres'>> & {
+    // The artists who played it, in order: artists of SEED_ARTISTS by their email, or artists without one, e.g. those of
+    // a collective, by their name.
+    performers: string[]
+    // The video's id on YouTube, which isn't checked against YouTube. Sets have no SoundCloud track, which the server
+    // would have to find on SoundCloud.
+    youtubeVideo?: string
+    status: Status
+  }
+
+export type SeedSession = {
+  // The collective whose takeover it is, by its email.
+  takeover?: string
+  name?: string
+  // The event's id on RA, which isn't checked against RA.
+  raEvent?: string
+  // The day it starts, as how many days after the day it's seeded (before, if negative), in Québec, and the time it
+  // starts there, or nothing for a session whose date isn't known yet.
+  when?: { day: number; start: string }
+  durationMinutes: number
+  status: Status
+  // In order. A set is given its status as soon as it's added, so that a cancelled set can be overlapped by the sets
+  // after it. Cancelling the session cancels them all, and marking it as done marks none of them.
+  sets: SeedSet[]
+}
+
+// The sessions are clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or happen
+// twice, and their sets' times wouldn't be as they look.
+export const SEED_SESSIONS: SeedSession[] = [
+  // Onde Commune's takeover: its three artists, one after the other.
+  {
+    takeover: 'onde.commune@example.com',
+    name: 'ONDE COMMUNE TAKEOVER',
+    raEvent: '2201001',
+    when: { day: -30, start: '20:00' },
+    durationMinutes: 180,
+    status: 'done',
+    sets: [
+      { performers: ['clementine@example.com'], offsetMinutes: 0, durationMinutes: 60, prestations: ['dj'], genres: ['techno', 'acid'], youtubeVideo: 'oNdEcOmMuN1', status: 'done' },
+      { performers: ['boreale@example.com'], offsetMinutes: 60, durationMinutes: 60, prestations: ['vinyl'], genres: ['house'], youtubeVideo: 'oNdEcOmMuN2', status: 'done' },
+      { performers: ['kwame@example.com'], offsetMinutes: 120, durationMinutes: 60, prestations: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
+    ],
+  },
+  // Collectif Béton's takeover: a guest who isn't one of its artists, then two of its artists together, until after
+  // midnight.
+  {
+    takeover: 'beton@example.com',
+    name: 'BÉTON 140',
+    when: { day: -60, start: '20:30' },
+    durationMinutes: 300,
+    status: 'done',
+    sets: [
+      { performers: ['DJ.Poutine@Example.com'], offsetMinutes: 0, durationMinutes: 90, prestations: ['dj'], youtubeVideo: 'bEtOnGuEsT1', status: 'done' },
+      {
+        performers: ['Mathis', 'Rosalie'],
+        offsetMinutes: 90,
+        durationMinutes: 210,
+        prestations: ['live-performance'],
+        otherPrestation: 'B2B machines',
+        genres: ['hard-techno', 'ebm-industrial'],
+        youtubeVideo: 'bEtOn140aaa',
+        status: 'done',
+      },
+    ],
+  },
+  // Without a name or links.
+  {
+    takeover: 'dub.laurentides@example.com',
+    when: { day: -10, start: '14:00' },
+    durationMinutes: 120,
+    status: 'done',
+    sets: [{ performers: ['Jah Pierre'], offsetMinutes: 0, durationMinutes: 120, status: 'done' }],
+  },
+  // An evening of several artists, without a takeover or a name, where a cancelled set was replaced by one that overlaps
+  // it.
+  {
+    when: { day: 30, start: '21:00' },
+    durationMinutes: 150,
+    status: 'planned',
+    sets: [
+      { performers: ['Marée Basse'], offsetMinutes: 30, durationMinutes: 60, prestations: ['live-performance'], status: 'cancelled' },
+      { performers: ['clementine@example.com', 'clement.brule@example.com'], offsetMinutes: 0, durationMinutes: 90, prestations: ['dj'], status: 'planned' },
+      { performers: ['kwame@example.com'], offsetMinutes: 90, durationMinutes: 60, prestations: ['dj'], genres: ['deep-house'], status: 'planned' },
+    ],
+  },
+  // A takeover put together before its date is known, whose last set's place isn't known either.
+  {
+    takeover: 'soeurs.ondes@example.com',
+    name: 'LES SŒURS ONDES TAKEOVER',
+    durationMinutes: 180,
+    status: 'planned',
+    sets: [
+      { performers: ['Ondine'], offsetMinutes: 0, durationMinutes: 60, prestations: ['live-performance'], otherPrestation: 'Synthé modulaire', genres: ['ambient'], status: 'planned' },
+      { performers: ['Marée'], offsetMinutes: 60, durationMinutes: 60, prestations: ['live-performance'], genres: ['experimental'], status: 'planned' },
+      { performers: ['Écume'], offsetMinutes: null, durationMinutes: 60, status: 'planned' },
+    ],
+  },
+  // Les Nuits Basses' takeover, cancelled, which cancelled its sets.
+  {
+    takeover: 'kwame@example.com',
+    raEvent: '2302002',
+    when: { day: 60, start: '20:00' },
+    durationMinutes: 120,
+    status: 'cancelled',
+    sets: [
+      { performers: ['Sable Mouvant'], offsetMinutes: 0, durationMinutes: 60, status: 'planned' },
+      { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, status: 'planned' },
+    ],
   },
 ]

@@ -5,6 +5,7 @@ import App from '../../app'
 import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
+import type { Session } from '../../session-fields'
 import { mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
@@ -68,6 +69,7 @@ const ONDES_PAGE = {
   '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
   '/api/admin/artists?collective=collective-1': { ok: true, artists: [AURORE, CYAN] },
   '/api/admin/applications?collective=collective-1': { ok: true, applications: [] },
+  '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [] },
   '/api/admin/artists': { ok: true, artists: ARTISTS },
 }
 
@@ -509,10 +511,45 @@ describe('A collective’s page', () => {
     expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).removePhoto).toBe('true')
   })
 
+  it('says when it has no sessions, with a link to add one as its takeover', async () => {
+    mockFetch(ONDES_PAGE)
+    renderAt('/admin/artistes/collectifs/collective-1')
+    expect(await screen.findByText('Aucune session.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle?takeover=collective-1')
+    expect(screen.getByText(/seront supprimés pour de bon/)).not.toHaveTextContent('Les sessions de ses takeovers restent')
+  })
+
+  it("lists the sessions of its takeovers, without their takeover, and says that they stay once it's deleted", async () => {
+    const session: Session = {
+      id: 'session-1',
+      start: '2026-11-15T02:00:00.000Z',
+      end: '2026-11-15T05:00:00.000Z',
+      durationMinutes: 180,
+      takeover: { id: 'collective-1', name: 'Ondes' },
+      name: 'ONDES TAKEOVER',
+      raEvent: null,
+      sets: [],
+      createdAt: '2026-10-01T16:00:00.000Z',
+      createdBy: 'admin@example.com',
+      updatedBy: null,
+      updatedAt: null,
+      status: 'planned',
+      statusUpdatedBy: null,
+      statusUpdatedAt: null,
+    }
+    mockFetch({ ...ONDES_PAGE, '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [session] } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+    expect(await screen.findByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    const table = screen.getByRole('table', { name: 'Sessions' })
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut'])
+    expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent('Les sessions de ses takeovers restent, sans takeover.')
+  })
+
   it('deletes the collective and its applications once confirmed, but not its artists, and goes back to the list', async () => {
     mockFetch({
       ...ONDES_PAGE,
       '/api/admin/applications?collective=collective-1': { ok: true, applications: [APPLICATION, { ...APPLICATION, id: 'application-2' }] },
+      '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [] },
       'DELETE /api/admin/collectives/collective-1': { ok: true },
       '/api/admin/collectives': { ok: true, collectives: [] },
     })

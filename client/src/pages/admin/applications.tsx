@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
@@ -30,9 +30,9 @@ import {
 } from './describe'
 import type { Entry, Owner } from './describe'
 import { ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
-import { compareText, search, useQueryParams, useSearchQuery, useSort } from './list'
+import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
-import { SearchField, SortHeader } from './list-controls'
+import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in one that came through the original Google Form.
@@ -81,16 +81,19 @@ function applicationColumns(owners: Owners): Record<ApplicationColumn, SortColum
   }
 }
 
-// Applications, as listed in this section, or on an artist's or a collective's page, where `owners` is left out since
-// they're all theirs, and so are the columns about them. The columns sort the list when there's `sorting`.
+// Applications, as listed in this section, or on an artist's or a collective's page, under the heading whose id is
+// `labelledBy`, where `owners` is left out since they're all theirs, and so are the columns about them. The columns sort
+// the list when there's `sorting`.
 export function ApplicationsTable({
   applications,
   owners,
   sorting,
+  labelledBy,
 }: {
   applications: Application[]
   owners?: Owners
   sorting?: Sorting<ApplicationColumn>
+  labelledBy?: string
 }) {
   const header = (column: ApplicationColumn, label: string) =>
     sorting ? (
@@ -101,7 +104,7 @@ export function ApplicationsTable({
       <th>{label}</th>
     )
   return (
-    <table className="admin-table">
+    <table className="admin-table" aria-labelledby={labelledBy}>
       <thead>
         <tr>
           {header('recue', 'Reçue le')}
@@ -172,9 +175,10 @@ function OwnerName({ application, owner }: { application: Application; owner: En
 
 // The applications of an artist or a collective, on their page, with a link to `newPath`, which creates another one.
 export function OwnApplications({ applications, newPath }: { applications: Loaded<{ applications: Application[] }>; newPath: string }) {
+  const headingId = useId()
   return (
     <>
-      <h2>Candidatures</h2>
+      <h2 id={headingId}>Candidatures</h2>
       <div className="admin-toolbar">
         <Link to={newPath} className="admin-button">
           nouvelle candidature
@@ -189,7 +193,7 @@ export function OwnApplications({ applications, newPath }: { applications: Loade
         (applications.value.applications.length === 0 ? (
           <p className="admin-placeholder">Aucune candidature.</p>
         ) : (
-          <ApplicationsTable applications={applications.value.applications} />
+          <ApplicationsTable applications={applications.value.applications} labelledBy={headingId} />
         ))}
     </>
   )
@@ -234,8 +238,7 @@ function ApplicationsList({ query }: { query: string }) {
     collectives.kind === 'loaded' ? collectives.value.collectives : [],
   )
   const sorting = useSort(applicationColumns(byKey), 'recue')
-  const [params, change] = useQueryParams()
-  const status = APPLICATION_STATUSES.find((status) => status === params.get('statut')) ?? null
+  const [status, setStatus] = useStatusFilter(APPLICATION_STATUSES)
 
   if (applications.kind === 'error') {
     return (
@@ -250,20 +253,17 @@ function ApplicationsList({ query }: { query: string }) {
   const found = search(all, query, (application) => [...(ownerOf(application, byKey)?.searchFields ?? []), ...applicationSearchFields(application)])
   const withStatus = (applications: Application[]) => (status ? applications.filter((application) => application.status === status) : applications)
   const listed = sorting.sorted(withStatus(found))
-  const filters: { status: ApplicationStatus | null; label: string }[] = [
-    { status: null, label: 'toutes' },
-    ...APPLICATION_STATUSES.map((status) => ({ status, label: STATUS_PLURALS[status] })),
-  ]
 
   return (
     <>
-      <div className="admin-filters" role="group" aria-label="Statut">
-        {filters.map((filter) => (
-          <button key={filter.label} type="button" aria-pressed={status === filter.status} onClick={() => change({ statut: filter.status })}>
-            {filter.label} ({filter.status ? found.filter((application) => application.status === filter.status).length : found.length})
-          </button>
-        ))}
-      </div>
+      <StatusFilters
+        all="toutes"
+        statuses={APPLICATION_STATUSES}
+        labels={STATUS_PLURALS}
+        status={status}
+        count={(status) => (status ? found.filter((application) => application.status === status).length : found.length)}
+        onChange={setStatus}
+      />
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       {listed.length === 0 ? (
@@ -425,13 +425,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
       {application.updatedBy && <p className="admin-meta">{byWhom('Modifiée', application.updatedBy, application.updatedAt)}</p>}
 
       <h2>Statut</h2>
-      <div className="admin-filters" role="group" aria-label="Statut">
-        {APPLICATION_STATUSES.map((status) => (
-          <button key={status} type="button" aria-pressed={application.status === status} disabled={busy} onClick={() => changeStatus(status)}>
-            {STATUS_LABELS[status]}
-          </button>
-        ))}
-      </div>
+      <StatusButtons statuses={APPLICATION_STATUSES} labels={STATUS_LABELS} status={application.status} disabled={() => busy} onChange={changeStatus} />
       {application.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>}
       {error && (
         <p className="admin-error" role="alert">

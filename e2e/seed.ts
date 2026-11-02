@@ -7,8 +7,9 @@ import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
 import type { components, paths } from '../client/src/api/schema.d.ts'
-import { SEED_ARTISTS, SEED_COLLECTIVES } from './seed-data.ts'
-import type { Profile, SeedApplication, SeedArtist, SeedCollective, SeedMember } from './seed-data.ts'
+import { addDays, quebecDateTime, quebecDayAndTime, quebecInstant } from '../client/src/quebec-time.ts'
+import { SEED_ARTISTS, SEED_COLLECTIVES, SEED_SESSIONS } from './seed-data.ts'
+import type { Profile, SeedApplication, SeedArtist, SeedCollective, SeedMember, SeedSession } from './seed-data.ts'
 
 export type Credentials = { email: string; password: string }
 
@@ -20,6 +21,10 @@ type ApplicationsResponse = paths['/api/admin/applications']['get']['responses']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
 type ApplicationStatus = components['schemas']['ApplicationStatus']
+type SessionsResponse = paths['/api/admin/sessions']['get']['responses'][200]['content']['application/json']
+type SessionResponse = paths['/api/admin/sessions']['post']['responses'][200]['content']['application/json']
+type NewSession = paths['/api/admin/sessions']['post']['requestBody']['content']['application/json']
+type NewSet = paths['/api/admin/sessions/{id}/sets']['post']['requestBody']['content']['application/json']
 type ApiError = components['schemas']['ApiError']
 
 export type SeedOptions = {
@@ -42,10 +47,13 @@ export const TURNSTILE_TOKEN = 'XXXX.DUMMY.TOKEN.XXXX'
 const DAY_MS = 24 * 60 * 60 * 1000
 
 // Seeds every artist of SEED_ARTISTS who isn't there yet, with their applications, then every collective of
-// SEED_COLLECTIVES that isn't there yet, and returns the names of those seeded and skipped. An artist is there when
-// another one has their email, whatever its case, or, for an artist without one, when another one without an email has
-// their name, whatever its case. A collective is there when another one has its email, whatever its case.
-export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[] }> {
+// SEED_COLLECTIVES that isn't there yet, then the sessions of SEED_SESSIONS, with their sets, if there are no sessions
+// yet, and returns the names of the artists and collectives seeded and skipped, and how many sessions were seeded. An
+// artist is there when another one has their email, whatever its case, or, for an artist without one, when another one
+// without an email has their name, whatever its case. A collective is there when another one has its email, whatever its
+// case. Sessions are seeded only while there are none, since their days, counted from the day they're seeded, would
+// otherwise overlap those seeded before.
+export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[]; sessions: number }> {
   const server = await logIn(url, credentials)
   const there = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map(seedKey))
   const seeded: string[] = []
@@ -98,7 +106,24 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
     }
     seeded.push(collective.profile.name)
   }
-  return { seeded, skipped }
+
+  const { sessions } = await server.call<SessionsResponse>('GET', '/api/admin/sessions')
+  if (sessions.length > 0) return { seeded, skipped, sessions: 0 }
+  const [{ artists }, { collectives: allCollectives }] = await Promise.all([
+    server.call<ArtistsResponse>('GET', '/api/admin/artists'),
+    server.call<CollectivesResponse>('GET', '/api/admin/collectives'),
+  ])
+  const collectiveIds = new Map(allCollectives.map((collective) => [collective.email.toLowerCase(), collective.id]))
+  // Including those the collectives were seeded with.
+  const performerIds = new Map(artists.map((artist) => [seedKey(artist), artist.id]))
+  for (const [i, session] of SEED_SESSIONS.entries()) {
+    try {
+      await addSession(server, session, performerIds, collectiveIds)
+    } catch (error) {
+      throw new Error(`${messageOf(error)}\nOnly ${i} of the sessions were seeded. To seed them again, delete them first.`, { cause: error })
+    }
+  }
+  return { seeded, skipped, sessions: SEED_SESSIONS.length }
 }
 
 // What tells whether an artist is there already (see `seed`).
@@ -226,6 +251,50 @@ async function setStatus(server: Server, id: string, status: ApplicationStatus):
   if (status !== 'new') await server.call('PUT', `/api/admin/applications/${id}/status`, { status })
 }
 
+// Adds the session and its sets as an admin would, with their statuses: its takeover's collective, by its email, in
+// `collectiveIds`, and its sets' performers, by their email, or else, for those without one, by their name, in
+// `artistIds` (see `seedKey`). Each set is given its status once it's added, and the session once its sets are, since a
+// cancelled session can't be added to.
+async function addSession(server: Server, session: SeedSession, artistIds: Map<string, string>, collectiveIds: Map<string, string>): Promise<void> {
+  const takeover = session.takeover === undefined ? null : collectiveIds.get(session.takeover.toLowerCase())
+  if (takeover === undefined) throw new Error(`A session's takeover, ${session.takeover}, isn't a collective that was seeded`)
+  let start: string | null = null
+  if (session.when) {
+    // The day in Québec, then the time there, as the admin pages take them.
+    const day = addDays(quebecDayAndTime(new Date()).day, session.when.day)
+    const instant = quebecInstant(day, session.when.start)
+    if (!instant) throw new Error(`A session's start, ${session.when.start}, doesn't exist on ${day} in Québec`)
+    start = quebecDateTime(instant)
+  }
+  const body: NewSession = { start, durationMinutes: session.durationMinutes, takeover, name: session.name ?? '', raEvent: session.raEvent ?? null }
+  const { id } = (await server.call<SessionResponse>('POST', '/api/admin/sessions', body)).session
+
+  const added = new Set<string>()
+  for (const set of session.sets) {
+    const performers = set.performers.map((key) => {
+      const id = artistIds.get(seedKey(key.includes('@') ? { email: key, name: '' } : { email: null, name: key }))
+      if (!id) throw new Error(`A set's performer, ${key}, isn't an artist who was seeded`)
+      return { id }
+    })
+    const fields: NewSet = {
+      performers,
+      offsetMinutes: set.offsetMinutes,
+      durationMinutes: set.durationMinutes,
+      prestations: set.prestations ?? [],
+      otherPrestation: set.otherPrestation ?? '',
+      genres: set.genres ?? [],
+      soundcloudTrack: null,
+      youtubeVideo: set.youtubeVideo ?? null,
+    }
+    const { sets } = (await server.call<SessionResponse>('POST', `/api/admin/sessions/${id}/sets`, fields)).session
+    // The set just added, the one that wasn't there before.
+    const setId = sets.find((other) => !added.has(other.id))!.id
+    added.add(setId)
+    if (set.status !== 'planned') await server.call('PUT', `/api/admin/sets/${setId}/status`, { status: set.status })
+  }
+  if (session.status !== 'planned') await server.call('PUT', `/api/admin/sessions/${id}/status`, { status: session.status })
+}
+
 function applicationFields({ days, timeSlots, prestations, otherPrestation, details }: SeedApplication) {
   return { dates: days.map(day), timeSlots, prestations, otherPrestation, details }
 }
@@ -306,8 +375,9 @@ if (import.meta.main) {
     process.exit(1)
   }
   try {
-    const { seeded, skipped } = await seed({ url, credentials: await seedAdmin(url) })
+    const { seeded, skipped, sessions } = await seed({ url, credentials: await seedAdmin(url) })
     console.log(`Seeded ${seeded.length} artists and collectives, and skipped ${skipped.length} that were already there.`)
+    console.log(sessions > 0 ? `Seeded ${sessions} sessions, with their sets.` : 'Seeded no sessions, since there were some already.')
   } catch (error) {
     console.error(`seed: ${messageOf(error)}`)
     process.exitCode = 1
