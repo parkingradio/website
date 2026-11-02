@@ -14,11 +14,13 @@ The server provides the API under `/api`, which this directory specifies, and se
 - **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid
   JSON), gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and `error`, a message meant for
   people, in English unless it's shown to the public. The only exception is [`GET /healthz`](#get-healthz), which fails
-  with `{"ok": false}` alone. An unexpected failure, e.g. the database's, gets a 500, unless the endpoint says
-  otherwise. Either way, its message only says that something went wrong: what went wrong is logged, but without the
-  personal data it could include, e.g. the values of a failed database query. Successful responses have `ok` set to
-  `true`, except for those of `GET /api/config`, `GET /api/events`, `GET /api/radio` and
-  `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404 error, whatever the request's body.
+  with `{"ok": false}` alone. Some errors have other fields too, which their endpoints say, e.g. the 409s of the
+  endpoints of sessions and sets have what's in the way (see [Rules](sessions.md#rules)). An unexpected failure, e.g.
+  the database's, gets a 500, unless the endpoint says otherwise. Either way, its message only says that something went
+  wrong: what went wrong is logged, but without the personal data it could include, e.g. the values of a failed
+  database query. Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
+  `GET /api/events`, `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404
+  error, whatever the request's body.
 - **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
   (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
@@ -87,7 +89,7 @@ the request failing.
 | [`GET /api/admin/radio`](radio.md#get-apiadminradio-admin) | admin | The playlist the radio's rotation is read from |
 | [`POST /api/admin/radio/preview`](radio.md#post-apiadminradiopreview-admin) | admin | What the radio would read from a playlist |
 | [`POST /api/admin/radio/playlist`](radio.md#post-apiadminradioplaylist-admin) | admin | Choosing the playlist the rotation is read from |
-| [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the radio reads playlists through |
+| [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the server reads SoundCloud through |
 | [`PUT /api/admin/radio/credentials`](radio.md#put-apiadminradiocredentials-admin) | admin | Entering the credentials of that SoundCloud app |
 | [`POST /api/admin/radio/credentials/check`](radio.md#post-apiadminradiocredentialscheck-admin) | admin | Whether SoundCloud accepts credentials, without saving them |
 | [`GET /api/admin/artists`](artists.md#get-apiadminartistscollectiveid-admin) | admin | Every artist, or a collective's |
@@ -95,13 +97,13 @@ the request failing.
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Changing an artist's profile, or replacing or removing their photo |
-| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, and taking them out of their collectives |
+| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, and taking them out of their collectives and their sets |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
 | [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Changing a collective's profile and members, or replacing or removing its photo |
-| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective, its photo and its applications, but not its members |
+| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective, its photo and its applications, but not its members, and leaving the sessions of its takeovers without one |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
@@ -111,6 +113,16 @@ the request failing.
 | [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
 | [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
+| [`GET /api/admin/sessions`](sessions.md#get-apiadminsessionsartistidtakeoverid-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, with their sets |
+| [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
+| [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session |
+| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session |
+| [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled |
+| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session and its sets |
+| [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session |
+| [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Changing a set |
+| [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled |
+| [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

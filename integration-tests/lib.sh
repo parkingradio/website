@@ -122,6 +122,35 @@ sql() {
     docker exec "$PG" psql --quiet --no-align --tuples-only --username parking_radio --dbname "${2:-parking_radio}" --command "$1"
 }
 
+# json <method> <url> [<body>] -- send a request with a JSON body, with the session cookie in `cookie`, e.g. an admin's.
+json() {
+    local body=()
+    if [ -n "${3:-}" ]; then body=(--header 'Content-Type: application/json' --data "$3"); fi
+    request --header "Cookie: ${cookie}" --request "$1" ${body[@]+"${body[@]}"} "$2"
+}
+
+# wait_for_sql <query> -- wait, for up to 10 seconds, for the query to return true.
+wait_for_sql() {
+    for _ in $(seq 1 100); do
+        [ "$(sql "$1")" = t ] && return 0
+        sleep 0.1
+    done
+    fail "timed out waiting for: $1"
+}
+
+# hold_row <table> <id> -- hold the row of the table with this id from another transaction, as an update would, until
+# release_row, e.g. to have requests wait for it.
+hold_row() {
+    docker exec --env PGAPPNAME=lock-holder "$PG" psql --quiet --username parking_radio --dbname parking_radio --command \
+        "begin; select from $1 where id = '$2' for no key update; select pg_sleep(30); commit;" >/dev/null 2>&1 &
+    wait_for_sql "select exists (select from pg_stat_activity where application_name = 'lock-holder' and wait_event = 'PgSleep')"
+}
+
+# release_row -- let go of the row that hold_row holds.
+release_row() {
+    sql "select pg_cancel_backend(pid) from pg_stat_activity where application_name = 'lock-holder'" >/dev/null
+}
+
 # expect_status <code>
 expect_status() {
     if [ "$STATUS" != "$1" ]; then

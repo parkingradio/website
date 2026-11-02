@@ -34,10 +34,10 @@ pattern is used whole as the artist, with no event or date.
 
 ## The SoundCloud app
 
-The server reads playlists through a SoundCloud app, whose credentials (a client ID and a secret) are found in the apps
-of the SoundCloud account it belongs to. They're kept in the database rather than set when the site is deployed, so
-that they can be changed without deploying it again. Its secret is never sent back once it's entered: it can only be
-replaced.
+The server reads playlists, and resolves the links to the tracks of [sets](sessions.md#links), through a SoundCloud app,
+whose credentials (a client ID and a secret) are found in the apps of the SoundCloud account it belongs to. They're kept
+in the database rather than set when the site is deployed, so that they can be changed without deploying it again. Its
+secret is never sent back once it's entered: it can only be replaced.
 
 The server checks credentials with SoundCloud before it saves them, so that a typo can't take the radio off air, and
 the radio reads its playlist through them right away.
@@ -140,7 +140,7 @@ Fails like the preview, and with 400 when none of the playlist's tracks can be p
 
 ## `GET /api/admin/radio/credentials` (admin)
 
-The SoundCloud app the radio reads playlists through.
+The SoundCloud app the server reads SoundCloud through (see [The SoundCloud app](#the-soundcloud-app)).
 
 | Response field | Type | |
 |---|---|---|

@@ -23,6 +23,7 @@ import { turnstileVerifier } from './applications/turnstile.js'
 import { sesEmailSender } from './core/email.js'
 import { adminsStore } from './admins/store.js'
 import { featuresStore } from './features/store.js'
+import { sessionsStore } from './sessions/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
 const loggerInstance: FastifyBaseLogger = logger
@@ -55,6 +56,7 @@ await registerRoutes(app, {
   applicationsSettings: applicationsSettingsStore(db),
   apply: applyStore(db),
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
+  sessions: sessionsStore(db),
 })
 
 const clientDist = path.join(import.meta.dirname, '../../client/dist')

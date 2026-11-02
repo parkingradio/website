@@ -4,6 +4,8 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from '../applications/fields.js'
 import type { ApplicationStatus, PrestationId, TimeSlot } from '../applications/fields.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
+import { STATUSES } from '../sessions/fields.js'
+import type { Status } from '../sessions/fields.js'
 
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
@@ -192,6 +194,116 @@ export const applications = pgTable(
     index('applications_collective_id_idx').on(table.collectiveId),
     check('applications_owner', sql`(${table.artistId} is null) <> (${table.collectiveId} is null)`),
     check('applications_status', oneOf(table.status, APPLICATION_STATUSES)),
+  ],
+)
+
+// Sessions: the occasions at the studio, e.g. an evening of three artists, or a collective's takeover. See
+// `SessionFields` in sessions/fields.ts for what each field can contain.
+//
+// Sessions with a start can't overlap, unless one of them is cancelled. That's the exclusion constraint
+// `sessions_no_overlap`, which drizzle can't declare, so it's only in the migration that adds it (0005_sessions.sql),
+// with the function it uses:
+//   EXCLUDE USING gist (session_period(start_at, duration_minutes) WITH &&)
+//     WHERE (status <> 'cancelled' AND start_at IS NOT NULL)
+// session_period(start, minutes) is tstzrange(start, start + minutes), from the start, included, to the end, excluded,
+// so that sessions can follow each other. The transactions that write sessions or sets take a lock first, which keeps
+// them from deadlocking on it, and lets the server check the rules that span both tables (see sessions/store.ts).
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text('created_by').notNull(), // the email of the admin who added the session
+    startAt: timestamp('start_at', { withTimezone: true }), // null until its date is known
+    durationMinutes: integer('duration_minutes').notNull(), // minutes that actually pass, whatever the clocks say
+    name: text('name').notNull(), // free text, "" for none
+    // The collective whose takeover the session is, null when it's none, or when that collective was deleted.
+    takeoverId: uuid('takeover_id').references(() => collectives.id, { onDelete: 'set null' }),
+    raEventId: text('ra_event_id'),
+    // The email of the admin who last changed the session, and when (null until then). Status changes don't count, and
+    // neither do changes to its sets.
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+    // The status admins gave the session, and the email of the admin who last changed it, and when (null until then).
+    status: text('status').$type<Status>().notNull().default('planned'),
+    statusUpdatedBy: text('status_updated_by'),
+    statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('sessions_takeover_id_idx').on(table.takeoverId),
+    check('sessions_duration', sql`${table.durationMinutes} between 1 and 1440`),
+    check('sessions_status', oneOf(table.status, STATUSES)),
+  ],
+)
+
+// Sets: the performances of a session, each streamed as its own YouTube live and uploaded as its own SoundCloud track.
+// See `SetFields` in sessions/fields.ts for what each field can contain. Deleting a session deletes its sets.
+//
+// A set's place in its session is relative to its start. A session's sets that have one can't overlap each other, unless
+// one of them is cancelled. That's the exclusion constraint `sets_no_overlap`, which drizzle can't declare either, so
+// it's only in the migration that adds it, with the btree_gist extension, which lets it compare session ids:
+//   EXCLUDE USING gist (session_id WITH =, int4range(offset_minutes, offset_minutes + duration_minutes) WITH &&)
+//     WHERE (status <> 'cancelled' AND offset_minutes IS NOT NULL)
+// That a set fits in its session, and that a cancelled session only has cancelled sets, are checked by the server, since
+// they span both tables (see sessions/store.ts).
+export const sets = pgTable(
+  'sets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdBy: text('created_by').notNull(), // the email of the admin who added the set
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    // In minutes after its session's start, and how long it lasts, in minutes that actually pass. Each one is null until
+    // it's known, but a set with an offset has a duration.
+    offsetMinutes: integer('offset_minutes'),
+    durationMinutes: integer('duration_minutes'),
+    prestations: text('prestations').array().$type<PrestationId[]>().notNull(), // ids, in the order of PRESTATIONS
+    otherPrestation: text('other_prestation').notNull(), // free text, "" for none
+    genres: text('genres').array().$type<GenreId[]>().notNull(), // ids, most important first
+    // SoundCloud's id for the track, and the link it was resolved from, both null when the set has no track.
+    soundcloudTrackId: text('soundcloud_track_id'),
+    soundcloudTrackUrl: text('soundcloud_track_url'),
+    youtubeVideoId: text('youtube_video_id'),
+    // The email of the admin who last changed the set, and when (null until then). Status changes don't count.
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+    // The status admins gave the set, and the email of the admin who last changed it, and when (null until then).
+    status: text('status').$type<Status>().notNull().default('planned'),
+    statusUpdatedBy: text('status_updated_by'),
+    statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('sets_session_id_idx').on(table.sessionId),
+    // A track, or a video, belongs to at most one set.
+    uniqueIndex('sets_soundcloud_track_id_idx').on(table.soundcloudTrackId),
+    uniqueIndex('sets_youtube_video_id_idx').on(table.youtubeVideoId),
+    check('sets_place', sql`${table.offsetMinutes} is null or ${table.durationMinutes} is not null`),
+    check('sets_offset', sql`${table.offsetMinutes} between 0 and 1439`),
+    check('sets_duration', sql`${table.durationMinutes} between 1 and 1440`),
+    check('sets_soundcloud_track', sql`(${table.soundcloudTrackId} is null) = (${table.soundcloudTrackUrl} is null)`),
+    check('sets_status', oneOf(table.status, STATUSES)),
+  ],
+)
+
+// The performers of each set, in order: artists, each only once in each set. Deleting a set or an artist deletes their
+// rows, so the set stays without them.
+export const setPerformers = pgTable(
+  'set_performers',
+  {
+    setId: uuid('set_id')
+      .notNull()
+      .references(() => sets.id, { onDelete: 'cascade' }),
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(), // the set's performers are in the order of their position
+  },
+  (table) => [
+    primaryKey({ columns: [table.setId, table.position] }),
+    // With the artist first, so that it also finds an artist's sets.
+    uniqueIndex('set_performers_artist_id_set_id_idx').on(table.artistId, table.setId),
   ],
 )
 

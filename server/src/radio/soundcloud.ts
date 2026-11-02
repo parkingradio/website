@@ -88,8 +88,9 @@ const Playlist = z
   }))
 export type SoundCloudPlaylist = z.output<typeof Playlist>
 
-// Where `/resolve` redirects for a playlist.
+// Where `/resolve` redirects for a playlist, and for a track.
 const PLAYLIST_PATH = /^\/playlists\/soundcloud:playlists:(\d+)$/
+const TRACK_PATH = /^\/tracks\/soundcloud:tracks:(\d+)$/
 
 const TracksPage = z.object({
   // Each track is checked on its own, so that one SoundCloud describes unexpectedly (e.g. one it's still
@@ -196,6 +197,21 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
     return parse(schema, await response.json(), pathname)
   }
 
+  // What a link on soundcloud.com leads to on the API, or null when SoundCloud shows nothing there. SoundCloud redirects
+  // to it, with the secret of a private playlist or track. Following the redirect would download what's there, e.g. a
+  // playlist with every track in it.
+  async function resolve(link: string): Promise<URL | null> {
+    const response = await get(`${API_ORIGIN}/resolve?url=${encodeURIComponent(link)}`, 'manual')
+    await response.body?.cancel()
+    if (response.status === 404) return null
+    const location = response.headers.get('location')
+    if (response.status < 300 || response.status >= 400 || !location) {
+      throw new Error(`SoundCloud responded to /resolve with ${response.status}`)
+    }
+    const resolved = new URL(location, API_ORIGIN)
+    return resolved.origin === API_ORIGIN ? resolved : null
+  }
+
   return {
     /**
      * Whether SoundCloud accepts the app's credentials, i.e. gives a token for them, which is then used by the requests
@@ -218,19 +234,20 @@ export function soundCloudClient({ clientId, clientSecret }: SoundCloudCredentia
      * playlist there, e.g. because the link is to a user or a track, or the private link was reset.
      */
     async resolvePlaylist(link: string): Promise<PlaylistLink | null> {
-      // SoundCloud redirects to what's at the link on the API, with the secret of a private playlist.
-      // Following the redirect would download the playlist with every track in it.
-      const response = await get(`${API_ORIGIN}/resolve?url=${encodeURIComponent(link)}`, 'manual')
-      await response.body?.cancel()
-      if (response.status === 404) return null
-      const location = response.headers.get('location')
-      if (response.status < 300 || response.status >= 400 || !location) {
-        throw new Error(`SoundCloud responded to /resolve with ${response.status}`)
-      }
-      const resolved = new URL(location, API_ORIGIN)
-      const id = PLAYLIST_PATH.exec(resolved.pathname)?.[1]
-      if (resolved.origin !== API_ORIGIN || !id) return null
+      const resolved = await resolve(link)
+      const id = resolved && PLAYLIST_PATH.exec(resolved.pathname)?.[1]
+      if (!id) return null
       return { id, secretToken: resolved.searchParams.get('secret_token') }
+    },
+
+    /**
+     * The id of the track a link to it on soundcloud.com leads to, e.g. "https://soundcloud.com/user/name", or
+     * "https://soundcloud.com/user/name/s-secret" for a private one. Null when SoundCloud shows no track there, e.g.
+     * because the link is to a user or a playlist, or the private link was reset.
+     */
+    async resolveTrack(link: string): Promise<string | null> {
+      const resolved = await resolve(link)
+      return (resolved && TRACK_PATH.exec(resolved.pathname)?.[1]) ?? null
     },
 
     /** A playlist, and the tracks in it that the app can see, in the playlist's order. */

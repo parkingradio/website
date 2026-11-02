@@ -1,11 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { errorMessage } from '../api/errors.js'
 import { ApiError, Day, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
 import { cached } from '../core/cache.js'
 import type { OnAir, OnAirStore } from './on-air.js'
 import type { RadioSettings, RadioSettingsStore } from './settings.js'
 import type { HlsStream, InvalidTrack, PlaylistLink, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from './soundcloud.js'
-import type { SoundCloudCredentialsStore, StoredSoundCloudCredentials } from './soundcloud-credentials.js'
+import { NO_CREDENTIALS } from './soundcloud-app.js'
+import type { SoundCloudApp } from './soundcloud-app.js'
+import type { StoredSoundCloudCredentials } from './soundcloud-credentials.js'
 
 // The API's requests and responses (see docs/design/server/radio.md). Since responses are checked against them, what
 // they say of the values that come from SoundCloud must hold for everything that the schemas of radio/soundcloud.ts
@@ -111,7 +114,6 @@ const ROTATION_RETRY_MS = 60 * 1000
 const RADIO_UNAVAILABLE: z.infer<typeof ApiError> = { ok: false, error: 'The radio is unavailable right now' }
 const NO_PLAYLIST: z.infer<typeof ApiError> = { ok: false, error: 'No playlist has been chosen for the radio yet' }
 const NOT_IN_ROTATION: z.infer<typeof ApiError> = { ok: false, error: 'Not a track of the radio rotation' }
-const NO_CREDENTIALS = 'The credentials of the SoundCloud app have not been entered yet'
 
 // A track's stream URL is shared by the listeners who start it around the same time, which in a radio is
 // most of them. A URL's playlist has to be loaded before it expires, about 2 minutes later than the
@@ -185,32 +187,14 @@ type Source = {
   read(): Promise<Pick<Chosen, 'rotation' | 'error'>>
 }
 
-// A client for SoundCloud, the credentials it uses, as they were saved, and where to stream each track from through it,
-// by track id.
-type Client = {
-  credentials: StoredSoundCloudCredentials
-  soundcloud: SoundCloudClient
-  streams: Map<string, () => Promise<HlsStream>>
-}
-
 type RadioOptions = {
-  // Builds a client for SoundCloud that uses the credentials it's given.
-  soundcloud: (credentials: SoundCloudCredentials) => SoundCloudClient
-  credentials: SoundCloudCredentialsStore
+  soundcloud: SoundCloudApp
   onAir: OnAirStore
   settings: RadioSettingsStore
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 function samePlaylist(a: RadioSettings, b: RadioSettings): boolean {
   return a.playlistId === b.playlistId && a.secretToken === b.secretToken
-}
-
-function sameCredentials(a: SoundCloudCredentials, b: SoundCloudCredentials): boolean {
-  return a.clientId === b.clientId && a.clientSecret === b.clientSecret
 }
 
 function credentialsResponse(credentials: StoredSoundCloudCredentials | null): RadioCredentials {
@@ -237,7 +221,7 @@ function currentPlaylist({ settings, rotation, error }: Chosen): ChosenPlaylist 
 
 export async function radioRoutes(
   app: FastifyInstance,
-  { soundcloud: newClient, credentials: credentialsStore, onAir, settings: settingsStore }: RadioOptions,
+  { soundcloud: soundcloudApp, onAir, settings: settingsStore }: RadioOptions,
 ) {
   // The credentials, and a private playlist's secret, are values of the queries that save them, which the app's error
   // handler keeps out of the logs and responses (see `useApiErrors`).
@@ -306,25 +290,9 @@ export async function radioRoutes(
     lastTracks = tracks
   }
 
-  // The client for the credentials that were entered last, replaced whenever they change.
-  let client: Client | null = null
-
-  function useClient(credentials: StoredSoundCloudCredentials, soundcloud: SoundCloudClient): SoundCloudClient {
-    client = { credentials, soundcloud, streams: new Map() }
-    return soundcloud
-  }
-
-  // The client for the credentials that were entered, or null until they are. They're loaded every time, like the
-  // playlist, so that every server picks up a change. Credentials loaded before newer ones were saved, by a request
-  // that was already under way, are ignored.
-  async function loadClient(): Promise<SoundCloudClient | null> {
-    const credentials = await credentialsStore.load()
-    if (!credentials) return null
-    if (client && (sameCredentials(client.credentials, credentials) || client.credentials.updatedAt > credentials.updatedAt)) {
-      return client.soundcloud
-    }
-    return useClient(credentials, newClient(credentials))
-  }
+  // Where to stream each track from, by track id, through each client for SoundCloud, so that they're forgotten along
+  // with the client when other credentials are entered.
+  const streamsByClient = new WeakMap<SoundCloudClient, Map<string, () => Promise<HlsStream>>>()
 
   // The source the rotation is read from, replaced whenever another playlist is chosen, or other credentials are
   // entered.
@@ -369,26 +337,26 @@ export async function radioRoutes(
     }
   }
 
-  // What the radio knows of the playlist chosen for the rotation, or null until one is chosen, and whether the
-  // credentials have been entered. The choice is loaded every time, rather than kept in memory, so that every server
-  // picks it up.
-  async function current(): Promise<{ radio: Chosen | null; credentialsEntered: boolean }> {
-    const [settings, soundcloud] = await Promise.all([settingsStore.load(), loadClient()])
-    const credentialsEntered = soundcloud !== null
-    if (!settings) return { radio: null, credentialsEntered }
+  // What the radio knows of the playlist chosen for the rotation, or null until one is chosen, and the client for
+  // SoundCloud, or null until the credentials have been entered. The choice is loaded every time, rather than kept in
+  // memory, so that every server picks it up.
+  async function current(): Promise<{ radio: Chosen | null; soundcloud: SoundCloudClient | null }> {
+    const [settings, soundcloud] = await Promise.all([settingsStore.load(), soundcloudApp.client()])
+    if (!settings) return { radio: null, soundcloud }
     // Nothing can be read until then, which isn't a failure to read the playlist.
-    if (!soundcloud) return { radio: { settings, rotation: null, error: null }, credentialsEntered }
+    if (!soundcloud) return { radio: { settings, rotation: null, error: null }, soundcloud }
     if (!source || !samePlaylist(source.settings, settings)) source = sourceFor(settings, soundcloud)
     // With other credentials, the playlist is read again right away, while the radio goes on with what it read before.
     else if (source.soundcloud !== soundcloud) source = sourceFor(settings, soundcloud, { rotation: source.rotation() })
     const { rotation, error } = await source.read()
     if (rotation && rotation.tracks !== lastTracks) rotationRead(rotation.tracks)
-    return { radio: { settings, rotation, error }, credentialsEntered }
+    return { radio: { settings, rotation, error }, soundcloud }
   }
 
-  // Tracks only get in the rotation once credentials have been entered, so there's a client by then.
-  function stream(trackId: string): Promise<HlsStream> {
-    const { soundcloud, streams } = client!
+  // Where to stream a track from, through `soundcloud`.
+  function stream(soundcloud: SoundCloudClient, trackId: string): Promise<HlsStream> {
+    let streams = streamsByClient.get(soundcloud)
+    if (!streams) streamsByClient.set(soundcloud, (streams = new Map()))
     let trackStream = streams.get(trackId)
     if (!trackStream) {
       // The secret is looked up whenever a stream is asked for, since it changes if the track's private link is reset.
@@ -472,8 +440,9 @@ export async function radioRoutes(
     async (request, reply) => {
       const { id } = request.params
       let radio: Chosen | null
+      let soundcloud: SoundCloudClient | null
       try {
-        ;({ radio } = await current())
+        ;({ radio, soundcloud } = await current())
       } catch (error) {
         request.log.error(error, 'Failed to load the radio from the database')
         return reply.status(502).send(RADIO_UNAVAILABLE)
@@ -485,7 +454,8 @@ export async function radioRoutes(
         return reply.status(404).send(NOT_IN_ROTATION)
       }
       try {
-        const { url, expiresAt } = await stream(id)
+        // Tracks only get in the rotation once credentials have been entered, so there's a client by then.
+        const { url, expiresAt } = await stream(soundcloud!, id)
         return { url, expiresAt: new Date(expiresAt).toISOString() }
       } catch (error) {
         request.log.error(error, 'Failed to get a stream from SoundCloud')
@@ -505,8 +475,8 @@ export async function radioRoutes(
       },
     },
     async () => {
-      const { radio, credentialsEntered } = await current()
-      return { ok: true as const, credentialsEntered, current: radio && currentPlaylist(radio) }
+      const { radio, soundcloud } = await current()
+      return { ok: true as const, credentialsEntered: soundcloud !== null, current: radio && currentPlaylist(radio) }
     },
   )
 
@@ -516,7 +486,7 @@ export async function radioRoutes(
   ): Promise<{ soundcloud: SoundCloudClient; playlist: PlaylistLink; rotation: Rotation } | { status: 400 | 404 | 409 | 502; error: string }> {
     const normalized = playlistLink(link)
     if (!normalized) return { status: 400, error: 'Not a link to a SoundCloud playlist' }
-    const soundcloud = await loadClient()
+    const soundcloud = await soundcloudApp.client()
     if (!soundcloud) return { status: 409, error: NO_CREDENTIALS }
     try {
       const playlist = await soundcloud.resolvePlaylist(normalized)
@@ -599,7 +569,7 @@ export async function radioRoutes(
         response: { 200: RadioCredentials },
       },
     },
-    async () => credentialsResponse(await credentialsStore.load()),
+    async () => credentialsResponse(await soundcloudApp.loadCredentials()),
   )
 
   // The credentials that were sent, with a client that uses them, once SoundCloud accepts them, or the error to respond
@@ -607,7 +577,7 @@ export async function radioRoutes(
   async function checkedCredentials(
     credentials: SoundCloudCredentials,
   ): Promise<{ credentials: SoundCloudCredentials; soundcloud: SoundCloudClient } | { status: 400 | 502; error: string }> {
-    const soundcloud = newClient(credentials)
+    const soundcloud = soundcloudApp.newClient(credentials)
     try {
       if (!(await soundcloud.checkCredentials())) return { status: 400, error: 'SoundCloud refused these credentials' }
     } catch (error) {
@@ -653,9 +623,8 @@ export async function radioRoutes(
       const { credentials, soundcloud } = checked
 
       const saved = { ...credentials, updatedBy: request.user!.email, updatedAt: new Date() }
-      await credentialsStore.save(saved)
       // The client already has a token, so it's used rather than one that would ask for another.
-      useClient(saved, soundcloud)
+      await soundcloudApp.save(saved, soundcloud)
       request.log.info({ clientId: credentials.clientId, by: saved.updatedBy }, 'Changed the credentials of the SoundCloud app of the radio')
       return credentialsResponse(saved)
     },

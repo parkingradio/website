@@ -119,7 +119,7 @@ describe('requireAuth', () => {
   function buildApp() {
     const app = Fastify()
     app.register(fastifyCookie)
-    app.decorate('sessions', { sessionVersion })
+    app.decorate('adminSessions', { sessionVersion })
     app.get('/protected', { preHandler: requireAuth }, async (request) => ({ user: request.user }))
     return app
   }

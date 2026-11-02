@@ -32,6 +32,7 @@ implemented, while these documents are its design: when they disagree, these doc
 | [Artists](server/artists.md) | Artists and their photos |
 | [Collectives](server/collectives.md) | Collectives, their members and their photos |
 | [Applications](server/applications.md) | Artists' and collectives' applications, applying through the form, and the emails about them |
+| [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [Events](server/events.md) | Parking Radio's events, read from Resident Advisor |
 | [Features](server/features.md) | Feature flags |

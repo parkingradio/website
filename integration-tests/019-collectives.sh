@@ -42,15 +42,6 @@ expect_no_artist() {
     if printf '%s' "$BODY" | grep -Fq "\"name\":\"$1\""; then fail "expected no artist named $1"; fi
 }
 
-# wait_for_sql <query> -- wait, for up to 10 seconds, for the query to return true.
-wait_for_sql() {
-    for _ in $(seq 1 100); do
-        [ "$(sql "$1")" = t ] && return 0
-        sleep 0.1
-    done
-    fail "timed out waiting for: $1"
-}
-
 # artist_ids -- the ids of the artists in the body of the last request, in order, on one line, without those of the
 # collectives they're in.
 artist_ids() {
@@ -213,16 +204,14 @@ expect_status 200
 # its memberships before its members' rows, the two would deadlock: Postgres would end one of them with an error, and
 # its request would fail with 500. Each request is only sent once the one before it waits for the row, and the
 # transaction holding it is cancelled once both do.
-docker exec --env PGAPPNAME=lock-holder "$PG" psql --quiet --username parking_radio --dbname parking_radio --command \
-    "begin; select from artists where id = '${passing}' for no key update; select pg_sleep(30); commit;" >/dev/null 2>&1 &
-wait_for_sql "select exists (select from pg_stat_activity where application_name = 'lock-holder' and wait_event = 'PgSleep')"
+hold_row artists "$passing"
 curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: ${cookie}" --request DELETE \
     "${ARTISTS}/${passing}" > "${FILES}/delete" &
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"artists\"%')"
 curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: ${cookie}" --request PUT \
     --form-string "collective=$(profile "$brume" "$passing")" "${COLLECTIVES}/${ondes}" > "${FILES}/put" &
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'select %for share')"
-sql "select pg_cancel_backend(pid) from pg_stat_activity where application_name = 'lock-holder'" >/dev/null
+release_row
 wait
 [ "$(cat "${FILES}/delete")" = 200 ] || fail "expected the artist to be deleted, got $(cat "${FILES}/delete")"
 [ "$(cat "${FILES}/put")" = 400 ] || fail "expected the collective's member not to exist anymore, got $(cat "${FILES}/put")"

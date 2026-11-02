@@ -283,6 +283,44 @@ describe('soundCloudClient', () => {
     })
   })
 
+  describe('resolveTrack', () => {
+    const resolve = (location: string | null, status = 302) =>
+      fakeSoundCloud({ [RESOLVE_URL]: () => new Response(null, { status, headers: location ? { location } : {} }) })
+
+    it('returns the id of the track a link leads to, without downloading it', async () => {
+      resolve('https://api.soundcloud.com/tracks/soundcloud:tracks:42')
+
+      expect(await client().resolveTrack('https://soundcloud.com/parkingdotradio/3tons')).toBe('42')
+      const [url, init] = fetchMock.mock.calls.at(-1)!
+      expect(url).toBe(`${RESOLVE_URL}?url=${encodeURIComponent('https://soundcloud.com/parkingdotradio/3tons')}`)
+      expect(init.redirect).toBe('manual')
+      expect(authorization()).toBe('OAuth token-1')
+    })
+
+    it('returns the id of a private track', async () => {
+      resolve('https://api.soundcloud.com/tracks/soundcloud:tracks:42?secret_token=s-AbC123')
+
+      expect(await client().resolveTrack('https://soundcloud.com/parkingdotradio/3tons/s-AbC123')).toBe('42')
+    })
+
+    it.each([
+      ['SoundCloud shows nothing at the link', null, 404],
+      ['the link is to a user', 'https://api.soundcloud.com/users/soundcloud:users:1', 302],
+      ['the link is to a playlist', PLAYLIST_URL, 302],
+      ['SoundCloud redirects outside of the API', 'https://example.com/tracks/soundcloud:tracks:42', 302],
+    ])('returns null when %s', async (_, location, status) => {
+      resolve(location, status)
+
+      expect(await client().resolveTrack('https://soundcloud.com/parkingdotradio/3tons')).toBeNull()
+    })
+
+    it('fails when SoundCloud responds with an error status', async () => {
+      resolve(null, 500)
+
+      await expect(client().resolveTrack('https://soundcloud.com/parkingdotradio/3tons')).rejects.toThrow('/resolve')
+    })
+  })
+
   describe('playlist', () => {
     it('returns the playlist and its tracks, in a simpler shape', async () => {
       const result = await client().playlist('1', null)

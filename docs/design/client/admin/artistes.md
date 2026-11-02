@@ -27,7 +27,7 @@ removes it once the artist is saved, and a photo that's chosen replaces it, show
 back. Under it, their applications are listed like in [Candidatures](candidatures.md), with a button to create another
 one. Since they're all the artist's, the list doesn't show the artist, their city or genres, and since they're few, it
 can't be searched, filtered or sorted. At the bottom, the artist can be deleted for good, with their photo, if they have
-one, and applications, after confirming. They're then taken out of their collectives, which stay.
+one, and applications, after confirming. They're then taken out of their collectives and their sets, which stay.
 
 ## A collective's page
 
@@ -37,7 +37,7 @@ page (or that it has none, which happens once its artists are deleted), its genr
 itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
 artist's. Under it, its applications are listed like an artist's, with a button to create another one. At the bottom,
 the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
-stay, and so do their own applications.
+stay, and so do their own applications, and the sessions of its takeovers, without one.
 
 ## Adding an artist
 

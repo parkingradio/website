@@ -121,7 +121,8 @@ expect_rows "select id, coalesce(artist_id::text, '-'), coalesce(collective_id::
 
 expect_rows "select column_name from information_schema.columns
              where table_name = 'artists' and column_name in ('kind', 'members')" ""
-expect_rows "select count(*) from drizzle.__drizzle_migrations" 5
+# Every migration, including those that came after: as many as the other checks' database, which the image migrated too.
+expect_rows "select count(*) from drizzle.__drizzle_migrations" "$(sql 'select count(*) from drizzle.__drizzle_migrations')"
 
 echo "  and the server serves them, with the photo they had"
 docker exec "$SERVER" sh -c "mkdir -p /tmp/private-bucket/artists && printf '\377\330\377\340JFIF' > /tmp/private-bucket/artists/legacy.jpg"

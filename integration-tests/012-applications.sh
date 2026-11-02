@@ -25,13 +25,6 @@ login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
 cookie="$(session_cookie)"
 
-# json <method> <url> [<body>] -- send a request with a JSON body.
-json() {
-    local body=()
-    if [ -n "${3:-}" ]; then body=(--header 'Content-Type: application/json' --data "$3"); fi
-    request --header "Cookie: ${cookie}" --request "$1" ${body[@]+"${body[@]}"} "$2"
-}
-
 # application <artist id> [<details>] [<more JSON fields>] -- an application for that artist, as JSON.
 application() {
     printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"%s}' \

@@ -14,7 +14,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     // What requireAuth checks sessions against, so that sessions end when their admin is revoked or chooses a new
     // password. app.ts sets it up, and so do the tests of routes that require a session.
-    sessions: Pick<AdminsStore, 'sessionVersion'>
+    adminSessions: Pick<AdminsStore, 'sessionVersion'>
   }
 }
 
@@ -98,11 +98,11 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   if (isCrossOrigin(request)) {
     return reply.code(403).send({ ok: false, error: 'Cross-origin request refused' } satisfies ApiError)
   }
-  if (!request.server.hasDecorator('sessions')) throw new Error("requireAuth needs the app's `sessions` (see app.ts)")
+  if (!request.server.hasDecorator('adminSessions')) throw new Error("requireAuth needs the app's `adminSessions` (see app.ts)")
   const token = request.cookies[config.sessionCookie]
   const session = token ? await verifySessionToken(token) : null
   // The session also has to be one that hasn't ended since, by its admin being revoked or choosing a new password.
-  if (!session || (await request.server.sessions.sessionVersion(session.id)) !== session.sessionVersion) {
+  if (!session || (await request.server.adminSessions.sessionVersion(session.id)) !== session.sessionVersion) {
     return reply.code(401).send({ ok: false, error: 'Unauthorized' } satisfies ApiError)
   }
   request.user = { id: session.id, email: session.email }

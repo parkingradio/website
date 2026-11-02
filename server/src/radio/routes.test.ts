@@ -9,6 +9,7 @@ import type { OnAir } from './on-air.js'
 import type { RadioSettings } from './settings.js'
 import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from './soundcloud.js'
 import type { StoredSoundCloudCredentials } from './soundcloud-credentials.js'
+import { soundCloudApp } from './soundcloud-app.js'
 import { radioRoutes } from './routes.js'
 import type { Radio } from './routes.js'
 
@@ -16,8 +17,9 @@ const checkCredentials = vi.fn<SoundCloudClient['checkCredentials']>()
 const playlist = vi.fn<SoundCloudClient['playlist']>()
 const resolvePlaylist = vi.fn<SoundCloudClient['resolvePlaylist']>()
 const hlsStream = vi.fn<SoundCloudClient['hlsStream']>()
+const resolveTrack = vi.fn<SoundCloudClient['resolveTrack']>()
 // Every client is a new one, as far as the routes can tell, but they all share the mocks above.
-const newClient = vi.fn<(credentials: SoundCloudCredentials) => SoundCloudClient>(() => ({ checkCredentials, playlist, resolvePlaylist, hlsStream }))
+const newClient = vi.fn<(credentials: SoundCloudCredentials) => SoundCloudClient>(() => ({ checkCredentials, playlist, resolvePlaylist, resolveTrack, hlsStream }))
 
 // The credentials of the SoundCloud app, as the database would keep them.
 let entered: StoredSoundCloudCredentials | null = null
@@ -86,8 +88,7 @@ async function buildApp(logs?: string[]) {
   await app.register(fastifyCookie)
   acceptSessions(app)
   await app.register(radioRoutes, {
-    soundcloud: newClient,
-    credentials: { load: loadCredentials, save: saveCredentials },
+    soundcloud: soundCloudApp(newClient, { load: loadCredentials, save: saveCredentials }),
     onAir: { load, save },
     settings: { load: loadSettings, save: saveSettings },
   })

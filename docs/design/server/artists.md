@@ -1,8 +1,8 @@
 # Artists
 
 The artists Parking Radio knows of: mostly artists who applied, and a few that the team only knows by name. Their
-applications for a set are in [Applications](applications.md), and the collectives they're in in
-[Collectives](collectives.md).
+applications for a set are in [Applications](applications.md), the collectives they're in in
+[Collectives](collectives.md), and the sets they played in [Sessions](sessions.md#sets).
 
 ## Profiles
 
@@ -104,4 +104,5 @@ and fails like it, with 400 when there's both a photo and `removePhoto`, and wit
 ## `DELETE /api/admin/artists/:id` (admin)
 
 Deletes an artist, their photo if they have one and their own applications, but not those of their collectives, takes
-them out of their collectives, and responds `{"ok": true}`. Fails with 404 when there's no such artist.
+them out of their collectives and their [sets](sessions.md#performers), and responds `{"ok": true}`. Fails with 404
+when there's no such artist.

@@ -6,6 +6,7 @@ import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
+import { lockSessions } from '../sessions/store.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import type { CollectiveProfile, SentMember } from './profile.js'
 
@@ -34,7 +35,8 @@ export type CollectivesStore = {
     id: string,
     changes: CollectiveProfile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: CollectiveRow; after: StoredCollective } | null>
-  // Returns the collective as it was, so that its photo can be deleted too. Its members stay.
+  // Returns the collective as it was, so that its photo can be deleted too. Its members stay, and the sessions of its
+  // takeovers are left without one.
   delete(id: string): Promise<CollectiveRow | null>
 }
 
@@ -138,8 +140,9 @@ export function collectivesStore(db: Queryable): CollectivesStore {
         db.transaction(async (tx) => {
           // The collective is locked first, then its new members, and only then are its memberships replaced. Deleting
           // an artist locks the artist, then their memberships, so taking the memberships before the artists could
-          // deadlock with it.
-          const [before] = await tx.select().from(collectives).where(eq(collectives.id, id)).for('update')
+          // deadlock with it. Like the update itself, which doesn't change a key, so that it doesn't wait for sessions
+          // whose takeover the collective is (see `lockSessions` in sessions/store.ts).
+          const [before] = await tx.select().from(collectives).where(eq(collectives.id, id)).for('no key update')
           if (!before) return null
           await lockMembers(tx, members)
           const [after] = await tx.update(collectives).set(changes).where(eq(collectives.id, id)).returning()
@@ -152,8 +155,12 @@ export function collectivesStore(db: Queryable): CollectivesStore {
 
     async delete(id) {
       if (!isUuid(id)) return null
-      const [row] = await db.delete(collectives).where(eq(collectives.id, id)).returning()
-      return row ?? null
+      return db.transaction(async (tx) => {
+        // Deleting it clears the takeover of its sessions, which writes them (see `lockSessions`).
+        await lockSessions(tx)
+        const [row] = await tx.delete(collectives).where(eq(collectives.id, id)).returning()
+        return row ?? null
+      })
     },
   }
 }

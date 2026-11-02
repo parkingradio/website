@@ -14,5 +14,5 @@ export async function sessionCookies(admin = TEST_ADMIN) {
 
 // Lets requireAuth check sessions without a database, as if every admin existed and had never chosen a new password.
 export function acceptSessions(app: FastifyInstance) {
-  app.decorate('sessions', { sessionVersion: async () => 0 })
+  app.decorate('adminSessions', { sessionVersion: async () => 0 })
 }

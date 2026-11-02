@@ -9,7 +9,8 @@ import { z } from 'zod'
 // client/src/artist-profile.ts): they must be changed together. These are the ones that count.
 //
 // Responses are checked against the lists below too (see artists/routes.ts), so taking a value out of one, e.g. a
-// genre, takes migrating the artists that have it: otherwise, every response with one of them fails with 500.
+// genre, takes migrating the artists that have it, and the sets, for genres (see sessions/fields.ts): otherwise, every
+// response with one of them fails with 500.
 
 export const NAME_MAX_LENGTH = 100
 const CITY_MAX_LENGTH = 100
@@ -42,7 +43,7 @@ export type Country = z.infer<typeof Country>
 // The genres an artist can pick from. What's stored is their id, which doesn't change, so that their names can, e.g. to
 // be translated. Their names are the client's (see client/src/artist-profile.ts), and the application emails' (see
 // applications/emails.ts).
-const GENRES = [
+export const GENRES = [
   'house',
   'deep-house',
   'tech-house',

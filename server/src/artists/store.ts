@@ -10,6 +10,7 @@ import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
 import { isUuid } from '../db/uuid.js'
+import { lockSessions } from '../sessions/store.js'
 
 // Checks the profiles and photos sent for artists against the rules in artists/profile.ts, keeps artists in the
 // database, and keeps their photos in the private bucket.
@@ -80,7 +81,8 @@ export type ArtistsStore = {
     id: string,
     changes: Profile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: ArtistRow; after: StoredArtist } | null>
-  // Returns the artist as they were, so that their photo can be deleted too. They're taken out of their collectives.
+  // Returns the artist as they were, so that their photo can be deleted too. They're taken out of their collectives and
+  // their sets.
   delete(id: string): Promise<ArtistRow | null>
 }
 
@@ -143,7 +145,9 @@ export function artistsStore(db: Queryable): ArtistsStore {
       if (!isUuid(id)) return null
       try {
         return await db.transaction(async (tx) => {
-          const [before] = await tx.select().from(artists).where(eq(artists.id, id)).for('update')
+          // Like the update itself, which doesn't change a key, so that it doesn't wait for sets' performers referring to
+          // the artist (see `lockSessions` in sessions/store.ts).
+          const [before] = await tx.select().from(artists).where(eq(artists.id, id)).for('no key update')
           if (!before) return null
           const [after] = await tx.update(artists).set(changes).where(eq(artists.id, id)).returning()
           return { before, after: await withCollectives(tx, after) }
@@ -156,8 +160,12 @@ export function artistsStore(db: Queryable): ArtistsStore {
 
     async delete(id) {
       if (!isUuid(id)) return null
-      const [row] = await db.delete(artists).where(eq(artists.id, id)).returning()
-      return row ?? null
+      return db.transaction(async (tx) => {
+        // Deleting them deletes their rows in set_performers, which writes sets' performers (see `lockSessions`).
+        await lockSessions(tx)
+        const [row] = await tx.delete(artists).where(eq(artists.id, id)).returning()
+        return row ?? null
+      })
     },
   }
 }

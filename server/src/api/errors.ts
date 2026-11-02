@@ -67,6 +67,11 @@ export function frameworkErrors(error: FastifyError, request: FastifyRequest, re
   return sendError(reply, 500, INTERNAL_ERROR)
 }
 
+// What went wrong, for an error that may not be an Error, e.g. in a message that says why a service couldn't be reached.
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 // Whether a query failed because it broke the constraint `name`, e.g. a unique index. Drizzle wraps the database's
 // error, which names the constraint.
 export function violatesConstraint(error: unknown, name: string): boolean {
