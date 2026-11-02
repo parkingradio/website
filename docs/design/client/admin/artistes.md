@@ -62,8 +62,8 @@ The form only adds artists: collectives are added with "ajouter un collectif".
 
 "ajouter un collectif" adds a collective by hand, at `/admin/artistes/collectifs/nouveau`, with the same form as the
 collective's page. It works like the artist form (see [Adding an artist](#adding-an-artist)), and checks the profile as
-the server does for admins (see [Profiles](../../server/collectives.md#profiles)), so the contact's email is required.
-It has no genres, which are the artists'.
+the server does for admins (see [Profiles](../../server/collectives.md#profiles)). It has no genres, which are the
+artists'.
 
 Its artists are in order, at least one, and can be reordered and removed. Each one is either:
 

@@ -1,5 +1,5 @@
 -- Adds sessions, the occasions at the studio, their sets, the performers of each set, who are artists, and the
--- collective whose takeover each session is.
+-- collective whose takeover each session is. Also lets a collective be without an email.
 --
 -- The schema changes are drizzle-kit's, except what's at the end, written by hand, since drizzle can't declare it: the
 -- btree_gist extension, the function session_period, and the exclusion constraints that use them. Sessions with a start
@@ -64,6 +64,7 @@ CREATE UNIQUE INDEX "set_performers_artist_id_set_id_idx" ON "set_performers" US
 CREATE INDEX "sets_session_id_idx" ON "sets" USING btree ("session_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "sets_soundcloud_track_id_idx" ON "sets" USING btree ("soundcloud_track_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "sets_youtube_video_id_idx" ON "sets" USING btree ("youtube_video_id");--> statement-breakpoint
+ALTER TABLE "collectives" ALTER COLUMN "email" DROP NOT NULL;--> statement-breakpoint
 CREATE EXTENSION IF NOT EXISTS btree_gist;--> statement-breakpoint
 -- A session's period: from its start to its start plus its duration, in minutes that actually pass. Adding an interval
 -- to a timestamptz is only stable, since adding days or months depends on the time zone, but adding minutes doesn't,

@@ -145,9 +145,7 @@ function CollectiveDetails({ collective, members }: { collective: Collective; me
           <LinksList links={collective.links} />
         </dd>
         <dt>Adresse e-mail du contact</dt>
-        <dd>
-          <a href={`mailto:${collective.email}`}>{collective.email}</a>
-        </dd>
+        <dd>{collective.email ? <a href={`mailto:${collective.email}`}>{collective.email}</a> : MISSING}</dd>
         <dt>Téléphone du contact</dt>
         <dd>{collective.phone ? <a href={`tel:${collective.phone}`}>{collective.phone}</a> : MISSING}</dd>
         <dt>Description</dt>

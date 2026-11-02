@@ -3,7 +3,7 @@ import { ArtistProfile, NO_NAME } from '../artists/profile.js'
 import type { ApplicantProfile, Profile } from '../artists/profile.js'
 import { InvalidProfile } from '../artists/store.js'
 import { ApplicantCollectiveProfile, NO_MEMBER } from '../collectives/profile.js'
-import type { CollectiveProfile } from '../collectives/profile.js'
+import type { ApplicantCollective } from '../collectives/profile.js'
 
 // Who applies with `POST /api/applications`: an artist alone, or a collective, with a profile for each of its artists, and
 // what's saved of them (see docs/design/server/applications.md). Artists see its errors, so they're in French.
@@ -50,7 +50,7 @@ export function validateApplicant(sent: unknown): Applicant {
 }
 
 // Who applied, as they're saved: an artist, or a collective and its artists, in order.
-export type Applied = { artist: ApplicantProfile } | { collective: Omit<CollectiveProfile, 'members'>; members: Profile[] }
+export type Applied = { artist: ApplicantProfile } | { collective: ApplicantCollective; members: Profile[] }
 
 // What's saved of who applied. A collective's artists are new artists, without an email or a phone.
 export function applied(applicant: Applicant): Applied {

@@ -3952,8 +3952,7 @@ export interface components {
                 spotify?: string;
                 tiktok?: string;
             } | null;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters */
-            email: string;
+            email?: string | null;
             phone?: string | null;
         };
         ApiError: {
@@ -4133,7 +4132,7 @@ export interface components {
             city: string;
             description: string;
             links: components["schemas"]["ArtistLinks"];
-            email: string;
+            email: string | null;
             phone: string;
             updatedBy: string | null;
             updatedAt: string | null;

@@ -72,7 +72,7 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
 
   // The props of the input of a field of the profile that's a single value.
   const input = (field: 'name' | 'city' | 'description' | 'email' | 'phone') => ({
-    value: profile[field],
+    value: profile[field] ?? '',
     'aria-invalid': shown(field) ? true : undefined,
     onChange: (event: { target: { value: string } }) => update({ [field]: event.target.value }),
     onBlur: leave(field),
@@ -112,7 +112,7 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
       <LinksField links={profile.links} onChange={(links) => update({ links })} showAll={submitted} onLeave={leave('links')} />
 
       <Labeled label="Adresse e-mail du contact" error={shown('email')}>
-        <input type="email" {...input('email')} maxLength={EMAIL_MAX_LENGTH} required />
+        <input type="email" {...input('email')} maxLength={EMAIL_MAX_LENGTH} />
       </Labeled>
 
       <Labeled label="Téléphone du contact" error={shown('phone')}>

@@ -321,10 +321,16 @@
             ]
           },
           "email": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 200 characters"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 200 characters"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "phone": {
             "anyOf": [
@@ -341,8 +347,7 @@
         },
         "required": [
           "name",
-          "members",
-          "email"
+          "members"
         ]
       },
       "ApiError": {
@@ -1065,7 +1070,10 @@
             "$ref": "#/components/schemas/ArtistLinks"
           },
           "email": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "phone": {
             "type": "string"

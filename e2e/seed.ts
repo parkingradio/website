@@ -50,9 +50,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 // SEED_COLLECTIVES that isn't there yet, then the sessions of SEED_SESSIONS, with their sets, if there are no sessions
 // yet, and returns the names of the artists and collectives seeded and skipped, and how many sessions were seeded. An
 // artist is there when another one has their email, whatever its case, or, for an artist without one, when another one
-// without an email has their name, whatever its case. A collective is there when another one has its email, whatever its
-// case. Sessions are seeded only while there are none, since their days, counted from the day they're seeded, would
-// otherwise overlap those seeded before.
+// without an email has their name, whatever its case, and likewise for a collective. Sessions are seeded only while
+// there are none, since their days, counted from the day they're seeded, would otherwise overlap those seeded before.
 export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded: string[]; skipped: string[]; sessions: number }> {
   const server = await logIn(url, credentials)
   const there = new Set((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map(seedKey))
@@ -83,9 +82,9 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
 
   const artistIds = new Map((await server.call<ArtistsResponse>('GET', '/api/admin/artists')).artists.map((artist) => [seedKey(artist), artist.id]))
   const { collectives } = await server.call<CollectivesResponse>('GET', '/api/admin/collectives')
-  const emails = new Set(collectives.map((collective) => collective.email.toLowerCase()))
+  const collectivesThere = new Set(collectives.map(seedKey))
   for (const collective of SEED_COLLECTIVES) {
-    if (emails.has(collective.profile.email.toLowerCase())) {
+    if (collectivesThere.has(seedKey(collective.profile))) {
       skipped.push(collective.profile.name)
       continue
     }
@@ -113,7 +112,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
     server.call<ArtistsResponse>('GET', '/api/admin/artists'),
     server.call<CollectivesResponse>('GET', '/api/admin/collectives'),
   ])
-  const collectiveIds = new Map(allCollectives.map((collective) => [collective.email.toLowerCase(), collective.id]))
+  const collectiveIds = new Map(allCollectives.map((collective) => [seedKey(collective), collective.id]))
   // Including those the collectives were seeded with.
   const performerIds = new Map(artists.map((artist) => [seedKey(artist), artist.id]))
   for (const [i, session] of SEED_SESSIONS.entries()) {
@@ -126,9 +125,15 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
   return { seeded, skipped, sessions: SEED_SESSIONS.length }
 }
 
-// What tells whether an artist is there already (see `seed`).
+// What tells whether an artist, or a collective, is there already (see `seed`).
 function seedKey({ email, name }: Pick<Profile, 'email' | 'name'>): string {
   return email ? `email:${email.toLowerCase()}` : `name:${name.toLowerCase()}`
+}
+
+// The `seedKey` of an artist or a collective that seed-data.ts names by their email, or by their name for those without
+// one.
+function seedKeyOf(emailOrName: string): string {
+  return seedKey(emailOrName.includes('@') ? { email: emailOrName, name: '' } : { email: null, name: emailOrName })
 }
 
 type Server = {
@@ -227,7 +232,7 @@ async function findApplied(server: Server, artist: SeedArtist): Promise<{ artist
 // The id of a collective that applied through the form, and of the application it sent, which the form doesn't return.
 async function findAppliedCollective(server: Server, collective: SeedCollective): Promise<{ collectiveId: string; applicationId: string }> {
   const { collectives } = await server.call<CollectivesResponse>('GET', '/api/admin/collectives')
-  const added = collectives.find((added) => added.email.toLowerCase() === collective.profile.email.toLowerCase())
+  const added = collectives.find((added) => seedKey(added) === seedKey(collective.profile))
   if (!added) throw new Error(`${collective.profile.name} applied, but wasn't added`)
   return { collectiveId: added.id, applicationId: await firstApplication(server, `collective=${added.id}`) }
 }
@@ -251,12 +256,12 @@ async function setStatus(server: Server, id: string, status: ApplicationStatus):
   if (status !== 'new') await server.call('PUT', `/api/admin/applications/${id}/status`, { status })
 }
 
-// Adds the session and its sets as an admin would, with their statuses: its takeover's collective, by its email, in
-// `collectiveIds`, and its sets' performers, by their email, or else, for those without one, by their name, in
-// `artistIds` (see `seedKey`). Each set is given its status once it's added, and the session once its sets are, since a
+// Adds the session and its sets as an admin would, with their statuses: its takeover's collective, in `collectiveIds`, and
+// its sets' performers, in `artistIds`, each by their email, or else, for those without one, by their name (see
+// `seedKey`). Each set is given its status once it's added, and the session once its sets are, since a
 // cancelled session can't be added to.
 async function addSession(server: Server, session: SeedSession, artistIds: Map<string, string>, collectiveIds: Map<string, string>): Promise<void> {
-  const takeover = session.takeover === undefined ? null : collectiveIds.get(session.takeover.toLowerCase())
+  const takeover = session.takeover === undefined ? null : collectiveIds.get(seedKeyOf(session.takeover))
   if (takeover === undefined) throw new Error(`A session's takeover, ${session.takeover}, isn't a collective that was seeded`)
   let start: string | null = null
   if (session.when) {
@@ -272,7 +277,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
   const added = new Set<string>()
   for (const set of session.sets) {
     const performers = set.performers.map((key) => {
-      const id = artistIds.get(seedKey(key.includes('@') ? { email: key, name: '' } : { email: null, name: key }))
+      const id = artistIds.get(seedKeyOf(key))
       if (!id) throw new Error(`A set's performer, ${key}, isn't an artist who was seeded`)
       return { id }
     })

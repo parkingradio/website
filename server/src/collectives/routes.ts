@@ -25,7 +25,7 @@ const Collective = z
     city: z.string(),
     description: z.string(),
     links: ArtistLinks,
-    email: z.string(),
+    email: z.string().nullable(),
     phone: z.string(),
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),

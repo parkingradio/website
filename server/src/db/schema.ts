@@ -115,7 +115,8 @@ export const artists = pgTable(
 
 // Collectives, whose members are artists. Two of them can't have the same email address, whatever its case, but a
 // collective can have an artist's. See the profile's schema in collectives/profile.ts for what each field may contain.
-// Admins can leave out the country, city, description, links and phone, which are then empty.
+// Admins can leave out the country, city, description, links and phone, which are then empty, and the email, which is
+// then null.
 export const collectives = pgTable(
   'collectives',
   {
@@ -128,7 +129,7 @@ export const collectives = pgTable(
     city: text('city').notNull(),
     description: text('description').notNull(),
     links: jsonb('links').$type<Partial<Record<LinkSiteId, string>>>().notNull(), // by site, profile names, or the address for "web"
-    email: text('email').notNull(), // the contact's
+    email: text('email'), // the contact's
     phone: text('phone').notNull(), // the contact's
     // Where the photo is stored (see `Photos` in artists/store.ts), and its MIME type, as checked from its contents.
     // Both null when the collective has no photo.

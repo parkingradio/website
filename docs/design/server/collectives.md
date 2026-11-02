@@ -12,9 +12,10 @@ The rules a profile has to follow are the schema `AdminCollectiveProfile` of `se
 the server checks every profile it's sent against it. Most rules are an artist's (see [Profiles](artists.md#profiles)),
 and so are their messages, in French, except those about members' ids, which are in English, since only admins send ids.
 
-Admins can leave out the same fields as for an artist, i.e. the country, city, description, links and phone, which are
-then stored as an empty string, or an empty object, but not the contact's email, which is how the team reaches the
-collective.
+Admins can leave out the same fields as for an artist, i.e. the country, city, description, links, email and phone,
+e.g. for collectives the team only knows by name, from their past takeovers. They're stored the same way: an empty
+string or object, and null for the email, so that any number of collectives can be without one. A collective applying
+with `POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
 
 A profile has:
 
@@ -26,7 +27,7 @@ A profile has:
 | `city` | string | Like an artist's |
 | `description` | string | Like an artist's bio |
 | `links` | object | Like an artist's |
-| `email` | string | The contact's, like an artist's, but never left out. Two collectives can't have the same one, whatever its case |
+| `email` | string or null | The contact's, like an artist's. Two collectives can't have the same one, whatever its case |
 | `phone` | string | The contact's, like an artist's |
 
 A collective has no genres of its own: its genres are its members', whom

@@ -46,22 +46,16 @@ describe('checkCollectiveProfile, as the server answers', () => {
     expect(error({ members: [{ id: 3 }] })).toBe('No such artist')
   })
 
-  it('needs a name and the contact’s email', () => {
+  it('needs a name', () => {
     expect(error({ name: ' ' })).toBe('Indiquez le nom du collectif.')
-    expect(error({ email: '' })).toBe('Indiquez votre adresse e-mail.')
-    expect(error({ email: null })).toBe('Indiquez votre adresse e-mail.')
-    expect(error({ email: 'ondes@' })).toBe('Indiquez une adresse e-mail valide.')
   })
 
-  it('takes a profile without a country, city, description, links or phone', () => {
-    const leftOut = { country: '', city: '', description: '', links: {}, phone: '' }
+  it('takes a profile without a country, city, description, links, email or phone', () => {
+    const leftOut = { country: '', city: '', description: '', links: {}, email: null, phone: '' }
     expect(checkCollectiveProfile({ ...valid(), ...leftOut }).profile).toEqual({ ...valid(), ...leftOut })
-    expect(checkCollectiveProfile({ name: 'Ondes', members: [{ name: 'Élise' }], email: 'ondes@example.com' }).profile).toEqual({
-      name: 'Ondes',
-      members: [{ name: 'Élise' }],
-      ...leftOut,
-      email: 'ondes@example.com',
-    })
+    expect(checkCollectiveProfile({ ...valid(), ...leftOut, email: ' ' }).profile).toEqual({ ...valid(), ...leftOut })
+    const minimal = { name: 'Ondes', members: [{ name: 'Élise' }] }
+    expect(checkCollectiveProfile(minimal).profile).toEqual({ ...minimal, ...leftOut })
   })
 
   it('still checks what is there, with the description’s own messages', () => {
@@ -70,6 +64,10 @@ describe('checkCollectiveProfile, as the server answers', () => {
     expect(error({ description: 'a\0' })).toBe('La description contient un caractère invalide.')
     expect(error({ links: { soundcloud: 'https://instagram.com/ondes' } })).toBe("SoundCloud : ce n'est pas une adresse SoundCloud.")
     expect(error({ phone: '123' })).toBe('Indiquez un numéro de téléphone valide.')
+    expect(error({ email: 'ondes@' })).toBe('Indiquez une adresse e-mail valide.')
+    expect(error({ email: `${'a'.repeat(190)}@example.com` })).toBe("L'adresse e-mail dépasse 200 caractères.")
+    expect(error({ email: 42 })).toBe('Indiquez votre adresse e-mail.')
+    expect(checkCollectiveProfile({ ...valid(), email: ' ondes@example.com ' }).profile?.email).toBe('ondes@example.com')
   })
 
   it('says what is wrong with every field that is wrong, in the order the server checks them', () => {

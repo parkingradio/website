@@ -2,10 +2,11 @@
 #
 # The admin routes for collectives work against a real database. The server's unit tests mock the database and the
 # photos, so this is what covers the collectives and collective_members tables: contact emails being unique among
-# collectives whatever their case, collectives listed by name, members kept in order, members created by name, the
-# check on members that takes the database (artists who exist), artists returning their collectives, what deleting an
-# artist or a collective does to the other, a collective's photo kept on disk, then deleted, changing a collective while
-# one of its members is deleted, and listing a collective's members as artists, in its order.
+# collectives whatever their case, but any number of collectives without one, collectives listed by name, members kept
+# in order, members created by name, the check on members that takes the database (artists who exist), artists
+# returning their collectives, what deleting an artist or a collective does to the other, a collective's photo kept on
+# disk, then deleted, changing a collective while one of its members is deleted, and listing a collective's members as
+# artists, in its order.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -229,6 +230,37 @@ expect_status 404
 admin GET "${ARTISTS}/${brume}"
 expect_status 200
 expect_body_contains '"collectives":[]'
+
+echo "  a collective is added without a country, city, description, links, email or phone, and read back that way"
+send collective POST "$COLLECTIVES" '{"name":"Partiel","members":[{"id":"'"$brume"'"}],"country":"","city":"","description":"",
+"links":{},"email":"","phone":""}'
+expect_status 200
+partial="$(first_id)"
+admin GET "${COLLECTIVES}/${partial}"
+expect_status 200
+expect_body_contains '"country":"","city":"","description":"","links":{},"email":null,"phone":""'
+
+echo "  another collective can be without an email too"
+send collective POST "$COLLECTIVES" '{"name":"Anonyme","members":[{"id":"'"$brume"'"}]}'
+expect_status 200
+expect_body_contains '"email":null'
+anonymous="$(first_id)"
+
+echo "  a collective's email is taken out, which frees it for another collective"
+send collective POST "$COLLECTIVES" "$(profile_with libre@collectives.test "$brume")"
+expect_status 200
+freed="$(first_id)"
+send collective PUT "${COLLECTIVES}/${freed}" "$(profile_with "" "$brume")"
+expect_status 200
+expect_body_contains '"email":null'
+send collective POST "$COLLECTIVES" "$(profile_with LIBRE@collectives.test "$brume")"
+expect_status 200
+expect_body_contains '"email":"LIBRE@collectives.test"'
+taker="$(first_id)"
+for removed in "$partial" "$anonymous" "$freed" "$taker"; do
+    admin DELETE "${COLLECTIVES}/${removed}"
+    expect_status 200
+done
 
 echo "  a collective that doesn't exist can't be viewed, changed or deleted"
 for id in "$NOBODY" not-a-uuid; do

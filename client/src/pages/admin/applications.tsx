@@ -509,9 +509,7 @@ function CollectiveSummary({ collective, members }: { collective: Collective; me
         <MembersList members={collective.members} />
       </dd>
       <dt>Adresse e-mail du contact</dt>
-      <dd>
-        <a href={`mailto:${collective.email}`}>{collective.email}</a>
-      </dd>
+      <dd>{collective.email ? <a href={`mailto:${collective.email}`}>{collective.email}</a> : MISSING}</dd>
       <dt>Téléphone du contact</dt>
       <dd>{collective.phone ? <a href={`tel:${collective.phone}`}>{collective.phone}</a> : MISSING}</dd>
     </dl>

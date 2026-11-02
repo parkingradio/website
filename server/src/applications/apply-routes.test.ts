@@ -60,7 +60,7 @@ const store: ApplyStore = {
     return { artistId: applicant.id, applicationId: addApplication(fields, { artistId: applicant.id }).id }
   }),
   applyAsCollective: vi.fn<ApplyStore['applyAsCollective']>(async (collective, members, fields) => {
-    if (collectives.some((other) => other.email.toLowerCase() === collective.email.toLowerCase())) throw new EmailTaken()
+    if (collectives.some((other) => other.email?.toLowerCase() === collective.email.toLowerCase())) throw new EmailTaken()
     const id = `collective-${++nextId}`
     const added = members.map(addArtist).map((artist) => artist.id)
     collectives.push({ id, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...collective, members: added })
@@ -345,6 +345,9 @@ describe('POST /api/applications', () => {
       { parts: { artist: asCollective({ description: '' }) }, error: 'Écrivez quelques lignes de description.' },
       { parts: { artist: asCollective({ links: {} }) }, error: 'Ajoutez au moins un lien.' },
       { parts: { artist: asCollective({ phone: '' }) }, error: 'Indiquez votre numéro de téléphone.' },
+      { parts: { artist: asCollective({ email: '' }) }, error: 'Indiquez votre adresse e-mail.' },
+      { parts: { artist: asCollective({ email: null }) }, error: 'Indiquez votre adresse e-mail.' },
+      { parts: { artist: asCollective({ email: undefined }) }, error: 'Indiquez votre adresse e-mail.' },
       // An artist's errors say which one it is, counting from 1.
       { parts: { artist: asCollective({ members: [member('Une'), member('Deux', { city: ' ' })] }) }, error: 'Artiste 2 : Indiquez la ville.' },
       { parts: { artist: asCollective({ members: [member('Une', { genres: [] })] }) }, error: 'Artiste 1 : Choisissez au moins un genre.' },

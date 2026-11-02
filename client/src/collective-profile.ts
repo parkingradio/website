@@ -39,8 +39,8 @@ function checkMember(member: unknown): Checked<SentMember> {
 
 // Checks a profile as it's being filled in the admin form, and returns what the server would save of it, or what's wrong
 // with each field instead, like `checkProfile` with `lenient`: admins can leave out the country, city, description,
-// links and phone, but not the contact's email. The members are in order, at least one, and an artist who's there twice
-// is only kept the first time.
+// links, email and phone. An email that's left out is null. The members are in order, at least one, and an artist who's
+// there twice is only kept the first time.
 export function checkCollectiveProfile(
   sent: unknown,
 ): { profile: CollectiveProfile; errors?: undefined } | { profile?: undefined; errors: FieldErrors<CollectiveProfile> } {
@@ -58,9 +58,9 @@ export function checkCollectiveProfile(
   const city = check('city', checkCity(collective.city, { lenient: true }))
   const description = check('description', checkDescription(collective.description, { lenient: true }))
   const links = check('links', checkLinks(collective.links, { lenient: true }))
-  const email = check('email', checkEmail(collective.email))
+  const email = check('email', checkEmail(collective.email, { lenient: true }))
   const phone = check('phone', checkPhone(collective.phone, { lenient: true }))
 
   if (Object.keys(errors).length > 0) return { errors }
-  return { profile: { name, members, country, city, description, links, email, phone } }
+  return { profile: { name, members, country, city, description, links, email: email || null, phone } }
 }

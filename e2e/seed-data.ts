@@ -605,6 +605,12 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     photo: '#7d5ba6',
     applications: [application([-10], 'done', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
   },
+  {
+    // Known only by name, from its past takeover, with its artists, who are new, known by name too.
+    profile: { name: 'Saut de Clôture', country: '', city: '', description: '', links: {}, email: null, phone: '' },
+    members: [{ name: 'Grillage' }, { name: 'Pied-de-Biche' }],
+    applications: [],
+  },
 ]
 
 type Status = components['schemas']['SessionStatus']
@@ -622,7 +628,7 @@ export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
   }
 
 export type SeedSession = {
-  // The collective whose takeover it is, by its email.
+  // The collective whose takeover it is, by its email, or by its name for one without.
   takeover?: string
   name?: string
   // The event's id on RA, which isn't checked against RA.
@@ -683,6 +689,15 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 120,
     status: 'done',
     sets: [{ performers: ['Jah Pierre'], offsetMinutes: 0, durationMinutes: 120, status: 'done' }],
+  },
+  // The takeover of a collective without an email, from long ago, back to back.
+  {
+    takeover: 'Saut de Clôture',
+    name: 'SAUT DE CLÔTURE TAKEOVER',
+    when: { day: -120, start: '19:00' },
+    durationMinutes: 120,
+    status: 'done',
+    sets: [{ performers: ['Grillage', 'Pied-de-Biche'], offsetMinutes: 0, durationMinutes: 120, prestations: ['dj'], status: 'done' }],
   },
   // An evening of several artists, without a takeover or a name, where a cancelled set was replaced by one that overlaps
   // it.

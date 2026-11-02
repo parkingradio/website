@@ -359,7 +359,7 @@ export function phone({ canLeaveOut }: { canLeaveOut: boolean }) {
   return canLeaveOut ? orLeftOut(phone, '') : phone
 }
 
-// An email address, or a blank one when it `canBeEmpty`. Unlike an artist's, a collective contact's is always required.
+// An email address, or a blank one when it `canBeEmpty`.
 export function emailAddress({ canBeEmpty = false } = {}) {
   return line("L'adresse e-mail", EMAIL_MAX_LENGTH, 'Indiquez votre adresse e-mail.', { canBeEmpty }).refine(
     (value) => !value || isEmailAddress(value),
@@ -368,8 +368,8 @@ export function emailAddress({ canBeEmpty = false } = {}) {
 }
 
 // An email address, unless admins `canLeaveOut` it: it's then absent, null or blank, and saved as null rather than
-// empty, so that any number of artists can be without one while emails stay unique.
-function email({ canLeaveOut }: { canLeaveOut: boolean }) {
+// empty, so that any number of artists, or of collectives, can be without one while emails stay unique.
+export function email({ canLeaveOut }: { canLeaveOut: boolean }) {
   return canLeaveOut ? orLeftOut(emailAddress({ canBeEmpty: true }), null) : emailAddress()
 }
 

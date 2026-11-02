@@ -39,17 +39,23 @@ describe('AdminCollectiveProfile', () => {
     })
   })
 
-  it('takes a profile without a country, city, description, links or phone, as for an artist', () => {
-    const leftOut = { country: '', city: '', description: '', links: {}, phone: '' }
+  it('takes a profile without a country, city, description, links, email or phone, as for an artist', () => {
+    const leftOut = { country: '', city: '', description: '', links: {}, email: null, phone: '' }
     expect(parse(leftOut).data).toMatchObject(leftOut)
-    expect(parse({ country: null, city: undefined, description: ' ', links: null, phone: ' ' }).data).toMatchObject(leftOut)
+    expect(parse({ country: null, city: undefined, description: ' ', links: null, email: ' ', phone: ' ' }).data).toMatchObject(leftOut)
+    for (const email of ['', ' ', null, undefined]) expect(parse({ email }).data?.email).toBeNull()
   })
 
-  it('still needs a name and the email of the contact, which it checks like an artist\'s', () => {
+  it("checks the contact's email like an artist's, when it's there", () => {
+    expect(error({ email: 'Nom <contact@example.com>' })).toBe('Indiquez une adresse e-mail valide.')
+    expect(error({ email: `${'a'.repeat(190)}@example.com` })).toBe("L'adresse e-mail dépasse 200 caractères.")
+    expect(error({ email: 42 })).toBe('Indiquez votre adresse e-mail.')
+    expect(parse({ email: ' contact@example.com ' }).data?.email).toBe('contact@example.com')
+  })
+
+  it('still needs a name', () => {
     expect(error({ name: ' ' })).toBe('Indiquez le nom du collectif.')
     expect(error({ name: 'x'.repeat(101) })).toBe('Le nom du collectif dépasse 100 caractères.')
-    for (const email of ['', ' ', null, undefined]) expect(error({ email })).toBe('Indiquez votre adresse e-mail.')
-    expect(error({ email: 'Nom <contact@example.com>' })).toBe('Indiquez une adresse e-mail valide.')
   })
 
   it('checks the description like a bio', () => {

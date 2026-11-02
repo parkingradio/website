@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artist } from '../../artist-profile'
-import { deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionTitle, sessionWhen, setHours, setName, setTitle } from './describe'
+import type { Collective } from '../../collective-profile'
+import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionTitle, sessionWhen, setHours, setName, setTitle } from './describe'
 
 describe('membersGenres', () => {
   const artists = new Map(
@@ -23,6 +24,23 @@ describe('membersGenres', () => {
     expect(membersGenres([{ id: 'd' }, { id: 'unknown' }, { id: 'b' }], artists)).toEqual(['house'])
     expect(membersGenres([{ id: 'd' }], artists)).toEqual([])
     expect(membersGenres([], artists)).toEqual([])
+  })
+})
+
+describe('collectiveOption', () => {
+  const collective = (changes: Partial<Collective>) =>
+    ({ id: 'collective-1', name: 'Ondes', email: null, city: '', country: '', members: [], ...changes }) as Collective
+
+  it("tells a collective apart by its email, or else where it's from, or else its artists, like an artist", () => {
+    expect(collectiveOption(collective({ email: 'ondes@example.com', city: 'Québec', country: 'CA' })).detail).toBe('ondes@example.com')
+    expect(collectiveOption(collective({ city: 'Québec', country: 'CA' })).detail).toBe('Québec, Canada')
+    expect(collectiveOption(collective({ country: 'CA' })).detail).toBe('Canada')
+    const members = [
+      { id: 'artist-1', name: 'Aurore' },
+      { id: 'artist-2', name: 'Brume' },
+    ]
+    expect(collectiveOption(collective({ members })).detail).toBe('Aurore, Brume')
+    expect(collectiveOption(collective({})).detail).toBeNull()
   })
 })
 

@@ -20,9 +20,9 @@ const stored = new Map<string, Buffer>()
 let nextId = 0
 let nextPhoto = 0
 
-// Like the database, where two collectives can't have the same email whatever its case.
-function emailTaken(email: string, except?: string) {
-  return rows.some((row) => row.id !== except && row.email.toLowerCase() === email.toLowerCase())
+// Like the database, where two collectives can't have the same email whatever its case, but any number can have none.
+function emailTaken(email: string | null, except?: string) {
+  return email !== null && rows.some((row) => row.id !== except && row.email?.toLowerCase() === email.toLowerCase())
 }
 
 // The members, as the store saves them: artists who exist, and new ones for those sent by name.
@@ -218,19 +218,31 @@ describe('collectives routes', () => {
       expect(vi.mocked(store.create).mock.calls[0][0].members).toEqual([{ id: 'artist-ana' }, { name: 'Cyan' }])
     })
 
-    it('adds a collective without a photo, country, city, description, links or phone', async () => {
+    it('adds a collective without a photo, country, city, description, links, email or phone', async () => {
       const app = await buildApp()
-      const leftOut = { country: '', city: '', description: '', links: {}, phone: '' }
+      const leftOut = { country: '', city: '', description: '', links: {}, email: null, phone: '' }
       const response = await create(app, profile(leftOut), null)
       expect(response.statusCode).toBe(200)
       expect(response.json().collective).toMatchObject({ ...leftOut, hasPhoto: false })
+      expect(rows[0]).toMatchObject(leftOut)
       expect(photos.store).not.toHaveBeenCalled()
+    })
+
+    it('adds any number of collectives without an email, whether it is left out, null or blank', async () => {
+      const app = await buildApp()
+      // JSON leaves out undefined fields.
+      for (const email of [undefined, null, '  ']) {
+        const response = await create(app, profile({ email }), null)
+        expect(response.statusCode).toBe(200)
+        expect(response.json().collective.email).toBeNull()
+      }
+      expect(rows.map((row) => row.email)).toEqual([null, null, null])
     })
 
     it('explains, in French, what is wrong with an invalid profile, without storing the photo', async () => {
       const app = await buildApp()
       for (const [changes, error] of [
-        [{ email: null }, 'Indiquez votre adresse e-mail.'],
+        [{ email: 'pas-une-adresse' }, 'Indiquez une adresse e-mail valide.'],
         [{ members: [] }, 'Indiquez au moins un artiste du collectif.'],
         [{ description: 'x'.repeat(5001) }, 'La description dépasse 5000 caractères.'],
       ] as const) {
@@ -332,6 +344,17 @@ describe('collectives routes', () => {
         updatedBy: 'admin@example.com',
       })
       expect(rows[0].photoKey).toBe('collectives/photo-1.jpeg')
+    })
+
+    it("takes out the contact's email, which frees it for another collective", async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ email: ' ' }), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().collective.email).toBeNull()
+      const taker = await create(app, profile({ name: 'Autres Ondes' }), null)
+      expect(taker.statusCode).toBe(200)
+      expect(taker.json().collective.email).toBe('contact@example.com')
     })
 
     it('takes the members as the collective returns them', async () => {

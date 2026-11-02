@@ -47,11 +47,11 @@ type ApplicationFormProps = {
 function ownerOptions(artists: Artist[], collectives: Collective[]): (ComboboxOption & { owner: Owner })[] {
   return [
     ...artists.map((artist) => ({ ...artistOption(artist), owner: { kind: 'artist' as const, id: artist.id } })),
-    ...collectives.map((collective) => ({
-      ...collectiveOption(collective),
-      detail: `${KIND_LABELS.collective}, ${collective.email}`,
-      owner: { kind: 'collective' as const, id: collective.id },
-    })),
+    ...collectives.map((collective) => {
+      const option = collectiveOption(collective)
+      const detail = [KIND_LABELS.collective, option.detail].filter(Boolean).join(', ')
+      return { ...option, detail, owner: { kind: 'collective' as const, id: collective.id } }
+    }),
   ]
     // Keyed by the address of their page, which tells artists and collectives apart.
     .map((option) => ({ ...option, key: entryPath(option.owner.kind, option.owner.id) }))

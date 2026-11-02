@@ -476,7 +476,24 @@ describe('A collective’s page', () => {
     expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
   })
 
-  it("needs the contact's email, and shows why the server refused the collective", async () => {
+  it("takes out the contact's email, which is then sent null", async () => {
+    const changed: Collective = { ...ONDES, email: null, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
+    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await edit()
+    fireEvent.change(screen.getByLabelText('Adresse e-mail du contact'), { target: { value: ' ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByText(/^Modifié par/)).toBeInTheDocument())
+    expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).profile.email).toBeNull()
+    expect(described('Adresse e-mail du contact')).toHaveTextContent(/^-$/)
+    // A collective without an email is changed with the field empty.
+    await edit()
+    expect(screen.getByLabelText('Adresse e-mail du contact')).toHaveValue('')
+  })
+
+  it("checks the contact's email, when there's one, and shows why the server refused the collective", async () => {
     mockFetch({
       ...ONDES_PAGE,
       'PUT /api/admin/collectives/collective-1': { ok: false, error: 'Another collective has this email address' },
@@ -485,9 +502,9 @@ describe('A collective’s page', () => {
 
     await edit()
     const email = screen.getByLabelText('Adresse e-mail du contact')
-    fireEvent.change(email, { target: { value: ' ' } })
+    fireEvent.change(email, { target: { value: 'brise@' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(errorOf(email)).toBe('Indiquez votre adresse e-mail.')
+    expect(errorOf(email)).toBe('Indiquez une adresse e-mail valide.')
     expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
 
     fireEvent.change(email, { target: { value: 'brise@example.com' } })
@@ -626,6 +643,28 @@ describe('Adding a collective', () => {
     expect((photo as File).name).toBe('brise.jpg')
   })
 
+  it('adds a collective with only its name and its artists, e.g. one known only by its past takeovers', async () => {
+    const leftOut = { country: '', city: '', description: '', links: {}, email: null, phone: '' } as const
+    const added: Collective = { ...ONDES, id: 'collective-3', name: 'Brise', ...leftOut }
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/artists': { ok: true, artists: ARTISTS },
+      'POST /api/admin/collectives': { ok: true, collective: added },
+      '/api/admin/collectives/collective-3': { ok: true, collective: added },
+    })
+    renderAt('/admin/artistes/collectifs/nouveau')
+
+    fireEvent.change(await screen.findByLabelText('Nom du collectif'), { target: { value: 'Brise' } })
+    addNew('Élise')
+    const country = screen.getByRole('combobox', { name: 'Pays' })
+    fireEvent.change(country, { target: { value: 'inconnu' } })
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Pays inconnu' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le collectif' }))
+
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/admin/artistes/collectifs/collective-3'))
+    expect(sent(requestsTo('POST', '/api/admin/collectives')[0]).profile).toEqual({ name: 'Brise', members: [{ name: 'Élise' }], ...leftOut })
+  })
+
   it('says what is wrong with every field when the form is sent, and sends nothing', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists: ARTISTS } })
     renderAt('/admin/artistes/collectifs/nouveau')
@@ -633,9 +672,8 @@ describe('Adding a collective', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'ajouter le collectif' }))
     expect(errorOf(screen.getByLabelText('Nom du collectif'))).toBe('Indiquez le nom du collectif.')
     expect(errorOf(membersField())).toBe('Indiquez au moins un artiste du collectif.')
-    expect(errorOf(screen.getByLabelText('Adresse e-mail du contact'))).toBe('Indiquez votre adresse e-mail.')
     // Admins can leave these out, and the photo is optional.
-    for (const label of ['Ville', 'Description', 'SoundCloud', 'Téléphone du contact', 'Photo']) {
+    for (const label of ['Ville', 'Description', 'SoundCloud', 'Adresse e-mail du contact', 'Téléphone du contact', 'Photo']) {
       expect(errorOf(screen.getByLabelText(label))).toBeNull()
     }
     await waitFor(() => expect(screen.getByLabelText('Nom du collectif')).toHaveFocus())

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, city, country, emailAddress, line, links, orLeftOut, phone, text } from '../artists/profile.js'
+import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, city, country, email, emailAddress, line, links, orLeftOut, phone, text } from '../artists/profile.js'
 
 // A collective's profile: the rules every collective's profile has to follow (see docs/design/server/collectives.md), as
 // the zod schemas the server checks them with, which openapi.json is generated from. They share most of their rules
@@ -49,8 +49,8 @@ const Members = z
       'when there are both',
   })
 
-// The profile of a collective, as it's sent, with what admins `canLeaveOut`: the same fields as for an artist, except
-// the email, which is the contact's, and how the team reaches the collective.
+// The profile of a collective, as it's sent, with what admins `canLeaveOut`: the same fields as for an artist, where the
+// email and phone are the contact's.
 function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
   const description = text('La description', BIO_MAX_LENGTH, 'Écrivez quelques lignes de description.', { canBeEmpty: canLeaveOut })
   return z.object({
@@ -60,19 +60,22 @@ function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
     city: city({ canLeaveOut }),
     description: canLeaveOut ? orLeftOut(description, '') : description,
     links: links({ canLeaveOut }),
-    email: emailAddress(),
+    email: email({ canLeaveOut }),
     phone: phone({ canLeaveOut }),
   })
 }
 
-// A collective's profile, as admins send it: they can leave out the country, city, description, links and phone, as for
-// an artist, but not the contact's email. What's there still has to be valid. It's cleaned up as it's checked, and the
-// first error is what the server answers.
+// A collective's profile, as admins send it: they can leave out the country, city, description, links, email and phone,
+// as for an artist, e.g. for collectives the team only knows by name. What's there still has to be valid. It's cleaned up
+// as it's checked, and the first error is what the server answers.
 export const AdminCollectiveProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminCollectiveProfile' })
 
 // A collective's profile, as it sends it when it applies (see `Applicant` in applications/applicant.ts), with nothing left
-// out. Its members are artists who apply with it, rather than members as admins send them.
-export const ApplicantCollectiveProfile = profile({ canLeaveOut: false }).omit({ members: true })
+// out. Its members are artists who apply with it, rather than members as admins send them. Its email is said again, as
+// for `ArtistProfile` (see artists/profile.ts).
+export const ApplicantCollectiveProfile = profile({ canLeaveOut: false }).omit({ members: true }).extend({ email: emailAddress() })
 
 export type CollectiveProfile = z.output<typeof AdminCollectiveProfile>
+// What's saved of the profile of a collective that applied, which always has an email address.
+export type ApplicantCollective = z.output<typeof ApplicantCollectiveProfile>
 export type SentMember = CollectiveProfile['members'][number]

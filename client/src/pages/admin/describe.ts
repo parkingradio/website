@@ -113,22 +113,26 @@ export function applicationOwner({ artistId, collectiveId }: { artistId: string 
   return collectiveId !== null ? { kind: 'collective', id: collectiveId } : { kind: 'artist', id: artistId! }
 }
 
-// What tells an artist apart from others with the same name, in the lists they're picked from: their email, or else where
-// they're from, or else their collectives.
-function detailOf(artist: Artist): string | null {
-  if (artist.email) return artist.email
-  if (artist.city || artist.country) return place(artist)
-  return artist.collectives.map((collective) => collective.name).join(', ') || null
+// What tells an artist or a collective apart from others with the same name, in the lists they're picked from: their
+// email, or else where they're from, or else the names of the `others` they're with, i.e. an artist's collectives, or a
+// collective's artists.
+function detailOf(
+  { email, city, country }: { email: string | null; city: string; country: string },
+  others: { name: string }[],
+): string | null {
+  if (email) return email
+  if (city || country) return place({ city, country })
+  return others.map((other) => other.name).join(', ') || null
 }
 
 // An artist, or a collective, as an option of the lists they're picked from, keyed by their id, with what tells them apart
 // from others with the same name.
 export function artistOption(artist: Artist): ComboboxOption {
-  return { key: artist.id, label: artist.name, detail: detailOf(artist) }
+  return { key: artist.id, label: artist.name, detail: detailOf(artist, artist.collectives) }
 }
 
 export function collectiveOption(collective: Collective): ComboboxOption {
-  return { key: collective.id, label: collective.name, detail: collective.email }
+  return { key: collective.id, label: collective.name, detail: detailOf(collective, collective.members) }
 }
 
 // What an artist or a collective is searched by, in the lists: their `names`, how to reach them, where they're from, their

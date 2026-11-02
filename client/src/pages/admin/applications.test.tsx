@@ -687,6 +687,14 @@ describe('An application’s page', () => {
       expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
     })
 
+    it('shows "-" in place of the email of a collective without one', async () => {
+      mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, email: null } } })
+      renderAt('/admin/candidatures/application-1')
+
+      await waitFor(() => expect(described('Adresse e-mail du contact')).toHaveTextContent(/^-$/))
+      expect(screen.queryByRole('link', { name: /@/ })).not.toBeInTheDocument()
+    })
+
     it('shows the collective without its genres when its artists could not be loaded', async () => {
       mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/artists?collective=collective-1': { ok: false, error: 'Boom' } })
       renderAt('/admin/candidatures/application-1')
@@ -716,9 +724,12 @@ describe('An application’s page', () => {
 describe('Creating an application', () => {
   it('creates an application for the artist it was started from, then shows it', async () => {
     const created = { ...APPLICATION, id: 'application-4', artistId: 'artist-2', timeSlots: [], prestations: ['dj'], otherPrestation: 'B2B', details: '' }
+    // A collective without an email, told apart like an artist.
+    const brise: Collective = { ...ONDES, id: 'collective-2', name: 'Brise', email: null, city: 'Gaspé' }
     mockFetch({
       ...LOGGED_IN,
       ...ARTISTS,
+      '/api/admin/collectives': { ok: true, collectives: [ONDES, brise] },
       'POST /api/admin/applications': { ok: true, application: created },
       '/api/admin/applications/application-4': { ok: true, application: created },
       '/api/admin/artists/artist-2': { ok: true, artist: BRUME },
@@ -729,7 +740,12 @@ describe('Creating an application', () => {
     expect(picked).toHaveValue('Brume')
     // By name, with their email, or else where they're from, and collectives say so.
     fireEvent.click(picked)
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Auroreaurore@example.com', 'BrumeCanada', 'Ondescollectif, ondes@example.com'])
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Auroreaurore@example.com',
+      'Brisecollectif, Gaspé, Canada',
+      'BrumeCanada',
+      'Ondescollectif, ondes@example.com',
+    ])
     fireEvent.keyDown(picked, { key: 'Escape' })
     // Received now, unless said otherwise.
     expect(screen.getByLabelText('Reçue le')).toHaveValue('')

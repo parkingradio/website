@@ -4,7 +4,7 @@ import { artistsStore } from '../artists/store.js'
 import type { StoredPhoto } from '../artists/store.js'
 import type { ApplicantProfile, Profile } from '../artists/profile.js'
 import { collectivesStore } from '../collectives/store.js'
-import type { CollectiveProfile } from '../collectives/profile.js'
+import type { ApplicantCollective } from '../collectives/profile.js'
 import type { db as Database } from '../db/connection.js'
 
 // Stores the applications that new artists and collectives send themselves, from `POST /api/applications`. On the admin
@@ -22,7 +22,7 @@ export type ApplyStore = {
   // all with a null `createdBy`. Returns the ids of the collective and its application. If a collective with the same
   // email already exists (ignoring case), throws an EmailTaken and creates nothing.
   applyAsCollective(
-    collective: Omit<CollectiveProfile, 'members'> & StoredPhoto,
+    collective: ApplicantCollective & StoredPhoto,
     members: (Profile & StoredPhoto)[],
     application: ApplicationFields,
   ): Promise<{ collectiveId: string; applicationId: string }>
