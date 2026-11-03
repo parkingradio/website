@@ -89,7 +89,7 @@ function CollectiveById({ id }: { id: string }) {
       </div>
       <CollectiveDetails collective={collective} members={members.kind === 'loaded' ? members.value.artists : null} />
 
-      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collectif=${collective.id}`} />
+      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collective=${collective.id}`} />
 
       <OwnSessions sessions={sessions} newPath={`/admin/sessions/nouvelle?takeover=${collective.id}`} />
 

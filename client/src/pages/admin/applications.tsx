@@ -65,19 +65,19 @@ function ownerOf(application: Application, owners: Owners): Entry | undefined {
 
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
 // them.
-type ApplicationColumn = 'recue' | 'artiste' | 'ville' | 'dates' | 'statut'
+type ApplicationColumn = 'received' | 'artist' | 'city' | 'dates' | 'status'
 
 function applicationColumns(owners: Owners): Record<ApplicationColumn, SortColumn<Application>> {
   const name = (application: Application) => ownerOf(application, owners)?.name ?? ''
   // An unknown artist or collective has no city or country, like one whose place is left out.
   const placeOf = (application: Application) => ownerOf(application, owners) ?? { city: '', country: '' }
   return {
-    recue: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
-    artiste: { compare: (a, b) => compareText(name(a), name(b)) },
-    ville: { compare: (a, b) => comparePlaces(placeOf(a), placeOf(b)) },
+    received: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
+    artist: { compare: (a, b) => compareText(name(a), name(b)) },
+    city: { compare: (a, b) => comparePlaces(placeOf(a), placeOf(b)) },
     // By the first day the artist would like to play.
     dates: { compare: (a, b) => a.dates[0].localeCompare(b.dates[0]) },
-    statut: { compare: (a, b) => APPLICATION_STATUSES.indexOf(a.status) - APPLICATION_STATUSES.indexOf(b.status) },
+    status: { compare: (a, b) => APPLICATION_STATUSES.indexOf(a.status) - APPLICATION_STATUSES.indexOf(b.status) },
   }
 }
 
@@ -107,17 +107,17 @@ export function ApplicationsTable({
     <table className="admin-table" aria-labelledby={labelledBy}>
       <thead>
         <tr>
-          {header('recue', 'Reçue le')}
+          {header('received', 'Reçue le')}
           {owners && (
             <>
-              {header('artiste', 'Artiste')}
-              {header('ville', 'Ville')}
+              {header('artist', 'Artiste')}
+              {header('city', 'Ville')}
               <th>Genres</th>
             </>
           )}
           {header('dates', 'Dates')}
           <th>Prestations</th>
-          {header('statut', 'Statut')}
+          {header('status', 'Statut')}
         </tr>
       </thead>
       <tbody>
@@ -227,7 +227,7 @@ function applicationSearchFields(application: Application): string[] {
 }
 
 // Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
-// those with the status in the `statut` query parameter. The status's buttons count the applications the search finds.
+// those with the status in the `status` query parameter. The status's buttons count the applications the search finds.
 function ApplicationsList({ query }: { query: string }) {
   const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
@@ -237,7 +237,7 @@ function ApplicationsList({ query }: { query: string }) {
     artists.kind === 'loaded' ? artists.value.artists : null,
     collectives.kind === 'loaded' ? collectives.value.collectives : [],
   )
-  const sorting = useSort(applicationColumns(byKey), 'recue')
+  const sorting = useSort(applicationColumns(byKey), 'received')
   const [status, setStatus] = useStatusFilter(APPLICATION_STATUSES)
 
   if (applications.kind === 'error') {
@@ -516,15 +516,15 @@ function CollectiveSummary({ collective, members }: { collective: Collective; me
   )
 }
 
-// Creating an application, for the artist in the `artiste` query parameter, or the collective in `collectif`, at first,
+// Creating an application, for the artist in the `artist` query parameter, or the collective in `collective`, at first,
 // if any.
 export function NewApplicationPage() {
   const artists = useApi('/api/admin/artists')
   const collectives = useApi('/api/admin/collectives')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const initialArtist = searchParams.get('artiste')
-  const initialCollective = searchParams.get('collectif')
+  const initialArtist = searchParams.get('artist')
+  const initialCollective = searchParams.get('collective')
 
   let content
   if (artists.kind === 'loading' || collectives.kind === 'loading') {

@@ -152,7 +152,7 @@ describe('The list of applications', () => {
     expect(filters.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
 
     fireEvent.click(filters.getByRole('button', { name: 'retenues (1)' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?statut=accepted$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=accepted$/)
     expect(filters.getByRole('button', { name: 'retenues (1)' })).toHaveAttribute('aria-pressed', 'true')
     expect(rows().map((row) => row[0])).toEqual(['6 octobre 2026'])
 
@@ -218,7 +218,7 @@ describe('The list of applications', () => {
 
   it('says when there are no applications', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: [] } })
-    renderAt('/admin/candidatures?statut=new')
+    renderAt('/admin/candidatures?status=new')
 
     await waitFor(() => expect(screen.getByText('Aucune candidature.')).toBeInTheDocument())
   })
@@ -299,20 +299,20 @@ describe('Searching the list of applications', () => {
     ])
 
     fireEvent.click(filters.getByRole('button', { name: 'retenues (1)' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?recherche=aurore&statut=accepted$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?search=aurore&status=accepted$/)
     expect(received()).toEqual(['6 octobre 2026'])
   })
 
   it('says there are none with a status, rather than that none matches, when there are none with it at all', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?statut=scheduled&recherche=aurore')
+    renderAt('/admin/candidatures?status=scheduled&search=aurore')
 
     await waitFor(() => expect(screen.getByText('Aucune candidature.')).toBeInTheDocument())
   })
 
   it('says when no application matches', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?recherche=zzzzzz')
+    renderAt('/admin/candidatures?search=zzzzzz')
 
     await waitFor(() => expect(screen.getByText('Aucune candidature ne correspond à la recherche.')).toBeInTheDocument())
     expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('zzzzzz')
@@ -320,7 +320,7 @@ describe('Searching the list of applications', () => {
 
   it('still finds applications by what they say when the artists could not be loaded', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: SEARCHED } })
-    renderAt('/admin/candidatures?recherche=soiree')
+    renderAt('/admin/candidatures?search=soiree')
 
     await waitFor(() => expect(received()).toEqual(['6 octobre 2026']))
   })
@@ -343,15 +343,38 @@ describe('Sorting the list of applications', () => {
     fireEvent.click(within(header).getByRole('button'))
     expect(header).toHaveAttribute('aria-sort', 'ascending')
     expect(received()).toEqual(['28 mars 2026', '6 octobre 2026', '7 octobre 2026', '8 octobre 2026'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?tri=recue&ordre=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=received&order=asc$/)
   })
 
   it('sorts the applications the way their column first sorts them when the URL does not say which way', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?tri=recue')
+    renderAt('/admin/candidatures?sort=received')
 
     await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
     expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
+  })
+
+  it('ignores a column, a direction or a status that the URL gives but it does not know', async () => {
+    mockFetch(LISTED)
+    const { unmount } = renderAt('/admin/candidatures?sort=ville&order=asc&status=nouvelle')
+
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
+    expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
+    expect(screen.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
+    unmount()
+
+    renderAt('/admin/candidatures?sort=city&order=up')
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Ville' })).toHaveAttribute('aria-sort', 'ascending'))
+  })
+
+  it('ignores the parameters of old addresses, which were in French', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures?recherche=aurore&tri=ville&ordre=asc&statut=new')
+
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
+    expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
+    expect(screen.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('')
   })
 
   it('sorts the applications by artist, each artist’s the most recently received first', async () => {
@@ -383,7 +406,7 @@ describe('Sorting the list of applications', () => {
     renderAt('/admin/candidatures')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ville' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?tri=ville&ordre=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=city&order=asc$/)
     expect(rows().map((row) => [row[0], row[2]])).toEqual([
       ['7 octobre 2026', 'Canada'],
       ['8 octobre 2026', 'Montréal, Canada'],
@@ -394,7 +417,7 @@ describe('Sorting the list of applications', () => {
 
   it('sorts the applications by the first day their artists would like to play', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?tri=recue&ordre=asc')
+    renderAt('/admin/candidatures?sort=received&order=asc')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Dates' }))
     expect(rows().map((row) => row[4])).toEqual(['29 oct. 2026', '5 nov. 2026', '12 nov. 2026', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)'])
@@ -734,7 +757,7 @@ describe('Creating an application', () => {
       '/api/admin/applications/application-4': { ok: true, application: created },
       '/api/admin/artists/artist-2': { ok: true, artist: BRUME },
     })
-    renderAt('/admin/candidatures/nouvelle?artiste=artist-2')
+    renderAt('/admin/candidatures/nouvelle?artist=artist-2')
 
     const picked = await screen.findByRole('combobox', { name: 'Artiste ou collectif' })
     expect(picked).toHaveValue('Brume')
@@ -777,7 +800,7 @@ describe('Creating an application', () => {
       '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
       '/api/admin/artists?collective=collective-1': { ok: true, artists: [BRUME, AURORE] },
     })
-    renderAt('/admin/candidatures/nouvelle?collectif=collective-1')
+    renderAt('/admin/candidatures/nouvelle?collective=collective-1')
 
     expect(await screen.findByRole('combobox', { name: 'Artiste ou collectif' })).toHaveValue('Ondes')
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
@@ -796,7 +819,7 @@ describe('Creating an application', () => {
 
   it('creates an application for a collective picked by its name', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, 'POST /api/admin/applications': { ok: false, error: 'Boom' } })
-    renderAt('/admin/candidatures/nouvelle?artiste=artist-1')
+    renderAt('/admin/candidatures/nouvelle?artist=artist-1')
 
     const picker = await screen.findByRole('combobox', { name: 'Artiste ou collectif' })
     fireEvent.change(picker, { target: { value: 'ond' } })
@@ -813,7 +836,7 @@ describe('Creating an application', () => {
 
   it('sends when the application was received, if a day was picked', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, 'POST /api/admin/applications': { ok: true, application: APPLICATION } })
-    renderAt('/admin/candidatures/nouvelle?artiste=artist-1')
+    renderAt('/admin/candidatures/nouvelle?artist=artist-1')
 
     fireEvent.change(await screen.findByLabelText('Reçue le'), { target: { value: '2026-03-28' } })
     fireEvent.change(screen.getByLabelText('Date 1'), { target: { value: '2026-12-10' } })
@@ -827,7 +850,7 @@ describe('Creating an application', () => {
   })
 
   it('picks nobody when started from an unknown artist or collective, and needs one to be picked', async () => {
-    for (const path of ['/admin/candidatures/nouvelle?artiste=gone', '/admin/candidatures/nouvelle?collectif=artist-1']) {
+    for (const path of ['/admin/candidatures/nouvelle?artist=gone', '/admin/candidatures/nouvelle?collective=artist-1']) {
       mockFetch({ ...LOGGED_IN, ...ARTISTS })
       const { unmount } = renderAt(path)
 

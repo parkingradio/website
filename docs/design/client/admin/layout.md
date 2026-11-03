@@ -38,7 +38,10 @@ The lists of artists and collectives, of applications and of sessions (see [Arti
 of the fields searched, whatever their case and accents, with "œ" and "æ" the same as "oe" and "ae", and allowing for
 about one typo every 5 letters. The search and the order are kept in the page's address, along with the status of
 applications or sessions, so that going back to a list from one of its entries with the browser's back button finds it
-as it was.
+as it was. The address's parameters are `search` (what's searched for), `sort` (the column the list is sorted by, as
+each page names it), `order` (`asc` or `desc`, which only counts along with `sort`) and `status` (as the server names
+it, e.g. `accepted`). Without `order`, "Reçue le" and "Date" sort the latest first, and every other column sorts in
+ascending order. A value the page doesn't know is ignored, as if the parameter weren't there.
 
 ## Endpoints
 

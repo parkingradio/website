@@ -50,7 +50,7 @@ function sessionPath(session: Pick<Session, 'id'>): string {
 }
 
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
-type SessionColumn = 'date' | 'nom' | 'statut'
+type SessionColumn = 'date' | 'name' | 'status'
 
 // Sessions without a date are later than any other, then by when they were added.
 function compareStarts(a: Session, b: Session): number {
@@ -60,8 +60,8 @@ function compareStarts(a: Session, b: Session): number {
 
 const SESSION_COLUMNS: Record<SessionColumn, SortColumn<Session>> = {
   date: { compare: compareStarts, descendingFirst: true },
-  nom: { compare: (a, b) => compareText(a.name, b.name) },
-  statut: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
+  name: { compare: (a, b) => compareText(a.name, b.name) },
+  status: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
 }
 
 function SessionsFailure({ message }: { message: string }) {
@@ -121,10 +121,10 @@ function SessionsTable({
         <tr>
           {header('date', 'Date')}
           <th>Heure</th>
-          {header('nom', 'Nom')}
+          {header('name', 'Nom')}
           {withTakeover && <th>Takeover</th>}
           <th>Artistes</th>
-          {header('statut', 'Statut')}
+          {header('status', 'Statut')}
         </tr>
       </thead>
       <tbody>
@@ -254,7 +254,7 @@ function sessionSearchFields(session: Session): string[] {
 }
 
 // Every session, the latest first unless they're sorted otherwise, or those `query` finds, or only those with the status
-// in the `statut` query parameter. The status's buttons count the sessions the search finds.
+// in the `status` query parameter. The status's buttons count the sessions the search finds.
 function SessionsList({ query }: { query: string }) {
   const sessions = useApi('/api/admin/sessions')
   const sorting = useSort(SESSION_COLUMNS, 'date')

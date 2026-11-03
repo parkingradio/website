@@ -57,25 +57,25 @@ export function useQueryParams(): [URLSearchParams, (changes: Record<string, str
 export function useSearchQuery() {
   const [params, change] = useQueryParams()
   return {
-    query: params.get('recherche') ?? '',
+    query: params.get('search') ?? '',
     // Searching doesn't add a step to the browser's history for each letter typed.
-    setQuery: (query: string) => change({ recherche: query || null }, { replace: true }),
+    setQuery: (query: string) => change({ search: query || null }, { replace: true }),
   }
 }
 
 // The order of a list, and what changes it. Without a column in the URL, the list is sorted by `initial`, and without a
-// direction, the way the column's header first sorts it.
+// direction along with the column, in descending order if the column is `descendingFirst`, or else in ascending order.
 export function useSort<K extends string, T>(columns: Record<K, SortColumn<T>>, initial: NoInfer<K>): Sorting<K> & { sorted: (entries: T[]) => T[] } {
   const [params, change] = useQueryParams()
-  const column = (Object.keys(columns) as K[]).find((column) => column === params.get('tri')) ?? initial
-  const direction = params.get('tri') === column ? params.get('ordre') : null
+  const column = (Object.keys(columns) as K[]).find((column) => column === params.get('sort')) ?? initial
+  const direction = params.get('sort') === column ? params.get('order') : null
   const sort = { column, descending: direction === 'desc' || (direction !== 'asc' && Boolean(columns[column].descendingFirst)) }
 
   return {
     sort,
     sortBy(column: K) {
       const descending = column === sort.column ? !sort.descending : Boolean(columns[column].descendingFirst)
-      change({ tri: column, ordre: descending ? 'desc' : 'asc' })
+      change({ sort: column, order: descending ? 'desc' : 'asc' })
     },
     // Entries that are equal stay in the order they were in.
     sorted(entries: T[]): T[] {
@@ -88,6 +88,6 @@ export function useSort<K extends string, T>(columns: Record<K, SortColumn<T>>, 
 // The status a list is filtered by, in the URL, if it's one of `statuses`, and what changes it, or removes it (null).
 export function useStatusFilter<S extends string>(statuses: readonly S[]): [S | null, (status: S | null) => void] {
   const [params, change] = useQueryParams()
-  const status = statuses.find((status) => status === params.get('statut')) ?? null
-  return [status, (status) => change({ statut: status })]
+  const status = statuses.find((status) => status === params.get('status')) ?? null
+  return [status, (status) => change({ status })]
 }

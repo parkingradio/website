@@ -14,10 +14,10 @@ each.
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist or
 collective, as [Artistes](artistes.md) searches them, their prestations, their questions or details, and the days the
 artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
-applications with a day in December, or a Thursday. Clicking "Reçue le", "Artiste", "Ville" (by city, then country),
-"Dates" (by the first day the artist would like to play) or "Statut" (nouvelle, retenue, planifiée, faite, then refusée)
-sorts the list by that column, and clicking it again sorts it the other way around. The status buttons count the
-applications the search finds.
+applications with a day in December, or a Thursday. Clicking "Reçue le" (`received`), "Artiste" (`artist`), "Ville"
+(`city`, by city, then country), "Dates" (`dates`, by the first day the artist would like to play) or "Statut"
+(`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that column, and clicking it again sorts
+it the other way around. The status buttons count the applications the search finds.
 
 Under the list, a line says that who the applications artists send are emailed to is chosen in
 [Configuration](configuration.md), and links to it.
@@ -36,11 +36,11 @@ and when, if anyone did. From top to bottom, it then shows:
 "nouvelle candidature" creates an application by hand, at `/admin/candidatures/nouvelle`, e.g. to bring in one that came
 through the original Google Form: a form with the artist or the collective, picked in a single field from those in the
 "Artistes" section, where collectives say so, the day the application was received (today if it's left empty), then the
-application itself. An artist's page leads to it with that artist picked already (`?artiste=<id>`), and a collective's
-page with that collective (`?collectif=<id>`). The application form says what's wrong with each field once it's left,
-like the artist form (see [Artistes](artistes.md)): it checks the application as the server does (see
-[Applications](../../server/applications.md)), for immediate feedback. The server's check is the one that counts: if it
-refuses what the form accepted, the form shows the server's message.
+application itself. An artist's page leads to it with that artist picked already (`?artist=<id>`), and a collective's
+page with that collective (`?collective=<id>`). Either is ignored when it isn't a known artist or collective. The
+application form says what's wrong with each field once it's left, like the artist form (see [Artistes](artistes.md)):
+it checks the application as the server does (see [Applications](../../server/applications.md)), for immediate feedback.
+The server's check is the one that counts: if it refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints
 

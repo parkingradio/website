@@ -51,9 +51,9 @@ the list show only the sessions with a status, or all of them ("toutes"), with h
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their name, their
 takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026"), or "date à
-déterminer". Clicking "Date" (by start, sessions without a date being later than any other, then by when they were
-added), "Nom" or "Statut" (planifiée, jouée, then annulée) sorts the list by that column, and clicking it again sorts it
-the other way around. The status buttons count the sessions the search finds.
+déterminer". Clicking "Date" (`date`, by start, sessions without a date being later than any other, then by when they
+were added), "Nom" (`name`) or "Statut" (`status`: planifiée, jouée, then annulée) sorts the list by that column, and
+clicking it again sorts it the other way around. The status buttons count the sessions the search finds.
 
 ## A session's page
 

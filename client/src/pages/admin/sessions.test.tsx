@@ -238,7 +238,7 @@ describe('The list of sessions', () => {
     const filters = within(await screen.findByRole('group', { name: 'Statut' }))
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (4)', 'planifiées (2)', 'jouées (1)', 'annulées (1)'])
     fireEvent.click(filters.getByRole('button', { name: 'jouées (1)' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?statut=done$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=done$/)
     expect(days()).toEqual(['ven. 2 oct. 2026'])
 
     fireEvent.click(filters.getByRole('button', { name: 'toutes (4)' }))
@@ -266,11 +266,13 @@ describe('The list of sessions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Date' }))
     expect(days()).toEqual(['lun. 31 août 2026', 'ven. 2 oct. 2026', 'sam. 14 nov. 2026', 'date à déterminer'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=date&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Nom' }))
     expect(rows().map((row) => row[2])).toEqual(['', '', 'ONDES TAKEOVER', 'SOIRÉE'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=name&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Statut' }))
     expect(rows().map((row) => row[5])).toEqual(['planifiée', 'planifiée', 'jouée', 'annulée'])
-    expect(screen.getByTestId('path')).toHaveTextContent('tri=statut&ordre=asc')
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=status&order=asc$/)
   })
 
   it('says when there are no sessions, or when they could not be loaded', async () => {

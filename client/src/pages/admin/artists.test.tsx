@@ -314,7 +314,7 @@ describe('Searching the list of artists', () => {
 
   it('keeps the search in the URL', async () => {
     await expectSearch('lyon', ['Brume'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?recherche=lyon$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?search=lyon$/)
     await expectSearch('', ['Aurore', 'Brume', 'Cyan'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes$/)
   })
@@ -384,7 +384,7 @@ describe('Sorting the list of artists', () => {
     fireEvent.click(within(header).getByRole('button'))
     expect(header).toHaveAttribute('aria-sort', 'descending')
     expect(names()).toEqual(['Dora', 'Cyan', 'Brume', 'Aurore'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?tri=nom&ordre=desc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/artistes\?sort=name&order=desc$/)
   })
 
   it('sorts artists before collectives, by name', async () => {
@@ -414,7 +414,7 @@ describe('Sorting the list of artists', () => {
 
   it('sorts the artists as the URL says, along with the search', async () => {
     mockFetch(ARTISTS)
-    renderAt('/admin/artistes?recherche=techno&tri=ville&ordre=desc')
+    renderAt('/admin/artistes?search=techno&sort=city&order=desc')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('techno')
@@ -461,7 +461,7 @@ describe('An artist’s page', () => {
 
     await waitFor(() => expect(screen.getAllByRole('link', { name: '5 octobre 2026' })).toHaveLength(2))
     expect(screen.getAllByRole('link', { name: '5 octobre 2026' })[0]).toHaveAttribute('href', '/admin/candidatures/application-1')
-    expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?artiste=artist-1')
+    expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?artist=artist-1')
   })
 
   it('shows what the artist left out, e.g. one who applied through the original Google Form', async () => {

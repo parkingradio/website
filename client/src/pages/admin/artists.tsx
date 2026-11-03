@@ -32,10 +32,10 @@ import { ArtistsFailure, BackToArtists, CollectivesFailure, LinksList, LoadFailu
 // collectives.tsx.
 
 // The columns the list can be sorted by, where artists come before collectives.
-const ENTRY_COLUMNS: Record<'nom' | 'type' | 'ville', SortColumn<Entry>> = {
-  nom: { compare: (a, b) => compareText(a.name, b.name) },
+const ENTRY_COLUMNS: Record<'name' | 'type' | 'city', SortColumn<Entry>> = {
+  name: { compare: (a, b) => compareText(a.name, b.name) },
   type: { compare: (a, b) => Number(a.kind !== 'artist') - Number(b.kind !== 'artist') },
-  ville: { compare: comparePlaces },
+  city: { compare: comparePlaces },
 }
 
 // Every artist and collective, by name.
@@ -68,7 +68,7 @@ export function ArtistsPage() {
 function ArtistsList({ query }: { query: string }) {
   const artists = useApi('/api/admin/artists')
   const collectives = useApi('/api/admin/collectives')
-  const sorting = useSort(ENTRY_COLUMNS, 'nom')
+  const sorting = useSort(ENTRY_COLUMNS, 'name')
 
   if (artists.kind === 'error' || collectives.kind === 'error') {
     return (
@@ -93,13 +93,13 @@ function ArtistsList({ query }: { query: string }) {
     <table className="admin-table">
       <thead>
         <tr>
-          <SortHeader column="nom" sorting={sorting}>
+          <SortHeader column="name" sorting={sorting}>
             Nom
           </SortHeader>
           <SortHeader column="type" sorting={sorting}>
             Type
           </SortHeader>
-          <SortHeader column="ville" sorting={sorting}>
+          <SortHeader column="city" sorting={sorting}>
             Ville
           </SortHeader>
           <th>Genres</th>
@@ -198,7 +198,7 @@ function ArtistById({ id }: { id: string }) {
       </div>
       <ArtistDetails artist={artist} />
 
-      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?artiste=${artist.id}`} />
+      <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?artist=${artist.id}`} />
 
       <OwnSets sessions={sessions} artistId={artist.id} />
 

@@ -8,8 +8,8 @@ collective), their city and genres. A collective's genres are its members' (see
 [A collective's genres](#a-collectives-genres)). A field above the list searches it (see
 [Searching lists](layout.md#searching-lists)) by name, email address, phone number, city, country, genres and the
 profile names of links, and a collective also by its artists' names, but not by bio or description, which would match
-too many searches. Clicking "Nom", "Type" (artists before collectives) or "Ville" (by city, then country) sorts the list
-by that column, and clicking it again sorts it the other way around.
+too many searches. Clicking "Nom" (`name`), "Type" (`type`, artists before collectives) or "Ville" (`city`, by city,
+then country) sorts the list by that column, and clicking it again sorts it the other way around.
 
 ## A collective's genres
 

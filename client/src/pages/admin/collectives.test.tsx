@@ -173,7 +173,7 @@ describe('A collective’s page', () => {
     // It's in the artists section.
     expect(screen.getByRole('link', { name: 'artistes' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: '← tous les artistes' })).toHaveAttribute('href', '/admin/artistes')
-    expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?collectif=collective-1')
+    expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?collective=collective-1')
     expect(screen.getByText('Aucune candidature.')).toBeInTheDocument()
   })
 
