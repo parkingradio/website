@@ -196,9 +196,11 @@ server's address (see [Conventions](README.md#conventions)):
   its artists' profiles.
   Replying to it answers the artist, or the collective's contact. When nobody was chosen, it isn't sent: applications
   are only saved, and confirmed. When the recipients can't be read, it's as if nobody was chosen.
-- To the artist, or the collective's contact: a confirmation that the application was received. Replying to it answers
-  the recipients, if there are any. It goes to whatever address the application has, so it doesn't repeat anything the
-  artist wrote: otherwise, anyone could have the server send their own text to any address.
+- To the artist, or the collective's contact: a confirmation that the application was received, which says how it goes
+  from there: because of the number of applications, going through them can take up to a month, only the artists and
+  collectives retained are contacted, by email, and those who've heard nothing within three months can apply again.
+  Replying to it answers the recipients, if there are any. It goes to whatever address the application has, so it
+  doesn't repeat anything the artist wrote: otherwise, anyone could have the server send their own text to any address.
 
 Emails that can't be sent are only logged: the application is saved either way, and the request still succeeds.
 Applications that admins create aren't emailed.

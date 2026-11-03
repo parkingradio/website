@@ -967,6 +967,10 @@
   margin: 0;
 }
 
+.appliquer .sent-body p + p {
+  margin-top: 0.75rem;
+}
+
 .appliquer .big {
   margin-bottom: 1rem !important;
   font-size: clamp(1.6rem, 5vw, 2.6rem);

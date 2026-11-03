@@ -167,7 +167,12 @@ export function applicationEmails({
       text: [
         'Bonjour,',
         '',
-        "Merci pour votre candidature à parking.radio, nous l'avons bien reçue. Nous regardons les dates et nous vous recontacterons par e-mail.",
+        "Merci pour votre candidature à parking.radio, nous l'avons bien reçue.",
+        '',
+        "En raison d'un volume élevé de candidatures, le traitement des demandes peut prendre jusqu'à un mois. Seuls les " +
+          "artistes et collectifs retenus seront contactés par courriel. Si vous n'avez reçu aucune réponse dans les trois " +
+          "mois suivant votre candidature, n'hésitez pas à postuler de nouveau. Nous ferons notre possible pour vous trouver " +
+          'une place dans notre programmation.',
         ...('collective' in applied
           ? ['', 'Petit rappel pour les takeovers : nous demandons aux collectifs de produire un flyer (carte blanche).']
           : []),

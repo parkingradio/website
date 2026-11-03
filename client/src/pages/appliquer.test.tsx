@@ -250,6 +250,15 @@ describe('Appliquer', () => {
     expect(applications()).toEqual([])
   })
 
+  it('asks for a profile photo of the artist, or of the collective and of each of its artists', () => {
+    renderForm()
+    expect(part('Présentation').getByLabelText("Photo de profil — une photo de presse de l'artiste, en bonne qualité")).toBeInTheDocument()
+
+    fireEvent.click(part("L'artiste").getByRole('radio', { name: /^Collectif/ }))
+    expect(part('Présentation').getByLabelText('Photo de profil — une photo de presse du collectif, en bonne qualité')).toBeInTheDocument()
+    expect(within(memberProfile(1)).getByLabelText("Photo de profil — une photo de presse de l'artiste, en bonne qualité")).toBeInTheDocument()
+  })
+
   it('sends the profile and the application with the photo, then thanks the artist', async () => {
     renderForm()
     await fillIn()
@@ -257,6 +266,13 @@ describe('Appliquer', () => {
 
     expect(await screen.findByText('Candidature envoyée')).toBeInTheDocument()
     expect(screen.getByText('artiste@example.com')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "En raison d'un volume élevé de candidatures, le traitement des demandes peut prendre jusqu'à un mois. Seuls les artistes et " +
+          "collectifs retenus seront contactés par courriel. Si vous n'avez reçu aucune réponse dans les trois mois suivant votre " +
+          "candidature, n'hésitez pas à postuler de nouveau. Nous ferons notre possible pour vous trouver une place dans notre programmation.",
+      ),
+    ).toBeInTheDocument()
     expect(document.activeElement).toBe(screen.getByText('Candidature envoyée').closest('section'))
 
     const { artist, application, photo, turnstileToken } = sentParts()

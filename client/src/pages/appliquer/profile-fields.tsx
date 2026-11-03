@@ -72,7 +72,7 @@ export function PresentationFields({ idPrefix, profile, onChange, errors, showEr
     <>
       <div className="field wide">
         <label htmlFor={fieldId(idPrefix, 'photo')}>
-          Photo <span className="hint">— une photo de presse en bonne qualité pour notre site web</span>
+          Photo de profil <span className="hint">— une photo de presse {collective ? 'du collectif' : "de l'artiste"}, en bonne qualité</span>
         </label>
         <PhotoField id={fieldId(idPrefix, 'photo')} value={profile.photo} onChange={(photo) => onChange({ photo })} invalid={!!errors.photo} />
         <FieldError message={errors.photo} />

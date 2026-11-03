@@ -24,8 +24,8 @@ The fields of an artist applying alone are (* means mandatory):
   plain text. As GeoNames' terms ask, the bottom of the page credits it.
 - "Genres musicaux" (*): 1 to 3 genres from a list grouped by family, in order: the first one is the artist's
   main genre.
-- "Photo": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a good
-  quality press photo for our site. A photo that was picked can be removed.
+- "Photo de profil": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a
+  good quality press photo of the artist. A photo that was picked can be removed.
 - "Bio" (*): free-form text, up to 1500 characters.
 - "Liens" (*, at least one): one field per site (SoundCloud, Instagram, website and Bandcamp are always shown;
   Mixcloud, Resident Advisor, YouTube, Spotify and TikTok can be added). Each field shows the site's address
@@ -48,7 +48,8 @@ that the team knows each of its artists, not only the collective:
 - The first part, "Le collectif", has "Nom du collectif" (*), then the collective's own "Pays" (*) and "Ville" (*), like
   an artist's, then "Artistes du collectif" (*, see below), and a note saying that collectives make their own flyer. A
   collective has no genres of its own: its genres are its artists'.
-- "Présentation" has the collective's photo, its "Description" (*, like a bio) and its links.
+- "Présentation" has the collective's "Photo de profil", for which the form asks for a press photo of the collective,
+  its "Description" (*, like a bio) and its links.
 - "Prestation" describes the collective's show as a whole.
 - "Contact" has a single email address and phone number, and says that they're the collective's contact person's, the
   only one the team communicates with, who gets the confirmation. Its artists have none of their own.
@@ -64,8 +65,8 @@ server's), as tabs above the profile of the one selected:
 - "+ ajouter un artiste (2 / 4)", after the tabs, adds an artist and selects their tab, up to 4.
 - An artist's profile has the same fields as an artist applying alone, in the same order, with the same rules and the
   same limits of the form's (e.g. up to 3 genres, and a bio of up to 1500 characters): "Nom d'artiste" (*), "Pays" (*),
-  "Ville" (*), "Genres musicaux" (*), "Photo" (optional), "Bio" (*) and "Liens" (*). It has no email address or phone
-  number. The profiles that aren't selected keep what they show, e.g. a link field that was added.
+  "Ville" (*), "Genres musicaux" (*), "Photo de profil" (optional), "Bio" (*) and "Liens" (*). It has no email address
+  or phone number. The profiles that aren't selected keep what they show, e.g. a link field that was added.
 
 A link's error shows as soon as it's pasted or its field is left. Other errors only show once the artist tries to send
 the form, which brings them to the first field to fix. For a collective, the profile of the first of its artists with
@@ -82,11 +83,13 @@ form can't be sent when it can't be fetched: it then says so, and to reload the 
 
 When an artist sends the form, it goes to `POST /api/applications`, which creates the artist, or the collective and its
 artists, and the application, and sends the emails about it (see [Applying](../server/applications.md#applying) and
-[Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist and says where the confirmation
-went. Otherwise, it shows the server's error, e.g. when an artist, or a collective, already has that email address: the
-form is only for new artists and collectives for now. Artists we already know will apply again from a different page,
-which isn't designed yet. An error about one of a collective's artists says which one. When the answer isn't the
-server's, e.g. the network failed, the form says that the application couldn't be sent, and to try again in a moment.
+[Emails](../server/applications.md#emails)). Once it's sent, the form thanks the artist, says where the confirmation
+went, and, like the confirmation, how it goes from there: going through applications can take up to a month, only the
+artists and collectives retained are contacted, and those who've heard nothing within three months can apply again.
+Otherwise, it shows the server's error, e.g. when an artist, or a collective, already has that email address: the form
+is only for new artists and collectives for now. Artists we already know will apply again from a different page, which
+isn't designed yet. An error about one of a collective's artists says which one. When the answer isn't the server's,
+e.g. the network failed, the form says that the application couldn't be sent, and to try again in a moment.
 
 ## Endpoints
 

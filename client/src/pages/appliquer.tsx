@@ -383,7 +383,7 @@ export function Appliquer() {
             note={
               collective
                 ? 'La personne-contact du collectif : nous communiquerons seulement avec elle. Elle recevra une confirmation à cette adresse.'
-                : 'Pour vous répondre. Vous recevrez une confirmation à cette adresse.'
+                : 'Pour vous joindre. Vous recevrez une confirmation à cette adresse.'
             }
           >
             <div className="field">
@@ -507,8 +507,13 @@ function Sent({ email }: { email: string }) {
       <div className="sent-body">
         <p className="big">Merci&nbsp;!</p>
         <p>
-          Nous avons bien reçu votre candidature. Une confirmation vient d'être envoyée à <b>{email}</b>. Nous vous recontacterons par e-mail
-          dès que nous aurons regardé les dates.
+          Nous avons bien reçu votre candidature. Une confirmation vient d'être envoyée à <b>{email}</b>.
+        </p>
+        <p>
+          En raison d'un volume élevé de candidatures, le traitement des demandes peut prendre jusqu'à un mois. Seuls les artistes et
+          collectifs retenus seront contactés par courriel. Si vous n'avez reçu aucune réponse dans les trois mois suivant votre
+          candidature, n'hésitez pas à postuler de nouveau. Nous ferons notre possible pour vous trouver une place dans notre
+          programmation.
         </p>
       </div>
     </section>

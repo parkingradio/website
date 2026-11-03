@@ -149,7 +149,11 @@ describe('applicationEmails', () => {
       to: ['artiste@example.com'],
       replyTo: ['equipe@example.com'],
       subject: 'parking.radio : nous avons bien reçu votre candidature',
-      text: "Bonjour,\n\nMerci pour votre candidature à parking.radio, nous l'avons bien reçue. Nous regardons les dates et nous vous recontacterons par e-mail.",
+      text:
+        "Bonjour,\n\nMerci pour votre candidature à parking.radio, nous l'avons bien reçue.\n\n" +
+        "En raison d'un volume élevé de candidatures, le traitement des demandes peut prendre jusqu'à un mois. Seuls les artistes et " +
+        "collectifs retenus seront contactés par courriel. Si vous n'avez reçu aucune réponse dans les trois mois suivant votre " +
+        "candidature, n'hésitez pas à postuler de nouveau. Nous ferons notre possible pour vous trouver une place dans notre programmation.",
     })
   })
 
