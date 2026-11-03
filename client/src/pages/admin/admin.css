@@ -58,6 +58,7 @@
 .admin button:hover,
 .admin button[aria-pressed='true'],
 .admin-form button[type='submit'],
+.admin button.admin-primary,
 .admin a.admin-button:hover,
 .admin .radio-choose,
 .radio-track-tag,
@@ -184,6 +185,11 @@
 .admin-error,
 .radio-track-left-out {
   color: #b3261e;
+}
+
+.admin code {
+  overflow-wrap: anywhere;
+  font-weight: 400;
 }
 
 .admin-placeholder {
@@ -636,6 +642,7 @@ dl.admin-record {
 
 .admin-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 

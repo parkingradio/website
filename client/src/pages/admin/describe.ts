@@ -35,6 +35,16 @@ export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
 // What each feature flag is: its name, and what turning it on does (see docs/design/server/features.md).
 export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {}
 
+// What an app that's allowed a scope can do, as the page where admins allow it says it, in plain words (see
+// docs/design/server/oauth.md). For `admin`, what the MCP server's tools leave out is named (see
+// docs/design/server/mcp.md).
+export const SCOPE_DESCRIPTIONS: Record<string, string> = {
+  admin:
+    'Il pourra faire tout ce que vous faites dans les pages admin, sauf gérer les admins et les applications connectées, ' +
+    "les photos, la connexion SoundCloud, les features de la page Configuration et les destinataires de l'envoi des " +
+    'candidatures par e-mail.',
+}
+
 export { countryName, genreName } from '../../artist-profile'
 
 // What's shown in place of what an artist's profile leaves out, which only admins can do (see `checkProfile`), e.g. for

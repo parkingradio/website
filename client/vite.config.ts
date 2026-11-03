@@ -22,6 +22,8 @@ export default defineConfig({
     proxy: {
       '/healthz': server,
       '/api': server,
+      // The metadata documents of OAuth, which apps read to connect to the dev server, whose address is the issuer.
+      '/.well-known': server,
     },
   },
   test: {

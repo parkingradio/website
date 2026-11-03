@@ -10,6 +10,7 @@ import { Contribuer } from './pages/contribuer'
 import { NotFound } from './pages/not-found'
 import { AdminShell } from './pages/admin/shell'
 import { AcceptInvite } from './pages/admin/accept-invite'
+import { Autoriser } from './pages/admin/autoriser'
 import { AdminLayout } from './pages/admin/layout'
 import { Admins } from './pages/admin/admins'
 import { Calendrier } from './pages/admin/calendrier'
@@ -35,6 +36,8 @@ function App() {
           <Route path="login" element={<Navigate to="/admin" replace />} />
           <Route element={<AdminShell />}>
             <Route path="accept-invite" element={<AcceptInvite />} />
+            {/* Where apps, e.g. Claude, send admins to allow them. */}
+            <Route path="autoriser" element={<Autoriser />} />
             <Route path="admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/calendrier" replace />} />
               <Route path="admins" element={<Admins />} />
