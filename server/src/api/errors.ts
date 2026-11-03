@@ -14,11 +14,14 @@ const INTERNAL_ERROR = 'Internal server error'
 // What requests for paths that don't exist get.
 export const NOT_FOUND = { ok: false, error: 'Not found' } satisfies ApiError
 
-type ErrorMessages = {
+type ErrorOptions = {
   // The message of a 4xx that Fastify or a plugin raises, e.g. because a body is too large.
   clientError?: (error: FastifyError) => string
   // The message of unexpected errors.
   internalError?: string
+  // How an error is sent, as an `ApiError` unless said otherwise, e.g. in OAuth's format, which can also give it another
+  // status than the error's.
+  send?: (reply: FastifyReply, status: number, message: string) => FastifyReply
 }
 
 // Sends every error of the routes of `app` as an `ApiError`, including those of the requests that no route matches. Those
@@ -29,22 +32,23 @@ type ErrorMessages = {
 // not end up in the logs, or in the response, where Fastify would put the error's message. So unexpected errors are
 // logged with only the query and Postgres's error, and their response only says that something went wrong.
 //
-// The messages can be chosen, e.g. to have them in French for a plugin whose errors the public sees.
-export function useApiErrors(app: FastifyInstance, messages: ErrorMessages = {}) {
-  const { clientError = (error: FastifyError) => error.message, internalError = INTERNAL_ERROR } = messages
+// The messages can be chosen, e.g. to have them in French for a plugin whose errors the public sees, and so can how errors
+// are sent.
+export function useApiErrors(app: FastifyInstance, options: ErrorOptions = {}) {
+  const { clientError = (error: FastifyError) => error.message, internalError = INTERNAL_ERROR, send = sendError } = options
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     const status = error.statusCode ?? 500
     if (status >= 400 && status < 500) {
       // Only for the errors of reading the body: those of a not-found handler itself, e.g. a 416 for a `Range` header
       // while sending the client's index.html, are its own.
       const unreadBody = request.is404 && error.code?.startsWith('FST_ERR_CTP_')
-      return unreadBody ? sendError(reply, 404, NOT_FOUND.error) : sendError(reply, status, clientError(error))
+      return unreadBody ? send(reply, 404, NOT_FOUND.error) : send(reply, status, clientError(error))
     }
     const where = request.is404
       ? `a ${request.method} request that matched no route`
       : `${request.method} ${request.routeOptions.url}`
     request.log.error({ err: withoutValues(error) }, `Failed to handle ${where}`)
-    return sendError(reply, 500, internalError)
+    return send(reply, 500, internalError)
   })
 }
 

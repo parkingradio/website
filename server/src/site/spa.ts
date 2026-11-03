@@ -10,6 +10,10 @@ import { notFoundRoutes } from './not-found.js'
 // the current build's files, keeps the default of being revalidated so that deploys are picked up at once.
 const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
+// Other sites can't show the app in a frame, so that they can't trick admins into clicking its buttons, e.g. to allow an
+// app to act as them (see docs/design/server/README.md).
+const NO_FRAMING = { 'x-frame-options': 'DENY', 'content-security-policy': "frame-ancestors 'none'" }
+
 type SpaOptions = {
   root: string
 }
@@ -20,6 +24,10 @@ type SpaOptions = {
  * notFoundRoutes.
  */
 export async function spaRoutes(app: FastifyInstance, { root }: SpaOptions) {
+  app.addHook('onSend', async (_request, reply) => {
+    reply.headers(NO_FRAMING)
+  })
+
   // Without a wildcard route, unmatched paths reach the not-found handler for their prefix, which is
   // what lets notFoundRoutes take over under /api and /assets.
   await app.register(fastifyStatic, {

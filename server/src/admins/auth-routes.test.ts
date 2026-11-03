@@ -9,7 +9,6 @@ const { selectResult, dbState } = vi.hoisted(() => ({
   dbState: {
     updatedPasswordHashes: [] as string[],
     updatedSessionVersions: [] as unknown[],
-    deleteCallCount: 0,
     deleteWhereArgs: [] as unknown[],
   },
 }))
@@ -25,7 +24,6 @@ vi.mock('../db/connection.js', () => ({
       const tx = {
         delete: () => ({
           where: (arg: unknown) => {
-            dbState.deleteCallCount += 1
             dbState.deleteWhereArgs.push(arg)
             const rows = selectResult.rows
             selectResult.rows = [] // a real DELETE ... RETURNING can only return a row once
@@ -51,10 +49,11 @@ import { DrizzleQueryError, eq } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { db } from '../db/connection.js'
 import { authRoutes, LOGIN_ATTEMPTS_PER_WINDOW } from './auth-routes.js'
-import { hashPassword, generateInviteToken, hashInviteToken, verifySessionToken } from './auth.js'
+import { hashPassword, verifySessionToken } from './auth.js'
+import { generateToken, hashToken } from '../core/tokens.js'
 import { config } from '../core/config.js'
 import { acceptSessions, sessionCookies } from './test-sessions.js'
-import { invites } from '../db/schema.js'
+import { invites, oauthCodes, oauthConnections } from '../db/schema.js'
 
 describe('auth routes', () => {
   const originalEnv = { ...process.env }
@@ -64,7 +63,6 @@ describe('auth routes', () => {
     selectResult.failure = null
     dbState.updatedPasswordHashes = []
     dbState.updatedSessionVersions = []
-    dbState.deleteCallCount = 0
     dbState.deleteWhereArgs = []
     process.env.JWT_SECRET = 'test-secret'
   })
@@ -256,8 +254,8 @@ describe('auth routes', () => {
   })
 
   describe('POST /api/auth/accept-invite', () => {
-    it('activates the account and deletes the invite when the token is valid', async () => {
-      const { token } = generateInviteToken()
+    it('activates the account, deletes the invite, and ends the connections of apps when the token is valid', async () => {
+      const { token } = generateToken()
       selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
       const app = await buildApp()
 
@@ -274,13 +272,14 @@ describe('auth routes', () => {
       // Which ends the sessions that started before, e.g. when the invite resets the password of an admin, by changing the
       // version of their sessions (incremented in SQL).
       expect(dbState.updatedSessionVersions[0]).toBeDefined()
-      expect(dbState.deleteCallCount).toBe(1)
+      // And the apps they connected, along with the codes they were given.
+      expect(dbState.deleteWhereArgs.slice(1)).toEqual([eq(oauthCodes.userId, 'user-1'), eq(oauthConnections.userId, 'user-1')])
     })
 
     it('deletes only the redeemed invite, keyed by its token hash, not every invite for the user', async () => {
       // A sibling invite for the same user (e.g. created by a concurrent re-invite)
       // must survive redeeming this one.
-      const { token } = generateInviteToken()
+      const { token } = generateToken()
       selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
       const app = await buildApp()
 
@@ -290,16 +289,15 @@ describe('auth routes', () => {
         payload: { token, password: 'new-password-123' },
       })
 
-      expect(dbState.deleteWhereArgs).toHaveLength(1)
-      expect(dbState.deleteWhereArgs[0]).toEqual(eq(invites.tokenHash, hashInviteToken(token)))
-      expect(dbState.deleteWhereArgs[0]).not.toEqual(eq(invites.userId, 'user-1'))
+      expect(dbState.deleteWhereArgs[0]).toEqual(eq(invites.tokenHash, hashToken(token)))
+      expect(dbState.deleteWhereArgs).not.toContainEqual(eq(invites.userId, 'user-1'))
     })
 
     it('only lets one of two concurrent requests for the same token succeed', async () => {
       // Regression test for a TOCTOU race: the invite must be deleted atomically
       // as part of looking it up, not looked up and deleted in two separate steps,
       // or two concurrent requests could both pass the lookup before either delete runs.
-      const { token } = generateInviteToken()
+      const { token } = generateToken()
       selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
       const app = await buildApp()
 
@@ -338,7 +336,7 @@ describe('auth routes', () => {
     })
 
     it('returns 400 for an expired token', async () => {
-      const { token } = generateInviteToken()
+      const { token } = generateToken()
       selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() - 60_000) }]
       const app = await buildApp()
 
@@ -354,7 +352,7 @@ describe('auth routes', () => {
     })
 
     it('returns 400 when the password is shorter than 8 characters', async () => {
-      const { token } = generateInviteToken()
+      const { token } = generateToken()
       selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
       const app = await buildApp()
 
@@ -400,7 +398,7 @@ describe('auth routes', () => {
     })
 
     it('returns 400 instead of crashing when password is not a string', async () => {
-      const { token } = generateInviteToken()
+      const { token } = generateToken()
       selectResult.rows = [{ id: 'invite-1', userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
       const app = await buildApp()
 

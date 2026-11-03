@@ -49,6 +49,13 @@ login() {
         --data "{\"email\":\"$2\",\"password\":\"$3\"}" "${BASE_URL}/api/auth/login"
 }
 
+# session_of <email> <password> -- log in, as a client at the check's address (IP), and print the session cookie.
+session_of() {
+    login "$IP" "$1" "$2"
+    expect_status 200
+    session_cookie
+}
+
 # session_cookie -- the session cookie set by the last request, e.g. a login, as a Cookie header's value.
 #
 # The cookie is marked Secure, which curl won't send back over http://, so checks replay it by hand.
@@ -81,6 +88,14 @@ invite_token() {
 accept_invite() {
     request --header 'Content-Type: application/json' \
         --data "{\"token\":\"$1\",\"password\":\"$2\"}" "${BASE_URL}/api/auth/accept-invite"
+}
+
+# new_admin <email> <password> -- create an admin who accepted their invite, as the create-admin command does.
+new_admin() {
+    create_admin "$1"
+    expect_output "Created admin $1."
+    accept_invite "$(invite_token)" "$2"
+    expect_status 200
 }
 
 # expect_output <string> -- expect what the last create_admin printed to contain the string, and it to have succeeded.

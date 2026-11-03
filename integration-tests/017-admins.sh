@@ -10,21 +10,6 @@ readonly REVOKED_EMAIL="revoked@integration.test"
 readonly RESET_EMAIL="reset@integration.test"
 readonly PENDING_EMAIL="pending-revoked@integration.test"
 
-# new_admin <email> <password> -- create an admin who accepted their invite, as the create-admin command does.
-new_admin() {
-    create_admin "$1"
-    expect_output "Created admin $1."
-    accept_invite "$(invite_token)" "$2"
-    expect_status 200
-}
-
-# session_of <email> <password> -- log in, and print the session cookie.
-session_of() {
-    login "$IP" "$1" "$2"
-    expect_status 200
-    session_cookie
-}
-
 # admin_in_body <email> -- the admin with this email, as the last request listed them. Admins are flat JSON objects.
 admin_in_body() {
     printf '%s' "$BODY" | grep -o "{[^{}]*\"email\":\"$1\"[^{}]*}"

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Queryable } from '../db/connection.js'
 import { invites, users } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { generateInviteToken } from './auth.js'
+import { generateToken } from '../core/tokens.js'
 
 // The admins, and the invites that let them choose their password. Admins are invited from the admin pages, or with the
 // create-admin command (see create-admin.ts), which is also how the first admin is created.
@@ -83,7 +83,7 @@ export function adminsStore(db: Queryable): AdminsStore {
         const userId = existing ? existing.id : (await tx.insert(users).values({ email, invitedBy }).returning({ id: users.id }))[0].id
         if (existing) await tx.delete(invites).where(eq(invites.userId, userId))
 
-        const { token, tokenHash } = generateInviteToken()
+        const { token, tokenHash } = generateToken()
         await tx.insert(invites).values({ userId, tokenHash, expiresAt: new Date(Date.now() + INVITE_TTL_MS) })
         await tx.delete(invites).where(lt(invites.expiresAt, new Date())) // garbage collect expired invites
 

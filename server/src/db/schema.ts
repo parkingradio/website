@@ -329,3 +329,62 @@ export const featureFlags = pgTable('feature_flags', {
   updatedBy: text('updated_by').notNull(), // the email of the admin who last turned it on or off
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 })
+
+// The apps that admins allowed to act as them, e.g. Claude, through the MCP server (see oauth/store.ts and
+// docs/design/server/oauth.md). An app uses its connection with an access token, whose hash is here, and a refresh token
+// (see oauthRefreshTokens).
+export const oauthConnections = pgTable(
+  'oauth_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').notNull(), // one of OAUTH_CLIENTS
+    scopes: text('scopes').array().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+    // When the connection ends unless it's used before then: when its latest refresh token expires.
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    accessTokenHash: text('access_token_hash').notNull().unique(), // sha256 hex; the token itself is never stored
+    accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('oauth_connections_user_id_idx').on(table.userId)],
+)
+
+// The codes that an admin's allowing an app gives it, which it exchanges for the tokens of a new connection. A used code
+// is kept until it expires, with the connection it made, so that using it again ends that connection.
+export const oauthCodes = pgTable(
+  'oauth_codes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    codeHash: text('code_hash').notNull().unique(), // sha256 hex; the code itself is never stored
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    codeChallenge: text('code_challenge').notNull(), // PKCE's, with S256
+    scopes: text('scopes').array().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    connectionId: uuid('connection_id').references(() => oauthConnections.id, { onDelete: 'set null' }),
+  },
+  (table) => [index('oauth_codes_user_id_idx').on(table.userId), index('oauth_codes_connection_id_idx').on(table.connectionId)],
+)
+
+// The refresh tokens of connections. Each one can be used once, for the next one, and a used one is kept until it
+// expires, so that using it again ends its connection.
+export const oauthRefreshTokens = pgTable(
+  'oauth_refresh_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tokenHash: text('token_hash').notNull().unique(), // sha256 hex; the token itself is never stored
+    connectionId: uuid('connection_id')
+      .notNull()
+      .references(() => oauthConnections.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (table) => [index('oauth_refresh_tokens_connection_id_idx').on(table.connectionId)],
+)

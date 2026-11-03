@@ -79,6 +79,15 @@ describe('SPA fallback', () => {
     expect(response.body).toBe(INDEX_HTML)
   })
 
+  it.each(['/', '/archives', '/assets/app.js'])("can't be shown in another site's frame: %s", async (url) => {
+    const app = await buildApp()
+
+    const response = await app.inject({ method: 'GET', url })
+
+    expect(response.headers['x-frame-options']).toBe('DENY')
+    expect(response.headers['content-security-policy']).toBe("frame-ancestors 'none'")
+  })
+
   it('answers HEAD requests for client-side routes', async () => {
     const app = await buildApp()
 

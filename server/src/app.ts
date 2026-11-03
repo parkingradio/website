@@ -29,6 +29,9 @@ import { sessionsRoutes } from './sessions/routes.js'
 import type { SessionsStore } from './sessions/store.js'
 import { healthRoutes } from './site/health.js'
 import { notFoundRoutes } from './site/not-found.js'
+import { oauthAppRoutes } from './oauth/app-routes.js'
+import { oauthRoutes } from './oauth/routes.js'
+import type { OAuthStore } from './oauth/store.js'
 import { configRoutes } from './site/runtime-config.js'
 
 // What the routes use to handle requests: the database, the stores built on it, and the services the server talks to.
@@ -54,6 +57,7 @@ export type Dependencies = {
   apply: ApplyStore
   verifyTurnstile: TurnstileVerifier
   sessions: SessionsStore
+  oauth: OAuthStore
 }
 
 // Registers every route of the server, other than the client's (see site/spa.ts). The routes only use `deps` to handle
@@ -82,5 +86,9 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   })
   await app.register(sessionsRoutes, { store: deps.sessions, resolveTrack: soundcloud.resolveTrack })
   await app.register(featuresRoutes, { store: deps.features })
+  // The site is the authorization server's issuer.
+  await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })
+  await app.register(oauthAppRoutes, { store: deps.oauth, issuer: deps.siteOrigin })
   await app.register(notFoundRoutes, { prefix: '/api' })
+  await app.register(notFoundRoutes, { prefix: '/.well-known' })
 }

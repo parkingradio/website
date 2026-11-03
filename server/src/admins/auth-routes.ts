@@ -6,7 +6,9 @@ import { z } from 'zod'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { users, invites } from '../db/schema.js'
-import { hashPassword, verifyPassword, signSessionToken, setSessionCookie, clearSessionCookie, hashInviteToken } from './auth.js'
+import { hashPassword, verifyPassword, signSessionToken, setSessionCookie, clearSessionCookie } from './auth.js'
+import { hashToken } from '../core/tokens.js'
+import { endConnections } from '../oauth/store.js'
 import { clientAddress } from '../api/client-address.js'
 
 // Logging in and out, and choosing a password from an invite. Admins themselves are seen and invited through
@@ -84,7 +86,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
     },
     async (request, reply) => {
       const { token, password } = request.body
-      const tokenHash = hashInviteToken(token)
+      const tokenHash = hashToken(token)
 
       const accepted = await db.transaction(async (tx) => {
         const [invite] = await tx
@@ -97,12 +99,13 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
         }
 
         // A new password ends the sessions that started with the old one, e.g. when an admin's password is reset with the
-        // create-admin command.
+        // create-admin command, and the apps they connected.
         const passwordHash = await hashPassword(password)
         await tx
           .update(users)
           .set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
           .where(eq(users.id, invite.userId))
+        await endConnections(tx, invite.userId)
         return true
       })
 
