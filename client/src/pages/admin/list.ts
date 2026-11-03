@@ -1,19 +1,21 @@
 import { useSearchParams } from 'react-router'
 import Fuse from 'fuse.js'
+import { normalize } from '../../normalize'
 
 // What the lists of artists and applications share: a field that searches them, and columns that sort them. Both are
 // kept in the URL, like the applications' status, so that going back to a list from one of its entries with the
 // browser finds it as it was. The field and the columns' headers are in list-controls.tsx.
 
-// The entries that have every word of `query` in one of their `fields`, whatever its case and accents, and allowing for a
-// typo or so, e.g. "monreal" for "Montréal". They're kept in their order, rather than the closest matches first, since
-// the lists are sorted by their columns.
+// The entries that have every word of `query` in one of their `fields`, whatever its case, accents and ligatures, e.g.
+// "soeurs" for "Sœurs" (see normalize), and allowing for a typo or so, e.g. "monreal" for "Montréal". They're kept in
+// their order, rather than the closest matches first, since the lists are sorted by their columns.
 // Only letters and digits make words, so a search without any, e.g. the "+" a phone number starts with, finds every entry,
 // like an empty one, rather than none.
 export function search<T>(entries: T[], query: string, fields: (entry: T) => string[]): T[] {
   if (!/[\p{L}\p{N}]/u.test(query)) return entries
   const fuse = new Fuse(entries, {
-    keys: [{ name: 'fields', getFn: fields }],
+    keys: [{ name: 'fields', getFn: (entry) => fields(entry).map(normalize) }],
+    // For the letters that normalize leaves, like "ø" or "ß".
     ignoreDiacritics: true,
     useTokenSearch: true,
     tokenMatch: 'all',
@@ -22,7 +24,7 @@ export function search<T>(entries: T[], query: string, fields: (entry: T) => str
     threshold: 0.2,
     shouldSort: false,
   })
-  return fuse.search(query).map((result) => result.item)
+  return fuse.search(normalize(query)).map((result) => result.item)
 }
 
 // A column a list can be sorted by. `compare` puts entries in ascending order. Sorting by the column starts in

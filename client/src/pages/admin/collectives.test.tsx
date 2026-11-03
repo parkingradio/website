@@ -394,7 +394,7 @@ describe('A collective’s page', () => {
   })
 
   it('says when a new artist has the name of a known one', async () => {
-    mockFetch(ONDES_PAGE)
+    mockFetch({ ...ONDES_PAGE, '/api/admin/artists': { ok: true, artists: [...ARTISTS, artist('artist-5', 'Lætitia')] } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
@@ -402,6 +402,9 @@ describe('A collective’s page', () => {
     expect(screen.getByText(/^Un artiste s'appelle déjà/)).toHaveTextContent(
       "Un artiste s'appelle déjà « Dora » : le choisir parmi les artistes connus évite de créer un doublon.",
     )
+    // Whatever its ligatures.
+    fireEvent.change(newArtist(), { target: { value: 'Laetitia' } })
+    expect(screen.getByText(/^Un artiste s'appelle déjà/)).toHaveTextContent("Un artiste s'appelle déjà « Lætitia »")
     // Not for a name nobody has.
     fireEvent.change(newArtist(), { target: { value: 'Élise' } })
     expect(screen.queryByText(/^Un artiste s'appelle déjà/)).not.toBeInTheDocument()
@@ -426,7 +429,15 @@ describe('A collective’s page', () => {
     addNew('ELISE', { enter: true })
     expect(screen.getByText(/est déjà parmi/)).toHaveTextContent('« Élise » est déjà parmi les artistes du collectif.')
     expect(newArtist()).toHaveValue('ELISE')
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Élise (nouveau)↑↓×'])
+    // Or its ligatures, with hyphens the same as spaces.
+    addNew('Sœur Jean-Marie')
+    addNew('SOEUR JEAN MARIE')
+    expect(screen.getByText(/est déjà parmi/)).toHaveTextContent('« Sœur Jean-Marie » est déjà parmi les artistes du collectif.')
+    // But not without them.
+    fireEvent.change(newArtist(), { target: { value: 'Soeur JeanMarie' } })
+    expect(screen.queryByText(/est déjà parmi/)).not.toBeInTheDocument()
+    fireEvent.change(newArtist(), { target: { value: 'ELISE' } })
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Élise (nouveau)↑↓×', '4Sœur Jean-Marie (nouveau)↑↓×'])
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(errorOf(membersField())).toBe('« ELISE » est déjà parmi les artistes du collectif : effacez ce nom.')

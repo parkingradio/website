@@ -154,6 +154,20 @@ describe('Combobox', () => {
     expect(input()).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('matches what is typed whatever its ligatures, and picks the option whose label it is when the field is left', () => {
+    const options = [
+      { key: 'a', label: 'Les Sœurs Ondes' },
+      { key: 'b', label: 'Lætitia' },
+      { key: 'c', label: 'Soeur Marie' },
+    ]
+    render(<Strict options={options} />)
+    fireEvent.change(input(), { target: { value: 'SŒUR' } })
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Soeur Marie', 'Les Sœurs Ondes'])
+    fireEvent.change(input(), { target: { value: 'laetitia' } })
+    fireEvent.blur(input())
+    expect(picked()).toBe('b')
+  })
+
   it("starts from the first option that can be picked when the one picked can't be anymore", () => {
     render(<Strict initial="b" />)
     fireEvent.click(input())

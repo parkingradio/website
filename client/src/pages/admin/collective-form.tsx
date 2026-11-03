@@ -27,7 +27,7 @@ const EMPTY: FormProfile = { name: '', members: [], country: 'CA', city: '', des
 
 type Field = keyof CollectiveProfile | 'photo'
 
-// The member with this name, whatever its case and accents, if there's one.
+// The member with this name, however it's written (see normalize), if there's one.
 function memberNamed(members: Member[], name: string): Member | undefined {
   return members.find((member) => normalize(member.name) === normalize(name))
 }

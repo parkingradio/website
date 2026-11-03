@@ -320,6 +320,17 @@ describe('Searching the list of artists', () => {
   })
 })
 
+describe('Searching the list of artists, with ligatures', () => {
+  it('finds artists whatever their ligatures, in the search or in what is searched', async () => {
+    const artists = [{ ...AURORE, name: 'Les Sœurs Ondes' }, { ...BRUME, name: 'Soeur Marie' }]
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: true, artists } })
+    renderAt('/admin/artistes')
+
+    await expectSearch('soeurs ondes', ['Les Sœurs Ondes'])
+    await expectSearch('sœur marie', ['Soeur Marie'])
+  })
+})
+
 describe('Searching the collectives', () => {
   const BRISE: Collective = {
     ...ONDES,

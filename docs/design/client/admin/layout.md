@@ -35,9 +35,10 @@ the country, when the other one is, and in place of a collective's genres when i
 
 The lists of artists and collectives, of applications and of sessions (see [Artistes](artistes.md),
 [Candidatures](candidatures.md) and [Sessions](sessions.md)), find the entries that have every word searched for, in any
-of the fields searched, whatever their case and accents, and allowing for about one typo every 5 letters. The search and
-the order are kept in the page's address, along with the status of applications or sessions, so that going back to a
-list from one of its entries with the browser's back button finds it as it was.
+of the fields searched, whatever their case and accents, with "œ" and "æ" the same as "oe" and "ae", and allowing for
+about one typo every 5 letters. The search and the order are kept in the page's address, along with the status of
+applications or sessions, so that going back to a list from one of its entries with the browser's back button finds it
+as it was.
 
 ## Endpoints
 

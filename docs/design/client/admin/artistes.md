@@ -71,9 +71,10 @@ Its artists are in order, at least one, and can be reordered and removed. Each o
   greyed out and marked "déjà dans le collectif", but can't be picked, or
 - a new artist, whose name is typed in "Ajouter un nouvel artiste", then added with a "+" button (or Enter), and whom
   the server creates with that name only when the collective is saved. The form isn't sent while a name is left typed
-  without being added. While the name typed is that of one of the collective's artists, whatever its case and accents,
-  the form says so, and the name can't be added. Otherwise, while it's that of an artist in this section, the form says
-  so too, since picking them would avoid a duplicate.
+  without being added. Names are the same here whatever their case and accents, with hyphens, apostrophes and dots the
+  same as spaces, and "œ" and "æ" the same as "oe" and "ae". While the name typed is that of one of the collective's
+  artists, the form says so, and the name can't be added. Otherwise, while it's that of an artist in this section, the
+  form says so too, since picking them would avoid a duplicate.
 
 ## Endpoints
 
