@@ -561,7 +561,7 @@ describe('A collective’s page', () => {
       createdBy: 'admin@example.com',
       updatedBy: null,
       updatedAt: null,
-      status: 'planned',
+      status: 'done',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
     }
@@ -570,6 +570,7 @@ describe('A collective’s page', () => {
     expect(await screen.findByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     const table = screen.getByRole('table', { name: 'Sessions' })
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut'])
+    expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
     expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent('Les sessions de ses takeovers restent, sans takeover.')
   })
 

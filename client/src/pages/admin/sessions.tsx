@@ -82,16 +82,14 @@ function Performers({ performers }: { performers: StudioSet['performers'] }) {
   ))
 }
 
-// The performers of a session's sets, set by set, those of cancelled sets greyed out.
+// The performers of a session's sets, set by set.
 function SessionArtists({ session }: { session: Session }) {
   return session.sets
     .filter((set) => set.performers.length > 0)
     .map((set, i) => (
       <Fragment key={set.id}>
         {i > 0 && ' · '}
-        <span className={set.status === 'cancelled' ? 'admin-set-cancelled' : undefined}>
-          <Performers performers={set.performers} />
-        </span>
+        <Performers performers={set.performers} />
       </Fragment>
     ))
 }
@@ -131,7 +129,7 @@ function SessionsTable({
       </thead>
       <tbody>
         {sessions.map((session) => (
-          <tr key={session.id}>
+          <tr key={session.id} className={`admin-status-${session.status}`}>
             <td className="admin-day">
               <Link to={sessionPath(session)}>{sessionDay(session)}</Link>
             </td>
@@ -141,7 +139,7 @@ function SessionsTable({
             <td>
               <SessionArtists session={session} />
             </td>
-            <td className={session.status === 'cancelled' ? 'admin-set-cancelled' : undefined}>{SESSION_STATUS_LABELS[session.status]}</td>
+            <td>{SESSION_STATUS_LABELS[session.status]}</td>
           </tr>
         ))}
       </tbody>
@@ -203,7 +201,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
             </thead>
             <tbody>
               {sets.map(({ set, session }) => (
-                <tr key={set.id} className={set.status === 'cancelled' ? 'admin-set-cancelled' : undefined}>
+                <tr key={set.id} className={`admin-status-${set.status}`}>
                   <td className="admin-day">{sessionDay(session)}</td>
                   <td className="admin-day">{setHours(set)}</td>
                   <td>
@@ -581,7 +579,7 @@ function SetsTable({
       </thead>
       <tbody>
         {session.sets.map((set) => (
-          <tr key={set.id} className={set.status === 'cancelled' ? 'admin-set-cancelled' : undefined}>
+          <tr key={set.id} className={`admin-status-${set.status}`}>
             <td className="admin-day">{setHours(set)}</td>
             <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
             <td>{describePrestations(set)}</td>

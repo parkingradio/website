@@ -218,21 +218,17 @@ describe('The list of sessions', () => {
       ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', '', 'Brume', 'jouée'],
       ['lun. 31 août 2026', '20 h – 21 h', '', '', '', 'annulée'],
     ])
+    // Done sessions are greyed out, and cancelled ones faded out in their own color.
+    const sessionRows = screen.getAllByRole('row').slice(1)
+    expect(sessionRows[0]).toHaveClass('admin-status-planned')
+    expect(sessionRows[1]).toHaveClass('admin-status-planned')
+    expect(sessionRows[2]).toHaveClass('admin-status-done')
+    expect(sessionRows[3]).toHaveClass('admin-status-cancelled')
     expect(screen.getByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2')
     expect(screen.getAllByRole('link', { name: 'Brume' })[0]).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
-    expect(screen.getByRole('cell', { name: 'annulée' })).toHaveClass('admin-set-cancelled')
     expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle')
-  })
-
-  it('greys out the artists of cancelled sets', async () => {
-    const cancelled = { ...SESSION, sets: [SET, { ...CYAN_SET, status: 'cancelled' as const }] }
-    mockFetch({ ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: [cancelled] } })
-    renderAt('/admin/sessions')
-
-    expect((await screen.findByRole('link', { name: 'Cyan' })).parentElement).toHaveClass('admin-set-cancelled')
-    expect(screen.getByRole('link', { name: 'Aurore' }).parentElement).not.toHaveClass('admin-set-cancelled')
   })
 
   it('lists only the sessions with a status, once it is picked, counting those the search finds', async () => {
@@ -320,7 +316,10 @@ describe("A session's page", () => {
       'aria-pressed',
       'true',
     )
-    expect(within(setsTable()).getAllByRole('row')[3]).toHaveClass('admin-set-cancelled')
+    const setRows = within(setsTable()).getAllByRole('row').slice(1)
+    expect(setRows[0]).toHaveClass('admin-status-planned')
+    expect(setRows[1]).toHaveClass('admin-status-done')
+    expect(setRows[2]).toHaveClass('admin-status-cancelled')
     expect(screen.getByText('La session et ses sets seront supprimés pour de bon. Leurs artistes et le collectif de son takeover restent.')).toBeInTheDocument()
   })
 

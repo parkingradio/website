@@ -521,6 +521,7 @@ describe('An artist’s page', () => {
         .slice(1)
         .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
     ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'Takeover de Ondes', 'Aurore, Brume', 'DJ', '-', '', 'annulé']])
+    expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-cancelled')
     expect(within(table).getByRole('link', { name: 'Takeover de Ondes' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(within(table).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /set/ })).not.toBeInTheDocument()

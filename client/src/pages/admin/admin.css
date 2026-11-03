@@ -377,15 +377,31 @@
   font-weight: 700;
 }
 
-/* Applications there's nothing more to do about. */
+/* Applications, sessions and sets there's nothing more to do about. */
 .admin-status-done,
 .admin-status-rejected {
   color: #666;
 }
 
-/* Sets that won't be played. */
-.admin-set-cancelled {
-  color: #666;
+/* Sessions and sets that won't be played, faded out too, but in a color of their own, so that they're told apart from
+   those that were. */
+.admin-status-cancelled {
+  color: #8a6d00;
+}
+
+/* The links of faded out sessions and sets fade out with them. */
+.admin-status-done a,
+.admin-status-cancelled a {
+  color: inherit;
+}
+
+/* The rows of faded out sessions and sets are tinted too, lightly enough that their text keeps WCAG AA contrast. */
+tr.admin-status-done {
+  background: #f5f5f5;
+}
+
+tr.admin-status-cancelled {
+  background: #fff8db;
 }
 
 /* An artist or an application: the photo, if there's one, then everything about them, as label and value side by

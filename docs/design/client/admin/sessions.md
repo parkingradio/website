@@ -2,7 +2,10 @@
 
 At `/admin/sessions`: the sessions at the studio and their sets: who played, when, and where their recordings are (see
 [Sessions](../../server/sessions.md)). A session's status is shown as "planifiée" (planned), "jouée" (done) or "annulée"
-(cancelled), and a set's as "planifié", "joué" or "annulé".
+(cancelled), and a set's as "planifié", "joué" or "annulé". Wherever the admin pages list sessions or sets, the rows of
+those that are done are greyed out, text and background, and those of cancelled ones are faded out in a color of their
+own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't told by color
+alone.
 
 ## Names
 
@@ -43,7 +46,7 @@ Durations, and the times of the sets of a session without a date, are entered in
 The section lists every session, those without a date first, the most recently added first, then the others, the
 latest first, with its day ("Date"), linking to its page, its start and end ("Heure"), its name ("Nom"), the collective
 whose takeover it is ("Takeover"), linking to it, its sets' performers ("Artistes"), set by set in their order, the sets
-separated by "·", each artist linking to their page, those of cancelled sets greyed out, and its status. Buttons above
+separated by "·", each artist linking to their page, and its status. Buttons above
 the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their name, their
@@ -68,7 +71,7 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   linking to their page, or "-" once they're all deleted, its prestations ("Prestation"), its genres ("Genres"), its
   links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
   which opens its form (see [A set's form](#a-sets-form)), and "×", which deletes it for good after confirming, its
-  artists staying. Cancelled sets are greyed out. When a status can't be changed, or a set can't be deleted, the
+  artists staying. When a status can't be changed, or a set can't be deleted, the
   section says why above the sets, naming it. "ajouter un set" opens the form of a new one. While the session is
   cancelled, sets can't be added to it, and its sets can't be un-cancelled, which the section says.
 - "Supprimer": deletes the session and its sets for good, after confirming. Its sets' artists, and its takeover's
