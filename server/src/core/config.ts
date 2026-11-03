@@ -8,6 +8,11 @@ export const config = {
   get isProduction() {
     return process.env.NODE_ENV === 'production'
   },
+  // Which deployment the server is, the name of its Terraform workspace, e.g. "production" or "test" (see
+  // docs/deployment.md), or "development" when ENVIRONMENT isn't set, e.g. for the dev server.
+  get environment() {
+    return process.env.ENVIRONMENT || 'development'
+  },
   // SERVER_PORT, in a checkout's .env (see "Several checkouts" in the README), or else PORT, e.g. in production. PORT
   // alone isn't enough for checkouts, since tools commonly set it for themselves, and what's set takes precedence over
   // .env, which would give every checkout the same port.
@@ -40,8 +45,8 @@ export const config = {
   get mailDomain() {
     return process.env.MAIL_DOMAIN
   },
-  // Where the site is, e.g. for links to it: the deployment's domain, or else the Vite dev server, on CLIENT_PORT (see the
-  // README).
+  // Where the site is, e.g. for links to it, and as the issuer of OAuth (see docs/design/server/oauth.md): the deployment's
+  // domain, or else the Vite dev server, on CLIENT_PORT (see the README).
   get siteOrigin() {
     const domain = process.env.MAIL_DOMAIN
     return domain ? `https://${domain}` : `http://localhost:${process.env.CLIENT_PORT || 5173}`

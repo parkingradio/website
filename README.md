@@ -97,6 +97,17 @@ DATABASE_URL=postgres://parking_radio:parking_radio@localhost:5433/parking_radio
 If two checkouts' directories have the same name, also give one of them its own `COMPOSE_PROJECT_NAME`, so that it gets
 its own database.
 
+### Trying the MCP server with Claude
+
+With `npm run dev` running, connect Claude Code to the dev server's MCP server (see
+[docs/design/server/mcp.md](docs/design/server/mcp.md)):
+
+```sh
+claude mcp add --transport http parking-radio "http://localhost:${CLIENT_PORT:-5173}/mcp"
+```
+
+Then `/mcp` in Claude Code opens the page where you allow it, once logged in as an admin.
+
 ### Testing and building
 
 ```sh

@@ -207,8 +207,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.get(
     '/api/admin/sessions',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Lister les sessions' } },
       schema: {
+        operationId: 'list_sessions',
         summary: "Every session, or those with a set an artist played, or a collective's takeovers, the most recent first",
         tags: ['Sessions'],
         querystring: z
@@ -234,8 +235,14 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.get(
     '/api/admin/sessions/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'A session, with its sets', tags: ['Sessions'], params: ById, response: { 200: SessionResponse, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Voir une session' } },
+      schema: {
+        operationId: 'get_session',
+        summary: 'A session, with its sets',
+        tags: ['Sessions'],
+        params: ById,
+        response: { 200: SessionResponse, 404: ApiError },
+      },
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
@@ -247,8 +254,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.post(
     '/api/admin/sessions',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Ajouter une session' } },
       schema: {
+        operationId: 'create_session',
         summary: 'Adds a session, as planned, without sets',
         tags: ['Sessions'],
         body: SessionFields,
@@ -265,8 +273,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.put(
     '/api/admin/sessions/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Modifier une session' } },
       schema: {
+        operationId: 'update_session',
         summary: 'Changes a session, but not its status or its sets, which move with its start',
         tags: ['Sessions'],
         params: ById,
@@ -283,8 +292,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.put(
     '/api/admin/sessions/:id/status',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: "Changer le statut d'une session" } },
       schema: {
+        operationId: 'update_session_status',
         summary: "Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled",
         tags: ['Sessions'],
         params: ById,
@@ -301,8 +311,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.delete(
     '/api/admin/sessions/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Supprimer une session' } },
       schema: {
+        operationId: 'delete_session',
         summary: 'Deletes a session and its sets, but not their performers',
         tags: ['Sessions'],
         params: ById,
@@ -318,8 +329,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.post(
     '/api/admin/sessions/:id/sets',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Ajouter un set' } },
       schema: {
+        operationId: 'create_set',
         summary: 'Adds a set to a session, as planned, and returns the session',
         tags: ['Sessions'],
         params: ById,
@@ -342,8 +354,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.put(
     '/api/admin/sets/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Modifier un set' } },
       schema: {
+        operationId: 'update_set',
         summary: 'Changes a set, but not its session or its status, and returns its session',
         tags: ['Sessions'],
         params: ById,
@@ -365,8 +378,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.put(
     '/api/admin/sets/:id/status',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: "Changer le statut d'un set" } },
       schema: {
+        operationId: 'update_set_status',
         summary: 'Marks a set as planned, done or cancelled, and returns its session',
         tags: ['Sessions'],
         params: ById,
@@ -383,8 +397,14 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   api.delete(
     '/api/admin/sets/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'Deletes a set, but not its performers', tags: ['Sessions'], params: ById, response: { 200: Ok, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Supprimer un set' } },
+      schema: {
+        operationId: 'delete_set',
+        summary: 'Deletes a set, but not its performers',
+        tags: ['Sessions'],
+        params: ById,
+        response: { 200: Ok, 404: ApiError },
+      },
     },
     async (request, reply) => {
       if (!(await store.deleteSet(request.params.id))) return reply.status(404).send(NO_SUCH_SET)

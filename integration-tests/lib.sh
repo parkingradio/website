@@ -166,6 +166,43 @@ release_row() {
     sql "select pg_cancel_backend(pid) from pg_stat_activity where application_name = 'lock-holder'" >/dev/null
 }
 
+# OAuth (see docs/design/server/oauth.md), as Claude connects to the server. The server's address, which is the issuer,
+# is the dev server's, since MAIL_DOMAIN isn't set.
+readonly ISSUER="http://localhost:5173"
+readonly CLAUDE="https://claude.ai/oauth/mcp-oauth-client-metadata"
+readonly CALLBACK="https://claude.ai/api/mcp/auth_callback"
+readonly TOKEN_ENDPOINT="${BASE_URL}/api/oauth/token"
+readonly AUTHORIZATION="${BASE_URL}/api/admin/oauth/authorization"
+
+# A PKCE verifier, and its S256 challenge, for every authorization of this check.
+readonly VERIFIER="$(openssl rand -hex 32)"
+readonly CHALLENGE="$(printf '%s' "$VERIFIER" | openssl dgst -sha256 -binary | base64 | tr '+/' '-_' | tr -d '=\n')"
+
+# authorize -- allow Claude as the admin of `cookie`, and print the code it gets.
+authorize() {
+    json POST "$AUTHORIZATION" "{\"response_type\":\"code\",\"client_id\":\"${CLAUDE}\",\"redirect_uri\":\"${CALLBACK}\",\
+\"code_challenge\":\"${CHALLENGE}\",\"code_challenge_method\":\"S256\",\"state\":\"s\",\"allow\":true}"
+    expect_status 200
+    body_field redirect | sed -n 's/.*[?&]code=\([^&]*\).*/\1/p'
+}
+
+# exchange <code> -- exchange a code for tokens.
+exchange() {
+    request --data-urlencode grant_type=authorization_code --data-urlencode "code=$1" --data-urlencode "client_id=${CLAUDE}" \
+        --data-urlencode "redirect_uri=${CALLBACK}" --data-urlencode "code_verifier=${VERIFIER}" \
+        --data-urlencode "resource=${ISSUER}/mcp" "$TOKEN_ENDPOINT"
+}
+
+# token_hash <code or token> -- the hash the server keeps of it, in SQL.
+token_hash() {
+    printf "encode(sha256(convert_to('%s', 'UTF8')), 'hex')" "$1"
+}
+
+# connection_of <access token> -- the id of the connection with this access token, if there's one.
+connection_of() {
+    sql "select id from oauth_connections where access_token_hash = $(token_hash "$1")"
+}
+
 # expect_status <code>
 expect_status() {
     if [ "$STATUS" != "$1" ]; then
@@ -188,6 +225,15 @@ expect_body() {
 expect_body_contains() {
     if ! printf '%s' "$BODY" | grep -Fq -- "$1"; then
         echo "  expected body to contain: $1" >&2
+        _show_body
+        exit 1
+    fi
+}
+
+# expect_body_lacks <string>
+expect_body_lacks() {
+    if printf '%s' "$BODY" | grep -Fq -- "$1"; then
+        echo "  expected body not to contain: $1" >&2
         _show_body
         exit 1
     fi

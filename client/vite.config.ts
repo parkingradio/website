@@ -22,8 +22,10 @@ export default defineConfig({
     proxy: {
       '/healthz': server,
       '/api': server,
-      // The metadata documents of OAuth, which apps read to connect to the dev server, whose address is the issuer.
+      // The metadata documents of OAuth, which apps read to connect to the dev server, whose address is the issuer, and the
+      // MCP server they connect to.
       '/.well-known': server,
+      '/mcp': server,
     },
   },
   test: {

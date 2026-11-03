@@ -30,6 +30,8 @@ import type { SessionsStore } from './sessions/store.js'
 import { healthRoutes } from './site/health.js'
 import { notFoundRoutes } from './site/not-found.js'
 import { oauthAppRoutes } from './oauth/app-routes.js'
+import { mcpRoutes } from './mcp/routes.js'
+import { collectToolRoutes } from './mcp/tools.js'
 import { oauthRoutes } from './oauth/routes.js'
 import type { OAuthStore } from './oauth/store.js'
 import { configRoutes } from './site/runtime-config.js'
@@ -43,6 +45,8 @@ export type Dependencies = {
   sendEmail: SendEmail | null
   // Where the site is, e.g. for the links in emails.
   siteOrigin: string
+  // Which deployment the server is, e.g. "production" (see config.environment).
+  environment: string
   // Builds a client for SoundCloud that uses the credentials it's given.
   soundcloud: (credentials: SoundCloudCredentials) => SoundCloudClient
   soundCloudCredentials: SoundCloudCredentialsStore
@@ -64,6 +68,8 @@ export type Dependencies = {
 // requests, so that generate-openapi.ts can register them without a database.
 export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   useZodSchemas(app)
+  // Before the routes, which it collects as they're registered.
+  const toolRoutes = collectToolRoutes(app)
   app.decorate('adminSessions', deps.admins)
   await app.register(fastifyCookie)
   await app.register(healthRoutes, { db: deps.db })
@@ -89,6 +95,8 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })
   await app.register(oauthAppRoutes, { store: deps.oauth, issuer: deps.siteOrigin })
+  await app.register(mcpRoutes, { store: deps.oauth, issuer: deps.siteOrigin, routes: toolRoutes, environment: deps.environment })
   await app.register(notFoundRoutes, { prefix: '/api' })
+  await app.register(notFoundRoutes, { prefix: '/mcp' })
   await app.register(notFoundRoutes, { prefix: '/.well-known' })
 }

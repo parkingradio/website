@@ -81,7 +81,7 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
   api.get(
     '/api/admin/oauth/authorization',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'What allowing an app would grant',
         tags: ['OAuth'],
@@ -111,7 +111,7 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
   api.post(
     '/api/admin/oauth/authorization',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Allows an app, which gets a code, or refuses',
         tags: ['OAuth'],
@@ -137,7 +137,7 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
   api.get(
     '/api/admin/connections',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: "The logged-in admin's connected apps",
         tags: ['OAuth'],
@@ -150,7 +150,7 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
   api.delete(
     '/api/admin/connections/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: "Disconnects one of the logged-in admin's apps",
         tags: ['OAuth'],

@@ -87,6 +87,7 @@ resource "aws_instance" "app" {
 
   user_data = templatefile("${path.module}/../templates/user_data.sh.tftpl", {
     aws_region         = data.aws_region.current.region
+    environment        = terraform.workspace
     domain             = var.domain
     assets_domain      = local.assets_domain
     private_bucket     = aws_s3_bucket.private.id

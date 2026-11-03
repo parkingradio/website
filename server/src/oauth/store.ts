@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
 import { generateToken, hashToken } from '../core/tokens.js'
 import type { Queryable } from '../db/connection.js'
-import { oauthCodes, oauthConnections, oauthRefreshTokens } from '../db/schema.js'
+import { oauthCodes, oauthConnections, oauthRefreshTokens, users } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
 
 // The connections of the apps admins allowed to act as them, the codes that make them, and their refresh tokens (see
@@ -32,6 +32,17 @@ export type StoredRefreshToken = { connectionId: string; userId: string; clientI
 
 export type StoredConnection = { id: string; clientId: string; scopes: string[]; createdAt: Date; lastUsedAt: Date }
 
+// What an access token lets its app do: its connection, and the user it acts as.
+export type AccessGrant = {
+  connectionId: string
+  clientId: string
+  scopes: string[]
+  user: { id: string; email: string; sessionVersion: number }
+}
+
+// How often a connection's `lastUsedAt` is updated at most, so that not every request writes it.
+const LAST_USED_PRECISION = '5 minutes'
+
 // The connection that a code would make, or that a refresh token is for, is gone, e.g. because it ended in the meantime.
 export class NoSuchConnection extends Error {}
 
@@ -55,6 +66,9 @@ export type OAuthStore = {
   refreshConnection(connectionId: string, tokens: Tokens): Promise<void>
   // Ends the connection of `clientId` that has this access or refresh token, if there's one.
   revoke(token: string, clientId: string): Promise<void>
+  // What the access token lets its app do, if it hasn't expired, nor its connection. That counts as using the connection.
+  // Null when there's no such token.
+  findAccessToken(token: string): Promise<AccessGrant | null>
   // The user's connections that haven't expired, the most recently used first.
   list(userId: string): Promise<StoredConnection[]>
   // Ends one of the user's connections, and returns whether there was one.
@@ -215,6 +229,31 @@ export function oauthStore(db: Queryable): OAuthStore {
         delete from ${oauthConnections} where ${oauthConnections.clientId} = ${clientId} and (
           ${oauthConnections.accessTokenHash} = ${tokenHash} or ${oauthConnections.id} in
             (select ${oauthRefreshTokens.connectionId} from ${oauthRefreshTokens} where ${oauthRefreshTokens.tokenHash} = ${tokenHash}))`)
+    },
+
+    async findAccessToken(token) {
+      type Row = { connection_id: string; client_id: string; scopes: string[]; user_id: string; email: string; session_version: number }
+      const { rows } = await db.execute<Row>(sql`
+        with found as (
+          select ${oauthConnections.id} as connection_id, ${oauthConnections.clientId} as client_id,
+                 ${oauthConnections.scopes} as scopes, ${users.id} as user_id, ${users.email} as email,
+                 ${users.sessionVersion} as session_version
+          from ${oauthConnections} join ${users} on ${users.id} = ${oauthConnections.userId}
+          where ${oauthConnections.accessTokenHash} = ${hashToken(token)}
+            and ${oauthConnections.accessTokenExpiresAt} > now() and ${oauthConnections.expiresAt} > now()),
+        used as (
+          update ${oauthConnections} set last_used_at = now()
+          where ${oauthConnections.id} = (select connection_id from found)
+            and ${oauthConnections.lastUsedAt} < now() - ${LAST_USED_PRECISION}::interval)
+        select * from found`)
+      const [row] = rows
+      if (!row) return null
+      return {
+        connectionId: row.connection_id,
+        clientId: row.client_id,
+        scopes: row.scopes,
+        user: { id: row.user_id, email: row.email, sessionVersion: row.session_version },
+      }
     },
 
     async list(userId) {

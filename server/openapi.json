@@ -3057,6 +3057,7 @@
     },
     "/api/events": {
       "get": {
+        "operationId": "list_events",
         "summary": "Parking Radio's events, from Resident Advisor",
         "tags": [
           "Events"
@@ -3097,6 +3098,7 @@
     },
     "/api/radio": {
       "get": {
+        "operationId": "get_on_air",
         "summary": "What's on the radio, and what comes next",
         "tags": [
           "Radio"
@@ -3238,6 +3240,7 @@
     },
     "/api/admin/radio": {
       "get": {
+        "operationId": "get_radio_playlist",
         "summary": "The playlist the radio's rotation is read from",
         "tags": [
           "Radio"
@@ -3305,6 +3308,7 @@
     },
     "/api/admin/radio/preview": {
       "post": {
+        "operationId": "preview_playlist",
         "summary": "What the radio would read from a playlist",
         "tags": [
           "Radio"
@@ -3429,7 +3433,8 @@
     },
     "/api/admin/radio/playlist": {
       "post": {
-        "summary": "Choosing the playlist the rotation is read from",
+        "operationId": "choose_playlist",
+        "summary": "Chooses the playlist the rotation is read from",
         "tags": [
           "Radio"
         ],
@@ -3537,6 +3542,7 @@
     },
     "/api/admin/radio/credentials": {
       "get": {
+        "operationId": "get_soundcloud_app",
         "summary": "The SoundCloud app the radio reads playlists through",
         "tags": [
           "Radio"
@@ -3771,6 +3777,7 @@
     },
     "/api/admin/artists": {
       "get": {
+        "operationId": "list_artists",
         "summary": "Every artist, by name, or a collective's, in its order",
         "tags": [
           "Artists"
@@ -3849,6 +3856,7 @@
         }
       },
       "post": {
+        "operationId": "create_artist",
         "summary": "Adds an artist, with or without a photo",
         "tags": [
           "Artists"
@@ -3973,6 +3981,7 @@
     },
     "/api/admin/artists/{id}": {
       "get": {
+        "operationId": "get_artist",
         "summary": "An artist",
         "tags": [
           "Artists"
@@ -4057,6 +4066,7 @@
         }
       },
       "put": {
+        "operationId": "update_artist",
         "summary": "Changes an artist's profile, and replaces or removes their photo",
         "tags": [
           "Artists"
@@ -4203,7 +4213,8 @@
         }
       },
       "delete": {
-        "summary": "Deletes an artist, their photo and their applications, and takes them out of their collectives",
+        "operationId": "delete_artist",
+        "summary": "Deletes an artist, their photo and their applications, and takes them out of their collectives and their sets",
         "tags": [
           "Artists"
         ],
@@ -4366,6 +4377,7 @@
     },
     "/api/admin/collectives": {
       "get": {
+        "operationId": "list_collectives",
         "summary": "Every collective, by name",
         "tags": [
           "Collectives"
@@ -4423,6 +4435,7 @@
         }
       },
       "post": {
+        "operationId": "create_collective",
         "summary": "Adds a collective, with or without a photo, and the members it names",
         "tags": [
           "Collectives"
@@ -4547,6 +4560,7 @@
     },
     "/api/admin/collectives/{id}": {
       "get": {
+        "operationId": "get_collective",
         "summary": "A collective",
         "tags": [
           "Collectives"
@@ -4631,6 +4645,7 @@
         }
       },
       "put": {
+        "operationId": "update_collective",
         "summary": "Changes a collective's profile and members, and replaces or removes its photo",
         "tags": [
           "Collectives"
@@ -4777,7 +4792,8 @@
         }
       },
       "delete": {
-        "summary": "Deletes a collective and its photo, but not its members",
+        "operationId": "delete_collective",
+        "summary": "Deletes a collective, its photo and its applications, but not its members, and leaves its takeovers' sessions without one",
         "tags": [
           "Collectives"
         ],
@@ -4940,6 +4956,7 @@
     },
     "/api/admin/applications": {
       "get": {
+        "operationId": "list_applications",
         "summary": "Every application, or an artist's or a collective's, the most recently received first",
         "tags": [
           "Applications"
@@ -5027,6 +5044,7 @@
         }
       },
       "post": {
+        "operationId": "create_application",
         "summary": "Creates an application for an artist or a collective",
         "tags": [
           "Applications"
@@ -5168,6 +5186,7 @@
     },
     "/api/admin/applications/recipients": {
       "get": {
+        "operationId": "get_application_recipients",
         "summary": "Who applications from artists are emailed to",
         "tags": [
           "Applications"
@@ -5288,6 +5307,7 @@
     },
     "/api/admin/applications/{id}": {
       "get": {
+        "operationId": "get_application",
         "summary": "An application",
         "tags": [
           "Applications"
@@ -5372,6 +5392,7 @@
         }
       },
       "put": {
+        "operationId": "update_application",
         "summary": "Changes an application",
         "tags": [
           "Applications"
@@ -5523,6 +5544,7 @@
         }
       },
       "delete": {
+        "operationId": "delete_application",
         "summary": "Deletes an application",
         "tags": [
           "Applications"
@@ -5603,6 +5625,7 @@
     },
     "/api/admin/applications/{id}/status": {
       "put": {
+        "operationId": "update_application_status",
         "summary": "Accepts or rejects an application, or gives it another status",
         "tags": [
           "Applications"
@@ -5846,6 +5869,7 @@
     },
     "/api/admin/sessions": {
       "get": {
+        "operationId": "list_sessions",
         "summary": "Every session, or those with a set an artist played, or a collective's takeovers, the most recent first",
         "tags": [
           "Sessions"
@@ -5933,6 +5957,7 @@
         }
       },
       "post": {
+        "operationId": "create_session",
         "summary": "Adds a session, as planned, without sets",
         "tags": [
           "Sessions"
@@ -6029,6 +6054,7 @@
     },
     "/api/admin/sessions/{id}": {
       "get": {
+        "operationId": "get_session",
         "summary": "A session, with its sets",
         "tags": [
           "Sessions"
@@ -6113,6 +6139,7 @@
         }
       },
       "put": {
+        "operationId": "update_session",
         "summary": "Changes a session, but not its status or its sets, which move with its start",
         "tags": [
           "Sessions"
@@ -6227,6 +6254,7 @@
         }
       },
       "delete": {
+        "operationId": "delete_session",
         "summary": "Deletes a session and its sets, but not their performers",
         "tags": [
           "Sessions"
@@ -6307,6 +6335,7 @@
     },
     "/api/admin/sessions/{id}/status": {
       "put": {
+        "operationId": "update_session_status",
         "summary": "Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled",
         "tags": [
           "Sessions"
@@ -6431,6 +6460,7 @@
     },
     "/api/admin/sessions/{id}/sets": {
       "post": {
+        "operationId": "create_set",
         "summary": "Adds a set to a session, as planned, and returns the session",
         "tags": [
           "Sessions"
@@ -6557,6 +6587,7 @@
     },
     "/api/admin/sets/{id}": {
       "put": {
+        "operationId": "update_set",
         "summary": "Changes a set, but not its session or its status, and returns its session",
         "tags": [
           "Sessions"
@@ -6681,6 +6712,7 @@
         }
       },
       "delete": {
+        "operationId": "delete_set",
         "summary": "Deletes a set, but not its performers",
         "tags": [
           "Sessions"
@@ -6761,6 +6793,7 @@
     },
     "/api/admin/sets/{id}/status": {
       "put": {
+        "operationId": "update_set_status",
         "summary": "Marks a set as planned, done or cancelled, and returns its session",
         "tags": [
           "Sessions"

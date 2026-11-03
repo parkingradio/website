@@ -82,8 +82,9 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.get(
     '/api/admin/collectives',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Lister les collectifs' } },
       schema: {
+        operationId: 'list_collectives',
         summary: 'Every collective, by name',
         tags: ['Collectives'],
         response: { 200: z.object({ ok: z.literal(true), collectives: z.array(Collective) }) },
@@ -95,8 +96,14 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.get(
     '/api/admin/collectives/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'A collective', tags: ['Collectives'], params: ById, response: { 200: CollectiveResponse, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Voir un collectif' } },
+      schema: {
+        operationId: 'get_collective',
+        summary: 'A collective',
+        tags: ['Collectives'],
+        params: ById,
+        response: { 200: CollectiveResponse, 404: ApiError },
+      },
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
@@ -108,7 +115,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.get(
     '/api/admin/collectives/:id/photo',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: "A collective's photo",
         tags: ['Collectives'],
@@ -126,8 +133,9 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.post(
     '/api/admin/collectives',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Ajouter un collectif' } },
       schema: {
+        operationId: 'create_collective',
         summary: 'Adds a collective, with or without a photo, and the members it names',
         tags: ['Collectives'],
         multipart: NewCollectiveForm,
@@ -154,8 +162,9 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.put(
     '/api/admin/collectives/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Modifier un collectif' } },
       schema: {
+        operationId: 'update_collective',
         summary: "Changes a collective's profile and members, and replaces or removes its photo",
         tags: ['Collectives'],
         params: ById,
@@ -193,9 +202,10 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   api.delete(
     '/api/admin/collectives/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Supprimer un collectif' } },
       schema: {
-        summary: 'Deletes a collective and its photo, but not its members',
+        operationId: 'delete_collective',
+        summary: "Deletes a collective, its photo and its applications, but not its members, and leaves its takeovers' sessions without one",
         tags: ['Collectives'],
         params: ById,
         response: { 200: Ok, 404: ApiError },

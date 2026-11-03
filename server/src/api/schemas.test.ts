@@ -39,10 +39,10 @@ describe('zodRoutes', () => {
       const api = zodRoutes(app)
       api.get('/public', { schema: { response: { 200: Ok } } }, handler)
       api.get('/public/:id', { schema: { params: z.object({ id: z.string() }), response: { 200: Ok } } }, handler)
-      api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
+      api.get('/api/admin/thing', { config: { admin: true, tool: null }, schema: { response: { 200: Ok } } }, handler)
       api.put(
         '/api/admin/thing/:id',
-        { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok, 404: ApiError } } },
+        { config: { admin: true, tool: null }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok, 404: ApiError } } },
         handler,
       )
     })
@@ -57,8 +57,8 @@ describe('zodRoutes', () => {
   it('checks the session of admin routes before anything else, for HEAD too', async () => {
     const { app } = await buildApp((app) => {
       const api = zodRoutes(app)
-      api.get('/api/admin/thing', { config: { admin: true }, schema: { response: { 200: Ok } } }, handler)
-      api.put('/api/admin/thing', { config: { admin: true }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
+      api.get('/api/admin/thing', { config: { admin: true, tool: null }, schema: { response: { 200: Ok } } }, handler)
+      api.put('/api/admin/thing', { config: { admin: true, tool: null }, schema: { body: z.object({ on: z.boolean() }), response: { 200: Ok } } }, handler)
     })
     for (const request of [{ method: 'GET' }, { method: 'HEAD' }, { method: 'PUT', payload: { on: 'yes' } }] as const) {
       expect((await app.inject({ url: '/api/admin/thing', ...request })).statusCode).toBe(401)
@@ -71,16 +71,27 @@ describe('zodRoutes', () => {
       ['need a schema', (app) => zodRoutes(app).get('/', handler)],
       [
         'one route per method',
-        (app) => zodRoutes(app).route({ method: ['GET', 'PUT'], url: '/api/admin/thing', config: { admin: true }, schema: {}, handler }),
+        (app) => zodRoutes(app).route({ method: ['GET', 'PUT'], url: '/api/admin/thing', config: { admin: true, tool: null }, schema: {}, handler }),
       ],
       // Without zodRoutes, nothing would check the session.
-      ['only works for the routes of zodRoutes', (app) => app.get('/', { config: { admin: true } }, handler)],
+      ['only works for the routes of zodRoutes', (app) => app.get('/', { config: { admin: true, tool: null } }, handler)],
       // The client takes a 401 from a route under /api/admin/ to mean that the session ended.
       ['admin routes are those under /api/admin/', (app) => app.get('/api/admin/thing', handler)],
       ['admin routes are those under /api/admin/', (app) => zodRoutes(app).get('/api/admin/thing', { schema: {} }, handler)],
       [
         'admin routes are those under /api/admin/',
-        (app) => zodRoutes(app).get('/api/thing', { config: { admin: true }, schema: {} }, handler),
+        (app) => zodRoutes(app).get('/api/thing', { config: { admin: true, tool: null }, schema: {} }, handler),
+      ],
+      // So that no admin route becomes a tool of the MCP server, or misses being one, without saying so.
+      ["admin routes say whether they're tools", (app) => zodRoutes(app).get('/api/admin/thing', { config: { admin: true }, schema: {} }, handler)],
+      [
+        "a tool's `operationId` is its name",
+        (app) => zodRoutes(app).get('/api/admin/thing', { config: { admin: true, tool: { title: 'Voir' } }, schema: {} }, handler),
+      ],
+      [
+        "a tool's `operationId` is its name",
+        (app) =>
+          zodRoutes(app).get('/api/admin/thing', { config: { admin: true, tool: { title: 'Voir' } }, schema: { operationId: 'getThing' } }, handler),
       ],
     ]
     for (const [error, routes] of refused) {

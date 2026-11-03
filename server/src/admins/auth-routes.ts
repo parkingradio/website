@@ -119,7 +119,7 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
 
   api.get(
     '/api/admin/me',
-    { config: { admin: true }, schema: { summary: 'The logged-in admin', tags: ['Admins'], response: { 200: LoggedIn } } },
+    { config: { admin: true, tool: null }, schema: { summary: 'The logged-in admin', tags: ['Admins'], response: { 200: LoggedIn } } },
     async (request) => ({ ok: true as const, email: request.user!.email }),
   )
 }

@@ -80,8 +80,9 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.get(
     '/api/admin/artists',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Lister les artistes' } },
       schema: {
+        operationId: 'list_artists',
         summary: "Every artist, by name, or a collective's, in its order",
         tags: ['Artists'],
         querystring: z.object({
@@ -100,8 +101,14 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.get(
     '/api/admin/artists/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'An artist', tags: ['Artists'], params: ById, response: { 200: ArtistResponse, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Voir un artiste' } },
+      schema: {
+        operationId: 'get_artist',
+        summary: 'An artist',
+        tags: ['Artists'],
+        params: ById,
+        response: { 200: ArtistResponse, 404: ApiError },
+      },
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
@@ -113,7 +120,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.get(
     '/api/admin/artists/:id/photo',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: "An artist's photo",
         tags: ['Artists'],
@@ -131,8 +138,9 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.post(
     '/api/admin/artists',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Ajouter un artiste' } },
       schema: {
+        operationId: 'create_artist',
         summary: 'Adds an artist, with or without a photo',
         tags: ['Artists'],
         multipart: NewArtistForm,
@@ -159,8 +167,9 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.put(
     '/api/admin/artists/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Modifier un artiste' } },
       schema: {
+        operationId: 'update_artist',
         summary: "Changes an artist's profile, and replaces or removes their photo",
         tags: ['Artists'],
         params: ById,
@@ -198,9 +207,10 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   api.delete(
     '/api/admin/artists/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Supprimer un artiste' } },
       schema: {
-        summary: 'Deletes an artist, their photo and their applications, and takes them out of their collectives',
+        operationId: 'delete_artist',
+        summary: 'Deletes an artist, their photo and their applications, and takes them out of their collectives and their sets',
         tags: ['Artists'],
         params: ById,
         response: { 200: Ok, 404: ApiError },

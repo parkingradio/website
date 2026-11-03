@@ -375,7 +375,9 @@ export async function radioRoutes(
   api.get(
     '/api/radio',
     {
+      config: { tool: { title: 'Voir ce qui joue à la radio' } },
       schema: {
+        operationId: 'get_on_air',
         summary: "What's on the radio, and what comes next",
         tags: ['Radio'],
         querystring: z.object({ upcoming: z.string().regex(/^\d+$/, 'Invalid input: expected a whole number').optional() }),
@@ -467,8 +469,9 @@ export async function radioRoutes(
   api.get(
     '/api/admin/radio',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Voir la playlist de la radio' } },
       schema: {
+        operationId: 'get_radio_playlist',
         summary: "The playlist the radio's rotation is read from",
         tags: ['Radio'],
         response: { 200: z.object({ ok: z.literal(true), credentialsEntered: z.boolean(), current: ChosenPlaylist.nullable() }) },
@@ -501,8 +504,9 @@ export async function radioRoutes(
   api.post(
     '/api/admin/radio/preview',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Prévisualiser une playlist', readOnly: true } },
       schema: {
+        operationId: 'preview_playlist',
         summary: 'What the radio would read from a playlist',
         tags: ['Radio'],
         body: PlaylistRequest,
@@ -525,9 +529,10 @@ export async function radioRoutes(
   api.post(
     '/api/admin/radio/playlist',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Changer la playlist de la radio' } },
       schema: {
-        summary: 'Choosing the playlist the rotation is read from',
+        operationId: 'choose_playlist',
+        summary: 'Chooses the playlist the rotation is read from',
         tags: ['Radio'],
         body: PlaylistRequest,
         response: { 200: Ok, 400: ApiError, 404: ApiError, 409: ApiError, 502: ApiError },
@@ -562,8 +567,9 @@ export async function radioRoutes(
   api.get(
     '/api/admin/radio/credentials',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: "Voir l'app SoundCloud" } },
       schema: {
+        operationId: 'get_soundcloud_app',
         summary: 'The SoundCloud app the radio reads playlists through',
         tags: ['Radio'],
         response: { 200: RadioCredentials },
@@ -590,7 +596,7 @@ export async function radioRoutes(
   api.post(
     '/api/admin/radio/credentials/check',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Whether SoundCloud accepts credentials, without saving them',
         tags: ['Radio'],
@@ -608,7 +614,7 @@ export async function radioRoutes(
   api.put(
     '/api/admin/radio/credentials',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Entering the credentials of the SoundCloud app',
         tags: ['Radio'],

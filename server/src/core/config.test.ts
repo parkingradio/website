@@ -86,6 +86,15 @@ describe('config', () => {
     })
   })
 
+  describe('environment', () => {
+    it('is ENVIRONMENT, or development when it is not set', () => {
+      process.env.ENVIRONMENT = 'test'
+      expect(config.environment).toBe('test')
+      delete process.env.ENVIRONMENT
+      expect(config.environment).toBe('development')
+    })
+  })
+
   describe('siteOrigin', () => {
     it('is the deployment when MAIL_DOMAIN is set', () => {
       process.env.MAIL_DOMAIN = 'parking.example.test'

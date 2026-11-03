@@ -143,8 +143,9 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.get(
     '/api/admin/applications',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Lister les candidatures' } },
       schema: {
+        operationId: 'list_applications',
         summary: "Every application, or an artist's or a collective's, the most recently received first",
         tags: ['Applications'],
         querystring: z
@@ -172,8 +173,13 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.get(
     '/api/admin/applications/recipients',
     {
-      config: { admin: true },
-      schema: { summary: 'Who applications from artists are emailed to', tags: ['Applications'], response: { 200: ApplicationRecipients } },
+      config: { admin: true, tool: { title: 'Voir les destinataires des candidatures' } },
+      schema: {
+        operationId: 'get_application_recipients',
+        summary: 'Who applications from artists are emailed to',
+        tags: ['Applications'],
+        response: { 200: ApplicationRecipients },
+      },
     },
     async () => recipientsResponse(await settings.load()),
   )
@@ -181,7 +187,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.put(
     '/api/admin/applications/recipients',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Chooses who applications from artists are emailed to',
         tags: ['Applications'],
@@ -199,8 +205,14 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.get(
     '/api/admin/applications/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'An application', tags: ['Applications'], params: ById, response: { 200: ApplicationResponse, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Voir une candidature' } },
+      schema: {
+        operationId: 'get_application',
+        summary: 'An application',
+        tags: ['Applications'],
+        params: ById,
+        response: { 200: ApplicationResponse, 404: ApiError },
+      },
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
@@ -214,8 +226,9 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.post(
     '/api/admin/applications',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Ajouter une candidature' } },
       schema: {
+        operationId: 'create_application',
         summary: 'Creates an application for an artist or a collective',
         tags: ['Applications'],
         body: NewApplication,
@@ -240,8 +253,9 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.put(
     '/api/admin/applications/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: 'Modifier une candidature' } },
       schema: {
+        operationId: 'update_application',
         summary: 'Changes an application',
         tags: ['Applications'],
         params: ById,
@@ -259,8 +273,9 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.put(
     '/api/admin/applications/:id/status',
     {
-      config: { admin: true },
+      config: { admin: true, tool: { title: "Changer le statut d'une candidature" } },
       schema: {
+        operationId: 'update_application_status',
         summary: 'Accepts or rejects an application, or gives it another status',
         tags: ['Applications'],
         params: ById,
@@ -279,8 +294,14 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   api.delete(
     '/api/admin/applications/:id',
     {
-      config: { admin: true },
-      schema: { summary: 'Deletes an application', tags: ['Applications'], params: ById, response: { 200: Ok, 404: ApiError } },
+      config: { admin: true, tool: { title: 'Supprimer une candidature' } },
+      schema: {
+        operationId: 'delete_application',
+        summary: 'Deletes an application',
+        tags: ['Applications'],
+        params: ById,
+        response: { 200: Ok, 404: ApiError },
+      },
     },
     async (request, reply) => {
       if (!(await store.delete(request.params.id))) return reply.status(404).send(NO_SUCH_APPLICATION)

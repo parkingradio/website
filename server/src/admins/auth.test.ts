@@ -83,6 +83,15 @@ describe('session tokens', () => {
     vi.advanceTimersByTime((SESSION_DURATION_SECONDS + 1) * 1000)
     expect(await verifySessionToken(token)).toBeNull()
   })
+
+  it('makes a shorter session when told to', async () => {
+    vi.useFakeTimers()
+    const token = await signSessionToken({ id: 'user-1', email: 'admin@example.com', sessionVersion: 0 }, 60)
+    vi.advanceTimersByTime(59 * 1000)
+    expect(await verifySessionToken(token)).not.toBeNull()
+    vi.advanceTimersByTime(2 * 1000)
+    expect(await verifySessionToken(token)).toBeNull()
+  })
 })
 
 describe('requireAuth', () => {

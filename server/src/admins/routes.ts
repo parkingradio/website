@@ -55,7 +55,7 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
   api.get(
     '/api/admin/admins',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Every admin, and whether they accepted their invite',
         tags: ['Admins'],
@@ -71,7 +71,7 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
   api.delete(
     '/api/admin/admins/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Revokes an admin, or cancels their invite',
         tags: ['Admins'],
@@ -97,7 +97,7 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
   api.post(
     '/api/admin/invite',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Invites an admin by email',
         tags: ['Admins'],

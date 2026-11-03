@@ -31,13 +31,17 @@ function jwtSecretKey(): Uint8Array {
   return new TextEncoder().encode(config.jwtSecret)
 }
 
-// A session for `user`, with the version their sessions have when it starts (see `sessionVersion` in db/schema.ts).
-export async function signSessionToken(user: { id: string; email: string; sessionVersion: number }): Promise<string> {
+// A session for `user`, with the version their sessions have when it starts (see `sessionVersion` in db/schema.ts), which
+// lasts `seconds`, e.g. a short one for a request the server sends itself as them (see mcp/tools.ts).
+export async function signSessionToken(
+  user: { id: string; email: string; sessionVersion: number },
+  seconds = SESSION_DURATION_SECONDS,
+): Promise<string> {
   return new SignJWT({ email: user.email, ver: user.sessionVersion })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
+    .setExpirationTime(`${seconds}s`)
     .sign(jwtSecretKey())
 }
 

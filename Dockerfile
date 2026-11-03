@@ -22,6 +22,8 @@ RUN npm ci --omit=dev -w server
 COPY --from=server-build /app/server/dist server/dist
 COPY server/drizzle server/drizzle
 COPY --from=client-build /app/client/dist client/dist
+# The rules of the areas the MCP server's tools act on, which it gives the model (see server/src/mcp/documentation.ts).
+COPY docs/design/server docs/design/server
 # Drop root privileges. The app can read its files (which are owned by root), but not modify them.
 USER node
 EXPOSE 3000

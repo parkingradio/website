@@ -27,7 +27,7 @@ export async function featuresRoutes(app: FastifyInstance, { store }: { store: F
   api.get(
     '/api/admin/features',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Every feature flag, and whether it is on',
         tags: ['Features'],
@@ -40,7 +40,7 @@ export async function featuresRoutes(app: FastifyInstance, { store }: { store: F
   api.put(
     '/api/admin/features/:id',
     {
-      config: { admin: true },
+      config: { admin: true, tool: null },
       schema: {
         summary: 'Turns a feature flag on or off',
         tags: ['Features'],

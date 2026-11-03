@@ -5,45 +5,21 @@
 # time, when the admin disconnects it, is revoked or chooses a new password, or after going unused. The unit tests check
 # the token endpoint against a stand-in for the store.
 #
-# The server's address, which is the issuer, is the dev server's (http://localhost:5173), since MAIL_DOMAIN isn't set.
+# The server's address, which is the issuer, is the dev server's (see OAuth in lib.sh).
 
 source "$(dirname "$0")/lib.sh"
 
 readonly IP=198.51.100.22
-readonly ISSUER="http://localhost:5173"
-readonly CLAUDE="https://claude.ai/oauth/mcp-oauth-client-metadata"
-readonly CALLBACK="https://claude.ai/api/mcp/auth_callback"
-readonly TOKEN="${BASE_URL}/api/oauth/token"
-readonly AUTHORIZATION="${BASE_URL}/api/admin/oauth/authorization"
 readonly CONNECTIONS="${BASE_URL}/api/admin/connections"
 readonly FILES="$(mktemp -d)"
 trap 'rm -rf "$FILES"' EXIT
-
-# A PKCE verifier, and its S256 challenge, for every authorization of this check.
-readonly VERIFIER="$(openssl rand -hex 32)"
-readonly CHALLENGE="$(printf '%s' "$VERIFIER" | openssl dgst -sha256 -binary | base64 | tr '+/' '-_' | tr -d '=\n')"
-
-# authorize -- allow Claude as the admin of `cookie`, and print the code it gets.
-authorize() {
-    json POST "$AUTHORIZATION" "{\"response_type\":\"code\",\"client_id\":\"${CLAUDE}\",\"redirect_uri\":\"${CALLBACK}\",\
-\"code_challenge\":\"${CHALLENGE}\",\"code_challenge_method\":\"S256\",\"state\":\"s\",\"allow\":true}"
-    expect_status 200
-    body_field redirect | sed -n 's/.*[?&]code=\([^&]*\).*/\1/p'
-}
-
-# exchange <code> -- exchange a code for tokens.
-exchange() {
-    request --data-urlencode grant_type=authorization_code --data-urlencode "code=$1" --data-urlencode "client_id=${CLAUDE}" \
-        --data-urlencode "redirect_uri=${CALLBACK}" --data-urlencode "code_verifier=${VERIFIER}" \
-        --data-urlencode "resource=${ISSUER}/mcp" "$TOKEN"
-}
 
 # refresh <refresh token> [<scope>] -- get new tokens with a refresh token.
 refresh() {
     local scope=()
     if [ -n "${2:-}" ]; then scope=(--data-urlencode "scope=$2"); fi
     request --data-urlencode grant_type=refresh_token --data-urlencode "refresh_token=$1" \
-        --data-urlencode "client_id=${CLAUDE}" ${scope[@]+"${scope[@]}"} "$TOKEN"
+        --data-urlencode "client_id=${CLAUDE}" ${scope[@]+"${scope[@]}"} "$TOKEN_ENDPOINT"
 }
 
 # connect -- connect Claude as the admin of `cookie`, setting `access` and `refresh` to its tokens, and `connection` to
@@ -54,16 +30,6 @@ connect() {
     access="$(body_field access_token)"
     refresh="$(body_field refresh_token)"
     connection="$(connection_of "$access")"
-}
-
-# token_hash <code or token> -- the hash the server keeps of it, in SQL.
-token_hash() {
-    printf "encode(sha256(convert_to('%s', 'UTF8')), 'hex')" "$1"
-}
-
-# connection_of <access token> -- the id of the connection with this access token, if there's one.
-connection_of() {
-    sql "select id from oauth_connections where access_token_hash = $(token_hash "$1")"
 }
 
 # expect_connected <id> / expect_disconnected <id> -- expect the connection to be there, or not anymore.
@@ -205,7 +171,7 @@ connect
 hold_row oauth_refresh_tokens "$(sql "select id from oauth_refresh_tokens where connection_id = '${connection}'")"
 for name in first second; do
     race_in_background "$name" --data-urlencode grant_type=refresh_token --data-urlencode "refresh_token=${refresh}" \
-        --data-urlencode "client_id=${CLAUDE}" "$TOKEN"
+        --data-urlencode "client_id=${CLAUDE}" "$TOKEN_ENDPOINT"
 done
 wait_for_both
 expect_disconnected "$connection"
@@ -218,7 +184,7 @@ hold_row oauth_codes "$(sql "select id from oauth_codes where code_hash = $(toke
 for name in first second; do
     race_in_background "$name" --data-urlencode grant_type=authorization_code --data-urlencode "code=${code}" \
         --data-urlencode "client_id=${CLAUDE}" --data-urlencode "redirect_uri=${CALLBACK}" \
-        --data-urlencode "code_verifier=${VERIFIER}" "$TOKEN"
+        --data-urlencode "code_verifier=${VERIFIER}" "$TOKEN_ENDPOINT"
 done
 wait_for_both
 [ "$(sql "select count(*) from oauth_connections")" = "$before" ] || fail "expected the code not to leave a connection"
@@ -245,7 +211,7 @@ docker exec --env PGAPPNAME=exchange "$PG" psql --quiet --username parking_radio
 wait_for_sql "select exists (select from pg_stat_activity where application_name = 'exchange' and wait_event_type = 'Lock')"
 race_in_background replay --data-urlencode grant_type=authorization_code --data-urlencode "code=${code}" \
     --data-urlencode "client_id=${CLAUDE}" --data-urlencode "redirect_uri=${CALLBACK}" \
-    --data-urlencode "code_verifier=${VERIFIER}" "$TOKEN"
+    --data-urlencode "code_verifier=${VERIFIER}" "$TOKEN_ENDPOINT"
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike '%delete from \"oauth_codes\"%')"
 release_row
 wait

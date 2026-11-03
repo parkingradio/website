@@ -46,6 +46,7 @@ await registerRoutes(app, {
   features: featuresStore(db),
   sendEmail: config.mailDomain ? sesEmailSender(config.awsRegion, config.mailDomain) : null,
   siteOrigin: config.siteOrigin,
+  environment: config.environment,
   soundcloud: soundCloudClient,
   soundCloudCredentials: soundCloudCredentialsStore(db),
   onAir: onAirStore(db),

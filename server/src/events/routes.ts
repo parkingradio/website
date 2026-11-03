@@ -181,7 +181,9 @@ export async function eventsRoutes(app: FastifyInstance) {
   api.get(
     '/api/events',
     {
+      config: { tool: { title: 'Voir les événements' } },
       schema: {
+        operationId: 'list_events',
         summary: "Parking Radio's events, from Resident Advisor",
         tags: ['Events'],
         response: { 200: Events, 502: ApiError },

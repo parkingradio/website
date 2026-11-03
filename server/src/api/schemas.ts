@@ -12,6 +12,9 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     // The route requires an admin's session: see `useZodSchemas`.
     admin?: boolean
+    // The route's tool of the MCP server (see docs/design/server/mcp.md), or null when it isn't one, which every admin
+    // route has to say. Its name is the route's `operationId`.
+    tool?: ToolConfig | null
   }
 
   interface FastifySchema {
@@ -19,8 +22,21 @@ declare module 'fastify' {
     // Fastify, so they aren't validated against it: it describes the request in openapi.json (see generate-openapi.ts).
     // Parts that are JSON, e.g. a profile, are described by their schema, which the route checks them against.
     multipart?: z.ZodObject
+    // The route's name in openapi.json, which is also its tool's (see `tool`).
+    operationId?: string
   }
 }
+
+export type ToolConfig = {
+  // In French, since admins see it when an app asks them to confirm calling the tool, e.g. "Supprimer un artiste".
+  title: string
+  // For a route that only reads, other than a GET, which always does.
+  readOnly?: true
+}
+
+// What tools are named: a verb, then what it acts on, then the field it changes, if it only changes one, in snake case,
+// e.g. `update_set_status` (see docs/design/server/mcp.md).
+const TOOL_NAME = /^[a-z]+(_[a-z]+)+$/
 
 // Sent with a 4xx or 5xx status when a request fails.
 export const ApiError = z.object({ ok: z.literal(false), error: z.string() }).meta({ id: 'ApiError' })
@@ -126,6 +142,13 @@ export function useZodSchemas(app: FastifyInstance) {
     // Clients tell admin routes by their path, e.g. to take a 401 to mean that the session ended.
     if (Boolean(route.config?.admin) !== route.url.startsWith('/api/admin/')) {
       throw new Error(`${route.method} ${route.url}: admin routes are those under /api/admin/, and only those`)
+    }
+    // So that no admin route becomes a tool, or misses being one, without saying so.
+    if (route.config?.admin && route.config.tool === undefined) {
+      throw new Error(`${route.method} ${route.url}: admin routes say whether they're tools, with \`config.tool\``)
+    }
+    if (route.config?.tool && !TOOL_NAME.test(route.schema?.operationId ?? '')) {
+      throw new Error(`${route.method} ${route.url}: a tool's \`operationId\` is its name, e.g. \`update_set_status\``)
     }
   })
 }
