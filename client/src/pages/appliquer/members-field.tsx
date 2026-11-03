@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { MAX_MEMBERS } from './choices'
 import { emptyMember } from './members'
 import type { Member, MemberErrors } from './members'
@@ -40,7 +40,8 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
   // The element to focus once the members have changed: a new member's name, or the tab selected once one is taken out,
   // since the button that was clicked is gone.
   const focus = useRef<(() => HTMLElement | null) | null>(null)
-  useEffect(() => {
+  // In the commit that changes them, like every move of the focus (see LoadedSession in sessions.tsx).
+  useLayoutEffect(() => {
     focus.current?.()?.focus()
     focus.current = null
   })

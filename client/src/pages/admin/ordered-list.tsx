@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 
 // Picks in order, e.g. a collective's artists or a set's performers, one per line, each of which can be moved up or down
 // or removed.
@@ -20,7 +20,8 @@ export function OrderedList<T>({ items, keyOf, label, name = label, onChange, ne
   // What gets the focus once the items change, since the button that changed them can be gone, disabled or moved, which
   // loses it: a button of an item, by its key, or else `nextFocus`.
   const focusNext = useRef<{ key: string; action: 'up' | 'down' | 'remove' } | 'next' | null>(null)
-  useEffect(() => {
+  // In the commit that changes them, like every move of the focus (see LoadedSession in sessions.tsx).
+  useLayoutEffect(() => {
     const next = focusNext.current
     focusNext.current = null
     if (next === 'next') document.getElementById(nextFocus)?.focus()

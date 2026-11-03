@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
@@ -350,7 +350,9 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   // What gets the focus once a set is deleted, since its × is gone: another set's ×, by the set's id, or the heading of
   // the sets.
   const focusAfterDelete = useRef<string | null>(null)
-  useEffect(() => {
+  // A layout effect, which React runs in the commit that removes the ×, rather than a passive one, which it runs in a later
+  // task when the update follows a request: the focus never falls back to the page in between.
+  useLayoutEffect(() => {
     const next = focusAfterDelete.current
     focusAfterDelete.current = null
     if (next === 'heading') document.getElementById(setsHeadingId)?.focus()
