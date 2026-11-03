@@ -20,7 +20,8 @@ export function OrderedList<T>({ items, keyOf, label, name = label, onChange, ne
   // What gets the focus once the items change, since the button that changed them can be gone, disabled or moved, which
   // loses it: a button of an item, by its key, or else `nextFocus`.
   const focusNext = useRef<{ key: string; action: 'up' | 'down' | 'remove' } | 'next' | null>(null)
-  // In the commit that changes them, like every move of the focus (see LoadedSession in sessions.tsx).
+  // A layout effect: for a click React runs a passive one in the same commit too, but not when the change follows a
+  // request (see LoadedSession in sessions.tsx).
   useLayoutEffect(() => {
     const next = focusNext.current
     focusNext.current = null

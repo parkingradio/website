@@ -815,10 +815,16 @@ describe("A set's form", () => {
     expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set de Cyan, 22 h – 23 h 30) ? Ses artistes restent.')
     expect(requestsTo('DELETE', '/api/admin/sets/set-2')).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
-    await waitFor(() => expect(rows(setsTable())).toHaveLength(2))
+    // The focus goes to the next set's ×, in the commit that removes the row. It's read in the waitFor that sees the row
+    // gone, which runs right after React's DOM changes and layout effects but before its passive effects, since waiting
+    // for the focus would also pass if it only moved later, leaving it on the page in between.
+    let focused: Element | null = null
+    await waitFor(() => {
+      expect(rows(setsTable())).toHaveLength(2)
+      focused = document.activeElement
+    })
+    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set, horaire à déterminer (1 h)' }))
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
-    // The focus goes to the next set's ×.
-    expect(screen.getByRole('button', { name: 'supprimer : Set, horaire à déterminer (1 h)' })).toHaveFocus()
 
     mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-3': { ok: false, error: 'Boom' } })
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
@@ -835,10 +841,19 @@ describe("A set's form", () => {
 
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume, 21 h – 22 h' })).toHaveFocus())
+    // Read as soon as the set is gone, as in the test above.
+    let focused: Element | null = null
+    await waitFor(() => {
+      expect(rows(setsTable())).toHaveLength(1)
+      focused = document.activeElement
+    })
+    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume, 21 h – 22 h' }))
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume, 21 h – 22 h' }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Sets' })).toHaveFocus())
-    expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+      focused = document.activeElement
+    })
+    expect(focused).toBe(screen.getByRole('heading', { level: 2, name: 'Sets' }))
   })
 
   it("closes the form of a set opened while it's being deleted, rather than showing a new set's", async () => {

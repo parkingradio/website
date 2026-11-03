@@ -40,7 +40,8 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
   // The element to focus once the members have changed: a new member's name, or the tab selected once one is taken out,
   // since the button that was clicked is gone.
   const focus = useRef<(() => HTMLElement | null) | null>(null)
-  // In the commit that changes them, like every move of the focus (see LoadedSession in sessions.tsx).
+  // A layout effect: for a click React runs a passive one in the same commit too, but not when the change follows a
+  // request (see LoadedSession in sessions.tsx).
   useLayoutEffect(() => {
     focus.current?.()?.focus()
     focus.current = null
