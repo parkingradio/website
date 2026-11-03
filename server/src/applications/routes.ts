@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ApiError, ById, Day, Ok, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Day, Ok, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
 import { ApplicationFields, ApplicationStatus, BAD_STATUS, PrestationId, ReceivedAt, TimeSlot } from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
@@ -163,12 +163,13 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
               .meta({ description: "Only this collective's applications. An unknown collective has none. Not with `artist`" }),
           })
           .refine((query) => query.artist === undefined || query.collective === undefined, 'Only one of artist and collective can be given'),
-        response: { 200: z.object({ ok: z.literal(true), applications: z.array(Application) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, applications: z.array(Application) }) },
       },
     },
     async (request) => {
       const owner = ownerOf(request.query.artist, request.query.collective)
-      return { ok: true as const, applications: (await store.list(owner)).map(application) }
+      const applications = (await store.list(owner)).map(application)
+      return { ok: true as const, total: applications.length, applications }
     },
   )
 

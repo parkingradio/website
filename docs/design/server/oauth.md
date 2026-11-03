@@ -231,6 +231,7 @@ it is. Fails with 400 (`invalid_request`) without `token` or `client_id`, or wit
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many connections `connections` has (see [Conventions](README.md#conventions)) |
 | `connections` | list of connections | The logged-in admin's own, the most recently used first |
 
 A connection has:

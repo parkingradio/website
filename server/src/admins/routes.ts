@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ApiError, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, Ok, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { AdminStatus, adminStatus, inviteLink } from './store.js'
 import type { AdminsStore, StoredAdmin } from './store.js'
 import type { SendEmail } from '../core/email.js'
@@ -59,12 +59,13 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
       schema: {
         summary: 'Every admin, and whether they accepted their invite',
         tags: ['Admins'],
-        response: { 200: z.object({ ok: z.literal(true), admins: z.array(Admin) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, admins: z.array(Admin) }) },
       },
     },
     async (request) => {
       const now = new Date()
-      return { ok: true as const, admins: (await store.list()).map((stored) => admin(stored, request.user!.id, now)) }
+      const admins = (await store.list()).map((stored) => admin(stored, request.user!.id, now))
+      return { ok: true as const, total: admins.length, admins }
     },
   )
 

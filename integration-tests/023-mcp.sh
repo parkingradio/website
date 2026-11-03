@@ -67,8 +67,9 @@ call update_artist "{\"id\":\"${artist}\",\"name\":\"MCP Integration 2\"}"
 expect_body_contains '\"name\":\"MCP Integration 2\"'
 [ "$(sql "select email || ' ' || phone from artists where id = '${artist}'")" = "${EMAIL} 514 555 0123" ] || fail "expected the email and phone to stay"
 
-echo "  the artists are listed as summaries"
+echo "  the artists are listed as summaries, with their total"
 call list_artists '{}'
+expect_body_contains "\\\"total\\\":$(sql "select count(*) from artists"),"
 expect_body_contains "{\\\"id\\\":\\\"${artist}\\\",\\\"name\\\":\\\"MCP Integration 2\\\""
 expect_body_lacks '\"bio\"'
 expect_body_lacks "$EMAIL"

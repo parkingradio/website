@@ -190,6 +190,7 @@ describe('OAuth routes', () => {
       const response = await app.inject({ method: 'GET', url: '/api/admin/connections', cookies: await sessionCookies() })
       expect(response.json()).toEqual({
         ok: true,
+        total: 1,
         connections: [{ id: 'connection-id', client: 'Claude Code', scopes: ['admin'], createdAt: createdAt.toISOString(), lastUsedAt: lastUsedAt.toISOString() }],
       })
       expect(store.list).toHaveBeenCalledWith(TEST_ADMIN.id)

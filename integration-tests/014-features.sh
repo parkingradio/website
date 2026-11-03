@@ -36,7 +36,7 @@ cookie="$(session_cookie)"
 echo "  admins see no flags"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/features"
 expect_status 200
-expect_body_contains '{"ok":true,"features":[]}'
+expect_body_contains '{"ok":true,"total":0,"features":[]}'
 
 echo "  a retired flag, or one that doesn't exist, can't be switched"
 for flag in "$RETIRED" some-flag; do

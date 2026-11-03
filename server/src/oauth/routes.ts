@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { checkAuthorization, redirectTo, scopesOf } from './authorization.js'
 import type { AuthorizationParams, CheckedAuthorization } from './authorization.js'
 import { findClient } from './clients.js'
@@ -141,10 +141,13 @@ export async function oauthRoutes(app: FastifyInstance, { store, issuer }: OAuth
       schema: {
         summary: "The logged-in admin's connected apps",
         tags: ['OAuth'],
-        response: { 200: z.object({ ok: z.literal(true), connections: z.array(Connection) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, connections: z.array(Connection) }) },
       },
     },
-    async (request) => ({ ok: true as const, connections: (await store.list(request.user!.id)).map(connection) }),
+    async (request) => {
+      const connections = (await store.list(request.user!.id)).map(connection)
+      return { ok: true as const, total: connections.length, connections }
+    },
   )
 
   api.delete(

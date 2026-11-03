@@ -357,10 +357,12 @@ describe('applications routes', () => {
       const all = await send(app, 'GET', '/api/admin/applications')
       expect(all.statusCode).toBe(200)
       expect(all.json().applications.map((row: { id: string }) => row.id)).toEqual(['application-3', 'application-2', 'application-1'])
+      expect(all.json().total).toBe(3)
 
       const theirs = await send(app, 'GET', '/api/admin/applications?artist=artist-1')
       expect(theirs.json().applications.map((row: { id: string }) => row.id)).toEqual(['application-3', 'application-1'])
-      expect((await send(app, 'GET', '/api/admin/applications?artist=nobody')).json()).toEqual({ ok: true, applications: [] })
+      expect(theirs.json().total).toBe(2)
+      expect((await send(app, 'GET', '/api/admin/applications?artist=nobody')).json()).toEqual({ ok: true, total: 0, applications: [] })
       const twice = await send(app, 'GET', '/api/admin/applications?artist=artist-1&artist=artist-2')
       expect(twice.statusCode).toBe(400)
       expect(twice.json()).toEqual({ ok: false, error: 'The artist must be a single id' })
@@ -373,7 +375,8 @@ describe('applications routes', () => {
 
       const theirs = await send(app, 'GET', '/api/admin/applications?collective=collective-1')
       expect(theirs.json().applications.map((row: { id: string }) => row.id)).toEqual(['application-2'])
-      expect((await send(app, 'GET', '/api/admin/applications?collective=nobody')).json()).toEqual({ ok: true, applications: [] })
+      expect(theirs.json().total).toBe(1)
+      expect((await send(app, 'GET', '/api/admin/applications?collective=nobody')).json()).toEqual({ ok: true, total: 0, applications: [] })
       const twice = await send(app, 'GET', '/api/admin/applications?collective=collective-1&collective=collective-2')
       expect(twice.statusCode).toBe(400)
       expect(twice.json()).toEqual({ ok: false, error: 'The collective must be a single id' })

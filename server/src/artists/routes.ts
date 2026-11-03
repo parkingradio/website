@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Reference, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
@@ -92,10 +92,13 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
             .optional()
             .meta({ description: "Only this collective's members, in its order. An unknown collective has none" }),
         }),
-        response: { 200: z.object({ ok: z.literal(true), artists: z.array(Artist) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, artists: z.array(Artist) }) },
       },
     },
-    async (request) => ({ ok: true as const, artists: (await store.list(request.query.collective)).map(artist) }),
+    async (request) => {
+      const artists = (await store.list(request.query.collective)).map(artist)
+      return { ok: true as const, total: artists.length, artists }
+    },
   )
 
   api.get(

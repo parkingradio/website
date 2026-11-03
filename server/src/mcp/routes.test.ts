@@ -114,7 +114,7 @@ async function buildApp(logs?: string[], environment = 'test') {
     api.get(
       '/api/admin/artists',
       { config: { admin: true, tool: { title: 'Lister les artistes' } }, schema: { operationId: 'list_artists', summary: 'Every artist' } },
-      async () => ({ ok: true, artists: [{ id: 'a', name: 'Aurore', bio: 'Long', email: 'a@example.com', phone: '555', genres: [], collectives: [] }] }),
+      async () => ({ ok: true, total: 1, artists: [{ id: 'a', name: 'Aurore', bio: 'Long', email: 'a@example.com', phone: '555', genres: [], collectives: [] }] }),
     )
   })
   await app.register(mcpRoutes, { store: store as unknown as OAuthStore, issuer: ISSUER, routes, environment })
@@ -449,9 +449,9 @@ describe('the MCP server', () => {
       expect(create.inputSchema.required).toEqual(['name'])
     })
 
-    it('list a summary of each one', async () => {
+    it('list a summary of each one, with the rest of the response as it is', async () => {
       const app = await buildApp()
-      expect((await call(app, 'list_artists')).body).toEqual({ ok: true, artists: [{ id: 'a', name: 'Aurore', genres: [], collectives: [] }] })
+      expect((await call(app, 'list_artists')).body).toEqual({ ok: true, total: 1, artists: [{ id: 'a', name: 'Aurore', genres: [], collectives: [] }] })
     })
 
     it("read the rules of an area, from the server's design documents", async () => {

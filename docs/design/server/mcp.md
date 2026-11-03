@@ -117,10 +117,10 @@ Québec time, to the second, with their offset from UTC, e.g. `2026-11-14T21:00:
 `2026-11-15T02:00:00.000Z`: the same instant, as the admin pages show it. Those of errors are too, e.g. the sessions and
 sets in the way of a 409. The instructions say so, and so do the rules of sessions (see [Times](sessions.md#times)).
 
-**Summaries.** The tools that list artists, collectives, applications and sessions give a summary of each one, so that
-their lists fit in what apps take as they grow, e.g. about 150,000 characters in claude.ai. Their descriptions say so,
-and the tools that get one of them give all of it. A summary has these fields of the full item, with the same names and
-shapes:
+**Summaries.** The tools that list artists, collectives, applications and sessions give a summary of each one, with the
+rest of their endpoint's response as it is, e.g. its `total`, so that their lists fit in what apps take as they grow,
+e.g. about 150,000 characters in claude.ai. Their descriptions say so, and the tools that get one of them give all of
+it. A summary has these fields of the full item, with the same names and shapes:
 
 | Endpoint | Fields |
 |---|---|

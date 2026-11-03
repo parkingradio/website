@@ -314,6 +314,8 @@ export interface paths {
                         "application/json": {
                             /** @enum {boolean} */
                             ok: true;
+                            /** @description How many items the list has */
+                            total: number;
                             admins: components["schemas"]["Admin"][];
                         };
                     };
@@ -1463,6 +1465,8 @@ export interface paths {
                         "application/json": {
                             /** @enum {boolean} */
                             ok: true;
+                            /** @description How many items the list has */
+                            total: number;
                             features: components["schemas"]["Feature"][];
                         };
                     };
@@ -1767,6 +1771,8 @@ export interface paths {
                         "application/json": {
                             /** @enum {boolean} */
                             ok: true;
+                            /** @description How many items the list has */
+                            total: number;
                             connections: components["schemas"]["Connection"][];
                         };
                     };
@@ -2747,6 +2753,8 @@ export interface operations {
                     "application/json": {
                         /** @enum {boolean} */
                         ok: true;
+                        /** @description How many items the list has */
+                        total: number;
                         artists: components["schemas"]["Artist"][];
                     };
                 };
@@ -3118,6 +3126,8 @@ export interface operations {
                     "application/json": {
                         /** @enum {boolean} */
                         ok: true;
+                        /** @description How many items the list has */
+                        total: number;
                         collectives: components["schemas"]["Collective"][];
                     };
                 };
@@ -3485,6 +3495,8 @@ export interface operations {
                     "application/json": {
                         /** @enum {boolean} */
                         ok: true;
+                        /** @description How many items the list has */
+                        total: number;
                         applications: components["schemas"]["Application"][];
                     };
                 };
@@ -3960,6 +3972,8 @@ export interface operations {
                     "application/json": {
                         /** @enum {boolean} */
                         ok: true;
+                        /** @description How many items the list has */
+                        total: number;
                         sessions: components["schemas"]["Session"][];
                     };
                 };

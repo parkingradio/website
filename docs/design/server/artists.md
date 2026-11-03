@@ -61,6 +61,7 @@ for as long as the database's backups are kept, like the artist's row, and is go
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many artists `artists` has (see [Conventions](README.md#conventions)) |
 | `artists` | list of artists | By name, whatever its case, or, with `collective`, only that collective's members, in the collective's order. An unknown collective has none |
 
 Fails with 400 if `collective` is given more than once.

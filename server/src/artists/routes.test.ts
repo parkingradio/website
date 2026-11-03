@@ -393,6 +393,7 @@ describe('artists routes', () => {
       const response = await get(app, '/api/admin/artists')
       expect(response.statusCode).toBe(200)
       expect(response.json().artists.map((artist: { name: string }) => artist.name)).toEqual(['Ana', 'zoé'])
+      expect(response.json().total).toBe(2)
     })
 
     it("lists a collective's members, in its order, or none for an unknown collective", async () => {
@@ -403,8 +404,8 @@ describe('artists routes', () => {
       members.set('collective-1', ['artist-2', 'artist-1'])
       const response = await get(app, '/api/admin/artists?collective=collective-1')
       expect(response.statusCode).toBe(200)
-      expect(response.json()).toEqual({ ok: true, artists: [rows[1], rows[0]].map((row) => expect.objectContaining({ id: row.id, name: row.name })) })
-      expect((await get(app, '/api/admin/artists?collective=collective-2')).json()).toEqual({ ok: true, artists: [] })
+      expect(response.json()).toEqual({ ok: true, total: 2, artists: [rows[1], rows[0]].map((row) => expect.objectContaining({ id: row.id, name: row.name })) })
+      expect((await get(app, '/api/admin/artists?collective=collective-2')).json()).toEqual({ ok: true, total: 0, artists: [] })
     })
 
     it('refuses more than one collective', async () => {

@@ -77,6 +77,7 @@ deleted the same way when the collective is deleted, or the photo is replaced or
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many collectives `collectives` has (see [Conventions](README.md#conventions)) |
 | `collectives` | list of collectives | By name, whatever its case |
 
 ## `GET /api/admin/collectives/:id` (admin)

@@ -39,7 +39,8 @@ A session, as the endpoints below return it, also has:
 
 ## Sets
 
-Every set belongs to a session: the one it's added to, which doesn't change. A set has:
+Every set belongs to a session: the one it's added to, which doesn't change. Sets aren't listed on their own: they're
+in their sessions, and the `total` of a list of sessions counts sessions, not sets. A set has:
 
 | Field | Type | |
 |---|---|---|
@@ -185,6 +186,7 @@ Responses give each one as an object, or null when there's none, with an `id` an
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many sessions `sessions` has (see [Conventions](README.md#conventions)) |
 | `sessions` | list of sessions | Whatever their status. The sessions without a start come first, the most recently added first, then the others, the most recent first (by `start`, then `createdAt`). With `artist`, only the sessions with at least one set, whatever its status, that has that artist among its performers, with all of their sets. With `takeover`, only that collective's takeovers. An unknown artist or collective has none |
 
 Fails with 400 if `artist` or `takeover` is given more than once, or if both are given.

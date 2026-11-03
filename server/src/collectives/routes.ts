@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Reference, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
@@ -87,10 +87,13 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
         operationId: 'list_collectives',
         summary: 'Every collective, by name',
         tags: ['Collectives'],
-        response: { 200: z.object({ ok: z.literal(true), collectives: z.array(Collective) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, collectives: z.array(Collective) }) },
       },
     },
-    async () => ({ ok: true as const, collectives: (await store.list()).map(collective) }),
+    async () => {
+      const collectives = (await store.list()).map(collective)
+      return { ok: true as const, total: collectives.length, collectives }
+    },
   )
 
   api.get(

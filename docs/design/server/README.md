@@ -38,6 +38,8 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
   requests other than `GET` that a browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail
   with 403. The tokens of apps (see [OAuth](oauth.md)) don't work there: they only work at `/mcp`.
+- **Totals.** The admin endpoints that list a collection, e.g. `GET /api/admin/artists`, give `total` with their list:
+  how many items it has. Lists inside something else, e.g. a session's sets, don't have one.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
   address: `CF-Connecting-IP` when it's there, or else the connection's. That header can be trusted since, in
   production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by

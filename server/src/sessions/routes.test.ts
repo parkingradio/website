@@ -313,9 +313,14 @@ describe('sessions routes', () => {
       await sessionWithSet(app, { performers: [{ id: 'artist-1' }], soundcloudTrack: null })
       await createSession(app, { takeover: null, start: null })
 
-      const ids = async (query: string) => (await send(app, 'GET', `/api/admin/sessions${query}`)).json().sessions.map((row: { id: string }) => row.id)
+      const ids = async (query: string) => {
+        const { total, sessions } = (await send(app, 'GET', `/api/admin/sessions${query}`)).json()
+        expect(total).toBe(sessions.length)
+        return sessions.map((row: { id: string }) => row.id)
+      }
       expect(await ids('')).toEqual(['session-1', 'session-3'])
       expect(await ids('?artist=artist-1')).toEqual(['session-1'])
+      expect((await send(app, 'GET', '/api/admin/sessions?artist=artist-1')).json().total).toBe(1)
       expect(await ids('?artist=artist-2')).toEqual([])
       expect(await ids('?takeover=collective-1')).toEqual(['session-1'])
       expect(store.list).toHaveBeenLastCalledWith({ takeover: 'collective-1' })

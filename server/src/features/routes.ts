@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ApiError, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { FeatureId, NoSuchFeature } from './store.js'
 import type { FeaturesStore, StoredFeature } from './store.js'
 
@@ -31,10 +31,13 @@ export async function featuresRoutes(app: FastifyInstance, { store }: { store: F
       schema: {
         summary: 'Every feature flag, and whether it is on',
         tags: ['Features'],
-        response: { 200: z.object({ ok: z.literal(true), features: z.array(Feature) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, features: z.array(Feature) }) },
       },
     },
-    async () => ({ ok: true as const, features: (await store.load()).map(feature) }),
+    async () => {
+      const features = (await store.load()).map(feature)
+      return { ok: true as const, total: features.length, features }
+    },
   )
 
   api.put(

@@ -135,7 +135,7 @@ expect_status 401
 echo "  there are no sessions yet"
 json GET "$SESSIONS"
 expect_status 200
-expect_body_contains '"sessions":[]'
+expect_body_contains '"total":0,"sessions":[]'
 
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Ana"}' "$ARTISTS"
 ana="$(first_id)"

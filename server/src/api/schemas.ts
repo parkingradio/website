@@ -45,6 +45,9 @@ export type ApiError = z.infer<typeof ApiError>
 // What requests that succeed respond when there's nothing else to say.
 export const Ok = z.object({ ok: z.literal(true) }).meta({ id: 'Ok' })
 
+// What the admin endpoints that list a collection give with their list (see "Totals" in docs/design/server/README.md).
+export const Total = z.number().int().nonnegative().meta({ description: 'How many items the list has' })
+
 // The parameters of a path with an id, e.g. `/api/admin/artists/:id`.
 export const ById = z.object({ id: z.string() })
 

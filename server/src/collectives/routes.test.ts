@@ -292,6 +292,7 @@ describe('collectives routes', () => {
       const response = await request(app, 'GET', '/api/admin/collectives')
       expect(response.statusCode).toBe(200)
       expect(response.json().collectives.map((collective: { name: string }) => collective.name)).toEqual(['Ondes', 'zébus'])
+      expect(response.json().total).toBe(2)
     })
   })
 

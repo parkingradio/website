@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
-import { ApiError, ById, Ok, Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { BAD_STATUS, Genre, Prestation, SessionFields, SetFields, Status } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
@@ -224,11 +224,12 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
               .meta({ description: "Only this collective's takeovers. Not with `artist`" }),
           })
           .refine((query) => query.artist === undefined || query.takeover === undefined, 'Only one of artist and takeover can be given'),
-        response: { 200: z.object({ ok: z.literal(true), sessions: z.array(SessionBody) }) },
+        response: { 200: z.object({ ok: z.literal(true), total: Total, sessions: z.array(SessionBody) }) },
       },
     },
     async (request) => {
-      return { ok: true as const, sessions: (await store.list(request.query)).map(sessionBody) }
+      const sessions = (await store.list(request.query)).map(sessionBody)
+      return { ok: true as const, total: sessions.length, sessions }
     },
   )
 

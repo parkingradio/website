@@ -54,6 +54,7 @@ admins can change a status to any other.
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many applications `applications` has (see [Conventions](README.md#conventions)) |
 | `applications` | list of applications | The most recently received first (by `receivedAt`, then `createdAt`). With `artist`, only that artist's applications, and with `collective`, only that collective's. An unknown artist or collective has none |
 
 Fails with 400 if `artist` or `collective` is given more than once, or if both are given.

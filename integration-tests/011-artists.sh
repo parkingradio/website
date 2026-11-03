@@ -38,7 +38,7 @@ expect_status 401
 echo "  there are no artists yet"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
 expect_status 200
-expect_body_contains '"artists":[]'
+expect_body_contains '"total":0,"artists":[]'
 
 echo "  an invalid profile is explained, in French"
 artist POST "${BASE_URL}/api/admin/artists" '{"name":"DJ Test","country":"XX"}' "${PHOTOS}/photo.jpg"

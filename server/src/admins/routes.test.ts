@@ -112,6 +112,7 @@ describe('admin routes', () => {
         { id: 'expired-id', email: 'expired@example.com', status: 'expired', inviteExpiresAt: null, invitedBy: TEST_ADMIN.email, createdAt, you: false },
         { id: 'cleaned-up-id', email: 'cleaned-up@example.com', status: 'expired', inviteExpiresAt: null, invitedBy: null, createdAt, you: false },
       ])
+      expect(response.json().total).toBe(6)
     })
   })
 

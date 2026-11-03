@@ -24,6 +24,7 @@ The retired flags are `nouveau-formulaire-candidature` and `nouveau-lecteur`.
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many flags `features` has (see [Conventions](README.md#conventions)) |
 | `features` | list of flags | Every flag, in the order of the list above. See below |
 
 Each flag:

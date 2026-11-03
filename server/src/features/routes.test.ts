@@ -88,6 +88,7 @@ describe('features routes', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({
       ok: true,
+      total: 2,
       features: [
         { id: 'new-thing', enabled: false, updatedBy: null, updatedAt: null },
         { id: 'other-thing', enabled: false, updatedBy: null, updatedAt: null },

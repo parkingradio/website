@@ -83,6 +83,7 @@ is only logged.
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
+| `total` | number | How many admins `admins` has (see [Conventions](README.md#conventions)) |
 | `admins` | list of admins | By email |
 
 An admin has:
