@@ -28,9 +28,11 @@ test('an admin allows an app, which gets tokens, then disconnects it', async ({ 
 
   await logIn(page, { at: `/autoriser?${query}` })
   await expect(page.getByRole('heading', { name: `Autoriser ${name}` })).toBeVisible()
-  const callback = page.waitForRequest((request) => request.url().startsWith(client.redirectUri))
   await page.getByRole('button', { name: 'autoriser' }).click()
-  const answer = new URL((await callback).url())
+  // Once the browser is back at the app, rather than once it asks for it: going elsewhere while that navigation is still
+  // on its way would be interrupted by it.
+  await page.waitForURL((url) => url.href.startsWith(client.redirectUri))
+  const answer = new URL(page.url())
   expect(answer.searchParams.get('state')).toBe('the-state')
 
   const exchange = { grant_type: 'authorization_code', code: answer.searchParams.get('code')!, client_id: client.id, redirect_uri: client.redirectUri, code_verifier: verifier }
