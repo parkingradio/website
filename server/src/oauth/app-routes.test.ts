@@ -243,6 +243,21 @@ describe('OAuth app routes', () => {
       expect(store.findCode).not.toHaveBeenCalled()
     })
 
+    it("logs why a request failed, its error's description, but not what it sent", async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      store.findCode.mockResolvedValueOnce(null)
+      await exchange(app)
+      // From the error handler, rather than the route.
+      await post(app, '/api/oauth/token', `${new URLSearchParams(EXCHANGE)}&code=again`)
+      const completed = logs.map((line) => JSON.parse(line)).filter((line) => line.msg === 'request completed')
+      expect(completed.map((line) => [line.res.statusCode, line.error])).toEqual([
+        [400, expect.stringMatching(/^Invalid grant/)],
+        [400, '`code` is there more than once'],
+      ])
+      expect(logs.join('\n')).not.toContain('the-code')
+    })
+
     it('fails with a 500, and logs the error without the values of a failed query', async () => {
       const logs: string[] = []
       const app = await buildApp(logs)

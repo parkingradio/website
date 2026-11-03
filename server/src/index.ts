@@ -9,6 +9,7 @@ import { config } from './core/config.js'
 import { db } from './db/connection.js'
 import { logger } from './core/logger.js'
 import { spaRoutes } from './site/spa.js'
+import { notFoundRoutes } from './site/not-found.js'
 import { soundCloudClient } from './radio/soundcloud.js'
 import { soundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { onAirStore } from './radio/on-air.js'
@@ -66,6 +67,10 @@ const clientDist = path.join(import.meta.dirname, '../../client/dist')
 
 if (existsSync(clientDist)) {
   await app.register(spaRoutes, { root: clientDist })
+} else {
+  // E.g. in development, where Vite serves the client. Rather than Fastify's own handler, which logs the request's URL with
+  // its query string, e.g. an invite's token.
+  await app.register(notFoundRoutes)
 }
 
 const port = config.port

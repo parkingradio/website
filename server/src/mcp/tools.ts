@@ -20,6 +20,11 @@ type JsonObject = { [key: string]: unknown }
 
 export type ToolResult = { content: [{ type: 'text'; text: string }]; isError?: true }
 
+// What calling a tool gives back, and, when it fails, why, which the MCP server logs (see Logs in
+// docs/design/server/README.md): its status, when it has one, and its error's message. Not the error's other fields, e.g.
+// the session and the set in the way of a 409, which are only given back.
+export type ToolCall = { result: ToolResult; failed?: { status?: number; error?: string } }
+
 export type Tool = {
   name: string
   title: string
@@ -27,7 +32,7 @@ export type Tool = {
   // The JSON Schema of its arguments, an object.
   inputSchema: JsonObject
   readOnly: boolean
-  call(args: JsonObject, as: ToolUser): Promise<ToolResult>
+  call(args: JsonObject, as: ToolUser): Promise<ToolCall>
 }
 
 // Collects the routes of `app` that are tools, as they're registered, which has to start before they are.
@@ -266,8 +271,11 @@ function text(value: unknown): string {
   return JSON.stringify(value).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
 }
 
-function failure(status: number, body: unknown): ToolResult {
-  return { content: [{ type: 'text', text: text({ status, ...(typeof body === 'object' ? body : { error: body }) }) }], isError: true }
+// A tool that fails gives the status and the error, with all its fields.
+export function failure(status: number, body: unknown): ToolCall {
+  const error = typeof body === 'object' && body !== null ? body : { error: body }
+  const message = 'error' in error && typeof error.error === 'string' ? error.error : undefined
+  return { result: { content: [{ type: 'text', text: text({ status, ...error }) }], isError: true }, failed: { status, error: message } }
 }
 
 // The tools of `routes`, which send their requests to `app`.
@@ -304,7 +312,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
     )
     const answer = (status: number, body: unknown) => withQuebecTimes(body, responses[status])
 
-    const call = async (args: JsonObject, as: ToolUser): Promise<ToolResult> => {
+    const call = async (args: JsonObject, as: ToolUser): Promise<ToolCall> => {
       const invalid = [...route.url.matchAll(/:(\w+)/g)].find(([, param]) => segment(args[param]) === null)
       if (invalid) return failure(400, { error: `\`${invalid[1]}\` isn't valid` })
       const path = route.url.replace(/:(\w+)/g, (_, param: string) => segment(args[param])!)
@@ -358,7 +366,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       let result = answer(response.status, response.body)
       if (SUMMARIES[name]) result = await SUMMARIES[name](result as JsonObject, send)
       if (hasContactDetails(route)) result = withoutContactDetails(result)
-      return { content: [{ type: 'text', text: text(result) }] }
+      return { result: { content: [{ type: 'text', text: text(result) }] } }
     }
 
     return {

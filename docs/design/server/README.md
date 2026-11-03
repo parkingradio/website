@@ -26,6 +26,13 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   revoke tokens take forms (`application/x-www-form-urlencoded`), and they and the metadata documents under
   `/.well-known` answer without `ok`, with OAuth's errors (`error` and `error_description`), while `/mcp` answers in
   JSON-RPC (see [OAuth](oauth.md) and [MCP server](mcp.md)).
+- **Logs.** Every request is logged with its method, its path, its status and how long it took, but not the values of
+  its query string, which can be secrets. Those to `/mcp`, whose path is always the same, are logged with their
+  JSON-RPC method, the name of the tool they call, and the connection and user they come from. Unless a request failed
+  unexpectedly (see Errors above), why it failed is logged too: its error's message, and for a tool that fails, whose
+  request still gets a 200, the tool's status too. So the server's messages never include personal data, or values the
+  request sent, though they can name things, e.g. a field. Bodies, tokens, and tools' arguments other than the ids in
+  their paths are never logged.
 - **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
   (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin

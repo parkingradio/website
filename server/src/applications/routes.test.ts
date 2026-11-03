@@ -556,15 +556,17 @@ describe('applications routes', () => {
       await send(app, 'PUT', URL, { recipients: ['equipe@example.com'] })
       vi.mocked(settings.save).mockClear()
       const invalid = [
-        { body: { recipients: ['equipe@example.com', 'pas une adresse'] }, error: 'Not an email address: pas une adresse' },
-        { body: { recipients: ['Équipe <equipe@example.com>'] }, error: 'Not an email address: Équipe <equipe@example.com>' },
-        { body: { recipients: [`${'x'.repeat(190)}@example.com`] }, error: `Not an email address: ${'x'.repeat(190)}@example.com` },
+        { body: { recipients: ['equipe@example.com', 'pas une adresse'] }, error: "Recipient 2 isn't an email address" },
+        { body: { recipients: ['Équipe <equipe@example.com>'] }, error: "Recipient 1 isn't an email address" },
+        // By its position in what was sent, blanks included.
+        { body: { recipients: [' ', 'pas une adresse'] }, error: "Recipient 2 isn't an email address" },
+        { body: { recipients: [`${'x'.repeat(190)}@example.com`] }, error: "Recipient 1 isn't an email address" },
         { body: { recipients: 'equipe@example.com' }, error: 'The recipients must be a list of email addresses' },
         { body: { recipients: [42] }, error: 'The recipients must be a list of email addresses' },
         { body: {}, error: 'The recipients must be a list of email addresses' },
         { body: { recipients: null }, error: 'The recipients must be a list of email addresses' },
         // The first that's wrong.
-        { body: { recipients: ['pas une adresse', ...Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`)] }, error: 'Not an email address: pas une adresse' },
+        { body: { recipients: ['pas une adresse', ...Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`)] }, error: "Recipient 1 isn't an email address" },
         {
           body: { recipients: [...Array.from({ length: 11 }, (_, i) => `admin-${i}@example.com`), 'pas une adresse'] },
           error: 'There can be at most 10 recipients',

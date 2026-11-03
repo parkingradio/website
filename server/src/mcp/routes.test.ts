@@ -2,12 +2,13 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Timestamp, zodRoutes, useZodSchemas } from '../api/schemas.js'
 import { readProfileForm } from '../artists/photo-form.js'
+import { createLogger } from '../core/logger.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import type { AccessGrant, OAuthStore } from '../oauth/store.js'
 import { DOCUMENTS, INSTRUCTIONS, instructions, rules } from './documentation.js'
@@ -27,7 +28,10 @@ const Profile = z.object({ name: z.string(), email: z.string().nullable(), phone
 let saved: z.infer<typeof Profile>
 
 async function buildApp(logs?: string[], environment = 'test') {
-  const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
+  // With the server's logger, which leaves the values of query strings out, e.g. tools' arguments. As a FastifyBaseLogger,
+  // like the server's (see index.ts).
+  const loggerInstance: FastifyBaseLogger | undefined = logs && createLogger({ write: (line: string) => logs.push(line) })
+  const app = Fastify({ loggerInstance })
   useZodSchemas(app)
   const routes = collectToolRoutes(app)
   await app.register(fastifyCookie)
@@ -118,6 +122,14 @@ async function buildApp(logs?: string[], environment = 'test') {
 }
 
 type App = Awaited<ReturnType<typeof buildApp>>
+
+// The line logged once the last request to /mcp was answered, with its status, rather than those of the requests its tools
+// sent their routes.
+function completed(logs: string[]) {
+  const lines = logs.map((line) => JSON.parse(line))
+  const { reqId } = lines.findLast((line) => line.msg === 'incoming request' && line.req.url === '/mcp')
+  return lines.find((line) => line.reqId === reqId && line.msg === 'request completed')
+}
 
 const HEADERS = { authorization: 'Bearer the-token', accept: 'application/json, text/event-stream', 'content-type': 'application/json' }
 
@@ -238,6 +250,100 @@ describe('the MCP server', () => {
     })
   })
 
+  describe('logs', () => {
+    it('say what a request calls, and for which connection and user, but not its arguments', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      await call(app, 'get_thing', { id: 'x', also: 'an-argument' })
+      expect(completed(logs)).toMatchObject({
+        res: { statusCode: 200 },
+        mcp: { method: 'tools/call', tool: 'get_thing' },
+        connection: 'connection-id',
+        user: USER.id,
+      })
+      expect(completed(logs)).not.toHaveProperty('error')
+      // Even one that its route refuses.
+      await call(app, 'update_thing', { id: 'x', size: 'another-argument' })
+      expect(completed(logs)).toMatchObject({ toolStatus: 400, error: expect.stringContaining('`size`') })
+      expect(logs.join('\n')).not.toMatch(/an-argument|another-argument/)
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      expect(completed(logs).mcp).toEqual({ method: 'tools/list' })
+    })
+
+    it('only keep enough of the names an app sends, and of the errors that repeat them', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      const long = 'x'.repeat(1000)
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: long, arguments: {} } })
+      expect(completed(logs).mcp.tool).toBe('x'.repeat(200))
+      expect(completed(logs).error).toHaveLength(200)
+      await post(app, { jsonrpc: '2.0', id: 1, method: long })
+      expect(completed(logs).mcp.method).toBe('x'.repeat(200))
+    })
+
+    it("say why a tool failed: its status, and its error's message, without its other fields", async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      await call(app, 'get_thing', { id: 'missing' })
+      expect(completed(logs)).toMatchObject({ mcp: { tool: 'get_thing' }, toolStatus: 404, error: 'No such thing' })
+      await call(app, 'update_thing', { id: 'x', size: 11 })
+      expect(completed(logs)).toMatchObject({ toolStatus: 409, error: 'Too big' })
+      expect(logs.join('\n')).not.toContain('"other"')
+      // Refused before the route.
+      await call(app, 'get_thing', { id: 'x', nope: true })
+      expect(completed(logs)).toMatchObject({ toolStatus: 400, error: "`nope` isn't an argument of this tool" })
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read_documentation', arguments: { area: 'nowhere' } } })
+      expect(completed(logs)).toMatchObject({ mcp: { tool: 'read_documentation' }, error: expect.stringMatching(/^`area` has to be one of /) })
+      expect(completed(logs)).not.toHaveProperty('toolStatus')
+    })
+
+    it('log what a tool throws as an unexpected error, which the tool only says happened', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      // Which signing the session of the tool's request needs.
+      delete process.env.JWT_SECRET
+      const { body, isError } = await call(app, 'get_thing', { id: 'x' })
+      expect(isError).toBe(true)
+      expect(body).toEqual({ status: 500, error: 'Internal server error' })
+      const failed = logs.map((line) => JSON.parse(line)).find((line) => line.msg === 'Failed to call the tool get_thing')
+      expect(failed).toMatchObject({ level: 50, err: { message: 'Missing required environment variable: JWT_SECRET' } })
+      expect(completed(logs)).toMatchObject({ toolStatus: 500 })
+      expect(completed(logs)).not.toHaveProperty('error')
+    })
+
+    it('say why a request failed when the answer is an error, whatever its status', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' }, { 'mcp-protocol-version': '2026-07-28' })
+      expect(completed(logs)).toMatchObject({
+        res: { statusCode: 400 },
+        mcp: { method: 'tools/list' },
+        connection: 'connection-id',
+        error: 'Bad Request: Unsupported protocol version: 2026-07-28 (supported versions: 2025-11-25, 2025-06-18, 2025-03-26)',
+      })
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'nope', arguments: {} } })
+      expect(completed(logs)).toMatchObject({ res: { statusCode: 200 }, mcp: { tool: 'nope' }, error: expect.stringContaining('Tool nope not found') })
+      await post(app, { jsonrpc: '2.0', id: 1, method: 'nowhere' })
+      expect(completed(logs)).toMatchObject({ res: { statusCode: 200 }, mcp: { method: 'nowhere' }, error: expect.stringContaining('Method not found') })
+      await app.inject({ method: 'POST', url: '/mcp', headers: HEADERS, payload: '{' })
+      expect(completed(logs)).toMatchObject({ res: { statusCode: 400 }, connection: 'connection-id', error: 'The body is not valid JSON' })
+      expect(completed(logs)).not.toHaveProperty('mcp')
+      await app.inject({ method: 'POST', url: '/mcp', headers: { ...HEADERS, authorization: '' }, payload: '{}' })
+      expect(completed(logs)).toMatchObject({ res: { statusCode: 401 }, error: 'An access token is required' })
+      expect(completed(logs)).not.toHaveProperty('connection')
+    })
+
+    it("don't say why a request failed unexpectedly, which the error's own line says", async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      store.findAccessToken.mockRejectedValueOnce(new Error('The database is down'))
+      const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      expect(response.json().error.code).toBe(-32603)
+      expect(completed(logs)).toMatchObject({ res: { statusCode: 500 } })
+      expect(completed(logs)).not.toHaveProperty('error')
+    })
+  })
+
   describe('tools', () => {
     it('are listed with their French titles and hints, and read_documentation', async () => {
       const app = await buildApp()
@@ -263,14 +369,10 @@ describe('the MCP server', () => {
     })
 
     it("send their routes the request their arguments make, as the connection's user, and give back the answer", async () => {
-      const logs: string[] = []
-      const app = await buildApp(logs)
+      const app = await buildApp()
       const { body, isError } = await call(app, 'get_thing', { id: 'x', also: 'yes' })
       expect(isError).toBeUndefined()
       expect(body).toEqual({ ok: true, id: 'x', also: 'yes', by: USER.email, text: 'a b' })
-      const logged = logs.map((line) => JSON.parse(line)).find((line) => line.msg === 'An MCP tool was called')
-      expect(logged).toMatchObject({ tool: 'get_thing', connection: 'connection-id', user: USER.id })
-      expect(logged).not.toHaveProperty('arguments')
     })
 
     it('give JSON without spaces, and escape the line and paragraph separators', async () => {

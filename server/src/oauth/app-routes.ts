@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import OAuth2Server from '@node-oauth/oauth2-server'
 import { useApiErrors } from '../api/errors.js'
+import { logWithRequest } from '../core/logger.js'
 import { SCOPES, isResource, mcpAddress } from './authorization.js'
 import { GRANT_TYPES, tokenModel } from './model.js'
 import type { OAuthOptions } from './routes.js'
@@ -18,7 +19,9 @@ const CONNECTION_IDLE_SECONDS = 90 * 24 * 60 * 60
 // Forms of the token and revocation endpoints are a few short fields.
 const FORM_BODY_LIMIT = 16 * 1024
 
+// Logs why the request failed, its description, unless it failed unexpectedly (see Logs in docs/design/server/README.md).
 function sendError(reply: FastifyReply, status: number, error: string, description: string) {
+  if (status < 500) logWithRequest(reply.request, { error: description })
   return reply.code(status).header('cache-control', 'no-store').send({ error, error_description: description })
 }
 

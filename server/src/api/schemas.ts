@@ -3,7 +3,7 @@ import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { checksOrigin, requireAuth } from '../admins/auth.js'
-import { useApiErrors } from './errors.js'
+import { logApiErrors, useApiErrors } from './errors.js'
 
 // What the routes' zod schemas share. The schemas validate requests and responses, and openapi.json is generated from
 // them (see generate-openapi.ts).
@@ -121,9 +121,10 @@ const refusingNul: typeof validatorCompiler = (route) => {
 // that send the NUL character are rejected with 400 too (see `refusingNul`).
 //
 // It also sets the app's error handler (see `useApiErrors`), so every app, tests' included, sends its errors as an
-// `ApiError`.
+// `ApiError`, and logs why they failed (see `logApiErrors`).
 export function useZodSchemas(app: FastifyInstance) {
   useApiErrors(app)
+  logApiErrors(app)
   app.setValidatorCompiler(refusingNul)
   app.setSerializerCompiler(serializerCompiler)
   // E.g. "`enabled`: Invalid input: expected boolean, received string", or "body: Invalid input: ..." for the whole body.

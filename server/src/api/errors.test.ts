@@ -21,12 +21,18 @@ async function buildApp(logs: string[] = []) {
     throw Object.assign(new Error('Somewhere else'), { statusCode: 302 })
   })
   app.post('/api/takes-json', async () => ({ ok: true }))
+  // Errors that don't go through the error handler.
+  app.get('/api/missing', async (_request, reply) => reply.status(404).send({ ok: false, error: 'No such thing', thing: 'secret' }))
+  app.get('/api/guarded', { onRequest: async (_request, reply) => reply.status(401).send({ ok: false, error: 'Unauthorized' }) }, async () => ({ ok: true }))
   app.get('/api/things/:id', async () => ({ ok: true }))
   await app.register(notFoundRoutes, { prefix: '/api' })
   return app
 }
 
 const json = { 'content-type': 'application/json' }
+
+// The line logged once the last request was answered, with its status.
+const completed = (logs: string[]) => JSON.parse(logs.findLast((line) => line.includes('"request completed"'))!)
 const tooLarge = JSON.stringify({ text: 'x'.repeat(2 * 1024 * 1024) })
 
 describe("the app's error handler", () => {
@@ -65,6 +71,32 @@ describe("the app's error handler", () => {
     ])
   })
 
+  it('logs why a request failed with a 4xx, however its error is sent, without its other fields', async () => {
+    const logs: string[] = []
+    const app = await buildApp(logs)
+    const failures = [
+      ['/api/refuses', 418, 'No coffee here'],
+      ['/api/missing', 404, 'No such thing'],
+      ['/api/guarded', 401, 'Unauthorized'],
+      ['/api/nope', 404, 'Not found'],
+    ] as const
+    for (const [url, status, error] of failures) {
+      await app.inject({ method: 'GET', url })
+      expect(completed(logs), url).toMatchObject({ res: { statusCode: status }, error })
+    }
+    expect(logs.join('')).not.toContain('secret')
+  })
+
+  it("doesn't log why a request that succeeded or failed unexpectedly failed", async () => {
+    const logs: string[] = []
+    const app = await buildApp(logs)
+    await app.inject({ method: 'POST', url: '/api/takes-json', payload: '{}', headers: json })
+    expect(completed(logs)).not.toHaveProperty('error')
+    await app.inject({ method: 'GET', url: '/api/fails' })
+    expect(completed(logs)).toMatchObject({ res: { statusCode: 500 } })
+    expect(completed(logs)).not.toHaveProperty('error')
+  })
+
   it("treats an error whose status isn't one of an error as unexpected", async () => {
     const logs: string[] = []
     const app = await buildApp(logs)
@@ -101,8 +133,9 @@ describe("the app's error handler", () => {
     expect(logs.join('')).toContain('Failed to handle a GET request that matched no route')
   })
 
-  it("doesn't quote a URL that can't be routed", async () => {
-    const app = await buildApp()
+  it("doesn't quote a URL that can't be routed, and logs the request once it's answered, like the others", async () => {
+    const logs: string[] = []
+    const app = await buildApp(logs)
     const responses = [
       await app.inject({ method: 'GET', url: '/api/things/%zz' }),
       await app.inject({ method: 'GET', url: `/api/things/${'x'.repeat(101)}` }),
@@ -111,5 +144,11 @@ describe("the app's error handler", () => {
       [400, { ok: false, error: 'Invalid URL' }],
       [414, { ok: false, error: 'URL too long' }],
     ])
+    const completed = logs.filter((line) => line.includes('"request completed"'))
+    expect(completed.map((line) => JSON.parse(line))).toMatchObject([
+      { res: { statusCode: 400 }, error: 'Invalid URL', responseTime: expect.any(Number) },
+      { res: { statusCode: 414 }, error: 'URL too long' },
+    ])
+    for (const line of completed) expect(line.match(/"error"/g)).toHaveLength(1)
   })
 })

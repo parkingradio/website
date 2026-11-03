@@ -74,8 +74,9 @@ describe('the tools of the API', () => {
       ['get_application', { id: 'recipients' }],
       ['update_application', { id: 'recipients', recipients: [] }],
     ] as const) {
-      const result = await tools.find((tool) => tool.name === name)!.call(args, { id: 'admin-id', email: 'admin@example.com', sessionVersion: 0 })
+      const { result, failed } = await tools.find((tool) => tool.name === name)!.call(args, { id: 'admin-id', email: 'admin@example.com', sessionVersion: 0 })
       expect(result.isError, name).toBe(true)
+      expect(failed, name).toEqual({ status: 400, error: 'The `id` given leads to another endpoint' })
       expect(JSON.parse(result.content[0].text)).toEqual({ status: 400, error: 'The `id` given leads to another endpoint' })
     }
   })

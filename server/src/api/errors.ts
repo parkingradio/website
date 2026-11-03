@@ -1,15 +1,16 @@
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
+import { logWithRequest } from '../core/logger.js'
 import type { ApiError } from './schemas.js'
 
 // The parts of an error that are safe to log: for a failed query, everything but its values.
-function withoutValues(error: Error): object {
+export function withoutValues(error: unknown): unknown {
   if (!(error instanceof DrizzleQueryError)) return error
   const cause: { message?: string; code?: string } | undefined = error.cause
   return { type: 'DrizzleQueryError', query: error.query, cause: { message: cause?.message, code: cause?.code } }
 }
 
-const INTERNAL_ERROR = 'Internal server error'
+export const INTERNAL_ERROR = 'Internal server error'
 
 // What requests for paths that don't exist get.
 export const NOT_FOUND = { ok: false, error: 'Not found' } satisfies ApiError
@@ -52,6 +53,19 @@ export function useApiErrors(app: FastifyInstance, options: ErrorOptions = {}) {
   })
 }
 
+// Logs why requests that fail with a 4xx failed: the message of their `ApiError`, however it's sent, e.g. by a route itself
+// rather than by the error handler (see Logs in docs/design/server/README.md). Errors sent in another format, e.g.
+// OAuth's, are logged where they're sent. Once for the whole app, since its plugins have its hooks.
+export function logApiErrors(app: FastifyInstance) {
+  app.addHook('preSerialization', async (request, reply, payload: unknown) => {
+    const failed = reply.statusCode >= 400 && reply.statusCode < 500 && typeof payload === 'object' && payload !== null
+    if (failed && 'ok' in payload && payload.ok === false && 'error' in payload && typeof payload.error === 'string') {
+      logWithRequest(request, { error: payload.error })
+    }
+    return payload
+  })
+}
+
 // As JSON, even when the error happened while sending a file, after the reply was given the file's type, and headers that
 // would let it be cached as the file.
 function sendError(reply: FastifyReply, status: number, error: string) {
@@ -63,12 +77,14 @@ function sendError(reply: FastifyReply, status: number, error: string) {
 const ROUTING_ERRORS: Record<string, string> = { FST_ERR_BAD_URL: 'Invalid URL', FST_ERR_MAX_PARAM_LENGTH: 'URL too long' }
 
 // For `Fastify({ frameworkErrors })`: sends the errors that Fastify raises before routing a request, which no error
-// handler sees, e.g. for a URL that isn't valid, as an `ApiError`.
+// handler sees, e.g. for a URL that isn't valid, as an `ApiError`. Fastify doesn't log these requests once they're
+// answered, as it does the others, so it's done here, the same way, with why they failed (see `logApiErrors`).
 export function frameworkErrors(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
-  const known = ROUTING_ERRORS[error.code]
-  if (known && error.statusCode) return sendError(reply, error.statusCode, known)
-  request.log.error({ err: error }, 'Failed to route a request')
-  return sendError(reply, 500, INTERNAL_ERROR)
+  const known = error.statusCode ? ROUTING_ERRORS[error.code] : undefined
+  if (!known) request.log.error({ err: error }, 'Failed to route a request')
+  const sent = known ? sendError(reply, error.statusCode!, known) : sendError(reply, 500, INTERNAL_ERROR)
+  reply.log.info({ res: reply, responseTime: reply.elapsedTime, error: known }, 'request completed')
+  return sent
 }
 
 // What went wrong, for an error that may not be an Error, e.g. in a message that says why a service couldn't be reached.

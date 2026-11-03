@@ -87,14 +87,17 @@ const NOT_RECIPIENTS = 'The recipients must be a list of email addresses'
 
 // The recipients that were sent: trimmed, without blank entries or duplicates, ignoring case, keeping the first spelling
 // of each. What's wrong is about the first of them that's wrong, which is either not an email address, or one too many.
+// It says which one by its position in the list, rather than repeating it, since it can be someone's address.
 const Recipients = z
   .array(z.string({ error: NOT_RECIPIENTS }), { error: NOT_RECIPIENTS })
   .transform((sent, context) => {
     const recipients = new Map<string, string>()
-    for (const recipient of sent.map((recipient) => recipient.trim()).filter(Boolean)) {
+    for (const [index, sentRecipient] of sent.entries()) {
+      const recipient = sentRecipient.trim()
+      if (!recipient) continue
       // Like an artist's email (see artists/profile.ts).
       if (!isEmailAddress(recipient) || recipient.length > EMAIL_MAX_LENGTH) {
-        context.addIssue({ code: 'custom', message: `Not an email address: ${recipient}` })
+        context.addIssue({ code: 'custom', message: `Recipient ${index + 1} isn't an email address` })
         return z.NEVER
       }
       if (!recipients.has(recipient.toLowerCase())) recipients.set(recipient.toLowerCase(), recipient)

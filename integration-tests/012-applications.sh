@@ -213,4 +213,4 @@ expect_status 200
 expect_body_contains "\"recipients\":[\"booking@integration.test\",\"equipe@integration.test\"],\"updatedBy\":\"${ADMIN_EMAIL}\""
 json PUT "$RECIPIENTS" '{"recipients":["pas une adresse"]}'
 expect_status 400
-expect_body_contains 'Not an email address: pas une adresse'
+expect_body_contains "Recipient 1 isn't an email address"

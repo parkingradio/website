@@ -1,12 +1,13 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
-import { McpServer, WebStandardStreamableHTTPServerTransport, fromJsonSchema } from '@modelcontextprotocol/server'
+import { McpServer, ProtocolErrorCode, WebStandardStreamableHTTPServerTransport, fromJsonSchema } from '@modelcontextprotocol/server'
 import type { AuthInfo, ScopeChallengeHandler, jsonSchemaValidator } from '@modelcontextprotocol/server'
-import { useApiErrors } from '../api/errors.js'
+import { INTERNAL_ERROR, useApiErrors, withoutValues } from '../api/errors.js'
+import { logWithRequest } from '../core/logger.js'
 import { mcpAddress, scopesOf } from '../oauth/authorization.js'
 import type { AccessGrant, OAuthStore } from '../oauth/store.js'
 import { AREAS, instructions, isArea, loadRules, serverName } from './documentation.js'
-import { buildTools } from './tools.js'
-import type { ToolResult, ToolRoute } from './tools.js'
+import { buildTools, failure } from './tools.js'
+import type { ToolCall, ToolRoute } from './tools.js'
 
 // The MCP server, at /mcp (see docs/design/server/mcp.md): MCP's Streamable HTTP transport, in its 2025 versions, which
 // answers each request with JSON, never as a stream, and keeps no sessions. Apps send the access token of a connection
@@ -25,6 +26,8 @@ const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26']
 const TOOL_SCOPE = 'admin'
 // Larger than any tool's arguments, e.g. a profile with a long bio.
 const BODY_LIMIT = 1024 * 1024
+// Enough of what an app sends, e.g. a tool's name, or an error that repeats it, to tell what it is, in the logs.
+const LOGGED_LENGTH = 200
 
 // A JSON-RPC error that isn't the answer to a request, e.g. because the request couldn't be read.
 function sendError(reply: FastifyReply, status: number, code: number, message: string) {
@@ -35,6 +38,18 @@ function sendError(reply: FastifyReply, status: number, code: number, message: s
 // exactly what its route takes, as it takes it.
 const PASS_THROUGH: jsonSchemaValidator = {
   getValidator: () => (input) => ({ valid: true, data: input as never, errorMessage: undefined }),
+}
+
+// The message of the JSON-RPC error that `body` is, if it's one, other than an internal error, whose message only says
+// that something went wrong: e.g. because the request's version of MCP isn't one of the server's.
+function jsonRpcError(body: unknown): string | undefined {
+  try {
+    // Not with the SDK's isJSONRPCErrorResponse, which refuses errors without an id, e.g. its transport's.
+    const { error } = (typeof body === 'string' ? JSON.parse(body) : {}) as { error?: { code?: unknown; message?: unknown } }
+    return error?.code !== ProtocolErrorCode.InternalError && typeof error?.message === 'string' ? error.message.slice(0, LOGGED_LENGTH) : undefined
+  } catch {
+    return undefined // e.g. no body, for a notification
+  }
 }
 
 type McpOptions = {
@@ -78,7 +93,14 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
   app.removeAllContentTypeParsers()
   app.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: BODY_LIMIT }, (_request, body, done) => done(null, body))
   useApiErrors(app, {
-    send: (reply, status, message) => sendError(reply, status, status < 500 ? -32600 : -32603, message),
+    send: (reply, status, message) => sendError(reply, status, status < 500 ? ProtocolErrorCode.InvalidRequest : ProtocolErrorCode.InternalError, message),
+  })
+  // Logs why a request failed when its answer is an error, whatever its status, whether the server or the SDK sends it (see
+  // Logs in docs/design/server/README.md).
+  app.addHook('onSend', async (request, _reply, payload) => {
+    const error = jsonRpcError(payload)
+    if (error) logWithRequest(request, { error })
+    return payload
   })
 
   const unauthorized = (reply: FastifyReply, invalid: boolean) =>
@@ -102,6 +124,7 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
     const grant = await store.findAccessToken(token)
     if (!grant) return unauthorized(reply, true)
     request.grant = grant
+    logWithRequest(request, { connection: grant.connectionId, user: grant.user.id })
   })
 
   // The server never sends anything on its own, and keeps no sessions.
@@ -118,6 +141,12 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
       return sendError(reply, 400, -32700, 'The body is not valid JSON')
     }
     if (Array.isArray(message)) return sendError(reply, 400, -32600, 'Batches are not supported')
+    // What the request calls, which its path, always /mcp, doesn't say.
+    const { method, params } = (message ?? {}) as { method?: unknown; params?: { name?: unknown } }
+    if (typeof method === 'string') {
+      const tool = method === 'tools/call' && typeof params?.name === 'string' ? params.name.slice(0, LOGGED_LENGTH) : undefined
+      logWithRequest(request, { mcp: { method: method.slice(0, LOGGED_LENGTH), tool } })
+    }
 
     // A server for this request only, since none is kept.
     const server = new McpServer(
@@ -129,25 +158,37 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
     // are other scopes than `admin`, which every connection and every user has for now.
     const scopeChallenge: ScopeChallengeHandler = () =>
       !grant.scopes.includes(TOOL_SCOPE) && scopesOf().includes(TOOL_SCOPE) ? { scopes: [TOOL_SCOPE] } : undefined
-    const allowed = (): ToolResult | undefined =>
-      grant.scopes.includes(TOOL_SCOPE) ? undefined : { content: [{ type: 'text', text: "The connection can't use this tool" }], isError: true }
-    const called = (name: string) => request.log.info({ tool: name, connection: grant.connectionId, user: grant.user.id }, 'An MCP tool was called')
+    const refused = (error: string): ToolCall => ({ result: { content: [{ type: 'text', text: error }], isError: true }, failed: { error } })
+    const allowed = (): ToolCall | undefined => (grant.scopes.includes(TOOL_SCOPE) ? undefined : refused("The connection can't use this tool"))
+    // Calls a tool, and logs why it failed when it does: its status, and its error, unless it failed unexpectedly, e.g.
+    // with a 502, whose message has what SoundCloud said. What a tool throws is logged as an unexpected error, which the
+    // tool only says happened, rather than the SDK giving the model its message.
+    const run = async (name: string, call: () => Promise<ToolCall>) => {
+      const called = await call().catch((error: unknown) => {
+        request.log.error({ err: withoutValues(error) }, `Failed to call the tool ${name}`)
+        return failure(500, { error: INTERNAL_ERROR })
+      })
+      if (called.failed) {
+        const { status, error } = called.failed
+        const unexpected = status !== undefined && status >= 500
+        logWithRequest(request, { toolStatus: status, error: unexpected ? undefined : error })
+      }
+      return called.result
+    }
 
     for (const { tool, config } of tools) {
-      server.registerTool(tool.name, { ...config, scopeChallenge }, async (args) => {
-        called(tool.name)
-        return allowed() ?? tool.call((args ?? {}) as Record<string, unknown>, grant.user)
-      })
+      server.registerTool(tool.name, { ...config, scopeChallenge }, async (args) =>
+        run(tool.name, async () => allowed() ?? tool.call((args ?? {}) as Record<string, unknown>, grant.user)),
+      )
     }
-    server.registerTool('read_documentation', { ...documentation, scopeChallenge }, async (args) => {
-      called('read_documentation')
-      const area = (args as { area?: unknown } | undefined)?.area
-      if (!isArea(area)) {
-        return { content: [{ type: 'text', text: `\`area\` has to be one of ${AREAS.join(', ')}` }], isError: true }
-      }
-      // After the instructions, which some apps don't give the model.
-      return allowed() ?? { content: [{ type: 'text', text: `${instructionsText}\n\n${rules[area]}` }] }
-    })
+    server.registerTool('read_documentation', { ...documentation, scopeChallenge }, async (args) =>
+      run('read_documentation', async () => {
+        const area = (args as { area?: unknown } | undefined)?.area
+        if (!isArea(area)) return refused(`\`area\` has to be one of ${AREAS.join(', ')}`)
+        // After the instructions, which some apps don't give the model.
+        return allowed() ?? { result: { content: [{ type: 'text', text: `${instructionsText}\n\n${rules[area]}` }] } }
+      }),
+    )
 
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
     await server.connect(transport)
