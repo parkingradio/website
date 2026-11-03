@@ -5,7 +5,7 @@ played, what they did, and where the recordings are. A session is e.g. an evenin
 4-hour takeover. A set is one performance during a session, usually about an hour, streamed as its own YouTube live and
 uploaded as its own SoundCloud track: a 4-hour takeover is one session of 4 sets. The recordings stay on SoundCloud and
 YouTube, which the server only links to. Sessions and sets are only reachable by admins for now. They have nothing to do
-with admins' sessions, which are about logging in (see [Sessions](admins.md#sessions)).
+with admins' sessions, which are about logging in (see [Sessions, in Admins](admins.md#sessions)).
 
 Each session is a row of the `sessions` table (`server/src/db/schema.ts`), and each set a row of `sets`, with its
 performers in `set_performers`. The rules each of their fields follows are the schemas `SessionFields` and `SetFields`
@@ -70,8 +70,9 @@ A session has a start, which can be null, and a duration, which can't. A session
 isn't known yet, e.g. a collective's artists grouped into a takeover while it's being planned. Requests send `start` as
 a date and time with its offset from UTC, like an application's `receivedAt`, e.g. `"2026-11-14T21:00-05:00"`, where the
 seconds can be left out, or as null, or a blank string, for none. Responses give it, and the `start` and `end` the server
-works out, as ISO 8601 strings in UTC. A start is from the year 2000 to the year 2999, in UTC, and can be in the past or
-in the future.
+works out, as ISO 8601 strings in UTC, which the MCP server's tools give in Québec time, with their offset, instead (see
+[Results, in MCP server](mcp.md#results)). A start is from the year 2000 to the year 2999, in UTC, and can be in the
+past or in the future.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
 moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set

@@ -30,8 +30,8 @@ A profile has:
 | `email` | string or null | The contact's, like an artist's. Two collectives can't have the same one, whatever its case |
 | `phone` | string | The contact's, like an artist's |
 
-A collective has no genres of its own: its genres are its members', whom
-[`GET /api/admin/artists?collective=<id>`](artists.md#get-apiadminartistscollectiveid-admin) returns.
+A collective has no genres of its own: its genres are its members', whom `GET /api/admin/artists?collective=<id>`
+returns.
 
 Emails are unique among collectives, and among artists, but not across both: a collective's contact is often one of
 its members, who may also apply alone, with the same email. So a person can't be the contact of two collectives.

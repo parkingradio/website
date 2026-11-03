@@ -1,6 +1,7 @@
 # Server
 
-The server provides the API under `/api`, which this directory specifies, and serves the client app.
+The server provides the API under `/api`, which this directory specifies, and the [MCP server](mcp.md) at `/mcp`, which
+apps connect to through [OAuth](oauth.md), and serves the client app.
 
 ## Conventions
 
@@ -20,16 +21,22 @@ The server provides the API under `/api`, which this directory specifies, and se
   wrong: what went wrong is logged, but without the personal data it could include, e.g. the values of a failed
   database query. Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
   `GET /api/events`, `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404
-  error, whatever the request's body.
+  error, whatever the request's body. What apps call for OAuth and MCP has its own errors (see below).
+- **OAuth and MCP.** What apps call follows its standards rather than the conventions above: the endpoints that get and
+  revoke tokens take forms (`application/x-www-form-urlencoded`), and they and the metadata documents under
+  `/.well-known` answer without `ok`, with OAuth's errors (`error` and `error_description`), while `/mcp` answers in
+  JSON-RPC (see [OAuth](oauth.md) and [MCP server](mcp.md)).
 - **Admin endpoints.** Endpoints marked "admin", which are exactly those under `/api/admin/`, require an admin's session
   (see [Sessions](admins.md#sessions)), and fail with 401 (`{"ok": false, "error": "Unauthorized"}`) without a valid
   one. That's the only reason they ever fail with 401, so callers can take it to mean that there's no session. Admin
   requests other than `GET` that a browser says come from another origin, in `Sec-Fetch-Site` or else `Origin`, fail
-  with 403.
+  with 403. The tokens of apps (see [OAuth](oauth.md)) don't work there: they only work at `/mcp`.
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
   address: `CF-Connecting-IP` when it's there, or else the connection's. That header can be trusted since, in
   production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by
   their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error.
+  The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
+  their requests from their own servers, which share a few addresses.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -42,10 +49,16 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request outside `/api` and `/assets`, where the build's files are. The app then shows the page for that path.
-This includes paths that aren't one of the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)),
-since the server doesn't know which pages the app has. Other requests for paths that don't exist, whatever their body,
-and files that don't exist under `/assets`, get a 404 error.
+`HEAD` request outside `/api`, `/assets`, where the build's files are, `/mcp` and `/.well-known`, where the metadata
+documents of [OAuth](oauth.md) are. The app then shows the page for that path. This includes paths that aren't one of
+the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't know which
+pages the app has. Other requests for paths that don't exist, whatever their body, and paths that don't exist under
+`/assets` and `/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see
+[Conventions](#conventions)).
+
+Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors
+'none'`), so that they can't trick admins into clicking its buttons, e.g. to allow an app (see
+[Autoriser une application](../client/admin/autoriser.md)).
 
 The names of the files under `/assets` change with their content, so they can be cached for good. The app itself is
 checked again every time it's loaded, so that a deploy shows right away.
@@ -73,6 +86,9 @@ the request failing.
 
 ## Endpoints
 
+Endpoints are public, admin (see [Conventions](#conventions)), or for apps, which need a connection's token (see
+[Authorization](mcp.md#authorization)).
+
 | Endpoint | Access | What it's for |
 |---|---|---|
 | [`GET /healthz`](#get-healthz) | public | Whether the server and its database work |
@@ -84,6 +100,15 @@ the request failing.
 | [`POST /api/admin/invite`](admins.md#post-apiadmininvite-admin) | admin | Inviting a new admin by email |
 | [`GET /api/admin/admins`](admins.md#get-apiadminadmins-admin) | admin | Every admin, and whether they accepted their invite |
 | [`DELETE /api/admin/admins/:id`](admins.md#delete-apiadminadminsid-admin) | admin | Revoking an admin |
+| [`GET /.well-known/oauth-protected-resource/mcp`](oauth.md#get-well-knownoauth-protected-resourcemcp) | public | Where apps get tokens for the MCP server |
+| [`GET /.well-known/oauth-authorization-server`](oauth.md#get-well-knownoauth-authorization-server) | public | The OAuth endpoints, and what they support |
+| [`GET /api/admin/oauth/authorization`](oauth.md#get-apiadminoauthauthorization-admin) | admin | What allowing an app would grant |
+| [`POST /api/admin/oauth/authorization`](oauth.md#post-apiadminoauthauthorization-admin) | admin | Allowing an app, or refusing |
+| [`POST /api/oauth/token`](oauth.md#post-apioauthtoken) | public | An app getting tokens for its connection |
+| [`POST /api/oauth/revoke`](oauth.md#post-apioauthrevoke) | public | An app ending its connection |
+| [`GET /api/admin/connections`](oauth.md#get-apiadminconnections-admin) | admin | The logged-in admin's connected apps |
+| [`DELETE /api/admin/connections/:id`](oauth.md#delete-apiadminconnectionsid-admin) | admin | Disconnecting one of them |
+| [`POST /mcp`](mcp.md#the-endpoint) | app | The MCP server, for connected apps |
 | [`GET /api/radio`](radio.md#get-apiradioupcomingn) | public | What's on the radio, and what comes next |
 | [`GET /api/radio/tracks/:id/stream`](radio.md#get-apiradiotracksidstream) | public | Where to stream a track of the rotation from |
 | [`GET /api/admin/radio`](radio.md#get-apiadminradio-admin) | admin | The playlist the radio's rotation is read from |

@@ -96,6 +96,10 @@ web app image to use, then launch the workflow, which will run `terraform apply`
 against that environment's state with that tag. The EC2 instance gets re-created automatically whenever
 required.
 
+The server is told which deployment it is, as `ENVIRONMENT`, the workspace's name, e.g. `test` or
+`production`. The MCP server tells Claude, so that it knows whether its changes are real (see
+[MCP server](design/server/mcp.md#the-endpoint)).
+
 Alternatively, deployment can be triggered locally without going through the workflow. Note the workspace
 selection.
 

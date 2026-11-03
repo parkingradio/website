@@ -24,6 +24,10 @@ production, which lasts 7 days. A session also ends when its admin is revoked, o
 `SameSite=Lax` still lets pages on other subdomains send the cookie, admin requests other than `GET` that come from
 another origin are refused (see [Conventions](README.md#conventions)).
 
+Admins can also connect apps, e.g. Claude, which then act as them through the MCP server, with tokens rather than the
+cookie (see [OAuth](oauth.md)). Their connections end along with their sessions, when they're revoked or choose a new
+password, but not when they log out.
+
 ## `POST /api/auth/login`
 
 | Request field | Type | |
@@ -42,7 +46,7 @@ accepted yet) or 429: each client gets 10 attempts per 15 minutes.
 ## `POST /api/auth/logout`
 
 Takes no body. Clears the session cookie, and responds `{"ok": true}`. There's nothing to revoke on the server: the
-session is only in the cookie.
+session is only in the cookie. The admin's connections stay (see [Sessions](#sessions)).
 
 ## `POST /api/auth/accept-invite`
 
@@ -52,8 +56,8 @@ session is only in the cookie.
 | `password` | string | At least 8 characters |
 
 Sets the password of the admin `token` invites, and responds `{"ok": true}`. The invite can't be used again, and the
-admin's sessions end, e.g. when the invite resets their password. Fails with 400: missing fields, a password that's too
-short, or an invalid or expired invite.
+admin's sessions and connections end, e.g. when the invite resets their password. Fails with 400: missing fields, a
+password that's too short, or an invalid or expired invite.
 
 ## `GET /api/admin/me` (admin)
 
@@ -95,5 +99,5 @@ An admin has:
 
 ## `DELETE /api/admin/admins/:id` (admin)
 
-Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, and their sessions end. For an admin who
-hasn't accepted their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).
+Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, and their sessions and connections end. For
+an admin who hasn't accepted their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).
