@@ -50,7 +50,7 @@ mcp '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 expect_status 202
 mcp '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 expect_status 200
-expect_body_contains '"name":"create_artist","title":"Ajouter un artiste"'
+expect_body_contains '"name":"create_artist","title":"Ajouter un artiste","description":"Once per conversation, before using it, read the rules with `read_documentation`, area `artists`. '
 expect_body_contains '"name":"read_documentation"'
 
 echo "  a tool adds an artist as the admin, and gives it back without its email and phone"
@@ -78,8 +78,9 @@ call create_artist "{\"name\":\"Another\",\"email\":\"${EMAIL}\"}"
 expect_body_contains '"isError":true'
 expect_body_contains '\"status\":409'
 
-echo "  read_documentation gives the rules from the image's design documents"
+echo "  read_documentation gives the instructions, then the rules from the image's design documents"
 call read_documentation '{"area":"sessions"}'
+expect_body_contains "\"text\":\"This is Parking Radio's development environment, not the production site"
 expect_body_contains '# Sessions'
 expect_body_lacks '## `GET'
 

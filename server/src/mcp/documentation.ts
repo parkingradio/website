@@ -2,15 +2,16 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 // What the MCP server gives the model besides its tools (see docs/design/server/mcp.md): the instructions, and the rules
-// of the areas its tools act on, from the server's design documents, which are where they're written down.
+// of the areas its tools act on, from the server's design documents, which are where they're written down. Since some
+// apps don't give the model the instructions, the rules come after them too.
 
 // The instructions, after the sentence that says which environment the server is (see `instructions`), as
 // docs/design/server/mcp.md has them, which a test checks.
 export const INSTRUCTIONS =
   'Parking Radio is an independent non-profit radio. These tools are its admin pages: the artists and collectives it ' +
   "knows of, their applications to play, the sessions at its studio and the sets played during them, and the radio's " +
-  'rotation. They act as the admin who connected you, and what you change is saved in their name. Before changing ' +
-  'anything in an area, read its rules with `read_documentation`. The lists the rules name, e.g. `GENRES`, are the ' +
+  'rotation. They act as the admin who connected you, and what you change is saved in their name. Before using an ' +
+  "area's tools, read its rules with `read_documentation`. The lists the rules name, e.g. `GENRES`, are the " +
   "values the tools take, and the files they name aren't available to you. Parking Radio is in Montréal: the tools " +
   'give times in Québec time, with their offset from UTC. Those you send need the offset from UTC in effect on their ' +
   "date, which changes with daylight saving time. Artists' and collectives' emails and phone numbers are never shown " +
@@ -36,6 +37,14 @@ export function serverName(environment: string): string {
 export const AREAS = ['radio', 'artists', 'collectives', 'applications', 'sessions'] as const
 export type Area = (typeof AREAS)[number]
 export const isArea = (name: unknown): name is Area => (AREAS as readonly unknown[]).includes(name)
+
+// The area whose rules an endpoint follows, by its path: that of the document that has it, or `sessions` for Parking
+// Radio's events, which sessions link to.
+export function areaOf(url: string): Area | undefined {
+  const name = /^\/api\/(?:admin\/)?([a-z]+)/.exec(url)?.[1]
+  if (name === 'sets' || name === 'events') return 'sessions'
+  return isArea(name) ? name : undefined
+}
 
 // Where the server's design documents are: next to the server, in the repository as in the image (see the Dockerfile).
 export const DOCUMENTS = path.join(import.meta.dirname, '../../../docs/design/server')

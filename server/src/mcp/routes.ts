@@ -64,7 +64,7 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
   const documentation = {
     title: 'Lire les règles',
     description:
-      'The rules of an area, e.g. those sessions and sets follow, their statuses and what deleting them does: read them before changing anything in it.',
+      'The instructions for these tools, then the rules of an area, e.g. those sessions and sets follow, their statuses and what deleting them does: read them before using its tools.',
     inputSchema: fromJsonSchema(
       { type: 'object', properties: { area: { type: 'string', enum: [...AREAS] } }, required: ['area'], additionalProperties: false },
       PASS_THROUGH,
@@ -145,7 +145,8 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
       if (!isArea(area)) {
         return { content: [{ type: 'text', text: `\`area\` has to be one of ${AREAS.join(', ')}` }], isError: true }
       }
-      return allowed() ?? { content: [{ type: 'text', text: rules[area] }] }
+      // After the instructions, which some apps don't give the model.
+      return allowed() ?? { content: [{ type: 'text', text: `${instructionsText}\n\n${rules[area]}` }] }
     })
 
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })

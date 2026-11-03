@@ -3,6 +3,8 @@ import { z } from 'zod'
 import type { ToolConfig } from '../api/schemas.js'
 import { signSessionToken } from '../admins/auth.js'
 import { config } from '../core/config.js'
+import { areaOf } from './documentation.js'
+import type { Area } from './documentation.js'
 
 // The tools of the MCP server, which are the routes that say they're tools (see `config.tool` in api/schemas.ts, and
 // docs/design/server/mcp.md). A tool sends its route the request its arguments make, as the connection's user, and gives
@@ -167,10 +169,16 @@ export function withQuebecTimes(value: unknown, schema: unknown): unknown {
   )
 }
 
-// What a tool's description says, past the route's summary.
+// What a tool's description starts with: to read its area's rules, once, rather than before each call.
+export function readFirst(area: Area | undefined): string {
+  return `Once per conversation, before using it, read the rules with \`read_documentation\`${area ? `, area \`${area}\`` : ''}.`
+}
+
+// What a tool's description says: first, to read its area's rules, since some apps only give the model the tools'
+// descriptions, rather than the instructions too (see docs/design/server/mcp.md), then the route's summary, and more.
 function descriptionOf(route: ToolRoute, name: string): string {
   const summary = route.schema.summary ?? ''
-  const sentences = [/[.!?]$/.test(summary) ? summary : `${summary}.`]
+  const sentences = [readFirst(areaOf(route.url)), /[.!?]$/.test(summary) ? summary : `${summary}.`]
   if (name in SUMMARIES) sentences.push(`Gives a summary of each one: \`get_${name.slice('list_'.length, -1)}\` gives all of it.`)
   // The tools that replace a whole item, rather than one of its fields, e.g. `update_set` but not `update_set_status`.
   if (route.method === 'PUT' && /^update_[a-z]+$/.test(name)) {

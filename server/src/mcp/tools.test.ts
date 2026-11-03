@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import { z } from 'zod'
 import { registerRoutes } from '../app.js'
 import type { Dependencies } from '../app.js'
-import { loadRules, rules } from './documentation.js'
+import { AREAS, loadRules, rules } from './documentation.js'
 import { buildTools, collectToolRoutes, hasContactDetails, inQuebecTime } from './tools.js'
 
 // The tools of the API's routes, against docs/design/server/mcp.md. Registering the routes only needs their
@@ -57,7 +57,11 @@ describe('the tools of the API', () => {
       expect(JSON.stringify(tool.inputSchema), tool.name).not.toContain('$ref')
       expect(tool.inputSchema).toMatchObject({ type: 'object', additionalProperties: false })
       expect(tool.description, tool.name).toMatch(/\.$/)
+      // Every one of them is in an area.
+      expect(tool.description, tool.name).toMatch(new RegExp(`^Once per conversation, before using it, read the rules with \`read_documentation\`, area \`(${AREAS.join('|')})\`\\. `))
     }
+    const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `(\w+)`/.exec(description)![1]]))
+    expect(areas).toMatchObject({ get_on_air: 'radio', get_application_recipients: 'applications', update_set: 'sessions', list_events: 'sessions' })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
       expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone', 'removePhoto']),

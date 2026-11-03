@@ -12,7 +12,7 @@ import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessi
 import type { AccessGrant, OAuthStore } from '../oauth/store.js'
 import { DOCUMENTS, INSTRUCTIONS, instructions, rules } from './documentation.js'
 import { mcpRoutes } from './routes.js'
-import { collectToolRoutes } from './tools.js'
+import { collectToolRoutes, readFirst } from './tools.js'
 
 // The MCP server, with routes of its own as tools, which say how they were called. Those of the API are checked against
 // the design by tools.test.ts, and end to end by integration-tests/023-mcp.sh.
@@ -245,7 +245,9 @@ describe('the MCP server', () => {
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
       expect(tools.map(({ name }) => name)).toEqual(['get_thing', 'update_thing', 'get_artist', 'update_artist', 'create_times', 'list_artists', 'read_documentation'])
       const get = tools.find(({ name }) => name === 'get_thing')!
-      expect(get).toMatchObject({ title: 'Voir une chose', description: 'A thing.', annotations: { title: 'Voir une chose', readOnlyHint: true, openWorldHint: false } })
+      // A route that isn't in an area's document points to read_documentation all the same. No real tool is like that:
+      // tools.test.ts checks that each one is in an area.
+      expect(get).toMatchObject({ title: 'Voir une chose', description: `${readFirst(undefined)} A thing.`, annotations: { title: 'Voir une chose', readOnlyHint: true, openWorldHint: false } })
       expect(get.inputSchema).toEqual({
         type: 'object',
         properties: { id: { type: 'string', description: "The thing's id" }, also: { type: 'string' } },
@@ -254,7 +256,10 @@ describe('the MCP server', () => {
       })
       const update = tools.find(({ name }) => name === 'update_thing')!
       expect(update.annotations).toEqual({ title: 'Modifier une chose', destructiveHint: true, openWorldHint: false })
-      expect(update.description).toBe("Changes a thing. It replaces it: what's left out is erased, except what it says it keeps, so read it first.")
+      expect(update.description).toBe(
+        `${readFirst(undefined)} Changes a thing. It replaces it: what's left out is erased, except what it says it keeps, so read it first.`,
+      )
+      expect(tools.find(({ name }) => name === 'get_artist')!.description.startsWith(`${readFirst('artists')} An artist.`)).toBe(true)
     })
 
     it("send their routes the request their arguments make, as the connection's user, and give back the answer", async () => {
@@ -351,8 +356,8 @@ describe('the MCP server', () => {
       const app = await buildApp()
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read_documentation', arguments: { area: 'sessions' } } })
       const { text } = response.json().result.content[0]
-      expect(text).toBe(rules(await readFile(path.join(DOCUMENTS, 'sessions.md'), 'utf8')))
-      expect(text).toMatch(/^# Sessions/)
+      expect(text).toBe(`${instructions('test')}\n\n${rules(await readFile(path.join(DOCUMENTS, 'sessions.md'), 'utf8'))}`)
+      expect(text).toMatch(/^This is Parking Radio's test environment, .*\n\n# Sessions\n/)
       expect(text).not.toContain('## `')
       const wrong = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read_documentation', arguments: { area: 'admins' } } })
       expect(wrong.json().result.isError).toBe(true)
@@ -368,6 +373,8 @@ describe('the MCP server', () => {
       const sentence = instructions(environment).slice(0, -INSTRUCTIONS.length - 1)
       expect(flat, environment).toContain(`"${sentence}"`)
     }
+    // And the sentence that starts the tools' descriptions.
+    expect(flat).toContain(`"${readFirst('sessions')}"`)
   })
 
   it('says so in production, without naming its environment', async () => {
