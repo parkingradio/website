@@ -10,7 +10,7 @@ The page shows:
 
 - The app asking, by its name, e.g. "Claude", and that it will act as the logged-in admin, by their email.
 - What it will be able to do, in plain words: for the `admin` scope, everything the admin does on the admin pages,
-  except what the MCP server leaves out, which it names (see [Tools](../../server/mcp.md#tools)).
+  except what the MCP server leaves out, which it lists (see [Tools](../../server/mcp.md#tools)).
 - Where the browser goes back to, by its host, e.g. "claude.ai", or that it's the admin's own computer, e.g. for Claude
   Code.
 - That the admin should only allow it if they just started connecting it themselves, since anyone can send them a link

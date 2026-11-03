@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 import { api } from '../../api/client'
 import type { Schema } from '../../api/client'
@@ -109,9 +109,22 @@ function Consent({ email }: { email: string }) {
       <p>
         <strong>{asked.client}</strong> demande à agir en votre nom ({email}) sur Parking Radio.
       </p>
-      {asked.scopes.map((scope) => (
-        <p key={scope}>{SCOPE_DESCRIPTIONS[scope] ?? scope}</p>
-      ))}
+      {asked.scopes.map((scope) => {
+        const description = SCOPE_DESCRIPTIONS[scope]
+        if (!description) return <p key={scope}>{scope}</p>
+        return (
+          <Fragment key={scope}>
+            <p>{description.text}</p>
+            {description.except.length > 0 && (
+              <ul>
+                {description.except.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
+          </Fragment>
+        )
+      })}
       <p>
         N'autorisez {asked.client} que si vous venez vous-même de lancer sa connexion. Si quelqu'un vous a envoyé ce lien,
         refusez.

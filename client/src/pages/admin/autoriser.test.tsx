@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router'
 import App from '../../app'
 import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { browser } from '../../browser'
-import { SCOPE_DESCRIPTIONS } from './describe'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 const CLAUDE = 'https://claude.ai/oauth/mcp-oauth-client-metadata'
@@ -60,7 +59,14 @@ describe('Autoriser une application', () => {
 
     expect(await screen.findByRole('heading', { name: 'Autoriser Claude' })).toBeInTheDocument()
     expect(screen.getByText(/demande à agir en votre nom \(admin@example\.com\) sur Parking Radio/)).toBeInTheDocument()
-    expect(screen.getByText(SCOPE_DESCRIPTIONS.admin)).toBeInTheDocument()
+    expect(screen.getByText('Il pourra faire tout ce que vous faites dans les pages admin, sauf :')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'gérer les admins et les applications connectées',
+      'voir ou ajouter des photos',
+      'changer la connexion SoundCloud',
+      'voir ou changer les features de la page Configuration',
+      "choisir les destinataires de l'envoi des candidatures par e-mail",
+    ])
     expect(screen.getByText(/N'autorisez Claude que si vous venez vous-même de lancer sa connexion/)).toBeInTheDocument()
     expect(screen.getByText('Ensuite, votre navigateur retournera vers claude.ai.')).toBeInTheDocument()
   })
