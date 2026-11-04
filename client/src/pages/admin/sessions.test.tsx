@@ -246,7 +246,7 @@ describe('The list of sessions', () => {
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (1)', 'annulées (0)'])
   })
 
-  it('searches the sessions by name, takeover, performer, and day written out', async () => {
+  it('searches the sessions by name, takeover, performer, and day written out, or a day of the month and a month', async () => {
     mockFetch(LIST)
     renderAt('/admin/sessions')
 
@@ -254,6 +254,11 @@ describe('The list of sessions', () => {
     await expectSearch('ondes', ['sam. 14 nov. 2026'])
     await expectSearch('aurore', ['sam. 14 nov. 2026'])
     await expectSearch('samedi novembre', ['sam. 14 nov. 2026'])
+    await expectSearch('14 nov', ['sam. 14 nov. 2026'])
+    await expectSearch('nov 14', ['sam. 14 nov. 2026'])
+    await expectSearch('31 août 2026', ['lun. 31 août 2026'])
+    // Not by "2" in "2026".
+    await expectSearch('2 nov', [])
     await expectSearch('determiner', ['date à déterminer'])
     await expectSearch('personne', [])
     expect(screen.getByText('Aucune session ne correspond à la recherche.')).toBeInTheDocument()

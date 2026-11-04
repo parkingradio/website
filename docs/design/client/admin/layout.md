@@ -36,9 +36,14 @@ the country, when the other one is, and in place of a collective's genres when i
 The lists of artists and collectives, of applications and of sessions (see [Artistes](artistes.md),
 [Candidatures](candidatures.md) and [Sessions](sessions.md)), find the entries that have every word searched for, in any
 of the fields searched, whatever their case and accents, with "œ" and "æ" the same as "oe" and "ae", and allowing for
-about one typo every 5 letters. The search and the order are kept in the page's address, along with the status of
-applications or sessions, so that going back to a list from one of its entries with the browser's back button finds it
-as it was. The address's parameters are `search` (what's searched for), `sort` (the column the list is sorted by, as
+about one typo every 5 letters. A day of the month next to a month, before or after it (e.g. "26 déc" or "déc 26"), with
+or without the year after them, is searched as a date, which counts as one word: it finds only the entries with that day
+written out in one field (e.g. "samedi 26 décembre 2026"), not those that merely have "26" and "déc" somewhere. The
+month is in French, written out or by its first three letters or more, as long as no other month starts with them (e.g.
+"sept" or "juil", but not "jui"). The day can be written "1er" or "01". Words are read from left to right, so "3 déc 26"
+is the date "3 déc", then the word "26". The search and the order are kept in the page's address, along with the status
+of applications or sessions, so that going back to a list from one of its entries with the browser's back button finds
+it as it was. The address's parameters are `search` (what's searched for), `sort` (the column the list is sorted by, as
 each page names it), `order` (`asc` or `desc`, which only counts along with `sort`) and `status` (as the server names
 it, e.g. `accepted`). Without `order`, "Reçue le" and "Date" sort the latest first, and every other column sorts in
 ascending order. A value the page doesn't know is ignored, as if the parameter weren't there.

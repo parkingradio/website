@@ -186,7 +186,8 @@ export function collectiveEntry(collective: Collective, artists: Map<string, Art
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long' })
 export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short' })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to be the same day wherever this
-// runs.
+// runs. The lists' search relies on the day, the month written out and the year being next to each other, in that
+// order (see search in list.ts).
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 const shortDayFormat = new Intl.DateTimeFormat('fr-CA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
@@ -226,6 +227,8 @@ export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: str
 // Sessions' and sets' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
 // and their names (see docs/design/client/admin/sessions.md).
 const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
+// The lists' search relies on the day, the month written out and the year being next to each other, in that order (see
+// search in list.ts).
 const longQuebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
 
 // What's shown in place of the day of a session whose date isn't known yet.

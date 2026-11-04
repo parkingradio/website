@@ -14,10 +14,11 @@ each.
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist or
 collective, as [Artistes](artistes.md) searches them, their performance types, their questions or details, and the days
 the artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
-applications with a day in December, or a Thursday. Clicking "Reçue le" (`received`), "Artiste" (`artist`), "Ville"
-(`city`, by city, then country), "Dates" (`dates`, by the first day the artist would like to play) or "Statut"
-(`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that column, and clicking it again sorts
-it the other way around. The status buttons count the applications the search finds.
+applications with a day in December, or a Thursday, and "26 déc" those with December 26th. Clicking "Reçue le"
+(`received`), "Artiste" (`artist`), "Ville" (`city`, by city, then country), "Dates" (`dates`, by the first day the
+artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by
+that column, and clicking it again sorts it the other way around. The status buttons count the applications the search
+finds.
 
 Under the list, a line says that who the applications artists send are emailed to is chosen in
 [Configuration](configuration.md), and links to it.

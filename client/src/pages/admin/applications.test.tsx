@@ -283,6 +283,40 @@ describe('Searching the list of applications', () => {
     await expectSearch('mars', [])
   })
 
+  it('finds applications by a day of the month and a month, only on that day, written as it may be typed', async () => {
+    const on = (day: number, dates: string[], changes: Partial<Application> = {}) => ({
+      ...APPLICATION,
+      id: `application-${day}`,
+      receivedAt: `2026-10-0${day}T16:00:00.000Z`,
+      createdAt: `2026-10-0${day}T16:00:00.000Z`,
+      dates,
+      ...changes,
+    })
+    const applications = [
+      on(5, ['2026-12-26']),
+      on(4, ['2026-11-26', '2026-12-03'], { details: 'J’ai décidé de postuler.' }),
+      on(3, ['2025-12-26'], { artistId: 'artist-2' }),
+      on(2, ['2026-12-11', '2026-12-21']),
+      on(1, ['2026-12-01']),
+    ]
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications } })
+    renderAt('/admin/candidatures')
+
+    // Not by "26" in "2026", or another day, or "dec" in "décidé".
+    await expectSearch('dec 26', ['5 octobre 2026', '3 octobre 2026'])
+    await expectSearch('26 déc', ['5 octobre 2026', '3 octobre 2026'])
+    await expectSearch('Déc. 26', ['5 octobre 2026', '3 octobre 2026'])
+    await expectSearch('26 décembre 2026', ['5 octobre 2026'])
+    await expectSearch('dec 26 2025', ['3 octobre 2026'])
+    await expectSearch('brume 26 dec', ['3 octobre 2026'])
+    await expectSearch('1 déc', ['1 octobre 2026'])
+    await expectSearch('1er decembre', ['1 octobre 2026'])
+    await expectSearch('01 dec', ['1 octobre 2026'])
+    await expectSearch('31 nov', [])
+    // "3 déc", then "26", which is in "2026".
+    await expectSearch('3 déc 26', ['4 octobre 2026'])
+  })
+
   it('counts the applications the search finds, by status, and keeps both in the URL', async () => {
     mockFetch(LISTED)
     renderAt('/admin/candidatures')

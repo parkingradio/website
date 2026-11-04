@@ -276,7 +276,7 @@ describe('Searching the list of artists', () => {
     await expectSearch('electro', ['Cyan'])
   })
 
-  it('finds artists by the start of a word, as it is typed', async () => {
+  it('finds artists by part of a word, as it is typed', async () => {
     await expectSearch('brux', ['Cyan'])
   })
 

@@ -7,14 +7,20 @@ import { normalize } from '../../normalize'
 // browser finds it as it was. The field and the columns' headers are in list-controls.tsx.
 
 // The entries that have every word of `query` in one of their `fields`, whatever its case, accents and ligatures, e.g.
-// "soeurs" for "Sœurs" (see normalize), and allowing for a typo or so, e.g. "monreal" for "Montréal". They're kept in
-// their order, rather than the closest matches first, since the lists are sorted by their columns.
+// "soeurs" for "Sœurs" (see normalize), and allowing for a typo or so, e.g. "monreal" for "Montréal". A date counts as
+// one word, which only finds the entries with that day written out in a field (see readDates). They're kept in their
+// order, rather than the closest matches first, since the lists are sorted by their columns.
 // Only letters and digits make words, so a search without any, e.g. the "+" a phone number starts with, finds every entry,
 // like an empty one, rather than none.
 export function search<T>(entries: T[], query: string, fields: (entry: T) => string[]): T[] {
   if (!/[\p{L}\p{N}]/u.test(query)) return entries
-  const fuse = new Fuse(entries, {
-    keys: [{ name: 'fields', getFn: (entry) => fields(entry).map(normalize) }],
+  const { dates, others } = readDates(normalize(query).match(WORD) ?? [])
+  const searched = entries.map((entry) => ({ entry, fields: fields(entry).map(normalize) }))
+  const dated = searched.filter(({ fields }) => dates.every((date) => fields.some((field) => date.test(field))))
+  const rest = others.join(' ')
+  if (!/[\p{L}\p{N}]/u.test(rest)) return dated.map(({ entry }) => entry)
+  const fuse = new Fuse(dated, {
+    keys: [{ name: 'fields', getFn: ({ fields }) => fields }],
     // For the letters that normalize leaves, like "ø" or "ß".
     ignoreDiacritics: true,
     useTokenSearch: true,
@@ -24,7 +30,50 @@ export function search<T>(entries: T[], query: string, fields: (entry: T) => str
     threshold: 0.2,
     shouldSort: false,
   })
-  return fuse.search(normalize(query)).map((result) => result.item)
+  return fuse.search(rest).map((result) => result.item.entry)
+}
+
+// What Fuse takes as words, in what it searches and what's searched for.
+const WORD = /[\p{L}\p{M}\p{N}_]+/gu
+
+const MONTHS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre']
+
+// The month a normalized word names, written out or by its first three letters or more, as long as no other month starts
+// with them, e.g. "dec" or "juil", but not "jui".
+function monthOf(word: string | undefined): string | undefined {
+  const months = word && word.length >= 3 ? MONTHS.filter((month) => month.startsWith(word)) : []
+  return months.length === 1 ? months[0] : undefined
+}
+
+// The day of the month a word is, e.g. "26", "01" or "1er".
+function dayOf(word: string | undefined): number | undefined {
+  const day = word && /^(\d\d?|1er)$/.test(word) ? parseInt(word) : 0
+  return day >= 1 && day <= 31 ? day : undefined
+}
+
+// The dates among normalized `words`, as what finds them written out, e.g. "26 decembre" in "samedi 26 decembre 2026",
+// and the other words. A date is a day of the month next to a month, before or after it, with or without the year after
+// them. Words are read from left to right, so "3 dec 26" is "3 dec", then "26".
+function readDates(words: string[]): { dates: RegExp[]; others: string[] } {
+  const dates: RegExp[] = []
+  const others: string[] = []
+  for (let i = 0; i < words.length; ) {
+    let day = dayOf(words[i])
+    let month = monthOf(words[i + 1])
+    if (day === undefined || month === undefined) {
+      day = dayOf(words[i + 1])
+      month = monthOf(words[i])
+    }
+    if (day === undefined || month === undefined) {
+      others.push(words[i])
+      i += 1
+    } else {
+      const year = /^\d{4}$/.test(words[i + 2] ?? '') ? ` ${words[i + 2]}` : ''
+      dates.push(new RegExp(`(?<![\\p{L}\\p{N}])${day}(?:er)? ${month}${year}(?![\\p{L}\\p{N}])`, 'u'))
+      i += year ? 3 : 2
+    }
+  }
+  return { dates, others }
 }
 
 // A column a list can be sorted by. `compare` puts entries in ascending order. Sorting by the column starts in
