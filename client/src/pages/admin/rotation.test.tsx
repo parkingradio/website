@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { Data, Schema } from '../../api/client'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
@@ -132,6 +132,25 @@ describe('Rotation', () => {
       `${time(lateEvening + 95 * MINUTE)}A · 2026-09-13`,
       'TEASER · 2026-09-01',
     ])
+  })
+
+  it("shows when the playlist was chosen and when the tracks begin in Québec time, whatever the browser's time zone", async () => {
+    // Loaded again in Tokyo's time zone, since formatters keep the one they're created in, where B begins at 12:30 the
+    // next day.
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.resetModules()
+    try {
+      const { Rotation: TokyoRotation } = await import('./rotation')
+      const lateEvening = Date.parse('2026-10-01T23:30:00-04:00')
+      mockFetch({ '/api/admin/radio': CURRENT, '/api/radio?upcoming=0': onAir('b', lateEvening) })
+      render(<TokyoRotation />)
+
+      await waitFor(() => expect(screen.getByText('en cours')).toBeInTheDocument())
+      expect(screen.getByText(/^Choisie par/)).toHaveTextContent('Choisie par someone@example.com le 30 septembre 2026 à 08 h 00.')
+      expect(rows().slice(0, 3)).toEqual(['23 h 30B · 2026-09-13en cours', 'vendredi 2 octobre', '00 h 35C · 2026-09-13'])
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('lists 10 tracks at first, and 25 more each time more are asked for', async () => {

@@ -72,6 +72,20 @@ describe("sessions' and sets' days and times", () => {
   })
 })
 
+describe('dates and times', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it("are in Québec time, whatever the browser's time zone", async () => {
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.resetModules()
+    const { byWhom, dateFormat } = await import('./describe')
+    expect(dateFormat.format(new Date('2026-10-05T23:30:00-04:00'))).toBe('5 octobre 2026')
+    expect(byWhom('Modifiée', 'admin@example.com', '2026-10-05T23:30:00-04:00')).toBe('Modifiée par admin@example.com le 5 octobre 2026 à 23 h 30.')
+  })
+})
+
 describe('names and times of sessions and sets', () => {
   const session = { start: null, end: null, durationMinutes: 150, name: '', takeover: null }
 

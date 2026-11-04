@@ -31,6 +31,9 @@ The admin pages show "-" in place of what an admin left out of an artist's or a 
 [Profiles](../../server/artists.md#profiles) and [Profiles](../../server/collectives.md#profiles)), or only the city or
 the country, when the other one is, and in place of a collective's genres when its artists have none.
 
+The admin pages show dates and times in Québec time, whatever the browser's time zone, since that's where Parking Radio
+is (see [Times, in Conventions](../../server/README.md#conventions)), and take them in Québec time too.
+
 ## Searching lists
 
 The lists of artists and collectives, of applications and of sessions (see [Artistes](artistes.md),

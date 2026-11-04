@@ -246,7 +246,7 @@ async function firstApplication(server: Server, query: string): Promise<string> 
 // Adds an application for the artist or the collective, as an admin would, with its status.
 async function addApplication(server: Server, owner: { artistId: string } | { collectiveId: string }, application: SeedApplication): Promise<void> {
   const body: NewApplication = { ...applicationFields(application), ...owner }
-  if (application.receivedDaysAgo !== undefined) body.receivedAt = new Date(Date.now() - application.receivedDaysAgo * DAY_MS).toISOString()
+  if (application.receivedDaysAgo !== undefined) body.receivedAt = quebecDateTime(new Date(Date.now() - application.receivedDaysAgo * DAY_MS))
   const { id } = (await server.call<ApplicationResponse>('POST', '/api/admin/applications', body)).application
   await setStatus(server, id, application.status)
 }

@@ -168,7 +168,7 @@ expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"upda
 
 echo "  a takeover has to be a collective that exists, and nothing is saved otherwise"
 for takeover in "$NOBODY" not-a-uuid "$ana"; do
-    json POST "$SESSIONS" "$(session_json '"2027-01-01T21:00Z"' 60 "\"takeover\":\"${takeover}\"")"
+    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"takeover\":\"${takeover}\"")"
     expect_status 400
     expect_body_contains '"error":"No such collective"'
 done
@@ -176,12 +176,12 @@ json GET "$SESSIONS"
 [ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected only the first session"; }
 
 echo "  sessions can't overlap, when they're added or changed, but one can start when another ends, and the 409 names the other"
-json POST "$SESSIONS" "$(session_json '"2026-11-15T05:00Z"' 60)"
+json POST "$SESSIONS" "$(session_json '"2026-11-15T00:00-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
-json POST "$SESSIONS" "$(session_json '"2026-11-15T06:00Z"' 60)"
+json POST "$SESSIONS" "$(session_json '"2026-11-15T01:00-05:00"' 60)"
 expect_status 200
 next="$(first_id)"
-json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T05:30Z"' 60)"
+json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${next}"
 expect_body_contains '"start":"2026-11-15T01:00:00-05:00","end":"2026-11-15T02:00:00-05:00"'
@@ -347,7 +347,7 @@ done
 echo "  a session can't be un-cancelled when it would overlap another one"
 json PUT "${SESSIONS}/${next}/status" '{"status":"cancelled"}'
 expect_status 200
-json POST "$SESSIONS" "$(session_json '"2026-11-15T06:30Z"' 60)"
+json POST "$SESSIONS" "$(session_json '"2026-11-15T01:30-05:00"' 60)"
 expect_status 200
 replacement="$(first_id)"
 json PUT "${SESSIONS}/${next}/status" '{"status":"planned"}'
@@ -389,22 +389,34 @@ done
 json GET "${SESSIONS}?from=${week[0]}&to=${week[1]}"
 expect_body_contains '"total":2,"sessions":['
 [ "$(session_ids)" = "${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the sessions of the week"; }
-json GET "${SESSIONS}?from=2026-10-26T04:00Z&to=2026-11-02T05:00Z"
-[ "$(session_ids)" = "${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the same sessions, from the same instants"; }
-json GET "${SESSIONS}?from=2026-10-26T00:00-05:00&to=2026-11-02T00:01-05:00"
+json GET "${SESSIONS}?from=2026-10-26T01:00-04:00&to=2026-11-02T00:01-05:00"
 [ "$(session_ids)" = "${dated[2]} ${dated[1]} " ] || { _show_body; fail "expected the sessions from an hour later"; }
 json GET "${SESSIONS}?to=2026-11-14T21:00-05:00"
 [ "$(session_ids)" = "${dated[2]} ${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the sessions before the first one"; }
-json GET "${SESSIONS}?from=2026-11-15T03:00%2B01:00"
+json GET "${SESSIONS}?from=2026-11-14T21:00-05:00"
 expect_body_contains '"total":3,"sessions":['
 [ "$(session_ids)" = "${replacement} ${next} ${first} " ] || { _show_body; fail "expected the sessions from the first one on"; }
 json GET "${SESSIONS}?takeover=${ondes}&from=2026-11-01T00:00-04:00"
 [ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected Les Ondes' takeovers with a start"; }
-json GET "${SESSIONS}?artist=${brume}&to=2026-11-15T06:00Z"
+json GET "${SESSIONS}?artist=${brume}&to=2026-11-15T01:00-05:00"
 [ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected the sessions where Brume played, before the next one"; }
-for query in "from=${week[1]}&to=${week[0]}" "from=${week[0]}&to=${week[0]}" from= from=2026-10-26 from=2026-11-15T03:00+01:00 to=1999-12-31T23:59Z; do
+for query in "from=${week[1]}&to=${week[0]}" "from=${week[0]}&to=${week[0]}" from= from=2026-10-26 to=1999-12-31T18:59-05:00; do
     json GET "${SESSIONS}?${query}"
     expect_status 400
+done
+
+echo "  instants are sent in Québec time, with Québec's offset then"
+# Midnight on Monday, October 26 is -04:00, and the same instant in UTC, or with -05:00, is another instant, refused all
+# the same. So is 2:30 on March 14, 2027, which the clocks skip.
+for query in from=2026-10-26T04:00Z from=2026-10-26T05:00%2B01:00 from=2026-10-26T00:00-05:00 to=2027-03-14T02:30-05:00; do
+    json GET "${SESSIONS}?${query}"
+    expect_status 400
+    expect_body_contains 'must be a single date and time in Québec time, with the offset from UTC in effect then (-05:00, or -04:00 from the second Sunday of March at 2:00 to the first Sunday of November at 2:00)'
+done
+for start in '"2026-11-14T21:00Z"' '"2026-11-14T21:00-04:00"' '"2027-03-14T02:30-04:00"'; do
+    json POST "$SESSIONS" "$(session_json "$start" 60)"
+    expect_status 400
+    expect_body_contains '"error":"The start must be a date and time in Québec time, with the offset from UTC in effect then'
 done
 for session in "${dated[@]}"; do
     json DELETE "${SESSIONS}/${session}"
@@ -455,7 +467,7 @@ echo "  two overlapping sessions sent at the same time wait for each other, and 
 # could insert into the exclusion constraint's index, then wait for each other, which Postgres would end as a deadlock:
 # a 500 rather than a 409.
 hold_sessions_lock ""
-for start in 2027-02-01T21:00Z 2027-02-01T21:30Z; do
+for start in 2027-02-01T16:00-05:00 2027-02-01T16:30-05:00; do
     send_in_background POST "$SESSIONS" "$(session_json "\"${start}\"" 60)" "$start"
 done
 wait_for_sessions_lock 2
@@ -463,7 +475,7 @@ release_sessions_lock
 wait
 statuses="$(for file in "${FILES}"/status-*; do cat "$file"; echo; done | sort | tr '\n' ' ')"
 [ "$statuses" = "200 409 " ] || fail "expected one session to be added and the other refused, got: ${statuses}"
-for start in 2027-02-01T21:00Z 2027-02-01T21:30Z; do
+for start in 2027-02-01T16:00-05:00 2027-02-01T16:30-05:00; do
     STATUS="$(cat "${FILES}/status-${start}")"
     BODY="$(cat "${FILES}/body-${start}")"
     if [ "$STATUS" = 200 ]; then added="$(first_id)"; else refused="$BODY"; fi
@@ -514,7 +526,7 @@ expect_body_contains '"durationMinutes":150'
 echo "  deleting a session and deleting an artist who played two of its sets wait for each other"
 # Each one deletes the artist's rows in set_performers, in an order of its own, so they would deadlock if they didn't
 # both take the sessions' lock first.
-json POST "$SESSIONS" "$(session_json '"2027-03-01T21:00Z"' 120)"
+json POST "$SESSIONS" "$(session_json '"2027-03-01T16:00-05:00"' 120)"
 doomed="$(first_id)"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Passager"}' "$ARTISTS"
 passenger="$(first_id)"
@@ -535,7 +547,7 @@ echo "  changing a session while its takeover's collective is deleted doesn't de
 request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Passage\",\"members\":[{\"id\":\"${ana}\"}],\"email\":\"passage@sessions.test\"}" "$COLLECTIVES"
 expect_status 200
 passage="$(first_id)"
-json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T06:00Z"' 60 "\"takeover\":\"${passage}\"")"
+json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"takeover\":\"${passage}\"")"
 expect_status 200
 # Another transaction holds the collective's row while the collective is deleted, which clears the session's takeover,
 # and so takes the sessions' lock first, like changing the session, which then waits for it. Had deleting the collective
@@ -543,7 +555,7 @@ expect_status 200
 hold_row collectives "$passage"
 delete_in_background "${COLLECTIVES}/${passage}" delete
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"collectives\"%')"
-send_in_background PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T06:00Z"' 60 "\"takeover\":\"${passage}\"")"
+send_in_background PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"takeover\":\"${passage}\"")"
 wait_for_sessions_lock
 release_row
 wait_for_background

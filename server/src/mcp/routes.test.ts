@@ -370,10 +370,10 @@ describe('the MCP server', () => {
 
     it("send their routes the request their arguments make, as the connection's user, and give back the answer", async () => {
       const app = await buildApp()
-      // A query argument arrives as it was given, e.g. with the `+` of an offset, which a query string has to encode.
-      const { body, isError } = await call(app, 'get_thing', { id: 'x', also: 'T21:00+01:00 & more' })
+      // A query argument arrives as it was given, e.g. with a `+` or a `&`, which a query string has to encode.
+      const { body, isError } = await call(app, 'get_thing', { id: 'x', also: 'a+b & more' })
       expect(isError).toBeUndefined()
-      expect(body).toEqual({ ok: true, id: 'x', also: 'T21:00+01:00 & more', by: USER.email, text: 'a b' })
+      expect(body).toEqual({ ok: true, id: 'x', also: 'a+b & more', by: USER.email, text: 'a b' })
     })
 
     it('give JSON without spaces, and escape the line and paragraph separators', async () => {

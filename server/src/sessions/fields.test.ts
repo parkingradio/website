@@ -33,7 +33,8 @@ function error(schema: typeof SessionFields | typeof SetFields, sent: unknown) {
   return result.success ? null : result.error.issues[0].message
 }
 
-const START = 'The start must be a date and time with its offset from UTC, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
+const START =
+  'The start must be a date and time in Québec time, with the offset from UTC in effect then (-05:00, or -04:00 from the second Sunday of March at 2:00 to the first Sunday of November at 2:00), except a time the clocks skip in spring, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
 
 describe('SessionFields', () => {
   const parse = (changes: Record<string, unknown> = {}) => SessionFields.parse(sessionFields(changes))
@@ -54,16 +55,42 @@ describe('SessionFields', () => {
     expect(parse({ start: ' ' }).start).toBeNull()
   })
 
-  it('takes a start with its offset from UTC, with or without seconds, in the past too', () => {
-    expect(parse({ start: '2026-11-15T02:00:30.5Z' }).start).toEqual(new Date('2026-11-15T02:00:30.500Z'))
-    // The night the clocks go back an hour, 01:30 happens twice, told apart by its offset.
+  it("takes a start with Québec's offset then, with or without seconds, in the past too", () => {
+    expect(parse({ start: '2026-11-14T21:00:30.5-05:00' }).start).toEqual(new Date('2026-11-15T02:00:30.500Z'))
+    expect(parse({ start: '2026-07-01T21:00-04:00' }).start).toEqual(new Date('2026-07-02T01:00:00Z'))
+    expect(parse({ start: '2000-01-01T00:00-05:00' }).start).toEqual(new Date('2000-01-01T05:00:00Z'))
+    // Before 2007, the clocks went forward on the first Sunday of April.
+    expect(parse({ start: '2006-03-20T21:00-05:00' }).start).toEqual(new Date('2006-03-21T02:00:00Z'))
+  })
+
+  it('takes either offset the night the clocks go back, when the hour before 2:00 happens twice', () => {
+    expect(parse({ start: '2026-11-01T00:59:59.999-04:00' }).start).toEqual(new Date('2026-11-01T04:59:59.999Z'))
     expect(parse({ start: '2026-11-01T01:30-04:00' }).start).toEqual(new Date('2026-11-01T05:30:00Z'))
+    expect(parse({ start: '2026-11-01T01:59:59.999-04:00' }).start).toEqual(new Date('2026-11-01T05:59:59.999Z'))
+    expect(parse({ start: '2026-11-01T01:00-05:00' }).start).toEqual(new Date('2026-11-01T06:00:00Z'))
     expect(parse({ start: '2026-11-01T01:30-05:00' }).start).toEqual(new Date('2026-11-01T06:30:00Z'))
-    expect(parse({ start: '2000-01-01T00:00Z' }).start).toEqual(new Date('2000-01-01T00:00:00Z'))
+    expect(parse({ start: '2026-11-01T02:00-05:00' }).start).toEqual(new Date('2026-11-01T07:00:00Z'))
+    for (const start of ['2026-11-01T00:59:59.999-05:00', '2026-11-01T02:00-04:00', '2026-11-01T02:00:00.001-04:00']) {
+      expect(sessionError(sessionFields({ start })), start).toBe(START)
+    }
+  })
+
+  it('refuses a start the night the clocks go forward between 2:00 and 3:00, which never happens', () => {
+    expect(parse({ start: '2027-03-14T01:59:59.999-05:00' }).start).toEqual(new Date('2027-03-14T06:59:59.999Z'))
+    expect(parse({ start: '2027-03-14T03:00-04:00' }).start).toEqual(new Date('2027-03-14T07:00:00Z'))
+    for (const start of ['2027-03-14T02:00-05:00', '2027-03-14T02:00-04:00', '2027-03-14T02:30-05:00', '2027-03-14T02:30-04:00', '2027-03-14T03:00-05:00', '2027-03-14T01:59-04:00']) {
+      expect(sessionError(sessionFields({ start })), start).toBe(START)
+    }
+  })
+
+  it("refuses a start with another offset than Québec's then", () => {
+    for (const start of ['2026-11-15T02:00Z', '2026-11-15T02:00+00:00', '2026-11-15T02:00-00:00', '2026-11-15T03:00+01:00', '2026-11-14T22:00-04:00', '2026-07-01T20:00-05:00']) {
+      expect(sessionError(sessionFields({ start })), start).toBe(START)
+    }
   })
 
   it('refuses a start that is not a date and time with an offset, or that is out of range, or left out', () => {
-    for (const start of ['2026-11-14T21:00', '2026-11-14', '2026-02-30T21:00Z', '2026-11-14T24:00Z', 1789437600000, '1999-12-31T23:59:59Z', undefined]) {
+    for (const start of ['2026-11-14T21:00', '2026-11-14', '2026-02-30T21:00-05:00', '2026-11-14T24:00-05:00', 1789437600000, '1999-12-31T18:59:59-05:00', undefined]) {
       expect(sessionError(sessionFields({ start })), String(start)).toBe(START)
     }
     // That's the year 3000 in UTC, whose dates and times couldn't be written as a response's.

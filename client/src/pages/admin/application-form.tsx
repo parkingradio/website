@@ -14,6 +14,7 @@ import type { Checked } from '../../checks'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxOption } from '../../combobox'
+import { quebecDateTime, quebecDayAndTime, quebecInstant } from '../../quebec-time'
 import { leaving, useCheckedForm } from './checked-form'
 import { KIND_LABELS, artistOption, collectiveOption, entryPath } from './describe'
 import type { Owner } from './describe'
@@ -58,25 +59,18 @@ function ownerOptions(artists: Artist[], collectives: Collective[]): (ComboboxOp
     .sort((a, b) => compareText(a.label, b.label))
 }
 
-// The day of `instant` (ISO 8601), as "YYYY-MM-DD", in the browser's time zone, where the admin pages show dates.
-function localDay(instant: string): string {
-  const date = new Date(instant)
-  const pad = (part: number, length: number) => String(part).padStart(length, '0')
-  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1, 2)}-${pad(date.getDate(), 2)}`
-}
-
-// When an application was received, to send, from the day picked: the start of that day in the browser's time zone, or
-// nothing if it's still `initialDay`, so that the time it was received at is kept. Returns what's wrong with the day
-// instead, if anything.
+// When an application was received, to send, from the day picked, in Québec time: its midnight there, with Québec's
+// offset then, or nothing if it's still `initialDay`, so that the time it was received at is kept. Returns what's wrong
+// with the day instead, if anything.
 function checkReceivedDay(day: string, initialDay: string): Checked<string | undefined> {
   if (day === initialDay) return { value: undefined }
   // Only a new application can be left without a day, as received now.
   if (!day) return { error: 'Choisissez le jour où la candidature a été reçue.' }
   // Browsers let years have more than 4 digits, which aren't dates the server takes.
-  if (!isDay(day)) return { error: 'La date de réception est invalide.' }
-  const receivedAt = new Date(`${day}T00:00`)
+  const receivedAt = isDay(day) ? quebecInstant(day, '00:00') : null
+  if (!receivedAt) return { error: 'La date de réception est invalide.' }
   const error = checkReceivedAt(receivedAt)
-  return error === null ? { value: receivedAt.toISOString() } : { error }
+  return error === null ? { value: quebecDateTime(receivedAt) } : { error }
 }
 
 export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSubmit, onCancel }: ApplicationFormProps) {
@@ -85,8 +79,8 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
   // An artist or a collective that isn't one of those listed, e.g. from an outdated link, isn't picked.
   const [ownerPicked, setOwnerPicked] = useState(owners?.initial ? entryPath(owners.initial.kind, owners.initial.id) : null)
   const owner = options.find((option) => option.key === ownerPicked)?.owner
-  // The day the application was received, as "YYYY-MM-DD", or empty for a new one, which was received now.
-  const initialDay = application.receivedAt ? localDay(application.receivedAt) : ''
+  // The day the application was received, in Québec time, as "YYYY-MM-DD", or empty for a new one, which was received now.
+  const initialDay = application.receivedAt ? quebecDayAndTime(new Date(application.receivedAt)).day : ''
   const [receivedDay, setReceivedDay] = useState(initialDay)
   // Days as "YYYY-MM-DD", or empty for a field that's not filled yet.
   const [dates, setDates] = useState(application.dates.length > 0 ? application.dates : [''])

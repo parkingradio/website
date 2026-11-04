@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EARLIEST_INSTANT, TIME_OF_DAY, dateTimeWith, dayWith } from '../api/formats.js'
+import { DATE_TIME_DESCRIPTION, EARLIEST_INSTANT, TIME_OF_DAY, dateTimeWith, dayWith } from '../api/formats.js'
 import { line, text } from '../artists/profile.js'
 
 // An application's fields: the lists and rules every application has to follow (see
@@ -80,12 +80,16 @@ export const ApplicationFields = z
   .meta({ id: 'ApplicationFields' })
 export type ApplicationFields = z.output<typeof ApplicationFields>
 
-const BAD_RECEIVED_AT = 'La date de réception est invalide.'
+// The rule of `QUEBEC_TIME_RULE` in api/formats.ts, in French, like the application's other errors.
+const BAD_RECEIVED_AT =
+  'La date de réception doit être une date et une heure du Québec, avec le décalage horaire en vigueur alors (-05:00, ou ' +
+  '-04:00 du deuxième dimanche de mars à 2 h au premier dimanche de novembre à 2 h), sauf une heure sautée au passage à ' +
+  "l'heure avancée, par exemple 2026-11-14T21:00-05:00."
 
-// When an admin says an artist sent an application: a date and time with its offset from UTC (see
-// `dateTimeWith` in api/formats.ts), from the year 2000, in UTC, like every instant requests send, that isn't in the
-// future, as a Date.
+// When an admin says an artist sent an application: a date and time in Québec time, with the offset from UTC in effect
+// then (see `dateTimeWith` in api/formats.ts), from the year 2000, in UTC, like every instant requests send, that isn't
+// in the future, as a Date.
 export const ReceivedAt = dateTimeWith(BAD_RECEIVED_AT)
   .refine((receivedAt) => receivedAt.getTime() >= EARLIEST_INSTANT, "La date de réception doit être en l'an 2000 ou après.")
   .refine((receivedAt) => receivedAt.getTime() <= Date.now(), 'La date de réception ne peut pas être dans le futur.')
-  .meta({ description: 'A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future' })
+  .meta({ description: `${DATE_TIME_DESCRIPTION}. From the year 2000, in UTC, and not in the future` })

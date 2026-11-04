@@ -3,6 +3,11 @@ import { ReceivedAt } from './fields.js'
 import type { ApplicationFields } from './fields.js'
 import { validateApplication } from './store.js'
 
+const BAD_RECEIVED_AT =
+  'La date de réception doit être une date et une heure du Québec, avec le décalage horaire en vigueur alors (-05:00, ou ' +
+  '-04:00 du deuxième dimanche de mars à 2 h au premier dimanche de novembre à 2 h), sauf une heure sautée au passage à ' +
+  "l'heure avancée, par exemple 2026-11-14T21:00-05:00."
+
 // The rules in applications/fields.ts, which every application has to follow. The server answers with the first error.
 
 function fields(changes: Partial<Record<keyof ApplicationFields, unknown>> = {}) {
@@ -136,13 +141,17 @@ describe('ReceivedAt', () => {
     vi.useRealTimers()
   })
 
-  it('takes a date and time with its offset from UTC, from the year 2000, in UTC, up to now', () => {
-    expect(check('2000-01-01T00:00Z')).toEqual({ value: new Date('2000-01-01T00:00:00Z') })
+  it("takes a date and time with Québec's offset then, from the year 2000, in UTC, up to now", () => {
     expect(check('1999-12-31T19:00-05:00')).toEqual({ value: new Date('2000-01-01T00:00:00Z') })
     expect(check('2026-03-28T10:03-04:00')).toEqual({ value: new Date('2026-03-28T14:03:00Z') })
-    expect(check('2026-03-28T14:03:07.123Z')).toEqual({ value: new Date('2026-03-28T14:03:07.123Z') })
-    expect(check('2026-10-14T18:00:00Z')).toEqual({ value: now })
-    expect(check('2026-10-14T19:00:00+01:00')).toEqual({ value: now })
+    expect(check('2026-03-28T10:03:07.123-04:00')).toEqual({ value: new Date('2026-03-28T14:03:07.123Z') })
+    expect(check('2026-03-08T00:00-05:00')).toEqual({ value: new Date('2026-03-08T05:00:00Z') })
+    expect(check('2026-10-14T14:00:00-04:00')).toEqual({ value: now })
+  })
+
+  it('takes either offset the night the clocks go back, when the hour before 2:00 happens twice', () => {
+    expect(check('2025-11-02T01:30-04:00')).toEqual({ value: new Date('2025-11-02T05:30:00Z') })
+    expect(check('2025-11-02T01:30-05:00')).toEqual({ value: new Date('2025-11-02T06:30:00Z') })
   })
 
   it('takes nothing as nothing', () => {
@@ -150,19 +159,41 @@ describe('ReceivedAt', () => {
   })
 
   it('refuses a date and time before the year 2000, in UTC', () => {
-    for (const sent of ['1999-12-31T23:59:59.999Z', '2000-01-01T00:59+01:00', '0001-01-01T00:00+04:00', '0000-06-01T00:00Z']) {
+    for (const sent of ['1999-12-31T18:59:59.999-05:00', '1999-07-01T12:00-04:00', '1900-01-01T00:00-05:00']) {
       expect(check(sent)).toEqual({ error: "La date de réception doit être en l'an 2000 ou après." })
     }
   })
 
   it('refuses a date and time in the future', () => {
-    for (const sent of ['2026-10-14T18:00:00.001Z', '2026-10-14T14:01:00-04:00', '2027-01-01T00:00:00Z']) {
+    for (const sent of ['2026-10-14T14:00:00.001-04:00', '2026-10-14T14:01-04:00', '2027-01-01T00:00:00-05:00']) {
       expect(check(sent)).toEqual({ error: 'La date de réception ne peut pas être dans le futur.' })
     }
   })
 
-  it('refuses anything but a date and time that exist, with their offset from UTC', () => {
-    const invalid = ['2026-03-28', '2026-03-28T10:03', '2026-03-28 10:03Z', '2026-02-29T10:03Z', '2026-03-28T24:00Z', '2026-03-28T10:60Z', '2026-03-28T10:03+24:00', '', null, 1774706580000]
-    for (const sent of invalid) expect(check(sent)).toEqual({ error: 'La date de réception est invalide.' })
+  it("refuses anything but a date and time that exist in Québec, with Québec's offset then", () => {
+    const invalid = [
+      '2026-03-28',
+      '2026-03-28T10:03',
+      '2026-03-28 10:03-04:00',
+      '2026-02-29T10:03-05:00',
+      '2026-03-28T24:00-04:00',
+      '2026-03-28T10:60-04:00',
+      '2026-03-28T10:03+24:00',
+      // Other offsets than Québec's then.
+      '2026-03-28T14:03Z',
+      '2026-03-28T14:03+00:00',
+      '2026-03-28T14:03-00:00',
+      '2026-03-28T15:03+01:00',
+      '2026-03-28T09:03-05:00',
+      // Clocks skip from 2:00 to 3:00 that night.
+      '2026-03-08T02:30-05:00',
+      '2026-03-08T02:30-04:00',
+      // Québec's offset wasn't whole minutes before 1895.
+      '0001-01-01T00:00-05:00',
+      '',
+      null,
+      1774706580000,
+    ]
+    for (const sent of invalid) expect(check(sent), String(sent)).toEqual({ error: BAD_RECEIVED_AT })
   })
 })

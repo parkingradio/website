@@ -36,12 +36,13 @@ and when, if anyone did. From top to bottom, it then shows:
 
 "nouvelle candidature" creates an application by hand, at `/admin/candidatures/nouvelle`, e.g. to bring in one that came
 through the original Google Form: a form with the artist or the collective, picked in a single field from those in the
-"Artistes" section, where collectives say so, the day the application was received (today if it's left empty), then the
-application itself. An artist's page leads to it with that artist picked already (`?artist=<id>`), and a collective's
-page with that collective (`?collective=<id>`). Either is ignored when it isn't a known artist or collective. The
-application form says what's wrong with each field once it's left, like the artist form (see [Artistes](artistes.md)):
-it checks the application as the server does (see [Applications](../../server/applications.md)), for immediate feedback.
-The server's check is the one that counts: if it refuses what the form accepted, the form shows the server's message.
+"Artistes" section, where collectives say so, the day the application was received (today if it's left empty), sent as
+its midnight in Québec time, then the application itself. An artist's page leads to it with that artist picked already
+(`?artist=<id>`), and a collective's page with that collective (`?collective=<id>`). Either is ignored when it isn't a
+known artist or collective. The application form says what's wrong with each field once it's left, like the artist form
+(see [Artistes](artistes.md)): it checks the application as the server does (see
+[Applications](../../server/applications.md)), for immediate feedback. The server's check is the one that counts: if it
+refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints
 

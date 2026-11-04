@@ -183,8 +183,9 @@ export function collectiveEntry(collective: Collective, artists: Map<string, Art
   return { ...collective, kind: 'collective', genres, searchFields: collectiveSearchFields(collective, genres ?? []) }
 }
 
-export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long' })
-export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short' })
+// Instants, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md).
+export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeZone: QUEBEC_TIME_ZONE })
+export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: QUEBEC_TIME_ZONE })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to be the same day wherever this
 // runs. The lists' search relies on the day, the month written out and the year being next to each other, in that
 // order (see search in list.ts).

@@ -1,6 +1,6 @@
-// Times in Québec, where the studio is, whatever the time zone of the browser: the admin pages show and take the times
-// of sessions and sets in Québec time (see docs/design/client/admin/sessions.md). It imports nothing, so that the seed
-// (e2e/seed.ts) can use it too.
+// Times in Québec, where the studio is, whatever the time zone of the browser: the admin pages show and take every date
+// and time in Québec time (see docs/design/client/admin/layout.md), e.g. those of sessions and sets (see
+// docs/design/client/admin/sessions.md). It imports nothing, so that the seed (e2e/seed.ts) can use it too.
 
 export const QUEBEC_TIME_ZONE = 'America/Toronto'
 const MINUTE_MS = 60 * 1000

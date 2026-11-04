@@ -2287,7 +2287,7 @@ export interface components {
             statusUpdatedAt: string | null;
         };
         SessionFields: {
-            /** @description A date and time with its offset from UTC, which can be left without seconds, from 2000 to 2999 in UTC. Null, or blank, for none */
+            /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
             start: string | null;
             durationMinutes: number;
             /** @description The id of the collective whose takeover the session is. Null, or blank, for none */
@@ -3550,10 +3550,7 @@ export interface operations {
                     otherPerformanceType: string;
                     /** @description Trimmed, then up to 2000 characters */
                     details: string;
-                    /**
-                     * Format: date-time
-                     * @description A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future
-                     */
+                    /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then. From the year 2000, in UTC, and not in the future */
                     receivedAt?: string;
                     /** @description The artist who applies. Not with `collectiveId` */
                     artistId?: string;
@@ -3736,10 +3733,7 @@ export interface operations {
                     otherPerformanceType: string;
                     /** @description Trimmed, then up to 2000 characters */
                     details: string;
-                    /**
-                     * Format: date-time
-                     * @description A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future
-                     */
+                    /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then. From the year 2000, in UTC, and not in the future */
                     receivedAt?: string;
                 };
             };
@@ -3956,9 +3950,9 @@ export interface operations {
                 artist?: string;
                 /** @description Only this collective's takeovers. Not with `artist` */
                 takeover?: string;
-                /** @description Only the sessions that start at or after this date and time, with its offset from UTC, e.g. "2026-11-09T00:00-05:00". Leaves out those without a start */
+                /** @description Only the sessions that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-09T00:00-05:00". Leaves out those without a start */
                 from?: string;
-                /** @description Only the sessions that start before this date and time, with its offset from UTC, e.g. "2026-11-16T00:00-05:00". Leaves out those without a start */
+                /** @description Only the sessions that start before this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-16T00:00-05:00". Leaves out those without a start */
                 to?: string;
             };
             header?: never;

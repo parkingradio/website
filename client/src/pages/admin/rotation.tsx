@@ -5,13 +5,15 @@ import { api } from '../../api/client'
 import type { Data, Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
+import { QUEBEC_TIME_ZONE } from '../../quebec-time'
+import { dateTimeFormat } from './describe'
 
 type RadioPlaylist = Schema<'RadioPlaylist'>
 type RadioPlaylistTrack = Schema<'RadioPlaylistTrack'>
 
-const chosenAtFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short' })
-const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit' })
-const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })
+// When the tracks begin, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md).
+const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit', timeZone: QUEBEC_TIME_ZONE })
+const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', timeZone: QUEBEC_TIME_ZONE })
 
 // Why a track is left out of the rotation, as SoundCloud says.
 const LEFT_OUT_REASONS: Record<Schema<'LeftOutTrack'>['reason'] | 'unexpected', string> = {
@@ -74,7 +76,7 @@ function OnAir({ settings, radio }: { settings: Loaded<Data<'get', '/api/admin/r
     <>
       <PlaylistHeader url={url} title={title} playlist={playlist} />
       <p className="admin-meta">
-        Choisie par {chosenBy} le {chosenAtFormat.format(new Date(chosenAt))}.
+        Choisie par {chosenBy} le {dateTimeFormat.format(new Date(chosenAt))}.
       </p>
       {error && (
         <p className="admin-error" role="alert">

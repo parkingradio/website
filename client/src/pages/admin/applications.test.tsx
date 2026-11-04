@@ -596,8 +596,41 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    // In the browser's time zone, like the admin pages show dates.
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe(new Date('2026-03-28T00:00').toISOString())
+    // Its midnight in Québec time, like the admin pages show dates, with Québec's offset then.
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-03-28T00:00-04:00')
+  })
+
+  it("shows and sends the day the application was received in Québec time, whatever the browser's time zone", async () => {
+    // Loaded again in Tokyo's time zone, since formatters keep the one they're created in, where the application was
+    // received on October 6, and created on October 7.
+    const application = { ...APPLICATION, receivedAt: '2026-10-05T23:30:00-04:00', createdAt: '2026-10-06T16:00:00-04:00' }
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.resetModules()
+    try {
+      const { default: TokyoApp } = await import('../../app')
+      const { MemoryRouter: TokyoRouter } = await import('react-router')
+      mockFetch({
+        ...PAGE,
+        '/api/admin/applications/application-1': { ok: true, application },
+        'PUT /api/admin/applications/application-1': { ok: true, application },
+      })
+      render(
+        <TokyoRouter initialEntries={['/admin/candidatures/application-1']} useTransitions={false}>
+          <TokyoApp />
+        </TokyoRouter>,
+      )
+
+      expect(await screen.findByText(/^Reçue le/)).toHaveTextContent('Reçue le 5 octobre 2026.')
+      fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+      expect(screen.getByLabelText('Reçue le')).toHaveValue('2026-10-05')
+      fireEvent.change(screen.getByLabelText('Reçue le'), { target: { value: '2026-01-15' } })
+      fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+      await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
+      expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-01-15T00:00-05:00')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('needs a day when the application was received, which is not in the future', async () => {
@@ -879,7 +912,7 @@ describe('Creating an application', () => {
     await waitFor(() => expect(requestsTo('POST', '/api/admin/applications')).toHaveLength(1))
     expect(jsonBody(requestsTo('POST', '/api/admin/applications')[0])).toMatchObject({
       artistId: 'artist-1',
-      receivedAt: new Date('2026-03-28T00:00').toISOString(),
+      receivedAt: '2026-03-28T00:00-04:00',
     })
   })
 

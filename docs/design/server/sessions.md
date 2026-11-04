@@ -68,12 +68,15 @@ A set, as the endpoints below return it, also has:
 ## Times
 
 A session has a start, which can be null, and a duration, which can't. A session without a start is one whose date
-isn't known yet, e.g. a collective's artists grouped into a takeover while it's being planned. Requests send `start` as
-an instant, with its offset from UTC, e.g. `"2026-11-14T21:00-05:00"`, or as null, or a blank string, for none.
-Responses give it, and the `start` and `end` the server works out, in Québec time, to the second, with the offset in
-effect then, e.g. `"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from
-the year 2000 to the year 2999, in UTC, and can be in the past or in the future. The `start` and `end` of the events
-that [`GET /api/events`](events.md#get-apievents) gives, which sessions link to (see [Links](#links)), are local times
+isn't known yet, e.g. a collective's artists grouped into a takeover while it's being planned. Requests send `start` in
+Québec time, with or without seconds, with the offset from UTC in effect then, e.g. `"2026-11-14T21:00-05:00"`, or
+`"2026-07-01T21:00-04:00"` in summer, or as null, or a blank string, for none. Any other offset is refused, e.g.
+`"2026-11-14T21:00-04:00"`, and so is a time the clocks skip, e.g. 2:30 on March 14, 2027. A time they show twice, e.g.
+1:30 on November 1, 2026, takes the offset of the one it is: -04:00 for the first, -05:00 for the second. Responses give
+it, and the `start` and `end` the server works out, in Québec time, to the second, with the offset in effect then, e.g.
+`"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from the year 2000 to the
+year 2999, in UTC, and can be in the past or in the future. The `start` and `end` of the events that
+[`GET /api/events`](events.md#get-apievents) gives, which sessions link to (see [Links](#links)), are local times
 instead, without an offset, as RA gives them.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
@@ -205,7 +208,8 @@ Every query parameter can be left out, and the list only has the sessions that m
 | `sessions` | list of sessions | Whatever their status. The sessions without a start come first, the most recently added first, then the others, the most recent first (by `start`, then `createdAt`) |
 
 Fails with 400 if a query parameter is given more than once, if both `artist` and `takeover` are given, if `from` or
-`to` is empty or isn't an instant from the year 2000 to 2999, in UTC, or if `from` isn't before `to`.
+`to` is empty or isn't an instant with Québec's offset then (see [Times](#times)), from the year 2000 to 2999, in UTC,
+or if `from` isn't before `to`.
 
 ## `GET /api/admin/sessions/:id` (admin)
 

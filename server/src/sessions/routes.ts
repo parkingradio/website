@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
-import { instantWith } from '../api/formats.js'
+import { IN_QUEBEC_TIME, QUEBEC_TIME_RULE, instantWith } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { BAD_STATUS, Genre, PerformanceType, SessionFields, SetFields, Status } from './fields.js'
@@ -207,9 +207,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
 
   // The bound `name` on the sessions' starts: they start `when` it.
   function bound(name: string, when: string, example: string) {
-    return instantWith(`\`${name}\` must be a single date and time with its offset from UTC, e.g. "${example}", from the year 2000 to 2999`)
+    return instantWith(`\`${name}\` must be a single date and time ${QUEBEC_TIME_RULE}, e.g. "${example}", from the year 2000 to 2999`)
       .optional()
-      .meta({ description: `Only the sessions that start ${when} this date and time, with its offset from UTC, e.g. "${example}". Leaves out those without a start` })
+      .meta({ description: `Only the sessions that start ${when} this date and time, ${IN_QUEBEC_TIME}, e.g. "${example}". Leaves out those without a start` })
   }
 
   api.get(

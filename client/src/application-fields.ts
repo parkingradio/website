@@ -47,8 +47,9 @@ export function isTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 }
 
-// Checks when an admin says an application was received, which the form sends as an ISO 8601 date and time (see
-// `toISOString`), whose format is then the server's: it can't be before the year 2000, in UTC, or later than `now`.
+// Checks when an admin says an application was received, which the form sends in Québec time, with Québec's offset then
+// (see `quebecDateTime`), whose format is then the server's: it can't be before the year 2000, in UTC, or later than
+// `now`.
 export function checkReceivedAt(receivedAt: Date, now = new Date()): string | null {
   if (receivedAt.getUTCFullYear() < 2000) return "La date de réception doit être en l'an 2000 ou après."
   if (receivedAt > now) return 'La date de réception ne peut pas être dans le futur.'

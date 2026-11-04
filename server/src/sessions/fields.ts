@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { instantWith } from '../api/formats.js'
+import { DATE_TIME_DESCRIPTION, QUEBEC_TIME_RULE, instantWith } from '../api/formats.js'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
 import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
@@ -68,7 +68,7 @@ function line(maxLength: number, message: string) {
     .meta({ description: `Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${maxLength} characters. Empty for none` })
 }
 
-const START = 'The start must be a date and time with its offset from UTC, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
+const START = `The start must be a date and time ${QUEBEC_TIME_RULE}, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null`
 const startTime = instantWith(START)
 
 const NAME_MAX_LENGTH = 100
@@ -84,7 +84,7 @@ export const SessionFields = z
           return parsed.success ? parsed.data : null
         },
         START,
-        'A date and time with its offset from UTC, which can be left without seconds, from 2000 to 2999 in UTC',
+        `${DATE_TIME_DESCRIPTION}, from 2000 to 2999 in UTC`,
       ),
       durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES),
       takeover: orNone(lowerCase, "The takeover must be a collective's id, or null", 'The id of the collective whose takeover the session is'),

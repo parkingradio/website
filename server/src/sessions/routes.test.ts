@@ -226,7 +226,7 @@ describe('sessions routes', () => {
         expect(response.statusCode, JSON.stringify(changes)).toBe(400)
       }
     }
-    for (const url of ['/api/admin/sessions?artist=a%00', '/api/admin/sessions?takeover=a%00', '/api/admin/sessions?from=2026-11-09T00:00Z%00', '/api/admin/sessions/session-1%00']) {
+    for (const url of ['/api/admin/sessions?artist=a%00', '/api/admin/sessions?takeover=a%00', '/api/admin/sessions?from=2026-11-09T00:00-05:00%00', '/api/admin/sessions/session-1%00']) {
       expect((await send(app, 'GET', url)).statusCode, url).toBe(400)
     }
     expect((await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'done\0' })).statusCode).toBe(400)
@@ -333,10 +333,12 @@ describe('sessions routes', () => {
       const to = new Date('2026-11-16T05:00:00Z')
       for (const [query, filter] of [
         ['from=2026-11-09T00:00-05:00&to=2026-11-16T00:00:00-05:00', { from, to }],
-        ['from=2026-11-09T05:00Z', { from }],
-        ['to=2026-11-16T06:00%2B01:00', { to }],
+        ['from=2026-11-09T00:00:00.000-05:00', { from }],
+        ['to=2026-11-16T00:00-05:00', { to }],
         ['artist=artist-1&from=2026-11-09T00:00-05:00', { artist: 'artist-1', from }],
-        ['takeover=collective-1&to=2026-11-16T05:00:00.000Z', { takeover: 'collective-1', to }],
+        ['takeover=collective-1&to=2026-11-16T00:00:00-05:00', { takeover: 'collective-1', to }],
+        // The hour before 2:00 happens twice the night the clocks go back, told apart by its offset.
+        ['from=2026-11-01T01:30-04:00&to=2026-11-01T01:30-05:00', { from: new Date('2026-11-01T05:30:00Z'), to: new Date('2026-11-01T06:30:00Z') }],
       ] as const) {
         const response = await send(app, 'GET', `/api/admin/sessions?${query}`)
         expect(response.statusCode, query).toBe(200)
@@ -346,21 +348,28 @@ describe('sessions routes', () => {
 
     it('refuses bounds that are not instants from 2000 to 2999, or given more than once, or `from` not before `to`', async () => {
       const app = await buildApp()
-      const notFrom = '`from` must be a single date and time with its offset from UTC, e.g. "2026-11-09T00:00-05:00", from the year 2000 to 2999'
-      const notTo = '`to` must be a single date and time with its offset from UTC, e.g. "2026-11-16T00:00-05:00", from the year 2000 to 2999'
+      const offsets = '-05:00, or -04:00 from the second Sunday of March at 2:00 to the first Sunday of November at 2:00'
+      const notFrom = `\`from\` must be a single date and time in Québec time, with the offset from UTC in effect then (${offsets}), except a time the clocks skip in spring, e.g. "2026-11-09T00:00-05:00", from the year 2000 to 2999`
+      const notTo = `\`to\` must be a single date and time in Québec time, with the offset from UTC in effect then (${offsets}), except a time the clocks skip in spring, e.g. "2026-11-16T00:00-05:00", from the year 2000 to 2999`
       for (const [query, error] of [
         ['from=next-week', notFrom],
         ['from=2026-11-09', notFrom],
         ['from=2026-11-09T00:00', notFrom],
-        ['from=2026-02-30T00:00Z', notFrom],
+        ['from=2026-02-30T00:00-05:00', notFrom],
         ['from=', notFrom],
-        ['from=1999-12-31T23:59Z', notFrom],
-        ['from=2026-11-09T00:00Z&from=2026-11-10T00:00Z', notFrom],
-        // A `+` that isn't sent as `%2B` is a space.
-        ['to=2026-11-16T06:00+01:00', notTo],
-        ['to=3000-01-01T00:00Z', notTo],
-        ['from=2026-11-09T00:00-05:00&to=2026-11-09T05:00Z', '`from` must be before `to`'],
-        ['from=2026-11-09T00:00-05:00&to=2026-11-09T04:00Z', '`from` must be before `to`'],
+        ['from=1999-12-31T18:59-05:00', notFrom],
+        ['from=2026-11-09T00:00-05:00&from=2026-11-10T00:00-05:00', notFrom],
+        // Other offsets than Québec's then.
+        ['from=2026-11-09T05:00Z', notFrom],
+        ['from=2026-11-09T05:00%2B00:00', notFrom],
+        ['from=2026-11-09T06:00%2B01:00', notFrom],
+        ['from=2026-11-09T01:00-04:00', notFrom],
+        // Clocks skip from 2:00 to 3:00 that night.
+        ['from=2027-03-14T02:30-05:00', notFrom],
+        ['to=2027-03-14T02:30-04:00', notTo],
+        ['to=2999-12-31T19:00-05:00', notTo],
+        ['from=2026-11-09T00:00-05:00&to=2026-11-09T00:00-05:00', '`from` must be before `to`'],
+        ['from=2026-11-01T01:30-05:00&to=2026-11-01T01:30-04:00', '`from` must be before `to`'],
       ]) {
         const response = await send(app, 'GET', `/api/admin/sessions?${query}`)
         expect(response.statusCode, query).toBe(400)
