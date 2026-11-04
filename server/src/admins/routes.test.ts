@@ -8,6 +8,7 @@ import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from './test-sessions.js'
 import { adminRoutes } from './routes.js'
+import { inQuebecTime } from '../api/formats.js'
 
 // The admins, as the store would list them, and what it says inviting does.
 let admins: StoredAdmin[] = []
@@ -102,8 +103,8 @@ describe('admin routes', () => {
       const response = await request(app, 'GET', '/api/admin/admins')
       expect(response.statusCode).toBe(200)
       // When invites expire is only said for admins who are invited.
-      const expires = admins[3].inviteExpiresAt!.toISOString()
-      const createdAt = '2026-10-01T12:00:00.000Z'
+      const expires = inQuebecTime(admins[3].inviteExpiresAt!)
+      const createdAt = '2026-10-01T08:00:00-04:00'
       expect(response.json().admins).toEqual([
         { id: TEST_ADMIN.id, email: TEST_ADMIN.email, status: 'active', inviteExpiresAt: null, invitedBy: null, createdAt, you: true },
         { id: 'other-id', email: 'other@example.com', status: 'active', inviteExpiresAt: null, invitedBy: TEST_ADMIN.email, createdAt, you: false },

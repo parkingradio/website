@@ -474,8 +474,12 @@ describe('soundCloudClient', () => {
         { [HLS_URL]: () => new Response(null, { status: 302, headers: { location: 'https://cdn.test/playlist.m3u8?expires=1' } }) },
       ],
       [
-        'the stream URL expires after the year 9999',
-        { [HLS_URL]: () => new Response(null, { status: 302, headers: { location: signedUrl(new Date('+010000-01-01T00:00:00Z')) } }) },
+        'the stream URL expires before the year 2000',
+        { [HLS_URL]: () => new Response(null, { status: 302, headers: { location: signedUrl(new Date('1999-12-31T23:59:59Z')) } }) },
+      ],
+      [
+        'the stream URL expires after the year 2999',
+        { [HLS_URL]: () => new Response(null, { status: 302, headers: { location: signedUrl(new Date('3000-01-01T00:00:00Z')) } }) },
       ],
     ])('fails when %s', async (_, overrides) => {
       fakeSoundCloud(overrides)

@@ -107,7 +107,8 @@ describe('features routes', () => {
   describe('PUT /api/admin/features/:id', () => {
     it('turns a flag on or off, with who did it and when, and returns it', async () => {
       const app = await buildApp()
-      const before = Date.now()
+      // Responses give times to the second.
+      const before = Math.floor(Date.now() / 1000) * 1000
       const response = await send(app, 'PUT', '/api/admin/features/other-thing', { enabled: true })
       expect(response.statusCode).toBe(200)
       const body = response.json()

@@ -22,8 +22,8 @@ An application has these fields:
 
 | Field | Type | |
 |---|---|---|
-| `dates` | list of strings | The days the artist would like to play, sorted. At least one. Past days are allowed, e.g. to import old applications |
-| `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end` in Québec time, `"HH:MM"`, e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
+| `dates` | list of strings | The days the artist would like to play, in Québec time (see [Times, in Conventions](README.md#conventions)), sorted. At least one. Past days are allowed, e.g. to import old applications |
+| `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end`, times of day in Québec time (see [Times, in Conventions](README.md#conventions)), e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
 | `performanceTypes` | list of strings | What the artist would do: ids from `PERFORMANCE_TYPES` in `server/src/applications/fields.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PERFORMANCE_TYPES`. Can be empty |
 | `otherPerformanceType` | string | Anything else the artist would do, in a few words, e.g. `"Synthé modulaire"`. Up to 60 characters. Can be empty |
 | `details` | string | The artist's questions or other details. Up to 2000 characters. Can be empty |
@@ -76,7 +76,7 @@ Creates an application for an existing artist or collective. The request has the
 |---|---|---|
 | `artistId` | string, optional | The id of the artist who's applying |
 | `collectiveId` | string, optional | The id of the collective that's applying |
-| `receivedAt` | string, optional | When the artist sent the application: a date and time with its offset from UTC, e.g. `"2026-03-28T14:03:00Z"` or `"2026-03-28T10:03:00-04:00"`, which can't be in the future. Now if it's left out (it can't be null) |
+| `receivedAt` | string, optional | When the artist sent the application: an instant (see [Times, in Conventions](README.md#conventions)), from the year 2000, in UTC, which can't be in the future. Now if it's left out (it can't be null) |
 
 | Response field | Type | |
 |---|---|---|

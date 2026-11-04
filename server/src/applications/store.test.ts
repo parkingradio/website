@@ -136,8 +136,9 @@ describe('ReceivedAt', () => {
     vi.useRealTimers()
   })
 
-  it('takes a date and time with its offset from UTC, up to now', () => {
-    expect(check('0001-01-01T00:00Z')).toEqual({ value: new Date('0001-01-01T00:00:00Z') })
+  it('takes a date and time with its offset from UTC, from the year 2000, in UTC, up to now', () => {
+    expect(check('2000-01-01T00:00Z')).toEqual({ value: new Date('2000-01-01T00:00:00Z') })
+    expect(check('1999-12-31T19:00-05:00')).toEqual({ value: new Date('2000-01-01T00:00:00Z') })
     expect(check('2026-03-28T10:03-04:00')).toEqual({ value: new Date('2026-03-28T14:03:00Z') })
     expect(check('2026-03-28T14:03:07.123Z')).toEqual({ value: new Date('2026-03-28T14:03:07.123Z') })
     expect(check('2026-10-14T18:00:00Z')).toEqual({ value: now })
@@ -148,6 +149,12 @@ describe('ReceivedAt', () => {
     expect(check(undefined)).toEqual({ value: undefined })
   })
 
+  it('refuses a date and time before the year 2000, in UTC', () => {
+    for (const sent of ['1999-12-31T23:59:59.999Z', '2000-01-01T00:59+01:00', '0001-01-01T00:00+04:00', '0000-06-01T00:00Z']) {
+      expect(check(sent)).toEqual({ error: "La date de réception doit être en l'an 2000 ou après." })
+    }
+  })
+
   it('refuses a date and time in the future', () => {
     for (const sent of ['2026-10-14T18:00:00.001Z', '2026-10-14T14:01:00-04:00', '2027-01-01T00:00:00Z']) {
       expect(check(sent)).toEqual({ error: 'La date de réception ne peut pas être dans le futur.' })
@@ -155,7 +162,7 @@ describe('ReceivedAt', () => {
   })
 
   it('refuses anything but a date and time that exist, with their offset from UTC', () => {
-    const invalid = ['0000-06-01T00:00Z', '0001-01-01T00:00+04:00', '2026-03-28', '2026-03-28T10:03', '2026-03-28 10:03Z', '2026-02-29T10:03Z', '2026-03-28T24:00Z', '2026-03-28T10:60Z', '2026-03-28T10:03+24:00', '', null, 1774706580000]
+    const invalid = ['2026-03-28', '2026-03-28T10:03', '2026-03-28 10:03Z', '2026-02-29T10:03Z', '2026-03-28T24:00Z', '2026-03-28T10:60Z', '2026-03-28T10:03+24:00', '', null, 1774706580000]
     for (const sent of invalid) expect(check(sent)).toEqual({ error: 'La date de réception est invalide.' })
   })
 })

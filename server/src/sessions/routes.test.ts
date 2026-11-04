@@ -247,14 +247,14 @@ describe('sessions routes', () => {
         ok: true,
         session: {
           id: 'session-1',
-          start: '2026-11-15T02:00:00.000Z',
-          end: '2026-11-15T06:00:00.000Z',
+          start: '2026-11-14T21:00:00-05:00',
+          end: '2026-11-15T01:00:00-05:00',
           durationMinutes: 240,
           takeover: { id: 'collective-1', name: 'Les Ondes' },
           name: 'HAUTE RIVE TAKEOVER',
           raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
           sets: [],
-          createdAt: '2026-11-01T12:00:00.000Z',
+          createdAt: '2026-11-01T07:00:00-05:00',
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,
@@ -277,7 +277,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       // From midnight, the night the clocks go back an hour: 4 hours later, they say 3:00.
       const response = await createSession(app, { start: '2026-11-01T00:00-04:00' })
-      expect(response.json().session).toMatchObject({ start: '2026-11-01T04:00:00.000Z', end: '2026-11-01T08:00:00.000Z' })
+      expect(response.json().session).toMatchObject({ start: '2026-11-01T00:00:00-04:00', end: '2026-11-01T03:00:00-05:00' })
     })
 
     it('refuses an invalid session, saying what is wrong, or a takeover that does not exist', async () => {
@@ -362,14 +362,14 @@ describe('sessions routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(response.json().session).toMatchObject({
-        start: '2026-11-22T01:00:00.000Z',
-        end: '2026-11-22T05:00:00.000Z',
+        start: '2026-11-21T20:00:00-05:00',
+        end: '2026-11-22T00:00:00-05:00',
         takeover: null,
         name: '',
         status: 'done',
         updatedBy: 'admin@example.com',
         updatedAt: expect.any(String),
-        sets: [{ id: 'set-2', start: '2026-11-22T02:00:00.000Z', end: '2026-11-22T03:00:00.000Z', updatedBy: null }],
+        sets: [{ id: 'set-2', start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T22:00:00-05:00', updatedBy: null }],
       })
       expect(store.update).toHaveBeenCalledWith('session-1', expect.objectContaining({ startAt: new Date('2026-11-22T01:00:00Z'), durationMinutes: 240 }))
     })
@@ -441,7 +441,7 @@ describe('sessions routes', () => {
       const response = await sessionWithSet(app)
 
       expect(response.statusCode).toBe(200)
-      expect(response.json().session).toMatchObject({ id: 'session-1', start: '2026-11-15T02:00:00.000Z' })
+      expect(response.json().session).toMatchObject({ id: 'session-1', start: '2026-11-14T21:00:00-05:00' })
       expect(response.json().session.sets).toEqual([
         {
           id: 'set-2',
@@ -451,14 +451,14 @@ describe('sessions routes', () => {
           ],
           offsetMinutes: 60,
           durationMinutes: 60,
-          start: '2026-11-15T03:00:00.000Z',
-          end: '2026-11-15T04:00:00.000Z',
+          start: '2026-11-14T22:00:00-05:00',
+          end: '2026-11-14T23:00:00-05:00',
           performanceTypes: ['dj', 'live-performance'],
           otherPerformanceType: 'Synthé modulaire',
           genres: ['ambient'],
           soundcloudTrack: { id: '42', url: 'https://soundcloud.com/parkingdotradio/3tons' },
           youtubeVideo: { id: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
-          createdAt: '2026-11-01T12:00:00.000Z',
+          createdAt: '2026-11-01T07:00:00-05:00',
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,
@@ -565,7 +565,7 @@ describe('sessions routes', () => {
       let response = await addSet(app, 'session-3')
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: "This YouTube video is another set's", session: other, set: other.sets[0] })
-      expect(response.json().set.start).toBe('2026-11-15T03:00:00.000Z')
+      expect(response.json().set.start).toBe('2026-11-14T22:00:00-05:00')
 
       // The set's own session.
       vi.mocked(store.addSet).mockRejectedValueOnce(new Conflict('This session is cancelled', rows[1]))
@@ -587,7 +587,7 @@ describe('sessions routes', () => {
       expect(response.json().session.sets[0]).toMatchObject({
         performers: [{ id: 'artist-2', name: 'Brume' }],
         offsetMinutes: 0,
-        start: '2026-11-15T02:00:00.000Z',
+        start: '2026-11-14T21:00:00-05:00',
         performanceTypes: [],
         genres: [],
         status: 'done',

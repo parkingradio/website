@@ -156,13 +156,13 @@ expect_body_contains '"error":"Text can'"'"'t contain the NUL character"'
 json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"raEvent":"https://ra.co/events/6683745\u0000"')"
 expect_status 400
 
-echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in UTC and its RA event reduced"
+echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in Québec time and its RA event reduced"
 json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
 expect_status 200
 first="$(first_id)"
 json GET "${SESSIONS}/${first}"
 expect_status 200
-expect_body_contains "\"start\":\"2026-11-15T02:00:00.000Z\",\"end\":\"2026-11-15T06:00:00.000Z\",\"durationMinutes\":240,\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
+expect_body_contains "\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-15T01:00:00-05:00\",\"durationMinutes\":240,\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
 expect_body_contains '"name":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"sets":[]'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\",\"statusUpdatedBy\":null"
 
@@ -184,14 +184,14 @@ next="$(first_id)"
 json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T05:30Z"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${next}"
-expect_body_contains '"start":"2026-11-15T06:00:00.000Z","end":"2026-11-15T07:00:00.000Z"'
+expect_body_contains '"start":"2026-11-15T01:00:00-05:00","end":"2026-11-15T02:00:00-05:00"'
 
 echo "  a session lasts the minutes that actually pass, for the database too, e.g. the night the clocks go back"
 # From midnight, for 4 hours: the clocks then say 3:00, an hour behind.
 json POST "$SESSIONS" "$(session_json '"2026-11-01T00:00-04:00"' 240)"
 expect_status 200
 night="$(first_id)"
-expect_body_contains '"start":"2026-11-01T04:00:00.000Z","end":"2026-11-01T08:00:00.000Z"'
+expect_body_contains '"start":"2026-11-01T00:00:00-04:00","end":"2026-11-01T03:00:00-05:00"'
 json POST "$SESSIONS" "$(session_json '"2026-11-01T02:59-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$night"
 json POST "$SESSIONS" "$(session_json '"2026-11-01T03:00-05:00"' 60)"
@@ -221,9 +221,9 @@ json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$ana")
     '"performanceTypes":["live-performance","dj","dj"],"otherPerformanceType":" Synthé \n modulaire ","genres":["ambient","techno","ambient"],"youtubeVideo":"https://youtu.be/dQw4w9WgXcQ?si=x"')"
 expect_status 200
 opening="$(last_set)"
-expect_body_contains "\"id\":\"${first}\",\"start\":\"2026-11-15T02:00:00.000Z\""
+expect_body_contains "\"id\":\"${first}\",\"start\":\"2026-11-14T21:00:00-05:00\""
 expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
-expect_body_contains '"offsetMinutes":0,"durationMinutes":60,"start":"2026-11-15T02:00:00.000Z","end":"2026-11-15T03:00:00.000Z"'
+expect_body_contains '"offsetMinutes":0,"durationMinutes":60,"start":"2026-11-14T21:00:00-05:00","end":"2026-11-14T22:00:00-05:00"'
 expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerformanceType":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
@@ -310,8 +310,8 @@ expect_body_contains '"updatedBy":null'
 echo "  moving a session moves its sets, which doesn't count as changing them, and so does taking its start away"
 json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
-expect_body_contains "\"start\":\"2026-11-22T02:00:00.000Z\",\"end\":\"2026-11-22T04:00:00.000Z\",\"durationMinutes\":120"
-expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":\"2026-11-22T03:00:00.000Z\",\"end\":\"2026-11-22T04:00:00.000Z\""
+expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
+expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":\"2026-11-21T22:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\""
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
 json PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"

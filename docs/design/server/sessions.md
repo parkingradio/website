@@ -69,11 +69,12 @@ A set, as the endpoints below return it, also has:
 
 A session has a start, which can be null, and a duration, which can't. A session without a start is one whose date
 isn't known yet, e.g. a collective's artists grouped into a takeover while it's being planned. Requests send `start` as
-a date and time with its offset from UTC, like an application's `receivedAt`, e.g. `"2026-11-14T21:00-05:00"`, where the
-seconds can be left out, or as null, or a blank string, for none. Responses give it, and the `start` and `end` the server
-works out, as ISO 8601 strings in UTC, which the MCP server's tools give in Québec time, with their offset, instead (see
-[Results, in MCP server](mcp.md#results)). A start is from the year 2000 to the year 2999, in UTC, and can be in the
-past or in the future.
+an instant, with its offset from UTC, e.g. `"2026-11-14T21:00-05:00"`, or as null, or a blank string, for none.
+Responses give it, and the `start` and `end` the server works out, in Québec time, to the second, with the offset in
+effect then, e.g. `"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from
+the year 2000 to the year 2999, in UTC, and can be in the past or in the future. The `start` and `end` of the events
+that [`GET /api/events`](events.md#get-apievents) gives, which sessions link to (see [Links](#links)), are local times
+instead, without an offset, as RA gives them.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
 moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set

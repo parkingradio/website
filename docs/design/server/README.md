@@ -6,10 +6,19 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON, except for photos. Dates and times are ISO 8601 strings, and days are `"YYYY-MM-DD"`. A body of a
-  type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
-  are larger than any endpoint needs, with a 413. One exception: in production, nginx itself refuses requests whose
-  body is over 52 MB, with a 413 that isn't JSON: that's room for a collective's application with 5 photos.
+  response is JSON, except for photos. A body of a type the endpoint doesn't take fails with a 4xx, and the server
+  refuses bodies other than `multipart/form-data` that are larger than any endpoint needs, with a 413. One exception:
+  in production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
+  collective's application with 5 photos.
+- **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
+  daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times with an
+  offset from UTC. Requests send them as `YYYY-MM-DDTHH:MM[:SS[.fraction]]`, then `Z` or `±HH:MM`, with any offset, e.g.
+  `"2026-11-14T21:00-05:00"` or `"2026-11-15T02:00Z"`. Responses give them as `YYYY-MM-DDTHH:MM:SS±HH:MM`, in Québec
+  time, to the second, with the fraction of a second dropped, and with the offset from UTC in effect at that instant,
+  e.g. `"2026-11-14T21:00:00-05:00"`, or `"2026-07-01T12:00:00-04:00"` in summer. Days are `"YYYY-MM-DD"`, and times of
+  day `"HH:MM"`, from `"00:00"` to `"23:59"`, both in Québec time, without an offset, e.g. an application's `dates` and
+  `timeSlots`. The one exception is events' `start` and `end`, which are local dates and times without an offset, as
+  Resident Advisor gives them (see [Events](events.md#get-apievents)).
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,

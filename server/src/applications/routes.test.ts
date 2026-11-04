@@ -8,6 +8,7 @@ import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { applicationsRoutes } from './routes.js'
+import { inQuebecTime } from '../api/formats.js'
 
 // A fake database: the applications, and the ids of the artists and collectives that exist.
 let rows: StoredApplication[] = []
@@ -194,8 +195,8 @@ describe('applications routes', () => {
           id: 'application-1',
           collectiveId: null,
           // When it was created, since nothing else was said.
-          receivedAt: rows[0].createdAt.toISOString(),
-          createdAt: rows[0].createdAt.toISOString(),
+          receivedAt: inQuebecTime(rows[0].createdAt),
+          createdAt: inQuebecTime(rows[0].createdAt),
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,
@@ -225,10 +226,10 @@ describe('applications routes', () => {
       const app = await buildApp()
       const received = await create(app, { receivedAt: '2026-03-28T10:03:00-04:00' })
       expect(received.statusCode).toBe(200)
-      expect(received.json().application).toMatchObject({ receivedAt: '2026-03-28T14:03:00.000Z', createdAt: rows[0].createdAt.toISOString() })
+      expect(received.json().application).toMatchObject({ receivedAt: '2026-03-28T10:03:00-04:00', createdAt: inQuebecTime(rows[0].createdAt) })
 
       const now = new Date().toISOString()
-      expect((await create(app, { receivedAt: now })).json().application.receivedAt).toBe(now)
+      expect((await create(app, { receivedAt: now })).json().application.receivedAt).toBe(inQuebecTime(now))
     })
 
     it('explains, in French, what is wrong with when the application was received', async () => {
@@ -237,6 +238,7 @@ describe('applications routes', () => {
       const invalid = [
         { receivedAt: new Date(Date.now() + 60_000).toISOString(), error: 'La date de réception ne peut pas être dans le futur.' },
         { receivedAt: '2026-03-28', error: 'La date de réception est invalide.' },
+        { receivedAt: '1999-12-31T23:59:59Z', error: "La date de réception doit être en l'an 2000 ou après." },
       ]
       for (const { receivedAt, error } of invalid) {
         const response = await create(app, { receivedAt })
@@ -429,10 +431,10 @@ describe('applications routes', () => {
       const app = await buildApp()
       await create(app, { receivedAt: '2026-03-28T14:03:00Z' })
       const kept = await send(app, 'PUT', '/api/admin/applications/application-1', application({ details: 'Corrigé.' }))
-      expect(kept.json().application).toMatchObject({ receivedAt: '2026-03-28T14:03:00.000Z', details: 'Corrigé.' })
+      expect(kept.json().application).toMatchObject({ receivedAt: '2026-03-28T10:03:00-04:00', details: 'Corrigé.' })
 
       const changed = await send(app, 'PUT', '/api/admin/applications/application-1', application({ receivedAt: '2026-03-27T04:00:00Z' }))
-      expect(changed.json().application.receivedAt).toBe('2026-03-27T04:00:00.000Z')
+      expect(changed.json().application.receivedAt).toBe('2026-03-27T00:00:00-04:00')
     })
 
     it('explains what is wrong with an invalid application, without changing it', async () => {
@@ -527,7 +529,8 @@ describe('applications routes', () => {
 
     it('replaces the recipients, with who changed them and when, and returns them', async () => {
       const app = await buildApp()
-      const before = Date.now()
+      // Responses give times to the second.
+      const before = Math.floor(Date.now() / 1000) * 1000
       const response = await send(app, 'PUT', URL, { recipients: ['equipe@example.com', 'booking@example.com'] })
       expect(response.statusCode).toBe(200)
       const body = response.json()

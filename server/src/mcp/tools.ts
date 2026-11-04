@@ -55,10 +55,10 @@ const TOOL_SESSION_SECONDS = 60
 // The parts of a request that a tool's arguments go to.
 type Part = 'path' | 'query' | 'body' | 'profile' | 'removePhoto'
 
-// The JSON Schema of `schema`, as it's received, or as it's sent, with the schemas it refers to written in it, since an
-// argument's schema can't refer to another tool's.
-function jsonSchema(schema: z.ZodType, io: 'input' | 'output' = 'input'): JsonObject {
-  const json = z.toJSONSchema(schema, { io, unrepresentable: 'any' }) as JsonObject & { $defs?: Record<string, unknown> }
+// The JSON Schema of `schema`, as it's received, with the schemas it refers to written in it, since an argument's schema
+// can't refer to another tool's.
+function jsonSchema(schema: z.ZodType): JsonObject {
+  const json = z.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' }) as JsonObject & { $defs?: Record<string, unknown> }
   const $defs = json.$defs ?? {}
   delete json.$defs
   delete json.$schema
@@ -125,8 +125,7 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
   return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, profile, nullable }
 }
 
-// The schemas a value that follows a JSON Schema can follow: the schema, and its alternatives, e.g. a date and time, or
-// null.
+// The schemas a value that follows a JSON Schema can follow: the schema, and its alternatives, e.g. a string, or null.
 function alternatives(schema: unknown): JsonObject[] {
   if (schema === null || typeof schema !== 'object') return []
   const { anyOf, oneOf, allOf } = schema as { anyOf?: unknown[]; oneOf?: unknown[]; allOf?: unknown[] }
@@ -136,42 +135,6 @@ function alternatives(schema: unknown): JsonObject[] {
 // Whether a JSON Schema takes null.
 function allowsNull(schema: unknown): boolean {
   return alternatives(schema).some(({ type }) => type === 'null' || (Array.isArray(type) && type.includes('null')))
-}
-
-// Québec's time zone and the en-CA locale, which writes days as YYYY-MM-DD, like the client's (see
-// client/src/quebec-time.ts).
-const QUEBEC_TIME = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Toronto',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-  timeZoneName: 'longOffset',
-})
-
-// A date and time, in Québec time, to the second, with its offset from UTC, e.g. "2026-11-14T21:00:00-05:00" for
-// "2026-11-15T02:00:00.000Z": the same instant, as admins see it.
-export function inQuebecTime(dateTime: string): string {
-  const part = Object.fromEntries(QUEBEC_TIME.formatToParts(new Date(dateTime)).map(({ type, value }) => [type, value]))
-  // The offset is written "GMT-05:00".
-  return `${part.year}-${part.month}-${part.day}T${part.hour}:${part.minute}:${part.second}${part.timeZoneName.replace('GMT', '')}`
-}
-
-// `value`, with the dates and times that `schema`, its JSON Schema, says it has in Québec time.
-export function withQuebecTimes(value: unknown, schema: unknown): unknown {
-  const schemas = alternatives(schema)
-  if (typeof value === 'string') return schemas.some(({ format }) => format === 'date-time') ? inQuebecTime(value) : value
-  if (Array.isArray(value)) return value.map((item) => withQuebecTimes(item, schemas.find(({ items }) => items)?.items))
-  if (value === null || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value).map(([key, field]) => [
-      key,
-      withQuebecTimes(field, schemas.map(({ properties }) => (properties as JsonObject | undefined)?.[key]).find(Boolean)),
-    ]),
-  )
 }
 
 // What a tool's description starts with: to read its area's rules, once, rather than before each call.
@@ -306,12 +269,6 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
     if (names.has(name)) throw new Error(`Two tools are named \`${name}\``)
     names.add(name)
     const { schema, parts, profile, nullable } = argumentsOf(route)
-    // What it responds, by status, for its dates and times.
-    const responses = Object.fromEntries(
-      Object.entries((route.schema.response ?? {}) as Record<string, z.ZodType>).map(([status, response]) => [status, jsonSchema(response, 'output')]),
-    )
-    const answer = (status: number, body: unknown) => withQuebecTimes(body, responses[status])
-
     const call = async (args: JsonObject, as: ToolUser): Promise<ToolCall> => {
       const invalid = [...route.url.matchAll(/:(\w+)/g)].find(([, param]) => segment(args[param]) === null)
       if (invalid) return failure(400, { error: `\`${invalid[1]}\` isn't valid` })
@@ -362,8 +319,8 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       }
 
       const response = await send(route.method, url, payload)
-      if (response.status >= 400) return failure(response.status, answer(response.status, response.body))
-      let result = answer(response.status, response.body)
+      if (response.status >= 400) return failure(response.status, response.body)
+      let result = response.body
       if (SUMMARIES[name]) result = await SUMMARIES[name](result as JsonObject, send)
       if (hasContactDetails(route)) result = withoutContactDetails(result)
       return { result: { content: [{ type: 'text', text: text(result) }] } }

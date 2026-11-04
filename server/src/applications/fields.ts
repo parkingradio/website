@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { TIME_OF_DAY, dateTimeWith, dayWith } from '../api/formats.js'
+import { EARLIEST_INSTANT, TIME_OF_DAY, dateTimeWith, dayWith } from '../api/formats.js'
 import { line, text } from '../artists/profile.js'
 
 // An application's fields: the lists and rules every application has to follow (see
@@ -83,7 +83,9 @@ export type ApplicationFields = z.output<typeof ApplicationFields>
 const BAD_RECEIVED_AT = 'La date de réception est invalide.'
 
 // When an admin says an artist sent an application: a date and time with its offset from UTC (see
-// `dateTimeWith` in api/formats.ts), that isn't in the future, as a Date.
+// `dateTimeWith` in api/formats.ts), from the year 2000, in UTC, like every instant requests send, that isn't in the
+// future, as a Date.
 export const ReceivedAt = dateTimeWith(BAD_RECEIVED_AT)
+  .refine((receivedAt) => receivedAt.getTime() >= EARLIEST_INSTANT, "La date de réception doit être en l'an 2000 ou après.")
   .refine((receivedAt) => receivedAt.getTime() <= Date.now(), 'La date de réception ne peut pas être dans le futur.')
-  .meta({ description: 'A date and time with its offset from UTC, which can be left without seconds. Not in the future' })
+  .meta({ description: 'A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future' })

@@ -10,6 +10,7 @@ import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
 import { EmailTaken } from './store.js'
 import type { ArtistsStore, PhotoFolder, SentPhoto, StoredArtist } from './store.js'
+import { inQuebecTime } from '../api/formats.js'
 
 // The artists, as the database would keep them, the ids of each collective's members, in order, and the photos, as the
 // bucket would keep them.
@@ -204,7 +205,7 @@ describe('artists routes', () => {
           links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
           id: 'artist-1',
           hasPhoto: true,
-          createdAt: rows[0].createdAt.toISOString(),
+          createdAt: inQuebecTime(rows[0].createdAt),
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,

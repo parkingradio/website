@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { dateTimeWith } from '../api/formats.js'
+import { EARLIEST_INSTANT, LATEST_INSTANT, dateTimeWith } from '../api/formats.js'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
 import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
@@ -26,11 +26,6 @@ export const NO_SUCH_COLLECTIVE = 'No such collective'
 // The longest a session or a set lasts, in minutes: 24 hours, so that a typo can't make a session overlap days of others.
 // A set's offset is less than that, since it starts within its session.
 const MAX_MINUTES = 24 * 60
-
-// Sessions start from 2000 to 2999, in UTC, which is plenty, and keeps their start and end where every date and time can
-// be written as a `Timestamp`, whose year has 4 digits.
-const EARLIEST = Date.parse('2000-01-01T00:00:00Z')
-const LATEST = Date.parse('3000-01-01T00:00:00Z')
 
 // A value, or null, or a blank string, for none, that's sent as a string, which `parse` turns into what's kept, or null
 // when it isn't one, which fails with `message`. It's trimmed first.
@@ -74,7 +69,7 @@ function line(maxLength: number, message: string) {
 }
 
 const START = 'The start must be a date and time with its offset from UTC, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
-const startTime = dateTimeWith(START).refine((date) => date.getTime() >= EARLIEST && date.getTime() < LATEST, START)
+const startTime = dateTimeWith(START).refine((date) => date.getTime() >= EARLIEST_INSTANT && date.getTime() < LATEST_INSTANT, START)
 
 const NAME_MAX_LENGTH = 100
 

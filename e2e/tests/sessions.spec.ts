@@ -204,7 +204,9 @@ test.describe('in another time zone', () => {
     await expect(value(page, 'Quand')).toHaveText(`${longDay(day)}, de 21 h à 22 h`)
     const id = new URL(page.url()).pathname.split('/').pop()
     const { session } = await (await page.request.get(`/api/admin/sessions/${id}`)).json()
-    expect(session.start).toBe(quebecInstant(day, '21:00')!.toISOString())
+    // The API gives it in Québec time too, with its offset.
+    expect(session.start).toMatch(new RegExp(`^${day}T21:00:00[+-]\\d{2}:\\d{2}$`))
+    expect(Date.parse(session.start)).toBe(quebecInstant(day, '21:00')!.getTime())
 
     expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
   })

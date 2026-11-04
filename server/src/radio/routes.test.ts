@@ -12,6 +12,7 @@ import type { StoredSoundCloudCredentials } from './soundcloud-credentials.js'
 import { soundCloudApp } from './soundcloud-app.js'
 import { radioRoutes } from './routes.js'
 import type { Radio } from './routes.js'
+import { inQuebecTime } from '../api/formats.js'
 
 const checkCredentials = vi.fn<SoundCloudClient['checkCredentials']>()
 const playlist = vi.fn<SoundCloudClient['playlist']>()
@@ -169,7 +170,7 @@ describe('radio routes', () => {
         durationMs: 3_420_000,
       }
       expect(response.json()).toEqual({
-        current: { track: nimK, startedAt: '2026-10-01T12:00:00.000Z' },
+        current: { track: nimK, startedAt: '2026-10-01T08:00:00-04:00' },
         upcoming: [
           {
             id: '2',
@@ -531,21 +532,24 @@ describe('radio routes', () => {
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({
         url: 'https://cdn.test/1/playlist.m3u8?n=1',
-        expiresAt: '2026-10-01T13:02:00.000Z',
+        expiresAt: '2026-10-01T09:02:00-04:00',
       })
       expect(hlsStream).toHaveBeenCalledWith('1', null)
     })
 
-    // The SoundCloud client only gives expiries in years 0000 to 9999 (see radio/soundcloud.ts), which all make
-    // timestamps.
-    it.each(['0000-01-01T00:00:00.000Z', '9999-12-31T23:59:59.999Z'])('hands out a stream that expires at %s', async (expiresAt) => {
+    // The SoundCloud client only gives expiries from the year 2000 to 2999, in UTC (see radio/soundcloud.ts), which all
+    // make timestamps.
+    it.each([
+      ['2000-01-01T00:00:00.000Z', '1999-12-31T19:00:00-05:00'],
+      ['2999-12-31T23:59:59.999Z', '2999-12-31T18:59:59-05:00'],
+    ])('hands out a stream that expires at %s', async (expiresAt, given) => {
       hlsStream.mockResolvedValue(streamFor(1, Date.parse(expiresAt)))
       const app = await buildApp()
 
       const response = await app.inject({ method: 'GET', url: '/api/radio/tracks/1/stream' })
 
       expect(response.statusCode).toBe(200)
-      expect(response.json().expiresAt).toBe(expiresAt)
+      expect(response.json().expiresAt).toBe(given)
     })
 
     it('streams a private track with its secret, as it was last read', async () => {
@@ -788,7 +792,7 @@ describe('radio routes', () => {
             url: ROTATION.url,
             title: 'Rotation',
             chosenBy: 'someone@example.com',
-            chosenAt: '2026-09-30T12:00:00.000Z',
+            chosenAt: '2026-09-30T08:00:00-04:00',
             playlist: {
               url: ROTATION.url,
               title: 'Rotation',
@@ -1047,7 +1051,7 @@ describe('radio routes', () => {
           updatedAt: NOW,
         })
         expect(response.json()).toEqual({ ok: true })
-        expect((await settings(app)).current).toMatchObject({ url: LINK, chosenBy: 'admin@example.com', chosenAt: '2026-10-01T12:00:00.000Z', error: null })
+        expect((await settings(app)).current).toMatchObject({ url: LINK, chosenBy: 'admin@example.com', chosenAt: '2026-10-01T08:00:00-04:00', error: null })
       })
 
       it('responds 400 when none of the tracks of the playlist can be played', async () => {
@@ -1071,7 +1075,7 @@ describe('radio routes', () => {
         vi.advanceTimersByTime(MINUTE)
 
         expect(await inOrder(app)).toMatchObject([{ id: '8' }, { id: '9' }])
-        expect((await radio(app)).current.startedAt).toBe(new Date(NOW + 11 * MINUTE).toISOString())
+        expect((await radio(app)).current.startedAt).toBe('2026-10-01T08:11:00-04:00')
         expect(playlist.mock.calls).toEqual([['7', null], ['9', 's-AbC123']])
       })
 
@@ -1085,7 +1089,7 @@ describe('radio routes', () => {
 
         await post(app, '/api/admin/radio/playlist', { link: ROTATION.url })
 
-        expect((await radio(app)).current).toMatchObject({ track: { id: '2' }, startedAt: new Date(NOW + 60 * MINUTE).toISOString() })
+        expect((await radio(app)).current).toMatchObject({ track: { id: '2' }, startedAt: '2026-10-01T09:00:00-04:00' })
       })
 
       it('still streams the tracks of the previous playlist for as long as they last, so that their listeners can finish them', async () => {
@@ -1136,7 +1140,7 @@ describe('radio routes', () => {
 
         expect(response).toEqual({
           ok: true,
-          credentials: { clientId: 'client-id', updatedBy: 'someone@example.com', updatedAt: ENTERED.updatedAt.toISOString() },
+          credentials: { clientId: 'client-id', updatedBy: 'someone@example.com', updatedAt: inQuebecTime(ENTERED.updatedAt) },
         })
         expect(JSON.stringify(response)).not.toContain('client-secret')
       })
@@ -1150,7 +1154,7 @@ describe('radio routes', () => {
         expect(response.statusCode).toBe(200)
         expect(response.json()).toEqual({
           ok: true,
-          credentials: { clientId: 'new-id', updatedBy: 'admin@example.com', updatedAt: new Date(NOW).toISOString() },
+          credentials: { clientId: 'new-id', updatedBy: 'admin@example.com', updatedAt: '2026-10-01T08:00:00-04:00' },
         })
         expect(newClient).toHaveBeenCalledExactlyOnceWith({ clientId: 'new-id', clientSecret: 'new-secret' })
         expect(checkCredentials).toHaveBeenCalledOnce()

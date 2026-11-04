@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { registerRoutes } from '../app.js'
 import type { Dependencies } from '../app.js'
 import { AREAS, loadRules, rules } from './documentation.js'
-import { buildTools, collectToolRoutes, hasContactDetails, inQuebecTime } from './tools.js'
+import { buildTools, collectToolRoutes, hasContactDetails } from './tools.js'
 
 // The tools of the API's routes, against docs/design/server/mcp.md. Registering the routes only needs their
 // dependencies to handle requests, which these tests don't send.
@@ -104,16 +104,6 @@ describe('the tools of the API', () => {
         expect(names.has('email') || names.has('phone'), `${route.method} ${route.url}`).toBe(false)
       }
     }
-  })
-})
-
-describe('inQuebecTime', () => {
-  it('gives the same instant in Québec time, with its offset, on either side of a change of time', () => {
-    expect(inQuebecTime('2026-11-15T02:00:00.000Z')).toBe('2026-11-14T21:00:00-05:00')
-    expect(inQuebecTime('2026-07-01T16:00:00.000Z')).toBe('2026-07-01T12:00:00-04:00')
-    // The night the clocks go back, 1:30 happens twice.
-    expect(inQuebecTime('2026-11-01T05:30:00.000Z')).toBe('2026-11-01T01:30:00-04:00')
-    expect(inQuebecTime('2026-11-01T06:30:00.000Z')).toBe('2026-11-01T01:30:00-05:00')
   })
 })
 

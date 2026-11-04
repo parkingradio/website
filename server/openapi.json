@@ -5118,7 +5118,7 @@
                     "description": "Trimmed, then up to 2000 characters"
                   },
                   "receivedAt": {
-                    "description": "A date and time with its offset from UTC, which can be left without seconds. Not in the future",
+                    "description": "A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future",
                     "type": "string",
                     "format": "date-time"
                   },
@@ -5466,7 +5466,7 @@
                     "description": "Trimmed, then up to 2000 characters"
                   },
                   "receivedAt": {
-                    "description": "A date and time with its offset from UTC, which can be left without seconds. Not in the future",
+                    "description": "A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future",
                     "type": "string",
                     "format": "date-time"
                   }

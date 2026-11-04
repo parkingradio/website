@@ -5,6 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
+import { inQuebecTime } from './formats.js'
 import { ApiError, Day, Ok, Timestamp, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
@@ -111,6 +112,24 @@ describe('zodRoutes', () => {
     expect(statuses).toEqual({ '2026-10-09T16:30:00.000Z': 200, '2026-10-09T12:30:00-04:00': 200, yesterday: 500, '2026-10-09': 500 })
   })
 
+  it('sends every timestamp of a response in Québec time, errors included', async () => {
+    const Times = z.object({ at: Timestamp, maybe: Timestamp.nullable(), list: z.array(z.object({ at: Timestamp })) })
+    const { app } = await buildApp((app) => {
+      zodRoutes(app).get<{ Querystring: { failing?: string } }>(
+        '/times',
+        { schema: { response: { 200: Times, 409: ApiError.extend({ times: Times }) } } },
+        async (request, reply) => {
+          const times = { at: '2026-11-15T02:00:00.000Z', maybe: null, list: [{ at: '2026-07-01T12:00:00-04:00' }, { at: '2026-11-01T06:30:00.999Z' }] }
+          if (request.query.failing) return reply.status(409).send({ ok: false, error: 'In the way', times })
+          return times
+        },
+      )
+    })
+    const times = { at: '2026-11-14T21:00:00-05:00', maybe: null, list: [{ at: '2026-07-01T12:00:00-04:00' }, { at: '2026-11-01T01:30:00-05:00' }] }
+    expect((await app.inject({ method: 'GET', url: '/times' })).json()).toEqual(times)
+    expect((await app.inject({ method: 'GET', url: '/times?failing=1' })).json()).toEqual({ ok: false, error: 'In the way', times })
+  })
+
   it('only sends days that exist', async () => {
     let day = ''
     const { app } = await buildApp((app) => {
@@ -167,5 +186,24 @@ describe('the NUL character', () => {
     expect((await send('/echo/1', { count: 'x', tags: ['\0'] })).body.error).toMatch(/^`count`: /)
     const sendFirstIssue = await echo(firstIssue)
     expect((await sendFirstIssue('/echo/1', { tags: ['\0'] })).body.error).toBe("Text can't contain the NUL character")
+  })
+})
+
+describe('inQuebecTime', () => {
+  it('gives the same instant in Québec time, to the second, with its offset, on either side of a change of time', () => {
+    expect(inQuebecTime('2026-11-15T02:00:00.000Z')).toBe('2026-11-14T21:00:00-05:00')
+    expect(inQuebecTime(new Date('2026-07-01T16:00:00.999Z'))).toBe('2026-07-01T12:00:00-04:00')
+    expect(inQuebecTime('2026-07-01T09:00:59+02:00')).toBe('2026-07-01T03:00:59-04:00')
+    // The night the clocks go back, 1:30 happens twice.
+    expect(inQuebecTime('2026-11-01T05:30:00.000Z')).toBe('2026-11-01T01:30:00-04:00')
+    expect(inQuebecTime('2026-11-01T06:30:00.000Z')).toBe('2026-11-01T01:30:00-05:00')
+    // The night they spring forward, 2:00 doesn't happen.
+    expect(inQuebecTime('2026-03-08T06:59:59.999Z')).toBe('2026-03-08T01:59:59-05:00')
+    expect(inQuebecTime('2026-03-08T07:00:00.000Z')).toBe('2026-03-08T03:00:00-04:00')
+  })
+
+  it('writes the years from 2000 to 2999, in UTC, with 4 digits', () => {
+    expect(inQuebecTime('2000-01-01T00:00:00.000Z')).toBe('1999-12-31T19:00:00-05:00')
+    expect(inQuebecTime('2999-12-31T23:59:59.999Z')).toBe('2999-12-31T18:59:59-05:00')
   })
 })

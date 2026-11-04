@@ -48,10 +48,9 @@ export function isTime(value: string): boolean {
 }
 
 // Checks when an admin says an application was received, which the form sends as an ISO 8601 date and time (see
-// `toISOString`), whose format is then the server's: it can't be before year 1, or later than `now`.
+// `toISOString`), whose format is then the server's: it can't be before the year 2000, in UTC, or later than `now`.
 export function checkReceivedAt(receivedAt: Date, now = new Date()): string | null {
-  // Postgres has no year 0, which is 1 BC, e.g. for "0001-01-01T00:00+01:00".
-  if (receivedAt.getUTCFullYear() < 1) return 'La date de réception est invalide.'
+  if (receivedAt.getUTCFullYear() < 2000) return "La date de réception doit être en l'an 2000 ou après."
   if (receivedAt > now) return 'La date de réception ne peut pas être dans le futur.'
   return null
 }

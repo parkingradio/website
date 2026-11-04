@@ -79,13 +79,13 @@ describe('checkApplication', () => {
 describe('checkReceivedAt', () => {
   const now = new Date('2026-10-14T18:00:00Z')
 
-  it('takes any time up to now', () => {
-    expect(checkReceivedAt(new Date('0001-01-01T00:00Z'), now)).toBeNull()
+  it('takes any time from the year 2000, in UTC, up to now', () => {
+    expect(checkReceivedAt(new Date('2000-01-01T00:00Z'), now)).toBeNull()
     expect(checkReceivedAt(now, now)).toBeNull()
   })
 
-  it('refuses a time in the future, or before year 1, which the database does not have', () => {
+  it('refuses a time in the future, or before the year 2000, in UTC', () => {
     expect(checkReceivedAt(new Date('2026-10-14T18:00:00.001Z'), now)).toBe('La date de réception ne peut pas être dans le futur.')
-    expect(checkReceivedAt(new Date('0001-01-01T00:00+04:00'), now)).toBe('La date de réception est invalide.')
+    expect(checkReceivedAt(new Date('2000-01-01T00:00+01:00'), now)).toBe("La date de réception doit être en l'an 2000 ou après.")
   })
 })

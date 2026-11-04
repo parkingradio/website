@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EARLIEST_INSTANT, LATEST_INSTANT } from '../api/formats.js'
 import { cached } from '../core/cache.js'
 
 // A minimal client for SoundCloud's API (https://developers.soundcloud.com/docs/api/guide), authenticated
@@ -107,8 +108,8 @@ const Streams = z.object({
 })
 
 // https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-creating-signed-url-custom-policy.html
-// The expiry, in seconds since the epoch, is handed out as an ISO 8601 timestamp, which only has years 0000 to 9999.
-const EpochTime = z.number().min(Date.parse('0000-01-01T00:00:00Z') / 1000).lt(Date.parse('+010000-01-01T00:00:00Z') / 1000)
+// The expiry, in seconds since the epoch, is handed out as a `Timestamp`, so it's kept to the instants requests can send.
+const EpochTime = z.number().min(EARLIEST_INSTANT / 1000).lt(LATEST_INSTANT / 1000)
 const CloudFrontPolicy = z.object({
   Statement: z.array(z.object({ Condition: z.object({ DateLessThan: z.object({ 'AWS:EpochTime': EpochTime }) }) })).min(1),
 })

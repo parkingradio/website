@@ -80,7 +80,7 @@ json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" third '"
 expect_status 200
 third="$(body_id)"
 json GET "${BASE_URL}/api/admin/applications/${third}"
-expect_body_contains '"receivedAt":"2026-03-28T14:03:00.000Z"'
+expect_body_contains '"receivedAt":"2026-03-28T10:03:00-04:00"'
 json POST "${BASE_URL}/api/admin/applications" "$(application "$artist" future '"receivedAt":"2099-01-01T00:00:00Z"')"
 expect_status 400
 expect_body_contains 'La date de réception ne peut pas être dans le futur.'
@@ -108,10 +108,10 @@ expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"performanceTypes":[
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" changed '"receivedAt":"2026-03-27T04:00:00Z"')"
 expect_status 200
-expect_body_contains '"receivedAt":"2026-03-27T04:00:00.000Z"'
+expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
 json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" 'changed again')"
 expect_status 200
-expect_body_contains '"receivedAt":"2026-03-27T04:00:00.000Z"'
+expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
 for status in accepted scheduled done rejected new; do
     json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
     expect_status 200

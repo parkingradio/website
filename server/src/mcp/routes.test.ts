@@ -88,7 +88,7 @@ async function buildApp(logs?: string[], environment = 'test') {
         },
       })
     }
-    // Its dates and times, which tools give in Québec time, and a body with a field that can be null.
+    // Its dates and times, which tools give as the route does, in Québec time, and a body with a field that can be null.
     const Times = z.object({ at: Timestamp, maybe: Timestamp.nullable(), list: z.array(z.object({ at: Timestamp, note: z.string() })) })
     api.post(
       '/api/admin/times',
@@ -430,7 +430,7 @@ describe('the MCP server', () => {
       expect(saved).toEqual({ name: 'Aurore', email: null, phone: '' })
     })
 
-    it('give the dates and times their responses have in Québec time, errors included, on either side of a change of time', async () => {
+    it('give the dates and times of their responses as their routes do, in Québec time, errors included', async () => {
       const app = await buildApp()
       const times = {
         at: '2026-11-01T01:30:00-04:00',

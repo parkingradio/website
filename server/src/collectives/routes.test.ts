@@ -10,6 +10,7 @@ import { NO_SUCH_MEMBER } from './profile.js'
 import { collectivesRoutes } from './routes.js'
 import { InvalidMember } from './store.js'
 import type { CollectivesStore, StoredCollective } from './store.js'
+import { inQuebecTime } from '../api/formats.js'
 
 // The collectives, as the database would keep them, the artists they can have as members, and the photos, as the bucket
 // would. How a profile and its photo are read from the request is shared with artists, and tested with them (see
@@ -197,7 +198,7 @@ describe('collectives routes', () => {
           links: { soundcloud: 'lesondes' },
           id: 'collective-1',
           hasPhoto: true,
-          createdAt: rows[0].createdAt.toISOString(),
+          createdAt: inQuebecTime(rows[0].createdAt),
           createdBy: 'admin@example.com',
           updatedBy: null,
           updatedAt: null,

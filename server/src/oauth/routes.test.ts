@@ -191,7 +191,7 @@ describe('OAuth routes', () => {
       expect(response.json()).toEqual({
         ok: true,
         total: 1,
-        connections: [{ id: 'connection-id', client: 'Claude Code', scopes: ['admin'], createdAt: createdAt.toISOString(), lastUsedAt: lastUsedAt.toISOString() }],
+        connections: [{ id: 'connection-id', client: 'Claude Code', scopes: ['admin'], createdAt: '2026-11-01T07:00:00-05:00', lastUsedAt: '2026-11-02T07:00:00-05:00' }],
       })
       expect(store.list).toHaveBeenCalledWith(TEST_ADMIN.id)
     })

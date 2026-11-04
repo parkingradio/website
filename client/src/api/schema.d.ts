@@ -3552,7 +3552,7 @@ export interface operations {
                     details: string;
                     /**
                      * Format: date-time
-                     * @description A date and time with its offset from UTC, which can be left without seconds. Not in the future
+                     * @description A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future
                      */
                     receivedAt?: string;
                     /** @description The artist who applies. Not with `collectiveId` */
@@ -3738,7 +3738,7 @@ export interface operations {
                     details: string;
                     /**
                      * Format: date-time
-                     * @description A date and time with its offset from UTC, which can be left without seconds. Not in the future
+                     * @description A date and time with its offset from UTC, which can be left without seconds. From the year 2000, in UTC, and not in the future
                      */
                     receivedAt?: string;
                 };
