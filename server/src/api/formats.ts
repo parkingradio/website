@@ -60,7 +60,7 @@ export const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/
 
 // A date and time with its offset from UTC, as above, as a Date. `message` is the error for anything else, e.g. in French
 // where artists see it. Its year isn't checked: e.g. Postgres has no year 0, so callers keep it to the instants from
-// `EARLIEST_INSTANT`.
+// `EARLIEST_INSTANT`, e.g. with `instantWith`.
 export function dateTimeWith(message: string) {
   return z
     .string({ error: message })
@@ -75,4 +75,10 @@ export function dateTimeWith(message: string) {
       }
       return new Date(sent)
     })
+}
+
+// A date and time with its offset from UTC, as a Date, from `EARLIEST_INSTANT` to `LATEST_INSTANT`, excluded. `message`
+// is the error for anything else.
+export function instantWith(message: string) {
+  return dateTimeWith(message).refine((date) => date.getTime() >= EARLIEST_INSTANT && date.getTime() < LATEST_INSTANT, message)
 }

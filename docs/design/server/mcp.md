@@ -92,11 +92,11 @@ e.g. "Supprimer un artiste".
 
 ### Arguments
 
-A tool's arguments are its endpoint's path parameters, its query parameters and the fields of its body. For the
-endpoints that take an artist or a collective with a photo, which are `multipart/form-data` (see
-[`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields of the profile, and
-`removePhoto` for those that change one. Tools can't send photos: an artist or a collective added with a tool has none,
-and one changed with a tool keeps theirs, unless `removePhoto` is `true`.
+A tool's arguments are its endpoint's path parameters, its query parameters, which reach it as they're given, e.g. with
+the `+` of an offset, and the fields of its body. For the endpoints that take an artist or a collective with a photo,
+which are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the
+fields of the profile, and `removePhoto` for those that change one. Tools can't send photos: an artist or a collective
+added with a tool has none, and one changed with a tool keeps theirs, unless `removePhoto` is `true`.
 
 The descriptions of the tools that replace an artist, a collective, an application, a session or a set say that what's
 left out is erased, except what their endpoint says it keeps, e.g. an application's `receivedAt`: what they replace has
@@ -146,7 +146,7 @@ about the environment included, for the apps that don't give them to the model, 
 in this directory before its first endpoint, as it is, except for its links, which the model can't follow: a link to
 another of these areas says to read it with `read_documentation`, and the others only keep their text. That part is,
 e.g., [Sessions](sessions.md) from its beginning to
-[`GET /api/admin/sessions`](sessions.md#get-apiadminsessionsartistidtakeoverid-admin). The endpoints are left out,
+[`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin). The endpoints are left out,
 since the tools already say what they take and give, and so is what comes after them, e.g. applying through the form
 and its emails, in [Applications](applications.md), which tools don't do. Those parts of the documents are therefore
 written so that they're enough to use the API correctly (see [Design](../README.md)).

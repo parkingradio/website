@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
+import { instantWith } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { BAD_STATUS, Genre, PerformanceType, SessionFields, SetFields, Status } from './fields.js'
@@ -204,13 +205,21 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
 
   const StatusBody = z.object({ status: Status }, { error: BAD_STATUS })
 
+  // The bound `name` on the sessions' starts: they start `when` it.
+  function bound(name: string, when: string, example: string) {
+    return instantWith(`\`${name}\` must be a single date and time with its offset from UTC, e.g. "${example}", from the year 2000 to 2999`)
+      .optional()
+      .meta({ description: `Only the sessions that start ${when} this date and time, with its offset from UTC, e.g. "${example}". Leaves out those without a start` })
+  }
+
   api.get(
     '/api/admin/sessions',
     {
       config: { admin: true, tool: { title: 'Lister les sessions' } },
       schema: {
         operationId: 'list_sessions',
-        summary: "Every session, or those with a set an artist played, or a collective's takeovers, the most recent first",
+        summary:
+          "Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, the most recent first",
         tags: ['Sessions'],
         querystring: z
           .object({
@@ -222,8 +231,11 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
               .string({ error: 'The takeover must be a single id' })
               .optional()
               .meta({ description: "Only this collective's takeovers. Not with `artist`" }),
+            from: bound('from', 'at or after', '2026-11-09T00:00-05:00'),
+            to: bound('to', 'before', '2026-11-16T00:00-05:00'),
           })
-          .refine((query) => query.artist === undefined || query.takeover === undefined, 'Only one of artist and takeover can be given'),
+          .refine((query) => query.artist === undefined || query.takeover === undefined, 'Only one of artist and takeover can be given')
+          .refine(({ from, to }) => from === undefined || to === undefined || from < to, '`from` must be before `to`'),
         response: { 200: z.object({ ok: z.literal(true), total: Total, sessions: z.array(SessionBody) }) },
       },
     },

@@ -5898,7 +5898,7 @@
     "/api/admin/sessions": {
       "get": {
         "operationId": "list_sessions",
-        "summary": "Every session, or those with a set an artist played, or a collective's takeovers, the most recent first",
+        "summary": "Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, the most recent first",
         "tags": [
           "Sessions"
         ],
@@ -5920,6 +5920,26 @@
             "name": "takeover",
             "required": false,
             "description": "Only this collective's takeovers. Not with `artist`"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "Only the sessions that start at or after this date and time, with its offset from UTC, e.g. \"2026-11-09T00:00-05:00\". Leaves out those without a start"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "Only the sessions that start before this date and time, with its offset from UTC, e.g. \"2026-11-16T00:00-05:00\". Leaves out those without a start"
           }
         ],
         "responses": {

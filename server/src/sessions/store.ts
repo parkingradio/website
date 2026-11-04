@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, lt, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -87,8 +87,9 @@ const SET_RULES: Record<string, Rule<SetPlace>> = {
 export type SessionsStore = {
   // Those without a start first, the most recently added first, then the others, the most recent first, by start, then
   // by when they were added. With `artist`, only the sessions with a set that artist played, and with `takeover`, only
-  // that collective's takeovers: none when there's no such artist or collective.
-  list(filter?: { artist?: string; takeover?: string }): Promise<StoredSession[]>
+  // that collective's takeovers: none when there's no such artist or collective. With `from` or `to`, only those that
+  // start at or after `from` and before `to`, which leaves out those without a start.
+  list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned". Throws a NoSuchReference or a Conflict.
   create(session: SessionChanges & { createdBy: string }): Promise<StoredSession>
@@ -291,18 +292,22 @@ async function setAndSession(tx: Queryable, id: string): Promise<{ session: Sess
 
 export function sessionsStore(db: Queryable): SessionsStore {
   return {
-    async list({ artist, takeover } = {}) {
+    async list({ artist, takeover, from, to } = {}) {
+      if ((artist !== undefined && !isUuid(artist)) || (takeover !== undefined && !isUuid(takeover))) return []
+      const conditions: SQL[] = []
       if (artist !== undefined) {
-        if (!isUuid(artist)) return []
         const played = db
           .select({ id: sets.sessionId })
           .from(sets)
           .innerJoin(setPerformers, eq(setPerformers.setId, sets.id))
           .where(eq(setPerformers.artistId, artist))
-        return sessionsWhere(db, inArray(sessions.id, played))
+        conditions.push(inArray(sessions.id, played))
       }
-      if (takeover !== undefined) return isUuid(takeover) ? sessionsWhere(db, eq(sessions.takeoverId, takeover)) : []
-      return sessionsWhere(db, undefined)
+      if (takeover !== undefined) conditions.push(eq(sessions.takeoverId, takeover))
+      // A session without a start matches neither, since comparing null gives null.
+      if (from !== undefined) conditions.push(gte(sessions.startAt, from))
+      if (to !== undefined) conditions.push(lt(sessions.startAt, to))
+      return sessionsWhere(db, and(...conditions))
     },
 
     async get(id) {

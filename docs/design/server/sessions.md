@@ -84,6 +84,11 @@ Durations and offsets are whole numbers of minutes, of time that actually passes
 from 21:00 to 2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A duration is from 1 minute to 24
 hours (1440 minutes), and an offset is from 0 to 1439 minutes.
 
+To find the sessions of a period, e.g. next week, list them with `from` and `to`, instants like `start`, each with the
+offset in effect at that time: that gives the sessions that start at or after `from` and before `to`, and leaves out
+those without a start. `from` alone gives those from then on. E.g. for the week of Monday, October 26, 2026, when the
+clocks go back: `from` `"2026-10-26T00:00-04:00"`, `to` `"2026-11-02T00:00-05:00"`.
+
 ## Rules
 
 - **Sessions don't overlap**, unless one of them is cancelled or has no start: there's one studio. A session takes from
@@ -182,15 +187,25 @@ Responses give each one as an object, or null when there's none, with an `id` an
 | `soundcloudTrack` | SoundCloud's id for the track, which doesn't change when the track is renamed | The link it was resolved from, reduced as above: a private track's private link mustn't be shown to the public |
 | `youtubeVideo` | The video's id | `https://www.youtube.com/watch?v=<id>` |
 
-## `GET /api/admin/sessions[?artist=<id>|?takeover=<id>]` (admin)
+## `GET /api/admin/sessions` (admin)
+
+Every query parameter can be left out, and the list only has the sessions that match all of those given:
+
+| Query parameter | |
+|---|---|
+| `artist` | An artist's id: only the sessions with at least one set, whatever its status, that has that artist among its performers, with all of their sets. An unknown artist has none. Not with `takeover` |
+| `takeover` | A collective's id: only that collective's takeovers. An unknown collective has none |
+| `from` | An instant (see [Times, in Conventions](README.md#conventions)): only the sessions that start at that instant or after it, which leaves out those without a start |
+| `to` | An instant: only the sessions that start before it, which leaves out those without a start |
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
 | `total` | number | How many sessions `sessions` has (see [Conventions](README.md#conventions)) |
-| `sessions` | list of sessions | Whatever their status. The sessions without a start come first, the most recently added first, then the others, the most recent first (by `start`, then `createdAt`). With `artist`, only the sessions with at least one set, whatever its status, that has that artist among its performers, with all of their sets. With `takeover`, only that collective's takeovers. An unknown artist or collective has none |
+| `sessions` | list of sessions | Whatever their status. The sessions without a start come first, the most recently added first, then the others, the most recent first (by `start`, then `createdAt`) |
 
-Fails with 400 if `artist` or `takeover` is given more than once, or if both are given.
+Fails with 400 if a query parameter is given more than once, if both `artist` and `takeover` are given, if `from` or
+`to` is empty or isn't an instant from the year 2000 to 2999, in UTC, or if `from` isn't before `to`.
 
 ## `GET /api/admin/sessions/:id` (admin)
 

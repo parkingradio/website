@@ -3,12 +3,12 @@
 # The admin routes for sessions and sets work against a real database. The server's unit tests fake the database, so
 # this is what covers the sessions, sets and set_performers tables: performers kept in order, with their names, and
 # takeovers, the checks that take the database (artists and collectives that exist), starts kept as instants and sets
-# placed relative to them, sessions listed those without a start first, then the most recent first, by artist and by
-# takeover, the rules of sessions (sessions don't overlap, a set fits in its session, a session's sets don't overlap
-# each other, a video or a track in at most one set, and a cancelled session only has cancelled sets), with what's in the
-# way in their 409s, including while other transactions change sessions, a set's own track not being resolved again,
-# what deleting an artist or a collective does to sessions and sets, and changing a session or a set while its
-# takeover's collective, or one of its performers, is deleted.
+# placed relative to them, sessions listed those without a start first, then the most recent first, by artist, by
+# takeover and by when they start, the rules of sessions (sessions don't overlap, a set fits in its session, a session's
+# sets don't overlap each other, a video or a track in at most one set, and a cancelled session only has cancelled sets),
+# with what's in the way in their 409s, including while other transactions change sessions, a set's own track not being
+# resolved again, what deleting an artist or a collective does to sessions and sets, and changing a session or a set
+# while its takeover's collective, or one of its performers, is deleted.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -375,6 +375,40 @@ done
 for query in "artist=${ana}&artist=${brume}" "takeover=${ondes}&takeover=${ondes}" "artist=${ana}&takeover=${ondes}"; do
     json GET "${SESSIONS}?${query}"
     expect_status 400
+done
+
+echo "  sessions are listed by when they start, from \`from\`, included, to \`to\`, excluded, by artist and by takeover too"
+# A week when the clocks go back, from Monday at midnight, before, to the next Monday at midnight, after.
+week=(2026-10-26T00:00-04:00 2026-11-02T00:00-05:00)
+dated=()
+for start in "${week[0]}" 2026-10-31T21:00-04:00 "${week[1]}"; do
+    json POST "$SESSIONS" "$(session_json "\"${start}\"" 60)"
+    expect_status 200
+    dated+=("$(first_id)")
+done
+json GET "${SESSIONS}?from=${week[0]}&to=${week[1]}"
+expect_body_contains '"total":2,"sessions":['
+[ "$(session_ids)" = "${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the sessions of the week"; }
+json GET "${SESSIONS}?from=2026-10-26T04:00Z&to=2026-11-02T05:00Z"
+[ "$(session_ids)" = "${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the same sessions, from the same instants"; }
+json GET "${SESSIONS}?from=2026-10-26T00:00-05:00&to=2026-11-02T00:01-05:00"
+[ "$(session_ids)" = "${dated[2]} ${dated[1]} " ] || { _show_body; fail "expected the sessions from an hour later"; }
+json GET "${SESSIONS}?to=2026-11-14T21:00-05:00"
+[ "$(session_ids)" = "${dated[2]} ${dated[1]} ${dated[0]} " ] || { _show_body; fail "expected the sessions before the first one"; }
+json GET "${SESSIONS}?from=2026-11-15T03:00%2B01:00"
+expect_body_contains '"total":3,"sessions":['
+[ "$(session_ids)" = "${replacement} ${next} ${first} " ] || { _show_body; fail "expected the sessions from the first one on"; }
+json GET "${SESSIONS}?takeover=${ondes}&from=2026-11-01T00:00-04:00"
+[ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected Les Ondes' takeovers with a start"; }
+json GET "${SESSIONS}?artist=${brume}&to=2026-11-15T06:00Z"
+[ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected the sessions where Brume played, before the next one"; }
+for query in "from=${week[1]}&to=${week[0]}" "from=${week[0]}&to=${week[0]}" from= from=2026-10-26 from=2026-11-15T03:00+01:00 to=1999-12-31T23:59Z; do
+    json GET "${SESSIONS}?${query}"
+    expect_status 400
+done
+for session in "${dated[@]}"; do
+    json DELETE "${SESSIONS}/${session}"
+    expect_status 200
 done
 
 echo "  a video belongs to at most one set, and the 409 names it and its session"

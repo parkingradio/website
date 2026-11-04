@@ -99,6 +99,12 @@ call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],
 expect_body_contains '\"offsetMinutes\":null'
 expect_body_contains '\"durationMinutes\":null'
 expect_body_contains '\"soundcloudTrack\":null'
+
+echo "  sessions are listed by when they start, with bounds whose offset has a +"
+call list_sessions '{"from":"2026-11-15T03:00+01:00","to":"2026-11-15T03:01+01:00"}'
+expect_body_contains "\\\"total\\\":1,\\\"sessions\\\":[{\\\"id\\\":\\\"${session}\\\""
+call list_sessions '{"from":"2026-11-15T03:01+01:00","to":"2026-11-15T05:00+01:00"}'
+expect_body_contains '\"total\":0,'
 call delete_session "{\"id\":\"${session}\"}"
 
 call delete_artist "{\"id\":\"${artist}\"}"

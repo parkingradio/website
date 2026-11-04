@@ -13,10 +13,11 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
   daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times with an
   offset from UTC. Requests send them as `YYYY-MM-DDTHH:MM[:SS[.fraction]]`, then `Z` or `±HH:MM`, with any offset, e.g.
-  `"2026-11-14T21:00-05:00"` or `"2026-11-15T02:00Z"`. Responses give them as `YYYY-MM-DDTHH:MM:SS±HH:MM`, in Québec
-  time, to the second, with the fraction of a second dropped, and with the offset from UTC in effect at that instant,
-  e.g. `"2026-11-14T21:00:00-05:00"`, or `"2026-07-01T12:00:00-04:00"` in summer. Days are `"YYYY-MM-DD"`, and times of
-  day `"HH:MM"`, from `"00:00"` to `"23:59"`, both in Québec time, without an offset, e.g. an application's `dates` and
+  `"2026-11-14T21:00-05:00"` or `"2026-11-15T02:00Z"`. In a query string, as in a form, `+` stands for a space, so an
+  offset's `+` is sent as `%2B`. Responses give them as `YYYY-MM-DDTHH:MM:SS±HH:MM`, in Québec time, to the second,
+  with the fraction of a second dropped, and with the offset from UTC in effect at that instant, e.g.
+  `"2026-11-14T21:00:00-05:00"`, or `"2026-07-01T12:00:00-04:00"` in summer. Days are `"YYYY-MM-DD"`, and times of day
+  `"HH:MM"`, from `"00:00"` to `"23:59"`, both in Québec time, without an offset, e.g. an application's `dates` and
   `timeSlots`. The one exception is events' `start` and `end`, which are local dates and times without an offset, as
   Resident Advisor gives them (see [Events](events.md#get-apievents)).
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
@@ -160,7 +161,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
 | [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
-| [`GET /api/admin/sessions`](sessions.md#get-apiadminsessionsartistidtakeoverid-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, with their sets |
+| [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, with their sets |
 | [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session |
 | [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session |

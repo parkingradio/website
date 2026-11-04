@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EARLIEST_INSTANT, LATEST_INSTANT, dateTimeWith } from '../api/formats.js'
+import { instantWith } from '../api/formats.js'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
 import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
@@ -69,7 +69,7 @@ function line(maxLength: number, message: string) {
 }
 
 const START = 'The start must be a date and time with its offset from UTC, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
-const startTime = dateTimeWith(START).refine((date) => date.getTime() >= EARLIEST_INSTANT && date.getTime() < LATEST_INSTANT, START)
+const startTime = instantWith(START)
 
 const NAME_MAX_LENGTH = 100
 

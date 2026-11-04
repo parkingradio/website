@@ -1340,7 +1340,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every session, or those with a set an artist played, or a collective's takeovers, the most recent first */
+        /** Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, the most recent first */
         get: operations["list_sessions"];
         put?: never;
         /** Adds a session, as planned, without sets */
@@ -3956,6 +3956,10 @@ export interface operations {
                 artist?: string;
                 /** @description Only this collective's takeovers. Not with `artist` */
                 takeover?: string;
+                /** @description Only the sessions that start at or after this date and time, with its offset from UTC, e.g. "2026-11-09T00:00-05:00". Leaves out those without a start */
+                from?: string;
+                /** @description Only the sessions that start before this date and time, with its offset from UTC, e.g. "2026-11-16T00:00-05:00". Leaves out those without a start */
+                to?: string;
             };
             header?: never;
             path?: never;
