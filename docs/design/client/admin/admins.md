@@ -32,9 +32,11 @@ be used. While there are none, it says so. Admins only see their own connections
 
 The invite links to `/accept-invite`, where the new admin chooses their password (see
 [`POST /api/auth/accept-invite`](../../server/admins.md#post-apiauthaccept-invite) for what it has to be), typing it
-twice. Once it's saved, the page leads to the login form at `/admin`, which says that it was saved. The link
-`tools/create-admin` gives also leads to `/accept-invite` (see [Roles](../../server/admins.md#roles)). The page is
-outside `/admin`, and doesn't require being logged in.
+twice. Saving it logs out whoever was logged in in that browser, and the page then leads to the login form at `/admin`,
+which says that it was saved. When someone is logged in, the page says so above the form: "Ce navigateur est connecté en
+tant que <email>. Enregistrer ce mot de passe le déconnectera."; while it can't tell, it says nothing. The link `tools/create-admin` gives also leads
+to `/accept-invite` (see [Roles](../../server/admins.md#roles)). The page is outside `/admin`, and doesn't require being
+logged in.
 
 ## Endpoints
 
@@ -43,4 +45,5 @@ outside `/admin`, and doesn't require being logged in.
 - `DELETE /api/admin/admins/:id`, for "révoquer".
 - `GET /api/admin/connections`, for "Vos applications connectées".
 - `DELETE /api/admin/connections/:id`, for "déconnecter".
+- `GET /api/admin/me`, on `/accept-invite`, to say who's logged in.
 - `POST /api/auth/accept-invite`, from `/accept-invite`.

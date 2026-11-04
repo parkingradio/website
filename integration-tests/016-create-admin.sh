@@ -14,10 +14,19 @@ upper_email="$(printf '%s' "$EMAIL" | tr '[:lower:]' '[:upper:]')"
 echo "  a new admin gets an invite link, with which they choose their password"
 create_admin "$EMAIL"
 expect_output "Created admin ${EMAIL}."
-accept_invite "$(invite_token)" first-password
+others_cookie="$(session_of "$ADMIN_EMAIL" "$ADMIN_PASSWORD")"
+accept_invite "$(invite_token)" first-password --header "Cookie: ${others_cookie}"
 expect_status 200
+accept_headers="$HEADERS" # checked below, once the new admin is seen to log in
 login "$IP" "$EMAIL" first-password
 expect_status 200
+
+echo "  which logs out whoever was logged in in that browser, e.g. the admin who invited them, but only there"
+HEADERS="$accept_headers"
+expect_header Set-Cookie 'session=;'
+request --header "Cookie: ${others_cookie}" "${BASE_URL}/api/admin/me"
+expect_status 200
+expect_body_contains "\"email\":\"${ADMIN_EMAIL}\""
 
 echo "  an admin who accepted their invite gets a link that resets their password, whatever the case of the email"
 create_admin "$upper_email"
@@ -42,6 +51,8 @@ create_admin "$PENDING_EMAIL"
 expect_output "${PENDING_EMAIL} hadn't accepted their invite yet: earlier links no longer work."
 accept_invite "$first_token" pending-password
 expect_status 400
+# Which leaves whoever was logged in in that browser so.
+expect_no_header Set-Cookie
 accept_invite "$(invite_token)" pending-password
 expect_status 200
 

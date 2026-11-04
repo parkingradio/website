@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
@@ -14,7 +14,19 @@ export function AcceptInvite() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  // Who's logged in in this browser, if anyone, whom saving the password logs out (see POST /api/auth/accept-invite).
+  const [loggedInAs, setLoggedInAs] = useState<string>()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    let cancelled = false
+    api.GET('/api/admin/me').then((result) => {
+      if (!cancelled && result.ok) setLoggedInAs(result.email)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const acceptInvite = async (event: FormEvent) => {
     event.preventDefault()
@@ -39,6 +51,11 @@ export function AcceptInvite() {
   return (
     <div className="admin-auth">
       <h1>Choisir un mot de passe</h1>
+      {loggedInAs !== undefined && (
+        <p className="admin-notice" role="status">
+          Ce navigateur est connecté en tant que {loggedInAs}. Enregistrer ce mot de passe le déconnectera.
+        </p>
+      )}
       <form className="admin-form" onSubmit={acceptInvite}>
         <label>
           Mot de passe

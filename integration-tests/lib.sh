@@ -84,10 +84,12 @@ invite_token() {
     printf '%s' "$OUTPUT" | sed -n 's/.*accept-invite?token=\([0-9a-f]*\).*/\1/p'
 }
 
-# accept_invite <token> <password> -- accept an invite, choosing a password.
+# accept_invite <token> <password> [curl args...] -- accept an invite, choosing a password.
 accept_invite() {
-    request --header 'Content-Type: application/json' \
-        --data "{\"token\":\"$1\",\"password\":\"$2\"}" "${BASE_URL}/api/auth/accept-invite"
+    local token="$1" password="$2"
+    shift 2
+    request --header 'Content-Type: application/json' "$@" \
+        --data "{\"token\":\"${token}\",\"password\":\"${password}\"}" "${BASE_URL}/api/auth/accept-invite"
 }
 
 # new_admin <email> <password> -- create an admin who accepted their invite, as the create-admin command does.
@@ -245,6 +247,15 @@ expect_body_lacks() {
 expect_header() {
     if ! printf '%s' "$HEADERS" | grep -iEq "^$1: *($2)"; then
         echo "  expected a $1 header matching: $2" >&2
+        printf '%s\n' "$HEADERS" | sed 's/^/    /' >&2
+        exit 1
+    fi
+}
+
+# expect_no_header <name> -- matched case-insensitively, like expect_header's.
+expect_no_header() {
+    if printf '%s' "$HEADERS" | grep -iq "^$1:"; then
+        echo "  expected no $1 header" >&2
         printf '%s\n' "$HEADERS" | sed 's/^/    /' >&2
         exit 1
     fi

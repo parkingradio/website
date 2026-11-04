@@ -113,6 +113,9 @@ export async function authRoutes(app: FastifyInstance, { db }: { db: Queryable }
         return reply.status(400).send({ ok: false, error: 'Invalid or expired invite link' })
       }
 
+      // As logging out does, so that whoever was logged in in this browser, e.g. the admin who sent the invite, isn't
+      // anymore.
+      clearSessionCookie(reply)
       return { ok: true as const }
     },
   )

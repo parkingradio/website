@@ -56,8 +56,10 @@ session is only in the cookie. The admin's connections stay (see [Sessions](#ses
 | `password` | string | At least 8 characters |
 
 Sets the password of the admin `token` invites, and responds `{"ok": true}`. The invite can't be used again, and the
-admin's sessions and connections end, e.g. when the invite resets their password. Fails with 400: missing fields, a
-password that's too short, or an invalid or expired invite.
+admin's sessions and connections end, e.g. when the invite resets their password. It also clears the session cookie, as
+logging out does, so that whoever accepts it in someone else's browser, e.g. that of the admin who sent the invite, then
+logs in as themselves; that admin stays logged in in other browsers. Fails with 400, which changes nothing: missing
+fields, a password that's too short, or an invalid or expired invite.
 
 ## `GET /api/admin/me` (admin)
 

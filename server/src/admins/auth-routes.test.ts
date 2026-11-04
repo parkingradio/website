@@ -276,6 +276,25 @@ describe('auth routes', () => {
       expect(dbState.deleteWhereArgs.slice(1)).toEqual([eq(oauthCodes.userId, 'user-1'), eq(oauthConnections.userId, 'user-1')])
     })
 
+    it("clears the session cookie, logging out whoever was logged in in this browser, e.g. the admin who sent the invite", async () => {
+      const { token } = generateToken()
+      selectResult.rows = [{ userId: 'user-1', expiresAt: new Date(Date.now() + 60_000) }]
+      const app = await buildApp()
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/auth/accept-invite',
+        payload: { token, password: 'new-password-123' },
+        cookies: await sessionCookies(),
+      })
+
+      expect(response.statusCode).toBe(200)
+      const cookie = response.cookies.find((c) => c.name === config.sessionCookie)
+      expect(cookie?.value).toBe('')
+      expect(cookie?.path).toBe('/')
+      expect(cookie?.expires!.getTime()).toBeLessThan(Date.now())
+    })
+
     it('deletes only the redeemed invite, keyed by its token hash, not every invite for the user', async () => {
       // A sibling invite for the same user (e.g. created by a concurrent re-invite)
       // must survive redeeming this one.
@@ -327,10 +346,13 @@ describe('auth routes', () => {
           method: 'POST',
           url: '/api/auth/accept-invite',
           payload: { token, password: 'new-password-123' },
+          cookies: await sessionCookies(),
         })
 
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: 'Invalid or expired invite link' })
+        // Whoever was logged in stays so.
+        expect(response.headers['set-cookie']).toBeUndefined()
       }
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
@@ -344,10 +366,12 @@ describe('auth routes', () => {
         method: 'POST',
         url: '/api/auth/accept-invite',
         payload: { token, password: 'new-password-123' },
+        cookies: await sessionCookies(),
       })
 
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'Invalid or expired invite link' })
+      expect(response.headers['set-cookie']).toBeUndefined()
       expect(dbState.updatedPasswordHashes).toHaveLength(0)
     })
 
