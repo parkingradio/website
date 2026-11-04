@@ -24,22 +24,65 @@ export const IN_QUEBEC_TIME = 'in Québec time, with the offset from UTC in effe
 export const QUEBEC_TIME_RULE = `${IN_QUEBEC_TIME} (${QUEBEC_OFFSETS}), except a time the clocks skip in spring`
 export const DATE_TIME_DESCRIPTION = `A date and time, which can be left without seconds, ${IN_QUEBEC_TIME}`
 
-const offsetFormat = new Intl.DateTimeFormat('en-US', { timeZone: QUEBEC_TIME_ZONE, timeZoneName: 'longOffset' })
+// One formatter per time zone, which gives its offset from UTC, or null for a time zone Intl doesn't know: making one is
+// slow.
+const offsetFormats = new Map<string, Intl.DateTimeFormat | null>()
 
-// Québec's offset from UTC at the instant `ms`, e.g. "-05:00". Before 1895, it isn't whole minutes, e.g. "-05:17:32".
-function quebecOffset(ms: number): string {
+function offsetFormat(zone: string): Intl.DateTimeFormat | null {
+  if (!offsetFormats.has(zone)) {
+    let format = null
+    try {
+      format = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' })
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error
+    }
+    offsetFormats.set(zone, format)
+  }
+  return offsetFormats.get(zone)!
+}
+
+// The offset from UTC of the time zone `zone`, which Intl knows, at the instant `ms`, e.g. "-05:00". Before 1895,
+// Québec's isn't whole minutes, e.g. "-05:17:32".
+function offsetIn(zone: string, ms: number): string {
   // "GMT-05:00", or "GMT" when it's UTC's.
-  return offsetFormat.formatToParts(ms).find(({ type }) => type === 'timeZoneName')!.value.slice('GMT'.length) || '+00:00'
+  return offsetFormat(zone)!.formatToParts(ms).find(({ type }) => type === 'timeZoneName')!.value.slice('GMT'.length) || '+00:00'
+}
+
+// Québec's offset from UTC at the instant `ms`, e.g. "-05:00".
+const quebecOffset = (ms: number) => offsetIn(QUEBEC_TIME_ZONE, ms)
+
+// An offset, e.g. "-05:00" or "+05:45", in milliseconds.
+function offsetMs(offset: string): number {
+  const [hours, minutes, seconds = '0'] = offset.slice(1).split(':')
+  return (offset.startsWith('-') ? -1 : 1) * ((Number(hours) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// The instant it is the local date and time `local`, "YYYY-MM-DDTHH:MM", in the time zone `zone`, or in Québec's when
+// there's none, or Intl doesn't know it. A time the clocks show twice, as they go back, is the first of the two instants,
+// and a time they skip, as they go forward, is moved forward by as much as they skip, e.g. 2:30 becomes 3:30: that's the
+// rule of RFC 5545 and of Temporal ("compatible").
+export function instantIn(given: string | null | undefined, local: string): Date {
+  const zone = given && offsetFormat(given) ? given : QUEBEC_TIME_ZONE
+  const wall = Date.parse(`${local}:00Z`)
+  // The zone's offset at that time is the one it has a day before, or a day after, since clocks change at most once in
+  // between. Each one is right if it gives back that time.
+  const before = wall - offsetMs(offsetIn(zone, wall - DAY_MS))
+  const after = wall - offsetMs(offsetIn(zone, wall + DAY_MS))
+  const right = [before, after].filter((ms) => ms + offsetMs(offsetIn(zone, ms)) === wall)
+  // None is right in a gap, where the offset before it moves the time forward by the gap.
+  return new Date(right.length > 0 ? Math.min(...right) : before)
 }
 
 // `instant` in Québec time, to the second, with the offset from UTC in effect then, e.g. "2026-11-14T21:00:00-05:00" for
-// "2026-11-15T02:00:00.000Z". Only the offset comes from Intl, and the day and time are worked out from it, which is right
-// since 1895, when Québec's offsets became whole minutes: the instants requests send are kept from `EARLIEST_INSTANT`.
+// "2026-11-15T02:00:00.000Z". Only the offset comes from Intl, and the day and time are worked out from it. Before 1895,
+// Québec's offset has seconds, e.g. "-05:17:32", which ISO 8601 doesn't: the instants requests send are kept from
+// `EARLIEST_INSTANT`.
 export function inQuebecTime(instant: Date | string): string {
   const ms = Math.floor(new Date(instant).getTime() / 1000) * 1000
   const offset = quebecOffset(ms)
-  const minutes = (offset.startsWith('-') ? -1 : 1) * (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(4, 6)))
-  return `${new Date(ms + minutes * 60 * 1000).toISOString().slice(0, 19)}${offset}`
+  return `${new Date(ms + offsetMs(offset)).toISOString().slice(0, 19)}${offset}`
 }
 
 // An instant, as responses give it: an ISO 8601 string, which is written in Québec time (see `inQuebecTime`) whatever the
@@ -102,3 +145,20 @@ export function dateTimeWith(message: string) {
 export function instantWith(message: string) {
   return dateTimeWith(message).refine((date) => date.getTime() >= EARLIEST_INSTANT && date.getTime() < LATEST_INSTANT, message)
 }
+
+// The query parameters `from` and `to` of a list of `things` by when they start, e.g. "sessions", as Dates: only those
+// that start at `from` or after it, and before `to`. `note` ends their descriptions. They go with `fromBeforeTo`, in a
+// plugin whose errors are its schemas' messages, as they are (see `firstIssue`), since these are whole sentences.
+export function startRange(things: string, note = '') {
+  const bound = (name: string, when: string, example: string) =>
+    instantWith(`\`${name}\` must be a single date and time ${QUEBEC_TIME_RULE}, e.g. "${example}", from the year 2000 to 2999`)
+      .optional()
+      .meta({ description: `Only the ${things} that start ${when} this date and time, ${IN_QUEBEC_TIME}, e.g. "${example}"${note}` })
+  return { from: bound('from', 'at or after', '2026-11-09T00:00-05:00'), to: bound('to', 'before', '2026-11-16T00:00-05:00') }
+}
+
+// Refines a query with `startRange`: `from` has to be before `to`.
+export const fromBeforeTo = [
+  ({ from, to }: { from?: Date; to?: Date }) => from === undefined || to === undefined || from < to,
+  '`from` must be before `to`',
+] as const

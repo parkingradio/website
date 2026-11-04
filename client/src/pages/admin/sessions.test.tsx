@@ -55,13 +55,14 @@ function raEvent(id: string, title: string, start: string) {
   return { id, title, category: 'other', start, end: null, venue: null, city: null, lineup: [], url: `https://ra.co/events/${id}`, flyer: null }
 }
 
-// RA's events, in no particular order, whose times are RA's, without a time zone.
+// RA's events, as the server orders them: the upcoming ones the soonest first, and the past ones the most recent first.
 const EVENTS = {
   '/api/events': {
     ok: true,
     promoterUrl: 'https://ra.co/promoters/183980',
-    upcoming: [raEvent('2400000', 'PLUS TARD', '2027-01-10T20:00'), raEvent('2300000', 'ONDES TAKEOVER', '2026-12-05T20:00')],
-    past: [raEvent('2100000', 'PLUS TÔT', '2026-09-01T20:00'), raEvent('6683745', 'HAUTE RIVE TAKEOVER', '2026-10-31T23:30')],
+    upcoming: [raEvent('2300000', 'ONDES TAKEOVER', '2026-12-05T20:00:00-05:00'), raEvent('2400000', 'PLUS TARD', '2027-01-10T20:00:00-05:00')],
+    // 23:30 on October 31 in Québec is already November 1 in UTC.
+    past: [raEvent('6683745', 'HAUTE RIVE TAKEOVER', '2026-10-31T23:30:00-04:00'), raEvent('2100000', 'PLUS TÔT', '2026-09-01T20:00:00-04:00')],
   },
 }
 
@@ -953,7 +954,7 @@ describe('Adding a session', () => {
     expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
   })
 
-  it('picks the event on RA among those read from RA, the upcoming ones first, by their day as RA gives it, or takes a pasted link', async () => {
+  it('picks the event on RA among those read from RA, the upcoming ones first, by the day they start in Québec, or takes a pasted link', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
     await fillIn()

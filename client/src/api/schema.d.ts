@@ -534,7 +534,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Parking Radio's events, from Resident Advisor */
+        /** Parking Radio's events on Resident Advisor, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given */
         get: operations["list_events"];
         put?: never;
         post?: never;
@@ -2171,6 +2171,7 @@ export interface components {
             title: string;
             /** @enum {string} */
             category: "synth-meetup" | "other";
+            /** Format: date-time */
             start: string;
             end: string | null;
             venue: string | null;
@@ -2181,7 +2182,9 @@ export interface components {
         };
         Events: {
             promoterUrl: string;
+            /** @description The soonest first */
             upcoming: components["schemas"]["Event"][];
+            /** @description The most recent first: without `from` and `to`, only the 20 most recent */
             past: components["schemas"]["Event"][];
         };
         Feature: {
@@ -2375,7 +2378,12 @@ export type $defs = Record<string, never>;
 export interface operations {
     list_events: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the events that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-09T00:00-05:00" */
+                from?: string;
+                /** @description Only the events that start before this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-16T00:00-05:00" */
+                to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2389,6 +2397,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Events"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

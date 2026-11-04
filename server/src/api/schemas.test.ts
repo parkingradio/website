@@ -5,7 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
-import { inQuebecTime } from './formats.js'
+import { inQuebecTime, instantIn } from './formats.js'
 import { ApiError, Day, Ok, Timestamp, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
@@ -205,5 +205,36 @@ describe('inQuebecTime', () => {
   it('writes the years from 2000 to 2999, in UTC, with 4 digits', () => {
     expect(inQuebecTime('2000-01-01T00:00:00.000Z')).toBe('1999-12-31T19:00:00-05:00')
     expect(inQuebecTime('2999-12-31T23:59:59.999Z')).toBe('2999-12-31T18:59:59-05:00')
+  })
+})
+
+describe('instantIn', () => {
+  const at = (zone: string, local: string) => instantIn(zone, local).toISOString()
+
+  it('gives the instant it is a local date and time in a time zone', () => {
+    expect(at('America/Toronto', '2026-11-14T21:00')).toBe('2026-11-15T02:00:00.000Z')
+    expect(at('America/Toronto', '2026-07-01T12:00')).toBe('2026-07-01T16:00:00.000Z')
+    expect(at('Europe/Paris', '2026-09-25T18:00')).toBe('2026-09-25T16:00:00.000Z')
+    expect(at('Asia/Kolkata', '2026-09-25T18:00')).toBe('2026-09-25T12:30:00.000Z')
+    expect(at('UTC', '2026-09-25T18:00')).toBe('2026-09-25T18:00:00.000Z')
+  })
+
+  it('takes the first of the two instants of a time the clocks show twice', () => {
+    expect(at('America/Toronto', '2026-11-01T01:30')).toBe('2026-11-01T05:30:00.000Z')
+    expect(at('Europe/Paris', '2026-10-25T02:30')).toBe('2026-10-25T00:30:00.000Z')
+    // Lord Howe Island's clocks go back half an hour.
+    expect(at('Australia/Lord_Howe', '2027-04-04T01:45')).toBe('2027-04-03T14:45:00.000Z')
+    expect(at('Australia/Lord_Howe', '2027-04-04T02:15')).toBe('2027-04-03T15:45:00.000Z')
+  })
+
+  it('moves a time the clocks skip forward by as much as they skip', () => {
+    expect(at('America/Toronto', '2027-03-14T02:30')).toBe('2027-03-14T07:30:00.000Z')
+    expect(at('Europe/Paris', '2027-03-28T02:30')).toBe('2027-03-28T01:30:00.000Z')
+    expect(at('Australia/Lord_Howe', '2026-10-04T02:15')).toBe('2026-10-03T15:45:00.000Z')
+  })
+
+  it("reads the time in Québec's time zone when Intl doesn't know the one it's given", () => {
+    expect(at('Mars/Olympus_Mons', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
+    expect(at('', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
   })
 })

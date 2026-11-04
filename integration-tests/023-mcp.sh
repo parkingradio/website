@@ -84,6 +84,9 @@ call read_documentation '{"area":"sessions"}'
 expect_body_contains "\"text\":\"This is Parking Radio's development environment, not the production site"
 expect_body_contains '# Sessions'
 expect_body_lacks '## `GET'
+call read_documentation '{"area":"events"}'
+expect_body_contains '# Events'
+expect_body_lacks '## `GET'
 
 echo "  a request counts as using the connection, at most every few minutes"
 sql "update oauth_connections set last_used_at = now() - interval '10 minutes' where id = '${connection}'" >/dev/null

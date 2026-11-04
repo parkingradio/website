@@ -9,7 +9,7 @@ const raEvent = {
   startTime: '2026-09-25T18:00:00.000',
   endTime: '2026-09-25T22:00:00.000',
   contentUrl: '/events/2512073',
-  venue: { name: 'Parking.Radio', area: { name: 'Quebec City' } },
+  venue: { name: 'Parking.Radio', area: { name: 'Quebec City', ianaTimeZone: 'America/Toronto' } },
   lineup: '<artist id="100001">Nadia Quartz</artist>\u00a0\nDJ ORPHEA\n\nILAN &amp; PAPA V \n',
   artists: [{ name: 'Nadia Quartz' }],
   images: [
@@ -63,8 +63,8 @@ describe('GET /api/events', () => {
           id: '2512073',
           title: 'PLEINE LUNE TAKEOVER',
           category: 'other',
-          start: '2026-09-25T18:00',
-          end: '2026-09-25T22:00',
+          start: '2026-09-25T18:00:00-04:00',
+          end: '2026-09-25T22:00:00-04:00',
           venue: 'Parking.Radio',
           city: 'Quebec City',
           lineup: ['Nadia Quartz', 'DJ ORPHEA', 'ILAN & PAPA V'],
@@ -77,7 +77,7 @@ describe('GET /api/events', () => {
           id: '1',
           title: 'PLEINE LUNE TAKEOVER',
           category: 'other',
-          start: '2026-09-25T18:00',
+          start: '2026-09-25T18:00:00-04:00',
           end: null,
           venue: null,
           city: null,
@@ -92,7 +92,7 @@ describe('GET /api/events', () => {
     expect(JSON.parse(init.body).variables.id).toBe('183980')
   })
 
-  it('asks RA for more upcoming events than the 10 it returns by default', async () => {
+  it('asks RA for more events than the 10 upcoming and 50 past ones it returns by default', async () => {
     fetchMock.mockResolvedValue(Response.json(raResponse))
     const app = await buildApp()
 
@@ -101,7 +101,9 @@ describe('GET /api/events', () => {
     const [, init] = fetchMock.mock.calls[0]
     const { query, variables } = JSON.parse(init.body)
     expect(query).toContain('events(type: LATEST, limit: $upcomingLimit)')
+    expect(query).toContain('events(type: PREVIOUS, limit: $pastLimit)')
     expect(variables.upcomingLimit).toBeGreaterThan(10)
+    expect(variables.pastLimit).toBeGreaterThan(1000)
   })
 
   it.each([
@@ -194,8 +196,8 @@ describe('GET /api/events', () => {
         id: '',
         title: '',
         category: 'other',
-        start: '2026-09-25T18:00',
-        end: '2026-09-26T02:30',
+        start: '2026-09-25T18:00:00-04:00',
+        end: '2026-09-26T02:30:00-04:00',
         venue: '',
         city: null,
         lineup: [],
@@ -204,7 +206,7 @@ describe('GET /api/events', () => {
       },
     ])
     expect(response.json().past).toEqual([
-      expect.objectContaining({ start: '2026-09-25T18:00', end: null, venue: null, city: null, lineup: [], flyer: null }),
+      expect.objectContaining({ start: '2026-09-25T18:00:00-04:00', end: null, venue: null, city: null, lineup: [], flyer: null }),
     ])
   })
 
@@ -236,10 +238,43 @@ describe('GET /api/events', () => {
         }),
     ],
     [
+      'RA returns as many past events as were asked for',
+      () =>
+        Response.json({
+          data: {
+            promoter: {
+              ...raResponse.data.promoter,
+              past: Array.from({ length: 2000 }, (_, i) => ({ ...raEvent, id: String(i) })),
+            },
+          },
+        }),
+    ],
+    [
       "a single event's start time isn't a local time",
       () =>
         Response.json({
           data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-09-25 18:00:00' }] } },
+        }),
+    ],
+    [
+      "a single event starts on a day that doesn't exist",
+      () =>
+        Response.json({
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-02-30T18:00:00.000' }] } },
+        }),
+    ],
+    [
+      "a single event starts in a month that doesn't exist",
+      () =>
+        Response.json({
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-13-01T18:00:00.000' }] } },
+        }),
+    ],
+    [
+      "a single event ends at a time that doesn't exist",
+      () =>
+        Response.json({
+          data: { promoter: { ...raResponse.data.promoter, past: [{ ...raEvent, endTime: '2026-09-25T24:30:00.000' }] } },
         }),
     ],
     [
@@ -315,5 +350,162 @@ describe('GET /api/events', () => {
     vi.advanceTimersByTime(60 * 1000)
     expect((await app.inject({ method: 'GET', url: '/api/events' })).statusCode).toBe(200)
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  // RA answering with these events, each given as its id, its local start, and maybe its venue's time zone.
+  type Spec = [id: string, startTime: string, zone?: string | null]
+  function answer(upcoming: Spec[], past: Spec[] = []) {
+    const toRa = ([id, startTime, zone = 'America/Toronto']: Spec) => ({
+      ...raEvent,
+      id,
+      startTime,
+      endTime: null,
+      contentUrl: `/events/${id}`,
+      venue: { name: 'Somewhere', area: { name: 'Somewhere', ianaTimeZone: zone } },
+    })
+    fetchMock.mockImplementation(async () => Response.json({ data: { promoter: { ...raResponse.data.promoter, upcoming: upcoming.map(toRa), past: past.map(toRa) } } }))
+  }
+
+  async function get(url: string) {
+    const app = await buildApp()
+    return app.inject({ method: 'GET', url })
+  }
+
+  const ids = (events: { id: string }[]) => events.map((event) => event.id)
+
+  it.each([
+    ['in Québec', 'America/Toronto', '2026-09-25T18:00', '2026-09-25T18:00:00-04:00'],
+    ['in another time zone', 'Europe/Paris', '2026-09-25T18:00', '2026-09-25T12:00:00-04:00'],
+    ['with an offset that isn\'t whole hours', 'Asia/Kolkata', '2026-09-25T18:00', '2026-09-25T08:30:00-04:00'],
+    ['without a time zone', null, '2026-09-25T18:00', '2026-09-25T18:00:00-04:00'],
+    ['in a time zone Intl doesn\'t know', 'Mars/Olympus_Mons', '2026-09-25T18:00', '2026-09-25T18:00:00-04:00'],
+    ['at a time the clocks show twice in its time zone', 'Europe/Paris', '2026-10-25T02:30', '2026-10-24T20:30:00-04:00'],
+    ['at a time the clocks skip in its time zone', 'Europe/Paris', '2027-03-28T02:30', '2027-03-27T21:30:00-04:00'],
+  ])("gives the start of an event %s as an instant in Québec time, read in its venue's time zone", async (_, zone, local, start) => {
+    answer([['1', local, zone]])
+
+    const response = await get('/api/events')
+
+    expect(response.json().upcoming[0].start).toBe(start)
+  })
+
+  it("reads the end, and the times of an event without a venue or an area, in Québec's time zone unless the venue says otherwise", async () => {
+    const promoter = {
+      ...raResponse.data.promoter,
+      upcoming: [
+        { ...raEvent, id: 'paris', startTime: '2026-10-24T22:00', endTime: '2026-10-25T05:00', venue: { name: 'Club', area: { name: 'Paris', ianaTimeZone: 'Europe/Paris' } } },
+        { ...raEvent, id: 'no-venue', venue: null },
+        { ...raEvent, id: 'no-area', venue: { name: 'Club', area: null } },
+      ],
+    }
+    fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
+
+    const { upcoming } = (await get('/api/events')).json()
+
+    // The clocks go back during the night in Paris.
+    expect(upcoming.find((event: { id: string }) => event.id === 'paris')).toMatchObject({ start: '2026-10-24T16:00:00-04:00', end: '2026-10-25T00:00:00-04:00' })
+    for (const id of ['no-venue', 'no-area']) {
+      expect(upcoming.find((event: { id: string }) => event.id === id)).toMatchObject({ start: '2026-09-25T18:00:00-04:00', end: '2026-09-25T22:00:00-04:00' })
+    }
+  })
+
+  it('lists the upcoming events the soonest first, and the past ones the most recent first, by when they start', async () => {
+    // 20:00 in Québec is later than 00:30 the next day in Paris.
+    answer(
+      [['quebec', '2026-11-20T20:00'], ['paris', '2026-11-21T00:30', 'Europe/Paris'], ['later', '2026-12-01T20:00']],
+      [['old', '2026-03-29T15:00'], ['recent', '2026-10-31T18:00'], ['middle', '2026-07-01T00:30', 'Europe/Paris'], ['middle-quebec', '2026-06-30T20:00']],
+    )
+
+    const { upcoming, past } = (await get('/api/events')).json()
+
+    expect(ids(upcoming)).toEqual(['paris', 'quebec', 'later'])
+    expect(ids(past)).toEqual(['recent', 'middle-quebec', 'middle', 'old'])
+  })
+
+  const pastDays: Spec[] = Array.from({ length: 25 }, (_, i) => [`past-${i + 1}`, `2026-08-${String(i + 1).padStart(2, '0')}T18:00`])
+
+  it('only gives the 20 most recent past events, without a time range', async () => {
+    answer([['upcoming', '2026-11-14T21:00']], pastDays.toReversed())
+
+    const { upcoming, past } = (await get('/api/events')).json()
+
+    expect(ids(upcoming)).toEqual(['upcoming'])
+    expect(ids(past)).toEqual(pastDays.slice(5).map(([id]) => id).toReversed())
+  })
+
+  it('never lists an event both as upcoming and past', async () => {
+    answer([['both', '2026-11-14T21:00']], [['both', '2026-11-14T21:00'], ['past', '2026-08-01T18:00']])
+
+    const { upcoming, past } = (await get('/api/events')).json()
+
+    expect(ids(upcoming)).toEqual(['both'])
+    expect(ids(past)).toEqual(['past'])
+  })
+
+  it.each([
+    ['from and to, with from included and to excluded', '?from=2026-08-02T18:00-04:00&to=2026-08-04T18:00-04:00', [], ['past-3', 'past-2']],
+    ['from alone, from then on', '?from=2026-08-24T18:00-04:00', ['upcoming-1', 'upcoming-2'], ['past-25', 'past-24']],
+    ['to alone, beyond the 20 most recent past events', '?to=2026-08-03T00:00-04:00', [], ['past-2', 'past-1']],
+    ['a range of upcoming events only', '?from=2026-11-14T21:00-05:00&to=2026-11-21T21:00-05:00', ['upcoming-1'], []],
+    ['a range of both', '?from=2026-08-25T00:00-04:00&to=2026-11-15T00:00-05:00', ['upcoming-1'], ['past-25']],
+    ['a range without any', '?from=2026-09-01T00:00-04:00&to=2026-10-01T00:00-04:00', [], []],
+  ])('gives the events that start in a time range: %s', async (_, query, upcoming, past) => {
+    answer([['upcoming-1', '2026-11-14T21:00'], ['upcoming-2', '2026-11-21T21:00']], pastDays.toReversed())
+
+    const response = await get(`/api/events${query}`)
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ promoterUrl: 'https://ra.co/promoters/183980' })
+    expect(ids(response.json().upcoming)).toEqual(upcoming)
+    expect(ids(response.json().past)).toEqual(past)
+  })
+
+  it("compares the time range with the instants events start at, read in their venue's time zone", async () => {
+    answer([], [['paris', '2026-08-10T02:00', 'Europe/Paris'], ['quebec', '2026-08-10T02:00']])
+
+    const response = await get('/api/events?from=2026-08-09T20:00-04:00&to=2026-08-09T20:01-04:00')
+
+    expect(ids(response.json().past)).toEqual(['paris'])
+  })
+
+  const BAD_BOUND = (name: string) => new RegExp(`^\`${name}\` must be a single date and time in Québec time, with the offset from UTC in effect then \\(.*\\), except a time the clocks skip in spring, e.g. ".*", from the year 2000 to 2999$`)
+
+  it.each([
+    ['from is UTC', '?from=2026-11-14T21:00Z', BAD_BOUND('from')],
+    ["to doesn't have Québec's offset then", '?to=2026-11-14T21:00-04:00', BAD_BOUND('to')],
+    ['from is empty', '?from=', BAD_BOUND('from')],
+    ['from is given twice', '?from=2026-11-14T21:00-05:00&from=2026-11-15T21:00-05:00', BAD_BOUND('from')],
+    ['from is a time the clocks skip', '?from=2027-03-14T02:30-05:00', BAD_BOUND('from')],
+    ['from is before the year 2000', '?from=1999-12-31T00:00-05:00', BAD_BOUND('from')],
+    ['to is a day without a time', '?to=2026-11-14', BAD_BOUND('to')],
+    ['from is to', '?from=2026-11-14T21:00-05:00&to=2026-11-14T21:00-05:00', /^`from` must be before `to`$/],
+    ['from is after to', '?from=2026-11-15T21:00-05:00&to=2026-11-14T21:00-05:00', /^`from` must be before `to`$/],
+  ])('responds 400 without asking RA when %s', async (_, query, error) => {
+    answer([])
+
+    const response = await get(`/api/events${query}`)
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ ok: false, error: expect.stringMatching(error) })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('responds 502 with a time range too when the events can\'t be read from RA', async () => {
+    fetchMock.mockResolvedValue(new Response('nope', { status: 500 }))
+
+    const response = await get('/api/events?from=2026-08-01T00:00-04:00')
+
+    expect(response.statusCode).toBe(502)
+    expect(response.json()).toEqual({ ok: false, error: 'Events are unavailable right now' })
+  })
+
+  it('asks RA once for every time range, and without one', async () => {
+    answer([['upcoming', '2026-11-14T21:00']], pastDays)
+    const app = await buildApp()
+
+    for (const query of ['', '?from=2026-08-01T00:00-04:00', '?to=2026-08-10T00:00-04:00', '?from=2026-08-05T00:00-04:00&to=2026-12-01T00:00-05:00']) {
+      expect((await app.inject({ method: 'GET', url: `/api/events${query}` })).statusCode).toBe(200)
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

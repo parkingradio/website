@@ -4,14 +4,27 @@ import type { Schema } from '../api/client'
 import { mockFetch, requestsTo } from '../test-utils'
 import { Programmation, ProgrammationList } from './programmation'
 
+// The events as the server gives them: the upcoming ones the soonest first, and the past ones the most recent first.
 const data: Schema<'Events'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
     {
+      id: 'soon',
+      title: 'Soon Party',
+      category: 'other',
+      start: '2026-10-03T22:00:00-04:00',
+      end: '2026-10-04T03:00:00-04:00',
+      venue: 'Venue A',
+      city: 'Montréal',
+      lineup: ['Artist A', 'Artist B'],
+      url: 'https://ra.co/events/1',
+      flyer: 'https://images.ra.co/soon.png',
+    },
+    {
       id: 'later',
       title: 'Later Party',
       category: 'other',
-      start: '2026-11-07T21:00',
+      start: '2026-11-07T21:00:00-05:00',
       end: null,
       venue: 'Venue B',
       city: 'Québec',
@@ -19,42 +32,30 @@ const data: Schema<'Events'> = {
       url: 'https://ra.co/events/2',
       flyer: null,
     },
-    {
-      id: 'soon',
-      title: 'Soon Party',
-      category: 'other',
-      start: '2026-10-03T22:00',
-      end: '2026-10-04T03:00',
-      venue: 'Venue A',
-      city: 'Montréal',
-      lineup: ['Artist A', 'Artist B'],
-      url: 'https://ra.co/events/1',
-      flyer: 'https://images.ra.co/soon.png',
-    },
   ],
   past: [
-    {
-      id: 'older',
-      title: 'Older Party',
-      category: 'other',
-      start: '2026-08-16T19:00',
-      end: null,
-      venue: null,
-      city: null,
-      lineup: [],
-      url: 'https://ra.co/events/3',
-      flyer: null,
-    },
     {
       id: 'recent',
       title: 'Recent Party',
       category: 'other',
-      start: '2026-09-05T22:00',
+      start: '2026-09-05T22:00:00-04:00',
       end: null,
       venue: 'Venue A',
       city: 'Montréal',
       lineup: [],
       url: 'https://ra.co/events/4',
+      flyer: null,
+    },
+    {
+      id: 'older',
+      title: 'Older Party',
+      category: 'other',
+      start: '2026-08-16T19:00:00-04:00',
+      end: null,
+      venue: null,
+      city: null,
+      lineup: [],
+      url: 'https://ra.co/events/3',
       flyer: null,
     },
   ],
@@ -87,7 +88,7 @@ describe('Programmation', () => {
 })
 
 describe('ProgrammationList', () => {
-  it('lists upcoming events soonest first, grouped by month', () => {
+  it('lists upcoming events in the order the server gives, the soonest first, grouped by month', () => {
     render(<ProgrammationList data={data} />)
     expect(eventTitles()).toEqual(['Soon Party', 'Later Party'])
     const months = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
@@ -117,7 +118,7 @@ describe('ProgrammationList', () => {
     )
   })
 
-  it('shows past events, most recent first, when switching to "passés"', () => {
+  it('shows past events, in the order the server gives, the most recent first, when switching to "passés"', () => {
     render(<ProgrammationList data={data} />)
     fireEvent.click(screen.getByRole('button', { name: 'passés' }))
     expect(screen.getByRole('button', { name: 'passés' })).toHaveAttribute('aria-pressed', 'true')
@@ -148,6 +149,25 @@ describe('ProgrammationList', () => {
     expect(row).toHaveTextContent('parking.radio · Québec')
     expect(row).toHaveTextContent('parking.radio crew')
     expect(row.textContent).not.toMatch(/Parking\.Radio|PARKING\.RADIO|Parking\.radio/)
+  })
+
+  it("shows days and times in Québec time, whatever the browser's time zone", async () => {
+    // Loaded again in Tokyo's time zone, since formatters keep the one they're created in, where 22:00 on October 31 in
+    // Québec is already 11:00 on November 1.
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.resetModules()
+    try {
+      const { ProgrammationList: TokyoList } = await import('./programmation')
+      const halloween = { ...data.upcoming[0], id: 'halloween', title: 'Halloween', start: '2026-10-31T22:00:00-04:00', end: '2026-11-01T02:00:00-05:00' }
+      render(<TokyoList data={{ ...data, upcoming: [halloween] }} />)
+
+      expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['octobre 2026'])
+      const row = screen.getByRole('heading', { name: 'Halloween' }).closest('li')!
+      expect(row.querySelector('.event-date')).toHaveTextContent('sam31oct')
+      expect(row).toHaveTextContent('22 h 00 – 02 h 00')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('says so when nothing is coming up', () => {

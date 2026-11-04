@@ -19,8 +19,9 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   show twice in the fall is sent with either offset, each its own instant. Responses give them as
   `YYYY-MM-DDTHH:MM:SS±HH:MM`, to the second, with the fraction of a second dropped, e.g. `"2026-11-14T21:00:00-05:00"`.
   Days are `"YYYY-MM-DD"`, and times of day `"HH:MM"`, from `"00:00"` to `"23:59"`, both in Québec time, without an
-  offset, e.g. an application's `dates` and `timeSlots`. The one exception is events' `start` and `end`, which are local
-  dates and times without an offset, as Resident Advisor gives them (see [Events](events.md#get-apievents)).
+  offset, e.g. an application's `dates` and `timeSlots`. Events' `start` and `end` are instants too: Resident Advisor
+  gives them as local times, which the server reads in the time zone of the event's venue (see
+  [Events](events.md#times)).
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,
@@ -172,6 +173,6 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Changing a set |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set |
-| [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor |
+| [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

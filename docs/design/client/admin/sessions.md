@@ -96,10 +96,10 @@ known collective. From top to bottom, the form has:
   [Artistes](artistes.md), or "Aucun takeover".
 - "Nom": free text, e.g. "HAUTE RIVE TAKEOVER".
 - "Événement RA": the link to the event's page on RA, or picked from the events read from RA (see
-  [Events](../../server/events.md)), each with its day, the upcoming ones first, the soonest first, then the past ones,
-  the most recent first, which fills in its link. Older events are given by pasting their link. "Aucun événement RA"
-  leaves it out. The form doesn't wait for RA: until the events are read, or when they can't be, the link can still be
-  pasted, and the form says when they couldn't be.
+  [Events](../../server/events.md)), each with the day it starts on in Québec, the upcoming ones first, the soonest
+  first, then the past ones, the most recent first, which fills in its link. Older events are given by pasting their
+  link. "Aucun événement RA" leaves it out. The form doesn't wait for RA: until the events are read, or when they can't
+  be, the link can still be pasted, and the form says when they couldn't be.
 
 When the collectives can't be loaded, the form says so: the session's takeover stays, but another one can't be picked.
 

@@ -75,9 +75,7 @@ Québec time, with or without seconds, with the offset from UTC in effect then, 
 1:30 on November 1, 2026, takes the offset of the one it is: -04:00 for the first, -05:00 for the second. Responses give
 it, and the `start` and `end` the server works out, in Québec time, to the second, with the offset in effect then, e.g.
 `"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from the year 2000 to the
-year 2999, in UTC, and can be in the past or in the future. The `start` and `end` of the events that
-[`GET /api/events`](events.md#get-apievents) gives, which sessions link to (see [Links](#links)), are local times
-instead, without an offset, as RA gives them.
+year 2999, in UTC, and can be in the past or in the future.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
 moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set
@@ -168,8 +166,8 @@ Requests send each of these as a string, or null, or a blank string, when there'
 
 - A session's `raEvent`: the event's id on RA, which is only digits, up to 20, as
   [`GET /api/events`](events.md#get-apievents) gives it, e.g. `"6683745"`, or a link to its page,
-  `https://ra.co/events/<id>`. It isn't checked against RA, so events older than those `GET /api/events` returns can be
-  pasted. Several sessions can have the same one.
+  `https://ra.co/events/<id>`. It isn't checked against RA, so any event can be given, e.g. one older than those
+  `GET /api/events` gives without a time range. Several sessions can have the same one.
 - A set's `soundcloudTrack`: a link to the track on soundcloud.com, e.g.
   `https://soundcloud.com/parkingdotradio/3tons`, or a private track's private link, which ends with its secret, e.g.
   `https://soundcloud.com/parkingdotradio/3tons/s-AbC123`. Other links, e.g. the `on.soundcloud.com` ones that

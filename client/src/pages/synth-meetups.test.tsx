@@ -19,14 +19,15 @@ function event(id: string, category: Schema<'Event'>['category'], start: string)
   }
 }
 
+// The events as the server gives them: the upcoming ones the soonest first.
 const events: Schema<'Events'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
-    event('later', 'synth-meetup', '2026-11-11T18:00'),
-    event('mixes', 'other', '2026-10-09T11:00'),
-    event('soon', 'synth-meetup', '2026-10-07T18:00'),
+    event('soon', 'synth-meetup', '2026-10-07T18:00:00-04:00'),
+    event('mixes', 'other', '2026-10-09T11:00:00-04:00'),
+    event('later', 'synth-meetup', '2026-11-11T18:00:00-05:00'),
   ],
-  past: [event('past', 'synth-meetup', '2026-09-23T18:00')],
+  past: [event('past', 'synth-meetup', '2026-09-23T18:00:00-04:00')],
 }
 
 describe('SynthMeetups', () => {
@@ -73,7 +74,7 @@ describe('SynthMeetups', () => {
     expect(lightbox).toBeEmptyDOMElement()
   })
 
-  it('lists the upcoming synth meetups from the server, soonest first, linking to RA', async () => {
+  it('lists the upcoming synth meetups in the order the server gives, the soonest first, linking to RA', async () => {
     render(<SynthMeetups />)
 
     const links = await screen.findAllByRole('link', { name: /^mercredi/ })
@@ -84,8 +85,24 @@ describe('SynthMeetups', () => {
     expect(requestsTo('GET', '/api/events')).toHaveLength(1)
   })
 
+  it("gives the days of the synth meetups in Québec time, whatever the browser's time zone", async () => {
+    // Loaded again in Tokyo's time zone, since formatters keep the one they're created in, where 18:00 on Wednesday,
+    // October 7 in Québec is already Thursday.
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.resetModules()
+    try {
+      const { SynthMeetups: TokyoMeetups } = await import('./synth-meetups')
+      render(<TokyoMeetups />)
+
+      const links = await screen.findAllByRole('link', { name: /^mercredi/ })
+      expect(links.map((link) => link.textContent)).toEqual(['mercredi 7 octobre 2026', 'mercredi 11 novembre 2026'])
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('says so when no synth meetup is coming up', async () => {
-    mockFetch({ '/api/events': { ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00')] } })
+    mockFetch({ '/api/events': { ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00:00-04:00')] } })
     render(<SynthMeetups />)
 
     expect(await screen.findByText(/aucune date annoncée/)).toBeInTheDocument()

@@ -1,6 +1,7 @@
 // Times in Québec, where the studio is, whatever the time zone of the browser: the admin pages show and take every date
 // and time in Québec time (see docs/design/client/admin/layout.md), e.g. those of sessions and sets (see
-// docs/design/client/admin/sessions.md). It imports nothing, so that the seed (e2e/seed.ts) can use it too.
+// docs/design/client/admin/sessions.md), and the public pages show events' in Québec time too (see
+// docs/design/client/programmation.md). It imports nothing, so that the seed (e2e/seed.ts) can use it too.
 
 export const QUEBEC_TIME_ZONE = 'America/Toronto'
 const MINUTE_MS = 60 * 1000
@@ -22,6 +23,15 @@ export function quebecDayAndTime(instant: Date): { day: string; time: string } {
   const parts: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
   for (const { type, value } of partsFormat.formatToParts(instant)) parts[type] = value
   return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+}
+
+// The admin lists' search relies on the day, the month written out and the year being next to each other, in that order
+// (see search in pages/admin/list.ts).
+const longDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
+
+// E.g. "samedi 14 novembre 2026", the day of `instant` (ISO 8601) in Québec.
+export function formatLongQuebecDay(instant: string): string {
+  return longDayFormat.format(new Date(instant))
 }
 
 // How many minutes Québec's clocks are ahead of UTC at the instant `ms`, e.g. -300 in winter.

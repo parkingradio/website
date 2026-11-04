@@ -2,14 +2,19 @@ import { useState } from 'react'
 import type { Schema } from '../api/client'
 import { useApi } from '../api/use-api'
 import { RA_PROMOTER_URL } from '../events'
+import { QUEBEC_TIME_ZONE } from '../quebec-time'
 import './programmation.css'
 
 type Filter = 'upcoming' | 'past'
 
-const monthFormat = new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric' })
-const weekdayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short' })
-const shortMonthFormat = new Intl.DateTimeFormat('fr-CA', { month: 'short' })
-const timeFormat = new Intl.DateTimeFormat('fr-CA', { hour: '2-digit', minute: '2-digit' })
+// Events' days and times are in Québec time, like the rest of the site, whatever the time zone of the browser or of the
+// event's venue.
+const inQuebec = { timeZone: QUEBEC_TIME_ZONE } as const
+const monthFormat = new Intl.DateTimeFormat('fr-CA', { ...inQuebec, month: 'long', year: 'numeric' })
+const weekdayFormat = new Intl.DateTimeFormat('fr-CA', { ...inQuebec, weekday: 'short' })
+const dayFormat = new Intl.DateTimeFormat('fr-CA', { ...inQuebec, day: 'numeric' })
+const shortMonthFormat = new Intl.DateTimeFormat('fr-CA', { ...inQuebec, month: 'short' })
+const timeFormat = new Intl.DateTimeFormat('fr-CA', { ...inQuebec, hour: '2-digit', minute: '2-digit' })
 
 // The name is always written in lowercase, whatever the capitalization in RA (which has the venue as
 // "Parking.Radio").
@@ -54,9 +59,8 @@ export function Programmation() {
 export function ProgrammationList({ data }: { data: Schema<'Events'> }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
-  const shown = [...(filter === 'upcoming' ? data.upcoming : data.past)].sort(
-    (a, b) => (filter === 'upcoming' ? 1 : -1) * a.start.localeCompare(b.start),
-  )
+  // In the server's order: the soonest first, or the most recent first.
+  const shown = filter === 'upcoming' ? data.upcoming : data.past
 
   return (
     <div className="programmation">
@@ -111,7 +115,7 @@ function EventRow({ event }: { event: Schema<'Event'> }) {
     <li className="event">
       <time className="event-date" dateTime={event.start}>
         <span className="weekday">{weekdayFormat.format(start).replace('.', '')}</span>
-        <span className="day">{start.getDate()}</span>
+        <span className="day">{dayFormat.format(start)}</span>
         <span className="short-month">{shortMonthFormat.format(start).replace('.', '')}</span>
       </time>
       {event.flyer ? (

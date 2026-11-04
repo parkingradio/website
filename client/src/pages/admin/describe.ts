@@ -4,7 +4,7 @@ import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { QUEBEC_TIME_ZONE, quebecDayAndTime } from '../../quebec-time'
+import { QUEBEC_TIME_ZONE, formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
 import type { Session, SessionStatus, StudioSet } from '../../session-fields'
 import type { ComboboxOption } from '../../combobox'
 import { compareText } from './list'
@@ -228,9 +228,6 @@ export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: str
 // Sessions' and sets' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
 // and their names (see docs/design/client/admin/sessions.md).
 const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
-// The lists' search relies on the day, the month written out and the year being next to each other, in that order (see
-// search in list.ts).
-const longQuebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
 
 // What's shown in place of the day of a session whose date isn't known yet.
 const UNDATED = 'date à déterminer'
@@ -238,11 +235,6 @@ const UNDATED = 'date à déterminer'
 // E.g. "sam. 14 nov. 2026", the day of `instant` (ISO 8601) in Québec.
 function formatQuebecDay(instant: string): string {
   return quebecDayFormat.format(new Date(instant))
-}
-
-// E.g. "samedi 14 novembre 2026".
-export function formatLongQuebecDay(instant: string): string {
-  return longQuebecDayFormat.format(new Date(instant))
 }
 
 // E.g. "21 h", or "21 h 30", for `minutes` (of a day, or of a duration).

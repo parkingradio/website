@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useAssetUrl } from '../config-context'
 import { useApi } from '../api/use-api'
 import { RA_PROMOTER_URL } from '../events'
+import { formatLongQuebecDay } from '../quebec-time'
 import './synth-meetups.css'
 
 // Most recent first, so the gallery shows newer posters higher up.
@@ -48,8 +49,6 @@ type Poster = (typeof POSTERS)[number]
 
 const NDI_URL = 'https://ndi.video/tools/'
 
-const dateFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-
 function UpcomingDates() {
   const events = useApi('/api/events')
 
@@ -66,9 +65,8 @@ function UpcomingDates() {
   }
   if (events.kind === 'loading') return <p>chargement…</p>
 
-  const meetups = events.value.upcoming
-    .filter((event) => event.category === 'synth-meetup')
-    .sort((a, b) => a.start.localeCompare(b.start))
+  // In the server's order: the soonest first.
+  const meetups = events.value.upcoming.filter((event) => event.category === 'synth-meetup')
   if (meetups.length === 0) return <p>aucune date annoncée pour le moment. revenez bientôt.</p>
 
   return (
@@ -76,7 +74,7 @@ function UpcomingDates() {
       {meetups.map((meetup) => (
         <li key={meetup.id}>
           <a href={meetup.url} target="_blank" rel="noreferrer">
-            <time dateTime={meetup.start}>{dateFormat.format(new Date(meetup.start))}</time>
+            <time dateTime={meetup.start}>{formatLongQuebecDay(meetup.start)}</time>
           </a>
         </li>
       ))}

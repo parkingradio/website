@@ -86,11 +86,10 @@ Each tool's name is its endpoint's operation id in `server/openapi.json`, in sna
 the field it changes, if it only changes one, e.g. `list_sessions` for `GET /api/admin/sessions`, `create_set` for
 `POST /api/admin/sessions/:id/sets`, or `update_set_status` for `PUT /api/admin/sets/:id/status`. Its description starts
 by pointing to its area's rules in `read_documentation`, e.g. "Once per conversation, before using it, read the rules
-with `read_documentation`, area `sessions`.": the area whose document has its endpoint, or `sessions` for
-`GET /api/events`, whose events sessions link to. Then it's its endpoint's summary, which says what it does, including
-what else it changes, e.g. "Deletes an artist, their photo and their applications, and takes them out of their
-collectives and their sets". It also has a title in French, which admins see when an app asks them to confirm a change,
-e.g. "Supprimer un artiste".
+with `read_documentation`, area `sessions`.": the area whose document has its endpoint. Then it's its endpoint's
+summary, which says what it does, including what else it changes, e.g. "Deletes an artist, their photo and their
+applications, and takes them out of their collectives and their sets". It also has a title in French, which admins see
+when an app asks them to confirm a change, e.g. "Supprimer un artiste".
 
 ### Arguments
 
@@ -143,12 +142,12 @@ own. Every tool has `openWorldHint` set to `false`.
 
 Gives the model the rules of an area, e.g. the rules sessions and sets follow, their statuses and what deleting them
 does, rather than finding them out from errors. It takes `area`, one of `radio`, `artists`, `collectives`,
-`applications` and `sessions`, and gives the instructions (see [The endpoint](#the-endpoint)), as they are, the sentence
-about the environment included, for the apps that don't give them to the model, then the part of that area's document
-in this directory before its first endpoint, as it is, except for its links, which the model can't follow: a link to
-another of these areas says to read it with `read_documentation`, and the others only keep their text. That part is,
-e.g., [Sessions](sessions.md) from its beginning to
-[`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin). The endpoints are left out,
-since the tools already say what they take and give, and so is what comes after them, e.g. applying through the form
-and its emails, in [Applications](applications.md), which tools don't do. Those parts of the documents are therefore
-written so that they're enough to use the API correctly (see [Design](../README.md)).
+`applications`, `sessions` and `events`, and gives the instructions (see [The endpoint](#the-endpoint)), as they are,
+the sentence about the environment included, for the apps that don't give them to the model, then the part of that
+area's document in this directory before its first endpoint, as it is, except for its links, which the model can't
+follow: a link to another of these areas says to read it with `read_documentation`, and the others only keep their text.
+That part is, e.g., [Sessions](sessions.md) from its beginning to
+[`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin). The endpoints are left out, since the tools already
+say what they take and give, and so is what comes after them, e.g. applying through the form and its emails, in
+[Applications](applications.md), which tools don't do. Those parts of the documents are therefore written so that
+they're enough to use the API correctly (see [Design](../README.md)).

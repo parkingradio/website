@@ -4,12 +4,12 @@ import type { Loaded } from '../../api/use-api'
 import type { Schema } from '../../api/client'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
-import { quebecDayAndTime } from '../../quebec-time'
+import { formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
 import { after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes } from '../../session-fields'
 import type { Reference, SessionFields, SessionFormValues } from '../../session-fields'
 import { raEventId, raEventUrl } from '../../session-links'
 import { leaving, useCheckedForm } from './checked-form'
-import { collectiveOption, formatDuration, formatLongQuebecDay, formatShortDay } from './describe'
+import { collectiveOption, formatDuration, formatShortDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
 import { compareText } from './list'
 import type { GroupProps } from './profile-fields'
@@ -177,13 +177,13 @@ function TakeoverField({ takeover, collectives, onChange }: { takeover: Referenc
 // events are pasted.
 function RaEventField({ link, events: loaded, onChange, error, onLeave }: GroupProps<string> & { link: string; events: Loaded<Schema<'Events'>> }) {
   const pickerId = useId()
-  // The upcoming ones, the soonest first, then the past ones, the most recent first.
-  const events =
-    loaded.kind === 'loaded'
-      ? [...loaded.value.upcoming.toSorted((a, b) => a.start.localeCompare(b.start)), ...loaded.value.past.toSorted((a, b) => b.start.localeCompare(a.start))]
-      : []
-  // Events' days are RA's, without a time zone: the day is the start's, as it's written.
-  const options = [{ key: '', label: 'Aucun événement RA' }, ...events.map((event) => ({ key: event.id, label: event.title, detail: formatShortDay(event.start.slice(0, 10)) }))]
+  // The upcoming ones, the soonest first, then the past ones, the most recent first, as the server orders them.
+  const events = loaded.kind === 'loaded' ? [...loaded.value.upcoming, ...loaded.value.past] : []
+  // Each with the day it starts on in Québec.
+  const options = [
+    { key: '', label: 'Aucun événement RA' },
+    ...events.map((event) => ({ key: event.id, label: event.title, detail: formatShortDay(quebecDayAndTime(new Date(event.start)).day) })),
+  ]
   // The event the link leads to, if it's one of those read from RA, or none when there's no link.
   const id = link.trim() ? raEventId(link.trim()) : ''
   const selected = id !== null && options.some((option) => option.key === id) ? id : null

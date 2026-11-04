@@ -1509,13 +1509,13 @@
           },
           "start": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$"
+            "format": "date-time"
           },
           "end": {
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$"
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -1574,13 +1574,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Event"
-            }
+            },
+            "description": "The soonest first"
           },
           "past": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Event"
-            }
+            },
+            "description": "The most recent first: without `from` and `to`, only the 20 most recent"
           }
         },
         "required": [
@@ -3065,9 +3067,29 @@
     "/api/events": {
       "get": {
         "operationId": "list_events",
-        "summary": "Parking Radio's events, from Resident Advisor",
+        "summary": "Parking Radio's events on Resident Advisor, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given",
         "tags": [
           "Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "Only the events that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. \"2026-11-09T00:00-05:00\""
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "Only the events that start before this date and time, in Québec time, with the offset from UTC in effect then, e.g. \"2026-11-16T00:00-05:00\""
+          }
         ],
         "responses": {
           "200": {
@@ -3076,6 +3098,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Events"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
