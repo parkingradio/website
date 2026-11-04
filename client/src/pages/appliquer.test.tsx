@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { BoundFunctions, queries } from '@testing-library/react'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { GENRES } from '../artist-profile'
+import { GENRES, PHOTO_MAX_BYTES } from '../artist-profile'
 import { requestsTo } from '../test-utils'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
@@ -175,6 +175,13 @@ function memberProfile(n: number) {
 // Picks a photo with the file input in `scope`, which only the button that opens it shows.
 function pickPhoto(scope: HTMLElement, photo: File) {
   fireEvent.change(scope.querySelector('input[type=file]')!, { target: { files: [photo] } })
+}
+
+// A JPEG photo just over the size limit, which only claims to be that large, since only its size is checked.
+function tooLarge(name: string) {
+  const photo = new File(['fake'], name, { type: 'image/jpeg' })
+  Object.defineProperty(photo, 'size', { value: PHOTO_MAX_BYTES + 1 })
+  return photo
 }
 
 // Fills the profile of the nth artist of the collective, which is shown.
@@ -736,14 +743,56 @@ describe('Appliquer', () => {
     expect(sentParts().photo).toBeNull()
   })
 
-  it('says what is wrong with a photo that is not an image, and sends nothing', async () => {
+  it('says right away what is wrong with a photo that is not an image, and sends nothing', async () => {
     renderForm()
     await fillIn()
-    fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['gif'], 'presse.gif', { type: 'image/gif' })] } })
-    fireEvent.click(screen.getByRole('button', { name: 'envoyer ma candidature' }))
+    pickPhoto(document.body, new File(['gif'], 'presse.gif', { type: 'image/gif' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('La photo doit être en JPEG, PNG ou WebP.')
 
-    expect(await screen.findByText('La photo doit être en JPEG, PNG ou WebP.')).toBeInTheDocument()
+    await send()
     expect(applications()).toEqual([])
+  })
+
+  it('says right away that a photo is too large, keeps it until it is changed or removed, and sends nothing', async () => {
+    renderForm()
+    await fillIn()
+    const button = screen.getByLabelText(/^Photo/)
+    pickPhoto(document.body, tooLarge('grande.jpg'))
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('La photo dépasse 10 Mo.')
+    expect(button).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('grande.jpg')).toBeInTheDocument()
+
+    // Another one that's too large is announced again.
+    pickPhoto(document.body, tooLarge('encore.jpg'))
+    expect(screen.getByRole('alert')).not.toBe(alert)
+    expect(screen.getByRole('alert')).toHaveTextContent('La photo dépasse 10 Mo.')
+
+    await send()
+    expect(button).toHaveFocus()
+    expect(applications()).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
+    expect(screen.queryByText('La photo dépasse 10 Mo.')).not.toBeInTheDocument()
+    expect(button).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('shows only the photo error before the form is sent, even when the rest is empty', () => {
+    renderForm()
+    pickPhoto(document.body, tooLarge('grande.jpg'))
+
+    expect([...document.querySelectorAll('.error')].map((error) => error.textContent)).toEqual(['La photo dépasse 10 Mo.'])
+    expect(screen.queryByText(/champs sont à remplir|Il manque un champ/)).not.toBeInTheDocument()
+  })
+
+  it("says right away that a photo of one of a collective's artists is too large", async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une', { photo: tooLarge('une.jpg') })
+
+    expect(within(memberProfile(1)).getByRole('alert')).toHaveTextContent('La photo dépasse 10 Mo.')
+    expect(within(memberProfile(1)).getByLabelText(/^Photo/)).toHaveAttribute('aria-invalid', 'true')
   })
 
   it("doesn't ask GeoNames again for a city that was picked from its suggestions", async () => {

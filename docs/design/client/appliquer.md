@@ -25,7 +25,9 @@ The fields of an artist applying alone are (* means mandatory):
 - "Genres musicaux" (*): 1 to 3 genres from a list grouped by family, in order: the first one is the artist's
   main genre.
 - "Photo de profil": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a
-  good quality press photo of the artist. A photo that was picked can be removed.
+  good quality press photo of the artist. A photo that was picked can be removed. It's checked as soon as it's picked:
+  one that isn't a JPEG, PNG or WebP image of up to 10 MB says why right away, which screen readers announce, and stays
+  picked until it's changed or removed.
 - "Bio" (*): free-form text, up to 1500 characters.
 - "Liens" (*, at least one): one field per site (SoundCloud, Instagram, website and Bandcamp are always shown;
   Mixcloud, Resident Advisor, YouTube, Spotify and TikTok can be added). Each field shows the site's address
@@ -68,10 +70,11 @@ server's), as tabs above the profile of the one selected:
   "Ville" (*), "Genres musicaux" (*), "Photo de profil" (optional), "Bio" (*) and "Liens" (*). It has no email address
   or phone number. The profiles that aren't selected keep what they show, e.g. a link field that was added.
 
-A link's error shows as soon as it's pasted or its field is left. Other errors only show once the artist tries to send
-the form, which brings them to the first field to fix. For a collective, the profile of the first of its artists with
-errors is then selected, and the first field to fix may be in it. After that, errors update as the fields are fixed, and
-the form says how many are left to fix, counting those in every artist's profile.
+A link's error shows as soon as it's pasted or its field is left, and a photo's as soon as it's picked. Other errors
+only show once the artist tries to send the form, which brings them to the first field to fix. For a collective, the
+profile of the first of its artists with errors is then selected, and the first field to fix may be in it. After that,
+errors update as the fields are fixed, and the form says how many are left to fix, counting those in every artist's
+profile.
 
 Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without them
 having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't be sent

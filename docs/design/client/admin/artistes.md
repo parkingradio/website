@@ -52,9 +52,9 @@ some.
 "ajouter un artiste" adds an artist by hand, at `/admin/artistes/nouveau`, with the same form. Genres are tags to click,
 which pins them in order of importance, and the country is typed, with the matching countries suggested, of which one
 has to be picked, "Pays inconnu" leaving it out. It starts on Canada. Each field says what's wrong with it once it's
-left: the form checks the profile as the server does for admins (see [Profiles](../../server/artists.md#profiles)), for
-immediate feedback. The server's check is the one that counts: if it refuses what the form accepted, the form shows the
-server's message.
+left, which a photo is as soon as it's chosen: the form checks the profile as the server does for admins (see
+[Profiles](../../server/artists.md#profiles)), for immediate feedback. The server's check is the one that counts: if it
+refuses what the form accepted, the form shows the server's message.
 
 The form only adds artists: collectives are added with "ajouter un collectif".
 

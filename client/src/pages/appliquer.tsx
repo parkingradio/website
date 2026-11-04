@@ -14,7 +14,7 @@ import { DatePicker } from './appliquer/date-picker'
 import { emptyMember } from './appliquer/members'
 import type { Member, MemberErrors } from './appliquer/members'
 import { MembersField } from './appliquer/members-field'
-import { fieldId } from './appliquer/profile'
+import { fieldId, shownErrors } from './appliquer/profile'
 import type { Profile } from './appliquer/profile'
 import { FieldError, IdentityFields, PlaceFields, PresentationFields } from './appliquer/profile-fields'
 import { Turnstile } from './appliquer/turnstile'
@@ -161,7 +161,8 @@ function Part({ number, title, note, children }: { number: string; title: string
 export function Appliquer() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [status, setStatus] = useState<Status>({ state: 'editing' })
-  // Errors only show once the artist tries to send the form. After that, they update as fields are fixed.
+  // Errors only show once the artist tries to send the form, but for a photo's (see `shownErrors`). After that, they
+  // update as fields are fixed.
   const [attempts, setAttempts] = useState(0)
   // Computed once: the range shouldn't move under the artist's feet if the page stays open past midnight.
   const [{ first, last }] = useState(() => selectableDates(new Date()))
@@ -183,7 +184,7 @@ export function Appliquer() {
   const update = <K extends keyof Form>(key: K, value: Form[K]) => edit((current) => ({ ...current, [key]: value }))
   const change = (changes: Partial<Form>) => edit((current) => ({ ...current, ...changes }))
   const result = checked(form)
-  const errors = attempts > 0 ? result.errors : {}
+  const errors = shownErrors(result.errors, attempts > 0)
   const errorCount = attempts > 0 ? result.count : 0
 
   // After a failed attempt, bring the artist to the first field to fix (only then, not on every change), but not to one in

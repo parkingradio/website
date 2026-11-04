@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { MAX_MEMBERS } from './choices'
 import { emptyMember } from './members'
 import type { Member, MemberErrors } from './members'
-import { fieldId } from './profile'
+import { fieldId, shownErrors } from './profile'
 import { IdentityFields, PresentationFields } from './profile-fields'
 
 // The artists of a collective, each with their profile, as tabs above the profile of the one selected (see "Artistes du
@@ -29,7 +29,7 @@ type Props = {
   onSelect: (index: number) => void
   // What's wrong with each member's profile, whether it's shown or not, which says whether it's complete.
   memberErrors: MemberErrors[]
-  // Show the errors (set once the form was sent).
+  // Show every error, not only a photo's (set once the form was sent).
   showErrors: boolean
 }
 
@@ -120,7 +120,7 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
           member={member}
           label={memberLabel(member, index)}
           hidden={index !== selected}
-          errors={showErrors ? (memberErrors[index] ?? {}) : {}}
+          errors={shownErrors(memberErrors[index] ?? {}, showErrors)}
           showErrors={showErrors}
           onChange={(changed) => onChange(members.map((other) => (other.key === member.key ? changed : other)))}
         />

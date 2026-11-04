@@ -6,9 +6,14 @@ import type { Duration } from '../../session-fields'
 
 // What the forms of the admin sections are made of.
 
-// What's wrong with a field, under it.
-export function FieldError({ message }: { message: string | null | undefined }) {
-  return message ? <p className="admin-field-error">{message}</p> : null
+// What's wrong with a field, under it. `alert` for an error that shows while the focus stays on the field, e.g. a photo's
+// as soon as it's chosen, for screen readers to announce it.
+export function FieldError({ message, alert = false }: { message: string | null | undefined; alert?: boolean }) {
+  return message ? (
+    <p className="admin-field-error" role={alert ? 'alert' : undefined}>
+      {message}
+    </p>
+  ) : null
 }
 
 // A field with its label around it, and what's wrong with it under it.

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { GENRES, LINK_SITES, PHOTO_TYPES, parseLink } from '../../artist-profile'
+import { GENRES, LINK_SITES, PHOTO_MAX_BYTES, PHOTO_TYPES, parseLink } from '../../artist-profile'
 import type { ArtistLinks, GenreId, LinkSiteId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { COUNTRY_OPTIONS, genreName } from './describe'
@@ -58,10 +58,14 @@ export function PhotoField({
     if (shown.current) URL.revokeObjectURL(shown.current)
   }, [])
 
+  // How many photos were picked, which keys the error, so that another wrong one, picked in its place, is announced again.
+  const [picks, setPicks] = useState(0)
+
   const pick = (file: File | null) => {
     if (shown.current) URL.revokeObjectURL(shown.current)
     shown.current = file && (!file.type || PHOTO_TYPES.includes(file.type)) ? URL.createObjectURL(file) : null
     setPreview(shown.current)
+    setPicks((count) => count + 1)
     onChange(file)
   }
   const kept = current && !removed ? current : null
@@ -110,9 +114,9 @@ export function PhotoField({
         aria-invalid={error ? true : undefined}
         onChange={(event) => pick(event.target.files?.[0] ?? null)}
       />
-      <FieldError message={error} />
+      <FieldError key={picks} message={error} alert />
       <p className="admin-hint">
-        Facultative. JPEG, PNG ou WebP.
+        Facultative. JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo.
         {kept && !photo && ' En choisir une autre remplace la photo actuelle.'}
         {current && removed && !photo && " La photo actuelle sera retirée à l'enregistrement."}
       </p>

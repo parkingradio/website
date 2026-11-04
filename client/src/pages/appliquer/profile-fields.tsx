@@ -75,7 +75,8 @@ export function PresentationFields({ idPrefix, profile, onChange, errors, showEr
           Photo de profil <span className="hint">— une photo de presse {collective ? 'du collectif' : "de l'artiste"}, en bonne qualité</span>
         </label>
         <PhotoField id={fieldId(idPrefix, 'photo')} value={profile.photo} onChange={(photo) => onChange({ photo })} invalid={!!errors.photo} />
-        <FieldError message={errors.photo} />
+        {/* Keyed on the photo, so that another wrong one, picked in its place, is announced again. */}
+        <FieldError key={profile.photo && `${profile.photo.name}:${profile.photo.size}:${profile.photo.lastModified}`} message={errors.photo} alert />
       </div>
       <BioField
         id={fieldId(idPrefix, 'bio')}
@@ -102,8 +103,14 @@ export function PresentationFields({ idPrefix, profile, onChange, errors, showEr
   )
 }
 
-export function FieldError({ message }: { message: string | undefined }) {
-  return message ? <span className="error">{message}</span> : null
+// `alert` for an error that shows without the form being sent, e.g. a photo's as soon as it's picked, for screen readers
+// to announce it.
+export function FieldError({ message, alert = false }: { message: string | undefined; alert?: boolean }) {
+  return message ? (
+    <span className="error" role={alert ? 'alert' : undefined}>
+      {message}
+    </span>
+  ) : null
 }
 
 type PlaceProps = {

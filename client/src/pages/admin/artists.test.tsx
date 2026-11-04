@@ -600,6 +600,11 @@ describe('An artist’s page', () => {
     const photo = screen.getByLabelText('Photo')
     fireEvent.change(photo, { target: { files: [new File(['gif'], 'aurore.gif', { type: 'image/gif' })] } })
     expect(photo.closest('.admin-field')?.querySelector('.admin-field-error')).toHaveTextContent('La photo doit être en JPEG, PNG ou WebP.')
+    // The focus stays on the input, so the error is announced, and again for another wrong photo.
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('La photo doit être en JPEG, PNG ou WebP.')
+    fireEvent.change(photo, { target: { files: [new File(['gif'], 'autre.gif', { type: 'image/gif' })] } })
+    expect(screen.getByRole('alert')).not.toBe(alert)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(0)
   })
