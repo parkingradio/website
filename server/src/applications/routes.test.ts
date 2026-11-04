@@ -75,8 +75,8 @@ function application(changes: object = {}) {
     artistId: 'artist-1',
     dates: ['2027-01-15', '2026-12-10'],
     timeSlots: [{ start: '18:00', end: '22:00' }],
-    prestations: ['dj'],
-    otherPrestation: '',
+    performanceTypes: ['dj'],
+    otherPerformanceType: '',
     details: 'Une question ?',
     ...changes,
   }
@@ -171,10 +171,10 @@ describe('applications routes', () => {
     expect(settings.save).not.toHaveBeenCalled()
   })
 
-  it('responds 500 rather than return an application that the API cannot describe, e.g. with a prestation that is not in the list anymore', async () => {
+  it('responds 500 rather than return an application that the API cannot describe, e.g. with a performance type that is not in the list anymore', async () => {
     const app = await buildApp()
     await create(app)
-    rows[0] = { ...rows[0], prestations: ['theremin' as StoredApplication['prestations'][number]] }
+    rows[0] = { ...rows[0], performanceTypes: ['theremin' as StoredApplication['performanceTypes'][number]] }
     expect((await send(app, 'GET', '/api/admin/applications/application-1')).statusCode).toBe(500)
     expect((await send(app, 'GET', '/api/admin/applications')).statusCode).toBe(500)
   })
@@ -309,9 +309,9 @@ describe('applications routes', () => {
         { changes: { timeSlots: undefined }, error: 'Les plages horaires sont invalides.' },
         { changes: { timeSlots: '18:00-22:00' }, error: 'Les plages horaires sont invalides.' },
         { changes: { timeSlots: [null] }, error: 'Une des plages horaires est invalide.' },
-        { changes: { prestations: 'dj' }, error: 'Les prestations sont invalides.' },
-        { changes: { prestations: null }, error: 'Les prestations sont invalides.' },
-        { changes: { otherPrestation: 42 }, error: 'La prestation « Autre » est invalide.' },
+        { changes: { performanceTypes: 'dj' }, error: 'Les prestations sont invalides.' },
+        { changes: { performanceTypes: null }, error: 'Les prestations sont invalides.' },
+        { changes: { otherPerformanceType: 42 }, error: 'La prestation « Autre » est invalide.' },
         { changes: { details: ['Une question ?'] }, error: 'Le champ « Questions ou détails » est invalide.' },
         { changes: { receivedAt: null }, error: 'La date de réception est invalide.' },
       ]
@@ -325,7 +325,7 @@ describe('applications routes', () => {
 
     it('says what is wrong with the application before what is wrong with the artist', async () => {
       const app = await buildApp()
-      const response = await create(app, { artistId: 42, receivedAt: '2026-03-28', prestations: ['modular'] })
+      const response = await create(app, { artistId: 42, receivedAt: '2026-03-28', performanceTypes: ['modular'] })
       expect(response.json()).toEqual({ ok: false, error: "Une des prestations n'est pas dans la liste." })
       expect((await create(app, { artistId: 42, receivedAt: '2026-03-28' })).json()).toEqual({ ok: false, error: 'La date de réception est invalide.' })
       // Then what's wrong with each id, before there being both.
@@ -407,7 +407,7 @@ describe('applications routes', () => {
       await create(app)
       await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
       const response = await send(app, 'PUT', '/api/admin/applications/application-1', {
-        ...application({ artistId: 'artist-2', collectiveId: 'collective-1', timeSlots: [], prestations: ['live-performance'], otherPrestation: 'Visuels', details: '' }),
+        ...application({ artistId: 'artist-2', collectiveId: 'collective-1', timeSlots: [], performanceTypes: ['live-performance'], otherPerformanceType: 'Visuels', details: '' }),
         status: 'rejected',
       })
 
@@ -416,8 +416,8 @@ describe('applications routes', () => {
         artistId: 'artist-1',
         collectiveId: null,
         timeSlots: [],
-        prestations: ['live-performance'],
-        otherPrestation: 'Visuels',
+        performanceTypes: ['live-performance'],
+        otherPerformanceType: 'Visuels',
         details: '',
         status: 'accepted',
         updatedBy: 'admin@example.com',
@@ -458,7 +458,7 @@ describe('applications routes', () => {
       const malformed = [
         { response: await app.inject({ method: 'PUT', url, payload: 'null', headers: json, cookies }), error: 'Choisissez au moins une date.' },
         { response: await app.inject({ method: 'PUT', url, payload: '[]', headers: json, cookies }), error: 'Choisissez au moins une date.' },
-        { response: await send(app, 'PUT', url, application({ prestations: undefined })), error: 'Les prestations sont invalides.' },
+        { response: await send(app, 'PUT', url, application({ performanceTypes: undefined })), error: 'Les prestations sont invalides.' },
         { response: await send(app, 'PUT', url, application({ details: 42 })), error: 'Le champ « Questions ou détails » est invalide.' },
       ]
       for (const { response, error } of malformed) {

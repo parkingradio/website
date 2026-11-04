@@ -6,7 +6,7 @@ opens at its top, except when going back or forward in the browser's history.
 The site declares French as its language. Times of day are shown and entered in the 24-hour format, e.g. "21 h 30": the
 time fields are the browser's own, which follow the page's language in the browsers that format them by it. Pages'
 paths are in French, like everything visitors and admins read, while their query parameters, and the values in them,
-are in English, like the API's.
+are in English, [like the API's](../server/README.md#conventions).
 
 ## Navigation bar
 

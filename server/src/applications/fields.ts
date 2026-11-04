@@ -12,15 +12,15 @@ import { line, text } from '../artists/profile.js'
 // client/src/application-fields.ts): they must be changed together. These are the ones that count.
 //
 // Responses are checked against the lists below too (see applications/routes.ts), so taking a value out of one, e.g. a
-// prestation, takes migrating the applications that have it, and the sets, for prestations (see sessions/fields.ts):
-// otherwise, every response with one of them fails with 500.
+// performance type, takes migrating the applications that have it, and the sets, for performance types (see
+// sessions/fields.ts): otherwise, every response with one of them fails with 500.
 
 // What an artist can do in their set. What's stored is their id, which doesn't change, so that applications can be told
 // apart by what the artists would do whatever their names, e.g. once they're translated. Their names, in this order,
 // are the client's (see client/src/application-fields.ts), and the application emails' (see applications/emails.ts).
-export const PRESTATIONS = ['dj', 'vinyl', 'live-performance', 'rap', 'full-band'] as const
-export const PrestationId = z.enum(PRESTATIONS, { error: "Une des prestations n'est pas dans la liste." }).meta({ id: 'PrestationId' })
-export type PrestationId = z.infer<typeof PrestationId>
+export const PERFORMANCE_TYPES = ['dj', 'vinyl', 'live-performance', 'rap', 'full-band'] as const
+export const PerformanceTypeId = z.enum(PERFORMANCE_TYPES, { error: "Une des prestations n'est pas dans la liste." }).meta({ id: 'PerformanceTypeId' })
+export type PerformanceTypeId = z.infer<typeof PerformanceTypeId>
 
 // Admins follow applications on the admin pages, in this order: every application starts as "new", then is "accepted"
 // or "rejected", and an accepted one is "scheduled" once a date has been set with the artist, then "done" once they have
@@ -30,7 +30,7 @@ export const BAD_STATUS = `The status must be one of ${APPLICATION_STATUSES.join
 export const ApplicationStatus = z.enum(APPLICATION_STATUSES, { error: BAD_STATUS }).meta({ id: 'ApplicationStatus' })
 export type ApplicationStatus = z.infer<typeof ApplicationStatus>
 
-export const OTHER_PRESTATION_MAX_LENGTH = 60
+export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 const DETAILS_MAX_LENGTH = 2000
 
 const NO_DATE = 'Choisissez au moins une date.'
@@ -47,8 +47,8 @@ export type TimeSlot = z.infer<typeof TimeSlot>
 
 // An application's fields, as they're sent, by artists and by admins alike, in the order they're checked in, which is the
 // order of their errors: the server answers with the first. They're cleaned up as they're checked: dates and time slots
-// are sorted, without duplicates, prestations are in the order of PRESTATIONS, without duplicates, and text is trimmed.
-// Anything that isn't an object gets the error of the dates, which it doesn't have.
+// are sorted, without duplicates, performance types are in the order of PERFORMANCE_TYPES, without duplicates, and text
+// is trimmed. Anything that isn't an object gets the error of the dates, which it doesn't have.
 export const ApplicationFields = z
   .object(
     {
@@ -66,11 +66,11 @@ export const ApplicationFields = z
           return [...unique.keys()].sort().map((key) => unique.get(key)!)
         })
         .meta({ description: 'Saved sorted, without duplicates. None means any time' }),
-      prestations: z
-        .array(PrestationId, { error: 'Les prestations sont invalides.' })
-        .overwrite((ids) => PRESTATIONS.filter((id) => ids.includes(id)))
+      performanceTypes: z
+        .array(PerformanceTypeId, { error: 'Les prestations sont invalides.' })
+        .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))
         .meta({ description: 'In any order, even more than once: saved in the order of the list, without duplicates' }),
-      otherPrestation: line('La prestation « Autre »', OTHER_PRESTATION_MAX_LENGTH, 'La prestation « Autre » est invalide.', { canBeEmpty: true }),
+      otherPerformanceType: line('La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, 'La prestation « Autre » est invalide.', { canBeEmpty: true }),
       details: text('Le champ « Questions ou détails »', DETAILS_MAX_LENGTH, 'Le champ « Questions ou détails » est invalide.', {
         canBeEmpty: true,
       }),

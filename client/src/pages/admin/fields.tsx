@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, prestationName } from '../../application-fields'
-import type { PrestationId } from '../../application-fields'
+import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, performanceTypeName } from '../../application-fields'
+import type { PerformanceTypeId } from '../../application-fields'
 import type { Duration } from '../../session-fields'
 
 // What the forms of the admin sections are made of.
@@ -91,20 +91,20 @@ export function FormActions({ error, busy, submitLabel, onCancel }: { error: Rea
   )
 }
 
-// What an artist would do, or did, e.g. in an application or a set: prestations from the list, in any order, and anything
-// else, in a few words ("Autre"), whose error is `error`, shown once it's left.
-export function PrestationsField({
-  prestations,
-  otherPrestation,
+// What an artist would do, or did, e.g. in an application or a set: performance types from the list, in any order, and
+// anything else, in a few words ("Autre"), whose error is `error`, shown once it's left.
+export function PerformanceTypesField({
+  performanceTypes,
+  otherPerformanceType,
   onChange,
   onOtherChange,
   error,
   onLeave,
 }: {
-  prestations: PrestationId[]
-  otherPrestation: string
-  onChange: (prestations: PrestationId[]) => void
-  onOtherChange: (otherPrestation: string) => void
+  performanceTypes: PerformanceTypeId[]
+  otherPerformanceType: string
+  onChange: (performanceTypes: PerformanceTypeId[]) => void
+  onOtherChange: (otherPerformanceType: string) => void
   error: string | undefined
   onLeave: () => void
 }) {
@@ -112,22 +112,22 @@ export function PrestationsField({
     <fieldset className="admin-fields">
       <legend>Type de prestation</legend>
       <div className="admin-choices">
-        {PRESTATIONS.map((id) => (
+        {PERFORMANCE_TYPES.map((id) => (
           <label key={id}>
             <input
               type="checkbox"
-              checked={prestations.includes(id)}
-              onChange={(event) => onChange(event.target.checked ? [...prestations, id] : prestations.filter((other) => other !== id))}
+              checked={performanceTypes.includes(id)}
+              onChange={(event) => onChange(event.target.checked ? [...performanceTypes, id] : performanceTypes.filter((other) => other !== id))}
             />
-            {prestationName(id)}
+            {performanceTypeName(id)}
           </label>
         ))}
       </div>
       <Labeled label="Autre" error={error}>
         <input
           placeholder="en quelques mots"
-          value={otherPrestation}
-          maxLength={OTHER_PRESTATION_MAX_LENGTH}
+          value={otherPerformanceType}
+          maxLength={OTHER_PERFORMANCE_TYPE_MAX_LENGTH}
           aria-invalid={error ? true : undefined}
           onChange={(event) => onOtherChange(event.target.value)}
           onBlur={onLeave}

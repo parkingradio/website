@@ -19,8 +19,8 @@ function setFields(changes: Record<string, unknown> = {}) {
     performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
     offsetMinutes: 60,
     durationMinutes: 60,
-    prestations: ['dj'],
-    otherPrestation: '',
+    performanceTypes: ['dj'],
+    otherPerformanceType: '',
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
@@ -111,8 +111,8 @@ describe('SetFields', () => {
   it('keeps what was sent, with its links reduced', () => {
     expect(
       parse({
-        prestations: ['live-performance', 'dj', 'dj'],
-        otherPrestation: '  Synthé \n modulaire ',
+        performanceTypes: ['live-performance', 'dj', 'dj'],
+        otherPerformanceType: '  Synthé \n modulaire ',
         genres: ['ambient', 'techno', 'ambient'],
         soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons?si=x',
         youtubeVideo: 'https://youtu.be/dQw4w9WgXcQ',
@@ -122,8 +122,8 @@ describe('SetFields', () => {
       offsetMinutes: 60,
       durationMinutes: 60,
       // In the order of the list, without duplicates.
-      prestations: ['dj', 'live-performance'],
-      otherPrestation: 'Synthé modulaire',
+      performanceTypes: ['dj', 'live-performance'],
+      otherPerformanceType: 'Synthé modulaire',
       // In the order they were sent, without duplicates.
       genres: ['ambient', 'techno'],
       soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
@@ -165,18 +165,18 @@ describe('SetFields', () => {
     }
   })
 
-  it('refuses prestations and genres that are not in their lists, or not lists', () => {
-    const prestations = 'The prestations must be ids among dj, vinyl, live-performance, rap, full-band'
-    for (const sent of [['dj', 'karaoke'], 'dj', null, undefined]) expect(setError(setFields({ prestations: sent }))).toBe(prestations)
+  it('refuses performance types and genres that are not in their lists, or not lists', () => {
+    const performanceTypes = 'The performance types must be ids among dj, vinyl, live-performance, rap, full-band'
+    for (const sent of [['dj', 'karaoke'], 'dj', null, undefined]) expect(setError(setFields({ performanceTypes: sent }))).toBe(performanceTypes)
     const genres = 'The genres must be ids of artists\' genres, e.g. "techno"'
     for (const sent of [['techno', 'polka'], 'techno', null, undefined]) expect(setError(setFields({ genres: sent }))).toBe(genres)
-    expect(parse({ prestations: [], genres: [] })).toMatchObject({ prestations: [], genres: [] })
+    expect(parse({ performanceTypes: [], genres: [] })).toMatchObject({ performanceTypes: [], genres: [] })
   })
 
-  it('cleans up the other prestation, which can be empty', () => {
-    expect(parse({ otherPrestation: `${'x'.repeat(60)} ` }).otherPrestation).toHaveLength(60)
-    for (const otherPrestation of ['x'.repeat(61), null, undefined]) {
-      expect(setError(setFields({ otherPrestation }))).toBe('The other prestation must be text, up to 60 characters')
+  it('cleans up the other performance type, which can be empty', () => {
+    expect(parse({ otherPerformanceType: `${'x'.repeat(60)} ` }).otherPerformanceType).toHaveLength(60)
+    for (const otherPerformanceType of ['x'.repeat(61), null, undefined]) {
+      expect(setError(setFields({ otherPerformanceType }))).toBe('The other performance type must be text, up to 60 characters')
     }
   })
 

@@ -103,8 +103,8 @@ function set(changes: object = {}) {
     performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
     offsetMinutes: 60,
     durationMinutes: 60,
-    prestations: ['live-performance', 'dj'],
-    otherPrestation: 'Synthé modulaire',
+    performanceTypes: ['live-performance', 'dj'],
+    otherPerformanceType: 'Synthé modulaire',
     genres: ['ambient'],
     soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons?si=abc',
     youtubeVideo: 'https://www.youtube.com/live/dQw4w9WgXcQ',
@@ -213,7 +213,7 @@ describe('sessions routes', () => {
     }
     for (const changes of [
       { performers: [{ id: 'artist-1\0' }] },
-      { otherPrestation: 'Synthé\0' },
+      { otherPerformanceType: 'Synthé\0' },
       { soundcloudTrack: 'https://soundcloud.com/parkingdotradio/2t\0ne' },
       { youtubeVideo: 'https://youtu.be/dQw4w9WgXcQ\0' },
     ]) {
@@ -453,8 +453,8 @@ describe('sessions routes', () => {
           durationMinutes: 60,
           start: '2026-11-15T03:00:00.000Z',
           end: '2026-11-15T04:00:00.000Z',
-          prestations: ['dj', 'live-performance'],
-          otherPrestation: 'Synthé modulaire',
+          performanceTypes: ['dj', 'live-performance'],
+          otherPerformanceType: 'Synthé modulaire',
           genres: ['ambient'],
           soundcloudTrack: { id: '42', url: 'https://soundcloud.com/parkingdotradio/3tons' },
           youtubeVideo: { id: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
@@ -580,7 +580,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await sessionWithSet(app)
       await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'done' })
-      const response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-2' }], offsetMinutes: 0, prestations: [], genres: [] }))
+      const response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-2' }], offsetMinutes: 0, performanceTypes: [], genres: [] }))
 
       expect(response.statusCode).toBe(200)
       expect(response.json().session.id).toBe('session-1')
@@ -588,7 +588,7 @@ describe('sessions routes', () => {
         performers: [{ id: 'artist-2', name: 'Brume' }],
         offsetMinutes: 0,
         start: '2026-11-15T02:00:00.000Z',
-        prestations: [],
+        performanceTypes: [],
         genres: [],
         status: 'done',
         updatedBy: 'admin@example.com',

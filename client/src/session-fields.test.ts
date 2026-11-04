@@ -35,8 +35,8 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
     durationMinutes: null,
     start: null,
     end: null,
-    prestations: [],
-    otherPrestation: '',
+    performanceTypes: [],
+    otherPerformanceType: '',
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
@@ -310,21 +310,21 @@ describe('checkSet', () => {
       { id: 'artist-1', name: 'Aurore' },
       { id: 'artist-2', name: 'Brume' },
     ],
-    prestations: ['live-performance', 'dj'],
-    otherPrestation: '  Synthé   modulaire ',
+    performanceTypes: ['live-performance', 'dj'],
+    otherPerformanceType: '  Synthé   modulaire ',
     genres: ['ambient', 'techno'],
     soundcloudTrack: ' https://soundcloud.com/parkingdotradio/3tons ',
     youtubeVideo: '',
   }
 
-  it('returns what the server is sent: the ids, the offset and duration, the prestations in order, the other one cleaned up, and the links trimmed', () => {
+  it('returns what the server is sent: the ids, the offset and duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
     expect(checkSet(FORM, SESSION, 'pendant')).toEqual({
       fields: {
         performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
         offsetMinutes: 0,
         durationMinutes: 60,
-        prestations: ['dj', 'live-performance'],
-        otherPrestation: 'Synthé modulaire',
+        performanceTypes: ['dj', 'live-performance'],
+        otherPerformanceType: 'Synthé modulaire',
         genres: ['ambient', 'techno'],
         soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
         youtubeVideo: null,
@@ -340,7 +340,7 @@ describe('checkSet', () => {
           performers: [],
           opened: undefined,
           start: '',
-          otherPrestation: 'x'.repeat(61),
+          otherPerformanceType: 'x'.repeat(61),
           soundcloudTrack: 'https://on.soundcloud.com/AbCdE',
           youtubeVideo: 'https://www.youtube.com/@parkingradio',
         },
@@ -350,7 +350,7 @@ describe('checkSet', () => {
     ).toEqual({
       performers: 'Choisissez au moins un artiste.',
       start: "Indiquez l'heure de début.",
-      otherPrestation: 'La prestation « Autre » dépasse 60 caractères.',
+      otherPerformanceType: 'La prestation « Autre » dépasse 60 caractères.',
       soundcloudTrack: 'Le lien SoundCloud doit mener à la piste sur soundcloud.com, p. ex. « https://soundcloud.com/parkingdotradio/3tons ».',
       youtubeVideo: 'Le lien YouTube est invalide : collez le lien de la vidéo, ou son identifiant.',
     })

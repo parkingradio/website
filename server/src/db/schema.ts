@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean, primaryKey } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from '../applications/fields.js'
-import type { ApplicationStatus, PrestationId, TimeSlot } from '../applications/fields.js'
+import type { ApplicationStatus, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 import { STATUSES } from '../sessions/fields.js'
 import type { Status } from '../sessions/fields.js'
@@ -178,8 +178,8 @@ export const applications = pgTable(
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
     dates: date('dates').array().notNull(), // sorted
     timeSlots: jsonb('time_slots').$type<TimeSlot[]>().notNull(), // sorted; empty means any time
-    prestations: text('prestations').array().$type<PrestationId[]>().notNull(), // ids, in the order of PRESTATIONS
-    otherPrestation: text('other_prestation').notNull(),
+    performanceTypes: text('performance_types').array().$type<PerformanceTypeId[]>().notNull(), // ids, in the order of PERFORMANCE_TYPES
+    otherPerformanceType: text('other_performance_type').notNull(),
     details: text('details').notNull(),
     // The email of the admin who last changed the application, and when (null until then).
     updatedBy: text('updated_by'),
@@ -260,8 +260,8 @@ export const sets = pgTable(
     // it's known, but a set with an offset has a duration.
     offsetMinutes: integer('offset_minutes'),
     durationMinutes: integer('duration_minutes'),
-    prestations: text('prestations').array().$type<PrestationId[]>().notNull(), // ids, in the order of PRESTATIONS
-    otherPrestation: text('other_prestation').notNull(), // free text, "" for none
+    performanceTypes: text('performance_types').array().$type<PerformanceTypeId[]>().notNull(), // ids, in the order of PERFORMANCE_TYPES
+    otherPerformanceType: text('other_performance_type').notNull(), // free text, "" for none
     genres: text('genres').array().$type<GenreId[]>().notNull(), // ids, most important first
     // SoundCloud's id for the track, and the link it was resolved from, both null when the set has no track.
     soundcloudTrackId: text('soundcloud_track_id'),

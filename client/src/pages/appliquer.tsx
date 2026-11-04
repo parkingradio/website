@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { api, formData } from '../api/client'
-import { DETAILS_MAX_LENGTH, OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, checkApplication, prestationName } from '../application-fields'
-import type { ApplicationFields, PrestationId } from '../application-fields'
+import { DETAILS_MAX_LENGTH, OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, checkApplication, performanceTypeName } from '../application-fields'
+import type { ApplicationFields, PerformanceTypeId } from '../application-fields'
 import { checkApplicant } from '../applicant'
 import type { ApplicantErrors, ApplicantKind } from '../applicant'
 import { LINK_SITES, NAME_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
 import type { LinkSiteId } from '../artist-profile'
 import { useTurnstileSiteKey } from '../config-context'
-import { MAX_MEMBERS, SLOT_HOURS, TIME_SLOTS, prestationError, selectableDates } from './appliquer/choices'
+import { MAX_MEMBERS, SLOT_HOURS, TIME_SLOTS, performanceTypesError, selectableDates } from './appliquer/choices'
 import type { TimeSlotId } from './appliquer/choices'
 import { DatePicker } from './appliquer/date-picker'
 import { emptyMember } from './appliquer/members'
@@ -38,10 +38,10 @@ type Form = Profile & {
   kind: ApplicantKind | null
   // A collective's artists, each with their profile (an empty one to start with).
   members: Member[]
-  prestations: PrestationId[]
+  performanceTypes: PerformanceTypeId[]
   // "Autre" is checked, with what the artist wrote next to it.
   otherChecked: boolean
-  otherPrestation: string
+  otherPerformanceType: string
   email: string
   phone: string
   dates: string[]
@@ -59,9 +59,9 @@ const EMPTY: Form = {
   photo: null,
   bio: '',
   links: {},
-  prestations: [],
+  performanceTypes: [],
   otherChecked: false,
-  otherPrestation: '',
+  otherPerformanceType: '',
   email: '',
   phone: '',
   dates: [],
@@ -83,8 +83,8 @@ function sent(form: Form) {
     application: {
       dates: form.dates,
       timeSlots: TIME_SLOTS.filter(({ id }) => form.timeSlots.includes(id)).map(({ start, end }) => ({ start, end })),
-      prestations: form.prestations,
-      otherPrestation: form.otherChecked ? form.otherPrestation : '',
+      performanceTypes: form.performanceTypes,
+      otherPerformanceType: form.otherChecked ? form.otherPerformanceType : '',
       details: form.details,
     },
   }
@@ -112,8 +112,8 @@ function checked(form: Form) {
   if (errors.links) errors.links = linksError(errors.links, form.links)
   const photo = pickedPhotoError(form.photo)
   if (photo) errors.photo = photo
-  const prestation = prestationError(form.prestations, form.otherChecked ? form.otherPrestation : null)
-  if (prestation) errors.prestations ??= prestation
+  const performanceType = performanceTypesError(form.performanceTypes, form.otherChecked ? form.otherPerformanceType : null)
+  if (performanceType) errors.performanceTypes ??= performanceType
   const memberErrors: MemberErrors[] =
     form.kind === 'collective'
       ? form.members.map((member, index) => {
@@ -339,20 +339,20 @@ export function Appliquer() {
           </Part>
 
           <Part number="03" title="Prestation" note="Cochez tout ce qui s'applique.">
-            <fieldset className={errors.prestations ? 'field wide invalid' : 'field wide'}>
+            <fieldset className={errors.performanceTypes ? 'field wide invalid' : 'field wide'}>
               <legend>
                 Type de prestation <span className="required">*</span>
               </legend>
               <div className="chips">
-                {PRESTATIONS.map((id) => (
+                {PERFORMANCE_TYPES.map((id) => (
                   <label key={id} className="chip">
                     <input
                       type="checkbox"
-                      checked={form.prestations.includes(id)}
-                      aria-invalid={errors.prestations ? true : undefined}
-                      onChange={(event) => update('prestations', toggled(form.prestations, id, event.target.checked))}
+                      checked={form.performanceTypes.includes(id)}
+                      aria-invalid={errors.performanceTypes ? true : undefined}
+                      onChange={(event) => update('performanceTypes', toggled(form.performanceTypes, id, event.target.checked))}
                     />
-                    <span>{prestationName(id)}</span>
+                    <span>{performanceTypeName(id)}</span>
                   </label>
                 ))}
                 <label className="chip">
@@ -362,18 +362,18 @@ export function Appliquer() {
               </div>
               {form.otherChecked && (
                 <input
-                  className="other-prestation"
+                  className="other-performance-type"
                   type="text"
                   aria-label="Autre type de prestation"
-                  aria-invalid={errors.otherPrestation ? true : undefined}
+                  aria-invalid={errors.otherPerformanceType ? true : undefined}
                   placeholder="en quelques mots"
-                  maxLength={OTHER_PRESTATION_MAX_LENGTH}
+                  maxLength={OTHER_PERFORMANCE_TYPE_MAX_LENGTH}
                   autoFocus
-                  value={form.otherPrestation}
-                  onChange={(event) => update('otherPrestation', event.target.value)}
+                  value={form.otherPerformanceType}
+                  onChange={(event) => update('otherPerformanceType', event.target.value)}
                 />
               )}
-              <FieldError message={errors.prestations ?? errors.otherPrestation} />
+              <FieldError message={errors.performanceTypes ?? errors.otherPerformanceType} />
             </fieldset>
           </Part>
 

@@ -682,13 +682,13 @@
               "$ref": "#/components/schemas/TimeSlot"
             }
           },
-          "prestations": {
+          "performanceTypes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PrestationId"
+              "$ref": "#/components/schemas/PerformanceTypeId"
             }
           },
-          "otherPrestation": {
+          "otherPerformanceType": {
             "type": "string"
           },
           "details": {
@@ -741,8 +741,8 @@
           "createdBy",
           "dates",
           "timeSlots",
-          "prestations",
-          "otherPrestation",
+          "performanceTypes",
+          "otherPerformanceType",
           "details",
           "updatedBy",
           "updatedAt",
@@ -771,14 +771,14 @@
             },
             "description": "Saved sorted, without duplicates. None means any time"
           },
-          "prestations": {
+          "performanceTypes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PrestationId"
+              "$ref": "#/components/schemas/PerformanceTypeId"
             },
             "description": "In any order, even more than once: saved in the order of the list, without duplicates"
           },
-          "otherPrestation": {
+          "otherPerformanceType": {
             "type": "string",
             "maxLength": 60,
             "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
@@ -792,8 +792,8 @@
         "required": [
           "dates",
           "timeSlots",
-          "prestations",
-          "otherPrestation",
+          "performanceTypes",
+          "otherPerformanceType",
           "details"
         ]
       },
@@ -1733,7 +1733,7 @@
         ],
         "additionalProperties": false
       },
-      "PrestationId": {
+      "PerformanceTypeId": {
         "type": "string",
         "enum": [
           "dj",
@@ -2222,7 +2222,7 @@
             ],
             "description": "Its start plus its duration. Null when its start is"
           },
-          "prestations": {
+          "performanceTypes": {
             "type": "array",
             "items": {
               "type": "string",
@@ -2235,7 +2235,7 @@
               ]
             }
           },
-          "otherPrestation": {
+          "otherPerformanceType": {
             "type": "string"
           },
           "genres": {
@@ -2363,8 +2363,8 @@
           "durationMinutes",
           "start",
           "end",
-          "prestations",
-          "otherPrestation",
+          "performanceTypes",
+          "otherPerformanceType",
           "genres",
           "soundcloudTrack",
           "youtubeVideo",
@@ -2415,7 +2415,7 @@
             ],
             "description": "Null when that isn't known yet, which a set with an offset can't be"
           },
-          "prestations": {
+          "performanceTypes": {
             "type": "array",
             "items": {
               "type": "string",
@@ -2429,7 +2429,7 @@
             },
             "description": "In any order, even more than once: saved in the order of the list, without duplicates"
           },
-          "otherPrestation": {
+          "otherPerformanceType": {
             "type": "string",
             "maxLength": 60,
             "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters. Empty for none"
@@ -2506,8 +2506,8 @@
           "performers",
           "offsetMinutes",
           "durationMinutes",
-          "prestations",
-          "otherPrestation",
+          "performanceTypes",
+          "otherPerformanceType",
           "genres",
           "soundcloudTrack",
           "youtubeVideo"
@@ -5100,14 +5100,14 @@
                     },
                     "description": "Saved sorted, without duplicates. None means any time"
                   },
-                  "prestations": {
+                  "performanceTypes": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/PrestationId"
+                      "$ref": "#/components/schemas/PerformanceTypeId"
                     },
                     "description": "In any order, even more than once: saved in the order of the list, without duplicates"
                   },
-                  "otherPrestation": {
+                  "otherPerformanceType": {
                     "type": "string",
                     "maxLength": 60,
                     "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
@@ -5134,8 +5134,8 @@
                 "required": [
                   "dates",
                   "timeSlots",
-                  "prestations",
-                  "otherPrestation",
+                  "performanceTypes",
+                  "otherPerformanceType",
                   "details"
                 ]
               }
@@ -5448,14 +5448,14 @@
                     },
                     "description": "Saved sorted, without duplicates. None means any time"
                   },
-                  "prestations": {
+                  "performanceTypes": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/PrestationId"
+                      "$ref": "#/components/schemas/PerformanceTypeId"
                     },
                     "description": "In any order, even more than once: saved in the order of the list, without duplicates"
                   },
-                  "otherPrestation": {
+                  "otherPerformanceType": {
                     "type": "string",
                     "maxLength": 60,
                     "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
@@ -5474,8 +5474,8 @@
                 "required": [
                   "dates",
                   "timeSlots",
-                  "prestations",
-                  "otherPrestation",
+                  "performanceTypes",
+                  "otherPerformanceType",
                   "details"
                 ]
               }

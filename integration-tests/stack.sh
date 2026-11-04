@@ -20,8 +20,8 @@ STACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # worktrees) don't remove each other's. They're also labelled, so that anything left behind by a
 # run killed before its trap fired can be found with `--filter label=parking-radio-integration`.
 RUN_ID="$$-${RANDOM}"
-export LABEL="parking-radio-integration"
-export NETWORK="parking-radio-integration-${RUN_ID}"
+LABEL="parking-radio-integration"
+NETWORK="parking-radio-integration-${RUN_ID}"
 # The database's container, for tests that need to hold locks in it.
 export PG="parking-radio-integration-db-${RUN_ID}"
 # The image built from the tree, when PARKING_RADIO_IMAGE isn't set.
@@ -46,31 +46,6 @@ wait_until() {
     return 1
 }
 
-# run_server <container> <database> -- start the image's server (SERVER_IMAGE) in a container with this name, against
-# this database of the throwaway Postgres.
-#
-# Started the way docker-compose.prod.yml.tftpl starts it in production, in particular without --init, so that tests see
-# the same process setup as production does. The configuration is the development one, so that a newly required setting
-# doesn't have to be added here too.
-#
-# It's published on a port picked by Docker, so that it can't clash with a dev server or another run, and only on the
-# loopback interface, since the admin's password is no secret.
-#
-# Without a private bucket, it keeps artists' photos in a directory it can write to.
-run_server() {
-    docker run --detach --name "$1" --label "$LABEL" --network "$NETWORK" \
-        --publish 127.0.0.1::3000 \
-        --env-file "${STACK_DIR}/../.env.example" \
-        --env DATABASE_URL="postgres://parking_radio:parking_radio@${PG}:5432/$2" \
-        --env ASSETS_DOMAIN="$ASSETS_DOMAIN" \
-        --env PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
-        "$SERVER_IMAGE" >/dev/null
-}
-
-# For the checks that start servers of their own, e.g. on a database of their own.
-export STACK_DIR
-export -f wait_until run_server
-
 cleanup() {
     docker rm --force "$CONTAINER" "$PG" >/dev/null 2>&1 || true
     docker network rm "$NETWORK" >/dev/null 2>&1 || true
@@ -92,14 +67,14 @@ start_stack() {
 
     # Without PARKING_RADIO_IMAGE, build an image from the tree first, so that testing is a single
     # command from a clean checkout. CI sets it to the image it built, and so skips this.
+    local image
     if [ -n "${PARKING_RADIO_IMAGE:-}" ]; then
-        SERVER_IMAGE="$PARKING_RADIO_IMAGE"
+        image="$PARKING_RADIO_IMAGE"
     else
-        SERVER_IMAGE="$BUILT_IMAGE"
-        echo "Building ${SERVER_IMAGE}..."
-        docker build --label "$LABEL" --tag "$SERVER_IMAGE" "${STACK_DIR}/.."
+        image="$BUILT_IMAGE"
+        echo "Building ${image}..."
+        docker build --label "$LABEL" --tag "$image" "${STACK_DIR}/.."
     fi
-    export SERVER_IMAGE
 
     # Over TCP, which the temporary server the image runs while initializing the database doesn't
     # listen on, so that this doesn't succeed before the real server is up.
@@ -109,8 +84,22 @@ start_stack() {
         exit 1
     fi
 
-    echo "Starting ${SERVER_IMAGE}..."
-    run_server "$CONTAINER" parking_radio
+    echo "Starting ${image}..."
+    # Started the way docker-compose.prod.yml.tftpl starts it in production, in particular without
+    # --init, so that tests see the same process setup as production does. The configuration is
+    # the development one, so that a newly required setting doesn't have to be added here too.
+    #
+    # It's published on a port picked by Docker, so that it can't clash with a dev server or another
+    # run, and only on the loopback interface, since the admin's password is no secret.
+    #
+    # Without a private bucket, it keeps artists' photos in a directory it can write to.
+    docker run --detach --name "$CONTAINER" --label "$LABEL" --network "$NETWORK" \
+        --publish 127.0.0.1::3000 \
+        --env-file "${STACK_DIR}/../.env.example" \
+        --env DATABASE_URL="postgres://parking_radio:parking_radio@${PG}:5432/parking_radio" \
+        --env ASSETS_DOMAIN="$ASSETS_DOMAIN" \
+        --env PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
+        "$image" >/dev/null
     BASE_URL="http://$(docker port "$CONTAINER" 3000/tcp)"
     export BASE_URL
 

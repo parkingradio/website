@@ -123,9 +123,8 @@ checked in: `npm run generate:api` regenerates them, and CI checks that they're 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need
 `npm run db:up`. The browser tests then seed it, as `npm run seed` does, and run against that data, while the
-integration tests start from an empty database, except the one that checks a migration of existing data. Seeding has
-some of its artists and collectives apply through the "Appliquer" form, so the browser tests need Cloudflare to be
-reachable.
+integration tests start from an empty database. Seeding has some of its artists and collectives apply through the
+"Appliquer" form, so the browser tests need Cloudflare to be reachable.
 
 Stop the local database with `npm run db:down` when you're done.
 

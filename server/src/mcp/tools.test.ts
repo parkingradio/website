@@ -89,9 +89,9 @@ describe('the tools of the API', () => {
   it("take the fields of a POST's body that can be null as optional, but every field of a PUT's", async () => {
     const { tools } = await apiTools()
     const required = (name: string) => (tools.find((tool) => tool.name === name)!.inputSchema.required as string[]).sort()
-    expect(required('create_set')).toEqual(['genres', 'id', 'otherPrestation', 'performers', 'prestations'])
+    expect(required('create_set')).toEqual(['genres', 'id', 'otherPerformanceType', 'performanceTypes', 'performers'])
     expect(required('update_set')).toEqual(
-      ['durationMinutes', 'genres', 'id', 'offsetMinutes', 'otherPrestation', 'performers', 'prestations', 'soundcloudTrack', 'youtubeVideo'],
+      ['durationMinutes', 'genres', 'id', 'offsetMinutes', 'otherPerformanceType', 'performanceTypes', 'performers', 'soundcloudTrack', 'youtubeVideo'],
     )
   })
 

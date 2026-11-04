@@ -43,7 +43,7 @@ collective() {
         "$1" "$2" "$3"
 }
 
-readonly APPLICATION='{"dates":["2027-03-12"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":""}'
+readonly APPLICATION='{"dates":["2027-03-12"],"timeSlots":[{"start":"18:00","end":"22:00"}],"performanceTypes":["dj"],"otherPerformanceType":"","details":""}'
 
 # apply <client address> <profile> [<token>] [<photo>] [<member photo>...] -- apply, as a client at that address, with
 # PHOTO unless another file, or '' for no photo, is given, and a "memberPhoto" part for each file after it, where '' is

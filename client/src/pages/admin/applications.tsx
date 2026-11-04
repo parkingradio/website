@@ -21,7 +21,7 @@ import {
   collectiveGenreNames,
   comparePlaces,
   dateFormat,
-  describePrestations,
+  describePerformanceTypes,
   entryPath,
   formatDay,
   formatShortDay,
@@ -149,7 +149,7 @@ export function ApplicationsTable({
                 ))}
                 {more > 0 && ` (+${more})`}
               </td>
-              <td>{describePrestations(application)}</td>
+              <td>{describePerformanceTypes(application)}</td>
               <td className={`admin-status admin-status-${application.status}`}>{STATUS_LABELS[application.status]}</td>
             </tr>
           )
@@ -220,10 +220,11 @@ export function ApplicationsPage() {
   )
 }
 
-// What an application is searched by, besides its artist or collective (see `Entry`): its prestations, details, and the days
-// the artist would like to play, written out, e.g. "jeudi 10 décembre 2026", so that "décembre" or "jeudi" finds them.
+// What an application is searched by, besides its artist or collective (see `Entry`): its performance types, details,
+// and the days the artist would like to play, written out, e.g. "jeudi 10 décembre 2026", so that "décembre" or "jeudi"
+// finds them.
 function applicationSearchFields(application: Application): string[] {
-  return [describePrestations(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
+  return [describePerformanceTypes(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
 }
 
 // Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
@@ -457,7 +458,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
             : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}
         </dd>
         <dt>Type de prestation</dt>
-        <dd>{describePrestations(application) || '—'}</dd>
+        <dd>{describePerformanceTypes(application) || '—'}</dd>
         <dt>Questions ou détails</dt>
         <dd className="admin-text">{application.details || '—'}</dd>
       </dl>

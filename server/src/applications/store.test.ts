@@ -12,22 +12,22 @@ function fields(changes: Partial<Record<keyof ApplicationFields, unknown>> = {})
       { start: '18:00', end: '22:00' },
       { start: '11:00', end: '15:00' },
     ],
-    prestations: ['live-performance', 'dj'],
-    otherPrestation: '',
+    performanceTypes: ['live-performance', 'dj'],
+    otherPerformanceType: '',
     details: '',
     ...changes,
   }
 }
 
 describe('validateApplication', () => {
-  it('keeps dates, time slots and prestations in order, without duplicates', () => {
+  it('keeps dates, time slots and performance types in order, without duplicates', () => {
     const slot = { start: '18:00', end: '22:00' }
     expect(validateApplication(fields({ dates: ['2027-01-15', '2026-12-10', '2027-01-15'], timeSlots: [slot, { start: '11:00', end: '15:00' }, slot] }))).toEqual({
       dates: ['2026-12-10', '2027-01-15'],
       timeSlots: [{ start: '11:00', end: '15:00' }, slot],
-      // In the order of PRESTATIONS.
-      prestations: ['dj', 'live-performance'],
-      otherPrestation: '',
+      // In the order of PERFORMANCE_TYPES.
+      performanceTypes: ['dj', 'live-performance'],
+      otherPerformanceType: '',
       details: '',
     })
   })
@@ -70,18 +70,18 @@ describe('validateApplication', () => {
     }
   })
 
-  it('only takes prestations from the list, by their id, without duplicates', () => {
-    expect(validateApplication(fields({ prestations: ['full-band', 'vinyl', 'full-band', 'rap'] })).prestations).toEqual(['vinyl', 'rap', 'full-band'])
-    expect(validateApplication(fields({ prestations: [] })).prestations).toEqual([])
-    for (const prestation of ['DJ', 'Performance Live', 'modular', '', 42, null]) {
-      expect(() => validateApplication(fields({ prestations: ['dj', prestation] }))).toThrow("Une des prestations n'est pas dans la liste.")
+  it('only takes performance types from the list, by their id, without duplicates', () => {
+    expect(validateApplication(fields({ performanceTypes: ['full-band', 'vinyl', 'full-band', 'rap'] })).performanceTypes).toEqual(['vinyl', 'rap', 'full-band'])
+    expect(validateApplication(fields({ performanceTypes: [] })).performanceTypes).toEqual([])
+    for (const performanceType of ['DJ', 'Performance Live', 'modular', '', 42, null]) {
+      expect(() => validateApplication(fields({ performanceTypes: ['dj', performanceType] }))).toThrow("Une des prestations n'est pas dans la liste.")
     }
   })
 
-  it('trims the other prestation, and limits its length', () => {
-    expect(validateApplication(fields({ otherPrestation: '  Modular\n synth  ' })).otherPrestation).toBe('Modular synth')
-    expect(validateApplication(fields({ otherPrestation: 'x'.repeat(60) })).otherPrestation).toHaveLength(60)
-    expect(() => validateApplication(fields({ otherPrestation: 'x'.repeat(61) }))).toThrow('La prestation « Autre » dépasse 60 caractères.')
+  it('trims the other performance type, and limits its length', () => {
+    expect(validateApplication(fields({ otherPerformanceType: '  Modular\n synth  ' })).otherPerformanceType).toBe('Modular synth')
+    expect(validateApplication(fields({ otherPerformanceType: 'x'.repeat(60) })).otherPerformanceType).toHaveLength(60)
+    expect(() => validateApplication(fields({ otherPerformanceType: 'x'.repeat(61) }))).toThrow('La prestation « Autre » dépasse 60 caractères.')
   })
 
   it('trims the details, and limits their length', () => {
@@ -100,8 +100,8 @@ describe('validateApplication', () => {
   it('explains, in French, what is wrong with a field that is missing, or of the wrong type', () => {
     const invalid = [
       { field: 'timeSlots', other: '18:00-22:00', error: 'Les plages horaires sont invalides.' },
-      { field: 'prestations', other: 'dj', error: 'Les prestations sont invalides.' },
-      { field: 'otherPrestation', other: ['Visuels'], error: 'La prestation « Autre » est invalide.' },
+      { field: 'performanceTypes', other: 'dj', error: 'Les prestations sont invalides.' },
+      { field: 'otherPerformanceType', other: ['Visuels'], error: 'La prestation « Autre » est invalide.' },
       { field: 'details', other: ['Une question ?'], error: 'Le champ « Questions ou détails » est invalide.' },
     ]
     for (const { field, other, error } of invalid) {
@@ -112,7 +112,7 @@ describe('validateApplication', () => {
   })
 
   it('says what is wrong with the first field that is wrong, in the order of the application', () => {
-    const sent = { dates: [''], timeSlots: [{ start: '18:00', end: '' }], prestations: ['modular'], otherPrestation: 'x'.repeat(61), details: 'x'.repeat(2001) }
+    const sent = { dates: [''], timeSlots: [{ start: '18:00', end: '' }], performanceTypes: ['modular'], otherPerformanceType: 'x'.repeat(61), details: 'x'.repeat(2001) }
     const errors = ['Une des dates est invalide.', 'Une des plages horaires est invalide.', "Une des prestations n'est pas dans la liste.", 'La prestation « Autre » dépasse 60 caractères.', 'Le champ « Questions ou détails » dépasse 2000 caractères.']
     for (const [index, field] of Object.keys(sent).entries()) {
       expect(() => validateApplication({ ...fields(), ...Object.fromEntries(Object.entries(sent).slice(index)) })).toThrow(errors[index])

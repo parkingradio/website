@@ -39,7 +39,7 @@ export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
 const LEFT_OUT = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' } satisfies Partial<Profile>
 
 function application(days: number[], status: ApplicationStatus, fields: Partial<SeedApplication> = {}): SeedApplication {
-  return { days, status, timeSlots: [], prestations: ['dj'], otherPrestation: '', details: '', ...fields }
+  return { days, status, timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '', ...fields }
 }
 
 const EVENING = { start: '18:00', end: '22:00' }
@@ -86,7 +86,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'clement.brule@example.com',
       phone: '+33 6 12 34 56 78',
     },
-    applications: [application([70], 'new', { prestations: ['dj', 'vinyl'], receivedDaysAgo: 5 })],
+    applications: [application([70], 'new', { performanceTypes: ['dj', 'vinyl'], receivedDaysAgo: 5 })],
   },
   {
     profile: {
@@ -113,7 +113,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     applications: [
       application([60, 61, 62, 67, 68, 69], 'accepted', {
         timeSlots: [AFTERNOON, EVENING],
-        prestations: ['dj', 'vinyl'],
+        performanceTypes: ['dj', 'vinyl'],
         details: "J'aimerais faire un set de quatre heures, si c'est possible. Je peux apporter mes propres platines.",
         receivedDaysAgo: 20,
       }),
@@ -148,7 +148,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       phone: '+32 470 12 34 56',
     },
     form: true,
-    applications: [application([100, 101, 102], 'new', { prestations: ['dj', 'live-performance'] })],
+    applications: [application([100, 101, 102], 'new', { performanceTypes: ['dj', 'live-performance'] })],
   },
   {
     profile: {
@@ -163,7 +163,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     },
     photo: '#3b1f2b',
     form: true,
-    applications: [application([65], 'rejected', { timeSlots: [AFTERNOON], prestations: ['dj', 'rap'] })],
+    applications: [application([65], 'rejected', { timeSlots: [AFTERNOON], performanceTypes: ['dj', 'rap'] })],
   },
   {
     profile: {
@@ -179,7 +179,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     form: true,
     applications: [
       application([55], 'accepted', {
-        prestations: ['full-band'],
+        performanceTypes: ['full-band'],
         details: 'Nous sommes cinq musiciens. Avez-vous un piano ?',
       }),
     ],
@@ -217,7 +217,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       bio: 'Pays connu, ville inconnue.',
       email: 'takeshi.mori@example.com',
     },
-    applications: [application([-100], 'done', { prestations: ['live-performance'], receivedDaysAgo: 210 })],
+    applications: [application([-100], 'done', { performanceTypes: ['live-performance'], receivedDaysAgo: 210 })],
   },
   {
     profile: {
@@ -259,7 +259,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       phone: '514 555-0109',
     },
     applications: [
-      application([40], 'new', { timeSlots: [AFTERNOON, EVENING], prestations: ['rap'], receivedDaysAgo: 1 }),
+      application([40], 'new', { timeSlots: [AFTERNOON, EVENING], performanceTypes: ['rap'], receivedDaysAgo: 1 }),
     ],
   },
   {
@@ -274,7 +274,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       phone: '+52 55 1234 5678',
     },
     photo: '#bc4b51',
-    applications: [application([85, 86], 'new', { prestations: ['dj', 'vinyl'], receivedDaysAgo: 3 })],
+    applications: [application([85, 86], 'new', { performanceTypes: ['dj', 'vinyl'], receivedDaysAgo: 3 })],
   },
   {
     profile: {
@@ -330,7 +330,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'felix.ouellet@example.com',
       phone: '418 555-0111',
     },
-    applications: [application([50], 'scheduled', { prestations: ['full-band'], receivedDaysAgo: 35 })],
+    applications: [application([50], 'scheduled', { performanceTypes: ['full-band'], receivedDaysAgo: 35 })],
   },
   {
     profile: {
@@ -344,7 +344,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       phone: '450 555-0113',
     },
     applications: [
-      application([80], 'new', { prestations: ['live-performance'], otherPrestation: 'Chant', receivedDaysAgo: 7 }),
+      application([80], 'new', { performanceTypes: ['live-performance'], otherPerformanceType: 'Chant', receivedDaysAgo: 7 }),
     ],
   },
   {
@@ -374,8 +374,8 @@ export const SEED_ARTISTS: SeedArtist[] = [
     photo: '#264653',
     applications: [
       application([105], 'new', {
-        prestations: [],
-        otherPrestation: 'Installation sonore',
+        performanceTypes: [],
+        otherPerformanceType: 'Installation sonore',
         details: 'Il me faudrait environ deux heures pour installer.',
         receivedDaysAgo: 8,
       }),
@@ -418,7 +418,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'olivier.fortin@example.com',
       phone: '514 555-0118',
     },
-    applications: [application([15], 'accepted', { prestations: ['vinyl'], receivedDaysAgo: 45 })],
+    applications: [application([15], 'accepted', { performanceTypes: ['vinyl'], receivedDaysAgo: 45 })],
   },
   {
     profile: {
@@ -511,8 +511,8 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     applications: [
       application([58], 'accepted', {
         timeSlots: [EVENING],
-        prestations: ['dj'],
-        otherPrestation: 'B2B2B',
+        performanceTypes: ['dj'],
+        otherPerformanceType: 'B2B2B',
         details: 'Nous aimerions jouer toute la soirée, chacun son tour.',
         receivedDaysAgo: 12,
       }),
@@ -524,7 +524,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     // email.
     profile: { name: 'Les Nuits Basses', country: '', city: '', description: '', links: {}, email: 'kwame@example.com', phone: '' },
     members: [{ seeded: 'kwame@example.com' }, { seeded: 'Marée Basse' }, { name: 'Sable Mouvant' }],
-    applications: [application([120], 'new', { prestations: ['live-performance'], receivedDaysAgo: 1 })],
+    applications: [application([120], 'new', { performanceTypes: ['live-performance'], receivedDaysAgo: 1 })],
   },
   {
     profile: {
@@ -557,7 +557,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
         photo: '#c73e1d',
       },
     ],
-    applications: [application([90], 'scheduled', { timeSlots: [MIDDAY], prestations: ['live-performance'], otherPrestation: 'Synthé modulaire' })],
+    applications: [application([90], 'scheduled', { timeSlots: [MIDDAY], performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire' })],
   },
   {
     profile: {
@@ -617,7 +617,7 @@ type Status = components['schemas']['SessionStatus']
 type SetFields = components['schemas']['SetFields']
 
 export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
-  Partial<Pick<SetFields, 'prestations' | 'otherPrestation' | 'genres'>> & {
+  Partial<Pick<SetFields, 'performanceTypes' | 'otherPerformanceType' | 'genres'>> & {
     // The artists who played it, in order: artists of SEED_ARTISTS by their email, or artists without one, e.g. those of
     // a collective, by their name.
     performers: string[]
@@ -655,9 +655,9 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 180,
     status: 'done',
     sets: [
-      { performers: ['clementine@example.com'], offsetMinutes: 0, durationMinutes: 60, prestations: ['dj'], genres: ['techno', 'acid'], youtubeVideo: 'oNdEcOmMuN1', status: 'done' },
-      { performers: ['boreale@example.com'], offsetMinutes: 60, durationMinutes: 60, prestations: ['vinyl'], genres: ['house'], youtubeVideo: 'oNdEcOmMuN2', status: 'done' },
-      { performers: ['kwame@example.com'], offsetMinutes: 120, durationMinutes: 60, prestations: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
+      { performers: ['clementine@example.com'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['dj'], genres: ['techno', 'acid'], youtubeVideo: 'oNdEcOmMuN1', status: 'done' },
+      { performers: ['boreale@example.com'], offsetMinutes: 60, durationMinutes: 60, performanceTypes: ['vinyl'], genres: ['house'], youtubeVideo: 'oNdEcOmMuN2', status: 'done' },
+      { performers: ['kwame@example.com'], offsetMinutes: 120, durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
     ],
   },
   // Collectif Béton's takeover: a guest who isn't one of its artists, then two of its artists together, until after
@@ -669,13 +669,13 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 300,
     status: 'done',
     sets: [
-      { performers: ['DJ.Poutine@Example.com'], offsetMinutes: 0, durationMinutes: 90, prestations: ['dj'], youtubeVideo: 'bEtOnGuEsT1', status: 'done' },
+      { performers: ['DJ.Poutine@Example.com'], offsetMinutes: 0, durationMinutes: 90, performanceTypes: ['dj'], youtubeVideo: 'bEtOnGuEsT1', status: 'done' },
       {
         performers: ['Mathis', 'Rosalie'],
         offsetMinutes: 90,
         durationMinutes: 210,
-        prestations: ['live-performance'],
-        otherPrestation: 'B2B machines',
+        performanceTypes: ['live-performance'],
+        otherPerformanceType: 'B2B machines',
         genres: ['hard-techno', 'ebm-industrial'],
         youtubeVideo: 'bEtOn140aaa',
         status: 'done',
@@ -697,7 +697,7 @@ export const SEED_SESSIONS: SeedSession[] = [
     when: { day: -120, start: '19:00' },
     durationMinutes: 120,
     status: 'done',
-    sets: [{ performers: ['Grillage', 'Pied-de-Biche'], offsetMinutes: 0, durationMinutes: 120, prestations: ['dj'], status: 'done' }],
+    sets: [{ performers: ['Grillage', 'Pied-de-Biche'], offsetMinutes: 0, durationMinutes: 120, performanceTypes: ['dj'], status: 'done' }],
   },
   // An evening of several artists, without a takeover or a name, where a cancelled set was replaced by one that overlaps
   // it.
@@ -706,9 +706,9 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 150,
     status: 'planned',
     sets: [
-      { performers: ['Marée Basse'], offsetMinutes: 30, durationMinutes: 60, prestations: ['live-performance'], status: 'cancelled' },
-      { performers: ['clementine@example.com', 'clement.brule@example.com'], offsetMinutes: 0, durationMinutes: 90, prestations: ['dj'], status: 'planned' },
-      { performers: ['kwame@example.com'], offsetMinutes: 90, durationMinutes: 60, prestations: ['dj'], genres: ['deep-house'], status: 'planned' },
+      { performers: ['Marée Basse'], offsetMinutes: 30, durationMinutes: 60, performanceTypes: ['live-performance'], status: 'cancelled' },
+      { performers: ['clementine@example.com', 'clement.brule@example.com'], offsetMinutes: 0, durationMinutes: 90, performanceTypes: ['dj'], status: 'planned' },
+      { performers: ['kwame@example.com'], offsetMinutes: 90, durationMinutes: 60, performanceTypes: ['dj'], genres: ['deep-house'], status: 'planned' },
     ],
   },
   // A takeover put together before its date is known, whose last set's place isn't known either.
@@ -718,8 +718,8 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 180,
     status: 'planned',
     sets: [
-      { performers: ['Ondine'], offsetMinutes: 0, durationMinutes: 60, prestations: ['live-performance'], otherPrestation: 'Synthé modulaire', genres: ['ambient'], status: 'planned' },
-      { performers: ['Marée'], offsetMinutes: 60, durationMinutes: 60, prestations: ['live-performance'], genres: ['experimental'], status: 'planned' },
+      { performers: ['Ondine'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire', genres: ['ambient'], status: 'planned' },
+      { performers: ['Marée'], offsetMinutes: 60, durationMinutes: 60, performanceTypes: ['live-performance'], genres: ['experimental'], status: 'planned' },
       { performers: ['Écume'], offsetMinutes: null, durationMinutes: 60, status: 'planned' },
     ],
   },

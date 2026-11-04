@@ -22,7 +22,7 @@ export type StoredSession = SessionRow & { takeover: Reference | null; sets: Sto
 export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'name' | 'takeoverId' | 'raEventId'>
 export type SetChanges = Pick<
   SetRow,
-  'offsetMinutes' | 'durationMinutes' | 'prestations' | 'otherPrestation' | 'genres' | 'soundcloudTrackId' | 'soundcloudTrackUrl' | 'youtubeVideoId'
+  'offsetMinutes' | 'durationMinutes' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'soundcloudTrackId' | 'soundcloudTrackUrl' | 'youtubeVideoId'
 > & { performers: SentPerformer[] }
 export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpdatedAt: Date }
 

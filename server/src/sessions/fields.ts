@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { dateTimeWith } from '../api/formats.js'
-import { OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS } from '../applications/fields.js'
+import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
 import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
 
@@ -9,8 +9,8 @@ import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
 // errors are in English. Each error is a whole sentence, and the server answers with the first one, in the order of the
 // fields.
 //
-// Responses are checked against the lists that sets' prestations and genres are from too, which are applications' and
-// artists' (see applications/fields.ts and artists/profile.ts).
+// Responses are checked against the lists that sets' performance types and genres are from too, which are applications'
+// and artists' (see applications/fields.ts and artists/profile.ts).
 
 // Admins follow sessions and sets on the admin pages: every one starts as "planned", then is "done" once it's been
 // played, or "cancelled". Admins can change a status to any other, except that a cancelled session only has cancelled
@@ -118,15 +118,16 @@ const Performers = z
   .min(1, NO_PERFORMER)
   .meta({ description: 'Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped' })
 
-// Applications' prestations and artists' genres, with errors in English. Their schemas there have French errors, and the
-// ids that openapi.json names them by, so these have none.
-const BAD_PRESTATION = `The prestations must be ids among ${PRESTATIONS.join(', ')}`
-export const Prestation = z.enum(PRESTATIONS, { error: BAD_PRESTATION })
+// Applications' performance types and artists' genres, with errors in English. Their schemas there have French errors,
+// and the ids that openapi.json names them by, so these have none.
+const BAD_PERFORMANCE_TYPE = `The performance types must be ids among ${PERFORMANCE_TYPES.join(', ')}`
+export const PerformanceType = z.enum(PERFORMANCE_TYPES, { error: BAD_PERFORMANCE_TYPE })
 const BAD_GENRE = "The genres must be ids of artists' genres, e.g. \"techno\""
 export const Genre = z.enum(GENRES, { error: BAD_GENRE })
 
 // A set's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
-// sessions/links.ts), prestations are in the order of PRESTATIONS, and prestations and genres are without duplicates.
+// sessions/links.ts), performance types are in the order of PERFORMANCE_TYPES, and performance types and genres are
+// without duplicates.
 export const SetFields = z
   .object(
     {
@@ -137,11 +138,11 @@ export const SetFields = z
       durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}, or null`, 1, MAX_MINUTES)
         .nullable()
         .meta({ description: "Null when that isn't known yet, which a set with an offset can't be" }),
-      prestations: z
-        .array(Prestation, { error: BAD_PRESTATION })
-        .overwrite((ids) => PRESTATIONS.filter((id) => ids.includes(id)))
+      performanceTypes: z
+        .array(PerformanceType, { error: BAD_PERFORMANCE_TYPE })
+        .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))
         .meta({ description: 'In any order, even more than once: saved in the order of the list, without duplicates' }),
-      otherPrestation: line(OTHER_PRESTATION_MAX_LENGTH, `The other prestation must be text, up to ${OTHER_PRESTATION_MAX_LENGTH} characters`),
+      otherPerformanceType: line(OTHER_PERFORMANCE_TYPE_MAX_LENGTH, `The other performance type must be text, up to ${OTHER_PERFORMANCE_TYPE_MAX_LENGTH} characters`),
       genres: z
         .array(Genre, { error: BAD_GENRE })
         .overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))

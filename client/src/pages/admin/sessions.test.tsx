@@ -83,8 +83,8 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
     durationMinutes: null,
     start: null,
     end: null,
-    prestations: [],
-    otherPrestation: '',
+    performanceTypes: [],
+    otherPerformanceType: '',
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
@@ -113,7 +113,7 @@ const SESSION: Session = {
       durationMinutes: 60,
       start: '2026-11-15T02:00:00.000Z',
       end: '2026-11-15T03:00:00.000Z',
-      prestations: ['dj'],
+      performanceTypes: ['dj'],
       genres: ['techno'],
       soundcloudTrack: { id: '123', url: 'https://soundcloud.com/parkingdotradio/ondes' },
       youtubeVideo: { id: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
@@ -124,8 +124,8 @@ const SESSION: Session = {
       durationMinutes: 90,
       start: '2026-11-15T03:00:00.000Z',
       end: '2026-11-15T04:30:00.000Z',
-      prestations: ['live-performance'],
-      otherPrestation: 'Synthé',
+      performanceTypes: ['live-performance'],
+      otherPerformanceType: 'Synthé',
       genres: ['ambient'],
       status: 'done',
     }),
@@ -569,7 +569,7 @@ describe("A set's form", () => {
     fireEvent.mouseDown(screen.getByRole('option', { name: new RegExp(`^${name}`) }))
   }
 
-  it('adds a set when the last one ends, for an hour, with its prestations and its artists’ genres, and closes', async () => {
+  it('adds a set when the last one ends, for an hour, with its performance types and its artists’ genres, and closes', async () => {
     const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-3', name: 'Cyan' }], offsetMinutes: 150, durationMinutes: 60 })] }
     mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: added } })
     renderAt('/admin/sessions/session-1')
@@ -602,8 +602,8 @@ describe("A set's form", () => {
       performers: [{ id: 'artist-3' }, { id: 'artist-1' }],
       offsetMinutes: 150,
       durationMinutes: 60,
-      prestations: ['dj'],
-      otherPrestation: '',
+      performanceTypes: ['dj'],
+      otherPerformanceType: '',
       genres: ['house', 'techno', 'acid'],
       soundcloudTrack: null,
       youtubeVideo: null,
@@ -639,8 +639,8 @@ describe("A set's form", () => {
       performers: [{ id: 'artist-3' }],
       offsetMinutes: 210,
       durationMinutes: 30,
-      prestations: ['live-performance'],
-      otherPrestation: 'Synthé',
+      performanceTypes: ['live-performance'],
+      otherPerformanceType: 'Synthé',
       genres: ['ambient'],
     })
   })

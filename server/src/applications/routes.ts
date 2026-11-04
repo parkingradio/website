@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { ApiError, ById, Day, Ok, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
-import { ApplicationFields, ApplicationStatus, BAD_STATUS, PrestationId, ReceivedAt, TimeSlot } from './fields.js'
+import { ApplicationFields, ApplicationStatus, BAD_STATUS, PerformanceTypeId, ReceivedAt, TimeSlot } from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import { NoSuchArtist, NoSuchCollective } from './store.js'
 import type { ApplicationOwner, ApplicationsStore, StoredApplication } from './store.js'
@@ -21,8 +21,8 @@ const Application = z
     createdBy: z.string().nullable(),
     dates: z.array(Day),
     timeSlots: z.array(TimeSlot),
-    prestations: z.array(PrestationId),
-    otherPrestation: z.string(),
+    performanceTypes: z.array(PerformanceTypeId),
+    otherPerformanceType: z.string(),
     details: z.string(),
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),
@@ -70,8 +70,8 @@ function application(row: StoredApplication): Application {
     createdBy: row.createdBy,
     dates: row.dates,
     timeSlots: row.timeSlots,
-    prestations: row.prestations,
-    otherPrestation: row.otherPrestation,
+    performanceTypes: row.performanceTypes,
+    otherPerformanceType: row.otherPerformanceType,
     details: row.details,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,

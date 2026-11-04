@@ -1,5 +1,5 @@
 import type { FeatureId } from '../../api/client'
-import { prestationName } from '../../application-fields'
+import { performanceTypeName } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
@@ -61,8 +61,8 @@ export const MISSING = '-'
 export const COUNTRY_OPTIONS = [{ key: '', label: 'Pays inconnu' }, ...countryOptions()]
 
 // E.g. "DJ, Vinyl, autre : synthé modulaire", or "" when there's none.
-export function describePrestations({ prestations, otherPrestation }: Pick<Application, 'prestations' | 'otherPrestation'>): string {
-  return [...prestations.map(prestationName), ...(otherPrestation ? [`autre : ${otherPrestation}`] : [])].join(', ')
+export function describePerformanceTypes({ performanceTypes, otherPerformanceType }: Pick<Application, 'performanceTypes' | 'otherPerformanceType'>): string {
+  return [...performanceTypes.map(performanceTypeName), ...(otherPerformanceType ? [`autre : ${otherPerformanceType}`] : [])].join(', ')
 }
 
 // The address of an artist's or a collective's photo. The photo can change while its address stays the same, so the

@@ -26,10 +26,11 @@ jobs:
 
       - name: Check for schema drift
         run: |
-          npm run db:generate -w server
-          if [ -n "$(git status --porcelain -- server/drizzle)" ]; then
+          # drizzle-kit can fail, e.g. on a prompt it can't show here, and still exit with 0, so the check goes by what it prints.
+          output="$(npm run db:generate -w server 2>&1)" || { echo "$output"; exit 1; }
+          echo "$output"
+          if ! grep -q "No schema changes" <<<"$output"; then
             echo "::error::server/src/db/schema.ts doesn't match the committed migration files. Run 'npm run db:generate -w server' and commit the result."
-            git status --porcelain -- server/drizzle
             exit 1
           fi
 

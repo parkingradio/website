@@ -6,7 +6,7 @@ import { checkSet, durationOf, setPlace } from '../../session-fields'
 import type { Reference, Session, SetFields, SetFormValues } from '../../session-fields'
 import { leaving, useCheckedForm } from './checked-form'
 import { artistOption, formatDuration, genreNames, membersGenres, sessionWithin } from './describe'
-import { DurationField, FieldError, FormActions, Labeled, PrestationsField } from './fields'
+import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
 import { GenresField } from './profile-fields'
 import type { GroupProps } from './profile-fields'
@@ -73,13 +73,13 @@ export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCa
         onLeave={leave('start', 'end', 'offset', 'duration')}
       />
 
-      <PrestationsField
-        prestations={form.prestations}
-        otherPrestation={form.otherPrestation}
-        onChange={(prestations) => update({ prestations })}
-        onOtherChange={(otherPrestation) => update({ otherPrestation })}
-        error={shown('otherPrestation')}
-        onLeave={leave('otherPrestation')}
+      <PerformanceTypesField
+        performanceTypes={form.performanceTypes}
+        otherPerformanceType={form.otherPerformanceType}
+        onChange={(performanceTypes) => update({ performanceTypes })}
+        onOtherChange={(otherPerformanceType) => update({ otherPerformanceType })}
+        error={shown('otherPerformanceType')}
+        onLeave={leave('otherPerformanceType')}
       />
 
       <GenresField genres={form.genres} onChange={(genres) => update({ genres })} error={shown('genres')} onLeave={leave('genres')}>

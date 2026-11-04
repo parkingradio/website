@@ -297,38 +297,38 @@ describe('Appliquer', () => {
         { start: '11:00', end: '15:00' },
         { start: '18:00', end: '22:00' },
       ],
-      prestations: ['dj'],
-      otherPrestation: '',
+      performanceTypes: ['dj'],
+      otherPerformanceType: '',
       details: '',
     })
   })
 
-  it('sends the prestations by their ids, in the order of the list, and the other one', async () => {
+  it('sends the performance types by their ids, in the order of the list, and the other one', async () => {
     renderForm()
     await fillIn()
-    const prestation = part('Prestation')
-    fireEvent.click(prestation.getByLabelText('Full Band'))
-    fireEvent.click(prestation.getByLabelText('Performance Live'))
-    fireEvent.click(prestation.getByLabelText('Autre'))
-    type('Autre type de prestation', ' Synthé modulaire ', prestation)
+    const performanceType = part('Prestation')
+    fireEvent.click(performanceType.getByLabelText('Full Band'))
+    fireEvent.click(performanceType.getByLabelText('Performance Live'))
+    fireEvent.click(performanceType.getByLabelText('Autre'))
+    type('Autre type de prestation', ' Synthé modulaire ', performanceType)
     await send()
 
-    expect(sentParts().application).toMatchObject({ prestations: ['dj', 'live-performance', 'full-band'], otherPrestation: 'Synthé modulaire' })
+    expect(sentParts().application).toMatchObject({ performanceTypes: ['dj', 'live-performance', 'full-band'], otherPerformanceType: 'Synthé modulaire' })
   })
 
   it('takes "Autre" alone, once it says what it is', async () => {
     renderForm()
     await fillIn()
-    const prestation = part('Prestation')
-    fireEvent.click(prestation.getByLabelText('DJ'))
-    fireEvent.click(prestation.getByLabelText('Autre'))
+    const performanceType = part('Prestation')
+    fireEvent.click(performanceType.getByLabelText('DJ'))
+    fireEvent.click(performanceType.getByLabelText('Autre'))
     await send()
-    expect(prestation.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
+    expect(performanceType.getByText('Précisez votre autre type de prestation.')).toBeInTheDocument()
     expect(applications()).toEqual([])
 
-    type('Autre type de prestation', 'B2B', prestation)
+    type('Autre type de prestation', 'B2B', performanceType)
     await send()
-    expect(sentParts().application).toMatchObject({ prestations: [], otherPrestation: 'B2B' })
+    expect(sentParts().application).toMatchObject({ performanceTypes: [], otherPerformanceType: 'B2B' })
   })
 
   it("renders Turnstile with the site key from the server's configuration, in French, only shown when it's needed", () => {

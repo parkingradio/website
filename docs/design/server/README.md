@@ -12,6 +12,10 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   body is over 52 MB, with a 413 that isn't JSON: that's room for a collective's application with 5 photos.
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
+- **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,
+  `"live-performance"`), are in English, whatever language the pages that use them are in; so are the MCP tools'
+  arguments, which are the fields. E.g. an application's `performanceTypes`, which the Appliquer page calls "Type de
+  prestation". Messages aren't names: see Errors, below.
 - **Errors.** A request that fails, including one refused before an endpoint handles it (e.g. a body that isn't valid
   JSON), gets a 4xx or 5xx status and an error: an object with `ok` set to `false` and `error`, a message meant for
   people, in English unless it's shown to the public. The only exception is [`GET /healthz`](#get-healthz), which fails

@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import type { Body } from '../../api/client'
 import {
   DETAILS_MAX_LENGTH,
-  PRESTATIONS,
+  PERFORMANCE_TYPES,
   checkApplication,
   checkReceivedAt,
   isDay,
@@ -18,7 +18,7 @@ import { leaving, useCheckedForm } from './checked-form'
 import { KIND_LABELS, artistOption, collectiveOption, entryPath } from './describe'
 import type { Owner } from './describe'
 import { compareText } from './list'
-import { FieldError, FormActions, Labeled, PrestationsField } from './fields'
+import { FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 
 // A form for an application's fields, to create an application or change one. Each field is checked as the server checks
 // it (see `checkApplication`), and says what's wrong once it's been left, or once the form is sent. The server's error is
@@ -27,7 +27,7 @@ import { FieldError, FormActions, Labeled, PrestationsField } from './fields'
 // What changing an application sends: its fields, and when it was received, if that changed.
 type ApplicationChanges = Body<'put', '/api/admin/applications/{id}'>
 
-const EMPTY: ApplicationFields = { dates: [], timeSlots: [], prestations: [], otherPrestation: '', details: '' }
+const EMPTY: ApplicationFields = { dates: [], timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }
 
 type Field = keyof ApplicationFields | 'owner' | 'receivedAt'
 
@@ -91,8 +91,8 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
   // Days as "YYYY-MM-DD", or empty for a field that's not filled yet.
   const [dates, setDates] = useState(application.dates.length > 0 ? application.dates : [''])
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(application.timeSlots)
-  const [prestations, setPrestations] = useState(application.prestations)
-  const [otherPrestation, setOtherPrestation] = useState(application.otherPrestation)
+  const [performanceTypes, setPerformanceTypes] = useState(application.performanceTypes)
+  const [otherPerformanceType, setOtherPerformanceType] = useState(application.otherPerformanceType)
   const [details, setDetails] = useState(application.details)
 
   const fields: ApplicationFields = {
@@ -101,8 +101,8 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
     // A slot left entirely empty is dropped, but one that's half filled is wrong.
     timeSlots: timeSlots.filter((slot) => slot.start || slot.end),
     // In the order of the list, like the server keeps them.
-    prestations: PRESTATIONS.filter((id) => prestations.includes(id)),
-    otherPrestation,
+    performanceTypes: PERFORMANCE_TYPES.filter((id) => performanceTypes.includes(id)),
+    otherPerformanceType,
     details,
   }
   const { value: receivedAt, error: receivedAtError } = checkReceivedDay(receivedDay, initialDay)
@@ -202,13 +202,13 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
         <FieldError message={shown('timeSlots')} />
       </fieldset>
 
-      <PrestationsField
-        prestations={prestations}
-        otherPrestation={otherPrestation}
-        onChange={setPrestations}
-        onOtherChange={setOtherPrestation}
-        error={shown('otherPrestation')}
-        onLeave={leave('otherPrestation')}
+      <PerformanceTypesField
+        performanceTypes={performanceTypes}
+        otherPerformanceType={otherPerformanceType}
+        onChange={setPerformanceTypes}
+        onOtherChange={setOtherPerformanceType}
+        error={shown('otherPerformanceType')}
+        onLeave={leave('otherPerformanceType')}
       />
 
       <Labeled label="Questions ou détails" error={shown('details')}>

@@ -42,8 +42,8 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
       { start: '14:00', end: '18:00' },
       { start: '18:00', end: '22:00' },
     ],
-    prestations: ['dj', 'vinyl'],
-    otherPrestation: 'Synthé modulaire',
+    performanceTypes: ['dj', 'vinyl'],
+    otherPerformanceType: 'Synthé modulaire',
     details: 'Une question ?',
     ...changes,
   }
@@ -125,7 +125,7 @@ describe('describeApplication', () => {
   })
 
   it('says when any time works, and leaves out what the artist left blank', () => {
-    const text = describeApplication(artist(), fields({ timeSlots: [], prestations: [], otherPrestation: '', details: '' }))
+    const text = describeApplication(artist(), fields({ timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }))
     expect(text).toContain('Plages horaires : à toute heure\nType de prestation : —\n')
     expect(text).not.toContain('Questions ou détails')
     expect(text.endsWith('Sur deux lignes.')).toBe(true)

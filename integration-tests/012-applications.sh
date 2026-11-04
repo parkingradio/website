@@ -27,13 +27,13 @@ cookie="$(session_cookie)"
 
 # application <artist id> [<details>] [<more JSON fields>] -- an application for that artist, as JSON.
 application() {
-    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"prestations":["dj"],"otherPrestation":"","details":"%s"%s}' \
+    printf '{"artistId":"%s","dates":["2027-01-15","2020-02-29"],"timeSlots":[{"start":"18:00","end":"22:00"}],"performanceTypes":["dj"],"otherPerformanceType":"","details":"%s"%s}' \
         "$1" "${2:-}" "${3:+,$3}"
 }
 
 # application_of <collective id> [<more JSON fields>] -- an application for that collective, as JSON.
 application_of() {
-    printf '{"collectiveId":"%s","dates":["2027-02-01"],"timeSlots":[],"prestations":["full-band"],"otherPrestation":"","details":""%s}' \
+    printf '{"collectiveId":"%s","dates":["2027-02-01"],"timeSlots":[],"performanceTypes":["full-band"],"otherPerformanceType":"","details":""%s}' \
         "$1" "${2:+,$2}"
 }
 
@@ -70,7 +70,7 @@ expect_status 200
 expect_body_contains "\"artistId\":\"${artist}\""
 expect_body_contains '"dates":["2020-02-29","2027-01-15"]'
 # jsonb doesn't keep the order of keys, so a time slot's keys can come back in either order.
-expect_body '"timeSlots":\[\{("start":"18:00","end":"22:00"|"end":"22:00","start":"18:00")\}\],"prestations":\["dj"\],"otherPrestation":"","details":"first"'
+expect_body '"timeSlots":\[\{("start":"18:00","end":"22:00"|"end":"22:00","start":"18:00")\}\],"performanceTypes":\["dj"\],"otherPerformanceType":"","details":"first"'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains '"status":"new"'
 [ "$(body_field receivedAt)" = "$(body_field createdAt)" ] || { _show_body; fail "expected the application to be received when it was created"; }
@@ -102,9 +102,9 @@ expect_body_contains '"applications":[]'
 
 echo "  an application is changed, and its status too"
 json PUT "${BASE_URL}/api/admin/applications/${first}" \
-    '{"dates":["2026-12-10"],"timeSlots":[],"prestations":["full-band","live-performance"],"otherPrestation":"Synthé modulaire","details":""}'
+    '{"dates":["2026-12-10"],"timeSlots":[],"performanceTypes":["full-band","live-performance"],"otherPerformanceType":"Synthé modulaire","details":""}'
 expect_status 200
-expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"prestations":["live-performance","full-band"],"otherPrestation":"Synthé modulaire"'
+expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"performanceTypes":["live-performance","full-band"],"otherPerformanceType":"Synthé modulaire"'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" changed '"receivedAt":"2026-03-27T04:00:00Z"')"
 expect_status 200
@@ -158,7 +158,7 @@ expect_status 400
 expect_body_contains 'An application belongs to either an artist or a collective'
 
 echo "  the database refuses an application with neither an artist nor a collective, or both"
-neither="insert into applications (dates, time_slots, prestations, other_prestation, details)
+neither="insert into applications (dates, time_slots, performance_types, other_performance_type, details)
     values ('{2027-01-15}', '[]', '{}', '', '')"
 both="update applications set artist_id = '${artist}' where id = '${theirs}'"
 # Through a file rather than $(...), where the ERR trap would report the query failing, which is what's expected.

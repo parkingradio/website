@@ -47,8 +47,8 @@ in their sessions, and the `total` of a list of sessions counts sessions, not se
 | `performers` | list | The artists who played, in order: see [Performers](#performers) |
 | `offsetMinutes` | number or null | When the set starts, in minutes after its session's start, or null when that isn't known yet: see [Times](#times) |
 | `durationMinutes` | number or null | How long the set lasts, or null when that isn't known yet: see [Times](#times) |
-| `prestations` | list of strings | What the performers do: ids from `PRESTATIONS` in `server/src/applications/fields.ts`, like an application's (see [Applications](applications.md)), e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values fail with 400. Responses list them in the order of `PRESTATIONS`. Can be empty |
-| `otherPrestation` | string | Anything else the performers do, in a few words, e.g. `"Synthé modulaire"`. Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 60 characters, or `""` when there's none |
+| `performanceTypes` | list of strings | What the performers do: ids from `PERFORMANCE_TYPES` in `server/src/applications/fields.ts`, like an application's (see [Applications](applications.md)), e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values fail with 400. Responses list them in the order of `PERFORMANCE_TYPES`. Can be empty |
+| `otherPerformanceType` | string | Anything else the performers do, in a few words, e.g. `"Synthé modulaire"`. Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 60 characters, or `""` when there's none |
 | `genres` | list of strings | The set's genres: ids of `GENRES` in `server/src/artists/profile.ts`, like an artist's (see [Profiles](artists.md#profiles)), most important first, or none. They describe the set, which can differ from its performers' genres, e.g. an ambient set by a techno artist. A genre that's there twice is dropped, keeping the first, and other values fail with 400 |
 | `soundcloudTrack` | object or null | The set's track on SoundCloud: see [Links](#links) |
 | `youtubeVideo` | object or null | The set's video on YouTube: see [Links](#links) |
@@ -244,7 +244,8 @@ session.
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
 Adds a set to a session, as `"planned"`. The request has the set's `performers`, `offsetMinutes`, `durationMinutes`,
-`prestations`, `otherPrestation`, `genres`, `soundcloudTrack` and `youtubeVideo`, as above, none of them left out.
+`performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack` and `youtubeVideo`, as above, none of them left
+out.
 
 | Response field | Type | |
 |---|---|---|

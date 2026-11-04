@@ -129,8 +129,8 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
   return {
     dates: ['2027-01-15', '2027-01-08'],
     timeSlots: [{ start: '18:00', end: '22:00' }],
-    prestations: ['dj'],
-    otherPrestation: '',
+    performanceTypes: ['dj'],
+    otherPerformanceType: '',
     details: 'Une question.',
     ...changes,
   }
@@ -445,8 +445,8 @@ describe('POST /api/applications', () => {
       { parts: { artist: 'null' }, error: 'Indiquez si vous postulez comme artiste ou comme collectif.' },
       { parts: { application: 'null' }, error: 'Choisissez au moins une date.' },
       { parts: { application: { ...fields(), timeSlots: '18:00-22:00' } }, error: 'Les plages horaires sont invalides.' },
-      { parts: { application: { ...fields(), prestations: undefined } }, error: 'Les prestations sont invalides.' },
-      { parts: { application: { ...fields(), otherPrestation: 42 } }, error: 'La prestation « Autre » est invalide.' },
+      { parts: { application: { ...fields(), performanceTypes: undefined } }, error: 'Les prestations sont invalides.' },
+      { parts: { application: { ...fields(), otherPerformanceType: 42 } }, error: 'La prestation « Autre » est invalide.' },
       { parts: { application: { ...fields(), details: null } }, error: 'Le champ « Questions ou détails » est invalide.' },
     ]
     for (const { parts, error } of invalid) {

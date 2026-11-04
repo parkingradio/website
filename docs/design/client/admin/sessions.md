@@ -68,8 +68,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   on RA ("Événement RA"), linking to it, or "-" for what it doesn't have. "modifier" changes the session in a form in
   its place (see [The session form](#the-session-form)).
 - "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
-  linking to their page, or "-" once they're all deleted, its prestations ("Prestation"), its genres ("Genres"), its
-  links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
+  linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
+  its links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
   which opens its form (see [A set's form](#a-sets-form)), and "×", which deletes it for good after confirming, its
   artists staying. When a status can't be changed, or a set can't be deleted, the
   section says why above the sets, naming it. "ajouter un set" opens the form of a new one. While the session is

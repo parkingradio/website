@@ -285,8 +285,8 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
       performers,
       offsetMinutes: set.offsetMinutes,
       durationMinutes: set.durationMinutes,
-      prestations: set.prestations ?? [],
-      otherPrestation: set.otherPrestation ?? '',
+      performanceTypes: set.performanceTypes ?? [],
+      otherPerformanceType: set.otherPerformanceType ?? '',
       genres: set.genres ?? [],
       soundcloudTrack: null,
       youtubeVideo: set.youtubeVideo ?? null,
@@ -300,8 +300,8 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
   if (session.status !== 'planned') await server.call('PUT', `/api/admin/sessions/${id}/status`, { status: session.status })
 }
 
-function applicationFields({ days, timeSlots, prestations, otherPrestation, details }: SeedApplication) {
-  return { dates: days.map(day), timeSlots, prestations, otherPrestation, details }
+function applicationFields({ days, timeSlots, performanceTypes, otherPerformanceType, details }: SeedApplication) {
+  return { dates: days.map(day), timeSlots, performanceTypes, otherPerformanceType, details }
 }
 
 // The day that's `offset` days after today (before, if negative), as "YYYY-MM-DD", in local time.

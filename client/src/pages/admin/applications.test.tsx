@@ -64,8 +64,8 @@ const APPLICATION: Application = {
   createdBy: 'admin@example.com',
   dates: ['2026-12-10', '2026-12-17', '2027-01-07', '2027-01-14'],
   timeSlots: [{ start: '18:00', end: '22:00' }],
-  prestations: ['dj'],
-  otherPrestation: 'Vinyle seulement',
+  performanceTypes: ['dj'],
+  otherPerformanceType: 'Vinyle seulement',
   details: 'Une question ?\nUne autre.',
   updatedBy: null,
   updatedAt: null,
@@ -77,9 +77,9 @@ const APPLICATION: Application = {
 // The most recently received first, as the server lists them. The last one came by email in March, and was created after
 // the others.
 const APPLICATIONS: Application[] = [
-  { ...APPLICATION, id: 'application-4', receivedAt: '2026-10-08T16:00:00.000Z', createdAt: '2026-10-08T16:00:00.000Z', dates: ['2026-10-29'], prestations: ['vinyl'], otherPrestation: '', status: 'done' },
-  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', receivedAt: '2026-10-07T16:00:00.000Z', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], prestations: ['rap'], status: 'rejected' },
-  { ...APPLICATION, id: 'application-2', receivedAt: '2026-10-06T16:00:00.000Z', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], prestations: ['full-band'], otherPrestation: '', status: 'accepted' },
+  { ...APPLICATION, id: 'application-4', receivedAt: '2026-10-08T16:00:00.000Z', createdAt: '2026-10-08T16:00:00.000Z', dates: ['2026-10-29'], performanceTypes: ['vinyl'], otherPerformanceType: '', status: 'done' },
+  { ...APPLICATION, id: 'application-3', artistId: 'artist-2', receivedAt: '2026-10-07T16:00:00.000Z', createdAt: '2026-10-07T16:00:00.000Z', dates: ['2026-11-05'], performanceTypes: ['rap'], status: 'rejected' },
+  { ...APPLICATION, id: 'application-2', receivedAt: '2026-10-06T16:00:00.000Z', createdAt: '2026-10-06T16:00:00.000Z', dates: ['2026-11-12'], performanceTypes: ['full-band'], otherPerformanceType: '', status: 'accepted' },
   { ...APPLICATION, receivedAt: '2026-03-28T14:00:00.000Z', createdAt: '2026-10-09T16:00:00.000Z' },
 ]
 
@@ -256,7 +256,7 @@ describe('Searching the list of applications', () => {
     await expectSearch('ambient', ['9 octobre 2026', '8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
   })
 
-  it('finds applications by their prestations and details', async () => {
+  it('finds applications by their performance types and details', async () => {
     mockFetch(LISTED)
     renderAt('/admin/candidatures')
 
@@ -336,7 +336,7 @@ describe('Sorting the list of applications', () => {
     const header = await screen.findByRole('columnheader', { name: 'Reçue le' })
     expect(header).toHaveAttribute('aria-sort', 'descending')
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le ↓', 'Artiste', 'Ville', 'Genres', 'Dates', 'Prestations', 'Statut'])
-    // There's no order to genres or prestations.
+    // There's no order to genres or performance types.
     expect(within(screen.getByRole('columnheader', { name: 'Genres' })).queryByRole('button')).not.toBeInTheDocument()
     expect(within(screen.getByRole('columnheader', { name: 'Prestations' })).queryByRole('button')).not.toBeInTheDocument()
 
@@ -487,8 +487,8 @@ describe('An application’s page', () => {
     expect(screen.getByText(/^Une question/)).toHaveTextContent('Une question ? Une autre.')
   })
 
-  it('says when an application has no time slot, prestation or details', async () => {
-    const bare = { ...APPLICATION, timeSlots: [], prestations: [], otherPrestation: '', details: '' }
+  it('says when an application has no time slot, performance type or details', async () => {
+    const bare = { ...APPLICATION, timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }
     mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: bare } })
     renderAt('/admin/candidatures/application-1')
 
@@ -546,8 +546,8 @@ describe('An application’s page', () => {
       dates: ['2026-12-17', '2027-01-07', '2027-01-14', '2027-02-04'],
       timeSlots: [],
       // By their ids.
-      prestations: ['dj', 'rap'],
-      otherPrestation: 'Vinyle, surtout',
+      performanceTypes: ['dj', 'rap'],
+      otherPerformanceType: 'Vinyle, surtout',
       details: 'Corrigé.',
     })
     expect(screen.getByText(/^Modifiée par/)).toHaveTextContent(/^Modifiée par other@example.com le 6 octobre 2026/)
@@ -588,7 +588,7 @@ describe('An application’s page', () => {
     expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
-  it('sends the prestations in the order of the list, whatever order they were checked in', async () => {
+  it('sends the performance types in the order of the list, whatever order they were checked in', async () => {
     mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
     renderAt('/admin/candidatures/application-1')
 
@@ -598,7 +598,7 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).prestations).toEqual(['dj', 'vinyl', 'full-band'])
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).performanceTypes).toEqual(['dj', 'vinyl', 'full-band'])
   })
 
   it('says what is wrong with a time slot once the time slots are left, and sends nothing', async () => {
@@ -746,7 +746,7 @@ describe('An application’s page', () => {
 
 describe('Creating an application', () => {
   it('creates an application for the artist it was started from, then shows it', async () => {
-    const created = { ...APPLICATION, id: 'application-4', artistId: 'artist-2', timeSlots: [], prestations: ['dj'], otherPrestation: 'B2B', details: '' }
+    const created = { ...APPLICATION, id: 'application-4', artistId: 'artist-2', timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: 'B2B', details: '' }
     // A collective without an email, told apart like an artist.
     const brise: Collective = { ...ONDES, id: 'collective-2', name: 'Brise', email: null, city: 'Gaspé' }
     mockFetch({
@@ -784,8 +784,8 @@ describe('Creating an application', () => {
       artistId: 'artist-2',
       dates: ['2026-12-10'],
       timeSlots: [],
-      prestations: ['dj'],
-      otherPrestation: 'B2B',
+      performanceTypes: ['dj'],
+      otherPerformanceType: 'B2B',
       details: '',
     })
   })
@@ -811,8 +811,8 @@ describe('Creating an application', () => {
       collectiveId: 'collective-1',
       dates: ['2026-12-10'],
       timeSlots: [],
-      prestations: [],
-      otherPrestation: '',
+      performanceTypes: [],
+      otherPerformanceType: '',
       details: '',
     })
   })

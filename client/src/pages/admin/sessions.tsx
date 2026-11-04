@@ -12,7 +12,7 @@ import {
   SESSION_STATUS_PLURALS,
   SET_STATUS_LABELS,
   byWhom,
-  describePrestations,
+  describePerformanceTypes,
   entryPath,
   formatDuration,
   genreNames,
@@ -210,7 +210,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
                   <td>
                     <Performers performers={set.performers} />
                   </td>
-                  <td>{describePrestations(set)}</td>
+                  <td>{describePerformanceTypes(set)}</td>
                   <td>{genreNames(set.genres)}</td>
                   <td>
                     <SetLinks set={set} />
@@ -582,7 +582,7 @@ function SetsTable({
           <tr key={set.id} className={`admin-status-${set.status}`}>
             <td className="admin-day">{setHours(set)}</td>
             <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
-            <td>{describePrestations(set)}</td>
+            <td>{describePerformanceTypes(set)}</td>
             <td>{genreNames(set.genres)}</td>
             <td>
               <SetLinks set={set} />

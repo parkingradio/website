@@ -11,28 +11,28 @@ import type { FieldErrors } from './checks'
 export type Application = Schema<'Application'>
 export type ApplicationFields = Schema<'ApplicationFields'>
 export type TimeSlot = Schema<'TimeSlot'>
-export type PrestationId = Schema<'PrestationId'>
+export type PerformanceTypeId = Schema<'PerformanceTypeId'>
 export type ApplicationStatus = Schema<'ApplicationStatus'>
 
-// The prestations' names, in French, in the order of the server's list, which is the order applications list them in.
-// The server emails them too (see server/src/applications/emails.ts), and they must be changed together.
-const PRESTATION_NAMES: Record<PrestationId, string> = {
+// The performance types' names, in French, in the order of the server's list, which is the order applications list them
+// in. The server emails them too (see server/src/applications/emails.ts), and they must be changed together.
+const PERFORMANCE_TYPE_NAMES: Record<PerformanceTypeId, string> = {
   dj: 'DJ',
   vinyl: 'Vinyl',
   'live-performance': 'Performance Live',
   rap: 'Rap',
   'full-band': 'Full Band',
 }
-export const PRESTATIONS = Object.keys(PRESTATION_NAMES) as PrestationId[]
+export const PERFORMANCE_TYPES = Object.keys(PERFORMANCE_TYPE_NAMES) as PerformanceTypeId[]
 
-export function prestationName(id: PrestationId): string {
-  return PRESTATION_NAMES[id]
+export function performanceTypeName(id: PerformanceTypeId): string {
+  return PERFORMANCE_TYPE_NAMES[id]
 }
 
 // In the order applications usually go through them (see describe.ts for their names).
 export const APPLICATION_STATUSES = everyOne<ApplicationStatus>()(['new', 'accepted', 'scheduled', 'done', 'rejected'])
 
-export const OTHER_PRESTATION_MAX_LENGTH = 60
+export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 export const DETAILS_MAX_LENGTH = 2000
 
 // Whether `value` is a "YYYY-MM-DD" day that exists (not e.g. 2026-02-30).
@@ -59,7 +59,7 @@ export function checkReceivedAt(receivedAt: Date, now = new Date()): string | nu
 // Checks an application's fields as they're being filled in a form, and returns what the server would save of them:
 // - dates and time slots are sorted, without duplicates
 // - text is trimmed
-// - prestations are in the order of PRESTATIONS, without duplicates
+// - performance types are in the order of PERFORMANCE_TYPES, without duplicates
 // If they aren't valid, returns what's wrong with each field instead, for the form to show each error by its field.
 export function checkApplication(
   sent: ApplicationFields,
@@ -79,8 +79,8 @@ export function checkApplication(
     else timeSlots.set(`${start}-${end}`, { start, end })
   }
 
-  const otherPrestation = checkLine(sent.otherPrestation, 'La prestation « Autre »', OTHER_PRESTATION_MAX_LENGTH, null)
-  if (otherPrestation.error !== undefined) errors.otherPrestation = otherPrestation.error
+  const otherPerformanceType = checkLine(sent.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
+  if (otherPerformanceType.error !== undefined) errors.otherPerformanceType = otherPerformanceType.error
 
   const details = checkText(sent.details, 'Le champ « Questions ou détails »', DETAILS_MAX_LENGTH, null)
   if (details.error !== undefined) errors.details = details.error
@@ -90,8 +90,8 @@ export function checkApplication(
     application: {
       dates: dates.sort(),
       timeSlots: [...timeSlots.keys()].sort().map((key) => timeSlots.get(key)!),
-      prestations: PRESTATIONS.filter((id) => sent.prestations.includes(id)),
-      otherPrestation: otherPrestation.value ?? '',
+      performanceTypes: PERFORMANCE_TYPES.filter((id) => sent.performanceTypes.includes(id)),
+      otherPerformanceType: otherPerformanceType.value ?? '',
       details: details.value ?? '',
     },
   }

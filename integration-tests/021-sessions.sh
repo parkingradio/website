@@ -51,7 +51,7 @@ session_json() {
 # set_json <performers JSON> <offset> <duration> [<more JSON fields>] -- a set, as JSON, without links unless they're
 # given.
 set_json() {
-    printf '{"performers":%s,"offsetMinutes":%s,"durationMinutes":%s,"prestations":["dj"],"otherPrestation":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null%s}' \
+    printf '{"performers":%s,"offsetMinutes":%s,"durationMinutes":%s,"performanceTypes":["dj"],"otherPerformanceType":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null%s}' \
         "$1" "$2" "$3" "${4:+,$4}"
 }
 
@@ -218,13 +218,13 @@ expect_body_contains '"start":null'
 
 echo "  a set is added to a session, as planned, with its performers in order, and placed in it"
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$ana")" 0 60 \
-    '"prestations":["live-performance","dj","dj"],"otherPrestation":" Synthé \n modulaire ","genres":["ambient","techno","ambient"],"youtubeVideo":"https://youtu.be/dQw4w9WgXcQ?si=x"')"
+    '"performanceTypes":["live-performance","dj","dj"],"otherPerformanceType":" Synthé \n modulaire ","genres":["ambient","techno","ambient"],"youtubeVideo":"https://youtu.be/dQw4w9WgXcQ?si=x"')"
 expect_status 200
 opening="$(last_set)"
 expect_body_contains "\"id\":\"${first}\",\"start\":\"2026-11-15T02:00:00.000Z\""
 expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 expect_body_contains '"offsetMinutes":0,"durationMinutes":60,"start":"2026-11-15T02:00:00.000Z","end":"2026-11-15T03:00:00.000Z"'
-expect_body_contains '"prestations":["dj","live-performance"],"otherPrestation":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
+expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerformanceType":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
 
@@ -275,7 +275,7 @@ later="$(last_set)"
 
 echo "  which the database checks too"
 status=0
-sql "insert into sets (created_by, session_id, offset_minutes, duration_minutes, prestations, other_prestation, genres)
+sql "insert into sets (created_by, session_id, offset_minutes, duration_minutes, performance_types, other_performance_type, genres)
      values ('psql', '${first}', 30, 60, '{}', '', '{}')" >"${FILES}/refused" 2>&1 || status=$?
 [ "$status" != 0 ] || fail "expected the database to refuse sets that overlap in a session"
 grep -q sets_no_overlap "${FILES}/refused" || fail "expected sets_no_overlap to refuse it, but got: $(cat "${FILES}/refused")"

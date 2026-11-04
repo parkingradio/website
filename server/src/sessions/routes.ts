@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
-import { BAD_STATUS, Genre, Prestation, SessionFields, SetFields, Status } from './fields.js'
+import { BAD_STATUS, Genre, PerformanceType, SessionFields, SetFields, Status } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
 import type { SessionsStore, SetChanges, SetRow, StoredSession, StoredSet } from './store.js'
@@ -34,8 +34,8 @@ const SetBody = z
     durationMinutes: z.number().nullable(),
     start: Timestamp.nullable().meta({ description: "Its session's start plus its offset. Null when either is" }),
     end: Timestamp.nullable().meta({ description: 'Its start plus its duration. Null when its start is' }),
-    prestations: z.array(Prestation),
-    otherPrestation: z.string(),
+    performanceTypes: z.array(PerformanceType),
+    otherPerformanceType: z.string(),
     genres: z.array(Genre),
     soundcloudTrack: Link.nullable().meta({
       description: "SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public",
@@ -111,8 +111,8 @@ function setBody(row: StoredSet, sessionStart: Date | null): SetBody {
     start: start?.toISOString() ?? null,
     // A set with an offset has a duration.
     end: start && after(start, row.durationMinutes!).toISOString(),
-    prestations: row.prestations,
-    otherPrestation: row.otherPrestation,
+    performanceTypes: row.performanceTypes,
+    otherPerformanceType: row.otherPerformanceType,
     genres: row.genres,
     soundcloudTrack: row.soundcloudTrackId === null ? null : { id: row.soundcloudTrackId, url: row.soundcloudTrackUrl! },
     youtubeVideo: link(row.youtubeVideoId, youtubeVideoUrl),

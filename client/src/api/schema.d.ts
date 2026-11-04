@@ -2047,8 +2047,8 @@ export interface components {
             createdBy: string | null;
             dates: string[];
             timeSlots: components["schemas"]["TimeSlot"][];
-            prestations: components["schemas"]["PrestationId"][];
-            otherPrestation: string;
+            performanceTypes: components["schemas"]["PerformanceTypeId"][];
+            otherPerformanceType: string;
             details: string;
             updatedBy: string | null;
             updatedAt: string | null;
@@ -2062,9 +2062,9 @@ export interface components {
             /** @description Saved sorted, without duplicates. None means any time */
             timeSlots: components["schemas"]["TimeSlotInput"][];
             /** @description In any order, even more than once: saved in the order of the list, without duplicates */
-            prestations: components["schemas"]["PrestationId"][];
+            performanceTypes: components["schemas"]["PerformanceTypeId"][];
             /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
-            otherPrestation: string;
+            otherPerformanceType: string;
             /** @description Trimmed, then up to 2000 characters */
             details: string;
         };
@@ -2210,7 +2210,7 @@ export interface components {
             ok: true;
         };
         /** @enum {string} */
-        PrestationId: "dj" | "vinyl" | "live-performance" | "rap" | "full-band";
+        PerformanceTypeId: "dj" | "vinyl" | "live-performance" | "rap" | "full-band";
         Radio: {
             current: {
                 track: components["schemas"]["RadioTrack"];
@@ -2316,8 +2316,8 @@ export interface components {
             start: string | null;
             /** @description Its start plus its duration. Null when its start is */
             end: string | null;
-            prestations: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
-            otherPrestation: string;
+            performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
+            otherPerformanceType: string;
             genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
             /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
             soundcloudTrack: components["schemas"]["SessionLink"] | null;
@@ -2339,9 +2339,9 @@ export interface components {
             /** @description Null when that isn't known yet, which a set with an offset can't be */
             durationMinutes: number | null;
             /** @description In any order, even more than once: saved in the order of the list, without duplicates */
-            prestations: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
+            performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
             /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters. Empty for none */
-            otherPrestation: string;
+            otherPerformanceType: string;
             /** @description Most important first. Those that are there twice are dropped, keeping the first */
             genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
             /** @description A link to the track on soundcloud.com, or its private link. Null, or blank, for none */
@@ -3545,9 +3545,9 @@ export interface operations {
                     /** @description Saved sorted, without duplicates. None means any time */
                     timeSlots: components["schemas"]["TimeSlotInput"][];
                     /** @description In any order, even more than once: saved in the order of the list, without duplicates */
-                    prestations: components["schemas"]["PrestationId"][];
+                    performanceTypes: components["schemas"]["PerformanceTypeId"][];
                     /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
-                    otherPrestation: string;
+                    otherPerformanceType: string;
                     /** @description Trimmed, then up to 2000 characters */
                     details: string;
                     /**
@@ -3731,9 +3731,9 @@ export interface operations {
                     /** @description Saved sorted, without duplicates. None means any time */
                     timeSlots: components["schemas"]["TimeSlotInput"][];
                     /** @description In any order, even more than once: saved in the order of the list, without duplicates */
-                    prestations: components["schemas"]["PrestationId"][];
+                    performanceTypes: components["schemas"]["PerformanceTypeId"][];
                     /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters */
-                    otherPrestation: string;
+                    otherPerformanceType: string;
                     /** @description Trimmed, then up to 2000 characters */
                     details: string;
                     /**

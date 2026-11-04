@@ -7,13 +7,13 @@ list, and shown by its name, the same on the "Appliquer" form and on the admin p
 
 The section lists every application, the most recently received first, with when it was received ("reçue le"), the
 artist or the collective, followed by "(collectif)" for a collective, their city and genres (see
-[A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the prestations and the status.
+[A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each.
 
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist or
-collective, as [Artistes](artistes.md) searches them, their prestations, their questions or details, and the days the
-artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
+collective, as [Artistes](artistes.md) searches them, their performance types, their questions or details, and the days
+the artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
 applications with a day in December, or a Thursday. Clicking "Reçue le" (`received`), "Artiste" (`artist`), "Ville"
 (`city`, by city, then country), "Dates" (`dates`, by the first day the artist would like to play) or "Statut"
 (`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by that column, and clicking it again sorts

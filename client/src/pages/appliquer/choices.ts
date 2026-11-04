@@ -1,4 +1,4 @@
-import type { PrestationId } from '../../application-fields'
+import type { PerformanceTypeId } from '../../application-fields'
 import type { ApplicantKind } from '../../applicant'
 import { countryOptions } from '../../artist-profile'
 import type { GenreId, LinkSiteId } from '../../artist-profile'
@@ -29,10 +29,11 @@ export const GENRE_GROUPS: { name: string; genres: GenreId[] }[] = [
   { name: 'Autres', genres: ['pop', 'indie-rock', 'punk', 'synthwave', 'hardcore-gabber'] },
 ]
 
-// At least one prestation, or "Autre" with a few words (null when it isn't checked). Returns what's missing, if anything.
-export function prestationError(prestations: PrestationId[], otherPrestation: string | null): string | null {
-  if (prestations.length > 0 || otherPrestation?.trim()) return null
-  return otherPrestation === null ? 'Choisissez au moins un type de prestation.' : 'Précisez votre autre type de prestation.'
+// At least one performance type, or "Autre" with a few words (null when it isn't checked). Returns what's missing, if
+// anything.
+export function performanceTypesError(performanceTypes: PerformanceTypeId[], otherPerformanceType: string | null): string | null {
+  if (performanceTypes.length > 0 || otherPerformanceType?.trim()) return null
+  return otherPerformanceType === null ? 'Choisissez au moins un type de prestation.' : 'Précisez votre autre type de prestation.'
 }
 
 // Links to these sites are always shown. The others are added with a button.

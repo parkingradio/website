@@ -12,8 +12,8 @@ function fields(changes: Partial<ApplicationFields> = {}): ApplicationFields {
       { start: '18:00', end: '22:00' },
       { start: '11:00', end: '15:00' },
     ],
-    prestations: ['live-performance', 'dj'],
-    otherPrestation: '',
+    performanceTypes: ['live-performance', 'dj'],
+    otherPerformanceType: '',
     details: '',
     ...changes,
   }
@@ -35,33 +35,33 @@ describe('isTime', () => {
 })
 
 describe('checkApplication', () => {
-  it('returns what the server would save: dates, time slots and prestations in order, without duplicates, and text trimmed', () => {
+  it('returns what the server would save: dates, time slots and performance types in order, without duplicates, and text trimmed', () => {
     const slot = { start: '18:00', end: '22:00' }
     const sent = fields({
       dates: ['2027-01-15', '2026-12-10', '2027-01-15'],
       timeSlots: [slot, { start: '11:00', end: '15:00' }, slot],
-      prestations: ['full-band', 'vinyl', 'full-band'],
-      otherPrestation: '  Synthé\n  modulaire ',
+      performanceTypes: ['full-band', 'vinyl', 'full-band'],
+      otherPerformanceType: '  Synthé\n  modulaire ',
       details: ' Une question ?\n',
     })
     expect(checkApplication(sent)).toEqual({
       application: {
         dates: ['2026-12-10', '2027-01-15'],
         timeSlots: [{ start: '11:00', end: '15:00' }, slot],
-        prestations: ['vinyl', 'full-band'],
-        otherPrestation: 'Synthé modulaire',
+        performanceTypes: ['vinyl', 'full-band'],
+        otherPerformanceType: 'Synthé modulaire',
         details: 'Une question ?',
       },
     })
   })
 
   it('says what is wrong with every field that is wrong, for forms to show each error by its field', () => {
-    const sent = fields({ dates: [''], timeSlots: [{ start: '18:00', end: '' }], otherPrestation: 'x'.repeat(61), details: 'x'.repeat(2001) })
+    const sent = fields({ dates: [''], timeSlots: [{ start: '18:00', end: '' }], otherPerformanceType: 'x'.repeat(61), details: 'x'.repeat(2001) })
     expect(checkApplication(sent)).toEqual({
       errors: {
         dates: 'Une des dates est invalide.',
         timeSlots: 'Une des plages horaires est invalide.',
-        otherPrestation: 'La prestation « Autre » dépasse 60 caractères.',
+        otherPerformanceType: 'La prestation « Autre » dépasse 60 caractères.',
         details: 'Le champ « Questions ou détails » dépasse 2000 caractères.',
       },
     })

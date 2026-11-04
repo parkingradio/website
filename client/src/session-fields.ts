@@ -1,6 +1,6 @@
 import type { Schema } from './api/client'
-import { OTHER_PRESTATION_MAX_LENGTH, PRESTATIONS, isDay, isTime } from './application-fields'
-import type { PrestationId } from './application-fields'
+import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, isDay, isTime } from './application-fields'
+import type { PerformanceTypeId } from './application-fields'
 import type { GenreId } from './artist-profile'
 import { checkLine, everyOne } from './checks'
 import type { FieldErrors } from './checks'
@@ -205,8 +205,8 @@ export type SetFormValues = {
   // The times the form opened with in a session with a date, e.g. a set's, and what they stood for: each one left as it
   // was stands for what it stood for, even when a time happens twice and the one meant is the second (see `setPlace`).
   opened?: { start: string; end: string; offsetMinutes: number; durationMinutes: number }
-  prestations: PrestationId[]
-  otherPrestation: string
+  performanceTypes: PerformanceTypeId[]
+  otherPerformanceType: string
   genres: GenreId[]
   soundcloudTrack: string
   youtubeVideo: string
@@ -222,8 +222,8 @@ const EMPTY_SET_FORM: SetFormValues = {
   end: '',
   offset: EMPTY_DURATION,
   duration: EMPTY_DURATION,
-  prestations: [],
-  otherPrestation: '',
+  performanceTypes: [],
+  otherPerformanceType: '',
   genres: [],
   soundcloudTrack: '',
   youtubeVideo: '',
@@ -243,8 +243,8 @@ export function setFormValues(set: StudioSet, session: SessionPlace): SetFormVal
   const values: SetFormValues = {
     ...EMPTY_SET_FORM,
     performers: set.performers,
-    prestations: set.prestations,
-    otherPrestation: set.otherPrestation,
+    performanceTypes: set.performanceTypes,
+    otherPerformanceType: set.otherPerformanceType,
     genres: set.genres,
     soundcloudTrack: set.soundcloudTrack?.url ?? '',
     youtubeVideo: set.youtubeVideo?.url ?? '',
@@ -325,8 +325,8 @@ export function checkSet(
   const errors: FieldErrors<SetFormValues> = {}
   if (form.performers.length === 0) errors.performers = 'Choisissez au moins un artiste.'
   if ('errors' in place) Object.assign(errors, place.errors)
-  const otherPrestation = checkLine(form.otherPrestation, 'La prestation « Autre »', OTHER_PRESTATION_MAX_LENGTH, null)
-  if (otherPrestation.error) errors.otherPrestation = otherPrestation.error
+  const otherPerformanceType = checkLine(form.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
+  if (otherPerformanceType.error) errors.otherPerformanceType = otherPerformanceType.error
   const soundcloudTrack = form.soundcloudTrack.trim()
   if (soundcloudTrack && !isSoundcloudTrackLink(soundcloudTrack)) {
     errors.soundcloudTrack = 'Le lien SoundCloud doit mener à la piste sur soundcloud.com, p. ex. « https://soundcloud.com/parkingdotradio/3tons ».'
@@ -341,8 +341,8 @@ export function checkSet(
       offsetMinutes: place.offsetMinutes,
       durationMinutes: place.durationMinutes,
       // In the order of the list, like the server keeps them.
-      prestations: PRESTATIONS.filter((id) => form.prestations.includes(id)),
-      otherPrestation: otherPrestation.value!,
+      performanceTypes: PERFORMANCE_TYPES.filter((id) => form.performanceTypes.includes(id)),
+      otherPerformanceType: otherPerformanceType.value!,
       genres: form.genres,
       soundcloudTrack: soundcloudTrack || null,
       youtubeVideo: youtubeVideo || null,

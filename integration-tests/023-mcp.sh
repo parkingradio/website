@@ -95,7 +95,7 @@ echo "  times are given in Québec time, and a new set's fields that can be null
 call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"takeover":null,"name":"MCP","raEvent":null}'
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-14T23:00:00-05:00\"'
 session="$(sql "select id from sessions where name = 'MCP'")"
-call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"prestations\":[\"dj\"],\"otherPrestation\":\"\",\"genres\":[]}"
+call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[]}"
 expect_body_contains '\"offsetMinutes\":null'
 expect_body_contains '\"durationMinutes\":null'
 expect_body_contains '\"soundcloudTrack\":null'

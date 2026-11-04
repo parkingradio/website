@@ -4,7 +4,7 @@ An application says when the artist would like to play and what they'd do. Appli
 `applications` table (`server/src/db/schema.ts`). Each one belongs to either an artist or a
 [collective](collectives.md), never both, and is deleted when its artist or collective is deleted. An application has
 the same fields either way: for a collective's, "the artist" below means the collective, and the fields describe its
-show as a whole, e.g. its prestations aren't each member's.
+show as a whole, e.g. its performance types aren't each member's.
 
 The server checks every application against the rules in `server/src/applications/fields.ts` (the `ApplicationFields`
 schema). These rules only make sure the data is valid: every field below has to be there, with its type, even when it's
@@ -24,8 +24,8 @@ An application has these fields:
 |---|---|---|
 | `dates` | list of strings | The days the artist would like to play, sorted. At least one. Past days are allowed, e.g. to import old applications |
 | `timeSlots` | list of objects | The times of day that work for the artist, on any of their dates, sorted. Each one has a `start` and an `end` in Québec time, `"HH:MM"`, e.g. `{"start": "18:00", "end": "22:00"}`. The end is later the same day. An empty list means any time |
-| `prestations` | list of strings | What the artist would do: ids from `PRESTATIONS` in `server/src/applications/fields.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PRESTATIONS`. Can be empty |
-| `otherPrestation` | string | Anything else the artist would do, in a few words, e.g. `"Synthé modulaire"`. Up to 60 characters. Can be empty |
+| `performanceTypes` | list of strings | What the artist would do: ids from `PERFORMANCE_TYPES` in `server/src/applications/fields.ts`, e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values are refused with 400. Responses list them in the order of `PERFORMANCE_TYPES`. Can be empty |
+| `otherPerformanceType` | string | Anything else the artist would do, in a few words, e.g. `"Synthé modulaire"`. Up to 60 characters. Can be empty |
 | `details` | string | The artist's questions or other details. Up to 2000 characters. Can be empty |
 
 What an artist would do is stored as an id that doesn't change, so that applications can be told apart by what the

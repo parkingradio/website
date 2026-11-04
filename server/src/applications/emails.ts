@@ -2,7 +2,7 @@ import { LINK_SITES } from '../artists/profile.js'
 import type { GenreId, Profile } from '../artists/profile.js'
 import type { Email } from '../core/email.js'
 import type { Applied } from './applicant.js'
-import type { ApplicationFields, PrestationId } from './fields.js'
+import type { ApplicationFields, PerformanceTypeId } from './fields.js'
 
 // The emails sent when an artist or a collective applies through `POST /api/applications`: the application, to the
 // recipients chosen on the admin pages, and a confirmation, to the artist, or the collective's contact. Both are in
@@ -61,9 +61,9 @@ const GENRE_NAMES: Record<GenreId, string> = {
   'hardcore-gabber': 'hardcore / gabber',
 }
 
-// The names of the prestations, as the forms show them: the client has its own copy (see PRESTATION_NAMES in
+// The names of the performance types, as the forms show them: the client has its own copy (see PERFORMANCE_TYPE_NAMES in
 // client/src/application-fields.ts), and they must be changed together.
-const PRESTATION_NAMES: Record<PrestationId, string> = {
+const PERFORMANCE_TYPE_NAMES: Record<PerformanceTypeId, string> = {
   dj: 'DJ',
   vinyl: 'Vinyl',
   'live-performance': 'Performance Live',
@@ -87,14 +87,14 @@ function links(profile: Pick<Profile, 'links'>): string[] {
 // aren't emailed, since they're on the admin pages. For a collective, that's its own profile and its application, then
 // each of its artists' profiles.
 export function describeApplication(applied: Applied, application: ApplicationFields): string {
-  const prestations = application.prestations.map((id) => PRESTATION_NAMES[id])
-  if (application.otherPrestation) prestations.push(`autre : ${application.otherPrestation}`)
+  const performanceTypes = application.performanceTypes.map((id) => PERFORMANCE_TYPE_NAMES[id])
+  if (application.otherPerformanceType) performanceTypes.push(`autre : ${application.otherPerformanceType}`)
   const sent = [
     '',
     'Dates souhaitées :',
     ...application.dates.map((date) => `  ${dayFormat.format(new Date(date))}`),
     `Plages horaires : ${application.timeSlots.length === 0 ? 'à toute heure' : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}`,
-    `Type de prestation : ${prestations.join(', ') || '—'}`,
+    `Type de prestation : ${performanceTypes.join(', ') || '—'}`,
   ]
   const details = application.details ? ['', 'Questions ou détails :', application.details] : []
 
