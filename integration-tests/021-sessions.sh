@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 #
-# The admin routes for sessions and sets work against a real database. The server's unit tests fake the database, so
-# this is what covers the sessions, sets and set_performers tables: performers kept in order, with their names, and
-# takeovers, the checks that take the database (artists and collectives that exist), starts kept as instants and sets
-# placed relative to them, sessions listed those without a start first, then the most recent first, by artist, by
-# takeover and by when they start, the rules of sessions (sessions don't overlap, a set fits in its session, a session's
-# sets don't overlap each other, a video or a track in at most one set, and a cancelled session only has cancelled sets),
-# with what's in the way in their 409s, including while other transactions change sessions, a set's own track not being
-# resolved again, what deleting an artist or a collective does to sessions and sets, and changing a session or a set
-# while its takeover's collective, or one of its performers, is deleted.
+# The admin routes for sessions and sets work against a real database, in the server's Docker image. The server's unit
+# tests fake the database, and its property-based tests (server/src/sessions/rules.db.test.ts) only check that the rules
+# of sessions hold after random requests, so this is what covers the sessions, sets and set_performers tables: performers
+# kept in order, with their names, and takeovers, the checks that take the database (artists and collectives that
+# exist), starts kept as instants and sets placed relative to them, sessions listed those without a start first, then
+# the most recent first, by artist, by takeover and by when they start, the rules of sessions (sessions don't overlap, a
+# video or a track in at most one set, and a cancelled session only has cancelled sets), with what's in the way in their
+# 409s, including while other transactions change sessions, sets that don't fit in their session or overlap each other,
+# which they say, a set's own track not being resolved again, what deleting an artist or a collective does to sessions
+# and sets, and changing a session or a set while its takeover's collective, or one of its performers, is deleted.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -63,6 +64,17 @@ session_ids() {
 # set_ids -- the ids of the sets in the body of the last request, in order, on one line.
 set_ids() {
     printf '%s' "$BODY" | grep -o '{"id":"[^"]*","performers"' | cut -d'"' -f4 | tr '\n' ' '
+}
+
+# expect_place <set id> <fits> [<set id>...] -- expect the body of the last request to have that set, saying whether it
+# fits in its session (true or false), and that it overlaps the other sets given, in order, and no others.
+expect_place() {
+    local id="$1" fits="$2" overlapping="" other
+    shift 2
+    for other in "$@"; do
+        overlapping="${overlapping:+${overlapping},}\"${other}\""
+    done
+    expect_body "\\{\"id\":\"${id}\",\"performers\":\\[[^]]*\\],[^{]*\"fitsInSession\":${fits},\"overlappingSets\":\\[${overlapping}\\]"
 }
 
 # last_set -- the id of the set that was added last.
@@ -242,27 +254,44 @@ done
 json GET "${SESSIONS}/${first}"
 [ "$(set_ids)" = "${opening} " ] || { _show_body; fail "expected only the opening set"; }
 
-echo "  a set fits in its session, with or without an offset, and a set without a duration always does"
+echo "  a set doesn't have to fit in its session, with or without an offset, which it says, and one without a duration fits"
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 200 60)"
-expect_conflict 'This set ends after its session' "$first"
+expect_status 200
+expect_place "$(last_set)" false
+json DELETE "${SETS}/$(last_set)"
+expect_status 200
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null 241)"
-expect_conflict 'This set ends after its session' "$first"
+expect_status 200
+expect_place "$(last_set)" false
+json DELETE "${SETS}/$(last_set)"
+expect_status 200
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null 240)"
 expect_status 200
 whenever="$(last_set)"
+expect_place "$whenever" true
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null null)"
 expect_status 200
 unplaced="$(last_set)"
 expect_body_contains "{\"id\":\"${unplaced}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":null,\"durationMinutes\":null,\"start\":null,\"end\":null"
 
-echo "  a session's sets can't overlap each other, when they're added or changed, but one can start when another ends"
+echo "  a session's sets can overlap each other, when they're added or changed, which they say, but one can start when another ends"
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 30 60)"
-expect_conflict 'Another set of this session overlaps this one' "$first" "$opening"
+expect_status 200
+across="$(last_set)"
+expect_place "$opening" true "$across"
+expect_place "$across" true "$opening"
+json PUT "${SETS}/${across}" "$(set_json "$(performers "$ana")" 60 60)"
+expect_status 200
+expect_place "$opening" true
+expect_place "$across" true
+json PUT "${SETS}/${across}" "$(set_json "$(performers "$ana")" 59 60)"
+expect_status 200
+expect_place "$across" true "$opening"
+json DELETE "${SETS}/${across}"
+expect_status 200
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60 60)"
 expect_status 200
 second="$(last_set)"
-json PUT "${SETS}/${second}" "$(set_json "$(performers "$ana")" 59 60)"
-expect_conflict 'Another set of this session overlaps this one' "$first" "$opening"
 json GET "${SESSIONS}/${first}"
 # By offset, those without one last, in the order they were added.
 [ "$(set_ids)" = "${opening} ${second} ${whenever} ${unplaced} " ] || { _show_body; fail "expected the sets by offset"; }
@@ -273,39 +302,36 @@ json POST "${SESSIONS}/${next}/sets" "$(set_json "$(performers "$brume")" 0 60)"
 expect_status 200
 later="$(last_set)"
 
-echo "  which the database checks too"
-status=0
-sql "insert into sets (created_by, session_id, offset_minutes, duration_minutes, performance_types, other_performance_type, genres)
-     values ('psql', '${first}', 30, 60, '{}', '', '{}')" >"${FILES}/refused" 2>&1 || status=$?
-[ "$status" != 0 ] || fail "expected the database to refuse sets that overlap in a session"
-grep -q sets_no_overlap "${FILES}/refused" || fail "expected sets_no_overlap to refuse it, but got: $(cat "${FILES}/refused")"
-
-echo "  cancelled sets don't count, until they're not cancelled anymore"
+echo "  a cancelled set isn't among the sets the others overlap, but says which ones it would overlap"
 json PUT "${SETS}/${opening}/status" '{"status":"cancelled"}'
 expect_status 200
 expect_body_contains "\"status\":\"cancelled\",\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume")" 0 30)"
 expect_status 200
 instead="$(last_set)"
+expect_place "$instead" true
+expect_place "$opening" true "$instead"
 json PUT "${SETS}/${opening}/status" '{"status":"planned"}'
-expect_conflict 'Another set of this session overlaps this one' "$first" "$instead"
+expect_status 200
+expect_place "$instead" true "$opening"
 json DELETE "${SETS}/${instead}"
 expect_status 200
 json PUT "${SETS}/${opening}/status" '{"status":"done"}'
 expect_status 200
 
-echo "  a session can't be shortened so that one of its sets ends after it, even a cancelled one, and nothing changes"
+echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, cancelled ones included"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
+expect_status 200
+json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"takeover\":\"${ondes}\"")"
+expect_status 200
+expect_body_contains '"durationMinutes":119'
+expect_place "$opening" true
+expect_place "$second" false
+expect_place "$whenever" false
+json PUT "${SETS}/${second}/status" '{"status":"planned"}'
 expect_status 200
 json DELETE "${SETS}/${whenever}"
 expect_status 200
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"takeover\":\"${ondes}\"")"
-expect_conflict 'One of the sets of this session would end after it' "$first" "$second"
-json PUT "${SETS}/${second}/status" '{"status":"planned"}'
-expect_status 200
-json GET "${SESSIONS}/${first}"
-expect_body_contains '"durationMinutes":240'
-expect_body_contains '"updatedBy":null'
 
 echo "  moving a session moves its sets, which doesn't count as changing them, and so does taking its start away"
 json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
@@ -513,15 +539,18 @@ for set in "$opening" "$second"; do
     expect_status 200
 done
 
-echo "  a set added while another transaction shortens its session waits for it, and is refused if it doesn't fit anymore"
+echo "  a set added while another transaction shortens its session waits for it, and says if it doesn't fit anymore"
 # Only because of the sessions' lock too.
 hold_sessions_lock "update sessions set duration_minutes = 150 where id = '${first}';"
 send_in_background POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 120 60)"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
-expect_conflict 'This set ends after its session' "$first"
+expect_status 200
 expect_body_contains '"durationMinutes":150'
+expect_place "$(last_set)" false
+json DELETE "${SETS}/$(last_set)"
+expect_status 200
 
 echo "  deleting a session and deleting an artist who played two of its sets wait for each other"
 # Each one deletes the artist's rows in set_performers, in an order of its own, so they would deadlock if they didn't

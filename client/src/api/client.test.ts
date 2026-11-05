@@ -64,9 +64,9 @@ describe('api', () => {
   })
 
   it("returns everything the server's error has, e.g. what's in the way of a 409", async () => {
-    mockFetch({ 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'Another set overlaps this one', session: null, set: null } })
+    mockFetch({ 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'This session is cancelled', session: null, set: null } })
     const result = await api.PUT('/api/admin/sets/{id}/status', { params: { path: { id: 'set-1' } }, body: { status: 'planned' } })
-    expect(result).toEqual({ ok: false, error: 'Another set overlaps this one', session: null, set: null })
+    expect(result).toEqual({ ok: false, error: 'This session is cancelled', session: null, set: null })
     // Typed as the endpoint's errors.
     if (!result.ok && 'set' in result) expect(result.set).toBeNull()
   })

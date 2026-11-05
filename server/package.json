@@ -12,6 +12,7 @@
     "generate:openapi": "tsx src/generate-openapi.ts",
     "check:openapi": "tsx src/generate-openapi.ts --check",
     "test": "vitest run",
+    "test:db": "vitest run --config vitest.db.config.ts",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
@@ -45,6 +46,7 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.9.0",
+    "fast-check": "^4.10.2",
     "globals": "^17.11.0",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",

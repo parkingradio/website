@@ -240,13 +240,9 @@ export const sessions = pgTable(
 // Sets: the performances of a session, each streamed as its own YouTube live and uploaded as its own SoundCloud track.
 // See `SetFields` in sessions/fields.ts for what each field can contain. Deleting a session deletes its sets.
 //
-// A set's place in its session is relative to its start. A session's sets that have one can't overlap each other, unless
-// one of them is cancelled. That's the exclusion constraint `sets_no_overlap`, which drizzle can't declare either, so
-// it's only in the migration that adds it, with the btree_gist extension, which lets it compare session ids:
-//   EXCLUDE USING gist (session_id WITH =, int4range(offset_minutes, offset_minutes + duration_minutes) WITH &&)
-//     WHERE (status <> 'cancelled' AND offset_minutes IS NOT NULL)
-// That a set fits in its session, and that a cancelled session only has cancelled sets, are checked by the server, since
-// they span both tables (see sessions/store.ts).
+// A set's place in its session is relative to its start. A session's sets are meant to fit in it without overlapping each
+// other, but they don't have to, so nothing checks it (see "Sets' places" in docs/design/server/sessions.md). That a
+// cancelled session only has cancelled sets is checked by the server, since it spans both tables (see sessions/store.ts).
 export const sets = pgTable(
   'sets',
   {

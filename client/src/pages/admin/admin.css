@@ -67,13 +67,21 @@
   color: #f9f9f9;
 }
 
-.admin button:disabled {
+.admin button:disabled,
+.admin button[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }
 
+/* A greyed-out button, which can't be used, but keeps the focus (see button.tsx), isn't black when hovered, unless it's
+   pressed. */
+.admin button[aria-disabled='true']:not([aria-pressed='true']):hover {
+  background: none;
+  color: #1c1c1c;
+}
+
 /* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
-   below), and the headers of the columns that sort a list. */
+   below), and the headers of the columns that sort a list (see also .admin-warning). */
 .admin .radio-track-left-out button,
 .admin .radio-track-left-out button:hover,
 .admin .admin-sort,
@@ -402,6 +410,47 @@ tr.admin-status-done {
 
 tr.admin-status-cancelled {
   background: #fff8db;
+}
+
+/* The mark of a set whose place is wrong, e.g. that overlaps another, which doesn't prevent anything: a button that looks
+   like text, bold, and bigger than the times it follows, though not taller than their line, so that its row isn't
+   taller, and in that line, rather than over the cell's padding like the rows' other buttons (see
+   `.admin-table-controls`). */
+.admin .admin-warning,
+.admin .admin-warning:hover {
+  margin-block: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #9a4a00;
+  font-weight: 700;
+  font-size: 1.2em;
+  line-height: 1;
+  vertical-align: top;
+  cursor: help;
+}
+
+/* A tooltip (see button.tsx), placed by its button, over the rest of the page, though not over the navigation bar or
+   the player's bar (see .page). */
+.admin-tooltip {
+  position: fixed;
+  z-index: 20;
+  /* As wide as what it says, up to its max-width, rather than squeezed against the window's edge before it's placed. */
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 32px));
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #000;
+  background: #fff;
+  color: #1c1c1c;
+  font-size: 13px;
+  font-weight: 300;
+  white-space: normal;
+  text-align: left;
+}
+
+/* A sentence per line. */
+.admin-tooltip > span {
+  display: block;
 }
 
 /* An artist or an application: the photo, if there's one, then everything about them, as label and value side by

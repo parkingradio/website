@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Button } from './button'
 import type { Sorting } from './list'
 
 // The field that searches a list of the admin sections, the headers of the columns that sort it, and the buttons that
@@ -60,28 +61,31 @@ export function StatusFilters<S extends string>({
 }
 
 // Buttons that change a status to one of the `statuses`, each named by `labels`, where the current one is pressed. They're
-// named `label`, e.g. "Statut", and those that `disabled` says can't be picked are disabled.
+// named `label`, e.g. "Statut". They're disabled while `disabled`, e.g. while a change is saved, but those that a rule
+// keeps from being picked are greyed out, saying why (`unavailable`, see button.tsx).
 export function StatusButtons<S extends string>({
   label = 'Statut',
   statuses,
   labels,
   status,
   disabled,
+  unavailable,
   onChange,
 }: {
   label?: string
   statuses: readonly S[]
   labels: Record<S, string>
   status: S
-  disabled: (status: S) => boolean
+  disabled: boolean
+  unavailable?: (status: S) => string | null
   onChange: (status: S) => void
 }) {
   return (
     <div className="admin-filters" role="group" aria-label={label}>
       {statuses.map((each) => (
-        <button key={each} type="button" aria-pressed={status === each} disabled={disabled(each)} onClick={() => onChange(each)}>
+        <Button key={each} aria-pressed={status === each} disabled={disabled} unavailable={unavailable?.(each)} onClick={() => onChange(each)}>
           {labels[each]}
-        </button>
+        </Button>
       ))}
     </div>
   )

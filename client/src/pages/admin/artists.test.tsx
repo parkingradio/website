@@ -88,6 +88,8 @@ const STUB_SET: StudioSet = {
   durationMinutes: 60,
   start: '2026-11-15T02:00:00.000Z',
   end: '2026-11-15T03:00:00.000Z',
+  fitsInSession: true,
+  overlappingSets: [],
   performanceTypes: ['dj'],
   otherPerformanceType: '',
   genres: [],

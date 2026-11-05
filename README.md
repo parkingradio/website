@@ -113,12 +113,19 @@ Then `/mcp` in Claude Code opens the page where you allow it, once logged in as 
 ```sh
 npm run build
 npm run test                # runs every workspace's test suite
+npm run test:db             # the server's tests that need a database
 npm run test:integration    # integration tests on the Docker image
 npm run test:e2e            # browser tests on the Docker image
 ```
 
 The API's OpenAPI document (`server/openapi.json`) and the client's types (`client/src/api/schema.d.ts`) are generated and
 checked in: `npm run generate:api` regenerates them, and CI checks that they're up to date.
+
+`test:db` runs the server's tests that need a real database, e.g. the property-based tests of the rules of sessions
+(`server/src/sessions/rules.db.test.ts`). Each test file creates a database of its own, and drops it afterwards, on the
+Postgres server at `DATABASE_URL`, from the environment or `.env`, e.g. the local one that `npm run db:up` starts. The
+property-based tests try random sequences of requests: when one fails, it prints the seed and the path that replay it,
+e.g. `FC_SEED=... FC_PATH=... npm run test:db`, and `FC_NUM_RUNS` sets how many sequences they try.
 
 Both `test:integration` and `test:e2e` build the Docker image from the tree, unless `PARKING_RADIO_IMAGE` names one to
 use instead, and start it against a throwaway Postgres (see `integration-tests/stack.sh`), so they don't need

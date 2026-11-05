@@ -2,11 +2,11 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import Fastify from 'fastify'
 import type { FastifyBaseLogger } from 'fastify'
-import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { frameworkErrors } from './api/errors.js'
 import { registerRoutes } from './app.js'
 import { config } from './core/config.js'
 import { db } from './db/connection.js'
+import { migrateDatabase } from './db/migrate.js'
 import { logger } from './core/logger.js'
 import { spaRoutes } from './site/spa.js'
 import { notFoundRoutes } from './site/not-found.js'
@@ -35,7 +35,7 @@ const app = Fastify({ loggerInstance, frameworkErrors })
 app.addHook('onClose', () => db.$client.end())
 
 try {
-  await migrate(db, { migrationsFolder: path.join(import.meta.dirname, '../drizzle') })
+  await migrateDatabase(db)
 } catch (error) {
   app.log.error(error)
   process.exit(1)

@@ -6,6 +6,7 @@ import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
 import type { Session, SessionStatus, StudioSet } from '../../session-fields'
+import { Button } from './button'
 import {
   MISSING,
   SESSION_STATUS_LABELS,
@@ -23,6 +24,7 @@ import {
   sessionTitle,
   sessionWhen,
   setHours,
+  setInSentence,
   setName,
   setTitle,
 } from './describe'
@@ -373,7 +375,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     const uncancelled = session.sets.filter((set) => set.status !== 'cancelled').length
     if (status === 'cancelled' && uncancelled > 0) {
       const sets = uncancelled === 1 ? "son set qui ne l'est pas" : `ses ${uncancelled} sets qui ne le sont pas`
-      if (!window.confirm(`Annuler la session annule aussi ${sets}. Ne plus l'annuler ne les rétablira pas : chaque set se rétablit à part. Annuler la session ?`)) return
+      if (!window.confirm(`Annuler la session annule aussi ${sets}. Annuler la session ?`)) return
     }
     setBusy(true)
     setError(null)
@@ -404,7 +406,11 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
     const index = session.sets.findIndex((other) => other.id === set.id)
     focusAfterDelete.current = (session.sets[index + 1] ?? session.sets[index - 1])?.id ?? 'heading'
-    setSession((session) => ({ ...session, sets: session.sets.filter((other) => other.id !== set.id) }))
+    // The other sets don't overlap it anymore.
+    setSession((session) => ({
+      ...session,
+      sets: session.sets.filter((other) => other.id !== set.id).map((other) => ({ ...other, overlappingSets: other.overlappingSets.filter((id) => id !== set.id) })),
+    }))
     setOpen((open) => (open?.kind === 'set' && open.id === set.id ? null : open))
   }
 
@@ -431,7 +437,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       {session.updatedBy && <p className="admin-meta">{byWhom('Modifiée', session.updatedBy, session.updatedAt)}</p>}
 
       <h2>Statut</h2>
-      <StatusButtons statuses={STATUSES} labels={SESSION_STATUS_LABELS} status={session.status} disabled={() => busy} onChange={changeStatus} />
+      <StatusButtons statuses={STATUSES} labels={SESSION_STATUS_LABELS} status={session.status} disabled={busy} onChange={changeStatus} />
       {session.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', session.statusUpdatedBy, session.statusUpdatedAt)}</p>}
       <ErrorMessage error={error} />
 
@@ -474,15 +480,11 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       <h2 id={setsHeadingId} tabIndex={-1}>
         Sets
       </h2>
-      {cancelled ? (
-        <p className="admin-placeholder">La session est annulée&nbsp;: on ne peut pas lui ajouter de set, ni rétablir les siens.</p>
-      ) : (
-        <div className="admin-toolbar">
-          <button type="button" onClick={() => openForm({ kind: 'set', id: null })}>
-            ajouter un set
-          </button>
-        </div>
-      )}
+      <div className="admin-toolbar">
+        <Button unavailable={cancelled ? 'La session est annulée\u00a0: on ne peut pas lui ajouter de set.' : null} onClick={() => openForm({ kind: 'set', id: null })}>
+          ajouter un set
+        </Button>
+      </div>
       <ErrorMessage error={setsError} />
       {session.sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
@@ -549,8 +551,33 @@ function SetLinks({ set }: { set: StudioSet }) {
   ))
 }
 
+// What's wrong with where a set is, a sentence each, when it isn't cancelled: that it doesn't fit in its session, then
+// each set that it overlaps, in the order of the session's sets (see "Sets' places" in docs/design/server/sessions.md).
+function setProblems(set: StudioSet, session: Session): string[] {
+  if (set.status === 'cancelled') return []
+  const overlapping = session.sets.filter((other) => set.overlappingSets.includes(other.id)).map((other) => `Chevauche ${setInSentence(other)}.`)
+  if (set.fitsInSession) return overlapping
+  const where = set.offsetMinutes === null ? 'Dure plus longtemps que' : set.offsetMinutes >= session.durationMinutes ? 'Commence après' : 'Finit après'
+  return [`${where} la session.`, ...overlapping]
+}
+
+// The mark after a set's times, when its place is wrong, saying why in its tooltip.
+function ProblemsMark({ problems }: { problems: string[] }) {
+  return (
+    problems.length > 0 && (
+      <>
+        {' '}
+        {/* With U+FE0E, so that phones don't draw it as a colored emoji. */}
+        <Button className="admin-warning" aria-label="avertissement" tip={problems}>
+          {'\u26a0\ufe0e'}
+        </Button>
+      </>
+    )
+  )
+}
+
 // A session's sets, each with its status as buttons that change it, a button that opens its form, and one that deletes it.
-// The sets of a cancelled session can't be un-cancelled.
+// The sets of a cancelled session can't be un-cancelled. Those whose place is wrong are marked, saying why.
 function SetsTable({
   session,
   busy,
@@ -580,7 +607,10 @@ function SetsTable({
       <tbody>
         {session.sets.map((set) => (
           <tr key={set.id} className={`admin-status-${set.status}`}>
-            <td className="admin-day">{setHours(set)}</td>
+            <td className="admin-day">
+              {setHours(set)}
+              <ProblemsMark problems={setProblems(set, session)} />
+            </td>
             <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
             <td>{describePerformanceTypes(set)}</td>
             <td>{genreNames(set.genres)}</td>
@@ -593,7 +623,8 @@ function SetsTable({
                 statuses={STATUSES}
                 labels={SET_STATUS_LABELS}
                 status={set.status}
-                disabled={(status) => busy || (session.status === 'cancelled' && status !== 'cancelled')}
+                disabled={busy}
+                unavailable={(status) => (session.status === 'cancelled' && status !== 'cancelled' ? 'La session est annulée\u00a0: on ne peut pas rétablir ses sets.' : null)}
                 onChange={(status) => onStatus(set, status)}
               />
             </td>

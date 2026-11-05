@@ -15,7 +15,9 @@ in an error, its day follows its name or its takeover, e.g. "HAUTE RIVE TAKEOVER
 
 A set is called by its performers, e.g. "Set de Aurore, Brume et Écume", or "Set" once they're all deleted. Where it's
 named outside its session's page, e.g. in an error, its session's name and its times follow, e.g.
-"Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
+"Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h". Within a sentence, it's "le set de Aurore, 21 h –
+22 h", or "le set, 21 h – 22 h" once its performers are all deleted, with its times as its session's page shows them (see
+[Times](#times)), e.g. "le set de Aurore, +1 h – +2 h 30" in a session without a date.
 
 ## Times
 
@@ -62,8 +64,8 @@ Clicking a session opens it at `/admin/sessions/<id>`, titled with its name (see
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
-  sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too, and that un-cancelling the
-  session won't un-cancel them (see [Status](../../server/sessions.md#status)).
+  sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
+  [Status](../../server/sessions.md#status)).
 - "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer"),
   how long it lasts ("Durée"), its takeover ("Takeover de"), linking to the collective, its name ("Nom") and its event
   on RA ("Événement RA"), linking to it, or "-" for what it doesn't have. "modifier" changes the session in a form in
@@ -72,9 +74,17 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
   its links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
   which opens its form (see [A set's form](#a-sets-form)), and "×", which deletes it for good after confirming, its
-  artists staying. When a status can't be changed, or a set can't be deleted, the
-  section says why above the sets, naming it. "ajouter un set" opens the form of a new one. While the session is
-  cancelled, sets can't be added to it, and its sets can't be un-cancelled, which the section says.
+  artists staying. When a status can't be changed, or a set can't be deleted, the section says why above the sets,
+  naming it. "ajouter un set" opens the form of a new one. While the session is cancelled, "ajouter un set" can't be
+  used, saying « La session est annulée : on ne peut pas lui ajouter de set. », and neither can its sets' "planifié"
+  and "joué", saying « La session est annulée : on ne peut pas rétablir ses sets. » (see [Controls that can't be
+  used](layout.md#controls-that-cant-be-used)). A set that isn't cancelled, and doesn't fit in the
+  session or overlaps another set that isn't cancelled (see [Sets' places](../../server/sessions.md#sets-places)), has a
+  "⚠" after its times, whose tooltip (see [Tooltips](layout.md#tooltips)) says why, a sentence per line: first « Commence
+  après la session. » when it starts at or after the session's end, « Finit après la session. » when it ends after it,
+  or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
+  « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
+  [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
 - "Supprimer": deletes the session and its sets for good, after confirming. Its sets' artists, and its takeover's
   collective, stay, which the page says of those it has.
 
@@ -91,7 +101,7 @@ known collective. From top to bottom, the form has:
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
   times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
   after. The form says that the sets of a session move with it. It doesn't check that they still fit in it once it's
-  shorter: the server refuses it then, naming a set that doesn't (see [Errors](#errors)).
+  shorter: the session's page then marks those that don't (see [A session's page](#a-sessions-page)).
 - "Takeover de": the collective whose takeover the session is, picked from the collectives of
   [Artistes](artistes.md), or "Aucun takeover".
 - "Nom": free text, e.g. "HAUTE RIVE TAKEOVER".
@@ -114,13 +124,16 @@ top to bottom, the form has:
   [Artistes](artistes.md). The set's performers are offered too, greyed out and marked "déjà dans le set", but can't be
   picked. Performers can't be created by typing a name: they're added in Artistes first.
 - "Horaire": in a session with a date, "Début" and "Fin", in Québec time (see [Times](#times)), then how long the set
-  lasts; in a session without one, "Début", in hours and minutes after the session's start, and "Durée", which is
-  needed once there's a start. With "horaire à déterminer" checked, e.g. while the order of the sets isn't known, only
-  "Durée", which can be left empty. A set takes place within its session, starting at most 23 h 59 after its start,
-  and lasts no longer than it, which the form checks, saying when the session is. A new set starts by default when the last
-  of the session's sets that isn't cancelled and whose place is known ends, or at the session's start when there's
-  none, for an hour, or until the session ends if that's sooner. When the session's sets fill it, "Début" and "Fin" (or
-  "Durée") start empty.
+  lasts; in a session without one, "Début", in hours and minutes after the session's start, and "Durée", which is needed
+  once there's a start. With "horaire à déterminer" checked, e.g. while the order of the sets isn't known, only "Durée",
+  which can be left empty. A set starts at most 23 h 59 after its session's start, and lasts at most 24 h, which the
+  form checks (see [Times](../../server/sessions.md#times)). The form says when the session is, and, in a session with a
+  date, that the set « commence le lendemain » or « finit le lendemain » when its start or its end is on a later day
+  than the session's start, since a start time before the session's is the next day's. It doesn't check that the set
+  fits in the session, or doesn't overlap another set: the session's page marks those (see [A session's
+  page](#a-sessions-page)). A new set starts by default when the last of the session's sets that isn't cancelled and
+  whose place is known ends, or at the session's start when there's none, for an hour, or until the session ends if
+  that's sooner. When the session's sets fill it, "Début" and "Fin" (or "Durée") start empty.
 - "Prestation": what the performers do, picked from the same list as the application form's (see
   [Candidatures](candidatures.md)), and "Autre", in a few words.
 - "Genres": tags to click, like an artist's (see [Adding an artist](artistes.md#adding-an-artist)). While it has none,
@@ -134,11 +147,11 @@ When the artists can't be loaded, the form says so: the set's performers stay, b
 
 The forms say what's wrong with each field once it's left, like the artist form (see [Artistes](artistes.md)): they
 check sessions and sets as the server does, for immediate feedback, but not the rules that involve other sessions or
-sets, e.g. overlaps (see [Rules](../../server/sessions.md#rules)). The server's check is the one that counts: if it
-refuses what the form accepted, the form shows the server's message. When the server names what's in the way, the
-message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set of the
-session whose page this is is named by its performers and times, without a link, and the session itself isn't named.
-Changing a status shows these the same way.
+sets, e.g. sessions that overlap (see [Rules](../../server/sessions.md#rules)). The server's check is the one that
+counts: if it refuses what the form accepted, the form shows the server's message. When the server names what's in the
+way, the message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set
+of the session whose page this is is named by its performers and times, without a link, and the session itself isn't
+named. Changing a status shows these the same way.
 
 ## Endpoints
 

@@ -51,6 +51,23 @@ each page names it), `order` (`asc` or `desc`, which only counts along with `sor
 it, e.g. `accepted`). Without `order`, "Reçue le" and "Date" sort the latest first, and every other column sorts in
 ascending order. A value the page doesn't know is ignored, as if the parameter weren't there.
 
+## Tooltips
+
+Some controls have a tooltip, under them, or above them when there's no room below, e.g. to say why they can't be used
+(see [Controls that can't be used](#controls-that-cant-be-used)). It shows while the control is hovered with a mouse, or
+has the keyboard's focus, and stays while the pointer moves onto it. On touch screens, tapping the control, with a finger
+or a pen, shows it until the control is tapped again, or something else is, or the focus leaves it. Escape hides it, even
+while the control is hovered or focused. Screen readers read it as the control's description. Only controls that do
+nothing else when they're clicked have one.
+
+## Controls that can't be used
+
+A control that a rule keeps from being used, e.g. "ajouter un set" while a session is cancelled, stays where it is,
+greyed out, and its tooltip says why (see [Tooltips](#tooltips)), rather than the page explaining the rule in a
+sentence. It keeps the keyboard's focus, so that its tooltip can be read, and screen readers announce it as unavailable.
+Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
+without a tooltip.
+
 ## Endpoints
 
 - `GET /api/admin/me`, to know whether there's a session, and the admin's email.

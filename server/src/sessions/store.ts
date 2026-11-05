@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -46,12 +46,10 @@ export class Conflict extends Error {
 }
 
 export const SESSION_CANCELLED = 'This session is cancelled'
-const SET_DOES_NOT_FIT = 'This set ends after its session'
-const SET_WOULD_NOT_FIT = 'One of the sets of this session would end after it'
 
 // The rules of sessions that the database enforces, by the constraint that enforces each one, with how to find what's
 // in the way of the session or the set that broke it, as it would have been saved.
-type SetPlace = Pick<SetRow, 'sessionId' | 'offsetMinutes' | 'durationMinutes' | 'soundcloudTrackId' | 'youtubeVideoId'>
+type SetLinks = Pick<SetRow, 'soundcloudTrackId' | 'youtubeVideoId'>
 type Rule<Saved> = { message: string; other: (saved: Saved) => SQL }
 
 const SESSION_RULES: Record<string, Rule<SessionChanges>> = {
@@ -63,13 +61,7 @@ const SESSION_RULES: Record<string, Rule<SessionChanges>> = {
   },
 }
 
-const SET_RULES: Record<string, Rule<SetPlace>> = {
-  sets_no_overlap: {
-    message: 'Another set of this session overlaps this one',
-    // Like the constraint, which only fails for a set with an offset, and so a duration.
-    other: ({ sessionId, offsetMinutes, durationMinutes }) =>
-      sql`${sets.sessionId} = ${sessionId} and ${sets.status} <> 'cancelled' and ${sets.offsetMinutes} is not null and int4range(${sets.offsetMinutes}, ${sets.offsetMinutes} + ${sets.durationMinutes}) && int4range(${offsetMinutes}::integer, ${offsetMinutes! + durationMinutes!}::integer)`,
-  },
+const SET_RULES: Record<string, Rule<SetLinks>> = {
   sets_soundcloud_track_id_idx: {
     message: "This SoundCloud track is another set's",
     // A unique index never fails on null.
@@ -175,13 +167,13 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 // and deleting a collective, which write them too, by deleting the artist's rows in set_performers, and by clearing
 // the takeover of the collective's sessions (see artists/store.ts and collectives/store.ts). They're done one at a time,
 // so that:
-// - Two writes that would overlap can't both insert into an exclusion constraint's index, then each wait for the other
-//   to end before they could tell whether they overlap, which Postgres would end as a deadlock, rather than with the
-//   exclusion constraint's error.
-// - What a write reads can't change until it's done: the rules that span sessions and sets (a set fits in its session,
-//   and a cancelled session only has cancelled sets), whether the session, the set, the takeover's collective and the
-//   performers exist, and so whether the foreign keys hold, without locking their rows, which would keep their profiles
-//   from being changed in the meantime.
+// - Two sessions that would overlap can't both be inserted into the index of the exclusion constraint sessions_no_overlap,
+//   then each wait for the other to end before it could tell whether they overlap, which Postgres would end as a
+//   deadlock, rather than with the constraint's error.
+// - What a write reads can't change until it's done: the rule that spans sessions and sets (a cancelled session only has
+//   cancelled sets), and whether the session, the set, the takeover's collective and the performers exist, and so
+//   whether the foreign keys hold, without locking their rows, which would keep their profiles from being changed in the
+//   meantime.
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock.
 // Every transaction that takes it takes it before any other lock, so it can't be part of a deadlock itself. The
@@ -257,7 +249,7 @@ function checkingSessionRules<T>(tx: Queryable, id: string | null, session: Sess
 
 // Runs `write`, which saves the set `id`, or a new one when it's null, as `set` says it then is, and throws a Conflict
 // with the other set, and its session, when it breaks a rule (see `checkingRules`).
-function checkingSetRules<T>(tx: Queryable, id: string | null, set: SetPlace, write: (savepoint: Queryable) => Promise<T>) {
+function checkingSetRules<T>(tx: Queryable, id: string | null, set: SetLinks, write: (savepoint: Queryable) => Promise<T>) {
   return checkingRules(
     tx,
     SET_RULES,
@@ -273,21 +265,16 @@ function checkingSetRules<T>(tx: Queryable, id: string | null, set: SetPlace, wr
   )
 }
 
-// Whether a set, as `set` places it, fits in a session of `durationMinutes`. A set without a duration always does.
-function fits(set: Pick<SetRow, 'offsetMinutes' | 'durationMinutes'>, durationMinutes: number): boolean {
-  return set.durationMinutes === null || (set.offsetMinutes ?? 0) + set.durationMinutes <= durationMinutes
-}
-
 // The session `id`, or null when there's no such session.
 async function sessionRow(tx: Queryable, id: string): Promise<SessionRow | null> {
   const [session] = await tx.select().from(sessions).where(eq(sessions.id, id))
   return session ?? null
 }
 
-// The set `id`, and its session, or null when there's no such set.
-async function setAndSession(tx: Queryable, id: string): Promise<{ session: SessionRow; set: SetRow } | null> {
-  const [found] = await tx.select({ set: sets, session: sessions }).from(sets).innerJoin(sessions, eq(sessions.id, sets.sessionId)).where(eq(sets.id, id))
-  return found ?? null
+// The session of the set `id`, or null when there's no such set.
+async function sessionOfSet(tx: Queryable, id: string): Promise<SessionRow | null> {
+  const [found] = await tx.select({ session: sessions }).from(sets).innerJoin(sessions, eq(sessions.id, sets.sessionId)).where(eq(sets.id, id))
+  return found?.session ?? null
 }
 
 export function sessionsStore(db: Queryable): SessionsStore {
@@ -329,16 +316,6 @@ export function sessionsStore(db: Queryable): SessionsStore {
         await lockSessions(tx)
         if (!(await sessionRow(tx, id))) return null
         await checkTakeover(tx, changes.takeoverId)
-        // Its sets move with its start, so only its duration can leave one of them out. Cancelled ones count too.
-        const [left] = await tx
-          .select({ id: sets.id })
-          .from(sets)
-          .where(and(eq(sets.sessionId, id), gt(sql`coalesce(${sets.offsetMinutes}, 0) + ${sets.durationMinutes}`, changes.durationMinutes)))
-          .limit(1)
-        if (left) {
-          const { session, set } = (await setWithId(tx, left.id))!
-          throw new Conflict(SET_WOULD_NOT_FIT, session, set)
-        }
         await checkingSessionRules(tx, id, changes, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
         return sessionWithId(tx, id)
       })
@@ -384,7 +361,6 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const session = await sessionRow(tx, sessionId)
         if (!session) return null
         if (session.status === 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, sessionId))
-        if (!fits(set, session.durationMinutes)) throw new Conflict(SET_DOES_NOT_FIT, await sessionWithId(tx, sessionId))
         await checkPerformers(tx, performers)
         const row = { ...set, sessionId }
         const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }))
@@ -397,12 +373,10 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const found = await setAndSession(tx, id)
-        if (!found) return null
-        const { session } = found
-        if (!fits(changes, session.durationMinutes)) throw new Conflict(SET_DOES_NOT_FIT, await sessionWithId(tx, session.id))
+        const session = await sessionOfSet(tx, id)
+        if (!session) return null
         await checkPerformers(tx, performers)
-        await checkingSetRules(tx, id, { ...changes, sessionId: session.id }, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
+        await checkingSetRules(tx, id, changes, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
         await tx.delete(setPerformers).where(eq(setPerformers.setId, id))
         await addPerformers(tx, id, performers)
         return sessionWithId(tx, session.id)
@@ -413,14 +387,12 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        // With its place, which the status doesn't change.
-        const found = await setAndSession(tx, id)
-        if (!found) return null
-        const { session, set: before } = found
+        const session = await sessionOfSet(tx, id)
+        if (!session) return null
         if (session.status === 'cancelled' && change.status !== 'cancelled') {
           throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, session.id))
         }
-        await checkingSetRules(tx, id, before, (savepoint) => savepoint.update(sets).set(change).where(eq(sets.id, id)))
+        await tx.update(sets).set(change).where(eq(sets.id, id))
         return sessionWithId(tx, session.id)
       })
     },

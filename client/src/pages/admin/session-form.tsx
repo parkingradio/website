@@ -4,12 +4,12 @@ import type { Loaded } from '../../api/use-api'
 import type { Schema } from '../../api/client'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
-import { formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
+import { quebecDayAndTime } from '../../quebec-time'
 import { after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes } from '../../session-fields'
 import type { Reference, SessionFields, SessionFormValues } from '../../session-fields'
 import { raEventId, raEventUrl } from '../../session-links'
 import { leaving, useCheckedForm } from './checked-form'
-import { collectiveOption, formatDuration, formatShortDay } from './describe'
+import { collectiveOption, formatDuration, formatShortDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
 import { compareText } from './list'
 import type { GroupProps } from './profile-fields'
@@ -140,7 +140,7 @@ function TimesField({
           {dated && end && (
             <p className="admin-hint" role="status">
               Dure {formatDuration(dated.durationMinutes)}
-              {quebecDayAndTime(end).day !== form.day && `, finit le lendemain, ${formatLongQuebecDay(end.toISOString())}`}.
+              {nextDay('finit', end, form.day)}.
             </p>
           )}
           <FieldError message={error} />

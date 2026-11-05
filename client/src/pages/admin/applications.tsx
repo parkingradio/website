@@ -426,7 +426,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
       {application.updatedBy && <p className="admin-meta">{byWhom('Modifiée', application.updatedBy, application.updatedAt)}</p>}
 
       <h2>Statut</h2>
-      <StatusButtons statuses={APPLICATION_STATUSES} labels={STATUS_LABELS} status={application.status} disabled={() => busy} onChange={changeStatus} />
+      <StatusButtons statuses={APPLICATION_STATUSES} labels={STATUS_LABELS} status={application.status} disabled={busy} onChange={changeStatus} />
       {application.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>}
       {error && (
         <p className="admin-error" role="alert">

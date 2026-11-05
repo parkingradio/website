@@ -59,6 +59,62 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(page.getByRole('table', { name: 'Sessions' }).locator(`a[href="${sessionPage}"]`)).toBeVisible()
 })
 
+test('a seeded session marks its sets that overlap, and those that end after it, saying why in a tooltip', async ({ page, isMobile }) => {
+  await logIn(page, { at: '/admin/sessions' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('soirée à revoir')
+  await rowsOf(page, 'SOIRÉE À REVOIR').getByRole('link').first().click()
+  // By their performers' links, since the tooltips of the rows' marks name the sets they overlap.
+  const sets = page.getByRole('table', { name: 'Sets' })
+  const mark = (artist: string) =>
+    sets
+      .getByRole('row')
+      .filter({ has: page.getByRole('link', { name: artist, exact: true }) })
+      .getByRole('button', { name: 'avertissement' })
+  await expect(mark('Fréquence Boréale')).toHaveAccessibleDescription('Chevauche le set de Ondine, 20 h 30 – 21 h 30.')
+  await expect(mark('Ondine')).toHaveAccessibleDescription('Chevauche le set de Fréquence Boréale, 20 h – 21 h.')
+  await expect(mark('Jah Pierre')).toHaveAccessibleDescription('Finit après la session.')
+  const tooltip = page.getByRole('tooltip').filter({ visible: true })
+  await expect(tooltip).toHaveCount(0)
+  // The mark doesn't make its row taller.
+  const heights = await mark('Jah Pierre').evaluate((mark) => {
+    const row = mark.closest('tr')!
+    const marked = row.getBoundingClientRect().height
+    mark.style.display = 'none'
+    const unmarked = row.getBoundingClientRect().height
+    mark.style.display = ''
+    return { marked, unmarked }
+  })
+  expect(heights.marked).toBe(heights.unmarked)
+
+  if (isMobile) {
+    // Tapping the mark shows its tooltip, and tapping something else hides it.
+    await mark('Jah Pierre').tap()
+    await expect(tooltip).toHaveText('Finit après la session.')
+    await page.getByRole('heading', { level: 1 }).tap()
+    await expect(tooltip).toHaveCount(0)
+    return
+  }
+
+  // Hovering the mark shows its tooltip, right under it, and so does the keyboard's focus, until Escape.
+  await mark('Jah Pierre').hover()
+  await expect(tooltip).toHaveText('Finit après la session.')
+  const [markBox, tipBox] = [await mark('Jah Pierre').boundingBox(), await tooltip.boundingBox()]
+  expect(Math.abs(tipBox!.y - (markBox!.y + markBox!.height))).toBeLessThan(1)
+  await page.mouse.move(0, 0)
+  await expect(tooltip).toHaveCount(0)
+  // Clicking it with the mouse doesn't keep it once the mouse is gone.
+  await mark('Jah Pierre').click()
+  await page.mouse.move(0, 0)
+  await expect(tooltip).toHaveCount(0)
+  await sets.getByRole('button', { name: /^supprimer : Set de Ondine/ }).focus()
+  await page.keyboard.press('Tab')
+  await expect(mark('Jah Pierre')).toBeFocused()
+  await expect(tooltip).toHaveText('Finit après la session.')
+  await page.keyboard.press('Escape')
+  await expect(tooltip).toHaveCount(0)
+  await expect(mark('Jah Pierre')).toBeFocused()
+})
+
 // What a test's own entities are named after, two days for its sessions, from 2100 to 2899, in July, when clocks don't
 // change, and a YouTube video id of 11 characters. They're derived from its unique name, so that other tests' sessions,
 // even those left from a run that failed, are very unlikely to have them.
@@ -92,7 +148,7 @@ function longDay(day: string): string {
   return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 }
 
-test("a collective's takeover is added from its page, until the next day, with its sets, then moved, one of its sets deleted, cancelled and deleted", async ({ page }, testInfo) => {
+test("a collective's takeover is added from its page, until the next day, with its sets, then moved, one of its sets deleted, cancelled and deleted", async ({ page, isMobile }, testInfo) => {
   const { unique, day, otherDay, youtubeVideo } = own(testInfo)
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
@@ -179,6 +235,25 @@ test("a collective's takeover is added from its page, until the next day, with i
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
   await expect(sets.getByRole('button', { name: 'annulé', pressed: true })).toHaveCount(1)
+  // Its set can't be un-cancelled, and sets can't be added to it, which their buttons say, greyed out.
+  const planned = sets.getByRole('button', { name: 'planifié' })
+  await expect(planned).toHaveAttribute('aria-disabled', 'true')
+  await expect(planned).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')
+  const add = page.getByRole('button', { name: 'ajouter un set' })
+  await expect(add).toHaveAttribute('aria-disabled', 'true')
+  // By force, since Playwright waits for an aria-disabled button to be enabled before clicking or tapping it. Tapping it
+  // shows its tooltip, while clicking it with the mouse only shows it while the mouse hovers it.
+  const tooltip = page.getByRole('tooltip').filter({ visible: true })
+  if (isMobile) {
+    await add.tap({ force: true })
+    await expect(tooltip).toHaveText('La session est annulée\u00a0: on ne peut pas lui ajouter de set.')
+  } else {
+    await add.click({ force: true })
+    await expect(tooltip).toHaveText('La session est annulée\u00a0: on ne peut pas lui ajouter de set.')
+    await page.mouse.move(0, 0)
+    await expect(tooltip).toHaveCount(0)
+  }
+  await expect(page.getByRole('heading', { name: 'Nouveau set' })).toHaveCount(0)
 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'supprimer la session' }).click()

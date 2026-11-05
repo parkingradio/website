@@ -73,3 +73,11 @@ export function requestsTo(method: string, url: string): RequestInit[] {
     .filter((request) => request.url === url && request.method === method)
     .map(({ init }) => init)
 }
+
+/** An element's text, as its `textContent`, but without what's hidden, e.g. a tooltip that isn't shown. */
+export function visibleText(element: Element): string {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let text = ''
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) if (!node.parentElement!.closest('[hidden]')) text += node.nodeValue
+  return text
+}

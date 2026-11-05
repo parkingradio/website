@@ -263,6 +263,12 @@ function laterDay(start: string, end: string): boolean {
   return quebecDayAndTime(new Date(start)).day !== quebecDayAndTime(new Date(end)).day
 }
 
+// When `instant` is on a later day than `day` ("YYYY-MM-DD"), in Québec, what the forms say of it, e.g. ", finit le
+// lendemain, dimanche 15 novembre 2026" for "finit", or else "".
+export function nextDay(what: string, instant: Date, day: string): string {
+  return quebecDayAndTime(instant).day === day ? '' : `, ${what} le lendemain, ${formatLongQuebecDay(instant.toISOString())}`
+}
+
 type SessionTimes = Pick<Session, 'start' | 'end' | 'durationMinutes'>
 
 // E.g. "sam. 14 nov. 2026", or "date à déterminer".
@@ -322,4 +328,11 @@ export function setTitle(set: Pick<StudioSet, 'performers'>): string {
 // "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
 export function setName(set: StudioSet, session?: Pick<Session, 'name' | 'takeover' | 'start'>): string {
   return [setTitle(set), ...(session ? [sessionName(session)] : []), setHours(set)].join(', ')
+}
+
+// A set as it's named within a sentence on its session's page, e.g. "le set de Aurore, 21 h – 22 h", or "le set, 21 h –
+// 22 h" once its performers are all deleted.
+export function setInSentence(set: Pick<StudioSet, 'performers' | 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>): string {
+  const names = set.performers.map((performer) => performer.name)
+  return `le set${names.length > 0 ? ` de ${enumerate(names)}` : ''}, ${setHours(set)}`
 }

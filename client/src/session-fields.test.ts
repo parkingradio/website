@@ -35,6 +35,8 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
     durationMinutes: null,
     start: null,
     end: null,
+    fitsInSession: true,
+    overlappingSets: [],
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -197,13 +199,13 @@ describe('checkSession', () => {
 describe('setPlace', () => {
   // Saturday, November 14th, 2026, from 21:00 to 1:00 in Québec.
   const SESSION = session('2026-11-15T02:00:00.000Z', 240)
-  const WITHIN = 'de 21 h à 1 h le lendemain'
   const FORM = newSetFormValues({ ...SESSION, sets: [] })
   const place = (form: Partial<SetFormValues>, of: Session = SESSION) => {
-    const result = setPlace({ ...FORM, opened: undefined, ...form }, of, WITHIN)
+    const result = setPlace({ ...FORM, opened: undefined, ...form }, of)
     return 'errors' in result ? result.errors : result
   }
-  const outside = `Le set doit avoir lieu pendant la session, ${WITHIN}.`
+  const late = 'Un set commence au plus 23 h 59 après le début de la session.'
+  const longest = 'Un set dure au plus 24 heures.'
 
   it("is worked out from the times of day, from the session's start, a start before its start time being the next day", () => {
     expect(place({ start: '21:00', end: '22:00' })).toEqual({ offsetMinutes: 0, durationMinutes: 60 })
@@ -211,12 +213,17 @@ describe('setPlace', () => {
     expect(place({ start: '00:30', end: '01:00' })).toEqual({ offsetMinutes: 210, durationMinutes: 30 })
   })
 
-  it('takes place within the session', () => {
-    // The next day at 20:00, which is after the session.
-    expect(place({ start: '20:00', end: '21:00' })).toEqual({ start: outside })
-    expect(place({ start: '00:30', end: '01:30' })).toEqual({ end: outside })
-    // A day long, from 21:00: a set can start until a minute before it ends.
-    expect(place({ start: '20:59', end: '21:00' }, session('2026-11-15T02:00:00.000Z', 1440))).toEqual({ offsetMinutes: 1439, durationMinutes: 1 })
+  it("doesn't have to take place within the session, but starts at most 23 h 59 after its start, and lasts at most 24 hours", () => {
+    // The next day at 20:00, which is after the session, and until after it ends.
+    expect(place({ start: '20:00', end: '21:00' })).toEqual({ offsetMinutes: 1380, durationMinutes: 60 })
+    expect(place({ start: '00:30', end: '01:30' })).toEqual({ offsetMinutes: 210, durationMinutes: 60 })
+    expect(place({ start: '20:59', end: '21:00' })).toEqual({ offsetMinutes: 1439, durationMinutes: 1 })
+    // The night clocks fall back, times of day are an hour further apart: from 23:00 in summer time, 22:59 the next day is
+    // 24 h 59 later, and from 23:00 to 22:30 is 24 h 30.
+    const night = session('2026-11-01T03:00:00.000Z', 240)
+    expect(place({ start: '22:59', end: '23:30' }, night)).toEqual({ start: late })
+    expect(place({ start: '23:00', end: '22:30' }, night)).toEqual({ end: longest })
+    expect(place({ start: '23:00', end: '22:00' }, night)).toEqual({ offsetMinutes: 0, durationMinutes: 1440 })
   })
 
   it('says what is missing or invalid', () => {
@@ -244,22 +251,24 @@ describe('setPlace', () => {
     expect(place({ offset: { hours: '1', minutes: '30' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offsetMinutes: 90, durationMinutes: 60 })
     expect(place({ offset: { hours: '0', minutes: '' }, duration: { hours: '', minutes: '' } }, undated)).toEqual({ duration: 'Indiquez la durée du set.' })
     expect(place({ offset: { hours: '', minutes: '' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offset: 'Indiquez quand le set commence.' })
-    expect(place({ offset: { hours: '2', minutes: '30' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ duration: outside })
-    expect(place({ offset: { hours: '3', minutes: '' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offset: outside })
+    // After the session, or until after it.
+    expect(place({ offset: { hours: '2', minutes: '30' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offsetMinutes: 150, durationMinutes: 60 })
+    expect(place({ offset: { hours: '23', minutes: '59' }, duration: { hours: '24', minutes: '' } }, undated)).toEqual({ offsetMinutes: 1439, durationMinutes: 1440 })
+    expect(place({ offset: { hours: '24', minutes: '' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offset: late })
+    expect(place({ offset: { hours: '1', minutes: '' }, duration: { hours: '24', minutes: '1' } }, undated)).toEqual({ duration: longest })
   })
 
-  it("is only a duration, which can be left out, no longer than the session's, while the set's place isn't known", () => {
+  it("is only a duration, which can be left out, and can be longer than the session, while the set's place isn't known", () => {
     expect(place({ unplaced: true, duration: { hours: '', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: null })
     expect(place({ unplaced: true, duration: { hours: '1', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: 60 })
-    expect(place({ unplaced: true, duration: { hours: '5', minutes: '' } })).toEqual({
-      duration: `Le set ne peut pas durer plus longtemps que la session, ${WITHIN}.`,
-    })
+    expect(place({ unplaced: true, duration: { hours: '5', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: 300 })
+    expect(place({ unplaced: true, duration: { hours: '25', minutes: '' } })).toEqual({ duration: longest })
   })
 })
 
 describe('the place a set form opens with', () => {
   const sent = (form: SetFormValues, of: Session) => {
-    const { fields, errors } = checkSet(form, of, 'pendant')
+    const { fields, errors } = checkSet(form, of)
     return errors ?? { offsetMinutes: fields.offsetMinutes, durationMinutes: fields.durationMinutes }
   }
 
@@ -318,7 +327,7 @@ describe('checkSet', () => {
   }
 
   it('returns what the server is sent: the ids, the offset and duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
-    expect(checkSet(FORM, SESSION, 'pendant')).toEqual({
+    expect(checkSet(FORM, SESSION)).toEqual({
       fields: {
         performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
         offsetMinutes: 0,
@@ -345,7 +354,6 @@ describe('checkSet', () => {
           youtubeVideo: 'https://www.youtube.com/@parkingradio',
         },
         SESSION,
-        'pendant',
       ).errors,
     ).toEqual({
       performers: 'Choisissez au moins un artiste.',

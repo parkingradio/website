@@ -35,6 +35,13 @@ const SetBody = z
     durationMinutes: z.number().nullable(),
     start: Timestamp.nullable().meta({ description: "Its session's start plus its offset. Null when either is" }),
     end: Timestamp.nullable().meta({ description: 'Its start plus its duration. Null when its start is' }),
+    fitsInSession: z.boolean().meta({
+      description:
+        "Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits",
+    }),
+    overlappingSets: z.array(z.string()).meta({
+      description: "The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order",
+    }),
     performanceTypes: z.array(PerformanceType),
     otherPerformanceType: z.string(),
     genres: z.array(Genre),
@@ -102,8 +109,21 @@ function tracked(row: StoredSession | StoredSet) {
   }
 }
 
-function setBody(row: StoredSet, sessionStart: Date | null): SetBody {
-  const start = sessionStart === null || row.offsetMinutes === null ? null : after(sessionStart, row.offsetMinutes)
+// Whether a set fits in a session of `durationMinutes` (see "Sets' places" in docs/design/server/sessions.md).
+function fits(set: StoredSet, durationMinutes: number): boolean {
+  return set.durationMinutes === null || (set.offsetMinutes ?? 0) + set.durationMinutes <= durationMinutes
+}
+
+// Whether two sets of a session overlap, which needs both to have an offset, and so a duration. Each takes from its
+// offset, included, to its end, excluded.
+function overlap(a: StoredSet, b: StoredSet): boolean {
+  if (a.offsetMinutes === null || b.offsetMinutes === null) return false
+  return a.offsetMinutes < b.offsetMinutes + b.durationMinutes! && b.offsetMinutes < a.offsetMinutes + a.durationMinutes!
+}
+
+// The set `row` of `session`.
+function setBody(row: StoredSet, session: StoredSession): SetBody {
+  const start = session.startAt === null || row.offsetMinutes === null ? null : after(session.startAt, row.offsetMinutes)
   return {
     id: row.id,
     performers: row.performers,
@@ -112,6 +132,9 @@ function setBody(row: StoredSet, sessionStart: Date | null): SetBody {
     start: start?.toISOString() ?? null,
     // A set with an offset has a duration.
     end: start && after(start, row.durationMinutes!).toISOString(),
+    fitsInSession: fits(row, session.durationMinutes),
+    // A cancelled set doesn't take place, so it overlaps nothing, but it can list the sets it would overlap otherwise.
+    overlappingSets: session.sets.filter((other) => other.id !== row.id && other.status !== 'cancelled' && overlap(row, other)).map((other) => other.id),
     performanceTypes: row.performanceTypes,
     otherPerformanceType: row.otherPerformanceType,
     genres: row.genres,
@@ -130,7 +153,7 @@ function sessionBody(row: StoredSession): SessionBody {
     takeover: row.takeover,
     name: row.name,
     raEvent: link(row.raEventId, raEventUrl),
-    sets: row.sets.map((set) => setBody(set, row.startAt)),
+    sets: row.sets.map((set) => setBody(set, row)),
     ...tracked(row),
   }
 }
@@ -154,7 +177,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
       ok: false as const,
       error,
       session: session ? sessionBody(session) : null,
-      set: set ? setBody(set, session?.startAt ?? null) : null,
+      // A set in the way always comes with its session.
+      set: set && session ? setBody(set, session) : null,
     })
   }
 

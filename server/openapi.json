@@ -2224,6 +2224,17 @@
             ],
             "description": "Its start plus its duration. Null when its start is"
           },
+          "fitsInSession": {
+            "type": "boolean",
+            "description": "Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits"
+          },
+          "overlappingSets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order"
+          },
           "performanceTypes": {
             "type": "array",
             "items": {
@@ -2365,6 +2376,8 @@
           "durationMinutes",
           "start",
           "end",
+          "fitsInSession",
+          "overlappingSets",
           "performanceTypes",
           "otherPerformanceType",
           "genres",

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionTitle, sessionWhen, setHours, setName, setTitle } from './describe'
+import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionTitle, sessionWhen, setHours, setInSentence, setName, setTitle } from './describe'
 
 describe('membersGenres', () => {
   const artists = new Map(
@@ -114,5 +114,7 @@ describe('names and times of sessions and sets', () => {
     expect(setTitle({ performers: [] })).toBe('Set')
     expect(setName(set as never)).toBe('Set de Aurore et Brume, +1 h – +2 h')
     expect(setName(set as never, { ...session, name: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, date à déterminer, +1 h – +2 h')
+    expect(setInSentence(set)).toBe('le set de Aurore et Brume, +1 h – +2 h')
+    expect(setInSentence({ ...set, performers: [] })).toBe('le set, +1 h – +2 h')
   })
 })

@@ -6,11 +6,12 @@ import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { Conflict, NoSuchReference } from './store.js'
 import type { SessionsStore, StoredSession, StoredSet } from './store.js'
+import type { Status } from './fields.js'
 import { sessionsRoutes } from './routes.js'
 
 // A fake database: the sessions, with their sets, and the artists and collectives that exist, by id. It doesn't check the
-// rules of sessions, which the integration tests cover against a real database (see integration-tests/021-sessions.sh):
-// the tests below make it throw what the real one would.
+// rules of sessions, which the integration tests and the property-based tests cover against a real database (see
+// integration-tests/021-sessions.sh and rules.db.test.ts): the tests below make it throw what the real one would.
 let rows: StoredSession[] = []
 const NAMES: Record<string, string> = { 'artist-1': 'Ana', 'artist-2': 'Brume', 'collective-1': 'Les Ondes' }
 let nextId = 0
@@ -405,6 +406,52 @@ describe('sessions routes', () => {
     })
   })
 
+  describe("sets' places", () => {
+    // Sets of a session of 4 hours, by id: their offset, duration and status, and what the server says of them.
+    const SETS: [id: string, offset: number | null, duration: number | null, status: Status, fits: boolean, overlapping: string[]][] = [
+      ['first', 0, 60, 'planned', true, ['across']],
+      // From when the first one ends, which isn't an overlap.
+      ['second', 60, 60, 'done', true, ['across']],
+      ['across', 30, 60, 'planned', true, ['first', 'second']],
+      // Until the session ends, which fits.
+      ['last', 180, 60, 'planned', true, ['after']],
+      ['after', 200, 60, 'planned', false, ['last']],
+      // A cancelled set overlaps those that aren't, but they don't list it, and it doesn't count when it's another set's.
+      ['cancelled', 0, 240, 'cancelled', true, ['first', 'second', 'across', 'last', 'after']],
+      ['cancelled-after', 230, 120, 'cancelled', false, ['last', 'after']],
+      // Without an offset, it overlaps nothing, and its duration alone has to fit.
+      ['unplaced', null, 60, 'planned', true, []],
+      ['too-long', null, 241, 'planned', false, []],
+      ['unknown', null, null, 'planned', true, []],
+    ]
+
+    it('says whether each set fits in its session, and which sets that are not cancelled it overlaps, in order', async () => {
+      const app = await buildApp()
+      await createSession(app)
+      rows[0].sets = SETS.map(([id, offsetMinutes, durationMinutes, status]) => ({
+        id,
+        sessionId: 'session-1',
+        createdAt: CREATED_AT,
+        createdBy: 'admin@example.com',
+        ...NEW,
+        status,
+        offsetMinutes,
+        durationMinutes,
+        performers: [],
+        performanceTypes: [],
+        otherPerformanceType: '',
+        genres: [],
+        soundcloudTrackId: null,
+        soundcloudTrackUrl: null,
+        youtubeVideoId: null,
+      }))
+      const found = (await send(app, 'GET', '/api/admin/sessions/session-1')).json().session
+      expect(found.sets.map(({ id, fitsInSession, overlappingSets }: { id: string; fitsInSession: boolean; overlappingSets: string[] }) => [id, fitsInSession, overlappingSets])).toEqual(
+        SETS.map(([id, , , , fits, overlapping]) => [id, fits, overlapping]),
+      )
+    })
+  })
+
   describe('PUT /api/admin/sessions/:id', () => {
     it('replaces the session, but not its status, says who changed it, and moves its sets with its start', async () => {
       const app = await buildApp()
@@ -426,6 +473,14 @@ describe('sessions routes', () => {
       expect(store.update).toHaveBeenCalledWith('session-1', expect.objectContaining({ startAt: new Date('2026-11-22T01:00:00Z'), durationMinutes: 240 }))
     })
 
+    it("can shorten the session so that its sets don't fit in it anymore, which they say", async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session.sets).toEqual([expect.objectContaining({ id: 'set-2', offsetMinutes: 60, durationMinutes: 60, fitsInSession: false })])
+    })
+
     it('responds 404 for a session that does not exist', async () => {
       const app = await buildApp()
       const response = await send(app, 'PUT', '/api/admin/sessions/session-9', session())
@@ -433,14 +488,14 @@ describe('sessions routes', () => {
       expect(response.json()).toEqual({ ok: false, error: 'No such session' })
     })
 
-    it('responds 409 when one of its sets would not fit anymore, with that set and its session', async () => {
+    it('responds 409 when it would overlap another session, with that one', async () => {
       const app = await buildApp()
       const { session: before } = (await sessionWithSet(app)).json()
-      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('One of the sets of this session would end after it', rows[0], rows[0].sets[0]))
+      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', rows[0]))
       const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
 
       expect(response.statusCode).toBe(409)
-      expect(response.json()).toEqual({ ok: false, error: 'One of the sets of this session would end after it', session: before, set: before.sets[0] })
+      expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: before, set: null })
     })
   })
 
@@ -505,6 +560,8 @@ describe('sessions routes', () => {
           durationMinutes: 60,
           start: '2026-11-14T22:00:00-05:00',
           end: '2026-11-14T23:00:00-05:00',
+          fitsInSession: true,
+          overlappingSets: [],
           performanceTypes: ['dj', 'live-performance'],
           otherPerformanceType: 'Synthé modulaire',
           genres: ['ambient'],
@@ -694,10 +751,15 @@ describe('sessions routes', () => {
       expect(response.json()).toEqual({ ok: false, error: 'A set has at least one performer' })
       response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-9' }] }))
       expect(response.statusCode).toBe(400)
-      vi.mocked(store.updateSet).mockRejectedValueOnce(new Conflict('This set ends after its session', rows[0]))
-      response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ offsetMinutes: 230 }))
+      vi.mocked(store.updateSet).mockRejectedValueOnce(new Conflict("This YouTube video is another set's", rows[0], rows[0].sets[0]))
+      response = await send(app, 'PUT', '/api/admin/sets/set-2', set())
       expect(response.statusCode).toBe(409)
-      expect(response.json()).toEqual({ ok: false, error: 'This set ends after its session', session: expect.objectContaining({ id: 'session-1' }), set: null })
+      expect(response.json()).toEqual({
+        ok: false,
+        error: "This YouTube video is another set's",
+        session: expect.objectContaining({ id: 'session-1' }),
+        set: expect.objectContaining({ id: 'set-2', fitsInSession: true, overlappingSets: [] }),
+      })
     })
   })
 

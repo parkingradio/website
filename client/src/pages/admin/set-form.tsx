@@ -2,10 +2,11 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Artist, GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
-import { checkSet, durationOf, setPlace } from '../../session-fields'
-import type { Reference, Session, SetFields, SetFormValues } from '../../session-fields'
+import { quebecDayAndTime } from '../../quebec-time'
+import { after, checkSet, durationOf, setPlace } from '../../session-fields'
+import type { Reference, Session, SetFields, SetFormValues, SetPlace } from '../../session-fields'
 import { leaving, useCheckedForm } from './checked-form'
-import { artistOption, formatDuration, genreNames, membersGenres, sessionWithin } from './describe'
+import { artistOption, formatDuration, genreNames, membersGenres, nextDay, sessionWithin } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
 import { GenresField } from './profile-fields'
@@ -35,9 +36,8 @@ type SetFormProps = {
 export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
-  const within = sessionWithin(session)
-  const place = setPlace(form, session, within)
-  const checked = checkSet(form, session, within, place)
+  const place = setPlace(form, session)
+  const checked = checkSet(form, session, place)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!))
@@ -66,8 +66,7 @@ export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCa
       <PlaceField
         form={form}
         session={session}
-        within={within}
-        durationMinutes={'offsetMinutes' in place ? place.durationMinutes : null}
+        place={'errors' in place ? null : place}
         onChange={update}
         errors={{ start: shown('start'), end: shown('end'), offset: shown('offset'), duration: shown('duration') }}
         onLeave={leave('start', 'end', 'offset', 'duration')}
@@ -144,32 +143,41 @@ function PerformersField({ performers, artists, onChange, error, onLeave }: Grou
   )
 }
 
+// When a set that starts `offsetMinutes` after `sessionStart` and lasts `durationMinutes` is on a later day than the
+// session's start, since a start time before the session's is the next day's: e.g. ", commence le lendemain, dimanche
+// 15 novembre 2026", or else ", finit le lendemain, ...", or "" when it's all on the session's day.
+function laterDay(sessionStart: string, offsetMinutes: number, durationMinutes: number): string {
+  const start = new Date(sessionStart)
+  const day = quebecDayAndTime(start).day
+  const setStart = after(start, offsetMinutes)
+  return nextDay('commence', setStart, day) || nextDay('finit', after(setStart, durationMinutes), day)
+}
+
 // Where the set is in its session: in a session with a date, the times it starts and ends, in Québec time; in a session
 // without one, its start, after the session's, and its duration; or only its duration, while its place isn't known.
 function PlaceField({
   form,
   session,
-  within,
-  durationMinutes,
+  place,
   onChange,
   errors,
   onLeave,
 }: {
   form: SetFormValues
   session: Session
-  within: string
-  // How long the set lasts, once its times are valid.
-  durationMinutes: number | null
+  // Its offset and duration, once its times are valid.
+  place: SetPlace | null
   onChange: (changes: Partial<SetFormValues>) => void
   errors: Partial<Record<'start' | 'end' | 'offset' | 'duration', string>>
   onLeave: () => void
 }) {
   const dated = session.start !== null
+  const durationMinutes = place?.durationMinutes ?? null
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Horaire</legend>
       <p className="admin-hint">
-        {dated ? `La session a lieu ${within}.` : `La session dure ${formatDuration(session.durationMinutes)}.`}
+        {dated ? `La session a lieu ${sessionWithin(session)}.` : `La session dure ${formatDuration(session.durationMinutes)}.`}
         {dated && !form.unplaced && ' Heure du Québec.'}
       </p>
       <div className="admin-choices">
@@ -200,9 +208,10 @@ function PlaceField({
               <input type="time" value={form.end} aria-invalid={errors.end ? true : undefined} onChange={(event) => onChange({ end: event.target.value })} />
             </label>
           </div>
-          {durationMinutes !== null && (
+          {place !== null && place.offsetMinutes !== null && (
             <p className="admin-hint" role="status">
-              Dure {formatDuration(durationMinutes)}.
+              Dure {formatDuration(place.durationMinutes!)}
+              {laterDay(session.start!, place.offsetMinutes, place.durationMinutes!)}.
             </p>
           )}
           <FieldError message={errors.start ?? errors.end} />

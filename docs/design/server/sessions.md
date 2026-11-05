@@ -59,6 +59,8 @@ A set, as the endpoints below return it, also has:
 |---|---|---|
 | `id` | string | |
 | `start`, `end` | string or null | When the set starts and ends: its session's `start` plus its `offsetMinutes`, and that plus its `durationMinutes`. Null when its session has no `start`, or the set no `offsetMinutes` |
+| `fitsInSession` | boolean | Whether the set fits in its session, whatever its status: see [Sets' places](#sets-places) |
+| `overlappingSets` | list of strings | The ids of the other sets of its session that aren't cancelled and that it overlaps, in the order of the session's `sets`: see [Sets' places](#sets-places) |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, or a performer being deleted |
@@ -79,7 +81,8 @@ year 2999, in UTC, and can be in the past or in the future.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
 moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set
-with an offset also has a duration.
+with an offset also has a duration. A set is meant to take place during its session, but doesn't have to (see
+[Sets' places](#sets-places)).
 
 Durations and offsets are whole numbers of minutes, of time that actually passes, whatever the clocks say: a session
 from 21:00 to 2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A duration is from 1 minute to 24
@@ -94,30 +97,41 @@ clocks go back: `from` `"2026-10-26T00:00-04:00"`, `to` `"2026-11-02T00:00-05:00
 
 - **Sessions don't overlap**, unless one of them is cancelled or has no start: there's one studio. A session takes from
   its start, included, to its end, excluded, so a session can start when the one before it ends.
-- **A set fits in its session**: its offset plus its duration, or its duration alone when it has no offset, is no more
-  than the session's duration. A set without a duration always fits. Cancelled sets count too.
-- **A session's sets don't overlap each other**, unless one of them is cancelled or has no offset. A set takes from its
-  offset, included, to its offset plus its duration, excluded, so a set can start when the one before it ends. Since
-  sets fit in their sessions, and sessions don't overlap, there's one live at a time.
 - **A SoundCloud track, or a YouTube video, belongs to at most one set**, cancelled ones included.
+- **A cancelled session only has cancelled sets** (see [Status](#status)).
 
 Requests that would break a rule fail with 409, even when they're sent at the same time: when two requests would break a
 rule together, one of them fails. That's the case for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
-- changing a session's duration so that one of its sets doesn't fit in it anymore (changing its start never does that),
-- adding or changing a set so that it doesn't fit in its session, or overlaps another of the session's sets, or
-  un-cancelling a set when it would then overlap one,
-- adding a set to a cancelled session, or un-cancelling a set of a cancelled session (see [Status](#status)),
+- adding a set to a cancelled session, or un-cancelling a set of a cancelled session,
 - giving a set a track or a video that's another set's.
-
-A set that doesn't fit is a 409 too, rather than a 400, since it depends on its session as it is when the set is saved.
 
 These 409s also have `session` and `set`, what's in the way, as the endpoints return them, so that it can be named and
 linked to without another request. `set` is the set in the way, if it's a set, or else null, and `session` is the session
-in the way, or that set's session. A set that doesn't fit, or is added to or un-cancelled in a cancelled session, has its
-own session in the way. When several things are in the way, it's one of them. Both are null for the 409s that aren't
-about a session or a set.
+in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
+the way. When several things are in the way, it's one of them. Both are null for the 409s that aren't about a session or
+a set.
+
+## Sets' places
+
+Each set is streamed as its own YouTube live, so there's meant to be one at a time: a session's sets are meant to take
+place during it, one after the other. The server doesn't require it, so that a session's times and its sets' can be
+changed one at a time, in any order, e.g. a session shortened before its last set is moved. But since it's usually a
+mistake, or a change that isn't finished, each set says where it stands:
+
+- **A set fits in its session** (`fitsInSession`) when its offset plus its duration, or its duration alone when it has
+  no offset, is no more than the session's duration. A set without a duration always fits. This is about the set's
+  times only, whatever its status.
+- **A set overlaps another set of its session** when both have an offset, and so a duration, and their times overlap.
+  A set takes from its offset, included, to its offset plus its duration, excluded, so a set can start when the one
+  before it ends. `overlappingSets` lists the other sets that a set overlaps, but only those that aren't cancelled,
+  since a cancelled set doesn't take place. So it isn't symmetric: a cancelled set lists the sets it would overlap if it
+  weren't cancelled, but they don't list it.
+
+Only the sets that aren't cancelled are expected to fit in their session and to overlap no other set: those that don't
+are what's worth pointing out. Apps that change a session's or its sets' times should tell the admin about the sets
+that aren't cancelled and that they leave not fitting in their session, or overlapping another set.
 
 ## Status
 
@@ -239,10 +253,10 @@ When it fails, nothing is saved.
 
 ## `PUT /api/admin/sessions/:id` (admin)
 
-Replaces a session's fields, but not its status or its sets, which move with its start. It takes the same request as
-`POST /api/admin/sessions`, responds like it, with the session as it is then, and fails like it. It also fails with 409
-when one of the session's sets wouldn't fit in it anymore, with that set in `set`, and with 404 when there's no such
-session.
+Replaces a session's fields, but not its status or its sets, which move with its start, and stay as they are when it's
+shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It takes the same request as
+`POST /api/admin/sessions`, responds like it, with the session as it is then, and fails like it, and also with 404 when
+there's no such session.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 
@@ -276,7 +290,7 @@ Fails with:
 |---|---|
 | 400 | A field isn't valid, a performer doesn't exist, a link isn't one of those above, or SoundCloud shows no track at `soundcloudTrack` |
 | 404 | There's no such session, which is checked before the track is resolved |
-| 409 | The session is cancelled, which is checked before the track is resolved too, or the set wouldn't fit in it, or would overlap another of its sets, or its track or its video is another set's, with what's in the way in `session` and `set` (see [Rules](#rules)). Or `soundcloudTrack` has to be resolved and the credentials of the SoundCloud app haven't been entered yet, with both null |
+| 409 | The session is cancelled, which is checked before the track is resolved too, or the set's track or its video is another set's, with what's in the way in `session` and `set` (see [Rules](#rules)). Or `soundcloudTrack` has to be resolved and the credentials of the SoundCloud app haven't been entered yet, with both null |
 | 502 | `soundcloudTrack` has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
 
 When it fails, nothing is saved.
@@ -295,8 +309,8 @@ session.
 | `status` | `"planned"`, `"done"` or `"cancelled"` | |
 
 Changes a set's status, and responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `status` isn't one of
-these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is, or
-would then overlap another of its session's sets, with what's in the way in `session` and `set`.
+these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
+with that session in `session`.
 
 ## `DELETE /api/admin/sets/:id` (admin)
 

@@ -13,8 +13,8 @@ import { isSoundcloudTrackLink, raEventId, youtubeVideoId } from './session-link
 // The forms check sessions and sets as the server does, to say what's wrong right away, with a copy of the server's rules
 // (see server/src/sessions/fields.ts), which must be changed together with these. Their messages are in French, unlike
 // the server's. The server's are the ones that count: when they disagree, the server's message shows. The rules that
-// involve other sessions or sets, e.g. that they don't overlap, are only the server's, but whether a set fits in its
-// session is checked here too, since its times are worked out from the session's.
+// involve other sessions or sets, e.g. that sessions don't overlap, are only the server's. Whether a set fits in its
+// session, or overlaps another set, isn't checked: the server allows it, and its session's page marks it.
 
 export type Session = Schema<'Session'>
 // A set, as the endpoints return it. Not `Set`, which is JavaScript's.
@@ -31,6 +31,7 @@ export const STATUSES = everyOne<SessionStatus>()(['planned', 'done', 'cancelled
 const NAME_MAX_LENGTH = 100
 // The longest a session or a set lasts, in minutes. A set's offset is less than that.
 const MAX_MINUTES = 24 * 60
+const LONGEST = 'Un set dure au plus 24 heures.'
 // Sessions start from 2000 to 2999, in UTC.
 const EARLIEST = Date.parse('2000-01-01T00:00:00Z')
 const LATEST = Date.parse('3000-01-01T00:00:00Z')
@@ -265,18 +266,15 @@ export function newSetFormValues(session: SessionPlace & Pick<Session, 'sets'>):
   return { ...EMPTY_SET_FORM, ...placeValues(session, offsetMinutes, durationMinutes) }
 }
 
-type SetPlace = { offsetMinutes: number | null; durationMinutes: number | null }
+export type SetPlace = { offsetMinutes: number | null; durationMinutes: number | null }
 
 // Where a set is in `session`, from its times in Québec time, or its offset and duration (see "Times" in
-// docs/design/client/admin/sessions.md), if it fits in the session, or what's wrong with them instead. `within` says when
-// the session is, e.g. "de 21 h à 1 h", for the error of a set that doesn't fit.
-export function setPlace(form: SetFormValues, session: SessionPlace, within: string): SetPlace | { errors: FieldErrors<SetFormValues> } {
-  const outside = `Le set doit avoir lieu pendant la session, ${within}.`
-  const longer = `Le set ne peut pas durer plus longtemps que la session, ${within}.`
+// docs/design/client/admin/sessions.md), or what's wrong with them instead. It doesn't have to be within the session.
+export function setPlace(form: SetFormValues, session: SessionPlace): SetPlace | { errors: FieldErrors<SetFormValues> } {
   if (form.unplaced) {
     const durationMinutes = minutesOf(form.duration)
     if (durationMinutes === undefined || durationMinutes === 0) return { errors: { duration: 'La durée est invalide.' } }
-    if (durationMinutes !== null && durationMinutes > session.durationMinutes) return { errors: { duration: longer } }
+    if (durationMinutes !== null && durationMinutes > MAX_MINUTES) return { errors: { duration: LONGEST } }
     return { offsetMinutes: null, durationMinutes }
   }
 
@@ -306,21 +304,19 @@ export function setPlace(form: SetFormValues, session: SessionPlace, within: str
       place = { offsetMinutes: minutesBetween(sessionStart, startAt), durationMinutes: minutesBetween(startAt, endAt) }
     }
   }
-  const startField = session.start === null ? 'offset' : 'start'
-  const endField = session.start === null ? 'duration' : 'end'
-  if (place.offsetMinutes > MAX_MINUTES - 1 || place.offsetMinutes >= session.durationMinutes) return { errors: { [startField]: outside } }
-  if (place.offsetMinutes + place.durationMinutes > session.durationMinutes) return { errors: { [endField]: outside } }
+  // Hours and minutes can be typed past these, and times of day can be up to 25 hours apart the night the clocks go back.
+  if (place.offsetMinutes > MAX_MINUTES - 1) return { errors: { [session.start === null ? 'offset' : 'start']: 'Un set commence au plus 23 h 59 après le début de la session.' } }
+  if (place.durationMinutes > MAX_MINUTES) return { errors: { [session.start === null ? 'duration' : 'end']: LONGEST } }
   return place
 }
 
-// Checks a set of `session` as it's being filled in the form (see `setPlace` for `within`), with its `place` if it's
-// worked out already, and returns what the server would be sent, or what's wrong with each field instead. Links are sent
-// as they're typed, but trimmed, or null for none.
+// Checks a set of `session` as it's being filled in the form, with its `place` if it's worked out already, and returns
+// what the server would be sent, or what's wrong with each field instead. Links are sent as they're typed, but trimmed,
+// or null for none.
 export function checkSet(
   form: SetFormValues,
   session: SessionPlace,
-  within: string,
-  place = setPlace(form, session, within),
+  place = setPlace(form, session),
 ): { fields: SetFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SetFormValues> } {
   const errors: FieldErrors<SetFormValues> = {}
   if (form.performers.length === 0) errors.performers = 'Choisissez au moins un artiste.'

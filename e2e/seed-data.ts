@@ -723,6 +723,19 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Écume'], offsetMinutes: null, durationMinutes: 60, status: 'planned' },
     ],
   },
+  // An evening whose times are being changed: two of its sets overlap, and the last one ends after it, which its page
+  // marks (see "Sets' places" in docs/design/server/sessions.md).
+  {
+    name: 'SOIRÉE À REVOIR',
+    when: { day: 45, start: '20:00' },
+    durationMinutes: 120,
+    status: 'planned',
+    sets: [
+      { performers: ['boreale@example.com'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['vinyl'], status: 'planned' },
+      { performers: ['Ondine'], offsetMinutes: 30, durationMinutes: 60, performanceTypes: ['live-performance'], status: 'planned' },
+      { performers: ['Jah Pierre'], offsetMinutes: 90, durationMinutes: 60, status: 'planned' },
+    ],
+  },
   // Les Nuits Basses' takeover, cancelled, which cancelled its sets.
   {
     takeover: 'kwame@example.com',

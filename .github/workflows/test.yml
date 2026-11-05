@@ -14,6 +14,22 @@ jobs:
   test-npm:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # For the server's tests that need a database (npm run test:db), with the same settings as the development one, in
+    # docker-compose.yml.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: parking_radio
+          POSTGRES_PASSWORD: parking_radio
+          POSTGRES_DB: parking_radio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username parking_radio"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v7
 
@@ -41,6 +57,10 @@ jobs:
       - run: npm run build
       - run: npm run lint
       - run: npm test
+
+      - run: npm run test:db
+        env:
+          DATABASE_URL: postgres://parking_radio:parking_radio@localhost:5432/parking_radio
 
   # The app runs on arm64 in EC2, so the jobs that build, test and push the Docker image use native arm64 Github runners,
   # since that simplifies building and testing it.

@@ -2319,6 +2319,10 @@ export interface components {
             start: string | null;
             /** @description Its start plus its duration. Null when its start is */
             end: string | null;
+            /** @description Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits */
+            fitsInSession: boolean;
+            /** @description The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order */
+            overlappingSets: string[];
             performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
             otherPerformanceType: string;
             genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
