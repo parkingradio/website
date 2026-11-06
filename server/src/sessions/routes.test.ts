@@ -96,7 +96,7 @@ const store: SessionsStore = {
 const resolveTrack = vi.fn<(link: string) => Promise<string | null>>()
 
 function session(changes: object = {}) {
-  return { start: '2026-11-14T21:00-05:00', durationMinutes: 240, takeover: 'collective-1', name: 'HAUTE RIVE TAKEOVER', raEvent: '6683745', ...changes }
+  return { start: '2026-11-14T21:00-05:00', durationMinutes: 240, type: 'takeover', takeover: 'collective-1', name: 'HAUTE RIVE TAKEOVER', raEvent: '6683745', ...changes }
 }
 
 function set(changes: object = {}) {
@@ -252,8 +252,10 @@ describe('sessions routes', () => {
           start: '2026-11-14T21:00:00-05:00',
           end: '2026-11-15T01:00:00-05:00',
           durationMinutes: 240,
+          type: 'takeover',
           takeover: { id: 'collective-1', name: 'Les Ondes' },
           name: 'HAUTE RIVE TAKEOVER',
+          title: 'HAUTE RIVE TAKEOVER',
           raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
           sets: [],
           createdAt: '2026-11-01T07:00:00-05:00',
@@ -269,10 +271,21 @@ describe('sessions routes', () => {
 
     it('adds a session without a start, which has no end', async () => {
       const app = await buildApp()
-      const response = await createSession(app, { start: null, takeover: '', name: '', raEvent: null })
+      const response = await createSession(app, { start: null, type: 'guest-mixes', takeover: '', name: '', raEvent: null })
 
       expect(response.statusCode).toBe(200)
-      expect(response.json().session).toMatchObject({ start: null, end: null, durationMinutes: 240, takeover: null, name: '', raEvent: null })
+      expect(response.json().session).toMatchObject({ start: null, end: null, durationMinutes: 240, type: 'guest-mixes', takeover: null, name: '', title: 'GUEST MIXES', raEvent: null })
+    })
+
+    it('is called by its own name, or else the one its type gives it, from its collective for a takeover', async () => {
+      const app = await buildApp()
+      const title = async (changes: object) => (await createSession(app, { start: null, ...changes })).json().session.title
+      expect(await title({ name: '' })).toBe('LES ONDES TAKEOVER')
+      expect(await title({ name: 'VKT TAKEOVER' })).toBe('VKT TAKEOVER')
+      expect(await title({ type: 'live-performance', takeover: null, name: '' })).toBe('LIVE PERFORMANCE')
+      expect(await title({ type: 'synth-meetup', takeover: null, name: '' })).toBe('SYNTH MEETUPS')
+      expect(await title({ type: 'other', takeover: null, name: 'ATELIER DE DJing POUR FEMMES & OPEN DECKS' })).toBe('ATELIER DE DJing POUR FEMMES & OPEN DECKS')
+      expect(store.create).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'other', takeoverId: null, name: 'ATELIER DE DJing POUR FEMMES & OPEN DECKS' }))
     })
 
     it('ends a session after the minutes that actually pass, whatever the clocks say', async () => {
@@ -290,6 +303,16 @@ describe('sessions routes', () => {
       response = await createSession(app, { takeover: 'artist-1' })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'No such collective' })
+      for (const [changes, error] of [
+        [{ type: 'takeovers' }, 'The type must be one of guest-mixes, live-performance, takeover, synth-meetup, other'],
+        [{ takeover: null }, 'A takeover has a collective'],
+        [{ type: 'guest-mixes' }, 'Only a takeover has a collective'],
+        [{ type: 'other', takeover: null, name: '' }, 'A session of type other has a name'],
+      ] as const) {
+        response = await createSession(app, changes)
+        expect(response.statusCode, JSON.stringify(changes)).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
       expect(rows).toEqual([])
     })
 
@@ -313,7 +336,7 @@ describe('sessions routes', () => {
     it("lists every session, or those with a set an artist played, or a collective's takeovers", async () => {
       const app = await buildApp()
       await sessionWithSet(app, { performers: [{ id: 'artist-1' }], soundcloudTrack: null })
-      await createSession(app, { takeover: null, start: null })
+      await createSession(app, { type: 'guest-mixes', takeover: null, start: null })
 
       const ids = async (query: string) => {
         const { total, sessions } = (await send(app, 'GET', `/api/admin/sessions${query}`)).json()
@@ -457,14 +480,16 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await sessionWithSet(app)
       await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'done' })
-      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', takeover: null, name: '' }))
+      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', type: 'live-performance', takeover: null, name: '' }))
 
       expect(response.statusCode).toBe(200)
       expect(response.json().session).toMatchObject({
         start: '2026-11-21T20:00:00-05:00',
         end: '2026-11-22T00:00:00-05:00',
+        type: 'live-performance',
         takeover: null,
         name: '',
+        title: 'LIVE PERFORMANCE',
         status: 'done',
         updatedBy: 'admin@example.com',
         updatedAt: expect.any(String),

@@ -8,7 +8,9 @@ import { EmailTaken } from '../artists/store.js'
 import type { PhotoFolder, SentPhoto } from '../artists/store.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import { collectivesRoutes } from './routes.js'
-import { InvalidMember } from './store.js'
+import { Conflict } from '../sessions/store.js'
+import type { StoredSession } from '../sessions/store.js'
+import { HAS_TAKEOVERS, InvalidMember } from './store.js'
 import type { CollectivesStore, StoredCollective } from './store.js'
 import { inQuebecTime } from '../api/formats.js'
 
@@ -64,11 +66,11 @@ const store: CollectivesStore = {
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
   }),
-  delete: async (id) => {
+  delete: vi.fn<CollectivesStore['delete']>(async (id) => {
     const row = rows.find((row) => row.id === id)
     rows = rows.filter((other) => other.id !== id)
     return row ?? null
-  },
+  }),
 }
 
 const photos = {
@@ -410,6 +412,40 @@ describe('collectives routes', () => {
       expect(rows).toHaveLength(0)
       expect(stored.size).toBe(0)
       expect((await request(app, 'DELETE', '/api/admin/collectives/collective-1')).statusCode).toBe(404)
+    })
+
+    it('responds 409 while the collective has takeovers, with one of them, and keeps its photo', async () => {
+      const app = await buildApp()
+      await create(app)
+      const takeover: StoredSession = {
+        id: 'session-1',
+        createdAt: new Date('2026-11-01T12:00:00Z'),
+        createdBy: 'admin@example.com',
+        startAt: null,
+        durationMinutes: 240,
+        type: 'takeover',
+        name: '',
+        takeoverId: 'collective-1',
+        takeover: { id: 'collective-1', name: 'Les Ondes' },
+        raEventId: null,
+        updatedBy: null,
+        updatedAt: null,
+        status: 'planned',
+        statusUpdatedBy: null,
+        statusUpdatedAt: null,
+        sets: [],
+      }
+      vi.mocked(store.delete).mockRejectedValueOnce(new Conflict(HAS_TAKEOVERS, takeover))
+      const response = await request(app, 'DELETE', '/api/admin/collectives/collective-1')
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toEqual({
+        ok: false,
+        error: 'This collective has takeovers: give them another collective, or another type, first',
+        session: expect.objectContaining({ id: 'session-1', type: 'takeover', title: 'LES ONDES TAKEOVER', takeover: { id: 'collective-1', name: 'Les Ondes' } }),
+        set: null,
+      })
+      expect(rows).toHaveLength(1)
+      expect(stored.size).toBe(1)
     })
   })
 })

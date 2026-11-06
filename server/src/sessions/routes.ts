@@ -4,7 +4,7 @@ import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
-import { BAD_STATUS, Genre, PerformanceType, SessionFields, SetFields, Status } from './fields.js'
+import { BAD_STATUS, Genre, PerformanceType, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
 import type { SessionsStore, SetChanges, SetRow, StoredSession, StoredSet } from './store.js'
@@ -61,8 +61,10 @@ const SessionBody = z
     start: Timestamp.nullable().meta({ description: "Null while the session's date isn't known" }),
     end: Timestamp.nullable().meta({ description: 'Its start plus its duration. Null when its start is' }),
     durationMinutes: z.number(),
-    takeover: Reference.nullable().meta({ description: 'The collective whose takeover the session is' }),
-    name: z.string(),
+    type: SessionType,
+    takeover: Reference.nullable().meta({ description: 'The collective whose takeover the session is, which only takeovers have' }),
+    name: z.string().meta({ description: 'Its own name, which replaces the one its type gives it, or empty for none: the one to send back' }),
+    title: z.string().meta({ description: 'What the session is called: its name, or else the one its type gives it. Never empty' }),
     raEvent: Link.nullable(),
     sets: z.array(SetBody).meta({ description: 'By offset, then by when they were added, those without an offset last' }),
     ...Tracked,
@@ -73,8 +75,9 @@ type SessionBody = z.infer<typeof SessionBody>
 const SessionResponse = z.object({ ok: z.literal(true), session: SessionBody })
 
 // What the 409s respond: when a session or a set would break one of the rules of sessions, what's in the way (see
-// `Conflict` in sessions/store.ts), and null for the 409s that aren't about a session or a set.
-const ConflictError = ApiError.extend({
+// `Conflict` in sessions/store.ts), and null for the 409s that aren't about a session or a set. Deleting a collective
+// that has takeovers responds with it too (see collectives/routes.ts).
+export const ConflictError = ApiError.extend({
   session: SessionBody.nullable().meta({ description: "The session in the way, or the set's in the way" }),
   set: SetBody.nullable().meta({ description: 'The set in the way, if it is one' }),
 }).meta({ id: 'ConflictError' })
@@ -150,11 +153,24 @@ function sessionBody(row: StoredSession): SessionBody {
     start: row.startAt?.toISOString() ?? null,
     end: row.startAt && after(row.startAt, row.durationMinutes).toISOString(),
     durationMinutes: row.durationMinutes,
+    type: row.type,
     takeover: row.takeover,
     name: row.name,
+    title: sessionTitle(row),
     raEvent: link(row.raEventId, raEventUrl),
     sets: row.sets.map((set) => setBody(set, row)),
     ...tracked(row),
+  }
+}
+
+// What a 409 responds, with what's in the way (see `ConflictError`).
+export function conflictBody({ error, session, set }: { error: string; session?: StoredSession | null; set?: StoredSet | null }) {
+  return {
+    ok: false as const,
+    error,
+    session: session ? sessionBody(session) : null,
+    // A set in the way always comes with its session.
+    set: set && session ? setBody(set, session) : null,
   }
 }
 
@@ -171,15 +187,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
   app.setSchemaErrorFormatter(firstIssue)
 
   // Responds that a request failed: a 409 always has `session` and `set` (see `ConflictError`).
-  function fail(reply: FastifyReply, { status, error, session, set }: Failure) {
-    if (status !== 409) return reply.status(status).send({ ok: false as const, error })
-    return reply.status(409).send({
-      ok: false as const,
-      error,
-      session: session ? sessionBody(session) : null,
-      // A set in the way always comes with its session.
-      set: set && session ? setBody(set, session) : null,
-    })
+  function fail(reply: FastifyReply, { status, ...failure }: Failure) {
+    if (status !== 409) return reply.status(status).send({ ok: false as const, error: failure.error })
+    return reply.status(409).send(conflictBody(failure))
   }
 
   // Runs `save`, which saves a session or a set, and responds with the session it returns, or 404 with `notFound` when
@@ -219,8 +229,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, resolveTrack
     return { ...rest, soundcloudTrackId: track, soundcloudTrackUrl: soundcloudTrack, youtubeVideoId: youtubeVideo }
   }
 
-  function sessionChanges({ start, durationMinutes, takeover, name, raEvent }: SessionFields) {
-    return { startAt: start, durationMinutes, takeoverId: takeover, name, raEventId: raEvent }
+  function sessionChanges({ start, durationMinutes, type, takeover, name, raEvent }: SessionFields) {
+    return { startAt: start, durationMinutes, type, takeoverId: takeover, name, raEventId: raEvent }
   }
 
   function statusChange(status: z.infer<typeof Status>, by: string) {

@@ -123,7 +123,7 @@ it. A summary has these fields of the full item, with the same names and shapes:
 | `GET /api/admin/artists` | `id`, `name`, `country`, `city`, `genres` and `collectives` |
 | `GET /api/admin/collectives` | `id`, `name`, `country`, `city` and `members` |
 | `GET /api/admin/applications` | `id`, `artistId`, `collectiveId`, `receivedAt`, `status` and `dates`, and `name`, the name of its artist or collective, which the tool looks up |
-| `GET /api/admin/sessions` | `id`, `start`, `end`, `name`, `takeover`, `status` and `sets`, each with its `id`, `start`, `end`, `status` and `performers` |
+| `GET /api/admin/sessions` | `id`, `start`, `end`, `type`, `title`, `takeover`, `status` and `sets`, each with its `id`, `start`, `end`, `status` and `performers` |
 
 **Contact details.** The email and the phone of artists and collectives are never in what tools give: whatever a tool
 gives is sent to the model's provider, and these are people's personal contact details. Tools take them, though, since

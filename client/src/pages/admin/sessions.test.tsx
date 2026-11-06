@@ -103,8 +103,10 @@ const SESSION: Session = {
   start: '2026-11-15T02:00:00.000Z',
   end: '2026-11-15T06:00:00.000Z',
   durationMinutes: 240,
+  type: 'takeover',
   takeover: { id: 'collective-1', name: 'Ondes' },
-  name: 'ONDES TAKEOVER',
+  name: '',
+  title: 'ONDES TAKEOVER',
   raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
   sets: [
     studioSet('set-1', {
@@ -145,8 +147,10 @@ const UNDATED: Session = {
   start: null,
   end: null,
   durationMinutes: 180,
+  type: 'guest-mixes',
   takeover: null,
   name: '',
+  title: 'GUEST MIXES',
   raEvent: null,
   sets: [
     studioSet('set-4', { performers: [{ id: 'artist-2', name: 'Brume' }], offsetMinutes: 0, durationMinutes: 60 }),
@@ -165,8 +169,10 @@ const SESSIONS: Session[] = [
     start: '2026-10-03T00:00:00.000Z',
     end: '2026-10-03T01:00:00.000Z',
     durationMinutes: 60,
+    type: 'other',
     takeover: null,
     name: 'SOIRÉE',
+    title: 'SOIRÉE',
     raEvent: null,
     sets: [studioSet('set-6', {
         performers: [{ id: 'artist-2', name: 'Brume' }],
@@ -178,7 +184,7 @@ const SESSIONS: Session[] = [
       })],
     status: 'done',
   },
-  { ...SESSION, id: 'session-4', start: '2026-09-01T00:00:00.000Z', end: '2026-09-01T01:00:00.000Z', durationMinutes: 60, takeover: null, name: '', raEvent: null, sets: [], status: 'cancelled' },
+  { ...SESSION, id: 'session-4', start: '2026-09-01T00:00:00.000Z', end: '2026-09-01T01:00:00.000Z', durationMinutes: 60, type: 'live-performance', takeover: null, name: '', title: 'LIVE PERFORMANCE', raEvent: null, sets: [], status: 'cancelled' },
 ]
 
 function CurrentPath() {
@@ -216,10 +222,10 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['date à déterminer', '3 h', '', '', 'Brume · Cyan', 'planifiée'],
-      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Ondes', 'Aurore, Brume · Cyan', 'planifiée'],
-      ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', '', 'Brume', 'jouée'],
-      ['lun. 31 août 2026', '20 h – 21 h', '', '', '', 'annulée'],
+      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée'],
+      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée'],
+      ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', 'Autre', 'Brume', 'jouée'],
+      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée'],
     ])
     // Done sessions are greyed out, and cancelled ones faded out in their own color.
     const sessionRows = screen.getAllByRole('row').slice(1)
@@ -230,7 +236,7 @@ describe('The list of sessions', () => {
     expect(screen.getByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2')
     expect(screen.getAllByRole('link', { name: 'Brume' })[0]).toHaveAttribute('href', '/admin/artistes/artist-2')
-    expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+    expect(screen.getByRole('link', { name: 'Takeover' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
     expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle')
   })
 
@@ -249,11 +255,13 @@ describe('The list of sessions', () => {
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (1)', 'annulées (0)'])
   })
 
-  it('searches the sessions by name, takeover, performer, and day written out, or a day of the month and a month', async () => {
+  it('searches the sessions by title, type, takeover, performer, and day written out, or a day of the month and a month', async () => {
     mockFetch(LIST)
     renderAt('/admin/sessions')
 
     await expectSearch('soiree', ['ven. 2 oct. 2026'])
+    await expectSearch('guest mixes', ['date à déterminer'])
+    await expectSearch('autre', ['ven. 2 oct. 2026'])
     await expectSearch('ondes', ['sam. 14 nov. 2026'])
     await expectSearch('aurore', ['sam. 14 nov. 2026'])
     await expectSearch('samedi novembre', ['sam. 14 nov. 2026'])
@@ -276,7 +284,7 @@ describe('The list of sessions', () => {
     expect(days()).toEqual(['lun. 31 août 2026', 'ven. 2 oct. 2026', 'sam. 14 nov. 2026', 'date à déterminer'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=date&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Nom' }))
-    expect(rows().map((row) => row[2])).toEqual(['', '', 'ONDES TAKEOVER', 'SOIRÉE'])
+    expect(rows().map((row) => row[2])).toEqual(['GUEST MIXES', 'LIVE PERFORMANCE', 'ONDES TAKEOVER', 'SOIRÉE'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=name&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Statut' }))
     expect(rows().map((row) => row[5])).toEqual(['planifiée', 'planifiée', 'jouée', 'annulée'])
@@ -317,8 +325,11 @@ describe("A session's page", () => {
     expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'planifiée' })).toHaveAttribute('aria-pressed', 'true')
     expect(value('Quand')).toHaveTextContent('samedi 14 novembre 2026, de 21 h à 1 h le lendemain')
     expect(value('Durée')).toHaveTextContent('4 h')
+    expect(value('Type')).toHaveTextContent(/^Takeover$/)
     expect(within(value('Takeover de')).getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
-    expect(value('Nom')).toHaveTextContent('ONDES TAKEOVER')
+    // Faded out, since it's the name its type gives it.
+    expect(value('Nom')).toHaveTextContent(/^ONDES TAKEOVER$/)
+    expect(value('Nom')).toHaveClass('admin-generated')
     expect(within(value('Événement RA')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/6683745')
 
     expect(rows(setsTable())).toEqual([
@@ -344,26 +355,32 @@ describe("A session's page", () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Session sans date' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'GUEST MIXES' })).toBeInTheDocument()
     expect(value('Quand')).toHaveTextContent('date à déterminer')
     expect(value('Durée')).toHaveTextContent('3 h')
-    expect(value('Takeover de')).toHaveTextContent('-')
+    expect(value('Type')).toHaveTextContent(/^Guest mixes$/)
+    expect(screen.queryByText('Takeover de', { selector: 'dt' })).not.toBeInTheDocument()
     expect(value('Événement RA')).toHaveTextContent('-')
     expect(rows(setsTable()).map((row) => row[0])).toEqual(['+0 h – +1 h', '+1 h 30 – +2 h 30'])
     expect(screen.getByText('La session et ses sets seront supprimés pour de bon. Leurs artistes restent.')).toBeInTheDocument()
   })
 
-  it('is titled by its takeover, or else its day, and says what deleting it does', async () => {
-    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, name: '', sets: [] } } })
+  it('is titled by its own name, which it shows, and says what deleting it does', async () => {
+    const named = { ...SESSION, name: 'VKT TAKEOVER', title: 'VKT TAKEOVER', sets: [] }
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: named } })
     const first = renderAt('/admin/sessions/session-1')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Takeover de Ondes' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'VKT TAKEOVER' })).toBeInTheDocument()
+    expect(value('Nom')).toHaveTextContent(/^VKT TAKEOVER$/)
+    expect(value('Nom')).not.toHaveClass('admin-generated')
     expect(screen.getByText('Aucun set.')).toBeInTheDocument()
     expect(screen.getByText('La session sera supprimée pour de bon. Le collectif de son takeover reste.')).toBeInTheDocument()
     first.unmount()
 
-    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, name: '', takeover: null, sets: [] } } })
+    const other = { ...SESSION, type: 'other', name: 'LISTENING PARTY', title: 'LISTENING PARTY', takeover: null, sets: [] }
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: other } })
     const second = renderAt('/admin/sessions/session-1')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Session du samedi 14 novembre 2026' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'LISTENING PARTY' })).toBeInTheDocument()
+    expect(value('Type')).toHaveTextContent(/^Autre$/)
     expect(screen.getByText('La session sera supprimée pour de bon.')).toBeInTheDocument()
     second.unmount()
 
@@ -449,7 +466,7 @@ describe("A session's page", () => {
   })
 
   it('changes the session in a form in its place, sending its start back as it was', async () => {
-    const changed = { ...SESSION, name: 'AUTRE', updatedBy: 'admin@example.com', updatedAt: '2026-10-02T16:00:00.000Z' }
+    const changed = { ...SESSION, name: 'AUTRE', title: 'AUTRE', updatedBy: 'admin@example.com', updatedAt: '2026-10-02T16:00:00.000Z' }
     mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: changed } })
     renderAt('/admin/sessions/session-1')
 
@@ -459,7 +476,11 @@ describe("A session's page", () => {
     expect(screen.getByLabelText('Fin')).toHaveValue('01:00')
     expect(screen.getByRole('status')).toHaveTextContent('Dure 4 h, finit le lendemain, dimanche 15 novembre 2026.')
     expect(screen.getByText('Ses sets se déplacent avec elle.')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Takeover de' })).toHaveValue('Ondes')
+    expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
+    expect(screen.getByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
+    // The name its type gives it shows while it has none of its own.
+    expect(screen.getByLabelText('Nom')).toHaveValue('')
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'ONDES TAKEOVER')
     // Once RA's events are read, the session's is picked.
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Parmi les événements de RA' })).toHaveValue('HAUTE RIVE TAKEOVER'))
 
@@ -469,6 +490,7 @@ describe("A session's page", () => {
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 240,
+      type: 'takeover',
       takeover: 'collective-1',
       name: 'AUTRE',
       raEvent: 'https://ra.co/events/6683745',
@@ -597,6 +619,7 @@ describe("A session's page", () => {
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 180,
+      type: 'guest-mixes',
       takeover: null,
       name: '',
       raEvent: null,
@@ -963,10 +986,11 @@ describe("A set's form", () => {
 describe('Adding a session', () => {
   const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS }
 
-  async function fillIn({ day = '2026-11-14', start = '21:00', end = '01:00' } = {}) {
+  async function fillIn({ day = '2026-11-14', start = '21:00', end = '01:00', type = 'Guest mixes' as string | null } = {}) {
     fireEvent.change(await screen.findByLabelText('Date'), { target: { value: day } })
     fireEvent.change(screen.getByLabelText('Début'), { target: { value: start } })
     fireEvent.change(screen.getByLabelText('Fin'), { target: { value: end } })
+    if (type) fireEvent.click(screen.getByRole('radio', { name: type }))
   }
 
   it('adds a session, ending the next day when the end time is not after the start time, and goes to its page', async () => {
@@ -982,10 +1006,50 @@ describe('Adding a session', () => {
     expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 240,
+      type: 'guest-mixes',
       takeover: null,
       name: 'HAUTE RIVE',
       raEvent: null,
     })
+  })
+
+  it('needs a type, picked among them in order, a collective for a takeover only, and a name for another kind of session', async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn({ type: null })
+    const types = within(screen.getByRole('group', { name: 'Type' }))
+    expect(types.getAllByRole('radio').map((radio) => radio.parentElement!.textContent)).toEqual(['Guest mixes', 'Live performance', 'Takeover', 'Synth meetup', 'Autre'])
+    expect(types.getAllByRole('radio').filter((radio) => (radio as HTMLInputElement).checked)).toEqual([])
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'p. ex. LISTENING PARTY')
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    expect(await screen.findByText('Choisissez le type de la session.')).toBeInTheDocument()
+
+    // Only a takeover has a collective, which it needs, and which gives it its name.
+    expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+    fireEvent.click(types.getByRole('radio', { name: 'Takeover' }))
+    expect(screen.queryByText('Choisissez le type de la session.')).not.toBeInTheDocument()
+    expect(await screen.findByText('Choisissez le collectif du takeover.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'NOM DU COLLECTIF TAKEOVER')
+    const collective = screen.getByRole('combobox', { name: 'Collectif' })
+    fireEvent.click(collective)
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Ondes/ }))
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'ONDES TAKEOVER')
+
+    // Another type doesn't send it, but keeps it while the form is open.
+    fireEvent.click(types.getByRole('radio', { name: 'Synth meetup' }))
+    expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'SYNTH MEETUPS')
+    fireEvent.click(types.getByRole('radio', { name: 'Takeover' }))
+    expect(screen.getByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
+
+    fireEvent.click(types.getByRole('radio', { name: 'Autre' }))
+    expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'p. ex. LISTENING PARTY')
+    expect(await screen.findByText('Indiquez le nom de la session.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'ATELIER DE DJing' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'other', takeover: null, name: 'ATELIER DE DJing' })
   })
 
   it("adds a session whose date isn't known, keeping how long its times said it lasts", async () => {
@@ -1073,15 +1137,17 @@ describe('Adding a session', () => {
   it('starts as the takeover of the collective of the link that leads to it, sent by its id, unless it is unknown', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     const first = renderAt('/admin/sessions/nouvelle?takeover=collective-1')
-    expect(await screen.findByRole('combobox', { name: 'Takeover de' })).toHaveValue('Ondes')
-    await fillIn()
+    expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
+    expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
+    await fillIn({ type: null })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ takeover: 'collective-1' })
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1' })
     first.unmount()
 
     renderAt('/admin/sessions/nouvelle?takeover=unknown')
-    expect(await screen.findByRole('combobox', { name: 'Takeover de' })).toHaveValue('Aucun takeover')
+    expect(await screen.findByRole('radio', { name: 'Takeover' })).not.toBeChecked()
+    expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
   })
 
   it("shows the server's error, linking to the session it would overlap", async () => {
@@ -1100,6 +1166,15 @@ describe('Adding a session', () => {
     renderAt('/admin/sessions/nouvelle')
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
-    expect(screen.getByRole('combobox', { name: 'Takeover de' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: 'Takeover' }))
+    expect(screen.getByRole('combobox', { name: 'Collectif' })).toBeDisabled()
+  })
+
+  it('starts without a type when the collectives could not be loaded, even from a collective', async () => {
+    mockFetch({ ...NEW, '/api/admin/collectives': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/nouvelle?takeover=collective-1')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
+    expect(screen.getByRole('radio', { name: 'Takeover' })).not.toBeChecked()
   })
 })

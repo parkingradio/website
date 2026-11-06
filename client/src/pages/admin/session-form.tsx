@@ -5,11 +5,11 @@ import type { Schema } from '../../api/client'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import { quebecDayAndTime } from '../../quebec-time'
-import { after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes } from '../../session-fields'
-import type { Reference, SessionFields, SessionFormValues } from '../../session-fields'
+import { SESSION_TYPES, after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes, typeName } from '../../session-fields'
+import type { Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId, raEventUrl } from '../../session-links'
 import { leaving, useCheckedForm } from './checked-form'
-import { collectiveOption, formatDuration, formatShortDay, nextDay } from './describe'
+import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatShortDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
 import { compareText } from './list'
 import type { GroupProps } from './profile-fields'
@@ -23,8 +23,8 @@ export type SessionFormProps = {
   initial: SessionFormValues
   // Whether the session has sets, which move with it.
   hasSets?: boolean
-  // The collectives the takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as
-  // it is.
+  // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
+  // is.
   collectives: Collective[] | null
   // The events read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
@@ -54,17 +54,19 @@ export function SessionForm({ initial, hasSets = false, collectives, events, sub
         onLeave={leave('day', 'start', 'end', 'duration')}
       />
 
-      <TakeoverField takeover={form.takeover} collectives={collectives} onChange={(takeover) => update({ takeover })} />
+      <TypeField type={form.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
 
-      <Labeled label="Nom" error={shown('name')}>
-        <input
-          value={form.name}
-          placeholder="p. ex. HAUTE RIVE TAKEOVER"
-          aria-invalid={shown('name') ? true : undefined}
-          onChange={(event) => update({ name: event.target.value })}
-          onBlur={leave('name')}
+      {form.type === 'takeover' && (
+        <TakeoverField
+          takeover={form.takeover}
+          collectives={collectives}
+          onChange={(takeover) => update({ takeover })}
+          error={shown('takeover')}
+          onLeave={leave('takeover')}
         />
-      </Labeled>
+      )}
+
+      <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
 
       <RaEventField link={form.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} error={shown('raEvent')} onLeave={leave('raEvent')} />
 
@@ -151,25 +153,71 @@ function TimesField({
   )
 }
 
-// The collective whose takeover the session is, or none. When the collectives couldn't be loaded, the session's stays.
-function TakeoverField({ takeover, collectives, onChange }: { takeover: Reference | null; collectives: Collective[] | null; onChange: (takeover: Reference | null) => void }) {
+// The session's type, one of which is picked.
+function TypeField({ type, onChange, error, onLeave }: GroupProps<SessionType> & { type: SessionType | null }) {
+  const name = useId()
+  return (
+    <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
+      <legend>Type</legend>
+      <div className="admin-choices">
+        {SESSION_TYPES.map((value) => (
+          <label key={value}>
+            <input type="radio" name={name} checked={type === value} aria-invalid={error ? true : undefined} onChange={() => onChange(value)} />
+            {SESSION_TYPE_LABELS[value]}
+          </label>
+        ))}
+      </div>
+      <FieldError message={error} />
+    </fieldset>
+  )
+}
+
+// The collective whose takeover the session is, which a takeover has to have. When the collectives couldn't be loaded,
+// the session's stays.
+function TakeoverField({
+  takeover,
+  collectives,
+  onChange,
+  error,
+  onLeave,
+}: GroupProps<Reference> & { takeover: Reference | null; collectives: Collective[] | null }) {
   const id = useId()
   const listed = collectives ? collectives.map(collectiveOption).sort((a, b) => compareText(a.label, b.label)) : takeover ? [{ key: takeover.id, label: takeover.name }] : []
   return (
     <div className="admin-field">
-      <label htmlFor={id}>Takeover de</label>
+      <label htmlFor={id}>Collectif</label>
       <Combobox
         id={id}
-        options={[{ key: '', label: 'Aucun takeover' }, ...listed]}
-        selected={takeover?.id ?? ''}
+        options={listed}
+        onBlur={onLeave}
+        invalid={!!error}
+        selected={takeover?.id ?? null}
         onSelect={(key) => {
           const collective = collectives?.find((collective) => collective.id === key)
-          onChange(collective ? { id: collective.id, name: collective.name } : null)
+          if (collective) onChange({ id: collective.id, name: collective.name })
         }}
+        placeholder="choisir un collectif…"
         disabled={!collectives}
       />
-      <p className="admin-hint">Le collectif dont c'est le takeover, s'il y en a un.</p>
+      <FieldError message={error} />
     </div>
+  )
+}
+
+// The session's own name, which a session of type "other" needs, and which replaces the one the other types give it,
+// which the empty field shows.
+function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { form: SessionFormValues }) {
+  const placeholder = (form.type && typeName(form.type, form.takeover)) ?? (form.type === 'takeover' ? 'NOM DU COLLECTIF TAKEOVER' : 'p. ex. LISTENING PARTY')
+  return (
+    <Labeled label="Nom" error={error}>
+      <input
+        value={form.name}
+        placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onLeave}
+      />
+    </Labeled>
   )
 }
 

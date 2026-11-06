@@ -20,8 +20,9 @@ A session has:
 |---|---|---|
 | `start` | string or null | When the session starts, or null for a session whose date isn't known yet: see [Times](#times) |
 | `durationMinutes` | number | How long the session lasts: see [Times](#times) |
-| `takeover` | object or null | The collective whose takeover the session is: see [Takeovers](#takeovers) |
-| `name` | string | The session's name, as free text, like the event of a track's title (see [The rotation](radio.md#the-rotation)), e.g. `"HAUTE RIVE TAKEOVER"`. Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 100 characters, or `""` when there's none |
+| `type` | string | What kind of session it is, which gives it its name: see [Types and names](#types-and-names) |
+| `takeover` | object or null | The collective whose takeover the session is, which only takeovers have, and they always do: see [Types and names](#types-and-names) |
+| `name` | string | The session's own name, which replaces the one its type gives it, as free text: see [Types and names](#types-and-names). Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 100 characters, or `""` when there's none |
 | `raEvent` | object or null | The session's event on Resident Advisor: see [Links](#links) |
 
 A session, as the endpoints below return it, also has:
@@ -29,11 +30,12 @@ A session, as the endpoints below return it, also has:
 | Field | Type | |
 |---|---|---|
 | `id` | string | |
+| `title` | string | What the session is called: its `name`, or else the name its type gives it, e.g. `"HAUTE RIVE TAKEOVER"`, like the event of a track's title (see [The rotation](radio.md#the-rotation)). Never empty: see [Types and names](#types-and-names) |
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
 | `sets` | list of sets | Its sets, by `offsetMinutes`, then `createdAt`, the sets without an offset last, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when. Status changes don't count, and neither do changes to its sets, or the takeover's collective being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when. Status changes don't count, and neither do changes to its sets, or renaming the takeover's collective |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -99,19 +101,22 @@ clocks go back: `from` `"2026-10-26T00:00-04:00"`, `to` `"2026-11-02T00:00-05:00
   its start, included, to its end, excluded, so a session can start when the one before it ends.
 - **A SoundCloud track, or a YouTube video, belongs to at most one set**, cancelled ones included.
 - **A cancelled session only has cancelled sets** (see [Status](#status)).
+- **A takeover has a collective** (see [Types and names](#types-and-names)), so a collective with takeovers can't be
+  deleted.
 
 Requests that would break a rule fail with 409, even when they're sent at the same time: when two requests would break a
 rule together, one of them fails. That's the case for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
 - adding a set to a cancelled session, or un-cancelling a set of a cancelled session,
-- giving a set a track or a video that's another set's.
+- giving a set a track or a video that's another set's,
+- deleting a collective that has takeovers.
 
 These 409s also have `session` and `set`, what's in the way, as the endpoints return them, so that it can be named and
 linked to without another request. `set` is the set in the way, if it's a set, or else null, and `session` is the session
 in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
-the way. When several things are in the way, it's one of them. Both are null for the 409s that aren't about a session or
-a set.
+the way, and a collective that has takeovers has one of them. When several things are in the way, it's one of them. Both
+are null for the 409s that aren't about a session or a set.
 
 ## Sets' places
 
@@ -149,7 +154,7 @@ can still be changed, but not un-cancelled while it is.
 
 A set's performers are the artists who played it, in order, at least one when it's added or changed. Each artist is only
 once in a set. Several artists can play a set together. A set is always played by artists: when a collective plays, some
-of its artists do, during its takeover (see [Takeovers](#takeovers)).
+of its artists do, during its takeover (see [Types and names](#types-and-names)).
 
 Requests send the performers as a list of objects, in order, each one `{"id": <id>}`, an artist's id. Other fields are
 ignored, so that the performers a set returns can be sent back as they are. A performer that's there twice, whatever the
@@ -161,17 +166,39 @@ Responses list them as objects with the `id` and `name` of each one, in order.
 Deleting an artist takes them out of their sets, which stay as they are, even without performers. Changing such a set
 then takes at least one performer again, but its status can still be changed.
 
-## Takeovers
+## Types and names
 
-A session can be a collective's takeover. The performers of its sets are usually the collective's artists, but they
-don't have to be, e.g. for a guest. The `name` is separate, since not every session is a takeover.
+A session has one type, which says what kind of session it is, and gives it its name:
 
-Requests send `takeover` as the collective's id, or null, or a blank string, when there's none. A `takeover` that isn't
-a string or null fails with 400 (`"The takeover must be a collective's id, or null"`), and a string that isn't the id of
-a collective that exists with 400 (`"No such collective"`). Responses give it as an object with the collective's `id` and
-`name`, or null.
+| `type` | The name it gives |
+|---|---|
+| `"guest-mixes"` | `GUEST MIXES` |
+| `"live-performance"` | `LIVE PERFORMANCE` |
+| `"takeover"` | `<COLLECTIVE> TAKEOVER`: the name of the collective whose takeover it is, in upper case (Unicode's default case mapping), then a space and `TAKEOVER`, e.g. `SAUT DE CLÔTURE TAKEOVER` for Saut de Clôture |
+| `"synth-meetup"` | `SYNTH MEETUPS` |
+| `"other"` | None, e.g. for a workshop: it needs a `name` |
 
-Deleting a collective leaves the sessions of its takeovers without a takeover: they stay as they are otherwise.
+A takeover is a collective's session. The performers of its sets are usually the collective's artists, but they don't
+have to be, e.g. for a guest. Only takeovers have a collective (`takeover`), and every takeover has one, so a collective
+can't be deleted while it has takeovers (see
+[`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin)).
+
+A session's `name` is its own name, which replaces the one its type gives it, e.g. for a special evening,
+`"SPECIAL HALLOWEEN — MINIMALTIDE TAKEOVER"`. Any type can have one, and `"other"` needs one. It's kept as it's sent,
+its case included, e.g. `"ATELIER DE DJing POUR FEMMES & OPEN DECKS"`, but for its spaces (see [Sessions](#sessions)).
+
+What a session is called is its `title`: its `name`, or else the one its type gives it, so it's never empty. It's worked
+out when the session is read, from its collective's name as it is then, so renaming a collective renames its takeovers,
+unless they have a name of their own. Apps that change a session send back its `name`, not its `title`: otherwise the
+name its type gives it would become its own, and stop following its collective's name and its type.
+
+Requests send `type` as one of the types above, and fail with 400 otherwise (`"The type must be one of guest-mixes,
+live-performance, takeover, synth-meetup, other"`). They send `takeover` as the collective's id, or null, or a blank
+string, when there's none. A `takeover` that isn't a string or null fails with 400 (`"The takeover must be a
+collective's id, or null"`), and so does a takeover without a collective (`"A takeover has a collective"`), a session of
+another type with one (`"Only a takeover has a collective"`), a session of type `"other"` without a `name` (`"A session
+of type other has a name"`), and a string that isn't the id of a collective that exists (`"No such collective"`).
+Responses give `takeover` as an object with the collective's `id` and `name`, or null.
 
 ## Links
 
@@ -234,8 +261,8 @@ Fails with 404 when there's no such session.
 
 ## `POST /api/admin/sessions` (admin)
 
-Adds a session, as `"planned"`, without sets. The request has the session's `start`, `durationMinutes`, `takeover`,
-`name` and `raEvent`, as above, none of them left out.
+Adds a session, as `"planned"`, without sets. The request has the session's `start`, `durationMinutes`, `type`,
+`takeover`, `name` and `raEvent`, as above, none of them left out.
 
 | Response field | Type | |
 |---|---|---|
@@ -246,7 +273,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | A field isn't valid, the takeover's collective doesn't exist, or `raEvent` isn't one of the links above |
+| 400 | A field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, or `raEvent` isn't one of the links above |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)) |
 
 When it fails, nothing is saved.

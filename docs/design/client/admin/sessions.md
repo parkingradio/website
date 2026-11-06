@@ -5,16 +5,17 @@ At `/admin/sessions`: the sessions at the studio and their sets: who played, whe
 (cancelled), and a set's as "planifié", "joué" or "annulé". Wherever the admin pages list sessions or sets, the rows of
 those that are done are greyed out, text and background, and those of cancelled ones are faded out in a color of their
 own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't told by color
-alone.
+alone. A session's type is shown as "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre" (see
+[Types and names](../../server/sessions.md#types-and-names)).
 
 ## Names
 
-A session is called by its name, or else "Takeover de <collective>", or else "Session du <day>", e.g. "Session du
-samedi 14 novembre 2026", or "Session sans date" when its date isn't known yet. Where it's named along with others, e.g.
-in an error, its day follows its name or its takeover, e.g. "HAUTE RIVE TAKEOVER, sam. 14 nov. 2026".
+A session is called by its title, which the server gives: its own name, or else the one its type gives it (see
+[Types and names](../../server/sessions.md#types-and-names)). Where it's named along with others, e.g. in an error, its
+day follows, e.g. "HAUTE RIVE TAKEOVER, sam. 14 nov. 2026".
 
 A set is called by its performers, e.g. "Set de Aurore, Brume et Écume", or "Set" once they're all deleted. Where it's
-named outside its session's page, e.g. in an error, its session's name and its times follow, e.g.
+named outside its session's page, e.g. in an error, its session's title and its times follow, e.g.
 "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h". Within a sentence, it's "le set de Aurore, 21 h –
 22 h", or "le set, 21 h – 22 h" once its performers are all deleted, with its times as its session's page shows them (see
 [Times](#times)), e.g. "le set de Aurore, +1 h – +2 h 30" in a session without a date.
@@ -46,30 +47,31 @@ Durations, and the times of the sets of a session without a date, are entered in
 ## The list
 
 The section lists every session, those without a date first, the most recently added first, then the others, the
-latest first, with its day ("Date"), linking to its page, its start and end ("Heure"), its name ("Nom"), the collective
-whose takeover it is ("Takeover"), linking to it, its sets' performers ("Artistes"), set by set in their order, the sets
-separated by "·", each artist linking to their page, and its status. Buttons above
-the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
+latest first, with its day ("Date"), linking to its page, its start and end ("Heure"), its title ("Nom"), its type
+("Type"), which for a takeover links to its collective, its sets' performers ("Artistes"), set by set in their order,
+the sets separated by "·", each artist linking to their page, and its status.
+Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 
-A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their name, their
-takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026", which "14
-nov" finds), or "date à déterminer". Clicking "Date" (`date`, by start, sessions without a date being later than any
-other, then by when they were added), "Nom" (`name`) or "Statut" (`status`: planifiée, jouée, then annulée) sorts the
-list by that column, and clicking it again sorts it the other way around. The status buttons count the sessions the
-search finds.
+A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their title, their
+type, their takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026",
+which "14 nov" finds), or "date à déterminer". Clicking "Date" (`date`, by start, sessions without a date being later
+than any other, then by when they were added), "Nom" (`name`, by title) or "Statut" (`status`: planifiée, jouée, then
+annulée) sorts the list by that column, and clicking it again sorts it the other way around. The status buttons count
+the sessions the search finds.
 
 ## A session's page
 
-Clicking a session opens it at `/admin/sessions/<id>`, titled with its name (see [Names](#names)). Under the title, it
+Clicking a session opens it at `/admin/sessions/<id>`, titled as it's called (see [Names](#names)). Under the title, it
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
   sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
   [Status](../../server/sessions.md#status)).
 - "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer"),
-  how long it lasts ("Durée"), its takeover ("Takeover de"), linking to the collective, its name ("Nom") and its event
-  on RA ("Événement RA"), linking to it, or "-" for what it doesn't have. "modifier" changes the session in a form in
-  its place (see [The session form](#the-session-form)).
+  how long it lasts ("Durée"), its type ("Type"), for a takeover its collective ("Takeover de"), linking to it, its title
+  ("Nom"), faded out when it's the name its type gives it, and its event on RA ("Événement RA"), linking to it, or "-"
+  when it has none. "modifier" changes the session in a form in its place (see
+  [The session form](#the-session-form)).
 - "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
   linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
   its links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
@@ -94,24 +96,31 @@ wasn't saved.
 ## The session form
 
 "nouvelle session" adds a session, as planned, at `/admin/sessions/nouvelle`, then goes to its page, where its sets are
-added. A collective's page leads to it with its takeover picked (`?takeover=<id>`), which is ignored when it isn't a
-known collective. From top to bottom, the form has:
+added. A new session starts without a type, which has to be picked. A collective's page leads to it as its takeover,
+with "Takeover" and the collective picked (`?takeover=<id>`), unless it isn't one of the collectives loaded, e.g. when
+they can't be loaded, in which case nothing is picked. From top to bottom, the form has:
 
 - "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
   times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
   after. The form says that the sets of a session move with it. It doesn't check that they still fit in it once it's
   shorter: the session's page then marks those that don't (see [A session's page](#a-sessions-page)).
-- "Takeover de": the collective whose takeover the session is, picked from the collectives of
-  [Artistes](artistes.md), or "Aucun takeover".
-- "Nom": free text, e.g. "HAUTE RIVE TAKEOVER".
+- "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
+  buttons, in this order.
+- "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the
+  collectives of [Artistes](artistes.md). Picking another type and then "Takeover" again, while the form is open, finds
+  the collective that was picked; the server is only sent one for a takeover.
+- "Nom": the session's own name, as free text, which an "Autre" needs, and which replaces the name the other types
+  give (see [Types and names](../../server/sessions.md#types-and-names)). For those types, that name shows in the
+  empty field ("NOM DU COLLECTIF TAKEOVER" until a takeover's collective is picked). For "Autre", or before a type is
+  picked, the field shows an example, "p. ex. LISTENING PARTY". The name is sent as it's typed, its case included.
 - "Événement RA": the link to the event's page on RA, or picked from the events read from RA (see
   [Events](../../server/events.md)), each with the day it starts on in Québec, the upcoming ones first, the soonest
   first, then the past ones, the most recent first, which fills in its link. Older events are given by pasting their
   link. "Aucun événement RA" leaves it out. The form doesn't wait for RA: until the events are read, or when they can't
   be, the link can still be pasted, and the form says when they couldn't be.
 
-When the collectives can't be loaded, the form says so: the session's takeover stays, but another one can't be picked.
+When the collectives can't be loaded, the form says so: the session's collective stays, but another one can't be picked.
 
 ## A set's form
 
@@ -161,6 +170,6 @@ named. Changing a status shows these the same way.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status` and
   `DELETE /api/admin/sets/:id`, for its sets.
-- `GET /api/admin/collectives`, in the session form, to pick the takeover, and `GET /api/admin/artists`, in a set's
-  form, to pick the performers and suggest their genres, each time the form opens.
+- `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
+  set's form, to pick the performers and suggest their genres, each time the form opens.
 - `GET /api/events`, in the session form, to pick the event on RA, each time it opens.

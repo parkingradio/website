@@ -110,8 +110,10 @@ function stubSession(sets: StudioSet[]): Session {
     id: 'session-1',
     durationMinutes: 180,
     end: '2026-11-15T05:00:00.000Z',
+    type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
     name: '',
+    title: 'ONDES TAKEOVER',
     raEvent: null,
     sets,
   }
@@ -522,9 +524,9 @@ describe('An artist’s page', () => {
         .getAllByRole('row')
         .slice(1)
         .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
-    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'Takeover de Ondes', 'Aurore, Brume', 'DJ', '-', '', 'annulé']])
+    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', '', 'annulé']])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-cancelled')
-    expect(within(table).getByRole('link', { name: 'Takeover de Ondes' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(table).getByRole('link', { name: 'ONDES TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(within(table).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /set/ })).not.toBeInTheDocument()
     expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent("L'artiste sera aussi retiré de ses sets, qui restent.")

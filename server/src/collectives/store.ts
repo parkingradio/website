@@ -6,7 +6,7 @@ import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { lockSessions } from '../sessions/store.js'
+import { Conflict, lockSessions, takeoverOf } from '../sessions/store.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import type { CollectiveProfile, SentMember } from './profile.js'
 
@@ -18,6 +18,8 @@ export type StoredCollective = CollectiveRow & { members: Reference[] }
 
 // Thrown when a collective's members can't be saved, because one of them isn't an artist (`NO_SUCH_MEMBER`).
 export class InvalidMember extends Error {}
+
+export const HAS_TAKEOVERS = 'This collective has takeovers: give them another collective, or another type, first'
 
 // The collectives, as the admin pages manage them. Each method that's about one collective returns null when there's no
 // such collective, which is the case of any id that isn't a UUID.
@@ -35,8 +37,8 @@ export type CollectivesStore = {
     id: string,
     changes: CollectiveProfile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: CollectiveRow; after: StoredCollective } | null>
-  // Returns the collective as it was, so that its photo can be deleted too. Its members stay, and the sessions of its
-  // takeovers are left without one.
+  // Returns the collective as it was, so that its photo can be deleted too. Its members stay. Throws a Conflict, with one
+  // of its takeovers in the way, when it has some, which need it (see "Rules" in docs/design/server/sessions.md).
   delete(id: string): Promise<CollectiveRow | null>
 }
 
@@ -156,8 +158,10 @@ export function collectivesStore(db: Queryable): CollectivesStore {
     async delete(id) {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
-        // Deleting it clears the takeover of its sessions, which writes them (see `lockSessions`).
+        // So that no takeover of it can be added until it's deleted (see `lockSessions`).
         await lockSessions(tx)
+        const takeover = await takeoverOf(tx, id)
+        if (takeover) throw new Conflict(HAS_TAKEOVERS, takeover)
         const [row] = await tx.delete(collectives).where(eq(collectives.id, id)).returning()
         return row ?? null
       })

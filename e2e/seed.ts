@@ -271,7 +271,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     if (!instant) throw new Error(`A session's start, ${session.when.start}, doesn't exist on ${day} in Québec`)
     start = quebecDateTime(instant)
   }
-  const body: NewSession = { start, durationMinutes: session.durationMinutes, takeover, name: session.name ?? '', raEvent: session.raEvent ?? null }
+  const body: NewSession = { start, durationMinutes: session.durationMinutes, type: session.type, takeover, name: session.name ?? '', raEvent: session.raEvent ?? null }
   const { id } = (await server.call<SessionResponse>('POST', '/api/admin/sessions', body)).session
 
   const added = new Set<string>()

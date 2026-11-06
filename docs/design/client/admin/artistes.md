@@ -27,12 +27,12 @@ removes it once the artist is saved, and a photo that's chosen replaces it, show
 back. Under it, their applications are listed like in [Candidatures](candidatures.md), with a button to create another
 one. Since they're all the artist's, the list doesn't show the artist, their city or genres, and since they're few, it
 can't be searched, filtered or sorted. Under them, the sets they played, whatever their status, but not the other sets
-of the same sessions, are listed like a session's sets (see [A session's page](sessions.md#a-sessions-page)), with
-their session's day ("Date") and name ("Session"), linking to its page, but without being changed there: their status
-is only shown. Sets are added in their session, so there's no button to add one, and the list can't be searched,
-filtered or sorted either. At the bottom, the artist can be deleted for good, with their photo, if they have one, and
-applications, after confirming. They're then taken out of their collectives and their sets, which stay, which the page
-says of those they have.
+of the same sessions, are listed like a session's sets (see [A session's page](sessions.md#a-sessions-page)), with their
+session's day ("Date") and title ("Session", see [Names](sessions.md#names)), linking to its page, but without being
+changed there: their status is only shown. Sets are added in their session, so there's no button to add one, and the
+list can't be searched, filtered or sorted either. At the bottom, the artist can be deleted for good, with their photo,
+if they have one, and applications, after confirming. They're then taken out of their collectives and their sets, which
+stay, which the page says of those they have.
 
 ## A collective's page
 
@@ -41,11 +41,15 @@ list), with everything about it, its photo (or "Pas de photo"), its links, its a
 page (or that it has none, which happens once its artists are deleted), its genres, who added it (or that it applied by
 itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
 artist's. Under it, its applications are listed like an artist's, with a button to create another one, then the
-sessions of its takeovers, like in [Sessions](sessions.md) but without their takeover, with a button to add another one
+sessions of its takeovers, like in [Sessions](sessions.md) but without their type, with a button to add another one
 as its takeover ("nouvelle session"), and the list can't be searched, filtered or sorted either. At the bottom, the
 collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
-stay, and so do their own applications, and the sessions of its takeovers, without one, which the page says when it has
-some.
+stay, and so do their own applications. A collective that has takeovers can't be deleted (see
+[Types and names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used,
+saying « Un collectif avec des takeovers ne peut pas être supprimé. » (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)). When its sessions can't be loaded, it can be used,
+and the server's refusal shows if it has some, naming the takeover in the way and linking to it, like the errors of
+[Sessions](sessions.md#errors).
 
 ## Adding an artist
 

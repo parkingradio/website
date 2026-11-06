@@ -7,6 +7,8 @@ import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
 import type { Photos } from '../artists/store.js'
 import { AdminCollectiveProfile } from './profile.js'
+import { ConflictError, conflictBody } from '../sessions/routes.js'
+import { Conflict } from '../sessions/store.js'
 import { InvalidMember } from './store.js'
 import type { CollectivesStore, StoredCollective } from './store.js'
 
@@ -208,14 +210,21 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
       config: { admin: true, tool: { title: 'Supprimer un collectif' } },
       schema: {
         operationId: 'delete_collective',
-        summary: "Deletes a collective, its photo and its applications, but not its members, and leaves its takeovers' sessions without one",
+        summary:
+          "Deletes a collective, its photo and its applications, but not its members. Fails while it has takeovers, one of which the error names: give them another collective, or another type, first",
         tags: ['Collectives'],
         params: ById,
-        response: { 200: Ok, 404: ApiError },
+        response: { 200: Ok, 404: ApiError, 409: ConflictError },
       },
     },
     async (request, reply) => {
-      const row = await store.delete(request.params.id)
+      let row: Awaited<ReturnType<CollectivesStore['delete']>>
+      try {
+        row = await store.delete(request.params.id)
+      } catch (error) {
+        if (error instanceof Conflict) return reply.status(409).send(conflictBody({ error: error.message, session: error.session, set: error.set }))
+        throw error
+      }
       if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
       // The collective is gone either way.
       await forgetPhoto(photos, request.log, row.photoKey)

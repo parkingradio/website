@@ -19,7 +19,7 @@ type SessionRow = typeof sessions.$inferSelect
 export type StoredSession = SessionRow & { takeover: Reference | null; sets: StoredSet[] }
 
 // What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status.
-export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'name' | 'takeoverId' | 'raEventId'>
+export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'raEventId'>
 export type SetChanges = Pick<
   SetRow,
   'offsetMinutes' | 'durationMinutes' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'soundcloudTrackId' | 'soundcloudTrackUrl' | 'youtubeVideoId'
@@ -30,10 +30,10 @@ export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpda
 // exist. The message says which.
 export class NoSuchReference extends Error {}
 
-// Thrown when saving a session or a set would break one of the rules of sessions. The message says which, and `session`
-// and `set` are what's in the way: `set` is a set, if it's one, and `session` is the session in the way, or that set's.
-// Both are null only if it can't be found anymore, which only something outside the server could cause (see
-// `checkingRules`).
+// Thrown when saving a session or a set, or deleting a collective that has takeovers, would break one of the rules of
+// sessions. The message says which, and `session` and `set` are what's in the way: `set` is a set, if it's one, and
+// `session` is the session in the way, or that set's. Both are null only if it can't be found anymore, which only
+// something outside the server could cause (see `checkingRules`).
 export class Conflict extends Error {
   session: StoredSession | null
   set: StoredSet | null
@@ -132,14 +132,16 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
   return found
 }
 
-// The sessions that match `where`, in the order of `list`, with their takeovers and their sets.
-async function sessionsWhere(db: Queryable, where: SQL | undefined): Promise<StoredSession[]> {
-  const rows = await db
+// The sessions that match `where`, in the order of `list`, or only the first `limit` of them, with their takeovers and
+// their sets.
+async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {
+  const query = db
     .select({ session: sessions, takeoverName: collectives.name })
     .from(sessions)
     .leftJoin(collectives, eq(collectives.id, sessions.takeoverId))
     .where(where)
     .orderBy(sql`${sessions.startAt} desc nulls first`, desc(sessions.createdAt))
+  const rows = await (limit === undefined ? query : query.limit(limit))
   if (rows.length === 0) return []
   const setsBySession = await setsOf(
     db,
@@ -150,6 +152,13 @@ async function sessionsWhere(db: Queryable, where: SQL | undefined): Promise<Sto
     takeover: session.takeoverId === null ? null : { id: session.takeoverId, name: takeoverName! },
     sets: setsBySession.get(session.id) ?? [],
   }))
+}
+
+// One of the takeovers of the collective `collectiveId`, the first in the order of `list`, or null when it has none.
+// Deleting a collective checks it, in a transaction that holds the sessions' lock (see `lockSessions`), so that no
+// takeover can be added in the meantime.
+export async function takeoverOf(tx: Queryable, collectiveId: string): Promise<StoredSession | null> {
+  return (await sessionsWhere(tx, eq(sessions.takeoverId, collectiveId), 1))[0] ?? null
 }
 
 async function sessionWithId(db: Queryable, id: string): Promise<StoredSession | null> {
@@ -163,17 +172,16 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
   return set ? { session, set } : null
 }
 
-// Every transaction that writes sessions, sets or their performers takes this lock first, and so do deleting an artist
-// and deleting a collective, which write them too, by deleting the artist's rows in set_performers, and by clearing
-// the takeover of the collective's sessions (see artists/store.ts and collectives/store.ts). They're done one at a time,
-// so that:
+// Every transaction that writes sessions, sets or their performers takes this lock first, and so do deleting an artist,
+// which writes them too, by deleting the artist's rows in set_performers, and deleting a collective, which mustn't have
+// takeovers (see artists/store.ts and collectives/store.ts). They're done one at a time, so that:
 // - Two sessions that would overlap can't both be inserted into the index of the exclusion constraint sessions_no_overlap,
 //   then each wait for the other to end before it could tell whether they overlap, which Postgres would end as a
 //   deadlock, rather than with the constraint's error.
 // - What a write reads can't change until it's done: the rule that spans sessions and sets (a cancelled session only has
-//   cancelled sets), and whether the session, the set, the takeover's collective and the performers exist, and so
-//   whether the foreign keys hold, without locking their rows, which would keep their profiles from being changed in the
-//   meantime.
+//   cancelled sets), whether the session, the set, the takeover's collective and the performers exist, and so whether
+//   the foreign keys hold, without locking their rows, which would keep their profiles from being changed in the
+//   meantime, and whether a collective that's deleted has takeovers.
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock.
 // Every transaction that takes it takes it before any other lock, so it can't be part of a deadlock itself. The

@@ -1,7 +1,7 @@
 # Collectives
 
 The collectives Parking Radio knows of, whose members are [artists](artists.md). A collective usually gets a whole time
-slot, for its takeover, which is a session (see [Takeovers](sessions.md#takeovers)).
+slot, for its takeover, which is a session (see [Types and names](sessions.md#types-and-names)).
 
 ## Profiles
 
@@ -118,6 +118,8 @@ when there's no such collective.
 
 ## `DELETE /api/admin/collectives/:id` (admin)
 
-Deletes a collective, its photo if it has one and its [applications](applications.md), but not its members, leaves the
-sessions of its takeovers without one (see [Takeovers](sessions.md#takeovers)), and responds `{"ok": true}`. Fails with
-404 when there's no such collective.
+Deletes a collective, its photo if it has one and its [applications](applications.md), but not its members, and responds
+`{"ok": true}`. Fails with 404 when there's no such collective, or with 409 while it has takeovers, which need it (see
+[Types and names](sessions.md#types-and-names)), with one of them in `session`, and `set` null, like the 409s of sessions
+(see [Rules](sessions.md#rules)). Its takeovers are listed with `GET /api/admin/sessions?takeover=<id>`, and are given
+another collective, or another type, first.

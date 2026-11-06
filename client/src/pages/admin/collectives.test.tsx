@@ -544,17 +544,19 @@ describe('A collective’s page', () => {
     renderAt('/admin/artistes/collectifs/collective-1')
     expect(await screen.findByText('Aucune session.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle?takeover=collective-1')
-    expect(screen.getByText(/seront supprimés pour de bon/)).not.toHaveTextContent('Les sessions de ses takeovers restent')
+    expect(screen.getByRole('button', { name: 'supprimer le collectif' })).not.toHaveAttribute('aria-disabled')
   })
 
-  it("lists the sessions of its takeovers, without their takeover, and says that they stay once it's deleted", async () => {
+  it("lists the sessions of its takeovers, without their type, and can't be deleted while it has some", async () => {
     const session: Session = {
       id: 'session-1',
       start: '2026-11-15T02:00:00.000Z',
       end: '2026-11-15T05:00:00.000Z',
       durationMinutes: 180,
+      type: 'takeover',
       takeover: { id: 'collective-1', name: 'Ondes' },
-      name: 'ONDES TAKEOVER',
+      name: '',
+      title: 'ONDES TAKEOVER',
       raEvent: null,
       sets: [],
       createdAt: '2026-10-01T16:00:00.000Z',
@@ -571,7 +573,52 @@ describe('A collective’s page', () => {
     const table = screen.getByRole('table', { name: 'Sessions' })
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
-    expect(screen.getByText(/seront supprimés pour de bon/)).toHaveTextContent('Les sessions de ses takeovers restent, sans takeover.')
+    expect(within(table).getAllByRole('cell')[2]).toHaveTextContent('ONDES TAKEOVER')
+
+    const confirm = vi.spyOn(window, 'confirm')
+    const remove = screen.getByRole('button', { name: 'supprimer le collectif' })
+    expect(remove).toHaveAttribute('aria-disabled', 'true')
+    expect(remove).toHaveAccessibleDescription('Un collectif avec des takeovers ne peut pas être supprimé.')
+    fireEvent.click(remove)
+    expect(confirm).not.toHaveBeenCalled()
+    expect(requestsTo('DELETE', '/api/admin/collectives/collective-1')).toHaveLength(0)
+  })
+
+  it("shows the server's refusal when its sessions could not be loaded and it has takeovers, linking to the one in the way", async () => {
+    const takeover: Session = {
+      id: 'session-1',
+      start: '2026-11-15T02:00:00.000Z',
+      end: '2026-11-15T05:00:00.000Z',
+      durationMinutes: 180,
+      type: 'takeover',
+      takeover: { id: 'collective-1', name: 'Ondes' },
+      name: '',
+      title: 'ONDES TAKEOVER',
+      raEvent: null,
+      sets: [],
+      createdAt: '2026-10-01T16:00:00.000Z',
+      createdBy: 'admin@example.com',
+      updatedBy: null,
+      updatedAt: null,
+      status: 'planned',
+      statusUpdatedBy: null,
+      statusUpdatedAt: null,
+    }
+    const error = 'This collective has takeovers: give them another collective, or another type, first'
+    mockFetch({
+      ...ONDES_PAGE,
+      '/api/admin/sessions?takeover=collective-1': { ok: false, error: 'Boom' },
+      'DELETE /api/admin/collectives/collective-1': { ok: false, error, session: takeover, set: null },
+    })
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const remove = await screen.findByRole('button', { name: 'supprimer le collectif' })
+    expect(remove).not.toHaveAttribute('aria-disabled')
+    fireEvent.click(remove)
+    const alert = await screen.findByText(/^Le collectif n'a pas pu être supprimé/)
+    expect(alert).toHaveTextContent(`Le collectif n'a pas pu être supprimé : ${error} (ONDES TAKEOVER, sam. 14 nov. 2026)`)
+    expect(within(alert).getByRole('link', { name: 'ONDES TAKEOVER, sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
   })
 
   it('deletes the collective and its applications once confirmed, but not its artists, and goes back to the list', async () => {

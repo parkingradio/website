@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SessionFields, SetFields } from './fields.js'
+import { SESSION_TYPES, SessionFields, SetFields, sessionTitle } from './fields.js'
 
 // The rules in sessions/fields.ts, which every session and set has to follow. The server answers with the first error.
 
@@ -7,8 +7,9 @@ function sessionFields(changes: Record<string, unknown> = {}) {
   return {
     start: '2026-11-14T21:00-05:00',
     durationMinutes: 240,
+    type: 'guest-mixes',
     takeover: null,
-    name: 'HAUTE RIVE TAKEOVER',
+    name: 'GUEST MIXES SPÉCIAL',
     raEvent: null,
     ...changes,
   }
@@ -36,16 +37,47 @@ function error(schema: typeof SessionFields | typeof SetFields, sent: unknown) {
 const START =
   'The start must be a date and time in Québec time, with the offset from UTC in effect then (-05:00, or -04:00 from the second Sunday of March at 2:00 to the first Sunday of November at 2:00), except a time the clocks skip in spring, e.g. "2026-11-14T21:00-05:00", from the year 2000 to 2999, or null'
 
+describe('sessionTitle', () => {
+  const session = (type: (typeof SESSION_TYPES)[number], name = '', takeover: { name: string } | null = null) => sessionTitle({ type, name, takeover })
+
+  it("is the session's own name, or else the one its type gives it", () => {
+    expect(session('guest-mixes')).toBe('GUEST MIXES')
+    expect(session('live-performance')).toBe('LIVE PERFORMANCE')
+    expect(session('synth-meetup')).toBe('SYNTH MEETUPS')
+    expect(session('takeover', '', { name: 'Spectralis' })).toBe('SPECTRALIS TAKEOVER')
+    for (const type of SESSION_TYPES) {
+      expect(session(type, 'SPECIAL HALLOWEEN — MINIMALTIDE TAKEOVER', { name: 'MinimalTide' })).toBe('SPECIAL HALLOWEEN — MINIMALTIDE TAKEOVER')
+    }
+    expect(session('other', 'LISTENING PARTY')).toBe('LISTENING PARTY')
+  })
+
+  it("puts the collective's name in upper case, as Unicode's default case mapping has it", () => {
+    expect(session('takeover', '', { name: 'Saut de Clôture' })).toBe('SAUT DE CLÔTURE TAKEOVER')
+    expect(session('takeover', '', { name: 'Les Sœurs Ondes' })).toBe('LES SŒURS ONDES TAKEOVER')
+    expect(session('takeover', '', { name: 'Straße' })).toBe('STRASSE TAKEOVER')
+  })
+
+  it('is never empty for a session that follows the rules', () => {
+    const named = (type: (typeof SESSION_TYPES)[number]) => (type === 'other' ? 'X' : '')
+    for (const type of SESSION_TYPES) {
+      const fields = SessionFields.parse(sessionFields({ type, takeover: type === 'takeover' ? 'collective-1' : null, name: named(type) }))
+      // A collective's name isn't empty (see collectives/profile.ts).
+      expect(sessionTitle({ ...fields, takeover: fields.takeover === null ? null : { name: 'A' } }), type).not.toBe('')
+    }
+  })
+})
+
 describe('SessionFields', () => {
   const parse = (changes: Record<string, unknown> = {}) => SessionFields.parse(sessionFields(changes))
   const sessionError = (sent: unknown) => error(SessionFields, sent)
 
   it('keeps what was sent, with its start as a date and its links reduced', () => {
-    expect(parse({ takeover: ' Collective-1 ', raEvent: ' https://ra.co/events/6683745 ' })).toEqual({
+    expect(parse({ type: 'takeover', takeover: ' Collective-1 ', name: 'VKT TAKEOVER', raEvent: ' https://ra.co/events/6683745 ' })).toEqual({
       start: new Date('2026-11-15T02:00:00Z'),
       durationMinutes: 240,
+      type: 'takeover',
       takeover: 'collective-1',
-      name: 'HAUTE RIVE TAKEOVER',
+      name: 'VKT TAKEOVER',
       raEvent: '6683745',
     })
   })
@@ -106,9 +138,39 @@ describe('SessionFields', () => {
     }
   })
 
+  it('takes one of the types, and refuses any other value, or none', () => {
+    for (const type of SESSION_TYPES) {
+      const takeover = type === 'takeover' ? 'collective-1' : null
+      expect(parse({ type, takeover }).type).toBe(type)
+    }
+    for (const type of ['guest mixes', 'GUEST-MIXES', 'takeovers', '', null, undefined, ['guest-mixes']]) {
+      expect(sessionError(sessionFields({ type })), String(type)).toBe('The type must be one of guest-mixes, live-performance, takeover, synth-meetup, other')
+    }
+  })
+
   it('refuses a takeover that is not an id, or that is left out', () => {
-    expect(sessionError(sessionFields({ takeover: 42 }))).toBe("The takeover must be a collective's id, or null")
-    expect(sessionError(sessionFields({ takeover: undefined }))).toBe("The takeover must be a collective's id, or null")
+    for (const type of ['takeover', 'guest-mixes']) {
+      expect(sessionError(sessionFields({ type, takeover: 42 }))).toBe("The takeover must be a collective's id, or null")
+      expect(sessionError(sessionFields({ type, takeover: undefined }))).toBe("The takeover must be a collective's id, or null")
+    }
+  })
+
+  it('takes a collective for a takeover, which needs one, and none for the other types', () => {
+    expect(sessionError(sessionFields({ type: 'takeover', takeover: null }))).toBe('A takeover has a collective')
+    expect(sessionError(sessionFields({ type: 'takeover', takeover: ' ' }))).toBe('A takeover has a collective')
+    for (const type of SESSION_TYPES.filter((type) => type !== 'takeover')) {
+      expect(sessionError(sessionFields({ type, takeover: 'collective-1' })), type).toBe('Only a takeover has a collective')
+    }
+  })
+
+  it('takes a name for every type, which a session of type other needs, kept in its case', () => {
+    for (const type of SESSION_TYPES) {
+      const takeover = type === 'takeover' ? 'collective-1' : null
+      expect(parse({ type, takeover, name: 'ATELIER DE DJing POUR FEMMES & OPEN DECKS' }).name).toBe('ATELIER DE DJing POUR FEMMES & OPEN DECKS')
+      if (type !== 'other') expect(parse({ type, takeover, name: '' }).name).toBe('')
+    }
+    expect(sessionError(sessionFields({ type: 'other', name: '' }))).toBe('A session of type other has a name')
+    expect(sessionError(sessionFields({ type: 'other', name: ' \n ' }))).toBe('A session of type other has a name')
   })
 
   it('cleans up the name, which can be empty', () => {

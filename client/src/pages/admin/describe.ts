@@ -5,7 +5,7 @@ import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { QUEBEC_TIME_ZONE, formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
-import type { Session, SessionStatus, StudioSet } from '../../session-fields'
+import type { Session, SessionStatus, SessionType, StudioSet } from '../../session-fields'
 import type { ComboboxOption } from '../../combobox'
 import { compareText } from './list'
 
@@ -15,6 +15,15 @@ import { compareText } from './list'
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = { planned: 'planifiée', done: 'jouée', cancelled: 'annulée' }
 export const SESSION_STATUS_PLURALS: Record<SessionStatus, string> = { planned: 'planifiées', done: 'jouées', cancelled: 'annulées' }
 export const SET_STATUS_LABELS: Record<SessionStatus, string> = { planned: 'planifié', done: 'joué', cancelled: 'annulé' }
+
+// A session's type.
+export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
+  'guest-mixes': 'Guest mixes',
+  'live-performance': 'Live performance',
+  takeover: 'Takeover',
+  'synth-meetup': 'Synth meetup',
+  other: 'Autre',
+}
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   new: 'nouvelle',
@@ -297,17 +306,11 @@ export function sessionWhen(session: SessionTimes): string {
   return session.start === null ? UNDATED : `${sessionLongDay(session)}, ${sessionWithin(session)}`
 }
 
-// What a session is called: its name, or else its takeover, or else its day.
-export function sessionTitle(session: Pick<Session, 'name' | 'takeover' | 'start'>): string {
-  if (session.name) return session.name
-  if (session.takeover) return `Takeover de ${session.takeover.name}`
-  return session.start === null ? 'Session sans date' : `Session du ${formatLongQuebecDay(session.start)}`
-}
-
-// A session as it's named along with others, with its day after its name or its takeover, e.g. "HAUTE RIVE TAKEOVER, sam.
-// 14 nov. 2026".
-export function sessionName(session: Pick<Session, 'name' | 'takeover' | 'start'>): string {
-  return session.name || session.takeover ? `${sessionTitle(session)}, ${sessionDay(session)}` : sessionTitle(session)
+// A session as it's named along with others: its title, which the server gives, then its day, e.g. "HAUTE RIVE TAKEOVER,
+// sam. 14 nov. 2026", or "GUEST MIXES, date à déterminer". Where it's named alone, e.g. as its page's title, it's its
+// title only.
+export function sessionName(session: Pick<Session, 'title' | 'start'>): string {
+  return `${session.title}, ${sessionDay(session)}`
 }
 
 // E.g. "21 h – 22 h", "+0 h – +1 h" in a session without a date, or "horaire à déterminer (1 h)" for a set whose place
@@ -326,7 +329,7 @@ export function setTitle(set: Pick<StudioSet, 'performers'>): string {
 
 // A set as it's named on its session's page, e.g. "Set de Aurore, 21 h – 22 h", or outside it, with its session, e.g.
 // "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
-export function setName(set: StudioSet, session?: Pick<Session, 'name' | 'takeover' | 'start'>): string {
+export function setName(set: StudioSet, session?: Pick<Session, 'title' | 'start'>): string {
   return [setTitle(set), ...(session ? [sessionName(session)] : []), setHours(set)].join(', ')
 }
 

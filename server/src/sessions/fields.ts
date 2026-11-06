@@ -20,6 +20,33 @@ export const BAD_STATUS = `The status must be one of ${STATUSES.join(', ')}`
 export const Status = z.enum(STATUSES, { error: BAD_STATUS }).meta({ id: 'SessionStatus', description: "A session's or a set's status" })
 export type Status = z.infer<typeof Status>
 
+// What kind of session a session is, which gives it its name, except for "other" (see "Types and names" in
+// docs/design/server/sessions.md). In the order the admin pages offer them.
+export const SESSION_TYPES = ['guest-mixes', 'live-performance', 'takeover', 'synth-meetup', 'other'] as const
+export type SessionType = (typeof SESSION_TYPES)[number]
+const BAD_TYPE = `The type must be one of ${SESSION_TYPES.join(', ')}`
+export const SessionType = z.enum(SESSION_TYPES, { error: BAD_TYPE }).meta({
+  id: 'SessionType',
+  description:
+    "What kind of session it is, which gives it its name: GUEST MIXES, LIVE PERFORMANCE, <COLLECTIVE> TAKEOVER from its collective's name in upper case, SYNTH MEETUPS, or none for other",
+})
+
+const NAMES: Record<Exclude<SessionType, 'takeover' | 'other'>, string> = {
+  'guest-mixes': 'GUEST MIXES',
+  'live-performance': 'LIVE PERFORMANCE',
+  'synth-meetup': 'SYNTH MEETUPS',
+}
+
+// What a session is called: its own name, or else the one its type gives it, from the name of the collective whose
+// takeover it is, for a takeover. Never empty, since a session of type "other" has a name, and a takeover a collective,
+// whose name isn't empty.
+export function sessionTitle({ type, name, takeover }: { type: SessionType; name: string; takeover: { name: string } | null }): string {
+  if (name) return name
+  if (type === 'takeover') return `${takeover!.name.toUpperCase()} TAKEOVER`
+  // A session of type "other" has a name.
+  return type === 'other' ? '' : NAMES[type]
+}
+
 export const NO_SUCH_ARTIST = 'No such artist'
 export const NO_SUCH_COLLECTIVE = 'No such collective'
 
@@ -87,12 +114,22 @@ export const SessionFields = z
         `${DATE_TIME_DESCRIPTION}, from 2000 to 2999 in UTC`,
       ),
       durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES),
-      takeover: orNone(lowerCase, "The takeover must be a collective's id, or null", 'The id of the collective whose takeover the session is'),
-      name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`),
+      type: SessionType,
+      takeover: orNone(
+        lowerCase,
+        "The takeover must be a collective's id, or null",
+        'The id of the collective whose takeover the session is: a takeover has one, and the other types none',
+      ),
+      name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`).meta({
+        description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
+      }),
       raEvent: orNone(raEventId, 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"', "The event's id on RA, or a link to it"),
     },
     { error: 'A session must be an object with its fields' },
   )
+  .refine(({ type, takeover }) => type !== 'takeover' || takeover !== null, { message: 'A takeover has a collective', path: ['takeover'] })
+  .refine(({ type, takeover }) => type === 'takeover' || takeover === null, { message: 'Only a takeover has a collective', path: ['takeover'] })
+  .refine(({ type, name }) => type !== 'other' || name !== '', { message: 'A session of type other has a name', path: ['name'] })
   .meta({ id: 'SessionFields' })
 export type SessionFields = z.output<typeof SessionFields>
 

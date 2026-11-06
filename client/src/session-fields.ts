@@ -20,6 +20,7 @@ export type Session = Schema<'Session'>
 // A set, as the endpoints return it. Not `Set`, which is JavaScript's.
 export type StudioSet = Schema<'Set'>
 export type SessionStatus = Schema<'SessionStatus'>
+export type SessionType = Schema<'SessionType'>
 export type SessionFields = Schema<'SessionFields'>
 export type SetFields = Schema<'SetFields'>
 // An artist or a collective, by their id and name, as sessions and sets name them.
@@ -27,6 +28,24 @@ export type Reference = Schema<'Reference'>
 
 // In the order sessions and sets go through them (see describe.ts for their names).
 export const STATUSES = everyOne<SessionStatus>()(['planned', 'done', 'cancelled'])
+
+// In the order the session form offers them (see describe.ts for their names).
+export const SESSION_TYPES = everyOne<SessionType>()(['guest-mixes', 'live-performance', 'takeover', 'synth-meetup', 'other'])
+
+const NAMES: Record<Exclude<SessionType, 'takeover' | 'other'>, string> = {
+  'guest-mixes': 'GUEST MIXES',
+  'live-performance': 'LIVE PERFORMANCE',
+  'synth-meetup': 'SYNTH MEETUPS',
+}
+
+// The name a session of `type` is given, from the name of the collective whose takeover it is, for a takeover, or null
+// for a session of type "other", which has its own, or for a takeover until its collective is known. The session form
+// shows it, before the server gives it as part of the session's title (see `sessionTitle` in
+// server/src/sessions/fields.ts).
+export function typeName(type: SessionType, takeover: Pick<Reference, 'name'> | null): string | null {
+  if (type === 'takeover') return takeover && `${takeover.name.toUpperCase()} TAKEOVER`
+  return type === 'other' ? null : NAMES[type]
+}
 
 const NAME_MAX_LENGTH = 100
 // The longest a session or a set lasts, in minutes. A set's offset is less than that.
@@ -81,7 +100,8 @@ function checkStartEnd<T extends { start: string; end: string }>({ start, end }:
 // Sessions.
 
 // A session as the form has it: its day and times in Québec time, as "YYYY-MM-DD" and "HH:MM", or its duration when its
-// date isn't known yet (`undated`), its takeover's collective as it's shown, and the rest as it's typed.
+// date isn't known yet (`undated`), its type, or null until it's picked, its takeover's collective as it's shown, which
+// it keeps while another type is picked, but only a takeover sends, and the rest as it's typed.
 export type SessionFormValues = {
   undated: boolean
   day: string
@@ -91,6 +111,7 @@ export type SessionFormValues = {
   // The day and times the form opened with, e.g. a session's, and what they stood for: each one left as it was stands for
   // what it stood for, even when a time happens twice and the one meant is the second (see `sessionTimes`).
   opened?: { day: string; start: string; end: string; startAt: Date; durationMinutes: number }
+  type: SessionType | null
   takeover: Reference | null
   name: string
   raEvent: string
@@ -102,6 +123,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   start: '',
   end: '',
   duration: EMPTY_DURATION,
+  type: null,
   takeover: null,
   name: '',
   raEvent: '',
@@ -112,6 +134,7 @@ export function sessionFormValues(session: Session): SessionFormValues {
   const values = {
     ...EMPTY_SESSION_FORM,
     duration: durationOf(session.durationMinutes),
+    type: session.type,
     takeover: session.takeover,
     name: session.name,
     raEvent: session.raEvent?.url ?? '',
@@ -174,16 +197,21 @@ export function checkSession(
   times = sessionTimes(form),
 ): { fields: SessionFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SessionFormValues> } {
   const errors: FieldErrors<SessionFormValues> = 'errors' in times ? { ...times.errors } : {}
-  const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, null)
+  if (form.type === null) errors.type = 'Choisissez le type de la session.'
+  const takeover = form.type === 'takeover' ? form.takeover : null
+  if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'
+  const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, form.type === 'other' ? 'Indiquez le nom de la session.' : null)
   if (name.error) errors.name = name.error
   const raEvent = form.raEvent.trim()
   if (raEvent && !raEventId(raEvent)) errors.raEvent = "Le lien de l'événement RA est invalide, p. ex. « https://ra.co/events/6683745 »."
-  if (Object.keys(errors).length > 0 || 'errors' in times) return { errors }
+  // A missing type is one of the errors already: checking it again tells the compiler that there's one.
+  if (Object.keys(errors).length > 0 || 'errors' in times || form.type === null) return { errors }
   return {
     fields: {
       start: times.start && quebecDateTime(times.start),
       durationMinutes: times.durationMinutes,
-      takeover: form.takeover?.id ?? null,
+      type: form.type,
+      takeover: takeover?.id ?? null,
       name: name.value!,
       raEvent: raEvent || null,
     },

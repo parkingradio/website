@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { OwnApplications } from './applications'
+import { Button } from './button'
 import { CollectiveForm } from './collective-form'
+import { failure } from './session-errors'
 import { OwnSessions } from './sessions'
 import type { CollectiveFormProps } from './collective-form'
 import { ArtistsFailure, BackToArtists, LinksList, LoadFailure, MembersList, PhotoOrNone } from './profile-details'
@@ -31,7 +34,7 @@ function CollectiveById({ id }: { id: string }) {
   const [changed, setChanged] = useState<Collective | null>(null)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<ReactNode>(null)
   const navigate = useNavigate()
 
   if (loaded.kind === 'error') return <LoadFailure>Le collectif n'a pas pu être chargé&nbsp;: {loaded.message}</LoadFailure>
@@ -61,6 +64,8 @@ function CollectiveById({ id }: { id: string }) {
   }
 
   const count = applications.kind === 'loaded' ? applications.value.applications.length : null
+  // A collective that has takeovers can't be deleted, which the server checks too, e.g. when they couldn't be loaded.
+  const hasTakeovers = sessions.kind === 'loaded' && sessions.value.sessions.length > 0
   const remove = async () => {
     if (!window.confirm(`Supprimer définitivement ${deletedWith(collective.name, collective.hasPhoto, count)} ? Ses artistes restent.`)) return
     setBusy(true)
@@ -70,7 +75,8 @@ function CollectiveById({ id }: { id: string }) {
       navigate('/admin/artistes')
     } else {
       setBusy(false)
-      setError(`Le collectif n'a pas pu être supprimé : ${result.error}`)
+      // Naming the takeover in the way, if that's why.
+      setError(failure("Le collectif n'a pas pu être supprimé", result))
     }
   }
 
@@ -97,16 +103,15 @@ function CollectiveById({ id }: { id: string }) {
       <p>
         Le collectif{collective.hasPhoto && ', sa photo'} et ses candidatures seront supprimés pour de bon. Ses artistes restent, avec
         leurs propres candidatures.
-        {sessions.kind === 'loaded' && sessions.value.sessions.length > 0 && ' Les sessions de ses takeovers restent, sans takeover.'}
       </p>
       {error && (
         <p className="admin-error" role="alert">
           {error}
         </p>
       )}
-      <button type="button" onClick={remove} disabled={busy}>
+      <Button unavailable={hasTakeovers ? 'Un collectif avec des takeovers ne peut pas être supprimé.' : null} onClick={remove} disabled={busy}>
         supprimer le collectif
-      </button>
+      </Button>
     </>
   )
 }

@@ -534,6 +534,12 @@ dl.admin-record {
   overflow-wrap: anywhere;
 }
 
+/* A session's title on its page when it's the name its type gives it, rather than its own: faded out, but lighter than
+   the labels only as far as WCAG AA's contrast allows. */
+.admin-record dd.admin-generated {
+  color: #767676;
+}
+
 .admin-record dd ul {
   margin: 0;
   padding: 0;

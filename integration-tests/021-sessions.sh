@@ -3,13 +3,14 @@
 # The admin routes for sessions and sets work against a real database, in the server's Docker image. The server's unit
 # tests fake the database, and its property-based tests (server/src/sessions/rules.db.test.ts) only check that the rules
 # of sessions hold after random requests, so this is what covers the sessions, sets and set_performers tables: performers
-# kept in order, with their names, and takeovers, the checks that take the database (artists and collectives that
-# exist), starts kept as instants and sets placed relative to them, sessions listed those without a start first, then
-# the most recent first, by artist, by takeover and by when they start, the rules of sessions (sessions don't overlap, a
-# video or a track in at most one set, and a cancelled session only has cancelled sets), with what's in the way in their
-# 409s, including while other transactions change sessions, sets that don't fit in their session or overlap each other,
-# which they say, a set's own track not being resolved again, what deleting an artist or a collective does to sessions
-# and sets, and changing a session or a set while its takeover's collective, or one of its performers, is deleted.
+# kept in order, with their names, types and takeovers, and the names they give, which follow their collective's, the
+# checks that take the database (artists and collectives that exist), starts kept as instants and sets placed relative to
+# them, sessions listed those without a start first, then the most recent first, by artist, by takeover and by when they
+# start, the rules of sessions (sessions don't overlap, a video or a track in at most one set, a cancelled session only
+# has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
+# including while other transactions change sessions, sets that don't fit in their session or overlap each other, which
+# they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
+# collective's takeover, or changing a set, while that collective, or one of its performers, is deleted.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -43,10 +44,15 @@ performers() {
 }
 
 # session_json <start> <duration> [<more JSON fields>] -- a session, as JSON, starting at <start>, as JSON (e.g. a quoted
-# date and time, or null), without a takeover or an RA event unless they're given (the last of two fields with the same
-# name is the one that counts).
+# date and time, or null), of guest mixes, with a name of its own, without a takeover or an RA event unless they're given
+# (the last of two fields with the same name is the one that counts).
 session_json() {
-    printf '{"start":%s,"durationMinutes":%s,"takeover":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null%s}' "$1" "$2" "${3:+,$3}"
+    printf '{"start":%s,"durationMinutes":%s,"type":"guest-mixes","takeover":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null%s}' "$1" "$2" "${3:+,$3}"
+}
+
+# collective_json <name> -- the profile of the collective Les Ondes, as JSON, with that name, and Ana as its artist.
+collective_json() {
+    printf '{"name":"%s","members":[{"id":"%s"}],"email":"ondes@sessions.test"}' "$1" "$ana"
 }
 
 # set_json <performers JSON> <offset> <duration> [<more JSON fields>] -- a set, as JSON, without links unless they're
@@ -153,7 +159,7 @@ request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Ana"}' "$ART
 ana="$(first_id)"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Brume"}' "$ARTISTS"
 brume="$(first_id)"
-request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Les Ondes\",\"members\":[{\"id\":\"${ana}\"}],\"email\":\"ondes@sessions.test\"}" "$COLLECTIVES"
+request --header "Cookie: ${cookie}" --form-string "collective=$(collective_json 'Les Ondes')" "$COLLECTIVES"
 expect_status 200
 ondes="$(first_id)"
 
@@ -169,18 +175,53 @@ json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"raEvent":
 expect_status 400
 
 echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in Québec time and its RA event reduced"
-json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
+json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
 expect_status 200
 first="$(first_id)"
 json GET "${SESSIONS}/${first}"
 expect_status 200
-expect_body_contains "\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-15T01:00:00-05:00\",\"durationMinutes\":240,\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
-expect_body_contains '"name":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"sets":[]'
+expect_body_contains "\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-15T01:00:00-05:00\",\"durationMinutes\":240,\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
+expect_body_contains '"name":"HAUTE RIVE TAKEOVER","title":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"sets":[]'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\",\"statusUpdatedBy\":null"
+
+echo "  a session is called by its own name, or else the one its type gives it, from its collective's name as it is then"
+json POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"name\":\"\"")"
+expect_status 200
+named="$(first_id)"
+expect_body_contains "\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"},\"name\":\"\",\"title\":\"LES ONDES TAKEOVER\""
+request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes Côtières')" "${COLLECTIVES}/${ondes}"
+expect_status 200
+json GET "${SESSIONS}/${named}"
+expect_body_contains '"name":"","title":"LES ONDES CÔTIÈRES TAKEOVER"'
+expect_body_contains '"updatedBy":null,"updatedAt":null'
+request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes')" "${COLLECTIVES}/${ondes}"
+expect_status 200
+for type in guest-mixes:GUEST\ MIXES live-performance:LIVE\ PERFORMANCE synth-meetup:SYNTH\ MEETUPS; do
+    json PUT "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
+    expect_status 200
+    expect_body_contains "\"type\":\"${type%%:*}\",\"takeover\":null,\"name\":\"\",\"title\":\"${type#*:}\""
+done
+json PUT "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
+expect_status 200
+expect_body_contains '"type":"other","takeover":null,"name":"ATELIER DE DJing POUR FEMMES","title":"ATELIER DE DJing POUR FEMMES"'
+json DELETE "${SESSIONS}/${named}"
+expect_status 200
+
+echo "  only takeovers have a collective, and they need one, a session of type other needs a name, and nothing is saved otherwise"
+for fields in '"type":"takeovers"' '"type":"takeover"' "\"takeover\":\"${ondes}\"" "\"type\":\"other\",\"takeover\":\"${ondes}\"" '"type":"other","name":" "'; do
+    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "$fields")"
+    expect_status 400
+done
+json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"takeover"')"
+expect_body_contains '"error":"A takeover has a collective"'
+json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"takeover\":\"${ondes}\"")"
+expect_body_contains '"error":"Only a takeover has a collective"'
+json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"other","name":""')"
+expect_body_contains '"error":"A session of type other has a name"'
 
 echo "  a takeover has to be a collective that exists, and nothing is saved otherwise"
 for takeover in "$NOBODY" not-a-uuid "$ana"; do
-    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"takeover\":\"${takeover}\"")"
+    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${takeover}\"")"
     expect_status 400
     expect_body_contains '"error":"No such collective"'
 done
@@ -215,7 +256,7 @@ for session in "$night" "$dawn"; do
 done
 
 echo "  sessions without a start don't overlap anything, until they're given one"
-json POST "$SESSIONS" "$(session_json null 240 "\"takeover\":\"${ondes}\"")"
+json POST "$SESSIONS" "$(session_json null 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 canned="$(first_id)"
 expect_body_contains '"start":null,"end":null,"durationMinutes":240'
@@ -223,7 +264,7 @@ json POST "$SESSIONS" "$(session_json '""' 240)"
 expect_status 200
 other_canned="$(first_id)"
 expect_body_contains '"start":null,"end":null'
-json PUT "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"takeover\":\"${ondes}\"")"
+json PUT "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${canned}"
 expect_body_contains '"start":null'
@@ -322,7 +363,7 @@ expect_status 200
 echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, cancelled ones included"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"takeover\":\"${ondes}\"")"
+json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 expect_body_contains '"durationMinutes":119'
 expect_place "$opening" true
@@ -334,16 +375,16 @@ json DELETE "${SETS}/${whenever}"
 expect_status 200
 
 echo "  moving a session moves its sets, which doesn't count as changing them, and so does taking its start away"
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":\"2026-11-21T22:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\""
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
-json PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":null,\"end\":null"
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 
 echo "  cancelling a session cancels its sets, done ones included, but not the other way around"
@@ -572,19 +613,18 @@ wait
 [ "$(cat "${FILES}/session")" = 200 ] || fail "expected the session to be deleted, got $(cat "${FILES}/session")"
 [ "$(cat "${FILES}/artist")" = 200 ] || fail "expected the artist to be deleted, got $(cat "${FILES}/artist")"
 
-echo "  changing a session while its takeover's collective is deleted doesn't deadlock"
+echo "  making a session a collective's takeover while the collective is deleted doesn't deadlock, and fails"
 request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Passage\",\"members\":[{\"id\":\"${ana}\"}],\"email\":\"passage@sessions.test\"}" "$COLLECTIVES"
 expect_status 200
 passage="$(first_id)"
-json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"takeover\":\"${passage}\"")"
-expect_status 200
-# Another transaction holds the collective's row while the collective is deleted, which clears the session's takeover,
-# and so takes the sessions' lock first, like changing the session, which then waits for it. Had deleting the collective
-# not taken that lock, the two could deadlock, or break the rules of sessions unnoticed.
+# Another transaction holds the collective's row while the collective, which has no takeovers yet, is deleted, which
+# takes the sessions' lock first, to check that it has none until it's deleted, like making the session its takeover,
+# which then waits for it. Had deleting the collective not taken that lock, the session could become its takeover in the
+# meantime, and the two could deadlock, or the delete fail on the session's foreign key.
 hold_row collectives "$passage"
 delete_in_background "${COLLECTIVES}/${passage}" delete
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"collectives\"%')"
-send_in_background PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"takeover\":\"${passage}\"")"
+send_in_background PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${passage}\"")"
 wait_for_sessions_lock
 release_row
 wait_for_background
@@ -592,7 +632,7 @@ wait_for_background
 expect_status 400
 expect_body_contains '"error":"No such collective"'
 json GET "${SESSIONS}/${next}"
-expect_body_contains '"takeover":null'
+expect_body_contains '"type":"guest-mixes","takeover":null'
 
 echo "  changing a set while one of its performers is deleted doesn't deadlock"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Éphémère"}' "$ARTISTS"
@@ -624,12 +664,20 @@ expect_body_contains "{\"id\":\"${later}\",\"performers\":[]"
 json GET "${SESSIONS}/${first}"
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 
-echo "  deleting a collective leaves the sessions of its takeovers without one, which doesn't count as changing them"
+echo "  a collective can't be deleted while it has takeovers, which the 409 names, until they're of another type"
+readonly HAS_TAKEOVERS='This collective has takeovers: give them another collective, or another type, first'
+json DELETE "${COLLECTIVES}/${ondes}"
+expect_conflict "$HAS_TAKEOVERS" "$canned"
+json PUT "${SESSIONS}/${canned}" "$(session_json null 240)"
+expect_status 200
+json DELETE "${COLLECTIVES}/${ondes}"
+expect_conflict "$HAS_TAKEOVERS" "$first"
+json GET "${COLLECTIVES}/${ondes}"
+expect_status 200
+json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"type":"other"')"
+expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
-json GET "${SESSIONS}/${canned}"
-expect_body_contains '"takeover":null'
-expect_body_contains '"updatedBy":null,"updatedAt":null'
 
 echo "  a set without performers takes one again to be changed, but its status can still be changed"
 json PUT "${SETS}/${later}" "$(set_json '[]' 0 60)"

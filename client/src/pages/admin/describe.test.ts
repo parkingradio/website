@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionTitle, sessionWhen, setHours, setInSentence, setName, setTitle } from './describe'
+import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionWhen, setHours, setInSentence, setName, setTitle } from './describe'
 
 describe('membersGenres', () => {
   const artists = new Map(
@@ -87,7 +87,7 @@ describe('dates and times', () => {
 })
 
 describe('names and times of sessions and sets', () => {
-  const session = { start: null, end: null, durationMinutes: 150, name: '', takeover: null }
+  const session = { start: null, end: null, durationMinutes: 150, title: 'GUEST MIXES' }
 
   it("are counted from a session's start while its date isn't known", () => {
     expect(sessionDay(session)).toBe('date à déterminer')
@@ -99,13 +99,9 @@ describe('names and times of sessions and sets', () => {
     expect(setHours({ start: null, end: null, offsetMinutes: null, durationMinutes: null })).toBe('horaire à déterminer')
   })
 
-  it('name a session by its name, its takeover or its day, with its day where it is named along with others', () => {
-    const dated = { start: '2026-11-15T02:00:00.000Z', name: '', takeover: null }
-    expect(sessionTitle({ ...dated, name: 'HAUTE RIVE' })).toBe('HAUTE RIVE')
-    expect(sessionName({ ...dated, name: 'HAUTE RIVE' })).toBe('HAUTE RIVE, sam. 14 nov. 2026')
-    expect(sessionName({ ...session, takeover: { id: 'c', name: 'Ondes' } })).toBe('Takeover de Ondes, date à déterminer')
-    expect(sessionName(dated)).toBe('Session du samedi 14 novembre 2026')
-    expect(sessionName(session)).toBe('Session sans date')
+  it('name a session by its title, with its day, where it is named along with others', () => {
+    expect(sessionName({ start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE TAKEOVER' })).toBe('HAUTE RIVE TAKEOVER, sam. 14 nov. 2026')
+    expect(sessionName(session)).toBe('GUEST MIXES, date à déterminer')
   })
 
   it('name a set by its performers, with its session where it is named outside of it', () => {
@@ -113,7 +109,7 @@ describe('names and times of sessions and sets', () => {
     expect(setTitle(set)).toBe('Set de Aurore et Brume')
     expect(setTitle({ performers: [] })).toBe('Set')
     expect(setName(set as never)).toBe('Set de Aurore et Brume, +1 h – +2 h')
-    expect(setName(set as never, { ...session, name: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, date à déterminer, +1 h – +2 h')
+    expect(setName(set as never, { ...session, title: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, date à déterminer, +1 h – +2 h')
     expect(setInSentence(set)).toBe('le set de Aurore et Brume, +1 h – +2 h')
     expect(setInSentence({ ...set, performers: [] })).toBe('le set, +1 h – +2 h')
   })

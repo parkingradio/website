@@ -35,7 +35,16 @@ type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives:
 type Context = { app: FastifyInstance; database: TestDatabase; cookies: Record<string, string>; ids: Ids }
 type Body = { error: string; session: Session | null; set: StudioSet | null }
 type StudioSet = { id: string; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
-type Session = { id: string; start: string | null; end: string | null; durationMinutes: number; status: string; sets: StudioSet[] }
+type Session = {
+  id: string
+  start: string | null
+  end: string | null
+  durationMinutes: number
+  type: string
+  takeover: { id: string } | null
+  status: string
+  sets: StudioSet[]
+}
 
 // An operation: how to generate it, and how often, relative to the others, how to send it, and how to check the 409s it
 // can get, which are about the rules, each by its message.
@@ -50,6 +59,7 @@ const SESSION_OVERLAPS = 'Another session overlaps this one'
 const SESSION_CANCELLED = 'This session is cancelled'
 const TRACK_TAKEN = "This SoundCloud track is another set's"
 const VIDEO_TAKEN = "This YouTube video is another set's"
+const HAS_TAKEOVERS = 'This collective has takeovers: give them another collective, or another type, first'
 
 // An id that's never one of anything's.
 const NONE = '00000000-0000-4000-8000-000000000000'
@@ -70,6 +80,23 @@ function rarely<T>(value: fc.Arbitrary<T>): fc.Arbitrary<T | null> {
   return fc.oneof({ arbitrary: fc.constant(null), weight: 2 }, { arbitrary: value, weight: 1 })
 }
 
+// A session's type, its collective, as an index into the collectives, and its name: mostly a takeover, with a collective,
+// or another type, without one, and a name for those of type other, and sometimes what doesn't go together.
+type Kind = { type: string; takeover: number | null; name: string }
+const NAME = fc.constantFrom('', 'VKT TAKEOVER', 'ATELIER DE DJing')
+const Kind = mostly<Kind>(
+  fc.oneof(
+    fc.record({ type: fc.constant('takeover'), takeover: fc.nat(), name: NAME }),
+    fc.record({ type: fc.constantFrom('guest-mixes', 'live-performance', 'synth-meetup'), takeover: fc.constant(null), name: NAME }),
+    fc.record({ type: fc.constant('other'), takeover: fc.constant(null), name: fc.constant('LISTENING PARTY') }),
+  ),
+  fc.oneof(
+    fc.record({ type: fc.constant('takeover'), takeover: fc.constant(null), name: NAME }),
+    fc.record({ type: fc.constantFrom('guest-mixes', 'other'), takeover: fc.nat(), name: NAME }),
+    fc.record({ type: fc.constantFrom('other', 'meetup'), takeover: fc.constant(null), name: fc.constant('') }),
+  ),
+)
+
 // Sessions over a couple of evenings.
 const SessionFields = fc.record({
   start: mostly<string | null>(
@@ -77,12 +104,12 @@ const SessionFields = fc.record({
     fc.constant('1999-12-31T21:00-05:00'),
   ),
   durationMinutes: mostly<number>(fc.constantFrom(1, 60, 120, 240, 1440), fc.constantFrom(0, 1441)),
-  takeover: fc.option(fc.nat()),
+  kind: Kind,
 })
 type SessionArgs = typeof SessionFields extends fc.Arbitrary<infer T> ? T : never
 
-function sessionBody(context: Context, { start, durationMinutes, takeover }: SessionArgs) {
-  return { start, durationMinutes, takeover: takeover === null ? null : pick(context.ids.collectives, takeover), name: '', raEvent: null }
+function sessionBody(context: Context, { start, durationMinutes, kind: { type, takeover, name } }: SessionArgs) {
+  return { start, durationMinutes, type, takeover: takeover === null ? null : pick(context.ids.collectives, takeover), name, raEvent: null }
 }
 
 // The SoundCloud tracks, by the links that lead to them, and one where SoundCloud shows none.
@@ -275,11 +302,18 @@ const OPERATIONS = {
     run: (context, artist) => remove(context, `/api/admin/artists/${pick(context.ids.artists, artist)}`),
   } satisfies Operation<number>,
 
-  // Leaves the sessions of its takeovers without one.
+  // Fails while it has takeovers, which need it.
   deleteCollective: {
     weight: 1,
     args: fc.nat(),
     run: (context, collective) => remove(context, `/api/admin/collectives/${pick(context.ids.collectives, collective)}`),
+    conflicts: {
+      [HAS_TAKEOVERS]: (body, collective, context) => {
+        expect(body.session?.type).toBe('takeover')
+        expect(body.session?.takeover?.id).toBe(pick(context.ids.collectives, collective))
+        expect(body.set).toBeNull()
+      },
+    },
   } satisfies Operation<number>,
 }
 
@@ -313,9 +347,9 @@ async function buildApp(database: TestDatabase) {
   return app
 }
 
-// Empties the database, but for 4 artists, 2 collectives, and 2 sessions of 4 hours, one of them without a date, each with
-// 2 sets, one after the other, so that even short sequences act on sets, and returns their ids, in the order they were
-// added.
+// Empties the database, but for 4 artists, 2 collectives, and 2 sessions of 4 hours, one of them without a date, which is
+// the second collective's takeover, each with 2 sets, one after the other, so that even short sequences act on sets and
+// on a collective with a takeover, and returns their ids, in the order they were added.
 async function reset(database: TestDatabase): Promise<Ids> {
   await database.db.execute(sql`truncate sessions, artists, collectives cascade`)
   const profile = { country: '' as const, city: '', links: {}, phone: '' }
@@ -329,12 +363,16 @@ async function reset(database: TestDatabase): Promise<Ids> {
       .insert(collectives)
       .values(['Les Ondes', 'Haute Rive'].map((name) => ({ ...profile, name, description: '' })))
       .returning({ id: collectives.id }),
-    database.db
-      .insert(sessions)
-      .values([new Date('2026-11-15T02:00:00Z'), null].map((startAt) => ({ startAt, durationMinutes: 240, name: '', createdBy: 'seed' })))
-      .returning({ id: sessions.id }),
   ])
-  const [artistIds, collectiveIds, sessionIds] = added.map((rows) => rows.map(({ id }) => id))
+  const [artistIds, collectiveIds] = added.map((rows) => rows.map(({ id }) => id))
+  const sessionRows = await database.db
+    .insert(sessions)
+    .values([
+      { startAt: new Date('2026-11-15T02:00:00Z'), type: 'guest-mixes' as const, takeoverId: null },
+      { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[1] },
+    ].map((session) => ({ ...session, durationMinutes: 240, name: '', createdBy: 'seed' })))
+    .returning({ id: sessions.id })
+  const sessionIds = sessionRows.map(({ id }) => id)
   const setIds: string[] = []
   for (const sessionId of sessionIds) {
     for (const offsetMinutes of [0, 60]) {

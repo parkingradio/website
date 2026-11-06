@@ -614,6 +614,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
 ]
 
 type Status = components['schemas']['SessionStatus']
+type SessionType = components['schemas']['SessionType']
 type SetFields = components['schemas']['SetFields']
 
 export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
@@ -628,8 +629,10 @@ export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
   }
 
 export type SeedSession = {
-  // The collective whose takeover it is, by its email, or by its name for one without.
+  type: SessionType
+  // For a takeover, its collective, by its email, or by its name for one without.
   takeover?: string
+  // Its own name, which replaces the one its type gives it.
   name?: string
   // The event's id on RA, which isn't checked against RA.
   raEvent?: string
@@ -648,8 +651,8 @@ export type SeedSession = {
 export const SEED_SESSIONS: SeedSession[] = [
   // Onde Commune's takeover: its three artists, one after the other.
   {
+    type: 'takeover',
     takeover: 'onde.commune@example.com',
-    name: 'ONDE COMMUNE TAKEOVER',
     raEvent: '2201001',
     when: { day: -30, start: '20:00' },
     durationMinutes: 180,
@@ -660,9 +663,10 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['kwame@example.com'], offsetMinutes: 120, durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
     ],
   },
-  // Collectif Béton's takeover: a guest who isn't one of its artists, then two of its artists together, until after
-  // midnight.
+  // Collectif Béton's takeover, with a name of its own: a guest who isn't one of its artists, then two of its artists
+  // together, until after midnight.
   {
+    type: 'takeover',
     takeover: 'beton@example.com',
     name: 'BÉTON 140',
     when: { day: -60, start: '20:30' },
@@ -682,8 +686,9 @@ export const SEED_SESSIONS: SeedSession[] = [
       },
     ],
   },
-  // Without a name or links.
+  // Without links.
   {
+    type: 'takeover',
     takeover: 'dub.laurentides@example.com',
     when: { day: -10, start: '14:00' },
     durationMinutes: 120,
@@ -692,16 +697,16 @@ export const SEED_SESSIONS: SeedSession[] = [
   },
   // The takeover of a collective without an email, from long ago, back to back.
   {
+    type: 'takeover',
     takeover: 'Saut de Clôture',
-    name: 'SAUT DE CLÔTURE TAKEOVER',
     when: { day: -120, start: '19:00' },
     durationMinutes: 120,
     status: 'done',
     sets: [{ performers: ['Grillage', 'Pied-de-Biche'], offsetMinutes: 0, durationMinutes: 120, performanceTypes: ['dj'], status: 'done' }],
   },
-  // An evening of several artists, without a takeover or a name, where a cancelled set was replaced by one that overlaps
-  // it.
+  // An evening of guest mixes, where a cancelled set was replaced by one that overlaps it.
   {
+    type: 'guest-mixes',
     when: { day: 30, start: '21:00' },
     durationMinutes: 150,
     status: 'planned',
@@ -713,8 +718,8 @@ export const SEED_SESSIONS: SeedSession[] = [
   },
   // A takeover put together before its date is known, whose last set's place isn't known either.
   {
+    type: 'takeover',
     takeover: 'soeurs.ondes@example.com',
-    name: 'LES SŒURS ONDES TAKEOVER',
     durationMinutes: 180,
     status: 'planned',
     sets: [
@@ -726,6 +731,7 @@ export const SEED_SESSIONS: SeedSession[] = [
   // An evening whose times are being changed: two of its sets overlap, and the last one ends after it, which its page
   // marks (see "Sets' places" in docs/design/server/sessions.md).
   {
+    type: 'other',
     name: 'SOIRÉE À REVOIR',
     when: { day: 45, start: '20:00' },
     durationMinutes: 120,
@@ -738,6 +744,7 @@ export const SEED_SESSIONS: SeedSession[] = [
   },
   // Les Nuits Basses' takeover, cancelled, which cancelled its sets.
   {
+    type: 'takeover',
     takeover: 'kwame@example.com',
     raEvent: '2302002',
     when: { day: 60, start: '20:00' },
@@ -747,5 +754,21 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Sable Mouvant'], offsetMinutes: 0, durationMinutes: 60, status: 'planned' },
       { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, status: 'planned' },
     ],
+  },
+  // A live performance, coming up.
+  {
+    type: 'live-performance',
+    when: { day: 15, start: '20:00' },
+    durationMinutes: 60,
+    status: 'planned',
+    sets: [{ performers: ['Ondine'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire', status: 'planned' }],
+  },
+  // A synth meetup, which has no sets.
+  {
+    type: 'synth-meetup',
+    when: { day: -20, start: '18:00' },
+    durationMinutes: 180,
+    status: 'done',
+    sets: [],
   },
 ]

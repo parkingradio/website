@@ -4,8 +4,8 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_STATUSES } from '../applications/fields.js'
 import type { ApplicationStatus, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
-import { STATUSES } from '../sessions/fields.js'
-import type { Status } from '../sessions/fields.js'
+import { SESSION_TYPES, STATUSES } from '../sessions/fields.js'
+import type { SessionType, Status } from '../sessions/fields.js'
 
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
@@ -217,9 +217,11 @@ export const sessions = pgTable(
     createdBy: text('created_by').notNull(), // the email of the admin who added the session
     startAt: timestamp('start_at', { withTimezone: true }), // null until its date is known
     durationMinutes: integer('duration_minutes').notNull(), // minutes that actually pass, whatever the clocks say
-    name: text('name').notNull(), // free text, "" for none
-    // The collective whose takeover the session is, null when it's none, or when that collective was deleted.
-    takeoverId: uuid('takeover_id').references(() => collectives.id, { onDelete: 'set null' }),
+    type: text('type').$type<SessionType>().notNull(),
+    name: text('name').notNull(), // free text, "" for none, which a session of type "other" can't be
+    // The collective whose takeover the session is, which only takeovers have, and they always do. So a collective can't
+    // be deleted while it has takeovers, which the server checks first, under the sessions' lock (see sessions/store.ts).
+    takeoverId: uuid('takeover_id').references(() => collectives.id, { onDelete: 'restrict' }),
     raEventId: text('ra_event_id'),
     // The email of the admin who last changed the session, and when (null until then). Status changes don't count, and
     // neither do changes to its sets.
@@ -234,6 +236,9 @@ export const sessions = pgTable(
     index('sessions_takeover_id_idx').on(table.takeoverId),
     check('sessions_duration', sql`${table.durationMinutes} between 1 and 1440`),
     check('sessions_status', oneOf(table.status, STATUSES)),
+    check('sessions_type', oneOf(table.type, SESSION_TYPES)),
+    check('sessions_takeover', sql`(${table.type} = 'takeover') = (${table.takeoverId} is not null)`),
+    check('sessions_named', sql`${table.type} <> 'other' or ${table.name} <> ''`),
   ],
 )
 

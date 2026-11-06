@@ -1010,7 +1010,7 @@ export interface paths {
         /** Changes a collective's profile and members, and replaces or removes its photo */
         put: operations["update_collective"];
         post?: never;
-        /** Deletes a collective, its photo and its applications, but not its members, and leaves its takeovers' sessions without one */
+        /** Deletes a collective, its photo and its applications, but not its members. Fails while it has takeovers, one of which the error names: give them another collective, or another type, first */
         delete: operations["delete_collective"];
         options?: never;
         head?: never;
@@ -2274,9 +2274,13 @@ export interface components {
             /** @description Its start plus its duration. Null when its start is */
             end: string | null;
             durationMinutes: number;
-            /** @description The collective whose takeover the session is */
+            type: components["schemas"]["SessionType"];
+            /** @description The collective whose takeover the session is, which only takeovers have */
             takeover: components["schemas"]["Reference"] | null;
+            /** @description Its own name, which replaces the one its type gives it, or empty for none: the one to send back */
             name: string;
+            /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+            title: string;
             raEvent: components["schemas"]["SessionLink"] | null;
             /** @description By offset, then by when they were added, those without an offset last */
             sets: components["schemas"]["Set"][];
@@ -2293,9 +2297,10 @@ export interface components {
             /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
             start: string | null;
             durationMinutes: number;
-            /** @description The id of the collective whose takeover the session is. Null, or blank, for none */
+            type: components["schemas"]["SessionType"];
+            /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
             takeover: string | null;
-            /** @description Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
+            /** @description Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
             name: string;
             /** @description The event's id on RA, or a link to it. Null, or blank, for none */
             raEvent: string | null;
@@ -2309,6 +2314,11 @@ export interface components {
          * @enum {string}
          */
         SessionStatus: "planned" | "done" | "cancelled";
+        /**
+         * @description What kind of session it is, which gives it its name: GUEST MIXES, LIVE PERFORMANCE, <COLLECTIVE> TAKEOVER from its collective's name in upper case, SYNTH MEETUPS, or none for other
+         * @enum {string}
+         */
+        SessionType: "guest-mixes" | "live-performance" | "takeover" | "synth-meetup" | "other";
         Set: {
             id: string;
             /** @description The artists who played, in order */
@@ -3480,6 +3490,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictError"];
                 };
             };
             /** @description Default Response */

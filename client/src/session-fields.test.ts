@@ -10,6 +10,7 @@ import {
   sessionFormValues,
   sessionTimes,
   setFormValues,
+  typeName,
   setPlace,
 } from './session-fields'
 import type { Session, SessionFormValues, SetFormValues, StudioSet } from './session-fields'
@@ -53,8 +54,10 @@ function session(start: string | null, durationMinutes: number, sets: StudioSet[
     start,
     end: start && new Date(Date.parse(start) + durationMinutes * 60000).toISOString(),
     durationMinutes,
+    type: 'guest-mixes',
     takeover: null,
     name: '',
+    title: 'GUEST MIXES',
     raEvent: null,
     sets,
     ...TRACKED,
@@ -153,6 +156,7 @@ describe('checkSession', () => {
     day: '2026-11-14',
     start: '21:00',
     end: '01:00',
+    type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
     name: '  HAUTE   RIVE\nTAKEOVER ',
     raEvent: ' https://ra.co/events/6683745 ',
@@ -160,15 +164,32 @@ describe('checkSession', () => {
 
   it('returns what the server is sent: the start with its offset, the duration, the id, the name cleaned up and the link trimmed', () => {
     expect(checkSession(FORM)).toEqual({
-      fields: { start: '2026-11-14T21:00-05:00', durationMinutes: 240, takeover: 'collective-1', name: 'HAUTE RIVE TAKEOVER', raEvent: 'https://ra.co/events/6683745' },
+      fields: {
+        start: '2026-11-14T21:00-05:00',
+        durationMinutes: 240,
+        type: 'takeover',
+        takeover: 'collective-1',
+        name: 'HAUTE RIVE TAKEOVER',
+        raEvent: 'https://ra.co/events/6683745',
+      },
     })
-    expect(checkSession({ ...FORM, takeover: null, raEvent: ' ', undated: true, duration: { hours: '3', minutes: '' } }).fields).toEqual({
+    // The collective picked stays in the form for a takeover, but another type doesn't send it.
+    expect(checkSession({ ...FORM, type: 'live-performance', raEvent: ' ', undated: true, duration: { hours: '3', minutes: '' } }).fields).toEqual({
       start: null,
       durationMinutes: 180,
+      type: 'live-performance',
       takeover: null,
       name: 'HAUTE RIVE TAKEOVER',
       raEvent: null,
     })
+  })
+
+  it('needs a type, a collective for a takeover, and a name for a session of type other', () => {
+    expect(checkSession({ ...FORM, type: null }).errors).toEqual({ type: 'Choisissez le type de la session.' })
+    expect(checkSession({ ...FORM, takeover: null }).errors).toEqual({ takeover: 'Choisissez le collectif du takeover.' })
+    expect(checkSession({ ...FORM, type: 'other', name: ' ' }).errors).toEqual({ name: 'Indiquez le nom de la session.' })
+    expect(checkSession({ ...FORM, type: 'guest-mixes', name: ' ' }).fields).toMatchObject({ type: 'guest-mixes', takeover: null, name: '' })
+    expect(checkSession({ ...FORM, type: 'other', name: 'ATELIER DE DJing' }).fields).toMatchObject({ type: 'other', name: 'ATELIER DE DJing' })
   })
 
   it('says what is wrong with each field', () => {
@@ -189,6 +210,15 @@ describe('checkSession', () => {
     expect(checkSession({ ...form, end: '02:00' }).fields).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 30 })
     // A start that's typed is the first of the two again, and the end is the first time after it.
     expect(checkSession({ ...form, start: '01:15' }).fields).toMatchObject({ start: '2026-11-01T01:15-04:00', durationMinutes: 135 })
+  })
+
+  it('names a session as its type does, with its collective in upper case for a takeover', () => {
+    expect(typeName('guest-mixes', null)).toBe('GUEST MIXES')
+    expect(typeName('live-performance', null)).toBe('LIVE PERFORMANCE')
+    expect(typeName('synth-meetup', null)).toBe('SYNTH MEETUPS')
+    expect(typeName('takeover', { name: 'Saut de Clôture' })).toBe('SAUT DE CLÔTURE TAKEOVER')
+    expect(typeName('takeover', null)).toBeNull()
+    expect(typeName('other', null)).toBeNull()
   })
 
   it("shows a session whose date isn't known by its duration", () => {

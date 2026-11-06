@@ -11,6 +11,7 @@ import {
   MISSING,
   SESSION_STATUS_LABELS,
   SESSION_STATUS_PLURALS,
+  SESSION_TYPE_LABELS,
   SET_STATUS_LABELS,
   byWhom,
   describePerformanceTypes,
@@ -20,8 +21,6 @@ import {
   sessionDay,
   sessionHours,
   sessionLongDay,
-  sessionName,
-  sessionTitle,
   sessionWhen,
   setHours,
   setInSentence,
@@ -32,6 +31,7 @@ import { compareText, search, useSearchQuery, useSort, useStatusFilter } from '.
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ArtistsFailure, CollectivesFailure } from './profile-details'
+import { failure, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import type { SessionFormProps } from './session-form'
 import { SetForm } from './set-form'
@@ -47,10 +47,6 @@ function BackToSessions() {
   )
 }
 
-function sessionPath(session: Pick<Session, 'id'>): string {
-  return `/admin/sessions/${session.id}`
-}
-
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
 type SessionColumn = 'date' | 'name' | 'status'
 
@@ -62,7 +58,7 @@ function compareStarts(a: Session, b: Session): number {
 
 const SESSION_COLUMNS: Record<SessionColumn, SortColumn<Session>> = {
   date: { compare: compareStarts, descendingFirst: true },
-  name: { compare: (a, b) => compareText(a.name, b.name) },
+  name: { compare: (a, b) => compareText(a.title, b.title) },
   status: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
 }
 
@@ -96,18 +92,24 @@ function SessionArtists({ session }: { session: Session }) {
     ))
 }
 
+// A session's type, e.g. "Guest mixes", which for a takeover links to its collective.
+function SessionTypeName({ session }: { session: Session }) {
+  const label = SESSION_TYPE_LABELS[session.type]
+  return session.takeover ? <Link to={entryPath('collective', session.takeover.id)}>{label}</Link> : label
+}
+
 // Sessions, as listed in this section, or on a collective's page, under the heading whose id is `labelledBy`, where the
-// takeover is left out since they're all its takeovers. The columns sort the list when there's `sorting`.
+// type is left out since they're all its takeovers. The columns sort the list when there's `sorting`.
 function SessionsTable({
   sessions,
   sorting,
   labelledBy,
-  withTakeover = true,
+  withType = true,
 }: {
   sessions: Session[]
   sorting?: Sorting<SessionColumn>
   labelledBy?: string
-  withTakeover?: boolean
+  withType?: boolean
 }) {
   const header = (column: SessionColumn, label: string) =>
     sorting ? (
@@ -124,7 +126,7 @@ function SessionsTable({
           {header('date', 'Date')}
           <th>Heure</th>
           {header('name', 'Nom')}
-          {withTakeover && <th>Takeover</th>}
+          {withType && <th>Type</th>}
           <th>Artistes</th>
           {header('status', 'Statut')}
         </tr>
@@ -136,8 +138,12 @@ function SessionsTable({
               <Link to={sessionPath(session)}>{sessionDay(session)}</Link>
             </td>
             <td className="admin-day">{sessionHours(session)}</td>
-            <td>{session.name}</td>
-            {withTakeover && <td>{session.takeover && <Link to={entryPath('collective', session.takeover.id)}>{session.takeover.name}</Link>}</td>}
+            <td>{session.title}</td>
+            {withType && (
+              <td>
+                <SessionTypeName session={session} />
+              </td>
+            )}
             <td>
               <SessionArtists session={session} />
             </td>
@@ -165,7 +171,7 @@ export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions
         (sessions.value.sessions.length === 0 ? (
           <p className="admin-placeholder">Aucune session.</p>
         ) : (
-          <SessionsTable sessions={sessions.value.sessions} labelledBy={headingId} withTakeover={false} />
+          <SessionsTable sessions={sessions.value.sessions} labelledBy={headingId} withType={false} />
         ))}
     </>
   )
@@ -207,7 +213,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
                   <td className="admin-day">{sessionDay(session)}</td>
                   <td className="admin-day">{setHours(set)}</td>
                   <td>
-                    <Link to={sessionPath(session)}>{sessionTitle(session)}</Link>
+                    <Link to={sessionPath(session)}>{session.title}</Link>
                   </td>
                   <td>
                     <Performers performers={set.performers} />
@@ -244,11 +250,12 @@ export function SessionsPage() {
   )
 }
 
-// What a session is searched by: its name, its takeover's collective, its sets' performers, and its day, written out,
-// e.g. "samedi 14 novembre 2026", so that "novembre" or "samedi" finds it, or "date à déterminer".
+// What a session is searched by: its title, its type, its takeover's collective, its sets' performers, and its day,
+// written out, e.g. "samedi 14 novembre 2026", so that "novembre" or "samedi" finds it, or "date à déterminer".
 function sessionSearchFields(session: Session): string[] {
   return [
-    session.name,
+    session.title,
+    SESSION_TYPE_LABELS[session.type],
     session.takeover?.name ?? '',
     ...session.sets.flatMap((set) => set.performers.map((performer) => performer.name)),
     sessionLongDay(session),
@@ -284,22 +291,6 @@ function SessionsList({ query }: { query: string }) {
       ) : (
         <SessionsTable sessions={listed} sorting={sorting} />
       )}
-    </>
-  )
-}
-
-// Why something couldn't be done (`what`): the server's message, and what's in the way, if it names something, linking to
-// its session's page, unless that's the page of the session whose id is `here`, where a set is named without a link, and
-// the session itself isn't named.
-function failure(what: string, result: { error: string; session?: Session | null; set?: StudioSet | null }, here?: string): ReactNode {
-  const { session, set } = result
-  let named: ReactNode = null
-  if (session && set) named = session.id === here ? setName(set) : <Link to={sessionPath(session)}>{setName(set, session)}</Link>
-  else if (session && session.id !== here) named = <Link to={sessionPath(session)}>{sessionName(session)}</Link>
-  return (
-    <>
-      {what}&nbsp;: {result.error}
-      {named && <> ({named})</>}
     </>
   )
 }
@@ -432,7 +423,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   return (
     <>
       <BackToSessions />
-      <h1>{sessionTitle(session)}</h1>
+      <h1>{session.title}</h1>
       <p className="admin-meta">{byWhom('Ajoutée', session.createdBy, session.createdAt)}</p>
       {session.updatedBy && <p className="admin-meta">{byWhom('Modifiée', session.updatedBy, session.updatedAt)}</p>}
 
@@ -467,10 +458,19 @@ function LoadedSession({ loaded }: { loaded: Session }) {
             <dd>{sessionWhen(session)}</dd>
             <dt>Durée</dt>
             <dd>{formatDuration(session.durationMinutes)}</dd>
-            <dt>Takeover de</dt>
-            <dd>{session.takeover ? <Link to={entryPath('collective', session.takeover.id)}>{session.takeover.name}</Link> : MISSING}</dd>
+            <dt>Type</dt>
+            <dd>{SESSION_TYPE_LABELS[session.type]}</dd>
+            {session.takeover && (
+              <>
+                <dt>Takeover de</dt>
+                <dd>
+                  <Link to={entryPath('collective', session.takeover.id)}>{session.takeover.name}</Link>
+                </dd>
+              </>
+            )}
             <dt>Nom</dt>
-            <dd>{session.name || MISSING}</dd>
+            {/* Faded out when it's the name its type gives it. */}
+            <dd className={session.name ? undefined : 'admin-generated'}>{session.title}</dd>
             <dt>Événement RA</dt>
             <dd>{linkOrMissing(session.raEvent)}</dd>
           </dl>
@@ -681,9 +681,9 @@ function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: 
   )
 }
 
-// The session form, with every collective to pick the takeover's from, loaded each time it opens, so that they're
+// The session form, with every collective to pick a takeover's from, loaded each time it opens, so that they're
 // current, and nothing until then, and the events read from RA, which it doesn't wait for. When the collectives can't
-// be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's known.
+// be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's one of them.
 function SessionFormWithChoices({ takeoverId, initial, ...props }: Omit<SessionFormProps, 'collectives' | 'events'> & { takeoverId?: string | null }) {
   const collectives = useApi('/api/admin/collectives')
   // Asked for along with them, but not waited for.
@@ -696,7 +696,7 @@ function SessionFormWithChoices({ takeoverId, initial, ...props }: Omit<SessionF
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       <SessionForm
         {...props}
-        initial={takeover ? { ...initial, takeover: { id: takeover.id, name: takeover.name } } : initial}
+        initial={takeover ? { ...initial, type: 'takeover', takeover: { id: takeover.id, name: takeover.name } } : initial}
         collectives={collectiveList}
         events={events}
       />

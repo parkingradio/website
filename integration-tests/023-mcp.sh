@@ -94,8 +94,8 @@ call get_artist "{\"id\":\"${artist}\"}"
 [ "$(sql "select last_used_at > now() - interval '1 minute' from oauth_connections where id = '${connection}'")" = t ] \
     || fail "expected the connection to have been used just now"
 
-echo "  times are given in Québec time, and a new set's fields that can be null can be left out"
-call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"takeover":null,"name":"MCP","raEvent":null}'
+echo "  times are given in Québec time, and a new session's or set's fields that can be null can be left out"
+call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"type":"other","name":"MCP"}'
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-14T23:00:00-05:00\"'
 session="$(sql "select id from sessions where name = 'MCP'")"
 call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[]}"
@@ -103,9 +103,10 @@ expect_body_contains '\"offsetMinutes\":null'
 expect_body_contains '\"durationMinutes\":null'
 expect_body_contains '\"soundcloudTrack\":null'
 
-echo "  sessions are listed by when they start, with bounds in Québec time, and other offsets are refused"
+echo "  sessions are listed by when they start, with bounds in Québec time, and other offsets are refused, with their type and title"
 call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
 expect_body_contains "\\\"total\\\":1,\\\"sessions\\\":[{\\\"id\\\":\\\"${session}\\\""
+expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"status\":\"planned\",\"sets\"'
 call list_sessions '{"from":"2026-11-14T21:01-05:00","to":"2026-11-14T23:00-05:00"}'
 expect_body_contains '\"total\":0,'
 call list_sessions '{"from":"2026-11-15T03:00+01:00"}'

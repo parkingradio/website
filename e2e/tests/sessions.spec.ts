@@ -14,7 +14,9 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await logIn(page, { at: '/admin/sessions' })
   const search = page.getByRole('searchbox', { name: 'Rechercher' })
   await search.fill('onde commune takeover')
+  // Its name is the one its type gives it.
   const row = rowsOf(page, 'ONDE COMMUNE TAKEOVER')
+  await expect(row.getByRole('link', { name: 'Takeover', exact: true })).toBeVisible()
   await expect(row).toContainText('20 h – 23 h')
   await expect(row).toContainText('Clémentine Brûlée · Fréquence Boréale · Kwame Asante')
   await expect(row).toContainText('jouée')
@@ -37,10 +39,17 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^annulées/ }).click()
   await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annulée')
 
-  await search.fill('onde commune takeover')
+  // Those of the other types, among which a synth meetup, which has no sets.
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
+  await search.fill('synth meetup')
+  await expect(rowsOf(page, 'SYNTH MEETUPS')).toContainText('Synth meetup')
+  await search.fill('live performance')
+  await expect(rowsOf(page, 'LIVE PERFORMANCE')).toContainText('Ondine')
+
+  await search.fill('onde commune takeover')
   await row.getByRole('link').first().click()
   await expect(page.getByRole('heading', { level: 1, name: 'ONDE COMMUNE TAKEOVER' })).toBeVisible()
+  await expect(value(page, 'Nom')).toHaveText('ONDE COMMUNE TAKEOVER')
   const sessionPage = new URL(page.url()).pathname
   await expect(rowsOf(sets, 'Kwame Asante')).toContainText('22 h – 23 h')
 
@@ -57,6 +66,8 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await value(page, 'Takeover de').getByRole('link').click()
   await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
   await expect(page.getByRole('table', { name: 'Sessions' }).locator(`a[href="${sessionPage}"]`)).toBeVisible()
+  // Which keeps it from being deleted.
+  await expect(page.getByRole('button', { name: 'supprimer le collectif' })).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('a seeded session marks its sets that overlap, and those that end after it, saying why in a tooltip', async ({ page, isMobile }) => {
@@ -154,11 +165,13 @@ test("a collective's takeover is added from its page, until the next day, with i
   const mine = await addOwnCollective(page, unique)
   const name = `E2E ${unique}`
 
-  // From the collective's page, with its takeover picked already.
+  // From the collective's page, as its takeover already, whose name it gives.
   await page.goto(`/admin/artistes/collectifs/${mine.collective.id}`)
   await page.getByRole('link', { name: 'nouvelle session' }).click()
   await expect(page.getByRole('heading', { name: 'Nouvelle session' })).toBeVisible()
-  await expect(page.getByRole('combobox', { name: 'Takeover de' })).toHaveValue(mine.collective.name)
+  await expect(page.getByRole('radio', { name: 'Takeover' })).toBeChecked()
+  await expect(page.getByRole('combobox', { name: 'Collectif' })).toHaveValue(mine.collective.name)
+  await expect(page.getByLabel('Nom')).toHaveAttribute('placeholder', `${mine.collective.name.toUpperCase()} TAKEOVER`)
   await page.getByLabel('Date', { exact: true }).fill(day)
   await page.getByLabel('Début').fill('23:00')
   await page.getByLabel('Fin').fill('01:30')
@@ -274,8 +287,10 @@ test.describe('in another time zone', () => {
     await page.getByLabel('Date', { exact: true }).fill(day)
     await page.getByLabel('Début').fill('21:00')
     await page.getByLabel('Fin').fill('22:00')
+    await page.getByRole('radio', { name: 'Guest mixes' }).check()
     await page.getByRole('button', { name: 'ajouter la session' }).click()
 
+    await expect(page.getByRole('heading', { level: 1, name: 'GUEST MIXES' })).toBeVisible()
     await expect(value(page, 'Quand')).toHaveText(`${longDay(day)}, de 21 h à 22 h`)
     const id = new URL(page.url()).pathname.split('/').pop()
     const { session } = await (await page.request.get(`/api/admin/sessions/${id}`)).json()

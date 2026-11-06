@@ -2012,6 +2012,9 @@
           "durationMinutes": {
             "type": "number"
           },
+          "type": {
+            "$ref": "#/components/schemas/SessionType"
+          },
           "takeover": {
             "anyOf": [
               {
@@ -2021,10 +2024,15 @@
                 "type": "null"
               }
             ],
-            "description": "The collective whose takeover the session is"
+            "description": "The collective whose takeover the session is, which only takeovers have"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Its own name, which replaces the one its type gives it, or empty for none: the one to send back"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the session is called: its name, or else the one its type gives it. Never empty"
           },
           "raEvent": {
             "anyOf": [
@@ -2093,8 +2101,10 @@
           "start",
           "end",
           "durationMinutes",
+          "type",
           "takeover",
           "name",
+          "title",
           "raEvent",
           "sets",
           "createdAt",
@@ -2122,8 +2132,11 @@
             "minimum": 1,
             "maximum": 1440
           },
+          "type": {
+            "$ref": "#/components/schemas/SessionType"
+          },
           "takeover": {
-            "description": "The id of the collective whose takeover the session is. Null, or blank, for none",
+            "description": "The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none",
             "type": [
               "string",
               "null"
@@ -2132,7 +2145,7 @@
           "name": {
             "type": "string",
             "maxLength": 100,
-            "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none"
+            "description": "Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none"
           },
           "raEvent": {
             "description": "The event's id on RA, or a link to it. Null, or blank, for none",
@@ -2145,6 +2158,7 @@
         "required": [
           "start",
           "durationMinutes",
+          "type",
           "takeover",
           "name",
           "raEvent"
@@ -2174,6 +2188,17 @@
           "cancelled"
         ],
         "description": "A session's or a set's status"
+      },
+      "SessionType": {
+        "type": "string",
+        "enum": [
+          "guest-mixes",
+          "live-performance",
+          "takeover",
+          "synth-meetup",
+          "other"
+        ],
+        "description": "What kind of session it is, which gives it its name: GUEST MIXES, LIVE PERFORMANCE, <COLLECTIVE> TAKEOVER from its collective's name in upper case, SYNTH MEETUPS, or none for other"
       },
       "Set": {
         "type": "object",
@@ -4859,7 +4884,7 @@
       },
       "delete": {
         "operationId": "delete_collective",
-        "summary": "Deletes a collective, its photo and its applications, but not its members, and leaves its takeovers' sessions without one",
+        "summary": "Deletes a collective, its photo and its applications, but not its members. Fails while it has takeovers, one of which the error names: give them another collective, or another type, first",
         "tags": [
           "Collectives"
         ],
@@ -4920,6 +4945,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
                 }
               }
             }
