@@ -22,10 +22,6 @@ export function raEventId(sent: string): string | null {
   return id && RA_EVENT_ID.test(id) ? id : null
 }
 
-export function raEventUrl(id: string): string {
-  return `https://ra.co/events/${id}`
-}
-
 const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/
 
 // A video on YouTube, by its id, or a link to it, e.g. "https://www.youtube.com/watch?v=<id>", "https://youtu.be/<id>"

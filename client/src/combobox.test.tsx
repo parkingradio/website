@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Combobox } from './combobox'
-import type { ComboboxOption } from './combobox'
+import type { ComboboxFilter, ComboboxOption } from './combobox'
 
 const OPTIONS: ComboboxOption[] = [
   { key: 'a', label: 'Aurore' },
@@ -13,11 +13,19 @@ const OPTIONS: ComboboxOption[] = [
 ]
 
 // A combobox where only an option can be picked, which says what was picked.
-function Strict({ options = OPTIONS, initial = null }: { options?: ComboboxOption[]; initial?: string | null }) {
+function Strict({
+  options = OPTIONS,
+  initial = null,
+  filter,
+}: {
+  options?: ComboboxOption[]
+  initial?: string | null
+  filter?: ComboboxFilter
+}) {
   const [selected, setSelected] = useState<string | null>(initial)
   return (
     <>
-      <Combobox id="strict" options={options} selected={selected} onSelect={setSelected} />
+      <Combobox id="strict" options={options} selected={selected} onSelect={setSelected} filter={filter} />
       <output>{selected}</output>
     </>
   )
@@ -172,5 +180,17 @@ describe('Combobox', () => {
     render(<Strict initial="b" />)
     fireEvent.click(input())
     expect(active()).toBe('Aurore')
+  })
+
+  it('shows and picks the options its filter finds, in their order, rather than those whose label has what is typed', () => {
+    // Those whose label has what's typed, whatever its case, the last first.
+    const filter: ComboboxFilter = (options, query) => options.filter((option) => option.label.toLowerCase().includes(query)).reverse()
+    render(<Strict filter={filter} />)
+    // Without the filter, "Brise", which can't be picked, would be first, since it starts with "b", and "Ubel" second.
+    fireEvent.change(input(), { target: { value: 'b' } })
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Ubel', 'Brise'])
+    expect(active()).toBe('Ubel')
+    fireEvent.keyDown(input(), { key: 'Enter' })
+    expect(picked()).toBe('e')
   })
 })

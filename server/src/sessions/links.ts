@@ -1,6 +1,7 @@
 // What the links of sessions and sets are reduced to: the id of a session's event on RA, and the link to a set's track
 // on SoundCloud and the id of its video on YouTube (see "Links" in docs/design/server/sessions.md). Each function
-// returns null for what it doesn't take.
+// returns null for what it doesn't take. The client has a copy of `raEventId`, in client/src/session-links.ts, which
+// must be changed together with it.
 
 // The address `sent` is, if it's an http(s) one.
 function address(sent: string): URL | null {

@@ -154,6 +154,25 @@ async function deleteOwn(page: Page, { collective, artist }: Awaited<ReturnType<
   expect((await page.request.delete(`/api/admin/artists/${artist.id}`)).ok()).toBe(true)
 }
 
+// Parking Radio's events on RA, as the server would read them, which the session form is given instead, so that it
+// doesn't depend on RA. Their numbers are close to each other, as Parking Radio's often are.
+async function mockEvents(page: Page) {
+  const event = (id: string, start: string) => ({
+    id,
+    title: 'GUEST MIXES',
+    category: 'other',
+    start,
+    end: null,
+    venue: null,
+    city: null,
+    lineup: [],
+    url: `https://ra.co/events/${id}`,
+    flyer: null,
+  })
+  const events = { promoterUrl: 'https://ra.co/promoters/183980', upcoming: [], past: [event('1234568', '2026-10-17T21:00:00-04:00'), event('1234567', '2026-10-10T21:00:00-04:00')] }
+  await page.route((url) => url.pathname === '/api/events', (route) => route.fulfill({ json: events }))
+}
+
 // E.g. "samedi 14 novembre 2026", for a day as "YYYY-MM-DD".
 function longDay(day: string): string {
   return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
@@ -164,6 +183,7 @@ test("a collective's takeover is added from its page, until the next day, with i
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
   const name = `E2E ${unique}`
+  await mockEvents(page)
 
   // From the collective's page, as its takeover already, whose name it gives.
   await page.goto(`/admin/artistes/collectifs/${mine.collective.id}`)
@@ -177,7 +197,11 @@ test("a collective's takeover is added from its page, until the next day, with i
   await page.getByLabel('Fin').fill('01:30')
   await expect(page.getByRole('status')).toHaveText(`Dure 2 h 30, finit le lendemain, ${longDay(addDays(day, 1))}.`)
   await page.getByLabel('Nom').fill(name)
-  await page.getByLabel("Lien de l'événement").fill('https://ra.co/events/1234567')
+  // Its event on RA, found by its number, exactly.
+  await page.getByRole('combobox', { name: 'Événement RA' }).fill('1234567')
+  await expect(page.getByRole('option')).toHaveCount(1)
+  await page.getByRole('option', { name: /^GUEST MIXES, sam\. 10 oct\. 2026/ }).click()
+  await expect(page.getByRole('link', { name: 'https://ra.co/events/1234567' })).toBeVisible()
   await page.getByRole('button', { name: 'ajouter la session' }).click()
 
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
@@ -225,9 +249,12 @@ test("a collective's takeover is added from its page, until the next day, with i
   // Moved to another day, with its sets.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
   await expect(page.getByText('Ses sets se déplacent avec elle.')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('GUEST MIXES, sam. 10 oct. 2026')
   await page.getByLabel('Date', { exact: true }).fill(otherDay)
   await page.getByRole('button', { name: 'enregistrer' }).click()
   await expect(value(page, 'Quand')).toHaveText(`${longDay(otherDay)}, de 23 h à 1 h 30 le lendemain`)
+  // Its event on RA kept.
+  await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/1234567')
   await expect(sets.getByRole('row').nth(1)).toContainText('23 h – 0 h')
 
   // Listed in the section, found by its name, and on the artist's page.

@@ -114,11 +114,22 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
   give (see [Types and names](../../server/sessions.md#types-and-names)). For those types, that name shows in the
   empty field ("NOM DU COLLECTIF TAKEOVER" until a takeover's collective is picked). For "Autre", or before a type is
   picked, the field shows an example, "p. ex. LISTENING PARTY". The name is sent as it's typed, its case included.
-- "Événement RA": the link to the event's page on RA, or picked from the events read from RA (see
-  [Events](../../server/events.md)), each with the day it starts on in Québec, the upcoming ones first, the soonest
-  first, then the past ones, the most recent first, which fills in its link. Older events are given by pasting their
-  link. "Aucun événement RA" leaves it out. The form doesn't wait for RA: until the events are read, or when they can't
-  be, the link can still be pasted, and the form says when they couldn't be.
+- "Événement RA": picked from every one of Parking Radio's events, past ones included, read from RA (see
+  [Events](../../server/events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its title and
+  the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g. "n° 6683745", the
+  upcoming ones first, the soonest first, then the past ones, the most recent first. The field searches them by their
+  title and their day, written out (e.g. "samedi 14 novembre 2026", which "14 nov" finds), as the lists are searched
+  (see [Searching lists](layout.md#searching-lists)), and, when only digits are typed, by their number too, or part of
+  it, exactly (e.g. "2026" finds the events of 2026, and those whose number has "2026" in it), since Parking Radio's
+  numbers are close to each other. A link to an event's page on RA, as a session's `raEvent` takes it (see
+  [Links](../../server/sessions.md#links)), with or without its `https://`, finds that event, or nothing when it isn't
+  offered. "Aucun événement RA" is found by what it shows, and the session's own event, when it isn't among those read
+  (see below), by "Événement RA" and by its number, like the others. Once an event is picked, the form links to its page
+  on RA, showing its address, like the session's page. The session's own event, when it isn't among those read from RA,
+  e.g. another promoter's (see [Links](../../server/sessions.md#links)), is offered too, as "Événement RA n° 6683745",
+  so that the session keeps it unless another one is picked. The form doesn't wait for RA: until the events are read, or
+  when they can't be, only the session's own event and "Aucun événement RA" can be picked, and the form says when they
+  couldn't be.
 
 When the collectives can't be loaded, the form says so: the session's collective stays, but another one can't be picked.
 
@@ -172,4 +183,5 @@ named. Changing a status shows these the same way.
   `DELETE /api/admin/sets/:id`, for its sets.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
   set's form, to pick the performers and suggest their genres, each time the form opens.
-- `GET /api/events`, in the session form, to pick the event on RA, each time it opens.
+- `GET /api/events`, in the session form, to pick the event on RA, each time it opens, from the year 2000 on, to get
+  every one (see [Time ranges](../../server/events.md#time-ranges)).

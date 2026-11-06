@@ -1,17 +1,18 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Loaded } from '../../api/use-api'
 import type { Schema } from '../../api/client'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
-import { quebecDayAndTime } from '../../quebec-time'
+import type { ComboboxFilter, ComboboxOption } from '../../combobox'
+import { formatLongQuebecDay } from '../../quebec-time'
 import { SESSION_TYPES, after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes, typeName } from '../../session-fields'
-import type { Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
-import { raEventId, raEventUrl } from '../../session-links'
+import type { RaEvent, Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
+import { raEventId } from '../../session-links'
 import { leaving, useCheckedForm } from './checked-form'
-import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatShortDay, nextDay } from './describe'
+import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
-import { compareText } from './list'
+import { compareText, search } from './list'
 import type { GroupProps } from './profile-fields'
 
 // A form for a session, to add a session or change one, but not its sets. Like the artist form (see artist-form.tsx),
@@ -26,7 +27,7 @@ export type SessionFormProps = {
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
   // is.
   collectives: Collective[] | null
-  // The events read from RA, which the form doesn't wait for.
+  // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
   submitLabel: string
   // Sends the session's fields, and returns the error, if it failed.
@@ -68,7 +69,7 @@ export function SessionForm({ initial, hasSets = false, collectives, events, sub
 
       <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
 
-      <RaEventField link={form.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} error={shown('raEvent')} onLeave={leave('raEvent')} />
+      <RaEventField event={form.raEvent} own={initial.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} />
 
       <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
@@ -221,42 +222,71 @@ function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { fo
   )
 }
 
-// The event on RA, by the link to its page, which picking one of the events read from RA fills in, once they are. Older
-// events are pasted.
-function RaEventField({ link, events: loaded, onChange, error, onLeave }: GroupProps<string> & { link: string; events: Loaded<Schema<'Events'>> }) {
-  const pickerId = useId()
-  // The upcoming ones, the soonest first, then the past ones, the most recent first, as the server orders them.
-  const events = loaded.kind === 'loaded' ? [...loaded.value.upcoming, ...loaded.value.past] : []
-  // Each with the day it starts on in Québec.
-  const options = [
-    { key: '', label: 'Aucun événement RA' },
-    ...events.map((event) => ({ key: event.id, label: event.title, detail: formatShortDay(quebecDayAndTime(new Date(event.start)).day) })),
-  ]
-  // The event the link leads to, if it's one of those read from RA, or none when there's no link.
-  const id = link.trim() ? raEventId(link.trim()) : ''
-  const selected = id !== null && options.some((option) => option.key === id) ? id : null
+const NO_EVENT: ComboboxOption = { key: '', label: 'Aucun événement RA' }
+
+// The options of the event on RA, keyed by their event's number (see "The session form" in
+// docs/design/client/admin/sessions.md), with each one's event and what it's searched by.
+function raEventChoices(loaded: Loaded<Schema<'Events'>>, own: RaEvent | null) {
+  const read = loaded.kind === 'loaded' ? [...loaded.value.upcoming, ...loaded.value.past] : []
+  const choices = new Map<string, { event: RaEvent; searched: string[] }>(
+    read.map((event) => [event.id, { event: { id: event.id, url: event.url }, searched: [event.title, formatLongQuebecDay(event.start)] }]),
+  )
+  const options = [NO_EVENT]
+  if (own && !choices.has(own.id)) {
+    options.push({ key: own.id, label: `Événement RA n° ${own.id}` })
+    // Its number is searched exactly, like the others'.
+    choices.set(own.id, { event: own, searched: ['Événement RA'] })
+  }
+  options.push(...read.map((event) => ({ key: event.id, label: `${event.title}, ${formatQuebecDay(event.start)}`, detail: `n° ${event.id}` })))
+  // As the lists are searched, by title and day, and, when only digits are typed, by its number too, or part of it,
+  // exactly, since Parking Radio's are close to each other. Or by a link to its page, with or without its `https://`.
+  const filter: ComboboxFilter = (options, query) => {
+    const typed = query.trim()
+    const digits = /^\d+$/.test(typed)
+    // Only what's typed as a link is taken as one: a bare number is searched as a number, below.
+    const linked = digits ? null : raEventId(/^https?:\/\//i.test(typed) ? typed : `https://${typed}`)
+    if (linked) return options.filter((option) => option.key === linked)
+    const found = search(options, typed, (option) => choices.get(option.key)?.searched ?? [option.label])
+    if (!digits) return found
+    const searched = new Set(found)
+    return options.filter((option) => searched.has(option) || option.key.includes(typed))
+  }
+  return { options, choices, filter }
+}
+
+// The event on RA, picked among Parking Radio's events, or the session's own (`own`), or none, with a link to its page.
+function RaEventField({
+  event,
+  own,
+  events: loaded,
+  onChange,
+}: {
+  event: RaEvent | null
+  own: RaEvent | null
+  events: Loaded<Schema<'Events'>>
+  onChange: (event: RaEvent | null) => void
+}) {
+  const id = useId()
+  const { options, choices, filter } = useMemo(() => raEventChoices(loaded, own), [loaded, own])
   return (
-    <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
-      <legend>Événement RA</legend>
-      <div className="admin-field">
-        <label htmlFor={pickerId}>Parmi les événements de RA</label>
-        <Combobox
-          id={pickerId}
-          options={options}
-          selected={selected}
-          onSelect={(key) => onChange(key && raEventUrl(key))}
-          placeholder={loaded.kind === 'loading' ? 'chargement des événements…' : 'choisir un événement…'}
-        />
-        {loaded.kind === 'error' && (
-          <p className="admin-hint">
-            Les événements n'ont pas pu être lus sur RA&nbsp;: {loaded.message.replace(/\.$/, '')}. Collez le lien de l'événement.
-          </p>
-        )}
-      </div>
-      <Labeled label="Lien de l'événement" error={error}>
-        <input type="url" value={link} placeholder="https://ra.co/events/…" aria-invalid={error ? true : undefined} onChange={(event) => onChange(event.target.value)} />
-      </Labeled>
-      <p className="admin-hint">Pour un événement plus ancien que ceux de la liste, collez le lien de sa page sur RA.</p>
-    </fieldset>
+    <div className="admin-field">
+      <label htmlFor={id}>Événement RA</label>
+      <Combobox
+        id={id}
+        options={options}
+        selected={event?.id ?? ''}
+        onSelect={(key) => onChange(choices.get(key)?.event ?? null)}
+        filter={filter}
+        placeholder={loaded.kind === 'loading' ? 'chargement des événements…' : 'choisir un événement…'}
+      />
+      {event && (
+        <p className="admin-hint">
+          <a href={event.url} target="_blank" rel="noreferrer">
+            {event.url}
+          </a>
+        </p>
+      )}
+      {loaded.kind === 'error' && <p className="admin-hint">Les événements n'ont pas pu être lus sur RA&nbsp;: {loaded.message.replace(/\.$/, '')}.</p>}
+    </div>
   )
 }

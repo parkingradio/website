@@ -159,10 +159,10 @@ describe('checkSession', () => {
     type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
     name: '  HAUTE   RIVE\nTAKEOVER ',
-    raEvent: ' https://ra.co/events/6683745 ',
+    raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
   }
 
-  it('returns what the server is sent: the start with its offset, the duration, the id, the name cleaned up and the link trimmed', () => {
+  it('returns what the server is sent: the start with its offset, the duration, the id, the name cleaned up and the event on RA by its id', () => {
     expect(checkSession(FORM)).toEqual({
       fields: {
         start: '2026-11-14T21:00-05:00',
@@ -170,11 +170,11 @@ describe('checkSession', () => {
         type: 'takeover',
         takeover: 'collective-1',
         name: 'HAUTE RIVE TAKEOVER',
-        raEvent: 'https://ra.co/events/6683745',
+        raEvent: '6683745',
       },
     })
     // The collective picked stays in the form for a takeover, but another type doesn't send it.
-    expect(checkSession({ ...FORM, type: 'live-performance', raEvent: ' ', undated: true, duration: { hours: '3', minutes: '' } }).fields).toEqual({
+    expect(checkSession({ ...FORM, type: 'live-performance', raEvent: null, undated: true, duration: { hours: '3', minutes: '' } }).fields).toEqual({
       start: null,
       durationMinutes: 180,
       type: 'live-performance',
@@ -193,10 +193,9 @@ describe('checkSession', () => {
   })
 
   it('says what is wrong with each field', () => {
-    expect(checkSession({ ...FORM, start: '', name: 'x'.repeat(101), raEvent: 'https://ra.co/promoters/183980' }).errors).toEqual({
+    expect(checkSession({ ...FORM, start: '', name: 'x'.repeat(101) }).errors).toEqual({
       start: "Indiquez l'heure de début.",
       name: 'Le nom dépasse 100 caractères.',
-      raEvent: "Le lien de l'événement RA est invalide, p. ex. « https://ra.co/events/6683745 ».",
     })
   })
 

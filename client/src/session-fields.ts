@@ -5,7 +5,7 @@ import type { GenreId } from './artist-profile'
 import { checkLine, everyOne } from './checks'
 import type { FieldErrors } from './checks'
 import { quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstantFrom } from './quebec-time'
-import { isSoundcloudTrackLink, raEventId, youtubeVideoId } from './session-links'
+import { isSoundcloudTrackLink, youtubeVideoId } from './session-links'
 
 // How sessions and sets are checked in the browser, by the admin pages, and how their forms' times of day become what the
 // server takes (see docs/design/client/admin/sessions.md).
@@ -25,6 +25,8 @@ export type SessionFields = Schema<'SessionFields'>
 export type SetFields = Schema<'SetFields'>
 // An artist or a collective, by their id and name, as sessions and sets name them.
 export type Reference = Schema<'Reference'>
+// An event on RA, by its id and the link to its page, as sessions give it.
+export type RaEvent = Schema<'SessionLink'>
 
 // In the order sessions and sets go through them (see describe.ts for their names).
 export const STATUSES = everyOne<SessionStatus>()(['planned', 'done', 'cancelled'])
@@ -114,7 +116,7 @@ export type SessionFormValues = {
   type: SessionType | null
   takeover: Reference | null
   name: string
-  raEvent: string
+  raEvent: RaEvent | null
 }
 
 export const EMPTY_SESSION_FORM: SessionFormValues = {
@@ -126,7 +128,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   type: null,
   takeover: null,
   name: '',
-  raEvent: '',
+  raEvent: null,
 }
 
 // A session as the form shows it, to change it.
@@ -137,7 +139,7 @@ export function sessionFormValues(session: Session): SessionFormValues {
     type: session.type,
     takeover: session.takeover,
     name: session.name,
-    raEvent: session.raEvent?.url ?? '',
+    raEvent: session.raEvent,
   }
   if (session.start === null) return { ...values, undated: true }
   const startAt = new Date(session.start)
@@ -191,7 +193,7 @@ export function endTimeAfter(day: string, start: string, minutes: number): strin
 
 // Checks a session as it's being filled in the form, with its `times` if they're worked out already, and returns what
 // the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from UTC,
-// and the link as it's typed, but trimmed, or null for none.
+// and the event on RA by its id.
 export function checkSession(
   form: SessionFormValues,
   times = sessionTimes(form),
@@ -202,8 +204,6 @@ export function checkSession(
   if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'
   const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, form.type === 'other' ? 'Indiquez le nom de la session.' : null)
   if (name.error) errors.name = name.error
-  const raEvent = form.raEvent.trim()
-  if (raEvent && !raEventId(raEvent)) errors.raEvent = "Le lien de l'événement RA est invalide, p. ex. « https://ra.co/events/6683745 »."
   // A missing type is one of the errors already: checking it again tells the compiler that there's one.
   if (Object.keys(errors).length > 0 || 'errors' in times || form.type === null) return { errors }
   return {
@@ -213,7 +213,7 @@ export function checkSession(
       type: form.type,
       takeover: takeover?.id ?? null,
       name: name.value!,
-      raEvent: raEvent || null,
+      raEvent: form.raEvent?.id ?? null,
     },
   }
 }

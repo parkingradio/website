@@ -55,16 +55,23 @@ function raEvent(id: string, title: string, start: string) {
   return { id, title, category: 'other', start, end: null, venue: null, city: null, lineup: [], url: `https://ra.co/events/${id}`, flyer: null }
 }
 
+// Every one of Parking Radio's events, from the year 2000 on.
+const EVENTS_URL = '/api/events?from=2000-01-01T00%3A00-05%3A00'
+
 // RA's events, as the server orders them: the upcoming ones the soonest first, and the past ones the most recent first.
+// The past ones' numbers are close to each other, as Parking Radio's often are.
 const EVENTS = {
-  '/api/events': {
+  [EVENTS_URL]: {
     ok: true,
     promoterUrl: 'https://ra.co/promoters/183980',
     upcoming: [raEvent('2300000', 'ONDES TAKEOVER', '2026-12-05T20:00:00-05:00'), raEvent('2400000', 'PLUS TARD', '2027-01-10T20:00:00-05:00')],
     // 23:30 on October 31 in Québec is already November 1 in UTC.
-    past: [raEvent('6683745', 'HAUTE RIVE TAKEOVER', '2026-10-31T23:30:00-04:00'), raEvent('2100000', 'PLUS TÔT', '2026-09-01T20:00:00-04:00')],
+    past: [raEvent('6683745', 'HAUTE RIVE TAKEOVER', '2026-10-31T23:30:00-04:00'), raEvent('6683748', 'PLUS TÔT', '2026-09-01T20:00:00-04:00')],
   },
 }
+
+// What each option the open combobox shows says, e.g. an event's title and day, then its number.
+const options = () => screen.queryAllByRole('option').map((option) => option.textContent)
 
 const TRACKED = {
   createdAt: '2026-10-01T16:00:00.000Z',
@@ -481,8 +488,18 @@ describe("A session's page", () => {
     // The name its type gives it shows while it has none of its own.
     expect(screen.getByLabelText('Nom')).toHaveValue('')
     expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'ONDES TAKEOVER')
-    // Once RA's events are read, the session's is picked.
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Parmi les événements de RA' })).toHaveValue('HAUTE RIVE TAKEOVER'))
+    // Once RA's events are read, the session's is named by its title and its day.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('HAUTE RIVE TAKEOVER, sam. 31 oct. 2026'))
+    // Offered once, by its title, rather than by its number too.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Événement RA' }))
+    expect(options()).toEqual([
+      'Aucun événement RA',
+      'ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000',
+      'PLUS TARD, dim. 10 janv. 2027n° 2400000',
+      'HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745',
+      'PLUS TÔT, mar. 1 sept. 2026n° 6683748',
+    ])
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Événement RA' }), { key: 'Escape' })
 
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -493,8 +510,68 @@ describe("A session's page", () => {
       type: 'takeover',
       takeover: 'collective-1',
       name: 'AUTRE',
-      raEvent: 'https://ra.co/events/6683745',
+      raEvent: '6683745',
     })
+  })
+
+  it("keeps the session's event on RA when it isn't among those read from RA, and offers it until the form closes", async () => {
+    const other = { ...SESSION, raEvent: { id: '1000000', url: 'https://ra.co/events/1000000' } }
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: other }, 'PUT /api/admin/sessions/session-1': { ok: true, session: other } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    const picker = await screen.findByRole('combobox', { name: 'Événement RA' })
+    await waitFor(() => expect(picker).not.toHaveAttribute('placeholder', 'chargement des événements…'))
+    expect(picker).toHaveValue('Événement RA n° 1000000')
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/1000000' })).toHaveAttribute('href', 'https://ra.co/events/1000000')
+    fireEvent.click(picker)
+    expect(options()).toEqual([
+      'Aucun événement RA',
+      'Événement RA n° 1000000',
+      'ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000',
+      'PLUS TARD, dim. 10 janv. 2027n° 2400000',
+      'HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745',
+      'PLUS TÔT, mar. 1 sept. 2026n° 6683748',
+    ])
+    // It's found by its name and its number, like "Aucun événement RA" by its own.
+    fireEvent.change(picker, { target: { value: 'événement' } })
+    expect(options()).toEqual(['Aucun événement RA', 'Événement RA n° 1000000'])
+    fireEvent.change(picker, { target: { value: '1000' } })
+    expect(options()).toEqual(['Événement RA n° 1000000'])
+    fireEvent.change(picker, { target: { value: 'https://ra.co/events/1000000' } })
+    expect(options()).toEqual(['Événement RA n° 1000000'])
+
+    // Removed, then picked again.
+    fireEvent.change(picker, { target: { value: 'aucun' } })
+    fireEvent.keyDown(picker, { key: 'Enter' })
+    expect(picker).toHaveValue('Aucun événement RA')
+    expect(screen.queryByRole('link', { name: /^https:\/\/ra\.co/ })).not.toBeInTheDocument()
+    fireEvent.change(picker, { target: { value: '1000000' } })
+    fireEvent.keyDown(picker, { key: 'Enter' })
+    expect(picker).toHaveValue('Événement RA n° 1000000')
+
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '1000000' })
+  })
+
+  it("keeps the session's event on RA while RA's events can't be read, which it says, and only lets it be removed", async () => {
+    mockFetch({ ...PAGE, ...COLLECTIVES, [EVENTS_URL]: { ok: false, error: 'The events cannot be read from RA.' }, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    expect(await screen.findByText("Les événements n'ont pas pu être lus sur RA : The events cannot be read from RA.")).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Événement RA' })
+    expect(picker).toHaveValue('Événement RA n° 6683745')
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/6683745' })).toBeInTheDocument()
+    fireEvent.click(picker)
+    expect(options()).toEqual(['Aucun événement RA', 'Événement RA n° 6683745'])
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucun événement RA' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: null })
   })
 
   it('keeps a session that starts at the second 1:30 of the night clocks fall back where it is when its name changes', async () => {
@@ -1094,44 +1171,56 @@ describe('Adding a session', () => {
     expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
   })
 
-  it('picks the event on RA among those read from RA, the upcoming ones first, by the day they start in Québec, or takes a pasted link', async () => {
+  it('picks the event on RA among every one read from RA, the upcoming ones first, found by title, day or number', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
     await fillIn()
 
-    const picker = screen.getByRole('combobox', { name: 'Parmi les événements de RA' })
+    expect(screen.queryByLabelText("Lien de l'événement")).not.toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Événement RA' })
     await waitFor(() => expect(picker).not.toHaveAttribute('placeholder', 'chargement des événements…'))
+    expect(requestsTo('GET', EVENTS_URL)).toHaveLength(1)
+    expect(picker).toHaveValue('Aucun événement RA')
     fireEvent.click(picker)
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+    // Each by the day it starts on in Québec, e.g. October 31, though it's November 1 in UTC.
+    expect(options()).toEqual([
       'Aucun événement RA',
-      'ONDES TAKEOVER5 déc. 2026',
-      'PLUS TARD10 janv. 2027',
-      'HAUTE RIVE TAKEOVER31 oct. 2026',
-      'PLUS TÔT1 sept. 2026',
+      'ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000',
+      'PLUS TARD, dim. 10 janv. 2027n° 2400000',
+      'HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745',
+      'PLUS TÔT, mar. 1 sept. 2026n° 6683748',
     ])
-    fireEvent.mouseDown(screen.getByRole('option', { name: /^ONDES TAKEOVER/ }))
-    const link = screen.getByLabelText("Lien de l'événement")
-    expect(link).toHaveValue('https://ra.co/events/2300000')
 
-    // An older one, pasted, which isn't among those of the list.
-    fireEvent.change(link, { target: { value: 'https://ra.co/events/1000000' } })
-    expect(picker).toHaveValue('')
-    // One of the list, pasted, which picks it.
-    fireEvent.change(link, { target: { value: 'https://ra.co/events/6683745?ref=x' } })
-    expect(picker).toHaveValue('HAUTE RIVE TAKEOVER')
+    const found = (query: string) => {
+      fireEvent.change(picker, { target: { value: query } })
+      return options()
+    }
+    expect(found('plus')).toEqual(['PLUS TARD, dim. 10 janv. 2027n° 2400000', 'PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
+    expect(found('31 oct')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    expect(found('samedi 5 décembre 2026')).toEqual(['ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000'])
+    expect(found('haute 31 oct')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    // A number, or part of one, exactly, without the typos titles allow for.
+    expect(found('8374')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745', 'PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
+    expect(found('45')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    // Digits are searched in titles and days too, e.g. a year, or a day of the month.
+    expect(found('2026')).toEqual([
+      'ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000',
+      'HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745',
+      'PLUS TÔT, mar. 1 sept. 2026n° 6683748',
+    ])
+    expect(found('5')).toEqual(['ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000', 'HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    // A link to an event's page finds that one, if it's offered.
+    expect(found('https://www.ra.co/events/6683745/?ref=x')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    expect(found('ra.co/events/2300000')).toEqual(['ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000'])
+    expect(found('https://ra.co/events/1234567')).toEqual([])
+    expect(found(' 6683748 ')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
+    fireEvent.keyDown(picker, { key: 'Enter' })
+    expect(picker).toHaveValue('PLUS TÔT, mar. 1 sept. 2026')
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/6683748' })).toHaveAttribute('href', 'https://ra.co/events/6683748')
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ raEvent: 'https://ra.co/events/6683745?ref=x' })
-  })
-
-  it("doesn't wait for RA, and says when its events could not be read", async () => {
-    mockFetch({ ...NEW, '/api/events': { ok: false, error: 'The events cannot be read from RA.' } })
-    renderAt('/admin/sessions/nouvelle')
-
-    expect(await screen.findByText("Les événements n'ont pas pu être lus sur RA : The events cannot be read from RA. Collez le lien de l'événement.")).toBeInTheDocument()
-    expect(screen.getByLabelText("Lien de l'événement")).toBeEnabled()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ raEvent: '6683748' })
   })
 
   it('starts as the takeover of the collective of the link that leads to it, sent by its id, unless it is unknown', async () => {

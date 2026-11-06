@@ -1,10 +1,12 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { normalize } from './normalize'
 import './combobox.css'
 
 // `detail` is shown next to the label, e.g. a city's region. A `disabled` option is shown, but can't be picked.
 export type ComboboxOption = { key: string; label: string; detail?: string | null; disabled?: boolean }
+// The options that what's typed finds, in the order they're shown.
+export type ComboboxFilter = (options: ComboboxOption[], query: string) => ComboboxOption[]
 
 type ComboboxProps = {
   id: string
@@ -19,17 +21,21 @@ type ComboboxProps = {
       // The key of the option picked, or null while none is.
       selected: string | null
       onSelect: (key: string) => void
+      // In place of `matching`.
+      filter?: ComboboxFilter
       text?: undefined
     }
   | {
       selected?: undefined
       onSelect?: undefined
+      filter?: undefined
       // What's typed, which the parent keeps, and which picking an option replaces with its label.
       text: { value: string; onChange: (value: string) => void }
     }
 )
 
-// The options whose label contains `query`, those that start with it first, or whose key is `query`, e.g. "FR".
+// The options whose label contains `query`, those that start with it first, or whose key is `query`, e.g. "FR", unless
+// the combobox is given a `filter` of its own.
 function matching(options: ComboboxOption[], query: string): ComboboxOption[] {
   const q = normalize(query)
   if (!q) return options
@@ -73,7 +79,10 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
   const mouseAt = useRef<string | null>(null)
 
   const strict = mode.text === undefined
-  const found = strict ? (query === null ? [] : matching(options, query)) : options
+  const find = mode.filter ?? matching
+  // Kept between renders, e.g. as the mouse moves over the options, since a `filter` can be costly, e.g. a fuzzy search
+  // over hundreds of options.
+  const found = useMemo(() => (strict ? (query === null ? [] : find(options, query)) : options), [strict, query, find, options])
   // A strict list says when nothing matches, while suggestions are only shown when there are some.
   const open = strict ? query !== null : suggesting && options.length > 0
   const selectedLabel = options.find((option) => option.key === mode.selected)?.label ?? ''
@@ -170,7 +179,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
             setActive(-1)
           } else {
             setQuery(event.target.value)
-            highlight(normalize(event.target.value) ? enabled(matching(options, event.target.value), 0, 1) : pickedIndex())
+            highlight(normalize(event.target.value) ? enabled(find(options, event.target.value), 0, 1) : pickedIndex())
           }
         }}
         onFocus={(event) => {

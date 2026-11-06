@@ -242,7 +242,7 @@ const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day
 const UNDATED = 'date à déterminer'
 
 // E.g. "sam. 14 nov. 2026", the day of `instant` (ISO 8601) in Québec.
-function formatQuebecDay(instant: string): string {
+export function formatQuebecDay(instant: string): string {
   return quebecDayFormat.format(new Date(instant))
 }
 

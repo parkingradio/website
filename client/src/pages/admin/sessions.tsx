@@ -681,13 +681,17 @@ function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: 
   )
 }
 
+// Events from the year 2000 on, the earliest the server takes, which are every one of Parking Radio's events (see "Time
+// ranges" in docs/design/server/events.md).
+const EVERY_EVENT_FROM = '2000-01-01T00:00-05:00'
+
 // The session form, with every collective to pick a takeover's from, loaded each time it opens, so that they're
-// current, and nothing until then, and the events read from RA, which it doesn't wait for. When the collectives can't
+// current, and nothing until then, and every event read from RA, which it doesn't wait for. When the collectives can't
 // be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's one of them.
 function SessionFormWithChoices({ takeoverId, initial, ...props }: Omit<SessionFormProps, 'collectives' | 'events'> & { takeoverId?: string | null }) {
   const collectives = useApi('/api/admin/collectives')
   // Asked for along with them, but not waited for.
-  const events = useApi('/api/events')
+  const events = useApi('/api/events', { params: { query: { from: EVERY_EVENT_FROM } } })
   if (collectives.kind === 'loading') return null
   const collectiveList = collectives.kind === 'loaded' ? collectives.value.collectives : null
   const takeover = collectiveList?.find((collective) => collective.id === takeoverId)
