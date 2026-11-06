@@ -100,7 +100,8 @@
 .appliquer .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  --field-gap: 6px;
+  gap: var(--field-gap);
   min-width: 0;
 }
 
@@ -176,6 +177,16 @@
 .appliquer .error {
   font-size: 12px;
   color: var(--error);
+}
+
+/* A live region around an error (see `FieldError`), laid out as the error alone would be. */
+.appliquer .live-error {
+  display: grid;
+}
+
+/* Without an error in it, it takes no room: this cancels the field's gap above it. */
+.appliquer .field > .live-error:empty {
+  margin-top: calc(-1 * var(--field-gap));
 }
 
 .appliquer .count-chars {

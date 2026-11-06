@@ -70,9 +70,12 @@ server's), as tabs above the profile of the one selected:
   "Ville" (*), "Genres musicaux" (*), "Photo de profil" (optional), "Bio" (*) and "Liens" (*). It has no email address
   or phone number. The profiles that aren't selected keep what they show, e.g. a link field that was added.
 
-A link's error shows as soon as it's pasted or its field is left, and a photo's as soon as it's picked. Other errors
-only show once the artist tries to send the form, which brings them to the first field to fix. For a collective, the
-profile of the first of its artists with errors is then selected, and the first field to fix may be in it. After that,
+A link's error shows as soon as it's pasted or its field is left, and a photo's as soon as it's picked. What's wrong
+with the email address or the phone number also shows once its field is left with something in it, e.g. « Indiquez une
+adresse e-mail valide. », but not that it's missing, so that going through the form with the keyboard doesn't turn it
+red. Other errors only show once the artist tries to send the form, which brings them to the first field to fix. For a
+collective, the profile of the first of its artists with errors is then selected, and the first field to fix may be in
+it. Until the form is sent, the errors that show update as their fields change, but aren't counted. After that, all
 errors update as the fields are fixed, and the form says how many are left to fix. In the profile of one of the
 collective's artists, though, it's as if the form wasn't sent yet until a try to send it includes them, e.g. for an
 artist added since: until then, their errors don't count either.

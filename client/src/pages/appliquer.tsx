@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { FocusEvent, FormEvent, ReactNode } from 'react'
 import { api, formData } from '../api/client'
 import { DETAILS_MAX_LENGTH, OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, checkApplication, performanceTypeName } from '../application-fields'
 import type { ApplicationFields, PerformanceTypeId } from '../application-fields'
 import { checkApplicant } from '../applicant'
 import type { ApplicantErrors, ApplicantKind } from '../applicant'
-import { LINK_SITES, NAME_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
+import { EMAIL_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, PHONE_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
 import type { LinkSiteId } from '../artist-profile'
 import { useTurnstileSiteKey } from '../config-context'
 import { MAX_MEMBERS, SLOT_HOURS, TIME_SLOTS, performanceTypesError, selectableDates } from './appliquer/choices'
@@ -161,9 +161,17 @@ function Part({ number, title, note, children }: { number: string; title: string
 export function Appliquer() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [status, setStatus] = useState<Status>({ state: 'editing' })
-  // Errors only show once the artist tries to send the form (a photo's right away, see `shownErrors`, and those of a
-  // collective's artist once it was tried with them), then update as fields are fixed.
+  // Errors only show once the artist tries to send the form (a photo's right away, see `shownErrors`, a link's once it's
+  // left, a contact field's once it's left with something in it, and those of a collective's artist once it was tried with
+  // them), then update as fields are fixed.
   const [attempts, setAttempts] = useState(0)
+  // The contact fields the artist has left with something in them, which say what's wrong with them from then on, but not
+  // that they're missing until the form is sent. One left empty says nothing as it's typed in, until it's left again, so
+  // that going through the form with the keyboard doesn't turn it red.
+  const [left, setLeft] = useState<Set<'email' | 'phone'>>(new Set())
+  const leave = (field: 'email' | 'phone') => (event: FocusEvent<HTMLInputElement>) => {
+    if (event.target.value.trim()) setLeft((current) => new Set(current).add(field))
+  }
   // Computed once: the range shouldn't move under the artist's feet if the page stays open past midnight.
   const [{ first, last }] = useState(() => selectableDates(new Date()))
   const formRef = useRef<HTMLFormElement>(null)
@@ -184,7 +192,8 @@ export function Appliquer() {
   const update = <K extends keyof Form>(key: K, value: Form[K]) => edit((current) => ({ ...current, [key]: value }))
   const change = (changes: Partial<Form>) => edit((current) => ({ ...current, ...changes }))
   const result = checked(form)
-  const errors = shownErrors(result.errors, attempts > 0)
+  const errors = { ...shownErrors(result.errors, attempts > 0) }
+  for (const field of left) if (form[field].trim() && result.errors[field]) errors[field] = result.errors[field]
   // How many errors are left to fix once the form was sent, where those of a collective's artist only count once it was
   // tried with them (see `Member`).
   const memberErrorCount = result.memberErrors.reduce(
@@ -403,11 +412,13 @@ export function Appliquer() {
                 type="email"
                 autoComplete="email"
                 placeholder="vous@exemple.com"
+                maxLength={EMAIL_MAX_LENGTH}
                 aria-invalid={errors.email ? true : undefined}
                 value={form.email}
                 onChange={(event) => update('email', event.target.value)}
+                onBlur={leave('email')}
               />
-              <FieldError message={errors.email} />
+              <FieldError message={errors.email} announce="polite" />
             </div>
             <div className="field">
               <label htmlFor="phone">
@@ -418,11 +429,13 @@ export function Appliquer() {
                 type="tel"
                 autoComplete="tel"
                 placeholder="ex. 418 555-0123"
+                maxLength={PHONE_MAX_LENGTH}
                 aria-invalid={errors.phone ? true : undefined}
                 value={form.phone}
                 onChange={(event) => update('phone', event.target.value)}
+                onBlur={leave('phone')}
               />
-              <FieldError message={errors.phone} />
+              <FieldError message={errors.phone} announce="polite" />
             </div>
           </Part>
 

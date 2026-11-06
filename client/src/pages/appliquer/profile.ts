@@ -20,9 +20,10 @@ export function fieldId(prefix: string, field: 'nom' | 'pays' | 'ville' | 'photo
   return `${prefix}${field}`
 }
 
-// The errors the form shows, for the whole form or for one of a collective's artists: all of them once it was sent (with
-// that artist in it), and before that only the photo's. A photo is checked as soon as it's picked, since nothing typed
-// afterwards can fix it, unlike a field that's still being filled in.
+// The errors the form shows, for the whole form or for one of a collective's artists, on top of those that fields show once
+// they're left (see `LinksField` and `Appliquer`): all of them once it was sent (with that artist in it), and before that
+// only the photo's. A photo is checked as soon as it's picked, since nothing typed afterwards can fix it, unlike a field that's
+// still being filled in.
 export function shownErrors<Errors extends { photo?: string }>(errors: Errors, all: boolean): Partial<Errors> {
   return all ? errors : ({ photo: errors.photo } as Partial<Errors>)
 }

@@ -832,6 +832,78 @@ describe('Appliquer', () => {
     expect(screen.queryByText(/champs sont à remplir|Il manque un champ/)).not.toBeInTheDocument()
   })
 
+  it("says what is wrong with the email address and the phone number once they're left with something in them", () => {
+    renderForm()
+    const contact = part('Contact')
+    const email = contact.getByRole('textbox', { name: /Adresse e-mail/ })
+    const phone = contact.getByRole('textbox', { name: /Numéro de téléphone/ })
+    // Announced once the focus has moved on, by a live region that's there before the error is.
+    const live = email.closest('.field')!.querySelector('[aria-live="polite"]')!
+    expect(live).toBeEmptyDOMElement()
+
+    type(/Adresse e-mail/, 'sdaod', contact)
+    expect(email).not.toHaveAttribute('aria-invalid')
+    fireEvent.blur(email)
+    expect(email).toHaveAttribute('aria-invalid', 'true')
+    expect(live).toHaveTextContent('Indiquez une adresse e-mail valide.')
+
+    type(/Numéro de téléphone/, '123', contact)
+    fireEvent.blur(phone)
+    expect(phone).toHaveAttribute('aria-invalid', 'true')
+    expect(contact.getByText('Indiquez un numéro de téléphone valide.')).toBeInTheDocument()
+    expect(screen.queryByText(/champs sont à remplir|Il manque un champ/)).not.toBeInTheDocument()
+  })
+
+  it('says nothing as a contact field left empty is typed in, until it is left again', () => {
+    renderForm()
+    const contact = part('Contact')
+    const email = contact.getByRole('textbox', { name: /Adresse e-mail/ })
+    const phone = contact.getByRole('textbox', { name: /Numéro de téléphone/ })
+    fireEvent.blur(email)
+    type(/Numéro de téléphone/, '   ', contact)
+    fireEvent.blur(phone)
+    expect(email).not.toHaveAttribute('aria-invalid')
+    expect(phone).not.toHaveAttribute('aria-invalid')
+
+    type(/Adresse e-mail/, 'j', contact)
+    type(/Numéro de téléphone/, '418', contact)
+    expect(email).not.toHaveAttribute('aria-invalid')
+    expect(phone).not.toHaveAttribute('aria-invalid')
+    fireEvent.blur(email)
+    expect(contact.getByText('Indiquez une adresse e-mail valide.')).toBeInTheDocument()
+  })
+
+  it('updates the contact fields\' errors as they change, and says one emptied again is missing only once the form is sent', async () => {
+    renderForm()
+    const contact = part('Contact')
+    const email = contact.getByRole('textbox', { name: /Adresse e-mail/ })
+    const phone = contact.getByRole('textbox', { name: /Numéro de téléphone/ })
+    type(/Adresse e-mail/, 'sdaod', contact)
+    fireEvent.blur(email)
+    type(/Numéro de téléphone/, '123', contact)
+    fireEvent.blur(phone)
+
+    type(/Adresse e-mail/, 'artiste@example.com', contact)
+    expect(email).not.toHaveAttribute('aria-invalid')
+    expect(contact.queryByText('Indiquez une adresse e-mail valide.')).not.toBeInTheDocument()
+    type(/Numéro de téléphone/, '', contact)
+    expect(phone).not.toHaveAttribute('aria-invalid')
+    expect(contact.queryByText('Indiquez un numéro de téléphone valide.')).not.toBeInTheDocument()
+    expect(contact.queryByText('Indiquez votre numéro de téléphone.')).not.toBeInTheDocument()
+
+    await send()
+    expect(contact.getByText('Indiquez votre numéro de téléphone.')).toBeInTheDocument()
+  })
+
+  it("says what is wrong with a collective's contact once it's left", () => {
+    renderForm()
+    fireEvent.click(part("L'artiste").getByRole('radio', { name: /^Collectif/ }))
+    const contact = part('Contact')
+    type(/Adresse e-mail/, 'ondes@', contact)
+    fireEvent.blur(contact.getByRole('textbox', { name: /Adresse e-mail/ }))
+    expect(contact.getByText('Indiquez une adresse e-mail valide.')).toBeInTheDocument()
+  })
+
   it("says right away that a photo of one of a collective's artists is too large", async () => {
     renderForm()
     await fillInCollective()

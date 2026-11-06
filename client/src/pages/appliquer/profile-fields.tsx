@@ -76,7 +76,7 @@ export function PresentationFields({ idPrefix, profile, onChange, errors, showEr
         </label>
         <PhotoField id={fieldId(idPrefix, 'photo')} value={profile.photo} onChange={(photo) => onChange({ photo })} invalid={!!errors.photo} />
         {/* Keyed on the photo, so that another wrong one, picked in its place, is announced again. */}
-        <FieldError key={profile.photo && `${profile.photo.name}:${profile.photo.size}:${profile.photo.lastModified}`} message={errors.photo} alert />
+        <FieldError key={profile.photo && `${profile.photo.name}:${profile.photo.size}:${profile.photo.lastModified}`} message={errors.photo} announce="alert" />
       </div>
       <BioField
         id={fieldId(idPrefix, 'bio')}
@@ -103,14 +103,24 @@ export function PresentationFields({ idPrefix, profile, onChange, errors, showEr
   )
 }
 
-// `alert` for an error that shows without the form being sent, e.g. a photo's as soon as it's picked, for screen readers
-// to announce it.
-export function FieldError({ message, alert = false }: { message: string | undefined; alert?: boolean }) {
-  return message ? (
-    <span className="error" role={alert ? 'alert' : undefined}>
+// What's wrong with a field, under it. `announce` is for screen readers to announce it when it shows: "alert" for an
+// error that shows without the focus moving, e.g. a photo's as soon as it's picked, which is announced right away, and
+// "polite" for one that shows once the focus has moved on, e.g. once its field is left, which is announced after what's
+// being read, e.g. the next field's label. A polite one is also announced when it shows once the form is sent.
+export function FieldError({ message, announce }: { message: string | undefined; announce?: 'alert' | 'polite' }) {
+  const error = message ? (
+    <span className="error" role={announce === 'alert' ? 'alert' : undefined}>
       {message}
     </span>
   ) : null
+  // A live region only announces what changes in it, so it stays in the page when there's no error.
+  return announce === 'polite' ? (
+    <span className="live-error" aria-live="polite">
+      {error}
+    </span>
+  ) : (
+    error
+  )
 }
 
 type PlaceProps = {
