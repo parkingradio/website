@@ -140,6 +140,20 @@ test('the navigation bar says that the radio is off air', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'lecteur' })).toHaveCount(0)
 })
 
+// The stack doesn't say which environment the server is, so it's development (see `GET /api/config` in
+// docs/design/server/README.md).
+test('the navigation bar and the title say which environment this is', async ({ page }) => {
+  await page.goto('/archives')
+  const stamp = page.locator('nav').getByText('DEV', { exact: true })
+  await expect(stamp).toBeVisible()
+  await expect(page).toHaveTitle('[DEV] parking.radio')
+
+  // Clicking it is clicking the logo, which it's over: near its top left corner, which is well inside the logo.
+  const box = (await stamp.boundingBox())!
+  await page.mouse.click(box.x + 3, box.y + 2)
+  await expect(page).toHaveURL('/')
+})
+
 test('unknown URLs show that there is no such page', async ({ page }) => {
   for (const path of ['/nope', '/archives/nope', '/admin/nope']) {
     await page.goto(path)

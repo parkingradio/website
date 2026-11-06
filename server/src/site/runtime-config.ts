@@ -9,6 +9,8 @@ const Config = z
   .object({
     assetsDomain: z.string(),
     turnstileSiteKey: z.string(),
+    // Which deployment the server is, e.g. "production" (see config.environment).
+    environment: z.string(),
     // Whether each flag is on, by id. A flag that isn't there is off, and any other id fails the response's validation.
     // An object rather than a record, so that the client's types have the ids.
     features: z.strictObject(
@@ -19,7 +21,10 @@ const Config = z
 
 // Environment-specific values the client needs, and which features are on. Public on purpose: none of this is
 // sensitive, and the client has to be able to read it before it has a session.
-export async function configRoutes(app: FastifyInstance, { store }: { store: Pick<FeaturesStore, 'load'> }) {
+export async function configRoutes(
+  app: FastifyInstance,
+  { store, environment }: { store: Pick<FeaturesStore, 'load'>; environment: string },
+) {
   const api = zodRoutes(app)
 
   api.get(
@@ -44,7 +49,7 @@ export async function configRoutes(app: FastifyInstance, { store }: { store: Pic
       // A cast, since `fromEntries` loses the ids, and the type allows no property at all while there are no flags. The
       // ids are those of FEATURES, which are the only ones `load` returns.
       const features = Object.fromEntries(stored.map(({ id, enabled }) => [id, enabled])) as z.infer<typeof Config>['features']
-      return { assetsDomain: config.assetsDomain, turnstileSiteKey: config.turnstileSiteKey, features }
+      return { assetsDomain: config.assetsDomain, turnstileSiteKey: config.turnstileSiteKey, environment, features }
     },
   )
 }

@@ -20,11 +20,11 @@ those Claude uses. An app that asks for another version gets the latest of these
 Errors are JSON-RPC's, rather than the API's (see [Conventions](README.md#conventions)).
 
 The server only has tools. It's named "Parking Radio", followed by its environment outside production, e.g. "Parking
-Radio (test)". Its environment is the one the deployment gives it, e.g. `production` or `test`, or `development` when
-there's none (see [deployment.md](../../deployment.md#deploying-the-web-app)). Its instructions to the model start by
-saying which environment it is, so that the model knows whether its changes are real: in production, "This is Parking
-Radio's production site: changes are real, and affect real artists and the public site.", and otherwise, e.g. for
-`test`, "This is Parking Radio's test environment, not the production site: its data is for testing.". Then they are:
+Radio (test)". Its environment is the server's, the `environment` that [`GET /api/config`](README.md#get-apiconfig)
+gives. Its instructions to the model start by saying which environment it is, so that the model knows whether its
+changes are real: in production, "This is Parking Radio's production site: changes are real, and affect real artists
+and the public site.", and otherwise, e.g. for `test`, "This is Parking Radio's test environment, not the production
+site: its data is for testing.". Then they are:
 
 > Parking Radio is an independent non-profit radio. These tools are its admin pages: the artists and collectives it
 > knows of, their applications to play, the sessions at its studio and the sets played during them, and the radio's

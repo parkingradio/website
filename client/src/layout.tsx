@@ -1,7 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigationType } from 'react-router'
-import { useAssetUrl } from './config-context'
+import { useAssetUrl, useEnvironmentStamp } from './config-context'
 import { LivePill } from './player/live-pill'
 import { PlayerProvider } from './player/player'
 import { PlayerBar } from './player/player-bar'
@@ -9,11 +9,20 @@ import './layout.css'
 
 const MERCH_URL = 'https://parkingdotradio.bigcartel.com'
 
+// Every page's title, as in index.html, which shows it until the app knows whether to put the environment first.
+const TITLE = 'parking.radio'
+
 export function Layout() {
   const assetUrl = useAssetUrl()
   const location = useLocation()
   const navigationType = useNavigationType()
   const menuButton = useRef<HTMLButtonElement>(null)
+  const stamp = useEnvironmentStamp()
+
+  // Outside production, the tab's title starts with the environment, since it's what shows of a tab among others.
+  useEffect(() => {
+    document.title = stamp ? `[${stamp}] ${TITLE}` : TITLE
+  }, [stamp])
 
   // Another page opens at its top. Not when going back or forward, where the browser puts the page back where it was, nor
   // when only the query changes, like the admin lists' search.
@@ -59,9 +68,13 @@ export function Layout() {
               />
             </svg>
           </button>
-          <NavLink to="/" end className="logo">
-            <img src={assetUrl('p_3d_spin.gif')} alt="parking.radio" width={36} height={36} />
-          </NavLink>
+          {/* The environment's stamp is at the logo's corner, outside the link, so that it doesn't change its name. */}
+          <div className="navbar-logo">
+            <NavLink to="/" end className="logo">
+              <img src={assetUrl('p_3d_spin.gif')} alt="parking.radio" width={36} height={36} />
+            </NavLink>
+            {stamp && <span className="environment-stamp">{stamp}</span>}
+          </div>
           <div id="nav-links" className="nav-links">
             <NavLink to="/" end>
               parking.radio

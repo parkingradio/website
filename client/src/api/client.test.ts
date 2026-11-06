@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../test-utils'
+import { CONFIG, UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../test-utils'
 import { api, formData, onSessionEnded } from './client'
 import { useApi } from './use-api'
 
@@ -9,12 +9,7 @@ const FEATURE = { id: 'some-flag', enabled: true, updatedBy: 'admin@example.com'
 describe('api', () => {
   it('returns the response with `ok: true` when the request succeeds', async () => {
     mockFetch()
-    expect(await api.GET('/api/config')).toEqual({
-      ok: true,
-      assetsDomain: 'assets.example.test',
-      turnstileSiteKey: '1x00000000000000000000AA',
-      features: {},
-    })
+    expect(await api.GET('/api/config')).toEqual({ ok: true, ...CONFIG })
   })
 
   it('sends the path parameters in the URL, and the body as JSON', async () => {

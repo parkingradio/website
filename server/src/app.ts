@@ -73,7 +73,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   app.decorate('adminSessions', deps.admins)
   await app.register(fastifyCookie)
   await app.register(healthRoutes, { db: deps.db })
-  await app.register(configRoutes, { store: deps.features })
+  await app.register(configRoutes, { store: deps.features, environment: deps.environment })
   await app.register(authRoutes, { db: deps.db })
   await app.register(adminRoutes, { store: deps.admins, sendEmail: deps.sendEmail, origin: deps.siteOrigin })
   await app.register(eventsRoutes)

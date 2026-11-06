@@ -103,6 +103,7 @@ a session.
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
 | `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` asks for (see [Applying](applications.md#applying)) |
+| `environment` | string | The server's environment: the deployment it's part of, e.g. `production` or `test`, or `development` when it isn't told one (see [deployment.md](../../deployment.md#deploying-the-web-app)) |
 | `features` | object | Whether each feature flag is on (`true`) or off (`false`), by id, e.g. `{"some-flag": true}`. A flag that isn't there is off (see [Features](features.md)) |
 
 The response is never cached (`Cache-Control: no-store`), so that switching a feature flag takes effect for every page

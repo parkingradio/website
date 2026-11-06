@@ -1,6 +1,15 @@
 import { vi } from 'vitest'
+import type { AppConfig } from './config-context'
 
 export type Body = Record<string, unknown>
+
+// What `mockFetch` answers `/api/config` with, unless it's given another one, e.g. one spread from this.
+export const CONFIG: AppConfig = {
+  assetsDomain: 'assets.example.test',
+  turnstileSiteKey: '1x00000000000000000000AA',
+  environment: 'production',
+  features: {},
+}
 
 // The bodies of the `Request`s that `mockFetch`'s `fetch` got, read as it got them, since reading them is asynchronous,
 // or the FormData they were made with. That's what they send in a browser, but in the tests, jsdom's FormData is turned
@@ -35,7 +44,7 @@ export const UNAUTHORIZED: Body = { ok: false, error: 'Unauthorized' }
  */
 export function mockFetch(bodies: Record<string, Body> = {}) {
   const all: Record<string, Body> = {
-    '/api/config': { assetsDomain: 'assets.example.test', turnstileSiteKey: '1x00000000000000000000AA', features: {} },
+    '/api/config': CONFIG,
     '/api/radio?upcoming=0': { ok: false, error: 'No playlist has been chosen for the radio yet' },
     ...bodies,
   }

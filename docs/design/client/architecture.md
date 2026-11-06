@@ -18,7 +18,8 @@ purpose, like the Synth Meetups lightbox. On narrow screens like phones, the nav
 slides in from the left, opened by a menu button to the left of the logo.
 
 The navigation bar also has the player's "en ondes" button (see [Navigation bar
-button](player.md#navigation-bar-button)).
+button](player.md#navigation-bar-button)), and outside production, the environment's stamp (see
+[Environment](#environment)).
 
 The "merch" entry isn't a page within the app: it's a direct external link to Parking Radio's Bigcartel store
 (`https://parkingdotradio.bigcartel.com`), which handles the merch catalog, checkout, and payment entirely on its own.
@@ -28,7 +29,8 @@ The admin pages aren't linked from the navigation bar (see [Admin](admin/layout.
 ## Configuration
 
 The app reads [`GET /api/config`](../server/README.md#get-apiconfig) once, when it loads. Until it has it, what depends
-on it waits: assets don't show, and pages that depend on a feature flag show nothing.
+on it waits: assets don't show, pages that depend on a feature flag show nothing, and pages don't say which
+environment they're in.
 
 ### Feature flags
 
@@ -36,6 +38,15 @@ A page that depends on a feature flag (see [Features](../server/features.md)) sh
 flag is on, rather than switching from one version to the other in front of the visitor. When it can't know, it behaves
 as if the flag were off. Since the flags are read when the app loads, visitors get a change as soon as they load a page
 of the site, and a page they already have open stays as it was until they load it again.
+
+### Environment
+
+Outside production, every page says which environment it's in (see
+[`GET /api/config`](../server/README.md#get-apiconfig)), so that an admin with several tabs open doesn't change
+production's data thinking it's another environment's: "DEV" for `development`, and otherwise the environment's name in
+capitals, e.g. "TEST" for `test`. The navigation bar shows it as a red stamp at the logo's corner, with a red line along
+the bar's bottom. The tab's title, otherwise "parking.radio", starts with it too, e.g. "[TEST] parking.radio". When the
+configuration can't be read, pages don't say, as in production.
 
 ### Assets
 

@@ -2144,6 +2144,7 @@ export interface components {
         Config: {
             assetsDomain: string;
             turnstileSiteKey: string;
+            environment: string;
             features: Record<string, never>;
         };
         ConflictError: {

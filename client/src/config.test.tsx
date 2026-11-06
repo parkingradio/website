@@ -2,8 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { FeatureId } from './api/client'
 import { ConfigProvider } from './config'
-import { useAssetUrl, useFeature } from './config-context'
-import { mockFetch } from './test-utils'
+import { useAssetUrl, useEnvironmentStamp, useFeature } from './config-context'
+import { CONFIG, mockFetch } from './test-utils'
 
 function AssetUrl({ assetKey }: { assetKey: string }) {
   const assetUrl = useAssetUrl()
@@ -45,7 +45,7 @@ describe('useFeature', () => {
   }
 
   it('says whether each flag is on, once the configuration has been fetched', async () => {
-    mockFetch({ '/api/config': { assetsDomain: 'assets.example.test', features: { 'on-thing': true, 'off-thing': false } } })
+    mockFetch({ '/api/config': { ...CONFIG, features: { 'on-thing': true, 'off-thing': false } } })
     renderFeatures()
 
     expect(screen.getByTestId('on-thing')).toHaveTextContent('(pending)')
@@ -62,5 +62,42 @@ describe('useFeature', () => {
 
     await waitFor(() => expect(screen.getByTestId('on-thing')).toHaveTextContent('off'))
     expect(screen.getByTestId('off-thing')).toHaveTextContent('off')
+  })
+})
+
+describe('useEnvironmentStamp', () => {
+  function Stamp() {
+    return <span data-testid="stamp">{useEnvironmentStamp() ?? '(none)'}</span>
+  }
+
+  it.each([
+    ['development', 'DEV'],
+    ['test', 'TEST'],
+    ['production', '(none)'],
+  ])('is right for %s, once the configuration has been fetched', async (environment, stamp) => {
+    mockFetch({ '/api/config': { ...CONFIG, environment } })
+    render(
+      <ConfigProvider>
+        <Stamp />
+        <AssetUrl assetKey="poster.jpg" />
+      </ConfigProvider>,
+    )
+
+    expect(screen.getByTestId('stamp')).toHaveTextContent('(none)')
+    // The asset's URL shows once the configuration has been fetched.
+    await waitFor(() => expect(screen.getByTestId('url')).not.toHaveTextContent('(pending)'))
+    expect(screen.getByTestId('stamp')).toHaveTextContent(stamp)
+  })
+
+  it("is nothing when the configuration can't be fetched", async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockFetch({ '/api/config': { ok: false, error: 'Boom' } })
+    render(
+      <ConfigProvider>
+        <Stamp />
+      </ConfigProvider>,
+    )
+    await waitFor(() => expect(error).toHaveBeenCalled())
+    expect(screen.getByTestId('stamp')).toHaveTextContent('(none)')
   })
 })

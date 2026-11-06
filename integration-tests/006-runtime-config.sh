@@ -10,3 +10,5 @@ expect_status 200
 expect_body_contains "\"assetsDomain\":\"${ASSETS_DOMAIN}\""
 # The Turnstile site key, which the "Appliquer" form will need. Its value comes from .env.example.
 expect_body '"turnstileSiteKey":"[^"]+"'
+# Which deployment the server is: the stack doesn't say, so it's development.
+expect_body_contains '"environment":"development"'

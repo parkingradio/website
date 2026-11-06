@@ -98,7 +98,8 @@ required.
 
 The server is told which deployment it is, as `ENVIRONMENT`, the workspace's name, e.g. `test` or
 `production`. The MCP server tells Claude, so that it knows whether its changes are real (see
-[MCP server](design/server/mcp.md#the-endpoint)).
+[MCP server](design/server/mcp.md#the-endpoint)), and pages outside production say which deployment they're on (see
+[Environment](design/client/architecture.md#environment)).
 
 Alternatively, deployment can be triggered locally without going through the workflow. Note the workspace
 selection.

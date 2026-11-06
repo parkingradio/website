@@ -24,13 +24,13 @@ describe('GET /api/config', () => {
     process.env.TURNSTILE_SITE_KEY = 'site-key'
     const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
     useZodSchemas(app)
-    await app.register(configRoutes, { store })
+    await app.register(configRoutes, { store, environment: 'test' })
     return app
   }
 
   const flag = (id: string, enabled: boolean): StoredFeature => ({ id: id as FeatureId, enabled, updatedBy: null, updatedAt: null })
 
-  it('returns the assets domain, the Turnstile site key and whether each feature is on', async () => {
+  it('returns the assets domain, the Turnstile site key, the environment and whether each feature is on', async () => {
     const app = await buildApp({ load: async () => [flag('new-thing', true), flag('other-thing', false)] })
 
     const response = await app.inject({ method: 'GET', url: '/api/config' })
@@ -39,6 +39,7 @@ describe('GET /api/config', () => {
     expect(response.json()).toEqual({
       assetsDomain: 'assets.example.test',
       turnstileSiteKey: 'site-key',
+      environment: 'test',
       features: { 'new-thing': true, 'other-thing': false },
     })
   })
@@ -64,7 +65,12 @@ describe('GET /api/config', () => {
 
     expect(response.statusCode).toBe(200)
     // A flag that isn't there is off (see `useFeature` in the client).
-    expect(response.json()).toEqual({ assetsDomain: 'assets.example.test', turnstileSiteKey: 'site-key', features: {} })
+    expect(response.json()).toEqual({
+      assetsDomain: 'assets.example.test',
+      turnstileSiteKey: 'site-key',
+      environment: 'test',
+      features: {},
+    })
     expect(logs.some((line) => line.includes('Failed to load the feature flags'))).toBe(true)
   })
 })

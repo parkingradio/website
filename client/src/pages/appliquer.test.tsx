@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { BoundFunctions, queries } from '@testing-library/react'
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { GENRES, PHOTO_MAX_BYTES } from '../artist-profile'
-import { requestsTo } from '../test-utils'
+import { CONFIG, requestsTo } from '../test-utils'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
 import { Appliquer } from './appliquer'
@@ -34,7 +34,7 @@ const turnstile = {
   remove: vi.fn<TurnstileApi['remove']>(),
 }
 
-const LOADED: ConfigState = { kind: 'loaded', config: { assetsDomain: 'assets.example.test', turnstileSiteKey: SITE_KEY, features: {} } }
+const LOADED: ConfigState = { kind: 'loaded', config: { ...CONFIG, turnstileSiteKey: SITE_KEY } }
 
 function page(state: ConfigState) {
   return (

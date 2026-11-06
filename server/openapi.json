@@ -1149,6 +1149,9 @@
           "turnstileSiteKey": {
             "type": "string"
           },
+          "environment": {
+            "type": "string"
+          },
           "features": {
             "type": "object",
             "properties": {},
@@ -1158,6 +1161,7 @@
         "required": [
           "assetsDomain",
           "turnstileSiteKey",
+          "environment",
           "features"
         ],
         "additionalProperties": false

@@ -57,8 +57,13 @@
 }
 
 /* The logo sits at the far left; the auto margin keeps the other links hugging the right. */
-.navbar .logo {
+.navbar-logo {
+  position: relative;
+  display: flex;
   margin-right: auto;
+}
+
+.navbar .logo {
   padding: 0;
 }
 
@@ -69,6 +74,28 @@
 
 .navbar .logo img {
   display: block;
+}
+
+/* Outside production, the environment's stamp, e.g. "TEST", over the logo's lower right corner, and a red line under the
+   bar. Clicks go through the stamp to the logo, and without a z-index it stays under the drawer. The line is a shadow
+   rather than a border, so that the bar stays 55px high. */
+.environment-stamp {
+  position: absolute;
+  left: 20px;
+  bottom: -6px;
+  padding: 1px 4px;
+  background: #e0301e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.navbar:has(.environment-stamp) {
+  box-shadow: 0 3px 0 #e0301e;
 }
 
 .menu-button {
@@ -91,7 +118,8 @@
 /* The links need about 880px on a single line. Below that they move into a drawer that slides in from
    the left over the whole page, toggled by the menu button. While the menu is open, the button stays on
    top of the drawer and turns into its close button. The "en ondes" button's widths depend on this one too (see
-   player/player.css): changing the links means checking them. */
+   player/player.css): changing the links means checking them. At 901px, about 25px are left, which is why the
+   environment's stamp hangs over the logo rather than taking room in the bar. */
 @media (max-width: 900px) {
   .navbar {
     padding-inline: 0.5rem;

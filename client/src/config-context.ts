@@ -39,3 +39,15 @@ export function useTurnstileSiteKey(): string | undefined {
   const state = use(ConfigContext)
   return state.kind === 'loaded' ? state.config.turnstileSiteKey : undefined
 }
+
+/**
+ * The environment's stamp, e.g. "DEV" or "TEST" (see "Environment" in docs/design/client/architecture.md): undefined in
+ * production, and until the configuration is fetched, or if it can't be.
+ */
+export function useEnvironmentStamp(): string | undefined {
+  const state = use(ConfigContext)
+  if (state.kind !== 'loaded') return undefined
+  const { environment } = state.config
+  if (environment === 'production') return undefined
+  return environment === 'development' ? 'DEV' : environment.toUpperCase()
+}
