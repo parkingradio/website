@@ -60,10 +60,10 @@ that the team knows each of its artists, not only the collective:
 server's), as tabs above the profile of the one selected:
 
 - Each tab shows the artist's number and name ("Artiste 2" until it's typed), and "✓" once their profile is complete or
-  "○" until then. Once the form was sent, a tab whose profile has errors is shown as one to fix. A "×" takes the artist
-  out of the collective, after confirming when something was filled in their profile, but there's no "×" when there's
-  only one artist. When the selected artist is taken out, the next tab is selected, or the previous one if it was the
-  last; otherwise the selection stays on the same artist.
+  "○" until then. Once a try to send the form included an artist, their tab is shown as one to fix while their profile
+  has errors. A "×" takes the artist out of the collective, after confirming when something was filled in their profile,
+  but there's no "×" when there's only one artist. When the selected artist is taken out, the next tab is selected, or
+  the previous one if it was the last; otherwise the selection stays on the same artist.
 - "+ ajouter un artiste (2 / 4)", after the tabs, adds an artist and selects their tab, up to 4.
 - An artist's profile has the same fields as an artist applying alone, in the same order, with the same rules and the
   same limits of the form's (e.g. up to 3 genres, and a bio of up to 1500 characters): "Nom d'artiste" (*), "Pays" (*),
@@ -73,8 +73,9 @@ server's), as tabs above the profile of the one selected:
 A link's error shows as soon as it's pasted or its field is left, and a photo's as soon as it's picked. Other errors
 only show once the artist tries to send the form, which brings them to the first field to fix. For a collective, the
 profile of the first of its artists with errors is then selected, and the first field to fix may be in it. After that,
-errors update as the fields are fixed, and the form says how many are left to fix, counting those in every artist's
-profile.
+errors update as the fields are fixed, and the form says how many are left to fix. In the profile of one of the
+collective's artists, though, it's as if the form wasn't sent yet until a try to send it includes them, e.g. for an
+artist added since: until then, their errors don't count either.
 
 Above the button that sends the form, a Cloudflare Turnstile checks that the artist is a person, usually without them
 having to do anything: its checkbox is only shown when Cloudflare needs the artist to click it. The form can't be sent

@@ -27,15 +27,14 @@ type Props = {
   // The index of the member whose profile is shown.
   selected: number
   onSelect: (index: number) => void
-  // What's wrong with each member's profile, whether it's shown or not, which says whether it's complete.
+  // What's wrong with each member's profile, whether their tab is selected or not, which says whether it's complete (see
+  // `Member` for when it shows).
   memberErrors: MemberErrors[]
-  // Show every error, not only a photo's (set once the form was sent).
-  showErrors: boolean
 }
 
 // Every member's profile is there, and only the selected one is shown, so that the others keep what they show, e.g. a
 // link field that was added.
-export function MembersField({ members, onChange, selected, onSelect, memberErrors, showErrors }: Props) {
+export function MembersField({ members, onChange, selected, onSelect, memberErrors }: Props) {
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   // The element to focus once the members have changed: a new member's name, or the tab selected once one is taken out,
   // since the button that was clicked is gone.
@@ -69,7 +68,7 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
       <div className="member-tablist" role="group" aria-label="Artistes du collectif">
         {members.map((member, index) => {
           const complete = Object.keys(memberErrors[index] ?? {}).length === 0
-          const wrong = showErrors && !complete
+          const wrong = member.tried && !complete
           const label = memberLabel(member, index)
           return (
             <div
@@ -120,8 +119,7 @@ export function MembersField({ members, onChange, selected, onSelect, memberErro
           member={member}
           label={memberLabel(member, index)}
           hidden={index !== selected}
-          errors={shownErrors(memberErrors[index] ?? {}, showErrors)}
-          showErrors={showErrors}
+          errors={memberErrors[index] ?? {}}
           onChange={(changed) => onChange(members.map((other) => (other.key === member.key ? changed : other)))}
         />
       ))}
@@ -142,20 +140,21 @@ type ProfileProps = {
   member: Member
   label: string
   hidden: boolean
+  // What's wrong with the member's profile, whether it shows or not (see `shownErrors`).
   errors: MemberErrors
-  showErrors: boolean
   onChange: (member: Member) => void
 }
 
 // A member's profile: the same fields as an artist who applies alone, in the same order, without the email and phone.
-function MemberProfile({ member, label, hidden, errors, showErrors, onChange }: ProfileProps) {
+function MemberProfile({ member, label, hidden, errors, onChange }: ProfileProps) {
   const update = (changes: Partial<Member>) => onChange({ ...member, ...changes })
+  const shown = shownErrors(errors, member.tried)
   return (
     <fieldset className="member-panel" id={profileId(member)} hidden={hidden}>
       <legend className="visually-hidden">{label}</legend>
       <div className="fields">
-        <IdentityFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={errors} />
-        <PresentationFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={errors} showErrors={showErrors} />
+        <IdentityFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={shown} />
+        <PresentationFields idPrefix={idPrefix(member)} profile={member} onChange={update} errors={shown} showErrors={member.tried} />
       </div>
     </fieldset>
   )

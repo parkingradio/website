@@ -576,6 +576,52 @@ describe('Appliquer', () => {
     expect(applications()).toEqual([])
   })
 
+  it("shows what is wrong in the profile of an artist added after the form was sent only once it's sent with them", async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une')
+    type(/Adresse e-mail/, '', part('Contact'))
+    await send()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il manque un champ obligatoire ou un champ est à corriger.')
+
+    addMember()
+    expect(memberTab(2, 'à compléter')).toHaveAttribute('aria-current', 'true')
+    expect(memberProfile(2).querySelector('[aria-invalid="true"]')).toBeNull()
+    expect(within(memberProfile(2)).queryByText("Indiquez le nom d'artiste.")).not.toBeInTheDocument()
+    // Their errors don't count yet either.
+    expect(screen.getByRole('alert')).toHaveTextContent('Il manque un champ obligatoire ou un champ est à corriger.')
+
+    await send()
+    expect(screen.getByRole('alert')).toHaveTextContent('7 champs sont à remplir ou à corriger.')
+    expect(memberTab(2, 'à corriger')).toHaveAttribute('aria-current', 'true')
+    const profile = within(memberProfile(2))
+    expect(profile.getByRole('textbox', { name: /Nom d'artiste/ })).toHaveFocus()
+    expect(profile.getByText("Indiquez le nom d'artiste.")).toBeInTheDocument()
+  })
+
+  it('shows no errors in the profile of an artist added in place of one the form was sent with', async () => {
+    renderForm()
+    await fillInCollective()
+    await fillInMember(1, 'Une')
+    addMember()
+    await send()
+    expect(memberTab(2, 'à corriger')).toBeInTheDocument()
+
+    fireEvent.click(memberTabs().getByRole('button', { name: 'Enlever Artiste 2 du collectif' }))
+    addMember()
+    expect(memberTab(2, 'à compléter')).toHaveAttribute('aria-current', 'true')
+    expect(memberProfile(2).querySelector('[aria-invalid="true"]')).toBeNull()
+  })
+
+  it('shows no errors in the profile of the first artist of a collective once the form was sent as an artist', async () => {
+    renderForm()
+    fireEvent.click(part("L'artiste").getByRole('radio', { name: /^Artiste/ }))
+    await send()
+    fireEvent.click(part("L'artiste").getByRole('radio', { name: /^Collectif/ }))
+    expect(memberTab(1, 'à compléter')).toBeInTheDocument()
+    expect(memberProfile(1).querySelector('[aria-invalid="true"]')).toBeNull()
+  })
+
   it("shows the server's error about one of the artists", async () => {
     renderForm()
     await fillInCollective()

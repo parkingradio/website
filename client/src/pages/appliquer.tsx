@@ -124,11 +124,11 @@ function checked(form: Form) {
           return memberErrors
         })
       : []
-  const count = Object.keys(errors).length + memberErrors.reduce((total, member) => total + Object.keys(member).length, 0)
-  if (applicant.applicant && fields.application && count === 0) {
-    return { errors, memberErrors, count, applicant: applicant.applicant, application: fields.application }
+  const none = (fieldErrors: object) => Object.keys(fieldErrors).length === 0
+  if (applicant.applicant && fields.application && none(errors) && memberErrors.every(none)) {
+    return { errors, memberErrors, applicant: applicant.applicant, application: fields.application }
   }
-  return { errors, memberErrors, count }
+  return { errors, memberErrors }
 }
 
 // The photos of a collective's artists, as they're sent: a part for each, in order, where an empty one is no photo.
@@ -161,8 +161,8 @@ function Part({ number, title, note, children }: { number: string; title: string
 export function Appliquer() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [status, setStatus] = useState<Status>({ state: 'editing' })
-  // Errors only show once the artist tries to send the form, but for a photo's (see `shownErrors`). After that, they
-  // update as fields are fixed.
+  // Errors only show once the artist tries to send the form (a photo's right away, see `shownErrors`, and those of a
+  // collective's artist once it was tried with them), then update as fields are fixed.
   const [attempts, setAttempts] = useState(0)
   // Computed once: the range shouldn't move under the artist's feet if the page stays open past midnight.
   const [{ first, last }] = useState(() => selectableDates(new Date()))
@@ -185,7 +185,13 @@ export function Appliquer() {
   const change = (changes: Partial<Form>) => edit((current) => ({ ...current, ...changes }))
   const result = checked(form)
   const errors = shownErrors(result.errors, attempts > 0)
-  const errorCount = attempts > 0 ? result.count : 0
+  // How many errors are left to fix once the form was sent, where those of a collective's artist only count once it was
+  // tried with them (see `Member`).
+  const memberErrorCount = result.memberErrors.reduce(
+    (total, fieldErrors, index) => total + (form.members[index].tried ? Object.keys(fieldErrors).length : 0),
+    0,
+  )
+  const errorCount = attempts > 0 ? Object.keys(result.errors).length + memberErrorCount : 0
 
   // After a failed attempt, bring the artist to the first field to fix (only then, not on every change), but not to one in
   // the profile of an artist of the collective that isn't shown.
@@ -199,6 +205,8 @@ export function Appliquer() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setAttempts((count) => count + 1)
+    // A collective's artists all show their errors from now on, including those added since the form was last sent.
+    if (collective) setForm((current) => ({ ...current, members: current.members.map((member) => ({ ...member, tried: true })) }))
     // The first artist of the collective whose profile is wrong is shown, so that the form can bring the artist to it.
     const wrongMember = result.memberErrors.findIndex((member) => Object.keys(member).length > 0)
     if (wrongMember >= 0) setMemberTab(wrongMember)
@@ -315,7 +323,6 @@ export function Appliquer() {
                     selected={memberTab}
                     onSelect={setMemberTab}
                     memberErrors={result.memberErrors}
-                    showErrors={attempts > 0}
                   />
                   <FieldError message={errors.members} />
                   <p className="flyer-note">
