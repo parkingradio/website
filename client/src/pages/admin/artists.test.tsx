@@ -445,6 +445,8 @@ describe('An artist’s page', () => {
     // They're all theirs, so nothing about the artist is listed.
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-new')
+    // Only shown.
+    expect(within(table).queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 

@@ -102,8 +102,13 @@ const rows = () =>
   screen
     .queryAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? cell.textContent))
 const received = () => rows().map((row) => row[0])
+// What the buttons that filter the list by status say.
+const counts = () =>
+  within(screen.getByRole('group', { name: 'Statut' }))
+    .getAllByRole('button')
+    .map((button) => button.textContent)
 
 // Searches for `query`, and waits for the list to show `found`, by when they were received.
 async function expectSearch(query: string, found: string[]) {
@@ -133,7 +138,7 @@ describe('The list of applications', () => {
     expect(statusRows[1]).toHaveClass('admin-status-rejected')
     expect(statusRows[2]).toHaveClass('admin-status-accepted')
     expect(statusRows[3]).toHaveClass('admin-status-new')
-    expect(screen.getByRole('cell', { name: 'nouvelle' })).toHaveClass('admin-status')
+    expect(within(statusRows[3]).getAllByRole('cell').at(-1)).toHaveClass('admin-status')
     expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')
@@ -146,7 +151,7 @@ describe('The list of applications', () => {
     renderAt('/admin/candidatures?status=all')
 
     const filters = within(await screen.findByRole('group', { name: 'Statut' }))
-    expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual([
+    expect(counts()).toEqual([
       'toutes (4)',
       'nouvelles (1)',
       'retenues (1)',
@@ -356,7 +361,7 @@ describe('Searching the list of applications', () => {
 
     await expectSearch('aurore', ['8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
     const filters = within(screen.getByRole('group', { name: 'Statut' }))
-    expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual([
+    expect(counts()).toEqual([
       'toutes (3)',
       'nouvelles (1)',
       'retenues (1)',
@@ -390,6 +395,94 @@ describe('Searching the list of applications', () => {
     renderAt('/admin/candidatures?status=all&search=soiree')
 
     await waitFor(() => expect(received()).toEqual(['6 octobre 2026']))
+  })
+})
+
+describe('Changing the status of an application from the list', () => {
+  const LISTED = { ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: APPLICATIONS } }
+  // The one that's new.
+  const OLDEST = APPLICATIONS.at(-1)!
+  const PUT = 'PUT /api/admin/applications/application-1/status'
+  const select = (of: string) => screen.findByRole('combobox', { name: `Statut : Candidature de ${of}` })
+
+  it('offers every status, by a name that tells the applications apart', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures?status=all')
+
+    const first = await select('Aurore, reçue le 28 mars 2026')
+    expect(first).toHaveValue('new')
+    expect(within(first).getAllByRole('option').map((option) => option.textContent)).toEqual(['nouvelle', 'retenue', 'planifiée', 'faite', 'refusée'])
+    expect(screen.getAllByRole('combobox').map((each) => each.getAttribute('aria-label'))).toEqual([
+      'Statut : Candidature de Aurore, reçue le 8 octobre 2026',
+      'Statut : Candidature de Brume, reçue le 7 octobre 2026',
+      'Statut : Candidature de Aurore, reçue le 6 octobre 2026',
+      'Statut : Candidature de Aurore, reçue le 28 mars 2026',
+    ])
+  })
+
+  it('names an application whose artist is not known by what the list shows instead', async () => {
+    mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/collectives': { ok: true, collectives: [] }, '/api/admin/applications': { ok: true, applications: [APPLICATION] } })
+    renderAt('/admin/candidatures')
+
+    expect(await select('artiste inconnu, reçue le 5 octobre 2026')).toBeInTheDocument()
+  })
+
+  it('takes an application out of the status shown once it is changed, without loading the list again', async () => {
+    mockFetch({ ...LISTED, [PUT]: { ok: true, application: { ...OLDEST, status: 'accepted' } } })
+    renderAt('/admin/candidatures')
+
+    fireEvent.change(await select('Aurore, reçue le 28 mars 2026'), { target: { value: 'accepted' } })
+
+    await waitFor(() => expect(rows()).toEqual([]))
+    expect(screen.getByText('Aucune candidature avec ce statut.')).toBeInTheDocument()
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (2)', 'planifiées (0)', 'faites (1)', 'refusées (1)'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/)
+  })
+
+  it('keeps an application listed with its new status and color among all of them', async () => {
+    mockFetch({ ...LISTED, [PUT]: { ok: true, application: { ...OLDEST, status: 'rejected' } } })
+    renderAt('/admin/candidatures?status=all')
+
+    const changed = await select('Aurore, reçue le 28 mars 2026')
+    expect(changed.closest('tr')).toHaveClass('admin-status-new')
+    fireEvent.change(changed, { target: { value: 'rejected' } })
+
+    await waitFor(() => expect(changed.closest('tr')).toHaveClass('admin-status-rejected'))
+    expect(changed).toHaveValue('rejected')
+    expect(rows()).toHaveLength(4)
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (2)'])
+  })
+
+  it('shows the status picked and keeps only that application from being changed while it is saved', async () => {
+    mockFetch({ ...LISTED, [PUT]: { ok: true, application: { ...OLDEST, status: 'done' } } })
+    renderAt('/admin/candidatures?status=all')
+
+    const changed = await select('Aurore, reçue le 28 mars 2026')
+    const other = await select('Brume, reçue le 7 octobre 2026')
+    fireEvent.change(changed, { target: { value: 'done' } })
+
+    expect(changed).toBeDisabled()
+    expect(changed).toHaveValue('done')
+    expect(other).toBeEnabled()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('done')
+  })
+
+  it('says why a status could not be changed, naming the application, which keeps its status', async () => {
+    mockFetch({ ...LISTED, [PUT]: { ok: false, error: 'No such application' } })
+    renderAt('/admin/candidatures')
+
+    const changed = await select('Aurore, reçue le 28 mars 2026')
+    fireEvent.change(changed, { target: { value: 'accepted' } })
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent("Le statut de « Candidature de Aurore, reçue le 28 mars 2026 » n'a pas pu être changé : No such application"),
+    )
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('new')
+    expect(received()).toEqual(['28 mars 2026'])
   })
 })
 
@@ -488,11 +581,7 @@ describe('The default view of the list of applications', () => {
     renderAt('/admin/candidatures')
 
     await expectSearch('aurore', ['28 mars 2026', '9 octobre 2026'])
-    expect(
-      within(screen.getByRole('group', { name: 'Statut' }))
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['toutes (4)', 'nouvelles (2)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (0)'])
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (2)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (0)'])
   })
 })
 

@@ -68,7 +68,8 @@
 }
 
 .admin button:disabled,
-.admin button[aria-disabled='true'] {
+.admin button[aria-disabled='true'],
+.admin-status-select:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -173,7 +174,8 @@
 .admin-form input:focus-visible,
 .admin-form select:focus-visible,
 .admin-form textarea:focus-visible,
-.admin-search:focus-visible {
+.admin-search:focus-visible,
+.admin-status-select:focus-visible {
   outline: 2px solid #000;
   outline-offset: 1px;
 }
@@ -384,6 +386,40 @@
 /* Only a new application's status is bold, rather than its whole row. */
 .admin-status-new .admin-status {
   font-weight: 700;
+}
+
+/* An application's status, as a dropdown that changes it in the list: a pill, with its own arrow, in the color and the
+   weight of the row's text, which overflows into its cell's padding (see `.admin-table-controls`). Its line height is
+   set since, otherwise, Chrome makes it a pixel taller the first time it's hovered or focused. */
+.admin-status-select {
+  appearance: none;
+  margin-block: calc(-4.5px - 1px);
+  padding: 4.5px 24px 4.5px 10px;
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 14px center, right 9px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  color: inherit;
+  font: inherit;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+/* Black when hovered, like the pills. It isn't with them above since their `background` would take its arrow away. */
+.admin-status-select:not(:disabled):hover {
+  border-color: #000;
+  background-color: #000;
+  color: #f9f9f9;
+}
+
+/* The open list isn't bold or faded out along with its row, in the browsers where it would be. */
+.admin-status-select option {
+  background: #fff;
+  color: #1c1c1c;
+  font-weight: 300;
 }
 
 /* The rows of applications, sessions and sets that are done, faded out and tinted, lightly enough that their text keeps
@@ -771,6 +807,13 @@ dl.admin-record {
 
   .admin-session .admin-error {
     flex-basis: 100%;
+  }
+
+  /* At least 16px, or iOS zooms into the page when it gets focus, with its taller line overflowing too. */
+  .admin-status-select {
+    margin-block: calc(-4.5px - 1px - 2px);
+    font-size: 16px;
+    line-height: 20px;
   }
 
   /* On a line of its own, under the toolbar's button. */

@@ -185,6 +185,8 @@ describe('A collective’s page', () => {
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
     expect(within(table).getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(within(table).getByText('DJ, Full Band')).toBeInTheDocument()
+    // Only shown.
+    expect(within(table).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('says when its applications could not be loaded', async () => {

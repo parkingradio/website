@@ -261,7 +261,11 @@ test('a collective is added with an artist picked and one added by name, shown, 
   const applicationPage = new URL(page.url()).pathname
   const listed = page.locator(`a[href="${applicationPage}"]`)
   await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
-  await expect(page.getByRole('row').filter({ has: listed })).toContainText(`${name} (collectif)`)
+  const row = page.getByRole('row').filter({ has: listed })
+  await expect(row).toContainText(`${name} (collectif)`)
+  // Accepted from the list, which then no longer shows it, since it shows the new ones.
+  await row.getByRole('combobox').selectOption({ label: 'retenue' })
+  await expect(listed).toHaveCount(0)
   await page.goBack()
   await page.getByRole('link', { name, exact: true }).click()
   await expect(page.getByRole('table', { name: 'Candidatures' })).toContainText('15 janv. 2027')
@@ -273,7 +277,7 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await expect(page.getByRole('link', { name, exact: true })).toBeHidden()
 
   // Its application is gone with it.
-  await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
+  await page.goto('/admin/candidatures?status=all')
   await expect(page.getByRole('table')).toBeVisible()
   await expect(listed).toHaveCount(0)
 

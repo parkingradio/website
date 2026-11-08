@@ -9,10 +9,14 @@ few words.
 
 The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
 by "(collectif)" for a collective, their city and genres (see
-[A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status.
+[A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status,
+as a dropdown that changes it, without confirming.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
-"retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first.
+"retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first. When
+the list shows a single status, an application changed to another leaves it as soon as that's saved. In "toutes", it
+stays, with its new status. Only its own dropdown is locked while it's saved. When a status can't be changed, the list
+says why above it, naming the application, and the row keeps its status.
 
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist or
 collective, as [Artistes](artistes.md) searches them, their performance types, their questions or details, and the days
@@ -49,7 +53,7 @@ refuses what the form accepted, the form shows the server's message.
 
 ## Endpoints
 
-- `GET /api/admin/applications`, for the list.
+- `GET /api/admin/applications`, for the list, and `PUT /api/admin/applications/:id/status`, to change a status from it.
 - `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/status` and
   `DELETE /api/admin/applications/:id`, for an application's page.
 - `POST /api/admin/applications`, for "nouvelle candidature".

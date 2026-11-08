@@ -28,7 +28,7 @@ import {
   genreNames,
   place,
 } from './describe'
-import type { Entry, Owner } from './describe'
+import type { Entry, EntryKind, Owner } from './describe'
 import { ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
@@ -63,6 +63,16 @@ function ownerOf(application: Application, owners: Owners): Entry | undefined {
   return owners.get(entryPath(kind, id))
 }
 
+// What's shown in place of the name of who an application is for, when it isn't known.
+const unknownOwner = (kind: EntryKind) => `${KIND_LABELS[kind]} inconnu`
+
+// An application as it's named among others, e.g. "Candidature de Aurore, reçue le 28 mars 2026", since an artist can have
+// several.
+function applicationName(application: Application, owner: Entry | undefined): string {
+  const name = owner?.name ?? unknownOwner(applicationOwner(application).kind)
+  return `Candidature de ${name}, reçue le ${dateFormat.format(new Date(application.receivedAt))}`
+}
+
 // What the list of applications opens on.
 const DEFAULT_STATUS: ApplicationStatus = 'new'
 // Those still to go through, where the oldest come first, rather than the most recently received.
@@ -88,16 +98,18 @@ function applicationColumns(owners: Owners, status: ApplicationStatus | null): R
 
 // Applications, as listed in this section, or on an artist's or a collective's page, under the heading whose id is
 // `labelledBy`, where `owners` is left out since they're all theirs, and so are the columns about them. The columns sort
-// the list when there's `sorting`.
+// the list when there's `sorting`, and the statuses are dropdowns that change them when there's `changeStatus`.
 export function ApplicationsTable({
   applications,
   owners,
   sorting,
+  changeStatus,
   labelledBy,
 }: {
   applications: Application[]
   owners?: Owners
   sorting?: Sorting<ApplicationColumn>
+  changeStatus?: (application: Application, status: ApplicationStatus) => Promise<void>
   labelledBy?: string
 }) {
   const header = (column: ApplicationColumn, label: string) =>
@@ -155,7 +167,17 @@ export function ApplicationsTable({
                 {more > 0 && ` (+${more})`}
               </td>
               <td>{describePerformanceTypes(application)}</td>
-              <td className="admin-status">{STATUS_LABELS[application.status]}</td>
+              <td className="admin-status">
+                {changeStatus ? (
+                  <StatusSelect
+                    label={`Statut : ${applicationName(application, owner)}`}
+                    status={application.status}
+                    onChange={(status) => changeStatus(application, status)}
+                  />
+                ) : (
+                  STATUS_LABELS[application.status]
+                )}
+              </td>
             </tr>
           )
         })}
@@ -164,11 +186,36 @@ export function ApplicationsTable({
   )
 }
 
+// An application's status, as a dropdown that changes it, which shows the one picked and can't be used while it's saved.
+function StatusSelect({ label, status, onChange }: { label: string; status: ApplicationStatus; onChange: (status: ApplicationStatus) => Promise<void> }) {
+  const [saving, setSaving] = useState<ApplicationStatus | null>(null)
+  return (
+    <select
+      className="admin-status-select"
+      aria-label={label}
+      value={saving ?? status}
+      disabled={saving !== null}
+      onChange={async (event) => {
+        const picked = event.target.value as ApplicationStatus
+        setSaving(picked)
+        await onChange(picked)
+        setSaving(null)
+      }}
+    >
+      {APPLICATION_STATUSES.map((each) => (
+        <option key={each} value={each}>
+          {STATUS_LABELS[each]}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // Who an application is for, linking to their page, followed by "(collectif)" for a collective.
 function OwnerName({ application, owner }: { application: Application; owner: Entry | undefined }) {
   if (!owner) {
     const { kind, id } = applicationOwner(application)
-    return <Link to={entryPath(kind, id)}>{kind === 'collective' ? 'collectif inconnu' : 'artiste inconnu'}</Link>
+    return <Link to={entryPath(kind, id)}>{unknownOwner(kind)}</Link>
   }
   return (
     <>
@@ -245,6 +292,9 @@ function ApplicationsList({ query }: { query: string }) {
   )
   const [status, setStatus] = useStatusFilter(APPLICATION_STATUSES, DEFAULT_STATUS)
   const sorting = useSort(applicationColumns(byKey, status), 'received')
+  // The applications as the changes of their status left them, which replace the ones loaded.
+  const [changed, setChanged] = useState<Record<string, Application>>({})
+  const [statusError, setStatusError] = useState<string | null>(null)
 
   if (applications.kind === 'error') {
     return (
@@ -255,10 +305,17 @@ function ApplicationsList({ query }: { query: string }) {
   }
   if (applications.kind === 'loading' || artists.kind === 'loading' || collectives.kind === 'loading') return null
 
-  const all = applications.value.applications
+  const all = applications.value.applications.map((application) => changed[application.id] ?? application)
   const found = search(all, query, (application) => [...(ownerOf(application, byKey)?.searchFields ?? []), ...applicationSearchFields(application)])
   const withStatus = (applications: Application[]) => (status ? applications.filter((application) => application.status === status) : applications)
   const listed = sorting.sorted(withStatus(found))
+
+  const changeStatus = async (application: Application, status: ApplicationStatus) => {
+    setStatusError(null)
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status } })
+    if (result.ok) setChanged((changed) => ({ ...changed, [application.id]: result.application }))
+    else setStatusError(`Le statut de «\u00a0${applicationName(application, ownerOf(application, byKey))}\u00a0» n'a pas pu être changé : ${result.error}`)
+  }
 
   return (
     <>
@@ -272,6 +329,11 @@ function ApplicationsList({ query }: { query: string }) {
       />
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
+      {statusError && (
+        <p className="admin-error" role="alert">
+          {statusError}
+        </p>
+      )}
       {listed.length === 0 ? (
         <p className="admin-placeholder">
           {all.length === 0
@@ -281,7 +343,7 @@ function ApplicationsList({ query }: { query: string }) {
               : 'Aucune candidature ne correspond à la recherche.'}
         </p>
       ) : (
-        <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} />
+        <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} changeStatus={changeStatus} />
       )}
     </>
   )
