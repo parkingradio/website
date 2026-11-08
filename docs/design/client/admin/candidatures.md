@@ -2,8 +2,10 @@
 
 At `/admin/candidatures`: the applications of artists and collectives for a set, for the team to go through (see
 [Applications](../../server/applications.md)). Each application's status is shown as "nouvelle" (new), "retenue"
-(accepted), "planifiée" (scheduled), "faite" (done) or "refusée" (rejected). What the artist would do is picked from a
-list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a few words.
+(accepted), "planifiée" (scheduled), "faite" (done) or "refusée" (rejected). Wherever applications are listed, their rows
+are colored by status (see [Status colors](layout.md#status-colors)), and "nouvelle" is in bold. What the artist would do
+is picked from a list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a
+few words.
 
 The section lists every application, the most recently received first, with when it was received ("reçue le"), the
 artist or the collective, followed by "(collectif)" for a collective, their city and genres (see

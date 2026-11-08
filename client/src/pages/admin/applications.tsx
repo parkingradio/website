@@ -127,7 +127,7 @@ export function ApplicationsTable({
           // rather than left out, like a collective's genres when only the artists couldn't be.
           const owner = owners && ownerOf(application, owners)
           return (
-            <tr key={application.id}>
+            <tr key={application.id} className={`admin-status-${application.status}`}>
               <td>
                 <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.receivedAt))}</Link>
               </td>
@@ -150,7 +150,7 @@ export function ApplicationsTable({
                 {more > 0 && ` (+${more})`}
               </td>
               <td>{describePerformanceTypes(application)}</td>
-              <td className={`admin-status admin-status-${application.status}`}>{STATUS_LABELS[application.status]}</td>
+              <td className="admin-status">{STATUS_LABELS[application.status]}</td>
             </tr>
           )
         })}

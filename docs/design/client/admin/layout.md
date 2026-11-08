@@ -59,6 +59,13 @@ are `search` (what's searched for), `sort` (the column the list is sorted by, as
 "Reçue le" and "Date" sort the latest first, and every other column sorts in ascending order. A value the page doesn't
 know is ignored, as if the parameter weren't there.
 
+## Status colors
+
+Wherever the admin pages list applications, sessions or sets, the rows of those that are done are greyed out, text, links
+and background, and those of rejected applications and of cancelled sessions and sets are faded out the same way, in a
+color of their own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't
+told by color alone.
+
 ## Tooltips
 
 Some controls have a tooltip, under them, or above them when there's no room below, e.g. to say why they can't be used

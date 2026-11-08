@@ -2,11 +2,9 @@
 
 At `/admin/sessions`: the sessions at the studio and their sets: who played, when, and where their recordings are (see
 [Sessions](../../server/sessions.md)). A session's status is shown as "planifiée" (planned), "jouée" (done) or "annulée"
-(cancelled), and a set's as "planifié", "joué" or "annulé". Wherever the admin pages list sessions or sets, the rows of
-those that are done are greyed out, text and background, and those of cancelled ones are faded out in a color of their
-own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't told by color
-alone. A session's type is shown as "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre" (see
-[Types and names](../../server/sessions.md#types-and-names)).
+(cancelled), and a set's as "planifié", "joué" or "annulé". The rows of sessions and sets are colored by status (see
+[Status colors](layout.md#status-colors)). A session's type is shown as "Guest mixes", "Live performance", "Takeover",
+"Synth meetup" or "Autre" (see [Types and names](../../server/sessions.md#types-and-names)).
 
 ## Names
 

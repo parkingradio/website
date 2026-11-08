@@ -127,8 +127,13 @@ describe('The list of applications', () => {
       ['6 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '12 nov. 2026', 'Full Band', 'retenue'],
       ['28 mars 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
     ])
-    // There's nothing more to do about an application that's done, so it's greyed out like a rejected one.
-    expect(screen.getByRole('cell', { name: 'faite' })).toHaveClass('admin-status-done')
+    // Colored by status on the whole row, but only the status of a new one is bold.
+    const statusRows = screen.getAllByRole('row').slice(1)
+    expect(statusRows[0]).toHaveClass('admin-status-done')
+    expect(statusRows[1]).toHaveClass('admin-status-rejected')
+    expect(statusRows[2]).toHaveClass('admin-status-accepted')
+    expect(statusRows[3]).toHaveClass('admin-status-new')
+    expect(screen.getByRole('cell', { name: 'nouvelle' })).toHaveClass('admin-status')
     expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')

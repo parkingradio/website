@@ -381,35 +381,31 @@
   white-space: nowrap;
 }
 
-.admin-status-new {
+/* Only a new application's status is bold, rather than its whole row. */
+.admin-status-new .admin-status {
   font-weight: 700;
 }
 
-/* Applications, sessions and sets there's nothing more to do about. */
-.admin-status-done,
-.admin-status-rejected {
+/* The rows of applications, sessions and sets that are done, faded out and tinted, lightly enough that their text keeps
+   WCAG AA contrast. */
+.admin-status-done {
   color: #666;
-}
-
-/* Sessions and sets that won't be played, faded out too, but in a color of their own, so that they're told apart from
-   those that were. */
-.admin-status-cancelled {
-  color: #8a6d00;
-}
-
-/* The links of faded out sessions and sets fade out with them. */
-.admin-status-done a,
-.admin-status-cancelled a {
-  color: inherit;
-}
-
-/* The rows of faded out sessions and sets are tinted too, lightly enough that their text keeps WCAG AA contrast. */
-tr.admin-status-done {
   background: #f5f5f5;
 }
 
-tr.admin-status-cancelled {
+/* The rows of rejected applications, and of sessions and sets that won't be played, faded out and tinted the same way,
+   but in a color of their own, so that they're told apart from those that are done. */
+.admin-status-rejected,
+.admin-status-cancelled {
+  color: #8a6d00;
   background: #fff8db;
+}
+
+/* The links of faded out rows fade out with them. */
+.admin-status-done a,
+.admin-status-rejected a,
+.admin-status-cancelled a {
+  color: inherit;
 }
 
 /* The mark of a set whose place is wrong, e.g. that overlaps another, which doesn't prevent anything: a button that looks

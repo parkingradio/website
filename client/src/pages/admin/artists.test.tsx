@@ -440,9 +440,11 @@ describe('An artist’s page', () => {
     renderAt('/admin/artistes/artist-1')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
-    expect(within(screen.getByRole('table')).queryAllByRole('button')).toHaveLength(0)
+    const table = screen.getByRole('table')
+    expect(within(table).queryAllByRole('button')).toHaveLength(0)
     // They're all theirs, so nothing about the artist is listed.
     expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
+    expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-new')
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
