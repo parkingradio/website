@@ -7,11 +7,12 @@ are colored by status (see [Status colors](layout.md#status-colors)), and "nouve
 is picked from a list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a
 few words.
 
-The section lists every application, the most recently received first, with when it was received ("reçue le"), the
-artist or the collective, followed by "(collectif)" for a collective, their city and genres (see
+The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
+by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
-each.
+each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
+"retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first.
 
 A field above the list searches the applications (see [Searching lists](layout.md#searching-lists)) by their artist or
 collective, as [Artistes](artistes.md) searches them, their performance types, their questions or details, and the days

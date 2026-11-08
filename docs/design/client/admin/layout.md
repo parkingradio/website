@@ -55,9 +55,13 @@ the date "3 déc", then the word "26".
 The search and the order are kept in the page's address, along with the status of applications or sessions, so that
 going back to a list from one of its entries with the browser's back button finds it as it was. The address's parameters
 are `search` (what's searched for), `sort` (the column the list is sorted by, as each page names it), `order` (`asc` or
-`desc`, which only counts along with `sort`) and `status` (as the server names it, e.g. `accepted`). Without `order`,
-"Reçue le" and "Date" sort the latest first, and every other column sorts in ascending order. A value the page doesn't
-know is ignored, as if the parameter weren't there.
+`desc`, which only counts along with `sort`) and `status` (as the server names it, e.g. `accepted`, or `all` for every
+status). A value the page doesn't know is ignored, as if the parameter weren't there.
+
+Without `status`, a list that has statuses shows its default view, which its page names; picking that status with its
+button gives the same view. Without `sort`, a list is in the order its page gives, for the status shown when it has
+statuses. `sort` without `order` sorts that way when it names the column that order is by, and in ascending order
+otherwise.
 
 ## Status colors
 

@@ -44,11 +44,13 @@ Durations, and the times of the sets of a session without a date, are entered in
 
 ## The list
 
-The section lists every session, those without a date first, the most recently added first, then the others, the
-latest first, with its day ("Date"), linking to its page, its start and end ("Heure"), its title ("Nom"), its type
-("Type"), which for a takeover links to its collective, its sets' performers ("Artistes"), set by set in their order,
-the sets separated by "·", each artist linking to their page, and its status.
+The section lists the sessions, each with its day ("Date"), linking to its page, its start and end ("Heure"), its title
+("Nom"), its type ("Type"), which for a takeover links to its collective, its sets' performers ("Artistes"), set by set
+in their order, the sets separated by "·", each artist linking to their page, and its status.
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
+It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
+first, past ones included, then those without a date, the first added first. With another status or "toutes", those
+without a date come first, the most recently added first, then the others, the latest first.
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their title, their
 type, their takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026",

@@ -225,7 +225,7 @@ describe('The list of sessions', () => {
 
   it('lists every session, those without a date first, then the latest first, in Québec time', async () => {
     mockFetch(LIST)
-    renderAt('/admin/sessions')
+    renderAt('/admin/sessions?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
@@ -249,7 +249,7 @@ describe('The list of sessions', () => {
 
   it('lists only the sessions with a status, once it is picked, counting those the search finds', async () => {
     mockFetch(LIST)
-    renderAt('/admin/sessions')
+    renderAt('/admin/sessions?status=all')
 
     const filters = within(await screen.findByRole('group', { name: 'Statut' }))
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (4)', 'planifiées (2)', 'jouées (1)', 'annulées (1)'])
@@ -264,7 +264,7 @@ describe('The list of sessions', () => {
 
   it('searches the sessions by title, type, takeover, performer, and day, written out or as the list shows it', async () => {
     mockFetch(LIST)
-    renderAt('/admin/sessions')
+    renderAt('/admin/sessions?status=all')
 
     await expectSearch('soiree', ['ven. 2 oct. 2026'])
     await expectSearch('guest mixes', ['date à déterminer'])
@@ -287,18 +287,18 @@ describe('The list of sessions', () => {
 
   it('sorts the sessions by their columns, those without a date being the latest', async () => {
     mockFetch(LIST)
-    renderAt('/admin/sessions')
+    renderAt('/admin/sessions?status=all')
     await waitFor(() => expect(rows()).toHaveLength(4))
 
     fireEvent.click(screen.getByRole('button', { name: 'Date' }))
     expect(days()).toEqual(['lun. 31 août 2026', 'ven. 2 oct. 2026', 'sam. 14 nov. 2026', 'date à déterminer'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=date&order=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&sort=date&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Nom' }))
     expect(rows().map((row) => row[2])).toEqual(['GUEST MIXES', 'LIVE PERFORMANCE', 'ONDES TAKEOVER', 'SOIRÉE'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=name&order=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&sort=name&order=asc$/)
     fireEvent.click(screen.getByRole('button', { name: 'Statut' }))
     expect(rows().map((row) => row[5])).toEqual(['planifiée', 'planifiée', 'jouée', 'annulée'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=status&order=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&sort=status&order=asc$/)
   })
 
   it('says when there are no sessions, or when they could not be loaded', async () => {
@@ -310,6 +310,87 @@ describe('The list of sessions', () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions': { ok: false, error: 'Boom' } })
     renderAt('/admin/sessions')
     expect(await screen.findByRole('alert')).toHaveTextContent("Les sessions n'ont pas pu être chargées : Boom")
+  })
+})
+
+describe('The default view of the list of sessions', () => {
+  // A session that's still planned, though it's past.
+  const PAST = { ...SESSION, id: 'session-5', start: '2026-01-11T01:00:00.000Z', end: '2026-01-11T02:00:00.000Z', durationMinutes: 60, sets: [] }
+  const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: [...SESSIONS, PAST] } }
+  const SOONEST = ['sam. 10 janv. 2026', 'sam. 14 nov. 2026', 'date à déterminer']
+  const header = () => screen.getByRole('columnheader', { name: 'Date' })
+
+  it('opens on the planned sessions, the soonest first, past ones included, those without a date last', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions')
+
+    await waitFor(() => expect(days()).toEqual(SOONEST))
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+    expect(header()).toHaveTextContent('Date ↑')
+    expect(screen.getByRole('button', { name: 'planifiées (3)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions$/)
+  })
+
+  it('is the same view once its status is picked with its button', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'planifiées (3)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=planned$/)
+    expect(days()).toEqual(SOONEST)
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('lists every session, or those with another status, the latest first', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'toutes (5)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all$/)
+    expect(days()).toEqual(['date à déterminer', 'sam. 14 nov. 2026', 'ven. 2 oct. 2026', 'lun. 31 août 2026', 'sam. 10 janv. 2026'])
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+
+    fireEvent.click(screen.getByRole('button', { name: 'jouées (1)' }))
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('sorts the other way around with the first click on the column', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions')
+
+    await waitFor(() => expect(days()).toHaveLength(3))
+    fireEvent.click(within(header()).getByRole('button'))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?sort=date&order=desc$/)
+    expect(days()).toEqual([...SOONEST].reverse())
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('shows it for a status it does not know', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=planifiee')
+
+    await waitFor(() => expect(days()).toEqual(SOONEST))
+  })
+
+  it('says when there are none with its status, though there are others', async () => {
+    const others = SESSIONS.filter((session) => session.status !== 'planned')
+    mockFetch({ ...LIST, '/api/admin/sessions': { ok: true, sessions: others } })
+    renderAt('/admin/sessions')
+
+    expect(await screen.findByText('Aucune session avec ce statut.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'toutes (2)' })).toBeInTheDocument()
+  })
+
+  it('searches within it, while the buttons count what the search finds in every status', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions')
+
+    await expectSearch('brume', ['sam. 14 nov. 2026', 'date à déterminer'])
+    expect(
+      within(screen.getByRole('group', { name: 'Statut' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (1)', 'annulées (0)'])
   })
 })
 

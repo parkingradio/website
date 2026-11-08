@@ -117,7 +117,7 @@ async function expectSearch(query: string, found: string[]) {
 describe('The list of applications', () => {
   it('lists every application, the most recently received first, with when it was received and its artist', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     // Brume's genres are left out, and so is her city, which leaves her country.
@@ -143,7 +143,7 @@ describe('The list of applications', () => {
 
   it('lists only the applications with a status, once it is picked', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     const filters = within(await screen.findByRole('group', { name: 'Statut' }))
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual([
@@ -171,7 +171,7 @@ describe('The list of applications', () => {
       { ...APPLICATION, id: 'application-6', artistId: 'artist-1' },
     ]
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows().map((row) => row.slice(1, 4))).toEqual([
@@ -190,7 +190,7 @@ describe('The list of applications', () => {
       '/api/admin/collectives': { ok: false, error: 'Boom' },
       '/api/admin/applications': { ok: true, applications },
     })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
@@ -203,7 +203,7 @@ describe('The list of applications', () => {
 
   it('lists the applications without their artists when those could not be loaded', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: APPLICATIONS } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
@@ -214,7 +214,7 @@ describe('The list of applications', () => {
   it("leaves a collective's genres blank, rather than left out, when the artists could not be loaded", async () => {
     const applications = [{ ...APPLICATION, artistId: null, collectiveId: 'collective-1' }]
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
@@ -244,7 +244,7 @@ describe('Searching the list of applications', () => {
 
   it('finds applications by their artist', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await expectSearch('brume', ['7 octobre 2026'])
     await expectSearch('aurore@example.com', ['8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
@@ -253,7 +253,7 @@ describe('Searching the list of applications', () => {
   it('finds the applications of collectives by the collective, its artists’ names and their genres', async () => {
     const collectives = { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1', receivedAt: '2026-10-09T16:00:00.000Z' }
     mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [collectives, ...SEARCHED] } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await expectSearch('ondes', ['9 octobre 2026'])
     await expectSearch('quebec', ['9 octobre 2026'])
@@ -263,7 +263,7 @@ describe('Searching the list of applications', () => {
 
   it('finds applications by their performance types and details', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await expectSearch('rap', ['7 octobre 2026'])
     // "Vinyl", and "Vinyle seulement" for the others.
@@ -275,7 +275,7 @@ describe('Searching the list of applications', () => {
 
   it('finds applications by the days their artists would like to play, by month, weekday or day', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     // The first one would like to play on Thursdays in December and January, the others on a Thursday each, in October
     // and November.
@@ -306,7 +306,7 @@ describe('Searching the list of applications', () => {
       on(1, ['2026-12-01']),
     ]
     mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     // Not by "26" in "2026", or another day, or "dec" in "décidé".
     await expectSearch('dec 26', ['5 octobre 2026', '3 octobre 2026'])
@@ -352,7 +352,7 @@ describe('Searching the list of applications', () => {
 
   it('counts the applications the search finds, by status, and keeps both in the URL', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     await expectSearch('aurore', ['8 octobre 2026', '6 octobre 2026', '28 mars 2026'])
     const filters = within(screen.getByRole('group', { name: 'Statut' }))
@@ -366,7 +366,7 @@ describe('Searching the list of applications', () => {
     ])
 
     fireEvent.click(filters.getByRole('button', { name: 'retenues (1)' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?search=aurore&status=accepted$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=accepted&search=aurore$/)
     expect(received()).toEqual(['6 octobre 2026'])
   })
 
@@ -374,12 +374,12 @@ describe('Searching the list of applications', () => {
     mockFetch(LISTED)
     renderAt('/admin/candidatures?status=scheduled&search=aurore')
 
-    await waitFor(() => expect(screen.getByText('Aucune candidature.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Aucune candidature avec ce statut.')).toBeInTheDocument())
   })
 
   it('says when no application matches', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?search=zzzzzz')
+    renderAt('/admin/candidatures?status=all&search=zzzzzz')
 
     await waitFor(() => expect(screen.getByText('Aucune candidature ne correspond à la recherche.')).toBeInTheDocument())
     expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('zzzzzz')
@@ -387,9 +387,112 @@ describe('Searching the list of applications', () => {
 
   it('still finds applications by what they say when the artists could not be loaded', async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/artists': { ok: false, error: 'Boom' }, '/api/admin/applications': { ok: true, applications: SEARCHED } })
-    renderAt('/admin/candidatures?search=soiree')
+    renderAt('/admin/candidatures?status=all&search=soiree')
 
     await waitFor(() => expect(received()).toEqual(['6 octobre 2026']))
+  })
+})
+
+describe('The default view of the list of applications', () => {
+  // Another new one, received after the others.
+  const LATEST = { ...APPLICATION, id: 'application-5', receivedAt: '2026-10-09T16:00:00.000Z', createdAt: '2026-10-09T16:00:00.000Z' }
+  const LISTED = { ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: [LATEST, ...APPLICATIONS] } }
+  const header = () => screen.getByRole('columnheader', { name: 'Reçue le' })
+
+  it('opens on the new applications, the oldest received first', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures')
+
+    await waitFor(() => expect(received()).toEqual(['28 mars 2026', '9 octobre 2026']))
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+    expect(header()).toHaveTextContent('Reçue le ↑')
+    expect(screen.getByRole('button', { name: 'nouvelles (2)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/)
+  })
+
+  it('is the same view once its status is picked with its button', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures?status=all')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'nouvelles (2)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=new$/)
+    expect(received()).toEqual(['28 mars 2026', '9 octobre 2026'])
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('lists every application, or those with another status, the most recently received first', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'toutes (5)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=all$/)
+    expect(received()).toEqual(['9 octobre 2026', '8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+
+    fireEvent.click(screen.getByRole('button', { name: 'faites (1)' }))
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('lists the accepted ones the oldest received first too, until the first click on the column', async () => {
+    const accepted = { ...APPLICATION, id: 'application-6', receivedAt: '2026-10-10T16:00:00.000Z', createdAt: '2026-10-10T16:00:00.000Z', status: 'accepted' }
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [accepted, ...APPLICATIONS] } })
+    renderAt('/admin/candidatures?status=accepted')
+
+    await waitFor(() => expect(received()).toEqual(['6 octobre 2026', '10 octobre 2026']))
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+    expect(header()).toHaveTextContent('Reçue le ↑')
+
+    fireEvent.click(within(header()).getByRole('button'))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=accepted&sort=received&order=desc$/)
+    expect(received()).toEqual(['10 octobre 2026', '6 octobre 2026'])
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('sorts the other way around with the first click on the column, and then keeps to it', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures')
+
+    await waitFor(() => expect(received()).toHaveLength(2))
+    fireEvent.click(within(header()).getByRole('button'))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=received&order=desc$/)
+    expect(received()).toEqual(['9 octobre 2026', '28 mars 2026'])
+    expect(header()).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  it('starts from the oldest when the column is sorted by again, or the URL does not say which way', async () => {
+    mockFetch(LISTED)
+    const { unmount } = renderAt('/admin/candidatures')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Artiste' }))
+    fireEvent.click(within(header()).getByRole('button'))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=received&order=asc$/)
+    expect(received()).toEqual(['28 mars 2026', '9 octobre 2026'])
+    unmount()
+
+    renderAt('/admin/candidatures?sort=received')
+    await waitFor(() => expect(received()).toEqual(['28 mars 2026', '9 octobre 2026']))
+    expect(header()).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('says when there are none with its status, though there are others', async () => {
+    const others = APPLICATIONS.filter((application) => application.status !== 'new')
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: others } })
+    renderAt('/admin/candidatures')
+
+    expect(await screen.findByText('Aucune candidature avec ce statut.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'toutes (3)' })).toBeInTheDocument()
+  })
+
+  it('searches within it, while the buttons count what the search finds in every status', async () => {
+    mockFetch(LISTED)
+    renderAt('/admin/candidatures')
+
+    await expectSearch('aurore', ['28 mars 2026', '9 octobre 2026'])
+    expect(
+      within(screen.getByRole('group', { name: 'Statut' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['toutes (4)', 'nouvelles (2)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (0)'])
   })
 })
 
@@ -398,7 +501,7 @@ describe('Sorting the list of applications', () => {
 
   it('lists the most recently received first, then the other way around', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     const header = await screen.findByRole('columnheader', { name: 'Reçue le' })
     expect(header).toHaveAttribute('aria-sort', 'descending')
@@ -410,12 +513,12 @@ describe('Sorting the list of applications', () => {
     fireEvent.click(within(header).getByRole('button'))
     expect(header).toHaveAttribute('aria-sort', 'ascending')
     expect(received()).toEqual(['28 mars 2026', '6 octobre 2026', '7 octobre 2026', '8 octobre 2026'])
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=received&order=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=all&sort=received&order=asc$/)
   })
 
   it('sorts the applications the way their column first sorts them when the URL does not say which way', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?sort=received')
+    renderAt('/admin/candidatures?status=all&sort=received')
 
     await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
     expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
@@ -423,30 +526,30 @@ describe('Sorting the list of applications', () => {
 
   it('ignores a column, a direction or a status that the URL gives but it does not know', async () => {
     mockFetch(LISTED)
-    const { unmount } = renderAt('/admin/candidatures?sort=ville&order=asc&status=nouvelle')
+    const { unmount } = renderAt('/admin/candidatures?sort=ville&order=desc&status=nouvelle')
 
-    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
-    expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
-    expect(screen.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'ascending'))
+    expect(received()).toEqual(['28 mars 2026'])
+    expect(screen.getByRole('button', { name: 'nouvelles (1)' })).toHaveAttribute('aria-pressed', 'true')
     unmount()
 
-    renderAt('/admin/candidatures?sort=city&order=up')
+    renderAt('/admin/candidatures?status=all&sort=city&order=up')
     await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Ville' })).toHaveAttribute('aria-sort', 'ascending'))
   })
 
   it('ignores the parameters of old addresses, which were in French', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?recherche=aurore&tri=ville&ordre=asc&statut=new')
+    renderAt('/admin/candidatures?recherche=aurore&tri=ville&ordre=desc&statut=accepted')
 
-    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'descending'))
-    expect(received()).toEqual(['8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
-    expect(screen.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Reçue le' })).toHaveAttribute('aria-sort', 'ascending'))
+    expect(received()).toEqual(['28 mars 2026'])
+    expect(screen.getByRole('button', { name: 'nouvelles (1)' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('')
   })
 
   it('sorts the applications by artist, each artist’s the most recently received first', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Artiste' }))
     expect(rows().map((row) => row.slice(0, 2))).toEqual([
@@ -460,7 +563,7 @@ describe('Sorting the list of applications', () => {
   it('sorts the applications of collectives by their names, with those of artists', async () => {
     const collectives = { ...APPLICATION, id: 'application-5', artistId: null, collectiveId: 'collective-1', receivedAt: '2026-10-09T16:00:00.000Z' }
     mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [collectives, ...APPLICATIONS] } })
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Artiste' }))
     expect(rows().map((row) => row[1])).toEqual(['Aurore', 'Aurore', 'Aurore', 'Brume', 'Ondes (collectif)'])
@@ -470,10 +573,10 @@ describe('Sorting the list of applications', () => {
 
   it('sorts the applications by their artists’ places, those left out first', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ville' }))
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?sort=city&order=asc$/)
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=all&sort=city&order=asc$/)
     expect(rows().map((row) => [row[0], row[2]])).toEqual([
       ['7 octobre 2026', 'Canada'],
       ['8 octobre 2026', 'Montréal, Canada'],
@@ -484,7 +587,7 @@ describe('Sorting the list of applications', () => {
 
   it('sorts the applications by the first day their artists would like to play', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?sort=received&order=asc')
+    renderAt('/admin/candidatures?status=all&sort=received&order=asc')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Dates' }))
     expect(rows().map((row) => row[4])).toEqual(['29 oct. 2026', '5 nov. 2026', '12 nov. 2026', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)'])
@@ -492,7 +595,7 @@ describe('Sorting the list of applications', () => {
 
   it('sorts the applications by status, in the order they usually go through them', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures')
+    renderAt('/admin/candidatures?status=all')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Statut' }))
     expect(rows().map((row) => row[6])).toEqual(['nouvelle', 'retenue', 'faite', 'refusée'])

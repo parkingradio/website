@@ -42,10 +42,13 @@ import { SetForm } from './set-form'
 function BackToSessions() {
   return (
     <Link to="/admin/sessions" className="admin-back">
-      ← toutes les sessions
+      ← sessions
     </Link>
   )
 }
+
+// What the list of sessions opens on.
+const DEFAULT_STATUS: SessionStatus = 'planned'
 
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
 type SessionColumn = 'date' | 'name' | 'status'
@@ -56,10 +59,13 @@ function compareStarts(a: Session, b: Session): number {
   return start(a) - start(b) || Date.parse(a.createdAt) - Date.parse(b.createdAt)
 }
 
-const SESSION_COLUMNS: Record<SessionColumn, SortColumn<Session>> = {
-  date: { compare: compareStarts, descendingFirst: true },
-  name: { compare: (a, b) => compareText(a.title, b.title) },
-  status: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
+// The soonest come first in the default view, and the latest otherwise.
+function sessionColumns(status: SessionStatus | null): Record<SessionColumn, SortColumn<Session>> {
+  return {
+    date: { compare: compareStarts, descendingFirst: status !== DEFAULT_STATUS },
+    name: { compare: (a, b) => compareText(a.title, b.title) },
+    status: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
+  }
 }
 
 function SessionsFailure({ message }: { message: string }) {
@@ -262,12 +268,12 @@ function sessionSearchFields(session: Session): string[] {
   ].filter(Boolean)
 }
 
-// Every session, the latest first unless they're sorted otherwise, or those `query` finds, or only those with the status
-// in the `status` query parameter. The status's buttons count the sessions the search finds.
+// The sessions with the status in the `status` query parameter, the default view without one, or every session, or those
+// of them that `query` finds. The status's buttons count the sessions the search finds.
 function SessionsList({ query }: { query: string }) {
   const sessions = useApi('/api/admin/sessions')
-  const sorting = useSort(SESSION_COLUMNS, 'date')
-  const [status, setStatus] = useStatusFilter(STATUSES)
+  const [status, setStatus] = useStatusFilter(STATUSES, DEFAULT_STATUS)
+  const sorting = useSort(sessionColumns(status), 'date')
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
   if (sessions.kind === 'loading') return null
@@ -287,7 +293,9 @@ function SessionsList({ query }: { query: string }) {
         onChange={setStatus}
       />
       {listed.length === 0 ? (
-        <p className="admin-placeholder">{withStatus(all).length === 0 ? 'Aucune session.' : 'Aucune session ne correspond à la recherche.'}</p>
+        <p className="admin-placeholder">
+          {all.length === 0 ? 'Aucune session.' : withStatus(all).length === 0 ? 'Aucune session avec ce statut.' : 'Aucune session ne correspond à la recherche.'}
+        </p>
       ) : (
         <SessionsTable sessions={listed} sorting={sorting} />
       )}

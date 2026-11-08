@@ -43,7 +43,7 @@ const LISTED_DATES = 3
 function BackToApplications() {
   return (
     <Link to="/admin/candidatures" className="admin-back">
-      ← toutes les candidatures
+      ← candidatures
     </Link>
   )
 }
@@ -63,16 +63,21 @@ function ownerOf(application: Application, owners: Owners): Entry | undefined {
   return owners.get(entryPath(kind, id))
 }
 
+// What the list of applications opens on.
+const DEFAULT_STATUS: ApplicationStatus = 'new'
+// Those still to go through, where the oldest come first, rather than the most recently received.
+const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
+
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
 // them.
 type ApplicationColumn = 'received' | 'artist' | 'city' | 'dates' | 'status'
 
-function applicationColumns(owners: Owners): Record<ApplicationColumn, SortColumn<Application>> {
+function applicationColumns(owners: Owners, status: ApplicationStatus | null): Record<ApplicationColumn, SortColumn<Application>> {
   const name = (application: Application) => ownerOf(application, owners)?.name ?? ''
   // An unknown artist or collective has no city or country, like one whose place is left out.
   const placeOf = (application: Application) => ownerOf(application, owners) ?? { city: '', country: '' }
   return {
-    received: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: true },
+    received: { compare: (a, b) => Date.parse(a.receivedAt) - Date.parse(b.receivedAt), descendingFirst: !OLDEST_FIRST.includes(status) },
     artist: { compare: (a, b) => compareText(name(a), name(b)) },
     city: { compare: (a, b) => comparePlaces(placeOf(a), placeOf(b)) },
     // By the first day the artist would like to play.
@@ -227,8 +232,8 @@ function applicationSearchFields(application: Application): string[] {
   return [describePerformanceTypes(application), application.details, ...application.dates.map(formatDay)].filter(Boolean)
 }
 
-// Every application, the most recently received first unless they're sorted otherwise, or those `query` finds, or only
-// those with the status in the `status` query parameter. The status's buttons count the applications the search finds.
+// The applications with the status in the `status` query parameter, the default view without one, or every application,
+// or those of them that `query` finds. The status's buttons count the applications the search finds.
 function ApplicationsList({ query }: { query: string }) {
   const applications = useApi('/api/admin/applications')
   const artists = useApi('/api/admin/artists')
@@ -238,8 +243,8 @@ function ApplicationsList({ query }: { query: string }) {
     artists.kind === 'loaded' ? artists.value.artists : null,
     collectives.kind === 'loaded' ? collectives.value.collectives : [],
   )
-  const sorting = useSort(applicationColumns(byKey), 'received')
-  const [status, setStatus] = useStatusFilter(APPLICATION_STATUSES)
+  const [status, setStatus] = useStatusFilter(APPLICATION_STATUSES, DEFAULT_STATUS)
+  const sorting = useSort(applicationColumns(byKey, status), 'received')
 
   if (applications.kind === 'error') {
     return (
@@ -268,7 +273,13 @@ function ApplicationsList({ query }: { query: string }) {
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       {listed.length === 0 ? (
-        <p className="admin-placeholder">{withStatus(all).length === 0 ? 'Aucune candidature.' : 'Aucune candidature ne correspond à la recherche.'}</p>
+        <p className="admin-placeholder">
+          {all.length === 0
+            ? 'Aucune candidature.'
+            : withStatus(all).length === 0
+              ? 'Aucune candidature avec ce statut.'
+              : 'Aucune candidature ne correspond à la recherche.'}
+        </p>
       ) : (
         <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} />
       )}

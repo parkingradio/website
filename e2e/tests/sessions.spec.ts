@@ -11,7 +11,7 @@ const rowsOf = (within: Page | Locator, text: string) => within.getByRole('row')
 const value = (page: Page, label: string) => page.locator('dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
 
 test('the seeded sessions are listed, searched and filtered, and on the pages of their artists and collectives', async ({ page }) => {
-  await logIn(page, { at: '/admin/sessions' })
+  await logIn(page, { at: '/admin/sessions?status=all' })
   const search = page.getByRole('searchbox', { name: 'Rechercher' })
   await search.fill('onde commune takeover')
   // Its name is the one its type gives it.

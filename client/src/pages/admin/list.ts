@@ -168,9 +168,11 @@ export function useSort<K extends string, T>(columns: Record<K, SortColumn<T>>, 
   }
 }
 
-// The status a list is filtered by, in the URL, if it's one of `statuses`, and what changes it, or removes it (null).
-export function useStatusFilter<S extends string>(statuses: readonly S[]): [S | null, (status: S | null) => void] {
+// The status a list is filtered by, or null for every status, and what changes it. The URL says which, with `all` for
+// every status, and without one of `statuses`, the list shows `initial`, its default view.
+export function useStatusFilter<S extends string>(statuses: readonly S[], initial: NoInfer<S>): [S | null, (status: S | null) => void] {
   const [params, change] = useQueryParams()
-  const status = statuses.find((status) => status === params.get('status')) ?? null
-  return [status, (status) => change({ status })]
+  const param = params.get('status')
+  const status = param === 'all' ? null : (statuses.find((status) => status === param) ?? initial)
+  return [status, (status) => change({ status: status ?? 'all' })]
 }

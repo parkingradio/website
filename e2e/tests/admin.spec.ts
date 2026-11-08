@@ -157,7 +157,7 @@ test('collectives are listed and searched with the artists, and lead to their ar
 test("a collective's application is listed with its city and its artists' genres, and on its page, which leads to another one", async ({
   page,
 }) => {
-  await logIn(page, { at: '/admin/candidatures' })
+  await logIn(page, { at: '/admin/candidatures?status=all' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('onde commune')
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Onde Commune', exact: true }) })
   await expect(row).toContainText('Onde Commune (collectif)')
