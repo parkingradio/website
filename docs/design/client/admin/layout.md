@@ -37,19 +37,27 @@ is (see [Times, in Conventions](../../server/README.md#conventions)), and take t
 ## Searching lists
 
 The lists of artists and collectives, of applications and of sessions (see [Artistes](artistes.md),
-[Candidatures](candidatures.md) and [Sessions](sessions.md)), find the entries that have every word searched for, in any
-of the fields searched, whatever their case and accents, with "œ" and "æ" the same as "oe" and "ae", and allowing for
-about one typo every 5 letters. A day of the month next to a month, before or after it (e.g. "26 déc" or "déc 26"), with
-or without the year after them, is searched as a date, which counts as one word: it finds only the entries with that day
-written out in one field (e.g. "samedi 26 décembre 2026"), not those that merely have "26" and "déc" somewhere. The
-month is in French, written out or by its first three letters or more, as long as no other month starts with them (e.g.
-"sept" or "juil", but not "jui"). The day can be written "1er" or "01". Words are read from left to right, so "3 déc 26"
-is the date "3 déc", then the word "26". The search and the order are kept in the page's address, along with the status
-of applications or sessions, so that going back to a list from one of its entries with the browser's back button finds
-it as it was. The address's parameters are `search` (what's searched for), `sort` (the column the list is sorted by, as
-each page names it), `order` (`asc` or `desc`, which only counts along with `sort`) and `status` (as the server names
-it, e.g. `accepted`). Without `order`, "Reçue le" and "Date" sort the latest first, and every other column sorts in
-ascending order. A value the page doesn't know is ignored, as if the parameter weren't there.
+[Candidatures](candidatures.md) and [Sessions](sessions.md)), find the entries that have every word searched for, on its
+own or in a longer word (e.g. "mar" in "mardi"), in any of the fields searched, whatever their case and accents, with
+"œ" and "æ" the same as "oe" and "ae", and allowing for about one typo every 5 letters.
+
+A day of the month with a month or a weekday next to it, before or after it, or a weekday on one side and a month on the
+other (e.g. "26 déc", "déc 26", "sam 26" or "sam. 26 déc."), with or without the year after them, is searched as a date,
+which counts as one word: it finds only the entries with that day written out in one field (e.g.
+"samedi 26 décembre 2026"), not those that merely have "26" and "déc" somewhere, or "samedi 26" without a month after it
+("sam 26" finds "samedi 26 décembre 2026", whatever the month, but not "samedi 26 ou dimanche 27"). Months and weekdays
+are in French, written out or by their first three letters or more, as long as no other month, or no other weekday,
+starts with them (e.g. "sept", "juil" or "sam", but not "jui"). "mar" can be either: "mar 5" finds March 5th and
+Tuesdays the 5th, but "mar 5 jan" only Tuesday, January 5th, and "jeu 5 mar" Thursday, March 5th. The day can be written
+"1er" or "01". Words are read from left to right, so "déc 26 janv 3" is the dates "déc 26" and "janv 3", and "3 déc 26"
+the date "3 déc", then the word "26".
+
+The search and the order are kept in the page's address, along with the status of applications or sessions, so that
+going back to a list from one of its entries with the browser's back button finds it as it was. The address's parameters
+are `search` (what's searched for), `sort` (the column the list is sorted by, as each page names it), `order` (`asc` or
+`desc`, which only counts along with `sort`) and `status` (as the server names it, e.g. `accepted`). Without `order`,
+"Reçue le" and "Date" sort the latest first, and every other column sorts in ascending order. A value the page doesn't
+know is ignored, as if the parameter weren't there.
 
 ## Tooltips
 

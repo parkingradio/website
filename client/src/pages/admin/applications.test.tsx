@@ -283,7 +283,7 @@ describe('Searching the list of applications', () => {
     await expectSearch('mars', [])
   })
 
-  it('finds applications by a day of the month and a month, only on that day, written as it may be typed', async () => {
+  it('finds applications by a day of the month with a month or a weekday, only on that day, written as it may be typed', async () => {
     const on = (day: number, dates: string[], changes: Partial<Application> = {}) => ({
       ...APPLICATION,
       id: `application-${day}`,
@@ -293,10 +293,11 @@ describe('Searching the list of applications', () => {
       ...changes,
     })
     const applications = [
+      on(6, ['2026-11-12'], { details: 'Dispo le samedi 26 ou le dimanche 27.' }),
       on(5, ['2026-12-26']),
       on(4, ['2026-11-26', '2026-12-03'], { details: 'J’ai décidé de postuler.' }),
       on(3, ['2025-12-26'], { artistId: 'artist-2' }),
-      on(2, ['2026-12-11', '2026-12-21']),
+      on(2, ['2026-12-11', '2026-12-21', '2027-03-01']),
       on(1, ['2026-12-01']),
     ]
     mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications } })
@@ -315,6 +316,33 @@ describe('Searching the list of applications', () => {
     await expectSearch('31 nov', [])
     // "3 déc", then "26", which is in "2026".
     await expectSearch('3 déc 26', ['4 octobre 2026'])
+    // "déc 3", then "nov 26".
+    await expectSearch('déc 3 nov 26', ['4 octobre 2026'])
+
+    // A weekday and a day, before or after it: Saturday, December 26th, 2026, not the other 26ths, nor "samedi 26" in
+    // details.
+    await expectSearch('sam 26', ['5 octobre 2026'])
+    await expectSearch('26 samedi', ['5 octobre 2026'])
+    await expectSearch('déc 26 sam', ['5 octobre 2026'])
+    await expectSearch('jeu 26', ['4 octobre 2026'])
+    await expectSearch('jeu 26 jeu 3', ['4 octobre 2026'])
+    // Not Friday, December 11th.
+    await expectSearch('ven 1', [])
+    await expectSearch('lun 26 déc 2026', [])
+    // "mar" is mardi or mars, unless it's with another month or weekday: Tuesday, December 1st, 2026, and Monday, March
+    // 1st, 2027.
+    await expectSearch('mar 1', ['2 octobre 2026', '1 octobre 2026'])
+    await expectSearch('1 mar', ['2 octobre 2026', '1 octobre 2026'])
+    await expectSearch('mar 1 2026', ['1 octobre 2026'])
+    await expectSearch('1 mar 2027', ['2 octobre 2026'])
+    await expectSearch('mar 1 déc', ['1 octobre 2026'])
+    await expectSearch('mar. 1 déc. 2026', ['1 octobre 2026'])
+    await expectSearch('lun 1 mar', ['2 octobre 2026'])
+    await expectSearch('mars 1', ['2 octobre 2026'])
+    // Without a day, words.
+    await expectSearch('mar', ['2 octobre 2026', '1 octobre 2026'])
+    await expectSearch('mardi', ['1 octobre 2026'])
+    await expectSearch('1 déc mar', ['1 octobre 2026'])
   })
 
   it('counts the applications the search finds, by status, and keeps both in the URL', async () => {

@@ -196,8 +196,8 @@ export function collectiveEntry(collective: Collective, artists: Map<string, Art
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeZone: QUEBEC_TIME_ZONE })
 export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: QUEBEC_TIME_ZONE })
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to be the same day wherever this
-// runs. The lists' search relies on the day, the month written out and the year being next to each other, in that
-// order (see search in list.ts).
+// runs. The lists' search relies on the weekday, the day, the month and the year being next to each other, in that
+// order, with the weekday and the month written out (see search in list.ts).
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 const shortDayFormat = new Intl.DateTimeFormat('fr-CA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 

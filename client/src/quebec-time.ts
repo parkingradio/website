@@ -25,8 +25,8 @@ export function quebecDayAndTime(instant: Date): { day: string; time: string } {
   return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
 }
 
-// The admin lists' search relies on the day, the month written out and the year being next to each other, in that order
-// (see search in pages/admin/list.ts).
+// The admin lists' search relies on the weekday, the day, the month and the year being next to each other, in that
+// order, with the weekday and the month written out (see search in pages/admin/list.ts).
 const longDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
 
 // E.g. "samedi 14 novembre 2026", the day of `instant` (ISO 8601) in Québec.

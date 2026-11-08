@@ -262,7 +262,7 @@ describe('The list of sessions', () => {
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (1)', 'annulées (0)'])
   })
 
-  it('searches the sessions by title, type, takeover, performer, and day written out, or a day of the month and a month', async () => {
+  it('searches the sessions by title, type, takeover, performer, and day, written out or as the list shows it', async () => {
     mockFetch(LIST)
     renderAt('/admin/sessions')
 
@@ -275,6 +275,9 @@ describe('The list of sessions', () => {
     await expectSearch('14 nov', ['sam. 14 nov. 2026'])
     await expectSearch('nov 14', ['sam. 14 nov. 2026'])
     await expectSearch('31 août 2026', ['lun. 31 août 2026'])
+    // What the list shows can be typed back.
+    await expectSearch('sam 14', ['sam. 14 nov. 2026'])
+    await expectSearch('ven. 2 oct.', ['ven. 2 oct. 2026'])
     // Not by "2" in "2026".
     await expectSearch('2 nov', [])
     await expectSearch('determiner', ['date à déterminer'])
@@ -1199,6 +1202,10 @@ describe('Adding a session', () => {
     expect(found('31 oct')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
     expect(found('samedi 5 décembre 2026')).toEqual(['ONDES TAKEOVER, sam. 5 déc. 2026n° 2300000'])
     expect(found('haute 31 oct')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
+    // As an event's day is shown, with "mar" for mardi, or by its weekday and day alone.
+    expect(found('mar 1 sept')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
+    expect(found('mar 1')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
+    expect(found('mar. 1 sept. 2026')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
     // A number, or part of one, exactly, without the typos titles allow for.
     expect(found('8374')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745', 'PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
     expect(found('45')).toEqual(['HAUTE RIVE TAKEOVER, sam. 31 oct. 2026n° 6683745'])
