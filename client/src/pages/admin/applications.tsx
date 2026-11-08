@@ -264,10 +264,6 @@ export function ApplicationsPage() {
         <SearchField query={query} onChange={setQuery} />
       </div>
       <ApplicationsList query={query} />
-      <p className="admin-meta">
-        Les destinataires des candidatures envoyées par e-mail se choisissent dans la{' '}
-        <Link to="/admin/configuration">configuration</Link>.
-      </p>
     </>
   )
 }

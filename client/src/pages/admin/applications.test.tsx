@@ -142,8 +142,6 @@ describe('The list of applications', () => {
     expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')
-    // Where who they're emailed to is chosen.
-    expect(within(screen.getByText(/se choisissent dans la/)).getByRole('link')).toHaveAttribute('href', '/admin/configuration')
   })
 
   it('lists only the applications with a status, once it is picked', async () => {

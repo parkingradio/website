@@ -27,9 +27,6 @@ artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée,
 that column, and clicking it again sorts it the other way around. The status buttons count the applications the search
 finds.
 
-Under the list, a line says that who the applications artists send are emailed to is chosen in
-[Configuration](configuration.md), and links to it.
-
 Clicking an application opens it at `/admin/candidatures/<id>`. Under its title, it says when it was received (unless
 that's the day it was created), who created it and when, or that it was sent through the form, and who last changed it
 and when, if anyone did. From top to bottom, it then shows:
