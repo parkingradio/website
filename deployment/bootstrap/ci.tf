@@ -44,7 +44,7 @@ resource "aws_iam_role" "github_actions_deploy" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           "token.actions.githubusercontent.com:sub" = [
             for environment in var.deploy_environments :
-            "repo:parkingradio/radio:environment:${environment}"
+            "repo:parkingradio/website:environment:${environment}"
           ]
         }
       }
