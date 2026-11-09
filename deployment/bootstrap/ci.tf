@@ -30,6 +30,10 @@ data "aws_iam_openid_connect_provider" "github_actions" {
 
 # Only the environments in var.deploy_environments, running the `deploy.yml` workflow in this repo,
 # can assume this role. A `sub` claim listing several values matches if any one of them does.
+#
+# GitHub gives this repo immutable subjects, which name its owner and itself along with their ids
+# (`parkingradio@<owner id>/website@<repo id>`), so that another repo taking its name later can't
+# assume the role.
 resource "aws_iam_role" "github_actions_deploy" {
   name = "parking-radio-github-actions-deploy"
 
@@ -44,7 +48,7 @@ resource "aws_iam_role" "github_actions_deploy" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           "token.actions.githubusercontent.com:sub" = [
             for environment in var.deploy_environments :
-            "repo:parkingradio/website:environment:${environment}"
+            "repo:parkingradio@274848085/website@1451495823:environment:${environment}"
           ]
         }
       }
