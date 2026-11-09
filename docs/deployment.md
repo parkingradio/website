@@ -65,15 +65,14 @@ on the first deployment. From then on, `bootstrap` is used like any other module
 from any machine with credentials for the account.
 
 After applying, the GitHub repository needs to be configured once. We use two GitHub environments
-(`test` and `production`) which allows two different deployments to coexist at once. `AWS_DEPLOY_ROLE_ARN`
-is the same for every environment and belongs at the repository level:
+(`test` and `production`) which allows two different deployments to coexist at once. Each deployment's GitHub
+environment has:
 
-- Variable `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap. This allows
-  the CI deployment pipeline to perform operations in the AWS account (e.g. deploy EC2) based on the OIDC trust
-  chain established by the one-time bootstrap. This is not sensitive.
-
-Other variables differ per deployment and belong on each deployment's GitHub environment:
-
+- Secret `AWS_DEPLOY_ROLE_ARN`: This is output by Terraform when doing the one-time CI bootstrap, and is the same
+  for every environment. This allows the CI deployment pipeline to perform operations in the AWS account (e.g.
+  deploy EC2) based on the OIDC trust chain established by the one-time bootstrap. It isn't a credential, but it's
+  a secret so that GitHub masks it in the workflows' logs, which are public, along with the AWS account's id it
+  contains (see `mask-aws-account-id` in the workflows).
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
   `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, `Zone:Zone Settings:Edit`, and
