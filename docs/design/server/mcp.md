@@ -74,8 +74,9 @@ endpoints, `GET /api/radio` and `GET /api/events`, except:
   give someone access, or send applicants' personal data to someone.
   `GET /api/admin/applications/recipients` is a tool.
 - The endpoints that enter or check the credentials of the SoundCloud app (see
-  [The SoundCloud app](radio.md#the-soundcloud-app)), so that secrets aren't sent to the model's provider.
-  `GET /api/admin/radio/credentials`, which doesn't give the secret, is a tool.
+  [The SoundCloud app](radio.md#the-soundcloud-app)) and of YouTube (see
+  [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
+  `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints of photos, which aren't JSON.
 
@@ -141,7 +142,7 @@ own. Every tool has `openWorldHint` set to `false`.
 ### `read_documentation`
 
 Gives the model the rules of an area, e.g. the rules sessions and sets follow, their statuses and what deleting them
-does, rather than finding them out from errors. It takes `area`, one of `radio`, `artists`, `collectives`,
+does, rather than finding them out from errors. It takes `area`, one of `radio`, `video`, `artists`, `collectives`,
 `applications`, `sessions` and `events`, and gives the instructions (see [The endpoint](#the-endpoint)), as they are,
 the sentence about the environment included, for the apps that don't give them to the model, then the part of that
 area's document in this directory before its first endpoint, as it is, except for its links, which the model can't

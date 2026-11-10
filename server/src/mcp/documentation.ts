@@ -35,7 +35,7 @@ export function serverName(environment: string): string {
 }
 
 // The areas whose rules `read_documentation` gives, by the name of their design document.
-export const AREAS = ['radio', 'artists', 'collectives', 'applications', 'sessions', 'events'] as const
+export const AREAS = ['radio', 'video', 'artists', 'collectives', 'applications', 'sessions', 'events'] as const
 export type Area = (typeof AREAS)[number]
 export const isArea = (name: unknown): name is Area => (AREAS as readonly unknown[]).includes(name)
 

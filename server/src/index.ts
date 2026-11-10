@@ -14,6 +14,8 @@ import { soundCloudClient } from './radio/soundcloud.js'
 import { soundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { onAirStore } from './radio/on-air.js'
 import { radioSettingsStore } from './radio/settings.js'
+import { youTubeCredentialsStore } from './video/credentials.js'
+import { youtube } from './video/youtube.js'
 import { artistsStore, privatePhotos } from './artists/store.js'
 import { collectivesStore } from './collectives/store.js'
 import { privateBucket } from './core/private-bucket.js'
@@ -52,6 +54,8 @@ await registerRoutes(app, {
   soundCloudCredentials: soundCloudCredentialsStore(db),
   onAir: onAirStore(db),
   radioSettings: radioSettingsStore(db),
+  youtube,
+  youtubeCredentials: youTubeCredentialsStore(db),
   artists: artistsStore(db),
   collectives: collectivesStore(db),
   photos: privatePhotos(privateBucket(config.privateFiles)),

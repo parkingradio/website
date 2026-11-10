@@ -36,8 +36,8 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   the database's, gets a 500, unless the endpoint says otherwise. Either way, its message only says that something went
   wrong: what went wrong is logged, but without the personal data it could include, e.g. the values of a failed
   database query. Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
-  `GET /api/events`, `GET /api/radio` and `GET /api/radio/tracks/:id/stream`. Unknown paths under `/api` get a 404
-  error, whatever the request's body. What apps call for OAuth and MCP has its own errors (see below).
+  `GET /api/events`, `GET /api/radio`, `GET /api/radio/tracks/:id/stream` and `GET /api/video`. Unknown paths under
+  `/api` get a 404 error, whatever the request's body. What apps call for OAuth and MCP has its own errors (see below).
 - **OAuth and MCP.** What apps call follows its standards rather than the conventions above: the endpoints that get and
   revoke tokens take forms (`application/x-www-form-urlencoded`), and they and the metadata documents under
   `/.well-known` answer without `ok`, with OAuth's errors (`error` and `error_description`), while `/mcp` answers in
@@ -143,6 +143,10 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the server reads SoundCloud through |
 | [`PUT /api/admin/radio/credentials`](radio.md#put-apiadminradiocredentials-admin) | admin | Entering the credentials of that SoundCloud app |
 | [`POST /api/admin/radio/credentials/check`](radio.md#post-apiadminradiocredentialscheck-admin) | admin | Whether SoundCloud accepts credentials, without saving them |
+| [`GET /api/video`](video.md#get-apivideo) | public | The video the site shows now |
+| [`GET /api/admin/video/credentials`](video.md#get-apiadminvideocredentials-admin) | admin | The YouTube channel the server reads the video from, and why the last read failed, if it did |
+| [`PUT /api/admin/video/credentials`](video.md#put-apiadminvideocredentials-admin) | admin | Entering the YouTube channel and the key it's read with |
+| [`POST /api/admin/video/credentials/check`](video.md#post-apiadminvideocredentialscheck-admin) | admin | Whether YouTube accepts a key and finds a channel, without saving them |
 | [`GET /api/admin/artists`](artists.md#get-apiadminartistscollectiveid-admin) | admin | Every artist, or a collective's |
 | [`GET /api/admin/artists/:id`](artists.md#get-apiadminartistsid-admin) | admin | An artist |
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |

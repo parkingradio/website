@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
-import { ApiError, Day, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
+import { ApiError, Credential, Day, Ok, Timestamp, zodRoutes } from '../api/schemas.js'
 import { cached } from '../core/cache.js'
 import type { OnAir, OnAirStore } from './on-air.js'
 import type { RadioSettings, RadioSettingsStore } from './settings.js'
@@ -73,15 +73,6 @@ type ChosenPlaylist = z.infer<typeof ChosenPlaylist>
 
 const PlaylistRequest = z.object({ link: z.string() })
 
-// The client has its own copy, for its form (see client/src/pages/admin/configuration/soundcloud.tsx).
-const CREDENTIAL_MAX_LENGTH = 200
-// openapi.json can't say that it's trimmed before its length is checked, so the description does.
-const Credential = z
-  .string()
-  .trim()
-  .min(1)
-  .max(CREDENTIAL_MAX_LENGTH)
-  .meta({ description: `Trimmed, then between 1 and ${CREDENTIAL_MAX_LENGTH} characters` })
 const CredentialsRequest = z.object({ clientId: Credential, clientSecret: Credential })
 
 // What `GET` and `PUT /api/admin/radio/credentials` respond. The secret is never sent back.

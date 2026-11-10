@@ -4,6 +4,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
+- "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -31,6 +32,20 @@ the credentials. "vérifier" asks SoundCloud whether it accepts the credentials 
 "enregistrer" saves them, which it only allows once the credentials typed have been verified. Each one shows a green
 check mark next to it once it went through, until the credentials are changed again.
 
+## Connexion YouTube
+
+The YouTube channel the server reads the site's video from, and the API key it reads it with (see
+[The YouTube credentials](../../server/video.md#the-youtube-credentials)). It says that the channel's id is found in the
+advanced settings of its YouTube account, linking to them (`https://www.youtube.com/account_advanced`), and the key in
+the credentials of a Google Cloud project, linking to them (`https://console.cloud.google.com/apis/credentials`),
+restricted to the YouTube Data API v3. It shows which admin last changed them, and when, or, until they're entered, that
+the site has no video to show. When the last read of YouTube failed, it says why.
+
+Under that, a form replaces them, like the SoundCloud app's credentials: the channel's id, filled in with the current
+one, and the key, whose field only shows dots in its place, since it's never sent back, and has to be typed. "vérifier"
+asks YouTube whether it accepts the key and finds the channel, without saving them, and "enregistrer" saves them, which
+it only allows once they've been verified, each with a check mark like the SoundCloud app's.
+
 ## Features
 
 The feature flags (see [Features](../../server/features.md)). It lists every flag, each with a switch, its name, what it
@@ -45,4 +60,6 @@ retired flag is removed too.
   par e-mail".
 - `GET /api/admin/radio/credentials`, `POST /api/admin/radio/credentials/check` and
   `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
+- `GET /api/admin/video/credentials`, `POST /api/admin/video/credentials/check` and
+  `PUT /api/admin/video/credentials`, for "Connexion YouTube".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".
