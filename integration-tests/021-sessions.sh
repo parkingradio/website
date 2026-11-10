@@ -255,6 +255,15 @@ expect_status 200
 expect_header Content-Type 'image/jpeg'
 expect_header X-Content-Type-Options 'nosniff'
 expect_header Cache-Control 'private, no-store'
+curl --silent --header "Cookie: ${cookie}" --output "${FILES}/served" "${SESSIONS}/${described}/flyer"
+cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
+# A flyer sent with a session that isn't saved is deleted: one that would overlap the first session, or a takeover of a
+# collective that doesn't exist.
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T22:00-05:00"' 60)" --form "flyer=@${FILES}/flyer.png"
+expect_status 409
+session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${NOBODY}\"")" --form "flyer=@${FILES}/flyer.png"
+expect_status 400
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the flyers of the sessions that weren't saved to be deleted"
 # Without a flyer, the session keeps its own.
 session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)"
 expect_body_contains '"hasFlyer":true'

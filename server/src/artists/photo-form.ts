@@ -22,11 +22,10 @@ const LIMITS: FormLimits = { files: 5, fields: 10, fieldSize: 64 * 1024 }
 
 // Reads a PhotoForm from `request`, with the photo from the part named `photoPart`. The route must have registered the
 // multipart plugin. Files other than the photos it reads are ignored: with `memberPhotos`, the "memberPhoto" parts are
-// read too. Every photo it reads stays in memory until
-// the request is done, which `limits` bounds. Returns `{ tooLarge }` if a photo is over PHOTO_MAX_BYTES, with the index
-// of the "memberPhoto" part when it's one of them, or undefined for the "photo" part, and "malformed" if the request
-// isn't actually multipart/form-data, has more fields or files than `limits` allows, a field larger than it allows, or
-// more than one photo part.
+// read too. Every photo it reads stays in memory until the request is done, which `limits` bounds. Returns
+// `{ tooLarge }` if a photo is over PHOTO_MAX_BYTES, with the index of the "memberPhoto" part when it's one of them, or
+// undefined for the photo part, and "malformed" if the request isn't actually multipart/form-data, has more fields or
+// files than `limits` allows, a field larger than it allows, or more than one photo part.
 export async function readPhotoForm(
   request: FastifyRequest,
   {
@@ -96,13 +95,13 @@ export const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as cons
 // collective, and checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character
 // (see `refusingNul` in api/schemas.ts), along with the "removePhoto" field, which only changing one reads. Returns the
 // checked profile and photo (null when there's none), or the error to reply with when the request is malformed or
-// invalid. A session's fields and flyer are read the same way, with `image` naming the flyer's part, the field that
-// removes it, and its errors.
+// invalid. A session's fields and flyer are read the same way, with `photoPart` naming the flyer's part, `remove` the
+// field that removes it, and `errors` what's wrong with it.
 export async function readProfileForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   part: string,
   schema: Schema,
-  { part: photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { part?: string; remove?: string; errors?: PhotoErrors } = {},
+  { photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { photoPart?: string; remove?: string; errors?: PhotoErrors } = {},
 ): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string }> {
   const form = await readPhotoForm(request, { photoPart })
   if (form === 'malformed') return INVALID_REQUEST

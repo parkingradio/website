@@ -5,10 +5,10 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 
 ## Conventions
 
-- **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON, except for photos and flyers. A body of a type the endpoint doesn't take fails with a 4xx, and the server
-  refuses bodies other than `multipart/form-data` that are larger than any endpoint needs, with a 413. One exception:
-  in production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
+- **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
+  is JSON, except for photos and flyers. A body of a type the endpoint doesn't take fails with a 4xx, and the server
+  refuses bodies other than `multipart/form-data` that are larger than any endpoint needs, with a 413. One exception: in
+  production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
   collective's application with 5 photos.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
   daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times in Québec

@@ -47,6 +47,11 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await rowsOf(page, 'SYNTH MEETUPS').getByRole('link').first().click()
   await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 64)
+  // The form shows the same one, from the client's copy of the server's.
+  const described = await value(page, 'Description').textContent()
+  await page.getByRole('button', { name: 'modifier' }).click()
+  await expect(page.getByLabel('Description')).toHaveAttribute('placeholder', described!)
+  await page.getByRole('button', { name: 'annuler' }).click()
   await page.goBack()
   await search.fill('live performance')
   await expect(rowsOf(page, 'LIVE PERFORMANCE')).toContainText('Ondine')

@@ -88,8 +88,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
   « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
   [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
-- "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its takeover's
-  collective, stay, which the page says of those it has.
+- "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
+  takeover's collective, stay, which the page says of those it has.
 
 Only one form is open at a time on a session's page, the session's or a set's: opening one closes the other, losing what
 wasn't saved.
@@ -119,9 +119,9 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
   gives (see [Descriptions](../../server/sessions.md#descriptions)). For the types that give one, that description shows
   in the empty field, and, while the field doesn't hold it, "reprendre le texte par défaut" fills the field with it, so
   that a few words of it can be changed, which makes it the session's own.
-- "Flyer": the session's flyer, like an artist's photo (see [An artist's page](artistes.md#an-artists-page)): an × removes
-  it once the session is saved, and a flyer that's chosen replaces it. It's checked as soon as it's chosen, as the server
-  checks it (see [Flyers](../../server/sessions.md#flyers)).
+- "Flyer": the session's flyer, like an artist's photo (see [An artist's page](artistes.md#an-artists-page)): an ×
+  removes it once the session is saved, and a flyer that's chosen replaces it. It's checked as soon as it's chosen, as
+  the server checks it (see [Flyers](../../server/sessions.md#flyers)).
 - "Événement RA": picked from every one of Parking Radio's events, past ones included, read from RA (see
   [Events](../../server/events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its title and
   the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g. "n° 6683745", the

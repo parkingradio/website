@@ -109,7 +109,7 @@ const SessionForm = NewSessionForm.extend({
 async function readSessionForm(
   request: FastifyRequest,
 ): Promise<{ fields: SessionFields; flyer: SentPhoto | null; removeFlyer: boolean } | { status: 400 | 413; error: string }> {
-  const sent = await readProfileForm(request, 'session', SessionFields, { part: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
+  const sent = await readProfileForm(request, 'session', SessionFields, { photoPart: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
   return 'error' in sent ? sent : { fields: sent.profile, flyer: sent.photo, removeFlyer: sent.removePhoto }
 }
 

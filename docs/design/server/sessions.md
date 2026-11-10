@@ -336,8 +336,8 @@ there's no such session, or 409 when the session would then overlap another one,
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 
-Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay. Fails with 404 when there's no such
-session.
+Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay. Fails with
+404 when there's no such session.
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
