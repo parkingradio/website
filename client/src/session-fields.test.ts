@@ -59,6 +59,9 @@ function session(start: string | null, durationMinutes: number, sets: StudioSet[
     name: '',
     title: 'GUEST MIXES',
     raEvent: null,
+    description: '',
+    effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+    hasFlyer: false,
     sets,
     ...TRACKED,
   }
@@ -171,6 +174,7 @@ describe('checkSession', () => {
         takeover: 'collective-1',
         name: 'HAUTE RIVE TAKEOVER',
         raEvent: '6683745',
+        description: '',
       },
     })
     // The collective picked stays in the form for a takeover, but another type doesn't send it.
@@ -181,6 +185,7 @@ describe('checkSession', () => {
       takeover: null,
       name: 'HAUTE RIVE TAKEOVER',
       raEvent: null,
+      description: '',
     })
   })
 

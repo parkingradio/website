@@ -67,6 +67,11 @@ describe('the tools of the API', () => {
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
       expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone', 'removePhoto']),
     )
+    expect(update.description).toContain("Tools can't send a photo.")
+    const updateSession = tools.find(({ name }) => name === 'update_session')!
+    expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description', 'removeFlyer']))
+    expect(updateSession.description).toContain("Tools can't send a flyer.")
+    expect(updateSession.description).not.toMatch(/email|photo/)
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {
@@ -91,6 +96,7 @@ describe('the tools of the API', () => {
     const { tools } = await apiTools()
     const required = (name: string) => (tools.find((tool) => tool.name === name)!.inputSchema.required as string[]).sort()
     expect(required('create_set')).toEqual(['genres', 'id', 'otherPerformanceType', 'performanceTypes', 'performers'])
+    expect(required('create_session')).toEqual(['description', 'durationMinutes', 'name', 'type'])
     expect(required('update_set')).toEqual(
       ['durationMinutes', 'genres', 'id', 'offsetMinutes', 'otherPerformanceType', 'performanceTypes', 'performers', 'soundcloudTrack', 'youtubeVideo'],
     )

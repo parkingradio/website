@@ -69,9 +69,10 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   [Status](../../server/sessions.md#status)).
 - "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer"),
   how long it lasts ("Durée"), its type ("Type"), for a takeover its collective ("Takeover de"), linking to it, its title
-  ("Nom"), faded out when it's the name its type gives it, and its event on RA ("Événement RA"), linking to it, or "-"
-  when it has none. "modifier" changes the session in a form in its place (see
-  [The session form](#the-session-form)).
+  ("Nom"), faded out when it's the name its type gives it, its description ("Description"), with its line breaks,
+  faded out when it's the one its type gives it, or "-" when it has none, its flyer ("Flyer"), or "Pas de flyer" in its
+  place, so that the team notices, and its event on RA ("Événement RA"), linking to it, or "-" when it has none.
+  "modifier" changes the session in a form in its place (see [The session form](#the-session-form)).
 - "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
   linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
   its links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
@@ -87,7 +88,7 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
   « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
   [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
-- "Supprimer": deletes the session and its sets for good, after confirming. Its sets' artists, and its takeover's
+- "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its takeover's
   collective, stay, which the page says of those it has.
 
 Only one form is open at a time on a session's page, the session's or a set's: opening one closes the other, losing what
@@ -114,6 +115,13 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
   give (see [Types and names](../../server/sessions.md#types-and-names)). For those types, that name shows in the
   empty field ("NOM DU COLLECTIF TAKEOVER" until a takeover's collective is picked). For "Autre", or before a type is
   picked, the field shows an example, "p. ex. LISTENING PARTY". The name is sent as it's typed, its case included.
+- "Description": the session's own description, as plain text on several lines, which replaces the one its type
+  gives (see [Descriptions](../../server/sessions.md#descriptions)). For the types that give one, that description shows
+  in the empty field, and, while the field doesn't hold it, "reprendre le texte par défaut" fills the field with it, so
+  that a few words of it can be changed, which makes it the session's own.
+- "Flyer": the session's flyer, like an artist's photo (see [An artist's page](artistes.md#an-artists-page)): an × removes
+  it once the session is saved, and a flyer that's chosen replaces it. It's checked as soon as it's chosen, as the server
+  checks it (see [Flyers](../../server/sessions.md#flyers)).
 - "Événement RA": picked from every one of Parking Radio's events, past ones included, read from RA (see
   [Events](../../server/events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its title and
   the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g. "n° 6683745", the
@@ -178,6 +186,7 @@ named. Changing a status shows these the same way.
 - `GET /api/admin/sessions`, for the list.
 - `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status` and
   `DELETE /api/admin/sessions/:id`, for a session's page.
+- `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status` and
   `DELETE /api/admin/sets/:id`, for its sets.

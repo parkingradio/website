@@ -1,48 +1,71 @@
 import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Loaded } from '../../api/use-api'
-import type { Schema } from '../../api/client'
+import type { Body, Schema } from '../../api/client'
+import { pickedPhotoError } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import type { ComboboxFilter, ComboboxOption } from '../../combobox'
 import { formatLongQuebecDay } from '../../quebec-time'
-import { SESSION_TYPES, after, checkSession, durationOf, endTimeAfter, minutesOf, sessionTimes, typeName } from '../../session-fields'
-import type { RaEvent, Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
+import {
+  DESCRIPTION_MAX_LENGTH,
+  SESSION_TYPES,
+  TYPE_DESCRIPTIONS,
+  after,
+  checkSession,
+  durationOf,
+  endTimeAfter,
+  minutesOf,
+  sessionTimes,
+  typeName,
+} from '../../session-fields'
+import type { RaEvent, Reference, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
 import { compareText, search } from './list'
+import { PhotoField } from './profile-fields'
 import type { GroupProps } from './profile-fields'
 
-// A form for a session, to add a session or change one, but not its sets. Like the artist form (see artist-form.tsx),
-// each field is checked as the server checks it (see `checkSession`), and says what's wrong once it's been left, or once
-// the form is sent, and the server's error is shown if it refuses the session anyway.
+// A form for a session and its flyer, to add a session or change one, but not its sets. Like the artist form (see
+// artist-form.tsx), each field is checked as the server checks it (see `checkSession`), and says what's wrong once it's
+// been left, or once the form is sent, and the server's error is shown if it refuses the session anyway.
 
 export type SessionFormProps = {
   // What the form starts with: a session's, to change it, or what a new one starts with.
   initial: SessionFormValues
   // Whether the session has sets, which move with it.
   hasSets?: boolean
+  // The address of the session's flyer, if it has one.
+  flyer?: string | null
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
   // is.
   collectives: Collective[] | null
   // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
   submitLabel: string
-  // Sends the session's fields, and returns the error, if it failed.
-  onSubmit: (fields: SessionFields) => Promise<ReactNode | null>
+  // Sends the form, as `PUT /api/admin/sessions/:id` takes it, which `POST /api/admin/sessions` takes too, without
+  // `removeFlyer`, and returns the error, if it failed.
+  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'>) => Promise<ReactNode | null>
   onCancel?: () => void
 }
 
-export function SessionForm({ initial, hasSets = false, collectives, events, submitLabel, onSubmit, onCancel }: SessionFormProps) {
+export function SessionForm({ initial, hasSets = false, flyer: current = null, collectives, events, submitLabel, onSubmit, onCancel }: SessionFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SessionFormValues>) => setForm((form) => ({ ...form, ...changes }))
+  const [flyer, setFlyer] = useState<File | null>(null)
+  // Whether to remove the session's flyer, which only happens once the form is sent.
+  const [removeFlyer, setRemoveFlyer] = useState(false)
   const times = sessionTimes(form)
   const checked = checkSession(form, times)
-  const errors = checked.errors ?? {}
-  // There are fields, since there are no errors by then.
-  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!))
+  const errors: Partial<Record<keyof SessionFormValues | 'flyer', string>> = { ...checked.errors }
+  const flyerProblem = pickedPhotoError(flyer, 'flyer')
+  if (flyerProblem) errors.flyer = flyerProblem
+  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () =>
+    // There are fields, since there are no errors by then.
+    onSubmit({ session: checked.fields!, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }),
+  )
 
   return (
     <form ref={formRef} className="admin-form admin-form-wide" onSubmit={submit} noValidate>
@@ -68,6 +91,21 @@ export function SessionForm({ initial, hasSets = false, collectives, events, sub
       )}
 
       <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
+
+      <DescriptionField form={form} onChange={(description) => update({ description })} error={shown('description')} onLeave={leave('description')} />
+
+      <PhotoField
+        image="flyer"
+        current={current}
+        removed={removeFlyer}
+        onRemove={() => setRemoveFlyer(true)}
+        photo={flyer}
+        onChange={(flyer) => {
+          setFlyer(flyer)
+          leave('flyer')()
+        }}
+        error={shown('flyer')}
+      />
 
       <RaEventField event={form.raEvent} own={initial.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} />
 
@@ -219,6 +257,37 @@ function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { fo
         onBlur={onLeave}
       />
     </Labeled>
+  )
+}
+
+// The session's own description, which replaces the one its type gives it, which the empty field shows, and which can be
+// taken as a start, to change a few words of it.
+function DescriptionField({ form, onChange, error, onLeave }: GroupProps<string> & { form: SessionFormValues }) {
+  const id = useId()
+  const typed = form.type && TYPE_DESCRIPTIONS[form.type]
+  return (
+    <div className="admin-field">
+      <label htmlFor={id}>Description</label>
+      <textarea
+        id={id}
+        value={form.description}
+        rows={8}
+        maxLength={DESCRIPTION_MAX_LENGTH}
+        placeholder={typed || undefined}
+        aria-invalid={error ? true : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onLeave}
+      />
+      <FieldError message={error} />
+      {typed && form.description !== typed && (
+        <p className="admin-hint">
+          Vide, c'est celle de son type.{' '}
+          <button type="button" onClick={() => onChange(typed)}>
+            reprendre le texte par défaut
+          </button>
+        </p>
+      )}
+    </div>
   )
 }
 

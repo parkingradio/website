@@ -2048,6 +2048,17 @@
               }
             ]
           },
+          "description": {
+            "type": "string",
+            "description": "Its own description, which replaces the one its type gives it, or empty for none: the one to send back"
+          },
+          "effectiveDescription": {
+            "type": "string",
+            "description": "Its description, or else the one its type gives it, or empty when neither has one"
+          },
+          "hasFlyer": {
+            "type": "boolean"
+          },
           "sets": {
             "type": "array",
             "items": {
@@ -2110,6 +2121,9 @@
           "name",
           "title",
           "raEvent",
+          "description",
+          "effectiveDescription",
+          "hasFlyer",
           "sets",
           "createdAt",
           "createdBy",
@@ -2157,6 +2171,11 @@
               "string",
               "null"
             ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to 5000 characters. Empty for none"
           }
         },
         "required": [
@@ -2165,7 +2184,8 @@
           "type",
           "takeover",
           "name",
-          "raEvent"
+          "raEvent",
+          "description"
         ]
       },
       "SessionLink": {
@@ -6446,16 +6466,34 @@
       },
       "post": {
         "operationId": "create_session",
-        "summary": "Adds a session, as planned, without sets",
+        "summary": "Adds a session, as planned, without sets, with or without a flyer",
         "tags": [
           "Sessions"
         ],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/SessionFields"
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "$ref": "#/components/schemas/SessionFields"
+                  },
+                  "flyer": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer"
+                  }
+                },
+                "required": [
+                  "session"
+                ]
+              },
+              "encoding": {
+                "session": {
+                  "contentType": "application/json"
+                }
               }
             }
           }
@@ -6523,6 +6561,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -6628,16 +6676,38 @@
       },
       "put": {
         "operationId": "update_session",
-        "summary": "Changes a session, but not its status or its sets, which move with its start",
+        "summary": "Changes a session, and replaces or removes its flyer, but not its status or its sets, which move with its start",
         "tags": [
           "Sessions"
         ],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/SessionFields"
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "$ref": "#/components/schemas/SessionFields"
+                  },
+                  "flyer": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer"
+                  },
+                  "removeFlyer": {
+                    "description": "\"true\" removes the session's flyer, when there's no new one. Anything else keeps it",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session"
+                ]
+              },
+              "encoding": {
+                "session": {
+                  "contentType": "application/json"
+                }
               }
             }
           }
@@ -6729,6 +6799,16 @@
               }
             }
           },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Default Response",
             "content": {
@@ -6743,7 +6823,7 @@
       },
       "delete": {
         "operationId": "delete_session",
-        "summary": "Deletes a session and its sets, but not their performers",
+        "summary": "Deletes a session, its flyer and its sets, but not their performers",
         "tags": [
           "Sessions"
         ],
@@ -6789,6 +6869,89 @@
             }
           },
           "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/{id}/flyer": {
+      "get": {
+        "summary": "A session's flyer",
+        "tags": [
+          "Sessions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
             "description": "Default Response",
             "content": {
               "application/json": {

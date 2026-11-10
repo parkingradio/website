@@ -636,6 +636,10 @@ export type SeedSession = {
   name?: string
   // The event's id on RA, which isn't checked against RA.
   raEvent?: string
+  // Its own description, which replaces the one its type gives it.
+  description?: string
+  // The colour of its flyer, for sessions that have one.
+  flyer?: string
   // The day it starts, as how many days after the day it's seeded (before, if negative), in Québec, and the time it
   // starts there, or nothing for a session whose date isn't known yet.
   when?: { day: number; start: string }
@@ -654,6 +658,8 @@ export const SEED_SESSIONS: SeedSession[] = [
     type: 'takeover',
     takeover: 'onde.commune@example.com',
     raEvent: '2201001',
+    description: 'ONDE COMMUNE TAKEOVER\n\nTrois artistes, trois heures\u00a0: techno, acid et house.\n\nLIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+    flyer: '#2a9d8f',
     when: { day: -30, start: '20:00' },
     durationMinutes: 180,
     status: 'done',
@@ -729,7 +735,7 @@ export const SEED_SESSIONS: SeedSession[] = [
     ],
   },
   // An evening whose times are being changed: two of its sets overlap, and the last one ends after it, which its page
-  // marks (see "Sets' places" in docs/design/server/sessions.md).
+  // marks (see "Sets' places" in docs/design/server/sessions.md). It has no description, which its type doesn't give.
   {
     type: 'other',
     name: 'SOIRÉE À REVOIR',
@@ -755,17 +761,19 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, status: 'planned' },
     ],
   },
-  // A live performance, coming up.
+  // A live performance, coming up, with its own description, but no flyer yet.
   {
     type: 'live-performance',
+    description: 'Ondine au synthé modulaire, une heure en direct du parking.',
     when: { day: 15, start: '20:00' },
     durationMinutes: 60,
     status: 'planned',
     sets: [{ performers: ['Ondine'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire', status: 'planned' }],
   },
-  // A synth meetup, which has no sets.
+  // A synth meetup, which has no sets, and has the description its type gives it, with a flyer.
   {
     type: 'synth-meetup',
+    flyer: '#f4a261',
     when: { day: -20, start: '18:00' },
     durationMinutes: 180,
     status: 'done',

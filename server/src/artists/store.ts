@@ -40,13 +40,17 @@ function photoType(body: Buffer): string | null {
   return null
 }
 
+// What's wrong with a photo, as an artist is told, or, e.g., what's wrong with a session's flyer.
+export type PhotoErrors = { wrongType: string; tooLarge: string }
+export const PHOTO_ERRORS: PhotoErrors = { wrongType: PHOTO_WRONG_TYPE, tooLarge: PHOTO_TOO_LARGE }
+
 // Checks the photo, from its type as told from its contents, and returns it with that type, or null when there's none.
-// Throws an InvalidProfile otherwise.
-export function validatePhoto(body: Buffer | undefined): SentPhoto | null {
+// Throws an InvalidProfile otherwise, with the message of `errors` that says what's wrong.
+export function validatePhoto(body: Buffer | undefined, errors = PHOTO_ERRORS): SentPhoto | null {
   if (!body) return null
   const type = photoType(body)
-  if (!type) throw new InvalidProfile(PHOTO_WRONG_TYPE)
-  if (body.length > PHOTO_MAX_BYTES) throw new InvalidProfile(PHOTO_TOO_LARGE)
+  if (!type) throw new InvalidProfile(errors.wrongType)
+  if (body.length > PHOTO_MAX_BYTES) throw new InvalidProfile(errors.tooLarge)
   return { body, type }
 }
 
@@ -170,12 +174,13 @@ export function artistsStore(db: Queryable): ArtistsStore {
   }
 }
 
-// Where new photos are stored: artists' under `artists/`, and collectives' under `collectives/`. That only keeps the
-// bucket tidy: what's stored is the photo's key, which is read and deleted as it is, whatever folder it's in.
-export type PhotoFolder = 'artists' | 'collectives'
+// Where new photos are stored: artists' under `artists/`, collectives' under `collectives/`, and sessions' flyers under
+// `sessions/`. That only keeps the bucket tidy: what's stored is the photo's key, which is read and deleted as it is,
+// whatever folder it's in.
+export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
-// Artists' and collectives' photos. They're personal data, so they're private files (see core/private-bucket.ts),
-// rather than public assets.
+// Artists' and collectives' photos, and sessions' flyers. They're private files (see core/private-bucket.ts), rather
+// than public assets: photos are personal data, and flyers are only for admins until their sessions are made public.
 export type Photos = Pick<PrivateFiles, 'read' | 'delete'> & {
   // Stores the photo under a new key in `folder`, and returns that key.
   store(photo: SentPhoto, folder: PhotoFolder): Promise<string>
@@ -200,7 +205,7 @@ export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SentPhoto
   return photo ? { photoKey: await photos.store(photo, folder), photoType: photo.type } : NO_PHOTO
 }
 
-// Deletes a photo that was stored but that no artist or collective uses, or uses anymore, if there's one. If that fails,
+// Deletes a photo (or a flyer) that was stored but that nothing uses, or uses anymore, if there's one. If that fails,
 // the error is only logged, so that the request it's part of can still succeed.
 export async function forgetPhoto(photos: Pick<Photos, 'delete'>, log: FastifyBaseLogger, key: string | null) {
   if (!key) return

@@ -115,6 +115,9 @@ function stubSession(sets: StudioSet[]): Session {
     name: '',
     title: 'ONDES TAKEOVER',
     raEvent: null,
+    description: '',
+    effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+    hasFlyer: false,
     sets,
   }
 }

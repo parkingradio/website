@@ -5,6 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { sql } from 'drizzle-orm'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
+import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
@@ -109,7 +110,12 @@ const SessionFields = fc.record({
 type SessionArgs = typeof SessionFields extends fc.Arbitrary<infer T> ? T : never
 
 function sessionBody(context: Context, { start, durationMinutes, kind: { type, takeover, name } }: SessionArgs) {
-  return { start, durationMinutes, type, takeover: takeover === null ? null : pick(context.ids.collectives, takeover), name, raEvent: null }
+  return { start, durationMinutes, type, takeover: takeover === null ? null : pick(context.ids.collectives, takeover), name, raEvent: null, description: '' }
+}
+
+// Adds or changes a session, which is sent as multipart/form-data, without a flyer.
+function sendSession({ app, cookies }: Context, method: 'POST' | 'PUT', url: string, session: object) {
+  return app.inject({ method, url, ...multipartBody({ session: JSON.stringify(session) }), cookies })
 }
 
 // The SoundCloud tracks, by the links that lead to them, and one where SoundCloud shows none.
@@ -211,7 +217,7 @@ const OPERATIONS = {
     weight: 4,
     args: SessionFields,
     async run(context, args) {
-      const response = await send(context, 'POST', '/api/admin/sessions', sessionBody(context, args))
+      const response = await sendSession(context, 'POST', '/api/admin/sessions', sessionBody(context, args))
       if (response.statusCode === 200) context.ids.sessions.push(response.json().session.id)
       return response
     },
@@ -221,7 +227,7 @@ const OPERATIONS = {
   updateSession: {
     weight: 3,
     args: fc.record({ session: fc.nat(), fields: SessionFields }),
-    run: (context, { session, fields }) => send(context, 'PUT', `/api/admin/sessions/${pick(context.ids.sessions, session)}`, sessionBody(context, fields)),
+    run: (context, { session, fields }) => sendSession(context, 'PUT', `/api/admin/sessions/${pick(context.ids.sessions, session)}`, sessionBody(context, fields)),
     conflicts: {
       [SESSION_OVERLAPS]: (body, { session, fields }, context) =>
         expectOverlappingSession(body.session, pick(context.ids.sessions, session), period(fields.start!, fields.durationMinutes)),
@@ -327,7 +333,7 @@ const STEP: fc.Arbitrary<Step> = fc.oneof(
   })),
 )
 
-// Photos aren't sent, so there are none to read or delete.
+// Photos and flyers aren't sent, so there are none to read or delete.
 const NO_PHOTOS: Photos = {
   store: async () => {
     throw new Error('No photos in these tests')
@@ -341,7 +347,7 @@ async function buildApp(database: TestDatabase) {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
-  await app.register(sessionsRoutes, { store: sessionsStore(database.db), resolveTrack: async (link) => TRACKS[link] ?? null })
+  await app.register(sessionsRoutes, { store: sessionsStore(database.db), photos: NO_PHOTOS, resolveTrack: async (link) => TRACKS[link] ?? null })
   await app.register(artistsRoutes, { store: artistsStore(database.db), photos: NO_PHOTOS })
   await app.register(collectivesRoutes, { store: collectivesStore(database.db), photos: NO_PHOTOS })
   return app

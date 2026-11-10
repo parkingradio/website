@@ -99,6 +99,18 @@ const START = `The start must be a date and time ${QUEBEC_TIME_RULE}, e.g. "2026
 const startTime = instantWith(START)
 
 const NAME_MAX_LENGTH = 100
+const DESCRIPTION_MAX_LENGTH = 5000
+const DESCRIPTION = `The description must be text, up to ${DESCRIPTION_MAX_LENGTH} characters`
+
+// Plain text on several lines: each \r\n or \r becomes \n, and it's trimmed, but its spaces and line breaks are kept.
+const description = z
+  .string({ error: DESCRIPTION })
+  .overwrite((value) => value.replace(/\r\n?/g, '\n'))
+  .trim()
+  .max(DESCRIPTION_MAX_LENGTH, DESCRIPTION)
+  .meta({
+    description: `Its own description, as plain text, which replaces the one its type gives it: send back the session's \`description\`, not its \`effectiveDescription\`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to ${DESCRIPTION_MAX_LENGTH} characters. Empty for none`,
+  })
 
 // A session's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
 // sessions/links.ts).
@@ -124,6 +136,7 @@ export const SessionFields = z
         description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
       }),
       raEvent: orNone(raEventId, 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"', "The event's id on RA, or a link to it"),
+      description,
     },
     { error: 'A session must be an object with its fields' },
   )

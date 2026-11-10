@@ -78,7 +78,7 @@ endpoints, `GET /api/radio` and `GET /api/events`, except:
   [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
-- The endpoints of photos, which aren't JSON.
+- The endpoints of photos and flyers, which aren't JSON.
 
 There's also [`read_documentation`](#read_documentation).
 
@@ -95,10 +95,11 @@ when an app asks them to confirm a change, e.g. "Supprimer un artiste".
 ### Arguments
 
 A tool's arguments are its endpoint's path parameters, its query parameters, which reach it as they're given, and the
-fields of its body. For the endpoints that take an artist or a collective with a photo, which are `multipart/form-data`
-(see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields of the profile, and
-`removePhoto` for those that change one. Tools can't send photos: an artist or a collective added with a tool has none,
-and one changed with a tool keeps theirs, unless `removePhoto` is `true`.
+fields of its body. For the endpoints that take an artist or a collective with a photo, or a session with a flyer, which
+are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields
+of the profile or the session, and `removePhoto` or `removeFlyer` for those that change one. Tools can't send photos or
+flyers: what's added with a tool has none, and what's changed with a tool keeps its own, unless `removePhoto` or
+`removeFlyer` is `true`.
 
 The descriptions of the tools that replace an artist, a collective, an application, a session or a set say that what's
 left out is erased, except what their endpoint says it keeps, e.g. an application's `receivedAt`: what they replace has

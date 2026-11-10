@@ -29,9 +29,33 @@ export function CountryField({ country, onChange, error, onLeave }: GroupProps<s
   )
 }
 
+// What the field says of the image it picks, a photo or a flyer, whose genders differ.
+const IMAGE_TEXTS = {
+  photo: {
+    label: 'Photo',
+    chosen: 'Photo choisie',
+    current: 'Photo actuelle',
+    removeChosen: 'retirer la photo choisie',
+    removeCurrent: 'retirer la photo',
+    optional: 'Facultative',
+    replaces: 'En choisir une autre remplace la photo actuelle.',
+    removed: "La photo actuelle sera retirée à l'enregistrement.",
+  },
+  flyer: {
+    label: 'Flyer',
+    chosen: 'Flyer choisi',
+    current: 'Flyer actuel',
+    removeChosen: 'retirer le flyer choisi',
+    removeCurrent: 'retirer le flyer',
+    optional: 'Facultatif',
+    replaces: 'En choisir un autre remplace le flyer actuel.',
+    removed: "Le flyer actuel sera retiré à l'enregistrement.",
+  },
+}
+
 // The photo picked, or else the artist's or collective's, if there's one and it isn't removed, each with an × that takes
 // it away, then the input that picks a photo, which replaces theirs. An × goes away once clicked, so the focus goes to the
-// input rather than being lost.
+// input rather than being lost. A session's flyer is picked the same way (`image`).
 export function PhotoField({
   current,
   removed,
@@ -39,6 +63,7 @@ export function PhotoField({
   photo,
   onChange,
   error,
+  image = 'photo',
 }: {
   // The address of their photo, if there's one, and whether it's to be removed.
   current: string | null
@@ -47,7 +72,9 @@ export function PhotoField({
   photo: File | null
   onChange: (photo: File | null) => void
   error: string | undefined
+  image?: keyof typeof IMAGE_TEXTS
 }) {
+  const texts = IMAGE_TEXTS[image]
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
   // The address of the photo picked, to show it, made when it's picked and released once it's replaced or the form is
@@ -72,13 +99,13 @@ export function PhotoField({
 
   return (
     <div className="admin-field">
-      <label htmlFor={id}>Photo</label>
+      <label htmlFor={id}>{texts.label}</label>
       {photo ? (
         <div className="admin-photo">
-          {preview ? <img src={preview} alt="Photo choisie" /> : <span>{photo.name}</span>}
+          {preview ? <img src={preview} alt={texts.chosen} /> : <span>{photo.name}</span>}
           <button
             type="button"
-            aria-label="retirer la photo choisie"
+            aria-label={texts.removeChosen}
             onClick={() => {
               // So that picking the same file again still counts as a change.
               if (input.current) input.current.value = ''
@@ -92,10 +119,10 @@ export function PhotoField({
       ) : (
         kept && (
           <div className="admin-photo">
-            <img src={kept} alt="Photo actuelle" />
+            <img src={kept} alt={texts.current} />
             <button
               type="button"
-              aria-label="retirer la photo"
+              aria-label={texts.removeCurrent}
               onClick={() => {
                 onRemove()
                 input.current?.focus()
@@ -116,9 +143,9 @@ export function PhotoField({
       />
       <FieldError key={picks} message={error} alert />
       <p className="admin-hint">
-        Facultative. JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo.
-        {kept && !photo && ' En choisir une autre remplace la photo actuelle.'}
-        {current && removed && !photo && " La photo actuelle sera retirée à l'enregistrement."}
+        {texts.optional}. JPEG, PNG ou WebP, jusqu'à {PHOTO_MAX_BYTES / 1024 / 1024} Mo.
+        {kept && !photo && ` ${texts.replaces}`}
+        {current && removed && !photo && ` ${texts.removed}`}
       </p>
     </div>
   )

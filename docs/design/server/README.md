@@ -6,7 +6,7 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every
-  response is JSON, except for photos. A body of a type the endpoint doesn't take fails with a 4xx, and the server
+  response is JSON, except for photos and flyers. A body of a type the endpoint doesn't take fails with a 4xx, and the server
   refuses bodies other than `multipart/form-data` that are larger than any endpoint needs, with a 413. One exception:
   in production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
   collective's application with 5 photos.
@@ -170,10 +170,11 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
 | [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, with their sets |
 | [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
-| [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session |
-| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session |
+| [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer |
+| [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer |
+| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session, or replacing or removing its flyer |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled |
-| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session and its sets |
+| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session |
 | [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Changing a set |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled |
