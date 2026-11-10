@@ -2,41 +2,41 @@ import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PlayerProvider } from '../../player/player'
+import { mockFetch, requestsTo } from '../../test-utils'
 import { YouTubeWidget } from './youtube'
 
-// What the YouTube Data API answers for the channel, and for its uploads playlist.
-type Answers = { channels?: unknown; playlistItems?: unknown }
-
-const CHANNEL = { items: [{ contentDetails: { relatedPlaylists: { uploads: 'UUuploads' } } }] }
-const LATEST = { items: [{ snippet: { resourceId: { videoId: 'latest' } } }] }
-
-// Returns the answers, which a test can change before the widget asks again. The player's request for what's on air is
-// left unanswered.
-function stubYouTube(initial: Answers = {}) {
-  const answers = { channels: CHANNEL, playlistItems: LATEST, ...initial }
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((input: string | Request) => {
-      const url = typeof input === 'string' ? input : input.url
-      if (url.endsWith('/api/radio?upcoming=0')) return new Promise(() => {})
-      const answer = url.includes('/channels?')
-        ? answers.channels
-        : url.includes('/playlistItems?') && url.includes('playlistId=UUuploads')
-          ? answers.playlistItems
-          : null
-      if (answer === null) throw new Error(`Unexpected fetch to ${url}`)
-      return Promise.resolve({ json: () => Promise.resolve(answer) })
-    }),
-  )
-  return answers
+// Has the server answer `GET /api/video` with `id`'s video, or none for null, or fail with `'failure'`, until it's
+// called again.
+function answer(id: string | null | 'failure') {
+  mockFetch({
+    '/api/video': id === 'failure' ? { ok: false, error: 'The video is unavailable right now' } : { video: id && { id } },
+  })
 }
 
-// The widget asks YouTube again every minute.
+// Lets a minute pass, after which the widget asks again.
 async function poll() {
-  await act(async () => vi.advanceTimersByTime(60_000))
+  await act(() => vi.advanceTimersByTimeAsync(60_000))
 }
 
-const thumbnail = (id: string) => `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
+// Lets minutes pass until the widget has had the server's next answer, which it shows before asking again a minute later.
+// Testing Library's waitFor can't be used, since its own timeout would pass with the minutes, unlike vitest's.
+async function answered() {
+  const requests = videoRequests()
+  await vi.waitFor(async () => {
+    await poll()
+    // Two more requests: the one answered, and the next, which is only sent once that answer is shown.
+    expect(videoRequests()).toBeGreaterThan(requests + 1)
+  })
+}
+
+const playing = () => screen.queryByTitle('Parking Radio YouTube')
+const coverImage = (container: HTMLElement) => container.querySelector('.youtube-cover img')
+
+// Waits for `id`'s video to show behind its cover.
+async function showsCover(container: HTMLElement, id: string) {
+  await waitFor(() => expect(coverImage(container)).toHaveAttribute('src', `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`))
+}
+const videoRequests = () => requestsTo('GET', '/api/video').length
 
 // How it pauses the player shared by every page, and is paused by it, is tested with the player (see player.test.tsx).
 function renderWidget() {
@@ -49,83 +49,171 @@ function renderWidget() {
   )
 }
 
+// Waits for `id`'s video behind its cover, then plays it.
+async function play(container: HTMLElement, id: string) {
+  await showsCover(container, id)
+  fireEvent.click(container.querySelector('.youtube-cover')!)
+  expect(playing()).toHaveAttribute('src', `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`)
+}
+
 afterEach(() => {
   vi.useRealTimers()
 })
 
 describe('YouTubeWidget', () => {
-  it('shows the most recent video behind a cover', async () => {
-    stubYouTube()
+  it('shows the video the server says behind a cover', async () => {
+    answer('latest')
     const { container } = renderWidget()
-    await waitFor(() =>
-      expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', 'https://i.ytimg.com/vi/latest/maxresdefault.jpg'),
-    )
-    expect(screen.queryByTitle('Parking Radio YouTube')).not.toBeInTheDocument()
+    await showsCover(container, 'latest')
+    expect(playing()).not.toBeInTheDocument()
   })
 
   it('plays the video from its cover', async () => {
-    stubYouTube()
+    answer('latest')
     const { container } = renderWidget()
-    await waitFor(() => expect(container.querySelector('.youtube-cover img')).toBeInTheDocument())
-    fireEvent.click(container.querySelector('.youtube-cover')!)
-    expect(screen.getByTitle('Parking Radio YouTube')).toHaveAttribute(
-      'src',
-      'https://www.youtube.com/embed/latest?autoplay=1&rel=0&modestbranding=1',
-    )
+    await play(container, 'latest')
     expect(container.querySelector('.youtube-cover')).not.toBeInTheDocument()
   })
 
-  it('says "Hors direct" when the channel has no video', async () => {
-    stubYouTube({ playlistItems: { items: [] } })
+  it('says "Hors direct" when the server says there is no video', async () => {
+    answer(null)
     renderWidget()
     expect(await screen.findByText('Hors direct')).toBeInTheDocument()
   })
 
-  it("shows the API's errors", async () => {
-    stubYouTube({ channels: { error: { code: 403, message: 'The request cannot be completed because you have exceeded your quota.' } } })
-    renderWidget()
-    expect(
-      await screen.findByText('⚠ API 403: The request cannot be completed because you have exceeded your quota.'),
-    ).toBeInTheDocument()
+  it('says "Hors direct", without an error, when the server can\'t say', async () => {
+    answer('failure')
+    const { container } = renderWidget()
+    expect(await screen.findByText('Hors direct')).toBeInTheDocument()
+    expect(container.querySelector('.youtube')).toHaveTextContent(/^Hors direct$/)
   })
 
-  it("shows why YouTube can't be reached", async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
+  it('says "Hors direct" when the server can\'t be reached', async () => {
+    mockFetch()
     renderWidget()
-    expect(await screen.findByText('⚠ Failed to fetch')).toBeInTheDocument()
+    expect(await screen.findByText('Hors direct')).toBeInTheDocument()
   })
 
-  describe('asking again every minute', () => {
-    beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }))
+  describe('asking again a minute after each answer', () => {
+    beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true }))
 
-    it('keeps the video waiting behind its cover, even when there is a newer one', async () => {
-      const answers = stubYouTube()
+    it('shows a newer video instead of the one waiting behind its cover', async () => {
+      answer('latest')
       const { container } = renderWidget()
-      await waitFor(() => expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', thumbnail('latest')))
-      answers.playlistItems = { items: [{ snippet: { resourceId: { videoId: 'newer' } } }] }
+      await showsCover(container, 'latest')
+      answer('newer')
       await poll()
-      expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', thumbnail('latest'))
+      await showsCover(container, 'newer')
     })
 
-    it('replaces the video that plays when there is a newer one', async () => {
-      const answers = stubYouTube()
+    it('stops the video that plays when the server says another one, and shows its cover', async () => {
+      answer('latest')
       const { container } = renderWidget()
-      await waitFor(() => expect(container.querySelector('.youtube-cover img')).toBeInTheDocument())
+      await play(container, 'latest')
+      answer('newer')
+      await poll()
+      await showsCover(container, 'newer')
+      expect(playing()).not.toBeInTheDocument()
+    })
+
+    it("doesn't play a video again when the server says it once more", async () => {
+      answer('first')
+      const { container } = renderWidget()
+      await play(container, 'first')
+      answer('second')
+      await poll()
+      await showsCover(container, 'second')
+      answer('first')
+      await poll()
+      await showsCover(container, 'first')
+      expect(playing()).not.toBeInTheDocument()
+    })
+
+    it('keeps playing the video when the server says the same one', async () => {
+      answer('latest')
+      const { container } = renderWidget()
+      await play(container, 'latest')
+      await answered()
+      expect(playing()).toBeInTheDocument()
+    })
+
+    it('stops the video that plays when the server says there is none', async () => {
+      answer('latest')
+      const { container } = renderWidget()
+      await play(container, 'latest')
+      answer(null)
+      await poll()
+      expect(await screen.findByText('Hors direct')).toBeInTheDocument()
+      expect(playing()).not.toBeInTheDocument()
+    })
+
+    it("keeps what it shows when the server can't say", async () => {
+      answer('latest')
+      const { container } = renderWidget()
+      await showsCover(container, 'latest')
+      answer('failure')
+      await answered()
+      await showsCover(container, 'latest')
+
       fireEvent.click(container.querySelector('.youtube-cover')!)
-      answers.playlistItems = { items: [{ snippet: { resourceId: { videoId: 'newer' } } }] }
-      await poll()
-      await waitFor(() => expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', thumbnail('newer')))
-      expect(screen.queryByTitle('Parking Radio YouTube')).not.toBeInTheDocument()
+      mockFetch()
+      await answered()
+      expect(playing()).toBeInTheDocument()
+      expect(screen.queryByText('Hors direct')).not.toBeInTheDocument()
     })
 
-    it('stops showing an error once YouTube answers', async () => {
-      const answers = stubYouTube({ channels: { error: { code: 503, message: 'Backend Error' } } })
+    it('shows the video once the server says it, after it could not', async () => {
+      answer('failure')
       const { container } = renderWidget()
-      expect(await screen.findByText('⚠ API 503: Backend Error')).toBeInTheDocument()
-      answers.channels = CHANNEL
+      expect(await screen.findByText('Hors direct')).toBeInTheDocument()
+      answer('latest')
       await poll()
-      await waitFor(() => expect(screen.queryByText('⚠ API 503: Backend Error')).not.toBeInTheDocument())
-      expect(container.querySelector('.youtube-cover img')).toHaveAttribute('src', thumbnail('latest'))
+      await showsCover(container, 'latest')
+    })
+
+    it('only asks again a minute after the server answered, so that a late answer never replaces a newer one', async () => {
+      // The server's answers, which it only gives when the test says.
+      const answers: ((body: object) => void)[] = []
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((request: Request) =>
+          new URL(request.url).pathname === '/api/video'
+            ? new Promise((resolve) => answers.push((body) => resolve(Response.json(body))))
+            : new Promise(() => {}),
+        ),
+      )
+      const { container } = renderWidget()
+      // StrictMode runs the widget's effect twice, which asks twice: only the second one's answer counts.
+      await waitFor(() => expect(answers).toHaveLength(2))
+      await poll()
+      await poll()
+      expect(answers).toHaveLength(2)
+
+      await act(async () => answers[1]({ video: { id: 'latest' } }))
+      await showsCover(container, 'latest')
+      expect(answers).toHaveLength(2)
+
+      await poll()
+      await waitFor(() => expect(answers).toHaveLength(3))
+      await act(async () => answers[2]({ video: { id: 'newer' } }))
+      await showsCover(container, 'newer')
+
+      // The answer to the request of the effect StrictMode threw away comes last, and changes nothing.
+      await act(async () => answers[0]({ video: { id: 'stale' } }))
+      await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+      await showsCover(container, 'newer')
+      expect(answers).toHaveLength(3)
+    })
+
+    it('stops asking once it is gone', async () => {
+      answer('latest')
+      const { container, unmount } = renderWidget()
+      await waitFor(() => expect(coverImage(container)).toBeInTheDocument())
+      unmount()
+      const requests = videoRequests()
+      await poll()
+      await poll()
+      expect(videoRequests()).toBe(requests)
     })
   })
 })

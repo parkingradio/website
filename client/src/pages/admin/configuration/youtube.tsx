@@ -31,7 +31,7 @@ export function YouTubeCredentials() {
             {saved.error && <p className="admin-error">La dernière lecture de YouTube a échoué&nbsp;: {saved.error}</p>}
           </>
         ) : (
-          <p className="admin-placeholder">Aucun identifiant&nbsp;: le site n'a aucune vidéo à montrer.</p>
+          <p className="admin-placeholder">Aucun identifiant&nbsp;: la page d'accueil ne montre aucune vidéo.</p>
         )
       }
     >

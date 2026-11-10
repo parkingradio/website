@@ -1,91 +1,60 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../../api/client'
+import type { Result, Schema } from '../../api/client'
 import { usePlayer } from '../../player/player-context'
 import './youtube.css'
 
-// The YouTube widget of the home page's old "combined widget" (combined_widget.html, which was hosted on R2): the most
-// recent video of Parking Radio's channel, behind a cover that plays it, or "Hors direct" when there's none. It's meant
-// to show the live stream when the channel is live, but doesn't detect it yet: the original tried, and never could.
+// The YouTube widget of the home page's old "combined widget" (combined_widget.html, which was hosted on R2): the video
+// the server says the site shows (see docs/design/server/video.md), behind a cover that plays it, or "Hors direct" when
+// there's none. It asks again a minute after each answer, and always shows what loading the page again would, even if
+// that stops the video being watched. When the server can't say, it keeps what it shows.
 //
 // It pauses the radio when it plays, and the radio playing stops it.
 
-export const API_KEY = 'AIzaSyBRcPalxY-XIncjXmTjbwj1RjrN2MTRKX8'
-export const CHANNEL_ID = 'UCvMw4qUIPPwkcZmBRRS0vNA'
 const POLL_MS = 60000
 
-// What the widget shows. Until the channel's videos are known, it's the cover, without a video to play.
+// What the widget shows. Until the server says, it's the cover, without a video to play.
 type Video = { kind: 'unknown' } | { kind: 'offline' } | { kind: 'cover' | 'playing'; id: string }
 
-// What the YouTube Data API answers, as far as the widget reads it.
-type ApiResponse<Item> = { error?: { code: number; message: string }; items?: Item[] }
-type ChannelItem = { contentDetails: { relatedPlaylists: { uploads: string } } }
-type PlaylistItem = { snippet: { resourceId: { videoId: string } } }
+// What to show after `shown`, given the server's answer: the video it says, behind its cover, unless it's the one shown,
+// or "Hors direct" when there's none. When the server can't say, what's shown stays, unless nothing is yet.
+function next(shown: Video, answer: Result<Schema<'Video'>>): Video {
+  if (!answer.ok) return shown.kind === 'unknown' ? { kind: 'offline' } : shown
+  if (!answer.video) return shown.kind === 'offline' ? shown : { kind: 'offline' }
+  return 'id' in shown && shown.id === answer.video.id ? shown : { kind: 'cover', id: answer.video.id }
+}
 
 export function YouTubeWidget() {
   const player = usePlayer()
-  const [video, setVideoState] = useState<Video>({ kind: 'unknown' })
-  const [error, setError] = useState<string | null>(null)
-  // What's shown, for the polling, which outlives renders.
-  const current = useRef(video)
-
-  const setVideo = useCallback((next: Video) => {
-    current.current = next
-    setVideoState(next)
-  }, [])
+  const [video, setVideo] = useState<Video>({ kind: 'unknown' })
 
   useEffect(() => {
-    const stopped = new AbortController()
-    const { signal } = stopped
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
-    // The first item the API answers `query` with, if any. Throws an error to show for the API's own errors, and when
-    // the request fails.
-    async function first<Item>(query: string): Promise<Item | undefined> {
-      const response = await fetch(`https://www.googleapis.com/youtube/v3/${query}&key=${API_KEY}`, { signal })
-      const data: ApiResponse<Item> = await response.json()
-      signal.throwIfAborted()
-      if (data.error) throw new Error(`API ${data.error.code}: ${data.error.message}`)
-      return data.items?.[0]
-    }
-
+    // Asks again a minute after each answer, rather than every minute, so that a late answer never replaces a newer one.
     async function check() {
-      try {
-        const channelItem = await first<ChannelItem>(`channels?part=contentDetails&id=${CHANNEL_ID}`)
-        setError(null)
-        if (!channelItem) {
-          setVideo({ kind: 'offline' })
-          return
-        }
-        // While a video waits behind its cover, there's no looking for a newer one: only when there's none yet, or
-        // while one plays, which a newer one replaces.
-        if (current.current.kind === 'cover') return
-        const uploads = channelItem.contentDetails.relatedPlaylists.uploads
-        const latest = await first<PlaylistItem>(`playlistItems?part=snippet&playlistId=${uploads}&maxResults=1`)
-        if (!latest) {
-          setVideo({ kind: 'offline' })
-          return
-        }
-        const id = latest.snippet.resourceId.videoId
-        const shown = current.current
-        if (!('id' in shown) || shown.id !== id) setVideo({ kind: 'cover', id })
-      } catch (e) {
-        if (!signal.aborted) setError(e instanceof Error ? e.message : String(e))
-      }
+      const answer = await api.GET('/api/video')
+      if (stopped) return
+      setVideo((shown) => next(shown, answer))
+      timer = setTimeout(check, POLL_MS)
     }
 
     check()
-    const timer = setInterval(check, POLL_MS)
     return () => {
-      stopped.abort()
-      clearInterval(timer)
+      stopped = true
+      clearTimeout(timer)
     }
-  }, [setVideo])
+  }, [])
 
   // The radio starting to play stops the video, which goes back to its cover. Playing the video pauses the radio first, so
   // that doesn't stop it.
   const radioPlaying = player.playing !== null
-  useEffect(() => {
-    const shown = current.current
-    if (radioPlaying && shown.kind === 'playing') setVideo({ kind: 'cover', id: shown.id })
-  }, [radioPlaying, setVideo])
+  const [radioWasPlaying, setRadioWasPlaying] = useState(radioPlaying)
+  if (radioPlaying !== radioWasPlaying) {
+    setRadioWasPlaying(radioPlaying)
+    if (radioPlaying && video.kind === 'playing') setVideo({ kind: 'cover', id: video.id })
+  }
 
   const play = () => {
     if (video.kind !== 'cover') return
@@ -116,7 +85,6 @@ export function YouTubeWidget() {
         )}
         {video.kind === 'offline' && <div className="youtube-offline">Hors direct</div>}
       </div>
-      {error && <div className="youtube-error">⚠ {error}</div>}
     </div>
   )
 }

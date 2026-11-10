@@ -61,13 +61,3 @@
   text-transform: uppercase;
   color: #555;
 }
-
-.youtube-error {
-  padding: 10px 12px;
-  font-size: 10px;
-  color: #c00;
-  background: #fff5f5;
-  border-top: 1px solid #fcc;
-  word-break: break-all;
-  line-height: 1.5;
-}
