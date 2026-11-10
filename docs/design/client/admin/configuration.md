@@ -39,7 +39,7 @@ The YouTube channel the server reads the site's video from, and the API key it r
 advanced settings of its YouTube account, linking to them (`https://www.youtube.com/account_advanced`), and the key in
 the credentials of a Google Cloud project, linking to them (`https://console.cloud.google.com/apis/credentials`),
 restricted to the YouTube Data API v3. It shows which admin last changed them, and when, or, until they're entered, that
-the site has no video to show. When the last read of YouTube failed, it says why.
+the home page shows no video. When the last read of YouTube failed, it says why.
 
 Under that, a form replaces them, like the SoundCloud app's credentials: the channel's id, filled in with the current
 one, and the key, whose field only shows dots in its place, since it's never sent back, and has to be typed. "vérifier"

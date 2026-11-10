@@ -35,11 +35,11 @@ describe('The YouTube channel', () => {
     expect(screen.getByRole('link', { name: 'identifiants' })).toHaveAttribute('href', 'https://console.cloud.google.com/apis/credentials')
   })
 
-  it('says that the site has no video to show until the credentials are entered', async () => {
+  it('says that the home page shows no video until the credentials are entered', async () => {
     mockFetch(NONE)
     render(<YouTubeCredentials />)
 
-    await waitFor(() => expect(screen.getByText("Aucun identifiant : le site n'a aucune vidéo à montrer.")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("Aucun identifiant : la page d'accueil ne montre aucune vidéo.")).toBeInTheDocument())
     expect(channelId()).toHaveValue('')
     expect(apiKey()).not.toHaveAttribute('placeholder')
   })

@@ -4,7 +4,6 @@ import type { MockInstance } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import type { Schema } from '../api/client'
 import App from '../app'
-import { API_KEY, CHANNEL_ID } from '../pages/home/youtube'
 import { mockFetch, requestsTo } from '../test-utils'
 import type { Body } from '../test-utils'
 import { positionAt, rediffusion, untilEnd } from './radio'
@@ -73,23 +72,15 @@ function streamOf(track: Schema<'RadioTrack'>) {
   return { [`/api/radio/tracks/${track.id}/stream`]: { url: `https://cdn.test/${track.id}.m3u8`, expiresAt: IN_AN_HOUR() } }
 }
 
-// What the YouTube Data API answers the home page's video widget: Parking Radio's channel, and its latest video.
-const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3'
-const YOUTUBE = {
-  [`${YOUTUBE_API}/channels?part=contentDetails&id=${CHANNEL_ID}&key=${API_KEY}`]: {
-    items: [{ contentDetails: { relatedPlaylists: { uploads: 'UUuploads' } } }],
-  },
-  [`${YOUTUBE_API}/playlistItems?part=snippet&playlistId=UUuploads&maxResults=1&key=${API_KEY}`]: {
-    items: [{ snippet: { resourceId: { videoId: 'latest' } } }],
-  },
-}
+// The video the home page shows.
+const VIDEO = { '/api/video': { video: { id: 'latest' } } }
 
 function mockSite({ radio = onAir(KRAKA, 60) }: { radio?: Body } = {}) {
   mockFetch({
     [RADIO_URL]: radio,
     ...streamOf(KRAKA),
     ...streamOf(NEBULO),
-    ...YOUTUBE,
+    ...VIDEO,
   })
 }
 
