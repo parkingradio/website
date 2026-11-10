@@ -1,19 +1,10 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
-import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { byWhom } from '../describe'
+import { CredentialsForm } from './credentials-form'
 
 // The credentials of the SoundCloud app the server reads SoundCloud through, for the radio's playlist and the tracks of
 // sets, in the configuration section.
-
-// How long each credential can be. The server's schema says so too (see server/src/radio/routes.ts), and decides.
-const CREDENTIAL_MAX_LENGTH = 200
-
-// What the secret field shows once a secret is saved, since the secret itself is never sent back.
-const SAVED_SECRET = '•'.repeat(32)
-
 export function SoundCloudCredentials() {
   const loaded = useApi('/api/admin/radio/credentials')
 
@@ -25,56 +16,25 @@ export function SoundCloudCredentials() {
       </p>
     )
   }
-  return <CredentialsForm loaded={loaded.value} />
-}
-
-// Who last changed the credentials, and a form that replaces them, filled in with the client ID that's saved. Since the
-// secret is never shown again, it has to be typed to replace them. They're verified with SoundCloud first, and can only
-// be saved once they've been.
-function CredentialsForm({ loaded }: { loaded: Schema<'RadioCredentials'> }) {
-  const [saved, setSaved] = useState(loaded.credentials)
-  const [clientId, setClientId] = useState(loaded.credentials?.clientId ?? '')
-  const [clientSecret, setClientSecret] = useState('')
-  // The credentials SoundCloud accepted the last time they were verified.
-  const [verified, setVerified] = useState<{ clientId: string; clientSecret: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  // Whether the credentials were just saved, or why they couldn't be verified or saved, until they're changed again.
-  const [outcome, setOutcome] = useState<{ ok: true } | { ok: false; error: string } | null>(null)
-
-  const typed = { clientId, clientSecret }
-  const isVerified = verified?.clientId === clientId && verified.clientSecret === clientSecret
-  const complete = clientId.trim() !== '' && clientSecret.trim() !== ''
-
-  const change = (update: () => void) => {
-    update()
-    setOutcome(null)
-  }
-
-  const verify = async () => {
-    setBusy(true)
-    const result = await api.POST('/api/admin/radio/credentials/check', { body: typed })
-    setBusy(false)
-    if (result.ok) setVerified(typed)
-    else setOutcome({ ok: false, error: `Les identifiants n'ont pas pu être vérifiés : ${result.error}` })
-  }
-
-  const save = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!isVerified) return
-    setBusy(true)
-    const result = await api.PUT('/api/admin/radio/credentials', { body: typed })
-    setBusy(false)
-    if (result.ok) {
-      setSaved(result.credentials)
-      setClientSecret('')
-      setOutcome({ ok: true })
-    } else {
-      setOutcome({ ok: false, error: `Les identifiants n'ont pas pu être enregistrés : ${result.error}` })
-    }
-  }
-
   return (
-    <>
+    <CredentialsForm
+      saved={loaded.value.credentials}
+      savedId={loaded.value.credentials?.clientId ?? ''}
+      labels={{ id: 'Client ID', secret: 'Client secret' }}
+      service="SoundCloud"
+      check={({ id, secret }) => api.POST('/api/admin/radio/credentials/check', { body: { clientId: id, clientSecret: secret } })}
+      save={({ id, secret }) => api.PUT('/api/admin/radio/credentials', { body: { clientId: id, clientSecret: secret } })}
+      status={(saved) =>
+        saved ? (
+          <p className="admin-meta">{byWhom('Changés', saved.updatedBy, saved.updatedAt)}</p>
+        ) : (
+          <p className="admin-placeholder">
+            Aucun identifiant&nbsp;: la radio ne peut lire aucune playlist, elle est hors ondes, et les liens SoundCloud des sets ne peuvent
+            pas être vérifiés.
+          </p>
+        )
+      }
+    >
       <p>
         Le site lit SoundCloud à travers une application SoundCloud, avec ses identifiants&nbsp;: la playlist de la radio, et les
         pistes des sets. Ils se trouvent dans les{' '}
@@ -83,62 +43,6 @@ function CredentialsForm({ loaded }: { loaded: Schema<'RadioCredentials'> }) {
         </a>{' '}
         du compte SoundCloud qui la possède.
       </p>
-      {saved ? (
-        <p className="admin-meta">{byWhom('Changés', saved.updatedBy, saved.updatedAt)}</p>
-      ) : (
-        <p className="admin-placeholder">
-          Aucun identifiant&nbsp;: la radio ne peut lire aucune playlist, elle est hors ondes, et les liens SoundCloud des sets ne peuvent pas
-          être vérifiés.
-        </p>
-      )}
-      <form className="admin-form" onSubmit={save}>
-        <label>
-          Client ID
-          <input
-            value={clientId}
-            maxLength={CREDENTIAL_MAX_LENGTH}
-            autoComplete="off"
-            onChange={(event) => change(() => setClientId(event.target.value))}
-            required
-          />
-        </label>
-        <label>
-          Client secret
-          <input
-            type="password"
-            className="admin-secret"
-            value={clientSecret}
-            placeholder={saved ? SAVED_SECRET : undefined}
-            maxLength={CREDENTIAL_MAX_LENGTH}
-            autoComplete="off"
-            onChange={(event) => change(() => setClientSecret(event.target.value))}
-            required
-          />
-        </label>
-        <div className="admin-row">
-          <button type="button" onClick={verify} disabled={busy || !complete || isVerified}>
-            vérifier
-          </button>
-          {isVerified && (
-            <span className="admin-saved" role="status" aria-label="Identifiants acceptés par SoundCloud">
-              ✓
-            </span>
-          )}
-          <button type="submit" disabled={busy || !isVerified}>
-            enregistrer
-          </button>
-          {outcome?.ok === true && (
-            <span className="admin-saved" role="status" aria-label="Identifiants enregistrés">
-              ✓
-            </span>
-          )}
-        </div>
-      </form>
-      {outcome?.ok === false && (
-        <p className="admin-error" role="alert">
-          {outcome.error}
-        </p>
-      )}
-    </>
+    </CredentialsForm>
   )
 }

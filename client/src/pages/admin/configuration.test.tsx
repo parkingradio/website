@@ -4,17 +4,20 @@ import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import { mockFetch } from '../../test-utils'
 
-// Who applications are emailed to, the SoundCloud app and the feature flags have their own tests, in
-// configuration/recipients.test.tsx, configuration/soundcloud.test.tsx and configuration/features.test.tsx: these are
-// for the section that gathers them.
+// Who applications are emailed to, the SoundCloud app, the YouTube channel and the feature flags have their own tests, in
+// configuration/recipients.test.tsx, configuration/soundcloud.test.tsx, configuration/youtube.test.tsx and
+// configuration/features.test.tsx: these are for the section that gathers them.
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 // No flags, so that these tests don't depend on flags that are bound to be retired.
 const NO_FEATURES = { '/api/admin/features': { ok: true, features: [] } }
 // Nobody gets applications by email yet, as on a new server.
 const NO_RECIPIENTS = { '/api/admin/applications/recipients': { ok: true, recipients: [], updatedBy: null, updatedAt: null } }
-// No SoundCloud credentials yet either.
-const NO_CREDENTIALS = { '/api/admin/radio/credentials': { ok: true, credentials: null } }
+// No SoundCloud or YouTube credentials yet either.
+const NO_CREDENTIALS = {
+  '/api/admin/radio/credentials': { ok: true, credentials: null },
+  '/api/admin/video/credentials': { ok: true, credentials: null },
+}
 const PAGE = { ...LOGGED_IN, ...NO_FEATURES, ...NO_RECIPIENTS, ...NO_CREDENTIALS }
 
 function CurrentPath() {
@@ -31,7 +34,7 @@ function renderAt(path: string) {
 }
 
 describe('The configuration section', () => {
-  it('shows who applications are emailed to, then the SoundCloud app, then the feature flags', async () => {
+  it('shows who applications are emailed to, then the SoundCloud app, then the YouTube channel, then the feature flags', async () => {
     mockFetch(PAGE)
     renderAt('/admin/configuration')
 
@@ -39,11 +42,13 @@ describe('The configuration section', () => {
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
       'Envoi des candidatures par e-mail',
       'Connexion SoundCloud',
+      'Connexion YouTube',
       'Features',
     ])
     await screen.findByText('Aucune feature pour le moment.')
     await screen.findByRole('textbox', { name: "Adresse e-mail d'un destinataire" })
     await screen.findByRole('textbox', { name: 'Client ID' })
+    await screen.findByRole('textbox', { name: 'ID de la chaîne' })
   })
 
   it('is where /admin/features leads, since the feature flags moved there', async () => {

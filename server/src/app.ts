@@ -26,6 +26,9 @@ import { soundCloudApp } from './radio/soundcloud-app.js'
 import type { SoundCloudClient, SoundCloudCredentials } from './radio/soundcloud.js'
 import type { SoundCloudCredentialsStore } from './radio/soundcloud-credentials.js'
 import { sessionsRoutes } from './sessions/routes.js'
+import type { YouTubeCredentialsStore } from './video/credentials.js'
+import { videoRoutes } from './video/routes.js'
+import type { YouTube } from './video/youtube.js'
 import type { SessionsStore } from './sessions/store.js'
 import { healthRoutes } from './site/health.js'
 import { notFoundRoutes } from './site/not-found.js'
@@ -52,6 +55,8 @@ export type Dependencies = {
   soundCloudCredentials: SoundCloudCredentialsStore
   onAir: OnAirStore
   radioSettings: RadioSettingsStore
+  youtube: YouTube
+  youtubeCredentials: YouTubeCredentialsStore
   artists: ArtistsStore
   collectives: CollectivesStore
   // Artists' and collectives' photos.
@@ -80,6 +85,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   // The radio and sessions share it (see radio/soundcloud-app.ts).
   const soundcloud = soundCloudApp(deps.soundcloud, deps.soundCloudCredentials)
   await app.register(radioRoutes, { soundcloud, onAir: deps.onAir, settings: deps.radioSettings })
+  await app.register(videoRoutes, { youtube: deps.youtube, credentials: deps.youtubeCredentials })
   await app.register(artistsRoutes, { store: deps.artists, photos: deps.photos })
   await app.register(collectivesRoutes, { store: deps.collectives, photos: deps.photos })
   await app.register(applicationsRoutes, { store: deps.applications, settings: deps.applicationsSettings })

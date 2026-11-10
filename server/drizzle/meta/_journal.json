@@ -71,6 +71,13 @@
       "when": 1793938287464,
       "tag": "0009_session_types",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794278680987,
+      "tag": "0010_youtube_credentials",
+      "breakpoints": true
     }
   ]
 }

@@ -81,6 +81,21 @@ export const soundcloudCredentials = pgTable(
   (table) => [check('soundcloud_credentials_single_row', sql`${table.id} = 1`)],
 )
 
+// The YouTube channel the server reads the site's video from, and the API key it reads it with, as entered on the admin
+// pages. There is only ever one row, and none until they've been entered.
+export const youtubeCredentials = pgTable(
+  'youtube_credentials',
+  {
+    id: smallint('id').primaryKey().default(1),
+    channelId: text('channel_id').notNull(),
+    apiKey: text('api_key').notNull(),
+    uploadsPlaylistId: text('uploads_playlist_id').notNull(), // the channel's uploads, read with the channel when it was entered
+    updatedBy: text('updated_by').notNull(), // the email of the admin who last changed them
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [check('youtube_credentials_single_row', sql`${table.id} = 1`)],
+)
+
 // Artists. Two of them can't have the same email address, whatever its case. See the profile's schemas in
 // artists/profile.ts for what each field may contain. Admins can leave out the country, city, genres, bio, links and
 // phone, which are then empty, and the email, which is then null.

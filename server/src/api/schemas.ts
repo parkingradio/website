@@ -55,6 +55,17 @@ export const ById = z.object({ id: z.string() })
 export const Reference = z.object({ id: z.string(), name: z.string() }).meta({ id: 'Reference' })
 export type Reference = z.infer<typeof Reference>
 
+// A credential of a service the server reads, e.g. the SoundCloud app's client ID, or a YouTube API key. The client has its
+// own copy of the length, for its forms (see client/src/pages/admin/configuration/credentials-form.tsx).
+const CREDENTIAL_MAX_LENGTH = 200
+// openapi.json can't say that it's trimmed before its length is checked, so the description does.
+export const Credential = z
+  .string()
+  .trim()
+  .min(1)
+  .max(CREDENTIAL_MAX_LENGTH)
+  .meta({ description: `Trimmed, then between 1 and ${CREDENTIAL_MAX_LENGTH} characters` })
+
 // Formats, e.g. `Timestamp`, which modules other than the routes' use too, e.g. the database's schema.
 export { Day, Timestamp } from './formats.js'
 

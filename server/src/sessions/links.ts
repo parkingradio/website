@@ -28,7 +28,8 @@ export function raEventUrl(id: string): string {
   return `https://ra.co/events/${id}`
 }
 
-const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/
+// What a video's id on YouTube is made of, which the site's video is checked against too (see video/youtube.ts).
+export const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/
 
 // A video on YouTube, by its id, or a link to it, e.g. "https://www.youtube.com/watch?v=<id>", "https://youtu.be/<id>"
 // or "https://www.youtube.com/live/<id>".
