@@ -4,14 +4,14 @@ import { z } from 'zod'
 import { Day, TIME_OF_DAY, fromBeforeTo, instantIn, startRange } from '../api/formats.js'
 import { ApiError, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { cached } from '../core/cache.js'
+import { RA_ORIGIN, RA_PROMOTER_ID } from './ra.js'
 
 // Events are managed on Resident Advisor, under Parking Radio's promoter page. RA has no public API, so
 // this uses the GraphQL endpoint that ra.co itself calls. It isn't documented and could change. We don't
 // normally favour calling private APIs, but this is the only way to implement what we need. We try to
 // mitigate the brittleness of the setup by validating our expectations of what GraphQL returns and failing
 // loudly when they are not satisfied.
-const RA_ORIGIN = 'https://ra.co'
-const RA_PROMOTER_ID = '183980'
+
 // How many past events the response has without `from` and `to`, the most recent.
 const RECENT_PAST_EVENTS = 20
 // RA only returns 10 upcoming events, and 50 past ones, unless asked for more, so ask for far more than we ever schedule

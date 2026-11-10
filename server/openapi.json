@@ -1939,6 +1939,67 @@
         ],
         "additionalProperties": false
       },
+      "RaEventContent": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session's start, or null when it has none. RA takes it in Québec time, without its offset"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session's end, or null when it has no start. RA takes it in Québec time, without its offset"
+          },
+          "lineup": {
+            "type": "string",
+            "description": "One performer per line: those of its sets that aren't cancelled, in order, without repeated lines, or else OPEN JAM for a synth meetup, or its title"
+          },
+          "venueId": {
+            "type": "string",
+            "description": "Parking Radio's venue on RA"
+          },
+          "promoterIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Parking Radio's promoter page on RA"
+          },
+          "content": {
+            "type": "string",
+            "description": "Its effective description"
+          }
+        },
+        "required": [
+          "title",
+          "start",
+          "end",
+          "lineup",
+          "venueId",
+          "promoterIds",
+          "content"
+        ],
+        "additionalProperties": false
+      },
       "Reference": {
         "type": "object",
         "properties": {
@@ -6869,6 +6930,93 @@
             }
           },
           "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/{id}/ra-event": {
+      "get": {
+        "operationId": "get_session_ra_event",
+        "summary": "The content of a session's event on Resident Advisor, which an admin creates there from it",
+        "tags": [
+          "Sessions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "event": {
+                      "$ref": "#/components/schemas/RaEventContent"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "event"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
             "description": "Default Response",
             "content": {
               "application/json": {

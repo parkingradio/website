@@ -589,6 +589,22 @@ dl.admin-record {
   white-space: pre-wrap;
 }
 
+/* A text of a session's event on RA, with the button that copies it after it. */
+.admin-copyable {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.admin-copyable > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-copy {
+  flex: none;
+}
+
 /* The forms for artists and applications have more to them than the login form, and longer text. */
 .admin-form-wide {
   max-width: 600px;

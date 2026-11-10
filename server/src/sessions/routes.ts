@@ -12,6 +12,7 @@ import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
 import { BAD_STATUS, Genre, PerformanceType, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
+import { raEventContent } from './ra-event.js'
 import { Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
 import type { SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
 
@@ -79,9 +80,26 @@ const SessionBody = z
     ...Tracked,
   })
   .meta({ id: 'Session' })
-type SessionBody = z.infer<typeof SessionBody>
+export type SessionBody = z.infer<typeof SessionBody>
 
 const SessionResponse = z.object({ ok: z.literal(true), session: SessionBody })
+
+// The content of a session's event on RA (see sessions/ra-event.ts).
+const RaEventContent = z
+  .object({
+    title: z.string(),
+    start: Timestamp.nullable().meta({ description: "The session's start, or null when it has none. RA takes it in Québec time, without its offset" }),
+    end: Timestamp.nullable().meta({ description: "The session's end, or null when it has no start. RA takes it in Québec time, without its offset" }),
+    lineup: z.string().meta({
+      description:
+        "One performer per line: those of its sets that aren't cancelled, in order, without repeated lines, or else OPEN JAM for a synth meetup, or its title",
+    }),
+    venueId: z.string().meta({ description: "Parking Radio's venue on RA" }),
+    promoterIds: z.array(z.string()).meta({ description: "Parking Radio's promoter page on RA" }),
+    content: z.string().meta({ description: 'Its effective description' }),
+  })
+  .meta({ id: 'RaEventContent' })
+export type RaEventContent = z.infer<typeof RaEventContent>
 
 // A session's flyer follows the rules of artists' photos (see `validatePhoto` in artists/store.ts), with errors in English.
 const FLYER_ERRORS = {
@@ -344,6 +362,25 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_SESSION)
       return { ok: true as const, session: sessionBody(row) }
+    },
+  )
+
+  api.get(
+    '/api/admin/sessions/:id/ra-event',
+    {
+      config: { admin: true, tool: { title: "Voir le contenu de l'événement RA d'une session" } },
+      schema: {
+        operationId: 'get_session_ra_event',
+        summary: "The content of a session's event on Resident Advisor, which an admin creates there from it",
+        tags: ['Sessions'],
+        params: ById,
+        response: { 200: z.object({ ok: z.literal(true), event: RaEventContent }), 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const row = await store.get(request.params.id)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION)
+      return { ok: true as const, event: raEventContent(sessionBody(row)) }
     },
   )
 

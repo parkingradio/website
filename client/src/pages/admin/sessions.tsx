@@ -32,6 +32,7 @@ import { compareText, search, useSearchQuery, useSort, useStatusFilter } from '.
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ArtistsFailure, CollectivesFailure } from './profile-details'
+import { RaEventSection } from './ra-event'
 import { failure, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import type { SessionFormProps } from './session-form'
@@ -463,7 +464,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
               modifier
             </button>
           </div>
-          <dl className="admin-record">
+          <dl className="admin-record" aria-label="Session">
             <dt>Quand</dt>
             <dd>{sessionWhen(session)}</dd>
             <dt>Durée</dt>
@@ -522,6 +523,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           onChanged={changed}
         />
       )}
+
+      <RaEventSection session={session} />
 
       <h2>Supprimer</h2>
       <p>{deleteText(session)}</p>

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import type { Artist } from '../../artist-profile'
@@ -402,7 +402,20 @@ describe('The default view of the list of sessions', () => {
   })
 })
 
-const PAGE = { ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: SESSION } }
+// The content of the event on RA of SESSION, as the server gives it.
+const RA_EVENT = {
+  title: 'ONDES TAKEOVER',
+  start: '2026-11-14T21:00:00-05:00',
+  end: '2026-11-15T01:00:00-05:00',
+  lineup: 'Aurore\nBrume\nCyan',
+  venueId: '288529',
+  promoterIds: ['183980'],
+  content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+}
+const RA_EVENTS = {
+  '/api/admin/sessions/session-1/ra-event': { ok: true, event: RA_EVENT },
+}
+const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the mark of each set says, if it has one, in its tooltip (see button.test.tsx).
 const marks = () =>
@@ -411,7 +424,10 @@ const marks = () =>
     .slice(1)
     .map((row) => within(row).queryByRole('button', { name: 'avertissement' })?.getAttribute('aria-describedby') ?? null)
     .map((id) => id && document.getElementById(id)!.textContent)
-const value = (label: string) => screen.getByText(label, { selector: 'dt' }).nextElementSibling as HTMLElement
+// What the session's record, or the content of its event on RA, says for `label`.
+const recordValue = (record: string, label: string) => within(screen.getByLabelText(record)).getByText(label, { selector: 'dt' }).nextElementSibling as HTMLElement
+const value = (label: string) => recordValue('Session', label)
+const raValue = (label: string) => recordValue("Contenu de l'événement RA", label)
 
 describe("A session's page", () => {
   it('shows everything about the session and its sets', async () => {
@@ -895,6 +911,68 @@ describe("A session's page", () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: false, error: 'No such session' } })
     renderAt('/admin/sessions/session-1')
     expect(await screen.findByRole('alert')).toHaveTextContent("La session n'a pas pu être chargée : No such session")
+  })
+})
+
+describe("A session's event on RA", () => {
+  const RA_URL = '/api/admin/sessions/session-1/ra-event'
+  const writeText = vi.fn<(text: string) => Promise<void>>()
+
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  })
+
+  it('shows its content, as the server gives it, with a button to copy each text', async () => {
+    mockFetch(PAGE)
+    renderAt('/admin/sessions/session-1')
+
+    expect(await screen.findByRole('heading', { name: 'Événement sur RA' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'créez un événement sur RA' })).toHaveAttribute('href', 'https://ra.co/pro/event/create')
+    await waitFor(() => expect(raValue('Titre')).toHaveTextContent(/^ONDES TAKEOVERcopier$/))
+    expect(raValue('Quand')).toHaveTextContent('samedi 14 novembre 2026, de 21 h à 1 h le lendemain')
+    expect(within(raValue('Line-up')).getByText(/^Aurore/)).toHaveTextContent('Aurore Brume Cyan', { normalizeWhitespace: true })
+    expect(within(raValue('Salle')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
+    expect(within(raValue('Promoteur')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/promoters/183980')
+    expect(raValue('Description')).toHaveTextContent('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+
+    fireEvent.click(screen.getByRole('button', { name: 'copier le line-up' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'copier le line-up' })).toHaveTextContent('copié'))
+    expect(writeText).toHaveBeenCalledWith('Aurore\nBrume\nCyan')
+    fireEvent.click(screen.getByRole('button', { name: 'copier le titre' }))
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('ONDES TAKEOVER'))
+    fireEvent.click(screen.getByRole('button', { name: 'copier la description' }))
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC'))
+
+    writeText.mockRejectedValue(new Error('Denied'))
+    fireEvent.click(screen.getByRole('button', { name: 'copier le titre' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'copier le titre' })).toHaveTextContent('échec de la copie'))
+  })
+
+  it("shows a session without a date as such, and a missing description without a button", async () => {
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, '/api/admin/sessions/session-2/ra-event': { ok: true, event: { ...RA_EVENT, start: null, end: null, content: '' } } })
+    renderAt('/admin/sessions/session-2')
+
+    await waitFor(() => expect(raValue('Quand')).toHaveTextContent('date à déterminer'))
+    expect(raValue('Description')).toHaveTextContent(/^-$/)
+    expect(screen.queryByRole('button', { name: 'copier la description' })).not.toBeInTheDocument()
+  })
+
+  it('reads it again whenever the session changes, e.g. its sets', async () => {
+    const cancelled = { ...SESSION, sets: [{ ...SET, status: 'cancelled' as const }, CYAN_SET, SESSION.sets[2]] }
+    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: true, session: cancelled } })
+    renderAt('/admin/sessions/session-1')
+    await waitFor(() => expect(requestsTo('GET', RA_URL)).toHaveLength(1))
+
+    mockFetch({ ...PAGE, [RA_URL]: { ok: true, event: { ...RA_EVENT, lineup: 'Cyan' } }, 'PUT /api/admin/sets/set-1/status': { ok: true, session: cancelled } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume, 21 h – 22 h' })).getByRole('button', { name: 'annulé' }))
+    await waitFor(() => expect(raValue('Line-up')).toHaveTextContent(/^Cyancopier$/))
+  })
+
+  it('says when its content could not be loaded', async () => {
+    mockFetch({ ...PAGE, [RA_URL]: { ok: false, error: 'Something went wrong' } })
+    renderAt('/admin/sessions/session-1')
+    expect(await screen.findByRole('alert')).toHaveTextContent("Le contenu de l'événement RA n'a pas pu être chargé : Something went wrong")
   })
 })
 

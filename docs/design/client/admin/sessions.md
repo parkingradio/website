@@ -88,6 +88,16 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
   « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
   [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
+- "Événement sur RA": the content of the session's event on Resident Advisor, as the server gives it (see
+  [Events on RA](../../server/sessions.md#events-on-ra)), which is how the event is created on RA by hand: its title
+  ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer per line, Parking
+  Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, and its description
+  ("Description"), with its line breaks, or "-" when it has none. A "copier" button after the title, the lineup and the
+  description copies it, then says "copié", or "échec de la copie", for a moment: the times, the venue and the promoter
+  are picked in RA's form rather than typed. A sentence above it says to create the event on RA with these fields,
+  linking to RA's form (`https://ra.co/pro/event/create`), then to add its link to the session in "Événement RA", with
+  "modifier". The content is read again whenever the session or its sets change, and the section says when it can't be
+  read.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
   takeover's collective, stay, which the page says of those it has.
 
@@ -187,6 +197,7 @@ named. Changing a status shows these the same way.
 - `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status` and
   `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
+- `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, on its page.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status` and
   `DELETE /api/admin/sets/:id`, for its sets.

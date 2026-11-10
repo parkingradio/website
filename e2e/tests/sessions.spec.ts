@@ -8,7 +8,11 @@ import { test, expect, adminMenu, logIn } from './fixtures.ts'
 
 // The rows of a page or a table that have `text`, and what a page says of `label`.
 const rowsOf = (within: Page | Locator, text: string) => within.getByRole('row').filter({ hasText: text })
-const value = (page: Page, label: string) => page.locator('dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
+// What the session's record, or the content of its event on RA, says for `label`.
+const recordValue = (page: Page, record: string, label: string) =>
+  page.getByLabel(record, { exact: true }).locator('dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
+const value = (page: Page, label: string) => recordValue(page, 'Session', label)
+const raValue = (page: Page, label: string) => recordValue(page, "Contenu de l'événement RA", label)
 
 test('the seeded sessions are listed, searched and filtered, and on the pages of their artists and collectives', async ({ page }) => {
   await logIn(page, { at: '/admin/sessions?status=all' })
@@ -47,10 +51,12 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await rowsOf(page, 'SYNTH MEETUPS').getByRole('link').first().click()
   await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 64)
+  // Its event on RA has a lineup, though it has no sets.
+  await expect(raValue(page, 'Line-up')).toHaveText(/^OPEN JAM/)
   // The form shows the same one, from the client's copy of the server's.
   const described = await value(page, 'Description').textContent()
   await page.getByRole('button', { name: 'modifier' }).click()
-  await expect(page.getByLabel('Description')).toHaveAttribute('placeholder', described!)
+  await expect(page.getByLabel('Description', { exact: true })).toHaveAttribute('placeholder', described!)
   await page.getByRole('button', { name: 'annuler' }).click()
   await page.goBack()
   await search.fill('live performance')
@@ -81,6 +87,20 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(page.getByRole('table', { name: 'Sessions' }).locator(`a[href="${sessionPage}"]`)).toBeVisible()
   // Which keeps it from being deleted.
   await expect(page.getByRole('button', { name: 'supprimer le collectif' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test("a seeded session's page shows the content of its event on RA, its performers from its sets that aren't cancelled", async ({ page }) => {
+  await logIn(page, { at: '/admin/sessions' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('guest mixes')
+  // The soonest, which is the seeded one.
+  await rowsOf(page, 'GUEST MIXES').first().getByRole('link').first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'GUEST MIXES' })).toBeVisible()
+  await expect(raValue(page, 'Titre')).toHaveText(/^GUEST MIXES/)
+  await expect(raValue(page, 'Quand')).toHaveText(await value(page, 'Quand').innerText())
+  await expect(raValue(page, 'Line-up').locator('span')).toHaveText('Clémentine Brûlée\nClément Brûlé\nKwame Asante')
+  await expect(raValue(page, 'Salle').getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
+  await expect(raValue(page, 'Description')).toHaveText(/^LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC/)
+  await expect(page.getByRole('button', { name: 'copier le line-up' })).toBeVisible()
 })
 
 test('a seeded session marks its sets that overlap, and those that end after it, saying why in a tooltip', async ({ page, isMobile }) => {

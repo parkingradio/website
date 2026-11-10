@@ -170,6 +170,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
 | [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, with their sets |
 | [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
+| [`GET /api/admin/sessions/:id/ra-event`](sessions.md#get-apiadminsessionsidra-event-admin) | admin | The content of a session's event on Resident Advisor |
 | [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer |
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer |
 | [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session, or replacing or removing its flyer |
