@@ -589,10 +589,21 @@ dl.admin-record {
   white-space: pre-wrap;
 }
 
-/* A text of a session's event on RA, with the button that copies it after it. */
+/* Creating a session's event on RA by hand, under its "Événement RA". */
+.admin-ra-panel {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+}
+
+.admin-ra-panel > p:first-child {
+  margin-top: 0;
+}
+
+/* A text of a session's event on RA, with the button that copies it after its first line. */
 .admin-copyable {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   gap: 1rem;
 }
 

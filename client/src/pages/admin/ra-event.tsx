@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import { api, formData } from '../../api/client'
 import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
+import { checkSession, sessionFormValues } from '../../session-fields'
 import type { Session } from '../../session-fields'
+import { raEventId, raEventUrl } from '../../session-links'
 import { MISSING, sessionWhen } from './describe'
+import { FormActions, Labeled } from './fields'
+import { failure } from './session-errors'
 
-// The section of a session's page that shows the content of its event on Resident Advisor, as the server gives it, with
-// a button to copy each of its texts, to create the event by hand on RA (see "Événement sur RA" in
+// Creating a session's event on Resident Advisor by hand, from its page: the content of the event, as the server gives
+// it, with a button to copy each of its texts, and the field its link is pasted in (see "A session's page" in
 // docs/design/client/admin/sessions.md).
 
 const RA_CREATE_EVENT = 'https://ra.co/pro/event/create'
@@ -79,19 +85,43 @@ function RaEventRecord({ session, event }: { session: Session; event: RaEventCon
   )
 }
 
-export function RaEventSection({ session }: { session: Session }) {
+// The panel that opens under the session's "Événement RA" while it has none: the content of its event, as the server
+// gives it, to create it on RA by hand, and the field its link is pasted in, which saves it as the session's event.
+export function RaEventPanel({ session, onSaved, onCancel }: { session: Session; onSaved: (session: Session) => void; onCancel: () => void }) {
   // Again whenever the session changes, its sets included, since the event's content follows them.
   const loaded = useApi('/api/admin/sessions/{id}/ra-event', { params: { path: { id: session.id } }, version: session })
+  const [link, setLink] = useState('')
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [error, setError] = useState<ReactNode>(null)
+  const [busy, setBusy] = useState(false)
+
+  // Saves the event as the session's, with the rest of the session as it was loaded, since the API replaces it whole.
+  const save = async (event: FormEvent) => {
+    event.preventDefault()
+    const typed = link.trim()
+    // Its number, or a link to it, with or without its https://.
+    const id = raEventId(typed) ?? raEventId(`https://${typed}`)
+    if (!id) return setLinkError(typed ? "Ce n'est pas le lien d'un événement RA, p. ex. https://ra.co/events/6683745." : "Collez le lien de l'événement RA.")
+    setLinkError(null)
+    const { fields } = checkSession({ ...sessionFormValues(session), raEvent: { id, url: raEventUrl(id) } })
+    // The session's own fields, as the server gave them, always pass.
+    if (!fields) return setError("L'événement RA n'a pas pu être enregistré.")
+    setBusy(true)
+    setError(null)
+    const result = await api.PUT('/api/admin/sessions/{id}', { params: { path: { id: session.id } }, body: { session: fields }, bodySerializer: formData })
+    setBusy(false)
+    if (!result.ok) return setError(failure("L'événement RA n'a pas pu être enregistré", result, session.id))
+    onSaved(result.session)
+  }
 
   return (
-    <>
-      <h2>Événement sur RA</h2>
+    <div className="admin-ra-panel">
       <p>
-        Pour créer l'événement de la session à la main,{' '}
+        Créez l'événement{' '}
         <a href={RA_CREATE_EVENT} target="_blank" rel="noreferrer">
-          créez un événement sur RA
+          sur RA
         </a>{' '}
-        avec ces champs, puis ajoutez son lien à la session dans «&nbsp;Événement RA&nbsp;», avec «&nbsp;modifier&nbsp;».
+        avec ces champs, puis collez son lien ci-dessous.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -99,6 +129,12 @@ export function RaEventSection({ session }: { session: Session }) {
         </p>
       )}
       {loaded.kind === 'loaded' && <RaEventRecord session={session} event={loaded.value.event} />}
-    </>
+      <form className="admin-form" onSubmit={save} noValidate>
+        <Labeled label="Lien de l'événement RA" error={linkError}>
+          <input type="url" value={link} placeholder="https://ra.co/events/…" onChange={(change) => setLink(change.target.value)} />
+        </Labeled>
+        <FormActions error={error} busy={busy} submitLabel="enregistrer" onCancel={onCancel} />
+      </form>
+    </div>
   )
 }
