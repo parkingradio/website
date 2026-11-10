@@ -96,7 +96,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     settings: deps.applicationsSettings,
     sendEmail: deps.sendEmail,
   })
-  await app.register(sessionsRoutes, { store: deps.sessions, resolveTrack: soundcloud.resolveTrack })
+  await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })

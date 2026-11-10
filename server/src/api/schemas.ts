@@ -116,6 +116,12 @@ function pathToNul(value: unknown): (string | number)[] | undefined {
 
 const NUL_ERROR = "Text can't contain the NUL character"
 
+// The error to refuse `value` with, what a schema kept of a request, if it has the NUL character anywhere, or null. For
+// what routes check themselves, e.g. the JSON part of a multipart request, as `refusingNul` does for the others.
+export function nulError(value: unknown): string | null {
+  return pathToNul(value) ? NUL_ERROR : null
+}
+
 // Validates requests against their zod schema, then refuses those that send the NUL character, which the database can't
 // store, anywhere in what the schema keeps (it drops the fields it doesn't know). Only once the schema accepted them, so
 // that its own errors come first, e.g. the French ones of `text` in artists/profile.ts.

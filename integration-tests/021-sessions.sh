@@ -20,6 +20,10 @@ readonly IP=198.51.100.30
 readonly NOBODY=00000000-0000-4000-8000-000000000000
 
 readonly FILES="$(mktemp -d)"
+# The smallest files that start like a JPEG and a PNG image, and one that's neither.
+printf '\xff\xd8\xff\xe0JFIF' > "${FILES}/flyer.jpg"
+printf '\x89PNG\r\n\x1a\nIHDR' > "${FILES}/flyer.png"
+printf '%%PDF-1.7' > "${FILES}/flyer.pdf"
 trap 'rm -rf "$FILES"' EXIT
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
@@ -44,10 +48,19 @@ performers() {
 }
 
 # session_json <start> <duration> [<more JSON fields>] -- a session, as JSON, starting at <start>, as JSON (e.g. a quoted
-# date and time, or null), of guest mixes, with a name of its own, without a takeover or an RA event unless they're given
-# (the last of two fields with the same name is the one that counts).
+# date and time, or null), of guest mixes, with a name of its own, without a takeover, an RA event or a description unless
+# they're given (the last of two fields with the same name is the one that counts).
 session_json() {
-    printf '{"start":%s,"durationMinutes":%s,"type":"guest-mixes","takeover":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null%s}' "$1" "$2" "${3:+,$3}"
+    printf '{"start":%s,"durationMinutes":%s,"type":"guest-mixes","takeover":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null,"description":""%s}' \
+        "$1" "$2" "${3:+,$3}"
+}
+
+# session_form <method> <url> <session JSON> [<curl args>...] -- add or change a session, as the admin, as
+# multipart/form-data, with its fields as JSON in the "session" part, and the other parts given, e.g. its flyer.
+session_form() {
+    local method="$1" url="$2" fields="$3"
+    shift 3
+    request --header "Cookie: ${cookie}" --request "$method" --form-string "session=${fields}" "$@" "$url"
 }
 
 # collective_json <name> -- the profile of the collective Les Ondes, as JSON, with that name, and Ana as its artist.
@@ -128,8 +141,11 @@ release_sessions_lock() {
 # for its response, which wait_for_background then waits for. Its status and body are in ${FILES}/status and
 # ${FILES}/body, or ${FILES}/status-<suffix> and ${FILES}/body-<suffix> with a suffix.
 send_in_background() {
+    local body=(--header 'Content-Type: application/json' --data "$3")
+    # Sessions are added and changed as multipart/form-data, with their fields as JSON (see session_form).
+    if [[ "$2" =~ /api/admin/sessions(/[^/]+)?$ ]]; then body=(--form-string "session=$3"); fi
     curl --silent --output "${FILES}/body${4:+-$4}" --write-out '%{http_code}' --header "Cookie: ${cookie}" --request "$1" \
-        --header 'Content-Type: application/json' --data "$3" "$2" > "${FILES}/status${4:+-$4}" &
+        "${body[@]}" "$2" > "${FILES}/status${4:+-$4}" &
 }
 
 # delete_in_background <url> <name> -- delete what's at the URL, as the admin, without waiting for the response, whose
@@ -164,28 +180,28 @@ expect_status 200
 ondes="$(first_id)"
 
 echo "  an invalid session is explained, including one with the NUL character"
-json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 0)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 0)"
 expect_status 400
 expect_body_contains '"error":"The duration must be a whole number of minutes, from 1 to 1440"'
 # Postgres can't keep it.
-json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"name":"HAUTE\u0000RIVE"')"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"name":"HAUTE\u0000RIVE"')"
 expect_status 400
 expect_body_contains '"error":"Text can'"'"'t contain the NUL character"'
-json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"raEvent":"https://ra.co/events/6683745\u0000"')"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"raEvent":"https://ra.co/events/6683745\u0000"')"
 expect_status 400
 
 echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in Québec time and its RA event reduced"
-json POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
 expect_status 200
 first="$(first_id)"
 json GET "${SESSIONS}/${first}"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-15T01:00:00-05:00\",\"durationMinutes\":240,\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
-expect_body_contains '"name":"HAUTE RIVE TAKEOVER","title":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"sets":[]'
+expect_body_contains '"name":"HAUTE RIVE TAKEOVER","title":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"description":"","effectiveDescription":"LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC","hasFlyer":false,"sets":[]'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\",\"statusUpdatedBy\":null"
 
 echo "  a session is called by its own name, or else the one its type gives it, from its collective's name as it is then"
-json POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"name\":\"\"")"
+session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"name\":\"\"")"
 expect_status 200
 named="$(first_id)"
 expect_body_contains "\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"},\"name\":\"\",\"title\":\"LES ONDES TAKEOVER\""
@@ -197,31 +213,94 @@ expect_body_contains '"updatedBy":null,"updatedAt":null'
 request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes')" "${COLLECTIVES}/${ondes}"
 expect_status 200
 for type in guest-mixes:GUEST\ MIXES live-performance:LIVE\ PERFORMANCE synth-meetup:SYNTH\ MEETUPS; do
-    json PUT "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
+    session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
     expect_status 200
     expect_body_contains "\"type\":\"${type%%:*}\",\"takeover\":null,\"name\":\"\",\"title\":\"${type#*:}\""
 done
-json PUT "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
+session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
 expect_status 200
 expect_body_contains '"type":"other","takeover":null,"name":"ATELIER DE DJing POUR FEMMES","title":"ATELIER DE DJing POUR FEMMES"'
 json DELETE "${SESSIONS}/${named}"
 expect_status 200
 
+echo "  a session has its own description, or else the one its type gives it, with its line breaks, and none for other"
+session_form POST "$SESSIONS" "$(session_json null 60 '"type":"synth-meetup","description":" \r\nUne  soirée.\r\n\r\nSPÉCIALE "')"
+expect_status 200
+described="$(first_id)"
+expect_body_contains '"description":"Une  soirée.\n\nSPÉCIALE","effectiveDescription":"Une  soirée.\n\nSPÉCIALE"'
+[ "$(sql "select description from sessions where id = '${described}'" | head -1)" = 'Une  soirée.' ] || fail "expected the description to be kept"
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"type":"synth-meetup"')"
+expect_body_contains '"description":"","effectiveDescription":"SYNTH MEETUPS\n\nRencontres hebdomadaires de création sonore et audiovisuelle'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"type":"other"')"
+expect_body_contains '"description":"","effectiveDescription":"","hasFlyer":false'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 "\"description\":\"$(printf 'x%.0s' $(seq 1 5001))\"")"
+expect_status 400
+expect_body_contains '"error":"The description must be text, up to 5000 characters"'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"description":"Une\u0000soirée"')"
+expect_status 400
+expect_body_contains '"error":"Text can'"'"'t contain the NUL character"'
+
+echo "  a session's flyer is checked, kept, served, replaced, removed, and deleted with it"
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.pdf"
+expect_status 400
+expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
+[ "$(photos_on_disk sessions)" = 0 ] || fail "expected no flyer on disk"
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.jpg"
+expect_status 200
+expect_body_contains '"hasFlyer":true'
+expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the session's flyer on disk"
+request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
+expect_status 200
+expect_header Content-Type 'image/jpeg'
+expect_header X-Content-Type-Options 'nosniff'
+expect_header Cache-Control 'private, no-store'
+curl --silent --header "Cookie: ${cookie}" --output "${FILES}/served" "${SESSIONS}/${described}/flyer"
+cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
+# A flyer sent with a session that isn't saved is deleted: one that would overlap the first session, or a takeover of a
+# collective that doesn't exist.
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T22:00-05:00"' 60)" --form "flyer=@${FILES}/flyer.png"
+expect_status 409
+session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${NOBODY}\"")" --form "flyer=@${FILES}/flyer.png"
+expect_status 400
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the flyers of the sessions that weren't saved to be deleted"
+# Without a flyer, the session keeps its own.
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)"
+expect_body_contains '"hasFlyer":true'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png" --form-string removeFlyer=true
+expect_status 400
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png"
+expect_status 200
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the replaced flyer to be deleted"
+request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
+expect_header Content-Type 'image/png'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form-string removeFlyer=true
+expect_body_contains '"hasFlyer":false'
+[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the removed flyer to be deleted"
+request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
+expect_status 404
+expect_body_contains '"error":"This session has no flyer"'
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png"
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the session's flyer on disk"
+json DELETE "${SESSIONS}/${described}"
+expect_status 200
+[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the deleted session's flyer to be deleted"
+
 echo "  only takeovers have a collective, and they need one, a session of type other needs a name, and nothing is saved otherwise"
 for fields in '"type":"takeovers"' '"type":"takeover"' "\"takeover\":\"${ondes}\"" "\"type\":\"other\",\"takeover\":\"${ondes}\"" '"type":"other","name":" "'; do
-    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "$fields")"
+    session_form POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "$fields")"
     expect_status 400
 done
-json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"takeover"')"
+session_form POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"takeover"')"
 expect_body_contains '"error":"A takeover has a collective"'
-json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"takeover\":\"${ondes}\"")"
+session_form POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"takeover\":\"${ondes}\"")"
 expect_body_contains '"error":"Only a takeover has a collective"'
-json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"other","name":""')"
+session_form POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 '"type":"other","name":""')"
 expect_body_contains '"error":"A session of type other has a name"'
 
 echo "  a takeover has to be a collective that exists, and nothing is saved otherwise"
 for takeover in "$NOBODY" not-a-uuid "$ana"; do
-    json POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${takeover}\"")"
+    session_form POST "$SESSIONS" "$(session_json '"2027-01-01T16:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${takeover}\"")"
     expect_status 400
     expect_body_contains '"error":"No such collective"'
 done
@@ -229,25 +308,25 @@ json GET "$SESSIONS"
 [ "$(session_ids)" = "${first} " ] || { _show_body; fail "expected only the first session"; }
 
 echo "  sessions can't overlap, when they're added or changed, but one can start when another ends, and the 409 names the other"
-json POST "$SESSIONS" "$(session_json '"2026-11-15T00:00-05:00"' 60)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-15T00:00-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
-json POST "$SESSIONS" "$(session_json '"2026-11-15T01:00-05:00"' 60)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-15T01:00-05:00"' 60)"
 expect_status 200
 next="$(first_id)"
-json PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"' 60)"
+session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${next}"
 expect_body_contains '"start":"2026-11-15T01:00:00-05:00","end":"2026-11-15T02:00:00-05:00"'
 
 echo "  a session lasts the minutes that actually pass, for the database too, e.g. the night the clocks go back"
 # From midnight, for 4 hours: the clocks then say 3:00, an hour behind.
-json POST "$SESSIONS" "$(session_json '"2026-11-01T00:00-04:00"' 240)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-01T00:00-04:00"' 240)"
 expect_status 200
 night="$(first_id)"
 expect_body_contains '"start":"2026-11-01T00:00:00-04:00","end":"2026-11-01T03:00:00-05:00"'
-json POST "$SESSIONS" "$(session_json '"2026-11-01T02:59-05:00"' 60)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-01T02:59-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$night"
-json POST "$SESSIONS" "$(session_json '"2026-11-01T03:00-05:00"' 60)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-01T03:00-05:00"' 60)"
 expect_status 200
 dawn="$(first_id)"
 for session in "$night" "$dawn"; do
@@ -256,15 +335,15 @@ for session in "$night" "$dawn"; do
 done
 
 echo "  sessions without a start don't overlap anything, until they're given one"
-json POST "$SESSIONS" "$(session_json null 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
+session_form POST "$SESSIONS" "$(session_json null 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 canned="$(first_id)"
 expect_body_contains '"start":null,"end":null,"durationMinutes":240'
-json POST "$SESSIONS" "$(session_json '""' 240)"
+session_form POST "$SESSIONS" "$(session_json '""' 240)"
 expect_status 200
 other_canned="$(first_id)"
 expect_body_contains '"start":null,"end":null'
-json PUT "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
+session_form PUT "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${canned}"
 expect_body_contains '"start":null'
@@ -363,7 +442,7 @@ expect_status 200
 echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, cancelled ones included"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
+session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 expect_body_contains '"durationMinutes":119'
 expect_place "$opening" true
@@ -375,16 +454,16 @@ json DELETE "${SETS}/${whenever}"
 expect_status 200
 
 echo "  moving a session moves its sets, which doesn't count as changing them, and so does taking its start away"
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":\"2026-11-21T22:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\""
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
-json PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+session_form PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":null,\"end\":null"
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 
 echo "  cancelling a session cancels its sets, done ones included, but not the other way around"
@@ -414,7 +493,7 @@ done
 echo "  a session can't be un-cancelled when it would overlap another one"
 json PUT "${SESSIONS}/${next}/status" '{"status":"cancelled"}'
 expect_status 200
-json POST "$SESSIONS" "$(session_json '"2026-11-15T01:30-05:00"' 60)"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-15T01:30-05:00"' 60)"
 expect_status 200
 replacement="$(first_id)"
 json PUT "${SESSIONS}/${next}/status" '{"status":"planned"}'
@@ -449,7 +528,7 @@ echo "  sessions are listed by when they start, from \`from\`, included, to \`to
 week=(2026-10-26T00:00-04:00 2026-11-02T00:00-05:00)
 dated=()
 for start in "${week[0]}" 2026-10-31T21:00-04:00 "${week[1]}"; do
-    json POST "$SESSIONS" "$(session_json "\"${start}\"" 60)"
+    session_form POST "$SESSIONS" "$(session_json "\"${start}\"" 60)"
     expect_status 200
     dated+=("$(first_id)")
 done
@@ -481,7 +560,7 @@ for query in from=2026-10-26T04:00Z from=2026-10-26T05:00%2B01:00 from=2026-10-2
     expect_body_contains 'must be a single date and time in Québec time, with the offset from UTC in effect then (-05:00, or -04:00 from the second Sunday of March at 2:00 to the first Sunday of November at 2:00)'
 done
 for start in '"2026-11-14T21:00Z"' '"2026-11-14T21:00-04:00"' '"2027-03-14T02:30-04:00"'; do
-    json POST "$SESSIONS" "$(session_json "$start" 60)"
+    session_form POST "$SESSIONS" "$(session_json "$start" 60)"
     expect_status 400
     expect_body_contains '"error":"The start must be a date and time in Québec time, with the offset from UTC in effect then'
 done
@@ -596,7 +675,7 @@ expect_status 200
 echo "  deleting a session and deleting an artist who played two of its sets wait for each other"
 # Each one deletes the artist's rows in set_performers, in an order of its own, so they would deadlock if they didn't
 # both take the sessions' lock first.
-json POST "$SESSIONS" "$(session_json '"2027-03-01T16:00-05:00"' 120)"
+session_form POST "$SESSIONS" "$(session_json '"2027-03-01T16:00-05:00"' 120)"
 doomed="$(first_id)"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Passager"}' "$ARTISTS"
 passenger="$(first_id)"
@@ -668,13 +747,13 @@ echo "  a collective can't be deleted while it has takeovers, which the 409 name
 readonly HAS_TAKEOVERS='This collective has takeovers: give them another collective, or another type, first'
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_conflict "$HAS_TAKEOVERS" "$canned"
-json PUT "${SESSIONS}/${canned}" "$(session_json null 240)"
+session_form PUT "${SESSIONS}/${canned}" "$(session_json null 240)"
 expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_conflict "$HAS_TAKEOVERS" "$first"
 json GET "${COLLECTIVES}/${ondes}"
 expect_status 200
-json PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"type":"other"')"
+session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"type":"other"')"
 expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
@@ -693,7 +772,7 @@ echo "  a session or a set that doesn't exist can't be viewed, changed or delete
 for id in "$NOBODY" not-a-uuid; do
     json GET "${SESSIONS}/${id}"
     expect_status 404
-    json PUT "${SESSIONS}/${id}" "$(session_json null 60)"
+    session_form PUT "${SESSIONS}/${id}" "$(session_json null 60)"
     expect_status 404
     json PUT "${SESSIONS}/${id}/status" '{"status":"done"}'
     expect_status 404

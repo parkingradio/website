@@ -1,7 +1,7 @@
 import { Fragment, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { api } from '../../api/client'
+import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
@@ -16,6 +16,7 @@ import {
   byWhom,
   describePerformanceTypes,
   entryPath,
+  flyerUrl,
   formatDuration,
   genreNames,
   sessionDay,
@@ -445,10 +446,11 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         <SessionFormWithChoices
           initial={sessionFormValues(session)}
           hasSets={session.sets.length > 0}
+          flyer={session.hasFlyer ? flyerUrl(session) : null}
           submitLabel="enregistrer"
           onCancel={() => setOpen(null)}
-          onSubmit={async (fields) => {
-            const result = await api.PUT('/api/admin/sessions/{id}', { params, body: fields })
+          onSubmit={async (body) => {
+            const result = await api.PUT('/api/admin/sessions/{id}', { params, body, bodySerializer: formData })
             if (!result.ok) return failure("La session n'a pas pu être enregistrée", result, session.id)
             changed(result.session)
             return null
@@ -479,6 +481,11 @@ function LoadedSession({ loaded }: { loaded: Session }) {
             <dt>Nom</dt>
             {/* Faded out when it's the name its type gives it. */}
             <dd className={session.name ? undefined : 'admin-generated'}>{session.title}</dd>
+            <dt>Description</dt>
+            {/* Faded out when it's the one its type gives it. */}
+            <dd className={session.description ? 'admin-text' : 'admin-text admin-generated'}>{session.effectiveDescription || MISSING}</dd>
+            <dt>Flyer</dt>
+            <dd>{session.hasFlyer ? <img src={flyerUrl(session)} alt={`Flyer de ${session.title}`} /> : 'Pas de flyer'}</dd>
             <dt>Événement RA</dt>
             <dd>{linkOrMissing(session.raEvent)}</dd>
           </dl>
@@ -527,7 +534,11 @@ function LoadedSession({ loaded }: { loaded: Session }) {
 
 // What deleting a session deletes, and what stays.
 function deleteText(session: Session): string {
-  const deleted = session.sets.length === 0 ? 'La session sera supprimée pour de bon.' : 'La session et ses sets seront supprimés pour de bon.'
+  const sets = session.sets.length > 0
+  let deleted = 'La session sera supprimée pour de bon.'
+  if (session.hasFlyer && sets) deleted = 'La session, son flyer et ses sets seront supprimés pour de bon.'
+  else if (session.hasFlyer) deleted = 'La session et son flyer seront supprimés pour de bon.'
+  else if (sets) deleted = 'La session et ses sets seront supprimés pour de bon.'
   const takeover = session.takeover ? 'le collectif de son takeover' : null
   if (!session.sets.some((set) => set.performers.length > 0)) return takeover ? `${deleted} Le collectif de son takeover reste.` : deleted
   return `${deleted} Leurs artistes${takeover ? ` et ${takeover}` : ''} restent.`
@@ -728,8 +739,8 @@ export function NewSessionPage() {
         takeoverId={searchParams.get('takeover')}
         initial={EMPTY_SESSION_FORM}
         submitLabel="ajouter la session"
-        onSubmit={async (fields) => {
-          const result = await api.POST('/api/admin/sessions', { body: fields })
+        onSubmit={async (body) => {
+          const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
           if (!result.ok) return failure("La session n'a pas pu être ajoutée", result)
           navigate(sessionPath(result.session))
           return null

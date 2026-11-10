@@ -238,6 +238,11 @@ export const sessions = pgTable(
     // be deleted while it has takeovers, which the server checks first, under the sessions' lock (see sessions/store.ts).
     takeoverId: uuid('takeover_id').references(() => collectives.id, { onDelete: 'restrict' }),
     raEventId: text('ra_event_id'),
+    description: text('description').notNull().default(''), // plain text, "" for none, which its type's then replaces
+    // Where the flyer is stored (see `Photos` in artists/store.ts), and its MIME type, as checked from its contents. Both
+    // null when the session has no flyer.
+    flyerKey: text('flyer_key'),
+    flyerType: text('flyer_type'),
     // The email of the admin who last changed the session, and when (null until then). Status changes don't count, and
     // neither do changes to its sets.
     updatedBy: text('updated_by'),
@@ -254,6 +259,7 @@ export const sessions = pgTable(
     check('sessions_type', oneOf(table.type, SESSION_TYPES)),
     check('sessions_takeover', sql`(${table.type} = 'takeover') = (${table.takeoverId} is not null)`),
     check('sessions_named', sql`${table.type} <> 'other' or ${table.name} <> ''`),
+    check('sessions_flyer', sql`(${table.flyerKey} is null) = (${table.flyerType} is null)`),
   ],
 )
 

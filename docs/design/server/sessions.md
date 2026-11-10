@@ -24,6 +24,7 @@ A session has:
 | `takeover` | object or null | The collective whose takeover the session is, which only takeovers have, and they always do: see [Types and names](#types-and-names) |
 | `name` | string | The session's own name, which replaces the one its type gives it, as free text: see [Types and names](#types-and-names). Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 100 characters, or `""` when there's none |
 | `raEvent` | object or null | The session's event on Resident Advisor: see [Links](#links) |
+| `description` | string | The session's own description, which replaces the one its type gives it, as plain text: see [Descriptions](#descriptions). Its line breaks become `\n`, and it's trimmed, then up to 5000 characters, or `""` when there's none |
 
 A session, as the endpoints below return it, also has:
 
@@ -32,10 +33,12 @@ A session, as the endpoints below return it, also has:
 | `id` | string | |
 | `title` | string | What the session is called: its `name`, or else the name its type gives it, e.g. `"HAUTE RIVE TAKEOVER"`, like the event of a track's title (see [The rotation](radio.md#the-rotation)). Never empty: see [Types and names](#types-and-names) |
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
+| `effectiveDescription` | string | The session's description: its `description`, or else the one its type gives it, or `""` when neither has one: see [Descriptions](#descriptions) |
+| `hasFlyer` | boolean | Whether the session has a flyer: see [Flyers](#flyers) |
 | `sets` | list of sets | Its sets, by `offsetMinutes`, then `createdAt`, the sets without an offset last, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when. Status changes don't count, and neither do changes to its sets, or renaming the takeover's collective |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, or renaming the takeover's collective |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -200,6 +203,32 @@ another type with one (`"Only a takeover has a collective"`), a session of type 
 of type other has a name"`), and a string that isn't the id of a collective that exists (`"No such collective"`).
 Responses give `takeover` as an object with the collective's `id` and `name`, or null.
 
+## Descriptions
+
+A session's `description` is its own text, e.g. for a special evening, which replaces the one its type gives it. It's
+plain text, without markup, on several lines: each `\r\n` or `\r` becomes `\n`, and it's trimmed, but its spaces and
+line breaks are kept as they are. Types give these, which are what Parking Radio puts on its events on Resident Advisor:
+
+| `type` | The description it gives |
+|---|---|
+| `"guest-mixes"`, `"live-performance"`, `"takeover"` | `LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC` |
+| `"synth-meetup"` | A text in French that presents the Synth Meetups and the studio's ceiling of LEDs |
+| `"other"` | None |
+
+These are `DEFAULT_DESCRIPTIONS`, in `server/src/sessions/descriptions.ts`. A session's `effectiveDescription` is its
+`description`, or else the one its type gives it, so it's `""` for a session of type `"other"` without one. Apps that
+change a session send back its `description`, not its `effectiveDescription`: otherwise the one its type gives it would
+become its own, and stop following its type.
+
+## Flyers
+
+A session can have a flyer, an image, which follows the same rules as an artist's photo (see
+[Photos](artists.md#photos)): it's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
+kept in the app's private files, and deleted when the session is deleted, or the flyer replaced or removed. It's sent
+along with the session's fields (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), and the MCP server's
+tools can't send one: a session added with a tool has none, and one changed with a tool keeps its own, unless
+`removeFlyer` is `true`.
+
 ## Links
 
 Requests send each of these as a string, or null, or a blank string, when there's none. Links can be `http://` or
@@ -258,10 +287,18 @@ or if `from` isn't before `to`.
 
 Fails with 404 when there's no such session.
 
+## `GET /api/admin/sessions/:id/flyer` (admin)
+
+Responds with the flyer itself, like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin).
+Fails with 404 when there's no such session, when it has no flyer, or when its flyer is missing.
+
 ## `POST /api/admin/sessions` (admin)
 
-Adds a session, as `"planned"`, without sets. The request has the session's `start`, `durationMinutes`, `type`,
-`takeover`, `name` and `raEvent`, as above, none of them left out.
+Adds a session, as `"planned"`, without sets. It's `multipart/form-data`, like
+[`POST /api/admin/artists`](artists.md#post-apiadminartists-admin), with two parts: `session`, the session's fields as
+JSON, in a field rather than a file, which are its `start`, `durationMinutes`, `type`, `takeover`, `name`, `raEvent` and
+`description`, as above, none of them left out, and `flyer`, its flyer, which can be left out. A few other fields or
+files are ignored, but a second flyer isn't: the request fails.
 
 | Response field | Type | |
 |---|---|---|
@@ -272,8 +309,9 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | A field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, or `raEvent` isn't one of the links above |
+| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, `raEvent` isn't one of the links above, or the flyer isn't a JPEG, PNG or WebP image |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)) |
+| 413 | The flyer is larger than 10 MB |
 
 When it fails, nothing is saved.
 
@@ -281,8 +319,10 @@ When it fails, nothing is saved.
 
 Replaces a session's fields, but not its status or its sets, which move with its start, and stay as they are when it's
 shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It takes the same request as
-`POST /api/admin/sessions`, responds like it, with the session as it is then, and fails like it, and also with 404 when
-there's no such session.
+`POST /api/admin/sessions`. With a flyer, it replaces the session's, which is deleted. Without one, the session keeps
+its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it. Responds like
+`POST /api/admin/sessions`, with the session as it is then, and fails like it, with 400 when there's both a flyer and
+`removeFlyer`, and with 404 when there's no such session.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 
@@ -296,8 +336,8 @@ there's no such session, or 409 when the session would then overlap another one,
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 
-Deletes a session and its sets, and responds `{"ok": true}`. Their performers stay. Fails with 404 when there's no such
-session.
+Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay. Fails with
+404 when there's no such session.
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 

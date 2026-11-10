@@ -1,7 +1,11 @@
+import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
+import { multipartBody } from '../api/test-multipart.js'
+import { PHOTO_MAX_BYTES } from '../artists/profile.js'
+import type { PhotoFolder, SentPhoto } from '../artists/store.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { Conflict, NoSuchReference } from './store.js'
@@ -59,10 +63,11 @@ const store: SessionsStore = {
     return row
   }),
   update: vi.fn<SessionsStore['update']>(async (id, changes) => {
-    const before = rows.find((session) => session.id === id)
-    if (!before) return null
-    Object.assign(before, changes, takeover(changes.takeoverId))
-    return before
+    const row = rows.find((session) => session.id === id)
+    if (!row) return null
+    const before = { ...row }
+    Object.assign(row, changes, takeover(changes.takeoverId))
+    return { before, after: row }
   }),
   setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => {
     const session = rows.find((row) => row.id === id)
@@ -71,9 +76,9 @@ const store: SessionsStore = {
     return session
   }),
   delete: async (id) => {
-    const before = rows.length
+    const row = rows.find((session) => session.id === id)
     rows = rows.filter((session) => session.id !== id)
-    return rows.length < before
+    return row ?? null
   },
   getSet: async (id) => sessionOf(id)?.sets.find((set) => set.id === id) ?? null,
   addSet: vi.fn<SessionsStore['addSet']>(async (sessionId, { performers: sent, ...set }) => {
@@ -92,11 +97,39 @@ const store: SessionsStore = {
   },
 }
 
+// Sessions' flyers, as the bucket would keep them.
+const stored = new Map<string, Buffer>()
+let nextFlyer = 0
+const photos = {
+  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
+    const key = `${folder}/flyer-${++nextFlyer}.${type.split('/')[1]}`
+    stored.set(key, body)
+    return key
+  }),
+  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
+  delete: vi.fn(async (key: string) => {
+    stored.delete(key)
+  }),
+}
+
+// The smallest things that start like a JPEG and a PNG file.
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
+
 // SoundCloud, through the SoundCloud app.
 const resolveTrack = vi.fn<(link: string) => Promise<string | null>>()
 
 function session(changes: object = {}) {
-  return { start: '2026-11-14T21:00-05:00', durationMinutes: 240, type: 'takeover', takeover: 'collective-1', name: 'HAUTE RIVE TAKEOVER', raEvent: '6683745', ...changes }
+  return {
+    start: '2026-11-14T21:00-05:00',
+    durationMinutes: 240,
+    type: 'takeover',
+    takeover: 'collective-1',
+    name: 'HAUTE RIVE TAKEOVER',
+    raEvent: '6683745',
+    description: '',
+    ...changes,
+  }
 }
 
 function set(changes: object = {}) {
@@ -119,7 +152,7 @@ async function buildApp(logs?: string[]) {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
-  await app.register(sessionsRoutes, { store, resolveTrack })
+  await app.register(sessionsRoutes, { store, photos, resolveTrack })
   return app
 }
 
@@ -129,8 +162,19 @@ async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
-async function createSession(app: App, changes: object = {}) {
-  return send(app, 'POST', '/api/admin/sessions', session(changes))
+// The multipart/form-data body that adds or changes a session: its fields, as JSON (or as they're given, when they're a
+// string), its flyer, and whether to remove it.
+type Files = { flyer?: Buffer; removeFlyer?: string }
+function sessionForm(fields: object | string, { flyer, removeFlyer }: Files = {}) {
+  return multipartBody({ session: typeof fields === 'string' ? fields : JSON.stringify(fields), flyer, removeFlyer })
+}
+
+async function sendSession(app: App, method: 'POST' | 'PUT', url: string, fields: object | string, files: Files = {}) {
+  return app.inject({ method, url, ...sessionForm(fields, files), cookies: await sessionCookies() })
+}
+
+async function createSession(app: App, changes: object = {}, files: Files = {}) {
+  return sendSession(app, 'POST', '/api/admin/sessions', session(changes), files)
 }
 
 async function addSet(app: App, sessionId: string, changes: object = {}) {
@@ -148,6 +192,8 @@ describe('sessions routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     nextId = 0
+    nextFlyer = 0
+    stored.clear()
     vi.clearAllMocks()
     resolveTrack.mockImplementation(async (link) => (link.startsWith('https://soundcloud.com/parkingdotradio/') ? '42' : null))
   })
@@ -164,7 +210,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/sessions?from=x' }),
       app.inject({ method: 'GET', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions', payload: { start: 'x' } }),
-      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', payload: session() }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set() }),
@@ -185,8 +231,8 @@ describe('sessions routes', () => {
     await sessionWithSet(app)
     const options = { headers: { 'sec-fetch-site': 'cross-site' }, cookies: await sessionCookies() }
     const requests = [
-      app.inject({ method: 'POST', url: '/api/admin/sessions', payload: session(), ...options }),
-      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', payload: session(), ...options }),
+      app.inject({ method: 'POST', url: '/api/admin/sessions', ...sessionForm(session()), ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set(), ...options }),
@@ -204,12 +250,18 @@ describe('sessions routes', () => {
     const app = await buildApp()
     await sessionWithSet(app, { soundcloudTrack: null, youtubeVideo: null })
     vi.clearAllMocks()
-    for (const changes of [{ name: 'HAUTE\0RIVE' }, { takeover: 'collective-1\0' }, { raEvent: '6683745\0' }, { start: '2026-11-14T21:00-05:00\0' }]) {
+    for (const changes of [
+      { name: 'HAUTE\0RIVE' },
+      { takeover: 'collective-1\0' },
+      { raEvent: '6683745\0' },
+      { start: '2026-11-14T21:00-05:00\0' },
+      { description: 'Une\0soirée' },
+    ]) {
       for (const [method, url] of [
         ['POST', '/api/admin/sessions'],
         ['PUT', '/api/admin/sessions/session-1'],
       ] as const) {
-        const response = await send(app, method, url, session(changes))
+        const response = await sendSession(app, method, url, session(changes))
         expect(response.statusCode, JSON.stringify(changes)).toBe(400)
       }
     }
@@ -257,6 +309,9 @@ describe('sessions routes', () => {
           name: 'HAUTE RIVE TAKEOVER',
           title: 'HAUTE RIVE TAKEOVER',
           raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
+          description: '',
+          effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+          hasFlyer: false,
           sets: [],
           createdAt: '2026-11-01T07:00:00-05:00',
           createdBy: 'admin@example.com',
@@ -329,6 +384,168 @@ describe('sessions routes', () => {
       vi.mocked(store.create).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
       response = await createSession(app)
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: null, set: null })
+    })
+  })
+
+  describe('descriptions', () => {
+    it('keeps its own description, with its spaces and line breaks, but not \r, and trimmed', async () => {
+      const app = await buildApp()
+      const response = await createSession(app, { description: '  SPÉCIAL\r\n\r\nDeux  salles,\rtrois   DJs.\n ' })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session).toMatchObject({ description: 'SPÉCIAL\n\nDeux  salles,\ntrois   DJs.', effectiveDescription: 'SPÉCIAL\n\nDeux  salles,\ntrois   DJs.' })
+    })
+
+    it('is described by its own description, or else the one its type gives it', async () => {
+      const app = await buildApp()
+      const described = async (changes: object) => (await createSession(app, { start: null, takeover: null, ...changes })).json().session.effectiveDescription
+      expect(await described({ type: 'guest-mixes' })).toBe('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+      expect(await described({ type: 'live-performance' })).toBe('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+      expect(await described({ type: 'takeover', takeover: 'collective-1' })).toBe('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+      expect(await described({ type: 'synth-meetup' })).toMatch(/^SYNTH MEETUPS\n\nRencontres hebdomadaires/)
+      expect(await described({ type: 'other', name: 'ATELIER' })).toBe('')
+      expect(await described({ type: 'other', name: 'ATELIER', description: 'Un atelier.' })).toBe('Un atelier.')
+      expect(await described({ type: 'synth-meetup', description: 'Spécial.' })).toBe('Spécial.')
+      // The one its type gives it isn't its own.
+      expect(rows.map((row) => row.description)).toEqual(['', '', '', '', '', 'Un atelier.', 'Spécial.'])
+    })
+
+    it('refuses a description that is too long, or not text', async () => {
+      const app = await buildApp()
+      expect((await createSession(app, { description: `${'a'.repeat(5000)}\n\n` })).statusCode).toBe(200)
+      for (const description of ['a'.repeat(5001), null, undefined]) {
+        const response = await createSession(app, { description })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'The description must be text, up to 5000 characters' })
+      }
+    })
+  })
+
+  describe('flyers', () => {
+    const get = async (app: App, url: string) => app.inject({ method: 'GET', url, cookies: await sessionCookies() })
+
+    it('adds the session with its flyer, whose type is told from its contents, and serves it', async () => {
+      const app = await buildApp()
+      const response = await createSession(app, {}, { flyer: PNG })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session.hasFlyer).toBe(true)
+      expect(photos.store).toHaveBeenCalledWith({ body: PNG, type: 'image/png' }, 'sessions')
+      expect(rows[0]).toMatchObject({ flyerKey: 'sessions/flyer-1.png', flyerType: 'image/png' })
+
+      const served = await get(app, '/api/admin/sessions/session-1/flyer')
+      expect(served.statusCode).toBe(200)
+      expect(served.rawPayload).toEqual(PNG)
+      expect(served.headers).toMatchObject({ 'content-type': 'image/png', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store' })
+    })
+
+    it('adds the session without a flyer when its part is empty', async () => {
+      const app = await buildApp()
+      const response = await createSession(app, {}, { flyer: Buffer.alloc(0) })
+      expect(response.json().session.hasFlyer).toBe(false)
+      expect(photos.store).not.toHaveBeenCalled()
+    })
+
+    it('refuses a flyer that is not a JPEG, PNG or WebP image, or too large, and a malformed request, saving nothing', async () => {
+      const app = await buildApp()
+      let response = await createSession(app, {}, { flyer: Buffer.from('%PDF-1.7') })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'The flyer must be a JPEG, PNG or WebP image' })
+      response = await createSession(app, {}, { flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]) })
+      expect(response.statusCode).toBe(413)
+      expect(response.json()).toEqual({ ok: false, error: 'The flyer is larger than 10 MB' })
+      expect((await createSession(app, {}, { flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES - JPEG.length)]) })).statusCode).toBe(200)
+      rows = []
+      vi.clearAllMocks()
+
+      const cookies = await sessionCookies()
+      for (const sent of [
+        sessionForm('{not json'),
+        multipartBody({ flyer: JPEG }),
+        { payload: JSON.stringify(session()), headers: { 'content-type': 'application/json' } },
+      ]) {
+        response = await app.inject({ method: 'POST', url: '/api/admin/sessions', ...sent, cookies })
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'Invalid request' })
+      }
+      expect(rows).toEqual([])
+      expect(photos.store).not.toHaveBeenCalled()
+    })
+
+    it('ignores fields other than the session and its flyer, but refuses a second flyer', async () => {
+      const app = await buildApp()
+      const cookies = await sessionCookies()
+      const { payload, headers } = multipartBody({ session: JSON.stringify(session()), submit: 'ajouter' })
+      expect((await app.inject({ method: 'POST', url: '/api/admin/sessions', payload, headers, cookies })).statusCode).toBe(200)
+      const twice = Buffer.concat([
+        sessionForm(session({ start: null })).payload.subarray(0, -'--test-boundary--\r\n'.length),
+        multipartBody({ flyer: JPEG }).payload.subarray(0, -'--test-boundary--\r\n'.length),
+        multipartBody({ flyer: PNG }).payload,
+      ])
+      const response = await app.inject({ method: 'POST', url: '/api/admin/sessions', payload: twice, headers, cookies })
+      expect(response.statusCode).toBe(400)
+      expect(rows).toHaveLength(1)
+    })
+
+    it("keeps the session's flyer when none is sent, replaces it, or removes it, deleting the one it had", async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: JPEG })
+      let response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ description: 'Nouveau.' }))
+      expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
+      expect(photos.delete).not.toHaveBeenCalled()
+
+      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
+      expect(response.json().session.hasFlyer).toBe(true)
+      expect(rows[0].flyerKey).toBe('sessions/flyer-2.png')
+      expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+
+      // Changing only its flyer changes the session.
+      rows[0].updatedBy = null
+      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { removeFlyer: 'true' })
+      expect(response.json().session).toMatchObject({ hasFlyer: false, updatedBy: 'admin@example.com' })
+      expect(rows[0]).toMatchObject({ flyerKey: null, flyerType: null })
+      expect(photos.delete).toHaveBeenLastCalledWith('sessions/flyer-2.png')
+      expect(stored.size).toBe(0)
+    })
+
+    it('refuses both a flyer and removing it, and deletes the new flyer when the session is not saved', async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: JPEG })
+      vi.clearAllMocks()
+      let response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG, removeFlyer: 'true' })
+      expect(response.statusCode).toBe(400)
+      expect(photos.store).not.toHaveBeenCalled()
+
+      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-9', session(), { flyer: PNG })
+      expect(response.statusCode).toBe(404)
+      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
+      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
+      expect(response.statusCode).toBe(409)
+      vi.mocked(store.create).mockRejectedValueOnce(new NoSuchReference('No such collective'))
+      response = await createSession(app, {}, { flyer: PNG })
+      expect(response.statusCode).toBe(400)
+      expect(photos.store).toHaveBeenCalledTimes(3)
+      expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png'], ['sessions/flyer-4.png']])
+      expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpeg')
+    })
+
+    it('deletes the flyer with its session', async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: JPEG })
+      expect((await send(app, 'DELETE', '/api/admin/sessions/session-1')).statusCode).toBe(200)
+      expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+    })
+
+    it('responds 404 for a session that does not exist, has no flyer, or whose flyer is missing', async () => {
+      const app = await buildApp()
+      expect((await get(app, '/api/admin/sessions/session-9/flyer')).json()).toEqual({ ok: false, error: 'No such session' })
+      await createSession(app)
+      let response = await get(app, '/api/admin/sessions/session-1/flyer')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'This session has no flyer' })
+      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: JPEG })
+      stored.clear()
+      response = await get(app, '/api/admin/sessions/session-1/flyer')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'The flyer of this session is missing' })
     })
   })
 
@@ -480,7 +697,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await sessionWithSet(app)
       await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'done' })
-      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', type: 'live-performance', takeover: null, name: '' }))
+      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', type: 'live-performance', takeover: null, name: '' }))
 
       expect(response.statusCode).toBe(200)
       expect(response.json().session).toMatchObject({
@@ -501,14 +718,14 @@ describe('sessions routes', () => {
     it("can shorten the session so that its sets don't fit in it anymore, which they say", async () => {
       const app = await buildApp()
       await sessionWithSet(app)
-      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
+      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
       expect(response.statusCode).toBe(200)
       expect(response.json().session.sets).toEqual([expect.objectContaining({ id: 'set-2', offsetMinutes: 60, durationMinutes: 60, fitsInSession: false })])
     })
 
     it('responds 404 for a session that does not exist', async () => {
       const app = await buildApp()
-      const response = await send(app, 'PUT', '/api/admin/sessions/session-9', session())
+      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-9', session())
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'No such session' })
     })
@@ -517,7 +734,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       const { session: before } = (await sessionWithSet(app)).json()
       vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', rows[0]))
-      const response = await send(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
+      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
 
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: before, set: null })

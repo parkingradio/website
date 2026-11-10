@@ -7,7 +7,7 @@ import fastifyCookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Timestamp, zodRoutes, useZodSchemas } from '../api/schemas.js'
-import { readProfileForm } from '../artists/photo-form.js'
+import { jsonField, readPhotoForm, readProfileForm } from '../artists/photo-form.js'
 import { createLogger } from '../core/logger.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import type { AccessGrant, OAuthStore } from '../oauth/store.js'
@@ -75,7 +75,7 @@ async function buildApp(logs?: string[], environment = 'test') {
           operationId: method === 'GET' ? 'get_artist' : 'update_artist',
           summary: method === 'GET' ? 'An artist' : "Changes an artist's profile",
           params: ById,
-          ...(method === 'PUT' && { multipart: z.object({ artist: Profile, removePhoto: z.string().optional() }) }),
+          ...(method === 'PUT' && { multipart: z.object({ artist: Profile, photo: z.file().optional(), removePhoto: z.string().optional() }) }),
         },
         handler: async (request, reply) => {
           if (method === 'PUT') {
@@ -88,6 +88,24 @@ async function buildApp(logs?: string[], environment = 'test') {
         },
       })
     }
+    // Like a session, which has no contact details, and a flyer rather than a photo.
+    api.put(
+      '/api/admin/sessions/:id',
+      {
+        config: { admin: true, tool: { title: 'Modifier une session' } },
+        schema: {
+          operationId: 'update_session',
+          summary: 'Changes a session',
+          params: ById,
+          multipart: z.object({ session: z.object({ name: z.string() }), flyer: z.file().optional(), removeFlyer: z.string().optional() }),
+        },
+      },
+      async (request, reply) => {
+        const form = await readPhotoForm(request, { photoPart: 'flyer' })
+        if (form === 'malformed' || 'tooLarge' in form) return reply.status(400).send({ ok: false, error: 'Invalid request' })
+        return { ok: true, session: jsonField(form.fields.session), removeFlyer: form.fields.removeFlyer ?? null }
+      },
+    )
     // Its dates and times, which tools give as the route does, in Québec time, and a body with a field that can be null.
     const Times = z.object({ at: Timestamp, maybe: Timestamp.nullable(), list: z.array(z.object({ at: Timestamp, note: z.string() })) })
     api.post(
@@ -349,7 +367,7 @@ describe('the MCP server', () => {
       const app = await buildApp()
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
-      expect(tools.map(({ name }) => name)).toEqual(['get_thing', 'update_thing', 'get_artist', 'update_artist', 'create_times', 'list_artists', 'read_documentation'])
+      expect(tools.map(({ name }) => name)).toEqual(['get_thing', 'update_thing', 'get_artist', 'update_artist', 'update_session', 'create_times', 'list_artists', 'read_documentation'])
       const get = tools.find(({ name }) => name === 'get_thing')!
       // A route that isn't in an area's document points to read_documentation all the same. No real tool is like that:
       // tools.test.ts checks that each one is in an area.
@@ -429,6 +447,18 @@ describe('the MCP server', () => {
       expect(saved).toEqual({ name: 'Aurore B.', email: 'aurore@example.com', phone: '555 0100' })
       await call(app, 'update_artist', { id: 'a', name: 'Aurore', email: null, phone: '', removePhoto: true })
       expect(saved).toEqual({ name: 'Aurore', email: null, phone: '' })
+    })
+
+    it('send a multipart request with its part that is JSON, and the field that removes its file, which they cannot send', async () => {
+      const app = await buildApp()
+      const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      const update = response.json().result.tools.find(({ name }: { name: string }) => name === 'update_session')
+      expect(update.description).toContain("Tools can't send a flyer.")
+      expect(update.description).not.toContain('email')
+      expect(update.inputSchema.properties.removeFlyer).toEqual({ type: 'boolean', description: "Whether to remove the flyer. Tools can't send one" })
+      // Without reading the session first, which has no email or phone to keep: there's no route to read it here.
+      expect((await call(app, 'update_session', { id: 's', name: 'X', removeFlyer: true })).body).toEqual({ ok: true, session: { name: 'X' }, removeFlyer: 'true' })
+      expect((await call(app, 'update_session', { id: 's', name: 'X' })).body).toEqual({ ok: true, session: { name: 'X' }, removeFlyer: null })
     })
 
     it('give the dates and times of their responses as their routes do, in Québec time, errors included', async () => {

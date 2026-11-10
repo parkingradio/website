@@ -417,11 +417,12 @@ export function checkProfile(
 // contents.
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-// What's wrong with a photo picked in a form, if one was. When the browser doesn't know the photo's type, which the server
-// tells from its contents anyway, only its size is checked.
-export function pickedPhotoError(photo: File | null): string | null {
+// What's wrong with a photo picked in a form, if one was, or a session's flyer, which follows the same rules. When the
+// browser doesn't know the photo's type, which the server tells from its contents anyway, only its size is checked.
+export function pickedPhotoError(photo: File | null, image: 'photo' | 'flyer' = 'photo'): string | null {
   if (!photo) return null
-  if (photo.type && !PHOTO_TYPES.includes(photo.type)) return 'La photo doit être en JPEG, PNG ou WebP.'
-  if (photo.size > PHOTO_MAX_BYTES) return `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+  const it = image === 'photo' ? 'La photo' : 'Le flyer'
+  if (photo.type && !PHOTO_TYPES.includes(photo.type)) return `${it} doit être en JPEG, PNG ou WebP.`
+  if (photo.size > PHOTO_MAX_BYTES) return `${it} dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
   return null
 }

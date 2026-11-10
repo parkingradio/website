@@ -23,7 +23,7 @@ type NewApplication = paths['/api/admin/applications']['post']['requestBody']['c
 type ApplicationStatus = components['schemas']['ApplicationStatus']
 type SessionsResponse = paths['/api/admin/sessions']['get']['responses'][200]['content']['application/json']
 type SessionResponse = paths['/api/admin/sessions']['post']['responses'][200]['content']['application/json']
-type NewSession = paths['/api/admin/sessions']['post']['requestBody']['content']['application/json']
+type NewSession = paths['/api/admin/sessions']['post']['requestBody']['content']['multipart/form-data']['session']
 type NewSet = paths['/api/admin/sessions/{id}/sets']['post']['requestBody']['content']['application/json']
 type ApiError = components['schemas']['ApiError']
 
@@ -271,8 +271,19 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     if (!instant) throw new Error(`A session's start, ${session.when.start}, doesn't exist on ${day} in Québec`)
     start = quebecDateTime(instant)
   }
-  const body: NewSession = { start, durationMinutes: session.durationMinutes, type: session.type, takeover, name: session.name ?? '', raEvent: session.raEvent ?? null }
-  const { id } = (await server.call<SessionResponse>('POST', '/api/admin/sessions', body)).session
+  const fields: NewSession = {
+    start,
+    durationMinutes: session.durationMinutes,
+    type: session.type,
+    takeover,
+    name: session.name ?? '',
+    raEvent: session.raEvent ?? null,
+    description: session.description ?? '',
+  }
+  const form = new FormData()
+  form.set('session', JSON.stringify(fields))
+  if (session.flyer) form.set('flyer', photo(session.flyer), 'flyer.png')
+  const { id } = (await server.call<SessionResponse>('POST', '/api/admin/sessions', form)).session
 
   const added = new Set<string>()
   for (const set of session.sets) {

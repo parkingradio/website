@@ -11,6 +11,7 @@ function sessionFields(changes: Record<string, unknown> = {}) {
     takeover: null,
     name: 'GUEST MIXES SPÉCIAL',
     raEvent: null,
+    description: '',
     ...changes,
   }
 }
@@ -79,6 +80,7 @@ describe('SessionFields', () => {
       takeover: 'collective-1',
       name: 'VKT TAKEOVER',
       raEvent: '6683745',
+      description: '',
     })
   })
 
@@ -179,6 +181,17 @@ describe('SessionFields', () => {
     expect(parse({ name: `${'x'.repeat(100)}  ` }).name).toHaveLength(100)
     expect(sessionError(sessionFields({ name: 'x'.repeat(101) }))).toBe('The name must be text, up to 100 characters')
     expect(sessionError(sessionFields({ name: null }))).toBe('The name must be text, up to 100 characters')
+  })
+
+  it('cleans up the description, keeping its spaces and line breaks, which can be empty', () => {
+    expect(parse({ description: ' \r\n Ligne 1\r\n\r\nLigne  2\rLigne\t3 \n' }).description).toBe('Ligne 1\n\nLigne  2\nLigne\t3')
+    expect(parse({ description: '' }).description).toBe('')
+    expect(parse({ description: `${'x'.repeat(5000)} \r\n` }).description).toHaveLength(5000)
+    // Its length counts once each line break is \n.
+    expect(parse({ description: 'x\r\n'.repeat(2500) }).description).toHaveLength(4999)
+    for (const description of ['x'.repeat(5001), null, undefined, 42]) {
+      expect(sessionError(sessionFields({ description })), String(description)).toBe('The description must be text, up to 5000 characters')
+    }
   })
 
   it('refuses an RA event that is not its id or a link to it, even with the NUL character where parsing would drop it', () => {

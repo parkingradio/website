@@ -2,7 +2,7 @@ import type { Schema } from './api/client'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, isDay, isTime } from './application-fields'
 import type { PerformanceTypeId } from './application-fields'
 import type { GenreId } from './artist-profile'
-import { checkLine, everyOne } from './checks'
+import { checkLine, checkText, everyOne } from './checks'
 import type { FieldErrors } from './checks'
 import { quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstantFrom } from './quebec-time'
 import { isSoundcloudTrackLink, youtubeVideoId } from './session-links'
@@ -49,7 +49,45 @@ export function typeName(type: SessionType, takeover: Pick<Reference, 'name'> | 
   return type === 'other' ? null : NAMES[type]
 }
 
+// The description each type of session gives it, unless it has its own, or "" for none: a copy of the server's
+// DEFAULT_DESCRIPTIONS (see server/src/sessions/descriptions.ts), which must be changed together with it. The session form
+// shows it, before the server gives it as part of the session's `effectiveDescription`.
+const STREAMED = 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC'
+export const TYPE_DESCRIPTIONS: Record<SessionType, string> = {
+  'guest-mixes': STREAMED,
+  'live-performance': STREAMED,
+  takeover: STREAMED,
+  'synth-meetup': `SYNTH MEETUPS
+
+Rencontres hebdomadaires de création sonore et audiovisuelle
+
+MANDAT
+
+• Désacraliser l'accès aux contextes de diffusion.
+
+• Partager le savoir concernant les pratiques de création temps-réel numériques.
+
+• Favoriser les processus collaboratifs.
+
+• Archiver les pratiques éphémères.
+
+LE PLAFOND
+
+Vous êtes invitez à tester du contenu visuel, audio réactif ou pas, conçu pour notre plafond.
+
+Voici comment:
+
+Le plafond lumineux regroupe près de 5000 LEDs adressables pour former un "écran".
+Ainsi, la création de contenu est simplifié; nul besoin de savoir programmer.
+
+Une approche temps-réel est priorisée afin de rapprocher les artistes de leur médium et de sa diffusion.
+
+En gros, l'artiste se pointe au parking avec son laptop et shoot ses visuels direct dans le plafond en format vidéo. Il suffit d'envoyer de la vidéo au système via réseau en utilisant NDI. La vidéo sera automatiquement redimensionnée (240 x 228 pixels) pour couvrir la surface.`,
+  other: '',
+}
+
 const NAME_MAX_LENGTH = 100
+export const DESCRIPTION_MAX_LENGTH = 5000
 // The longest a session or a set lasts, in minutes. A set's offset is less than that.
 const MAX_MINUTES = 24 * 60
 const LONGEST = 'Un set dure au plus 24 heures.'
@@ -117,6 +155,7 @@ export type SessionFormValues = {
   takeover: Reference | null
   name: string
   raEvent: RaEvent | null
+  description: string
 }
 
 export const EMPTY_SESSION_FORM: SessionFormValues = {
@@ -129,6 +168,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   takeover: null,
   name: '',
   raEvent: null,
+  description: '',
 }
 
 // A session as the form shows it, to change it.
@@ -140,6 +180,7 @@ export function sessionFormValues(session: Session): SessionFormValues {
     takeover: session.takeover,
     name: session.name,
     raEvent: session.raEvent,
+    description: session.description,
   }
   if (session.start === null) return { ...values, undated: true }
   const startAt = new Date(session.start)
@@ -204,6 +245,9 @@ export function checkSession(
   if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'
   const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, form.type === 'other' ? 'Indiquez le nom de la session.' : null)
   if (name.error) errors.name = name.error
+  // Each \r\n or \r becomes \n, as the server has it, but its spaces and line breaks are kept.
+  const description = checkText(form.description.replace(/\r\n?/g, '\n'), 'La description', DESCRIPTION_MAX_LENGTH, null)
+  if (description.error) errors.description = description.error
   // A missing type is one of the errors already: checking it again tells the compiler that there's one.
   if (Object.keys(errors).length > 0 || 'errors' in times || form.type === null) return { errors }
   return {
@@ -214,6 +258,7 @@ export function checkSession(
       takeover: takeover?.id ?? null,
       name: name.value!,
       raEvent: form.raEvent?.id ?? null,
+      description: description.value!,
     },
   }
 }

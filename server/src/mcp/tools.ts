@@ -52,8 +52,9 @@ export function collectToolRoutes(app: FastifyInstance): ToolRoute[] {
 // How long the session of a request a tool sends lasts: only for that request.
 const TOOL_SESSION_SECONDS = 60
 
-// The parts of a request that a tool's arguments go to.
-type Part = 'path' | 'query' | 'body' | 'profile' | 'removePhoto'
+// The parts of a request that a tool's arguments go to: for a multipart request, its part that's JSON, e.g. an artist's
+// profile, and the field that removes its file, e.g. `removePhoto`.
+type Part = 'path' | 'query' | 'body' | 'json' | 'remove'
 
 // The JSON Schema of `schema`, as it's received, with the schemas it refers to written in it, since an argument's schema
 // can't refer to another tool's.
@@ -72,16 +73,21 @@ function jsonSchema(schema: z.ZodType): JsonObject {
   return inline(json) as JsonObject
 }
 
-// A multipart request's part that's JSON, e.g. an artist's profile, rather than a file or a field.
-function profilePart(multipart: z.ZodObject): [string, z.ZodObject] {
-  const parts = Object.entries(multipart.shape).filter(([name, part]) => name !== 'removePhoto' && part instanceof z.ZodObject)
-  if (parts.length !== 1) throw new Error('A multipart tool takes one part that is JSON')
-  return parts[0] as [string, z.ZodObject]
+// What a multipart request sends: its part that's JSON, e.g. an artist's profile, its file, e.g. "photo", which tools
+// can't send, and the field that removes that file, if it has one, e.g. "removePhoto".
+function multipartParts(multipart: z.ZodObject): { json: [string, z.ZodObject]; file: string; remove: string | undefined } {
+  const parts = Object.entries(multipart.shape)
+  const json = parts.filter(([, part]) => part instanceof z.ZodObject)
+  const files = parts.filter(([, part]) => (part instanceof z.ZodOptional ? part.unwrap() : part) instanceof z.ZodFile)
+  if (json.length !== 1 || files.length !== 1) throw new Error('A multipart tool takes one part that is JSON, and one file')
+  const file = files[0][0]
+  const remove = `remove${file[0].toUpperCase()}${file.slice(1)}`
+  return { json: json[0] as [string, z.ZodObject], file, remove: remove in multipart.shape ? remove : undefined }
 }
 
 // The tools' arguments and where each one goes, from the route's schemas. Two arguments with the same name, e.g. a path
 // parameter and a field of the body, can't be told apart, so the server refuses to start.
-function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string, Part>; profile?: string; nullable: string[] } {
+function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string, Part>; json?: string; nullable: string[] } {
   const properties: JsonObject = {}
   const required: string[] = []
   const parts = new Map<string, Part>()
@@ -99,7 +105,7 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
       properties[name] = property
     }
     for (const name of json.required ?? []) {
-      if (route.method === 'POST' && (part === 'body' || part === 'profile') && allowsNull(json.properties[name])) nullable.push(name)
+      if (route.method === 'POST' && (part === 'body' || part === 'json') && allowsNull(json.properties[name])) nullable.push(name)
       else required.push(name)
     }
   }
@@ -112,17 +118,17 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
   }
   add(route.schema.querystring as z.ZodType | undefined, 'query')
   add(route.schema.body as z.ZodType | undefined, 'body')
-  let profile: string | undefined
+  let json: string | undefined
   if (route.schema.multipart) {
-    const [name, schema] = profilePart(route.schema.multipart)
-    profile = name
-    add(schema, 'profile')
-    if ('removePhoto' in route.schema.multipart.shape) {
-      parts.set('removePhoto', 'removePhoto')
-      properties.removePhoto = { type: 'boolean', description: "Whether to remove the photo. Tools can't send one" }
+    const { json: [name, schema], file, remove } = multipartParts(route.schema.multipart)
+    json = name
+    add(schema, 'json')
+    if (remove) {
+      parts.set(remove, 'remove')
+      properties[remove] = { type: 'boolean', description: `Whether to remove the ${file}. Tools can't send one` }
     }
   }
-  return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, profile, nullable }
+  return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, json, nullable }
 }
 
 // The schemas a value that follows a JSON Schema can follow: the schema, and its alternatives, e.g. a string, or null.
@@ -152,9 +158,9 @@ function descriptionOf(route: ToolRoute, name: string): string {
   if (route.method === 'PUT' && /^update_[a-z]+$/.test(name)) {
     sentences.push("It replaces it: what's left out is erased, except what it says it keeps, so read it first.")
   }
-  if (route.schema.multipart) sentences.push("Tools can't send a photo.")
+  if (route.schema.multipart) sentences.push(`Tools can't send a ${multipartParts(route.schema.multipart).file}.`)
   if (hasContactDetails(route) && route.method !== 'DELETE') sentences.push('Emails and phone numbers are never shown.')
-  if (route.schema.multipart && route.method === 'PUT') {
+  if (route.schema.multipart && hasContactDetails(route) && route.method === 'PUT') {
     sentences.push('Replacing a profile keeps the email and phone it isn\'t given, and null or "" removes them.')
   }
   return sentences.join(' ')
@@ -268,7 +274,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
     const name = route.schema.operationId!
     if (names.has(name)) throw new Error(`Two tools are named \`${name}\``)
     names.add(name)
-    const { schema, parts, profile, nullable } = argumentsOf(route)
+    const { schema, parts, json, nullable } = argumentsOf(route)
     const call = async (args: JsonObject, as: ToolUser): Promise<ToolCall> => {
       const invalid = [...route.url.matchAll(/:(\w+)/g)].find(([, param]) => segment(args[param]) === null)
       if (invalid) return failure(400, { error: `\`${invalid[1]}\` isn't valid` })
@@ -288,30 +294,31 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const send = await sender(as)
       const query = new URLSearchParams()
       const body: JsonObject = {}
-      let removePhoto = false
+      // The field that removes the file, when it's given as true, e.g. "removePhoto".
+      let remove: string | undefined
       for (const [arg, value] of Object.entries(args)) {
         const part = parts.get(arg)
         if (part === 'query' && value !== undefined) query.set(arg, String(value))
-        if (part === 'body' || part === 'profile') body[arg] = value
-        if (part === 'removePhoto') removePhoto = value === true
+        if (part === 'body' || part === 'json') body[arg] = value
+        if (part === 'remove' && value === true) remove = arg
       }
       for (const field of nullable) if (!(field in body)) body[field] = null
       const url = query.size > 0 ? `${path}?${query}` : path
 
       let payload: Payload | undefined
-      if (profile) {
+      if (json) {
         // A profile that's replaced keeps the email and phone it isn't given, since tools never show them, which loses a
         // change another admin makes to them in the meantime.
-        if (route.method === 'PUT' && (!('email' in body) || !('phone' in body))) {
+        if (route.method === 'PUT' && hasContactDetails(route) && (!('email' in body) || !('phone' in body))) {
           const current = await send('GET', path)
           if (current.status !== 200) return failure(current.status, current.body)
-          const saved = (current.body as JsonObject)[profile] as JsonObject | null | undefined
-          if (!saved || typeof saved !== 'object') return failure(500, { error: `The ${profile} couldn't be read` })
+          const saved = (current.body as JsonObject)[json] as JsonObject | null | undefined
+          if (!saved || typeof saved !== 'object') return failure(500, { error: `The ${json} couldn't be read` })
           for (const field of ['email', 'phone']) if (!(field in body)) body[field] = saved[field]
         }
         const form = new FormData()
-        form.append(profile, JSON.stringify(body))
-        if (removePhoto) form.append('removePhoto', 'true')
+        form.append(json, JSON.stringify(body))
+        if (remove) form.append(remove, 'true')
         const encoded = new Response(form)
         payload = { body: Buffer.from(await encoded.arrayBuffer()), contentType: encoded.headers.get('content-type')! }
       } else if (route.schema.body) {

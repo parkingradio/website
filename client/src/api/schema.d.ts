@@ -1578,7 +1578,7 @@ export interface paths {
         /** Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, the most recent first */
         get: operations["list_sessions"];
         put?: never;
-        /** Adds a session, as planned, without sets */
+        /** Adds a session, as planned, without sets, with or without a flyer */
         post: operations["create_session"];
         delete?: never;
         options?: never;
@@ -1595,11 +1595,87 @@ export interface paths {
         };
         /** A session, with its sets */
         get: operations["get_session"];
-        /** Changes a session, but not its status or its sets, which move with its start */
+        /** Changes a session, and replaces or removes its flyer, but not its status or its sets, which move with its start */
         put: operations["update_session"];
         post?: never;
-        /** Deletes a session and its sets, but not their performers */
+        /** Deletes a session, its flyer and its sets, but not their performers */
         delete: operations["delete_session"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sessions/{id}/flyer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A session's flyer */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2518,6 +2594,11 @@ export interface components {
             /** @description What the session is called: its name, or else the one its type gives it. Never empty */
             title: string;
             raEvent: components["schemas"]["SessionLink"] | null;
+            /** @description Its own description, which replaces the one its type gives it, or empty for none: the one to send back */
+            description: string;
+            /** @description Its description, or else the one its type gives it, or empty when neither has one */
+            effectiveDescription: string;
+            hasFlyer: boolean;
             /** @description By offset, then by when they were added, those without an offset last */
             sets: components["schemas"]["Set"][];
             /** Format: date-time */
@@ -2540,6 +2621,8 @@ export interface components {
             name: string;
             /** @description The event's id on RA, or a link to it. Null, or blank, for none */
             raEvent: string | null;
+            /** @description Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \r\n or \r becomes \n, and it is trimmed, then up to 5000 characters. Empty for none */
+            description: string;
         };
         SessionLink: {
             id: string;
@@ -4346,7 +4429,14 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SessionFields"];
+                "multipart/form-data": {
+                    session: components["schemas"]["SessionFields"];
+                    /**
+                     * Format: binary
+                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
+                     */
+                    flyer?: Blob;
+                };
             };
         };
         responses: {
@@ -4397,6 +4487,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */
@@ -4483,7 +4582,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SessionFields"];
+                "multipart/form-data": {
+                    session: components["schemas"]["SessionFields"];
+                    /**
+                     * Format: binary
+                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
+                     */
+                    flyer?: Blob;
+                    /** @description "true" removes the session's flyer, when there's no new one. Anything else keeps it */
+                    removeFlyer?: string;
+                };
             };
         };
         responses: {
@@ -4543,6 +4651,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
+                };
+            };
+            /** @description Default Response */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

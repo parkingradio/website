@@ -15,11 +15,13 @@ export type SetRow = typeof sets.$inferSelect
 export type StoredSet = SetRow & { performers: Reference[] }
 
 // A session, as the database keeps it, with the collective whose takeover it is, and its sets, in order.
-type SessionRow = typeof sessions.$inferSelect
+export type SessionRow = typeof sessions.$inferSelect
 export type StoredSession = SessionRow & { takeover: Reference | null; sets: StoredSet[] }
 
-// What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status.
-export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'raEventId'>
+// What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status, and a
+// session's flyer, which is where it's stored (see `Photos` in artists/store.ts), and its MIME type, or nulls for none.
+export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'raEventId' | 'description'>
+export type StoredFlyer = { flyerKey: string; flyerType: string } | { flyerKey: null; flyerType: null }
 export type SetChanges = Pick<
   SetRow,
   'offsetMinutes' | 'durationMinutes' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'soundcloudTrackId' | 'soundcloudTrackUrl' | 'youtubeVideoId'
@@ -84,13 +86,19 @@ export type SessionsStore = {
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned". Throws a NoSuchReference or a Conflict.
-  create(session: SessionChanges & { createdBy: string }): Promise<StoredSession>
-  // Replaces the session's fields, but not its status or its sets. Throws a NoSuchReference or a Conflict.
-  update(id: string, changes: SessionChanges & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
+  create(session: SessionChanges & StoredFlyer & { createdBy: string }): Promise<StoredSession>
+  // Replaces the session's fields, and its flyer when there's a new one, or nulls to remove it, but not its status or its
+  // sets. Returns the session as it was, so that a flyer that was replaced or removed can be deleted, and as it is then.
+  // Throws a NoSuchReference or a Conflict.
+  update(
+    id: string,
+    changes: SessionChanges & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+  ): Promise<{ before: SessionRow; after: StoredSession } | null>
   // Cancelling a session cancels its sets that aren't, as the same admin, at the same time. Throws a Conflict.
   setStatus(id: string, change: StatusChange): Promise<StoredSession | null>
-  // Returns false if the session didn't exist. Its sets are deleted with it, but not their performers.
-  delete(id: string): Promise<boolean>
+  // Returns the session as it was, so that its flyer can be deleted too, or null if it didn't exist. Its sets are deleted
+  // with it, but not their performers.
+  delete(id: string): Promise<SessionRow | null>
   // The set as the database keeps it, without its performers.
   getSet(id: string): Promise<SetRow | null>
   // Adds a set to the session `sessionId`, as "planned". Throws a NoSuchReference or a Conflict.
@@ -322,10 +330,11 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        if (!(await sessionRow(tx, id))) return null
+        const before = await sessionRow(tx, id)
+        if (!before) return null
         await checkTakeover(tx, changes.takeoverId)
         await checkingSessionRules(tx, id, changes, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
-        return sessionWithId(tx, id)
+        return { before, after: (await sessionWithId(tx, id))! }
       })
     },
 
@@ -348,11 +357,11 @@ export function sessionsStore(db: Queryable): SessionsStore {
     },
 
     async delete(id) {
-      if (!isUuid(id)) return false
+      if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const deleted = await tx.delete(sessions).where(eq(sessions.id, id)).returning({ id: sessions.id })
-        return deleted.length > 0
+        const [deleted] = await tx.delete(sessions).where(eq(sessions.id, id)).returning()
+        return deleted ?? null
       })
     },
 

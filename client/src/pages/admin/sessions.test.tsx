@@ -115,6 +115,9 @@ const SESSION: Session = {
   name: '',
   title: 'ONDES TAKEOVER',
   raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
+  description: '',
+  effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+  hasFlyer: false,
   sets: [
     studioSet('set-1', {
       performers: [
@@ -218,6 +221,11 @@ async function expectSearch(query: string, found: string[]) {
   const field = await screen.findByRole('searchbox', { name: 'Rechercher' })
   fireEvent.change(field, { target: { value: query } })
   await waitFor(() => expect(days()).toEqual(found))
+}
+
+// What was sent as the session's fields in a request to save one, as JSON in the "session" part.
+function sentSession(request: RequestInit) {
+  return JSON.parse((request.body as FormData).get('session') as string)
 }
 
 describe('The list of sessions', () => {
@@ -442,6 +450,38 @@ describe("A session's page", () => {
     expect(screen.getByText('La session et ses sets seront supprimés pour de bon. Leurs artistes et le collectif de son takeover restent.')).toBeInTheDocument()
   })
 
+  it('shows its description, faded out when it is the one its type gives it, and its flyer, or that it has none', async () => {
+    mockFetch(PAGE)
+    const first = renderAt('/admin/sessions/session-1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })).toBeInTheDocument()
+    expect(value('Description')).toHaveTextContent(/^LIVE STREAMING FROM QUÉBEC CITY\. SPACE OPEN TO PUBLIC$/)
+    expect(value('Description')).toHaveClass('admin-generated')
+    expect(value('Flyer')).toHaveTextContent(/^Pas de flyer$/)
+    first.unmount()
+
+    const own = { ...SESSION, description: 'Ligne 1\n\nLigne 2', effectiveDescription: 'Ligne 1\n\nLigne 2', hasFlyer: true, updatedAt: '2026-10-02T16:00:00.000Z' }
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: own } })
+    const second = renderAt('/admin/sessions/session-1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })).toBeInTheDocument()
+    // With its line breaks.
+    expect(value('Description').textContent).toBe('Ligne 1\n\nLigne 2')
+    expect(value('Description')).not.toHaveClass('admin-generated')
+    expect(within(value('Flyer')).getByRole('img', { name: 'Flyer de ONDES TAKEOVER' })).toHaveAttribute(
+      'src',
+      `/api/admin/sessions/session-1/flyer?v=${encodeURIComponent('2026-10-02T16:00:00.000Z')}`,
+    )
+    expect(screen.getByText('La session, son flyer et ses sets seront supprimés pour de bon. Leurs artistes et le collectif de son takeover restent.')).toBeInTheDocument()
+    second.unmount()
+
+    // A session of type other has none, unless it has its own.
+    const other = { ...SESSION, type: 'other', name: 'ATELIER', title: 'ATELIER', takeover: null, effectiveDescription: '', hasFlyer: true, sets: [] }
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: other } })
+    renderAt('/admin/sessions/session-1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'ATELIER' })).toBeInTheDocument()
+    expect(value('Description')).toHaveTextContent(/^-$/)
+    expect(screen.getByText('La session et son flyer seront supprimés pour de bon.')).toBeInTheDocument()
+  })
+
   it("shows a session whose date isn't known, its sets' times counted from its start", async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
@@ -588,14 +628,64 @@ describe("A session's page", () => {
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'AUTRE' })).toBeInTheDocument()
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toEqual({
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 240,
       type: 'takeover',
       takeover: 'collective-1',
       name: 'AUTRE',
       raEvent: '6683745',
+      description: '',
     })
+  })
+
+  it('changes its description and its flyer, which it can also remove, in the form', async () => {
+    const withFlyer = { ...SESSION, hasFlyer: true }
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: withFlyer }, 'PUT /api/admin/sessions/session-1': { ok: true, session: withFlyer } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    // The description its type gives it shows while it has none of its own, and can be taken as a start.
+    const description = await screen.findByLabelText('Description')
+    expect(description).toHaveValue('')
+    expect(description).toHaveAttribute('placeholder', 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+    fireEvent.click(screen.getByRole('button', { name: 'reprendre le texte par défaut' }))
+    expect(description).toHaveValue('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+    expect(screen.queryByRole('button', { name: 'reprendre le texte par défaut' })).not.toBeInTheDocument()
+    fireEvent.change(description, { target: { value: 'LIVE STREAMING FROM QUÉBEC CITY.\r\n\r\nSPECIAL  NIGHT ' } })
+    // A synth meetup gives another one, and a session of type other none.
+    fireEvent.click(screen.getByRole('radio', { name: 'Synth meetup' }))
+    expect(description.getAttribute('placeholder')).toMatch(/^SYNTH MEETUPS\n\nRencontres hebdomadaires/)
+    fireEvent.click(screen.getByRole('radio', { name: 'Autre' }))
+    expect(description).not.toHaveAttribute('placeholder')
+    expect(screen.queryByRole('button', { name: 'reprendre le texte par défaut' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: 'Takeover' }))
+
+    // Its flyer is shown, and removed once the session is saved.
+    expect(screen.getByRole('img', { name: 'Flyer actuel' })).toHaveAttribute('src', expect.stringMatching(/^\/api\/admin\/sessions\/session-1\/flyer\?v=/))
+    fireEvent.click(screen.getByRole('button', { name: 'retirer le flyer' }))
+    expect(screen.getByText(/Le flyer actuel sera retiré à l'enregistrement\./)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
+    const sent = requestsTo('PUT', '/api/admin/sessions/session-1')[0].body as FormData
+    expect(JSON.parse(sent.get('session') as string)).toMatchObject({ description: 'LIVE STREAMING FROM QUÉBEC CITY.\n\nSPECIAL  NIGHT' })
+    expect(sent.get('removeFlyer')).toBe('true')
+    expect(sent.get('flyer')).toBeNull()
+
+    // Another flyer replaces it, and is checked as soon as it's chosen.
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    const input = await screen.findByLabelText('Flyer')
+    fireEvent.change(input, { target: { files: [new File(['gif'], 'flyer.gif', { type: 'image/gif' })] } })
+    expect(await screen.findByText('Le flyer doit être en JPEG, PNG ou WebP.')).toBeInTheDocument()
+    const flyer = new File(['flyer'], 'flyer.png', { type: 'image/png' })
+    fireEvent.change(input, { target: { files: [flyer] } })
+    expect(screen.getByText(/^Facultatif\./)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(2))
+    const replaced = requestsTo('PUT', '/api/admin/sessions/session-1')[1].body as FormData
+    expect(replaced.get('flyer')).toBeInstanceOf(File)
+    expect((replaced.get('flyer') as File).name).toBe('flyer.png')
+    expect(replaced.get('removeFlyer')).toBeNull()
   })
 
   it("keeps the session's event on RA when it isn't among those read from RA, and offers it until the form closes", async () => {
@@ -636,7 +726,7 @@ describe("A session's page", () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '1000000' })
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '1000000' })
   })
 
   it("keeps the session's event on RA while RA's events can't be read, which it says, and only lets it be removed", async () => {
@@ -655,7 +745,7 @@ describe("A session's page", () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: null })
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: null })
   })
 
   it('keeps a session that starts at the second 1:30 of the night clocks fall back where it is when its name changes', async () => {
@@ -669,7 +759,7 @@ describe("A session's page", () => {
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
   })
 
   it('marks the sets that are not cancelled and do not fit in the session, or overlap, saying why', async () => {
@@ -777,13 +867,14 @@ describe("A session's page", () => {
     expect(screen.getByRole('status')).toHaveTextContent('Dure 3 h, finit le lendemain, dimanche 15 novembre 2026.')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-2')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 180,
       type: 'guest-mixes',
       takeover: null,
       name: '',
       raEvent: null,
+      description: '',
     })
     expect(await screen.findByText('samedi 14 novembre 2026, de 21 h à 0 h le lendemain')).toBeInTheDocument()
   })
@@ -1164,14 +1255,34 @@ describe('Adding a session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
 
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toEqual({
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 240,
       type: 'guest-mixes',
       takeover: null,
       name: 'HAUTE RIVE',
       raEvent: null,
+      description: '',
     })
+  })
+
+  it('adds a session with its own description, of at most 5000 characters, and a flyer', async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'x'.repeat(5001) } })
+    fireEvent.blur(screen.getByLabelText('Description'))
+    expect(screen.getByText('La description dépasse 5000 caractères.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: ' Une soirée.\n\nDeux salles. ' } })
+    fireEvent.change(screen.getByLabelText('Flyer'), { target: { files: [new File(['flyer'], 'flyer.jpg', { type: 'image/jpeg' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+    const sent = requestsTo('POST', '/api/admin/sessions')[0].body as FormData
+    expect(JSON.parse(sent.get('session') as string)).toMatchObject({ description: 'Une soirée.\n\nDeux salles.' })
+    expect((sent.get('flyer') as File).name).toBe('flyer.jpg')
+    expect(sent.get('removeFlyer')).toBeNull()
   })
 
   it('needs a type, picked among them in order, a collective for a takeover only, and a name for another kind of session', async () => {
@@ -1210,7 +1321,7 @@ describe('Adding a session', () => {
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'ATELIER DE DJing' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'other', takeover: null, name: 'ATELIER DE DJing' })
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'other', takeover: null, name: 'ATELIER DE DJing' })
   })
 
   it("adds a session whose date isn't known, keeping how long its times said it lasts", async () => {
@@ -1226,7 +1337,7 @@ describe('Adding a session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
 
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: null, durationMinutes: 210 })
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: null, durationMinutes: 210 })
   })
 
   it('needs the duration of a session without a date, of at most 24 hours', async () => {
@@ -1308,7 +1419,7 @@ describe('Adding a session', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ raEvent: '6683748' })
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ raEvent: '6683748' })
   })
 
   it('starts as the takeover of the collective of the link that leads to it, sent by its id, unless it is unknown', async () => {
@@ -1319,7 +1430,7 @@ describe('Adding a session', () => {
     await fillIn({ type: null })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1' })
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1' })
     first.unmount()
 
     renderAt('/admin/sessions/nouvelle?takeover=unknown')

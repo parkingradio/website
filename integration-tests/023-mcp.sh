@@ -95,7 +95,7 @@ call get_artist "{\"id\":\"${artist}\"}"
     || fail "expected the connection to have been used just now"
 
 echo "  times are given in Québec time, and a new session's or set's fields that can be null can be left out"
-call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"type":"other","name":"MCP"}'
+call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"type":"other","name":"MCP","description":""}'
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-14T23:00:00-05:00\"'
 session="$(sql "select id from sessions where name = 'MCP'")"
 call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[]}"
@@ -112,6 +112,13 @@ expect_body_contains '\"total\":0,'
 call list_sessions '{"from":"2026-11-15T03:00+01:00"}'
 expect_body_contains '"isError":true'
 expect_body_contains 'must be a single date and time in Québec time, with the offset from UTC in effect then'
+
+echo "  a session is changed as multipart/form-data, keeping its flyer, which tools can't send, unless it's removed"
+sql "update sessions set flyer_key = 'sessions/mcp.png', flyer_type = 'image/png' where id = '${session}'" >/dev/null
+call update_session "{\"id\":\"${session}\",\"start\":null,\"durationMinutes\":120,\"type\":\"other\",\"takeover\":null,\"name\":\"MCP\",\"raEvent\":null,\"description\":\"Par MCP.\"}"
+expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":true'
+call update_session "{\"id\":\"${session}\",\"start\":null,\"durationMinutes\":120,\"type\":\"other\",\"takeover\":null,\"name\":\"MCP\",\"raEvent\":null,\"description\":\"\",\"removeFlyer\":true}"
+expect_body_contains '\"description\":\"\",\"effectiveDescription\":\"\",\"hasFlyer\":false'
 call delete_session "{\"id\":\"${session}\"}"
 
 call delete_artist "{\"id\":\"${artist}\"}"

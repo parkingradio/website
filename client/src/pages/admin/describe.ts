@@ -80,6 +80,12 @@ export function photoUrl(of: 'artists' | 'collectives', { id, updatedAt, created
   return `/api/admin/${of}/${id}/photo?v=${encodeURIComponent(updatedAt ?? createdAt)}`
 }
 
+// The address of a session's flyer, which changes whenever the session does, like `photoUrl`, since changing its flyer
+// changes it.
+export function flyerUrl({ id, updatedAt, createdAt }: { id: string; updatedAt: string | null; createdAt: string }): string {
+  return `/api/admin/sessions/${id}/flyer?v=${encodeURIComponent(updatedAt ?? createdAt)}`
+}
+
 // The name of an artist's country, or "" when it's left out.
 export function countryOf({ country }: { country: string }): string {
   return country && countryName(country)

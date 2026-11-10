@@ -1,16 +1,18 @@
 import { Readable } from 'node:stream'
 import type { FastifyBaseLogger, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_TYPES } from './profile.js'
-import { InvalidProfile, validatePhoto, validateProfile } from './store.js'
-import type { Photos, SentPhoto } from './store.js'
+import { nulError } from '../api/schemas.js'
+import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './profile.js'
+import { InvalidProfile, PHOTO_ERRORS, validatePhoto, validateProfile } from './store.js'
+import type { PhotoErrors, Photos, SentPhoto } from './store.js'
 
 // Reading requests that send a photo with a few fields, e.g. a profile, and serving photos, for the routes of artists,
-// collectives and applications.
+// collectives and applications, and the same for sessions' flyers, which follow the same rules.
 
 // The contents of a multipart/form-data request that sends a photo with a few fields: the fields, as they were sent, the
-// photo from the "photo" part, if there's one, and, for a request that reads them, the photos of a collective's artists,
-// from the "memberPhoto" parts, in order, where an empty part is no photo.
+// photo from the "photo" part (or the part the request names, e.g. "flyer"), if there's one, and, for a request that
+// reads them, the photos of a collective's artists, from the "memberPhoto" parts, in order, where an empty part is no
+// photo.
 export type PhotoForm = { fields: Record<string, unknown>; photo: Buffer | undefined; memberPhotos: (Buffer | undefined)[] }
 
 // What a request with a photo can send. The photo can be up to PHOTO_MAX_BYTES. There's room for a few more fields and
@@ -18,15 +20,19 @@ export type PhotoForm = { fields: Record<string, unknown>; photo: Buffer | undef
 export type FormLimits = { files: number; fields: number; fieldSize: number }
 const LIMITS: FormLimits = { files: 5, fields: 10, fieldSize: 64 * 1024 }
 
-// Reads a PhotoForm from `request`. The route must have registered the multipart plugin. Files other than the photos it
-// reads are ignored: with `memberPhotos`, the "memberPhoto" parts are read too. Every photo it reads stays in memory until
-// the request is done, which `limits` bounds. Returns `{ tooLarge }` if a photo is over PHOTO_MAX_BYTES, with the index
-// of the "memberPhoto" part when it's one of them, or undefined for the "photo" part, and "malformed" if the request
-// isn't actually multipart/form-data, has more fields or files than `limits` allows, a field larger than it allows, or
-// more than one "photo" part.
+// Reads a PhotoForm from `request`, with the photo from the part named `photoPart`. The route must have registered the
+// multipart plugin. Files other than the photos it reads are ignored: with `memberPhotos`, the "memberPhoto" parts are
+// read too. Every photo it reads stays in memory until the request is done, which `limits` bounds. Returns
+// `{ tooLarge }` if a photo is over PHOTO_MAX_BYTES, with the index of the "memberPhoto" part when it's one of them, or
+// undefined for the photo part, and "malformed" if the request isn't actually multipart/form-data, has more fields or
+// files than `limits` allows, a field larger than it allows, or more than one photo part.
 export async function readPhotoForm(
   request: FastifyRequest,
-  { limits = LIMITS, memberPhotos: readMemberPhotos = false }: { limits?: FormLimits; memberPhotos?: boolean } = {},
+  {
+    limits = LIMITS,
+    memberPhotos: readMemberPhotos = false,
+    photoPart = 'photo',
+  }: { limits?: FormLimits; memberPhotos?: boolean; photoPart?: string } = {},
 ): Promise<PhotoForm | 'malformed' | { tooLarge: number | undefined }> {
   if (!request.isMultipart()) return 'malformed'
 
@@ -42,7 +48,7 @@ export async function readPhotoForm(
         // A field larger than `fieldSize` is cut short, rather than refused.
         if (part.valueTruncated) return 'malformed'
         fields[part.fieldname] = part.value
-      } else if (part.fieldname === 'photo') {
+      } else if (part.fieldname === photoPart) {
         // Only the first photo is kept. Any other one is still read, and thrown away: otherwise the rest of the request
         // would never be read, and the connection couldn't be used for the next request.
         if (++photoParts > 1) {
@@ -86,21 +92,27 @@ export function jsonField(value: unknown): unknown {
 export const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as const
 
 // Reads the profile, as JSON from the part `part`, and the photo from a request that adds or changes an artist or a
-// collective, and checks them, the profile against `schema`, along with the "removePhoto" field, which only changing
-// one reads. Returns the checked profile and photo (null when there's none), or the error to reply with when the
-// request is malformed or invalid.
+// collective, and checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character
+// (see `refusingNul` in api/schemas.ts), along with the "removePhoto" field, which only changing one reads. Returns the
+// checked profile and photo (null when there's none), or the error to reply with when the request is malformed or
+// invalid. A session's fields and flyer are read the same way, with `photoPart` naming the flyer's part, `remove` the
+// field that removes it, and `errors` what's wrong with it.
 export async function readProfileForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   part: string,
   schema: Schema,
+  { photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { photoPart?: string; remove?: string; errors?: PhotoErrors } = {},
 ): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string }> {
-  const form = await readPhotoForm(request)
+  const form = await readPhotoForm(request, { photoPart })
   if (form === 'malformed') return INVALID_REQUEST
-  if ('tooLarge' in form) return { status: 413, error: PHOTO_TOO_LARGE }
+  if ('tooLarge' in form) return { status: 413, error: errors.tooLarge }
   const sent = jsonField(form.fields[part])
   if (sent === undefined) return INVALID_REQUEST
   try {
-    return { profile: validateProfile(sent, schema), photo: validatePhoto(form.photo), removePhoto: form.fields.removePhoto === 'true' }
+    const profile = validateProfile(sent, schema)
+    const nul = nulError(profile)
+    if (nul) return { status: 400, error: nul }
+    return { profile, photo: validatePhoto(form.photo, errors), removePhoto: form.fields[remove] === 'true' }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message }
@@ -111,27 +123,34 @@ export async function readProfileForm<Schema extends z.ZodType>(
 // checked against this schema, which only says it's a file.
 const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
 
-// The response of the endpoints that serve a photo, an artist's or a collective's (see `sendPhoto`).
-export const PhotoResponse = {
-  description:
-    'The photo, with the type it was checked to have. Browsers are told not to guess another ' +
-    '(`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)',
-  content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
+// The response of the endpoints that serve a photo, an artist's or a collective's, or a session's flyer (see
+// `sendPhoto`).
+function imageResponse(image: 'photo' | 'flyer') {
+  return {
+    description:
+      `The ${image}, with the type it was checked to have. Browsers are told not to guess another ` +
+      '(`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)',
+    content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
+  }
 }
+export const PhotoResponse = imageResponse('photo')
+export const FlyerResponse = imageResponse('flyer')
 
-// Sends the photo of an artist or a collective (as `what` says), or a 404 when they have none, or when it's missing.
+// Sends the photo of an artist or a collective, or the flyer of a session (as `what` and `image` say), or a 404 when they
+// have none, or when it's missing.
 export async function sendPhoto(
   reply: FastifyReply,
   log: FastifyBaseLogger,
   photos: Photos,
   row: { photoKey: string | null; photoType: string | null },
-  what: 'artist' | 'collective',
+  what: 'artist' | 'collective' | 'session',
+  image: 'photo' | 'flyer' = 'photo',
 ) {
-  if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no photo` })
+  if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
   const photo = await photos.read(row.photoKey)
   if (!photo) {
-    log.error({ key: row.photoKey }, `The photo of a ${what} is missing`)
-    return reply.status(404).send({ ok: false, error: `The photo of this ${what} is missing` })
+    log.error({ key: row.photoKey }, `The ${image} of a ${what} is missing`)
+    return reply.status(404).send({ ok: false, error: `The ${image} of this ${what} is missing` })
   }
   // The type was checked from the photo's contents when it was sent, and browsers mustn't guess another.
   return reply

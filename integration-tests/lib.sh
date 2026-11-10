@@ -110,8 +110,8 @@ expect_output() {
     fi
 }
 
-# photos_on_disk [<folder>] -- how many photos the server keeps in a folder, artists' unless it says collectives', in the
-# directory that stands in for the private bucket.
+# photos_on_disk [<folder>] -- how many photos the server keeps in a folder, artists' unless it says collectives' or
+# sessions' (their flyers), in the directory that stands in for the private bucket.
 photos_on_disk() {
     local folder="/tmp/private-bucket/${1:-artists}"
     docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi" | wc -l | tr -d ' '

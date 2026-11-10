@@ -43,6 +43,16 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
   await search.fill('synth meetup')
   await expect(rowsOf(page, 'SYNTH MEETUPS')).toContainText('Synth meetup')
+  // Which has the description its type gives it, and a flyer.
+  await rowsOf(page, 'SYNTH MEETUPS').getByRole('link').first().click()
+  await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
+  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 64)
+  // The form shows the same one, from the client's copy of the server's.
+  const described = await value(page, 'Description').textContent()
+  await page.getByRole('button', { name: 'modifier' }).click()
+  await expect(page.getByLabel('Description')).toHaveAttribute('placeholder', described!)
+  await page.getByRole('button', { name: 'annuler' }).click()
+  await page.goBack()
   await search.fill('live performance')
   await expect(rowsOf(page, 'LIVE PERFORMANCE')).toContainText('Ondine')
 
@@ -50,6 +60,9 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await row.getByRole('link').first().click()
   await expect(page.getByRole('heading', { level: 1, name: 'ONDE COMMUNE TAKEOVER' })).toBeVisible()
   await expect(value(page, 'Nom')).toHaveText('ONDE COMMUNE TAKEOVER')
+  // With its own description, and its flyer.
+  await expect(value(page, 'Description')).toContainText('Trois artistes, trois heures')
+  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de ONDE COMMUNE TAKEOVER' })).toHaveJSProperty('naturalWidth', 64)
   const sessionPage = new URL(page.url()).pathname
   await expect(rowsOf(sets, 'Kwame Asante')).toContainText('22 h – 23 h')
 
