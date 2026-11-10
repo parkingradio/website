@@ -86,7 +86,8 @@ environment has:
 ## Building and pushing the app image
 
 A workflow builds the image on all PRs and branch pushes, after running tests. On pushes to `main` (exclusively),
-the built Docker image is pushed to `ghcr.io/parkingradio/radio` and tagged with the commit's short SHA.
+the built Docker image is pushed to `ghcr.io/parkingradio/website` and tagged with the commit's short SHA. The EC2
+instance pulls it without credentials, so that package must be public.
 
 ## Deploying the web app
 
