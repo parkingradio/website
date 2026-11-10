@@ -165,7 +165,7 @@ day-to-day development, use `npm run dev` instead. To build the production envir
 ```sh
 docker build -t parking-radio .
 npm run db:up   # if not already running
-docker run --init --rm -p 3000:3000 --network radio_default \
+docker run --init --rm -p 3000:3000 --network "$(docker compose ps --format '{{.Networks}}' postgres)" \
   --env-file .env.example \
   -e DATABASE_URL="postgres://parking_radio:parking_radio@postgres:5432/parking_radio" \
   -e PRIVATE_BUCKET_DIRECTORY=/tmp/private-bucket \
@@ -173,14 +173,12 @@ docker run --init --rm -p 3000:3000 --network radio_default \
 npm run db:down # when you're done
 ```
 
-Note that `DATABASE_URL` is overridden because `.env.example` points at `localhost` (for running the
-server directly on the host), but this container reaches Postgres over the `radio_default` Docker
-network instead, where it's addressable as `postgres`. The network is named after the Docker Compose project, i.e.
-the checkout's directory or `COMPOSE_PROJECT_NAME` (see "Several checkouts" above), so it's `radio_default` in a
-checkout named `radio`. Its port 3000 is published on 3000 too, which a checkout's own server may be using: publish it on
-another one, e.g. `-p 3005:3000`, if so. `PRIVATE_BUCKET_DIRECTORY`, the local directory that stands in
-for the private S3 bucket, is overridden too: the server runs as a user who can't write to the app's own directory,
-where `.env.example` puts it, but can write to `/tmp`.
+Note that `DATABASE_URL` is overridden because `.env.example` points at `localhost` (for running the server directly
+on the host), but this container reaches Postgres over the Docker network of the checkout's Docker Compose project
+instead, where it's addressable as `postgres`. The container's port 3000 is published on 3000 too, which a checkout's
+own server may be using: publish it on another one, e.g. `-p 3005:3000`, if so. `PRIVATE_BUCKET_DIRECTORY`, the local
+directory that stands in for the private S3 bucket, is overridden too: the server runs as a user who can't write to the
+app's own directory, where `.env.example` puts it, but can write to `/tmp`.
 
 Then `curl localhost:3000/healthz` should return `{"ok":true}`, and `http://localhost:3000` should serve
 the built client.
