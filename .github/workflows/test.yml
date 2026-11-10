@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     outputs:
-      image: ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }}
+      image: ghcr.io/parkingradio/website:${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
 
@@ -77,10 +77,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build --tag ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
-                       --tag ghcr.io/parkingradio/radio:latest .
-          docker save --output image.tar ghcr.io/parkingradio/radio:${{ steps.tag.outputs.tag }} \
-                                         ghcr.io/parkingradio/radio:latest
+          docker build --tag ghcr.io/parkingradio/website:${{ steps.tag.outputs.tag }} \
+                       --tag ghcr.io/parkingradio/website:latest .
+          docker save --output image.tar ghcr.io/parkingradio/website:${{ steps.tag.outputs.tag }} \
+                                         ghcr.io/parkingradio/website:latest
 
       - uses: actions/upload-artifact@v7
         with:
@@ -173,4 +173,4 @@ jobs:
       - name: Push Docker image
         run: |
           docker push ${{ needs.build-docker.outputs.image }}
-          docker push ghcr.io/parkingradio/radio:latest
+          docker push ghcr.io/parkingradio/website:latest

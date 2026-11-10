@@ -12,7 +12,7 @@ on:
           - test
           - production
       app_image_tag:
-        description: "Tag of the ghcr.io/parkingradio/radio image to deploy"
+        description: "Tag of the ghcr.io/parkingradio/website image to deploy"
         required: true
         type: string
 

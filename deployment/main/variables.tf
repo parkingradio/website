@@ -17,7 +17,7 @@ variable "domain" {
 variable "ghcr_image" {
   description = "GHCR image reference (without tag) for the app"
   type        = string
-  default     = "ghcr.io/parkingradio/radio"
+  default     = "ghcr.io/parkingradio/website"
 }
 
 variable "app_image_tag" {
