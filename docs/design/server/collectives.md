@@ -124,7 +124,7 @@ Changes the fields of a collective's profile it's sent, and leaves the others as
 [Changes, in Conventions](README.md#conventions)). It takes JSON, with any of the fields of a profile, and
 `removePhoto`, like [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin). `members`, when it's
 sent, replaces the collective's members, and creates those sent by name, like `PUT`. Responds like
-`PUT /api/admin/collectives/:id`, and fails like it, but with 400 when there's no field, and never with 413.
+`PUT /api/admin/collectives/:id`, and fails like it, but with 400 when there's no field.
 
 ## `DELETE /api/admin/collectives/:id` (admin)
 

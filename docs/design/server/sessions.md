@@ -9,9 +9,10 @@ with admins' sessions, which are about logging in (see [Sessions, in Admins](adm
 
 Each session is a row of the `sessions` table (`server/src/db/schema.ts`), and each set a row of `sets`, with its
 performers in `set_performers`. The rules each of their fields follows are the schemas `SessionFields` and `SetFields`
-of `server/src/sessions/fields.ts`. The server checks every session and set against them as it would be once it's added
-or changed, with the fields a change doesn't send as they are, then against the [rules](#rules) that involve other
-sessions and sets. Its errors are in English, since only admins see them.
+of `server/src/sessions/fields.ts`. The server checks the fields it's sent against them, then the rules that involve
+several fields on the session or the set as it will be once it's added or changed, with the fields a change doesn't send
+as they are, then the [rules](#rules) that involve other sessions and sets. Its errors are in English, since only admins
+see them.
 
 ## Sessions
 
@@ -363,7 +364,7 @@ Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, a
 `takeover`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the session's flyer, and
 deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its `type`, `takeover` and
 `name` are checked together, and it's checked against the other sessions, as the session would then be. Responds like
-`PUT`, and fails like it, but with 400 when there's no field, and never with 413.
+`PUT`, and fails like it, but with 400 when there's no field.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 

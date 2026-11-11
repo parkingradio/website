@@ -52,7 +52,7 @@ const CollectiveForm = NewCollectiveForm.extend({
 // What changing some of a collective's fields sends, as JSON.
 const CollectiveChanges = changesTo({
   ...AdminCollectiveProfile.shape,
-  removePhoto: z.boolean().meta({ description: "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out" }),
+  removePhoto: z.boolean({ error: '« removePhoto » doit être true ou false.' }).meta({ description: "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out" }),
 })
 
 const NO_SUCH_COLLECTIVE: z.infer<typeof ApiError> = { ok: false, error: 'No such collective' }

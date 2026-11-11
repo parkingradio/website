@@ -77,6 +77,7 @@ export function changesTo<Shape extends z.ZodRawShape>(shape: Shape) {
   return z
     .strictObject(z.object(shape).partial().shape, { error: objectError(NOT_CHANGES) })
     .refine((changes) => Object.keys(changes).length > 0, NO_CHANGES)
+    .meta({ minProperties: 1 })
 }
 
 // A credential of a service the server reads, e.g. the SoundCloud app's client ID, or a YouTube API key. The client has its

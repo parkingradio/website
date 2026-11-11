@@ -4881,7 +4881,8 @@
                     "description": "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }
@@ -5735,7 +5736,8 @@
                     "description": "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }
@@ -6311,7 +6313,8 @@
                 },
                 "required": [
                   "recipients"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -6658,7 +6661,8 @@
                     "type": "string"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }
@@ -6852,7 +6856,8 @@
                 },
                 "required": [
                   "status"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -7603,7 +7608,8 @@
                     "description": "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }
@@ -7977,7 +7983,8 @@
                 },
                 "required": [
                   "status"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -8468,7 +8475,8 @@
                     ]
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "minProperties": 1
               }
             }
           }
@@ -8682,7 +8690,8 @@
                 },
                 "required": [
                   "status"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }

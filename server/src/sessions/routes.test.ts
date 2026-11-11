@@ -878,6 +878,7 @@ describe('sessions routes', () => {
       const invalid = [
         [{ durationMinutes: 0 }, 'The duration must be a whole number of minutes, from 1 to 1440'],
         [{ title: 'X' }, 'Unknown field: `title`'],
+        [{ removeFlyer: 'true' }, 'removeFlyer must be true or false'],
         [{}, 'There must be at least one field to change'],
         [[], 'The changes must be an object with the fields to change'],
       ] as const
@@ -1251,6 +1252,8 @@ describe('sessions routes', () => {
       let response = await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'scheduled' })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'The status must be one of planned, done, cancelled' })
+      response = await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'done', by: 'x' })
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `by`' })
       response = await send(app, 'PUT', '/api/admin/sets/set-9/status', { status: 'done' })
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'No such set' })

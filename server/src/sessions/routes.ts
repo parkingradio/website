@@ -3,7 +3,7 @@ import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
-import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
 import { FlyerResponse, INVALID_REQUEST, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import { forgetPhoto } from '../artists/store.js'
@@ -123,7 +123,7 @@ const SessionForm = NewSessionForm.extend({
 // What changing some of a session's fields sends, as JSON, and some of a set's.
 const SessionChangesBody = changesTo({
   ...SESSION_FIELDS,
-  removeFlyer: z.boolean().meta({ description: "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out" }),
+  removeFlyer: z.boolean({ error: 'removeFlyer must be true or false' }).meta({ description: "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out" }),
 })
 const SetChangesBody = changesTo(SET_FIELDS)
 
@@ -328,7 +328,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     return { status, statusUpdatedBy: by, statusUpdatedAt: new Date() }
   }
 
-  const StatusBody = z.object({ status: Status }, { error: BAD_STATUS })
+  const StatusBody = z.strictObject({ status: Status }, { error: objectError(BAD_STATUS) })
 
   api.get(
     '/api/admin/sessions',

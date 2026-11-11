@@ -47,7 +47,7 @@ const ArtistForm = NewArtistForm.extend({
 // What changing some of an artist's fields sends, as JSON.
 const ArtistChanges = changesTo({
   ...AdminArtistProfile.shape,
-  removePhoto: z.boolean().meta({ description: "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out" }),
+  removePhoto: z.boolean({ error: '« removePhoto » doit être true ou false.' }).meta({ description: "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out" }),
 })
 
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }

@@ -463,6 +463,7 @@ describe('collectives routes', () => {
       for (const [changes, error] of [
         [{ name: ' ' }, 'Indiquez le nom du collectif.'],
         [{ genres: [] }, 'Unknown field: `genres`'],
+        [{ removePhoto: 1 }, '« removePhoto » doit être true ou false.'],
         [{}, 'There must be at least one field to change'],
       ] as const) {
         expect((await patch(app, '/api/admin/collectives/collective-1', changes)).json()).toEqual({ ok: false, error })

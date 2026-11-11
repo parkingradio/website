@@ -62,15 +62,13 @@ artist="$(sql "select id from artists where lower(email) = '${EMAIL}'")"
 [ -n "$artist" ] || fail "expected the artist to be added"
 [ "$(sql "select created_by from artists where id = '${artist}'")" = "$ADMIN_EMAIL" ] || fail "expected the admin to have added the artist"
 
-echo "  changing the artist only changes what it's given, which keeps the email and phone, unless it's given them as null"
+echo "  changing the artist only changes what it's given, which keeps the email and phone, without giving them back"
 call update_artist "{\"id\":\"${artist}\",\"name\":\"MCP Integration 2\"}"
 expect_body_contains '\"name\":\"MCP Integration 2\"'
 expect_body_contains '\"links\":{\"web\":\"https://example.com\"}'
+expect_body_lacks "$EMAIL"
+expect_body_lacks '\"phone\"'
 [ "$(sql "select email || ' ' || phone from artists where id = '${artist}'")" = "${EMAIL} 514 555 0123" ] || fail "expected the email and phone to stay"
-call update_artist "{\"id\":\"${artist}\",\"email\":null}"
-expect_body_lacks '"isError"'
-[ "$(sql "select coalesce(email, 'none') || ' ' || phone from artists where id = '${artist}'")" = "none 514 555 0123" ] \
-    || fail "expected the email to be removed, and the phone to stay"
 
 echo "  the artists are listed as summaries, with their total"
 call list_artists '{}'
@@ -80,9 +78,17 @@ expect_body_lacks '\"bio\"'
 expect_body_lacks "$EMAIL"
 
 echo "  a tool that fails says so, with the route's error"
-call update_artist '{"id":"00000000-0000-4000-8000-000000000000","name":"Personne"}'
+call create_artist "{\"name\":\"Another\",\"email\":\"${EMAIL}\"}"
 expect_body_contains '"isError":true'
-expect_body_contains '\"status\":404'
+expect_body_contains '\"status\":409'
+
+echo "  the artist's email is only removed when it's given as null, which doesn't give it back either"
+call update_artist "{\"id\":\"${artist}\",\"email\":null}"
+expect_body_lacks '"isError"'
+expect_body_lacks '\"email\"'
+expect_body_lacks '\"phone\"'
+[ "$(sql "select coalesce(email, 'none') || ' ' || phone from artists where id = '${artist}'")" = "none 514 555 0123" ] \
+    || fail "expected the email to be removed, and the phone to stay"
 
 echo "  read_documentation gives the instructions, then the rules from the image's design documents"
 call read_documentation '{"area":"sessions"}'

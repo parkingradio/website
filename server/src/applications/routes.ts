@@ -199,7 +199,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       schema: {
         summary: 'Chooses who applications from artists are emailed to',
         tags: ['Applications'],
-        body: z.object({ recipients: Recipients }, { error: NOT_RECIPIENTS }),
+        body: z.strictObject({ recipients: Recipients }, { error: objectError(NOT_RECIPIENTS) }),
         response: { 200: ApplicationRecipients },
       },
     },
@@ -306,7 +306,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
         summary: 'Accepts or rejects an application, or gives it another status',
         tags: ['Applications'],
         params: ById,
-        body: z.object({ status: ApplicationStatus }, { error: BAD_STATUS }),
+        body: z.strictObject({ status: ApplicationStatus }, { error: objectError(BAD_STATUS) }),
         response: { 200: ApplicationResponse, 404: ApiError },
       },
     },

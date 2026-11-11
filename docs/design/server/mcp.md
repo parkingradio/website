@@ -100,14 +100,14 @@ when an app asks them to confirm a change, e.g. "Supprimer un artiste".
 A tool's arguments are its endpoint's path parameters, its query parameters, which reach it as they're given, and the
 fields of its body. For the endpoints that add an artist or a collective with a photo, or a session with a flyer, which
 are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields
-of the profile or the session. Tools can't send photos or flyers: what's added with a tool has none, and what's changed
-with a tool keeps its own, unless `removePhoto` or `removeFlyer` is `true`.
+of the profile or the session. Tools can't send photos or flyers: what's added with a tool has none.
 
 In the tools of `POST` endpoints, a field of the body that can be null can be left out, which sends it as null, e.g. a
 new set's `soundcloudTrack`, or a new session's `start`, which makes a session whose date isn't known yet. The tools of
 `PATCH` endpoints take every field as optional, as their endpoints do, and their descriptions say that only what they're
 given changes, and that a list or an object they're given replaces the whole one (see
-[Changes, in Conventions](README.md#conventions)).
+[Changes, in Conventions](README.md#conventions)). So what's changed with a tool keeps its photo or its flyer, unless
+`removePhoto` or `removeFlyer` is `true`.
 
 ### Results
 

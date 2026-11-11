@@ -67,11 +67,12 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
   in responses as in requests. So removing a value from a list, or renaming one, has to change the stored data that
   still uses it, in the same change: until then, every response that would include the old value fails.
-- **Unknown fields.** The admin endpoints that add or change an artist, a collective, an application, a session or a set
-  fail with 400 when the fields they're sent as JSON, e.g. a profile, or a set, have one they don't take, which the error
-  names: otherwise, a misspelled field would go unnoticed. The fields inside one of them are ignored when the endpoint
-  says so, e.g. those of a collective's members, and so are the parts of a `multipart/form-data` request that the
-  endpoint doesn't read, e.g. a form's submit button.
+- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions and sets refuse the fields they
+  don't take in the JSON they're sent: its body, or the part of a `multipart/form-data` request that has an item's
+  fields, e.g. an artist's profile. Such a request fails with 400, and the error names the field: otherwise, a
+  misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it follow their own
+  rules, e.g. the other fields of a collective's members are ignored. The parts of a `multipart/form-data` request that
+  the endpoint doesn't read are ignored too, e.g. a form's submit button.
 - **Changes.** An artist, a collective, an application, a session or a set is changed with `PUT`, which replaces its
   fields, all of them sent, or with `PATCH`, which only changes the fields it's sent, and leaves the others as they are.
   `PATCH` takes JSON, never `multipart/form-data`, with any of the fields its `PUT` takes, at least one, each following

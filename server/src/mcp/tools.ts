@@ -273,7 +273,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const path = route.url.replace(/:(\w+)/g, (_, param: string) => segment(args[param])!)
       // The path has to lead to the tool's route, with the parameters it was given. Encoded, a parameter is one segment
       // of it, but a segment can still be that of another route, which the router prefers to a parameter, e.g.
-      // `update_application({ id: "recipients" })` would lead to PUT /api/admin/applications/recipients. The router
+      // `get_application({ id: "recipients" })` would lead to GET /api/admin/applications/recipients. The router
       // then finds other parameters, or none, so asking it is what keeps every tool to its route, whatever the routes.
       const found = new URL(path, 'http://localhost').pathname === path ? app.findRoute({ method: route.method, url: path }) : null
       const params = [...route.url.matchAll(/:(\w+)/g)].map(([, param]) => param)

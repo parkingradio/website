@@ -710,7 +710,7 @@ describe('artists routes', () => {
         [{ genres: ['polka'] }, "Un des genres n'est pas dans la liste."],
         [{ name: 'X\u0000' }, "Le nom d'artiste contient un caractère invalide."],
         [{ name: 'X', hasPhoto: false }, 'Unknown field: `hasPhoto`'],
-        [{ removePhoto: 'true' }, 'Invalid input: expected boolean, received string'],
+        [{ removePhoto: 'true' }, '« removePhoto » doit être true ou false.'],
         [{}, 'There must be at least one field to change'],
         [null, 'The changes must be an object with the fields to change'],
       ] as const

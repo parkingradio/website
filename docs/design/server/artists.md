@@ -110,7 +110,7 @@ Changes the fields of an artist's profile it's sent, and leaves the others as th
 [Changes, in Conventions](README.md#conventions)). It takes JSON, with any of the fields of a profile, and
 `removePhoto`, a boolean: `true` removes the artist's photo, and deletes it, and `false` keeps it, like leaving it out. A
 photo is only replaced with `PUT`. Responds like `PUT /api/admin/artists/:id`, and fails like it, but with 400 when
-there's no field, and never with 413.
+there's no field.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 

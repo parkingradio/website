@@ -582,6 +582,8 @@ describe('applications routes', () => {
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: 'The status must be one of new, accepted, scheduled, done, rejected' })
       }
+      const extra = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted', details: 'x' })
+      expect(extra.json()).toEqual({ ok: false, error: 'Unknown field: `details`' })
       expect(rows[0].status).toBe('new')
     })
 
@@ -648,6 +650,7 @@ describe('applications routes', () => {
       const invalid = [
         { body: { recipients: ['equipe@example.com', 'pas une adresse'] }, error: "Recipient 2 isn't an email address" },
         { body: { recipients: ['Équipe <equipe@example.com>'] }, error: "Recipient 1 isn't an email address" },
+        { body: { recipients: [], updatedBy: 'x' }, error: 'Unknown field: `updatedBy`' },
         // By its position in what was sent, blanks included.
         { body: { recipients: [' ', 'pas une adresse'] }, error: "Recipient 2 isn't an email address" },
         { body: { recipients: [`${'x'.repeat(190)}@example.com`] }, error: "Recipient 1 isn't an email address" },
