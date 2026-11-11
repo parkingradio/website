@@ -45,9 +45,16 @@ export function useTurnstileSiteKey(): string | undefined {
  * production, and until the configuration is fetched, or if it can't be.
  */
 export function useEnvironmentStamp(): string | undefined {
-  const state = use(ConfigContext)
-  if (state.kind !== 'loaded') return undefined
-  const { environment } = state.config
-  if (environment === 'production') return undefined
+  const environment = useEnvironment()
+  if (environment === undefined || environment === 'production') return undefined
   return environment === 'development' ? 'DEV' : environment.toUpperCase()
+}
+
+/**
+ * The server's environment, e.g. "production" or "test" (see "Environment" in docs/design/client/architecture.md):
+ * undefined until the configuration is fetched, or if it can't be.
+ */
+export function useEnvironment(): string | undefined {
+  const state = use(ConfigContext)
+  return state.kind === 'loaded' ? state.config.environment : undefined
 }

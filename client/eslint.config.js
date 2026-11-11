@@ -19,4 +19,13 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // What's served as it is, e.g. the bookmarklet's script, which runs on other sites as a classic script.
+  {
+    files: ['public/**/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      sourceType: 'script',
+      globals: globals.browser,
+    },
+  },
 ])

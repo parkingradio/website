@@ -1,22 +1,41 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { Link } from 'react-router'
 import { api, formData } from '../../api/client'
 import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
+import { useEnvironment, useEnvironmentStamp } from '../../config-context'
 import { checkSession, sessionFormValues } from '../../session-fields'
 import type { Session } from '../../session-fields'
 import { raEventId, raEventUrl } from '../../session-links'
+import { Button } from './button'
 import { MISSING, sessionWhen } from './describe'
 import { FormActions, Labeled } from './fields'
 import { failure } from './session-errors'
 
-// Creating a session's event on Resident Advisor by hand, from its page: the content of the event, as the server gives
-// it, with a button to copy each of its texts, and the field its link is pasted in (see "A session's page" in
+// Creating a session's event on Resident Advisor from its page: publishing it with the bookmarklet (see
+// docs/design/client/admin/publier-sur-ra.md), or by hand, from the content of the event, as the server gives it, with a
+// button to copy each of its texts, then the field its link is pasted in (see "Creating its event on RA" in
 // docs/design/client/admin/sessions.md).
 
 const RA_CREATE_EVENT = 'https://ra.co/pro/event/create'
 
 type RaEventContent = Schema<'RaEventContent'>
+
+// RA's form to create an event, with the event in its fragment, which never reaches RA's server, for the bookmarklet to
+// read, along with the site, its environment and the session it comes from, so that it can warn outside production and
+// lead back to the session.
+function publishUrl(session: Session, event: RaEventContent, environment: string): string {
+  const sent = { site: window.location.origin, environment, session: session.id, event }
+  return `${RA_CREATE_EVENT}#parking-radio=${encodeURIComponent(JSON.stringify(sent))}`
+}
+
+// Why the session's event can't be published on RA, if it can't. The panel only opens while it has none.
+function whyNotPublished(session: Session): string | null {
+  if (session.start === null) return "La session n'a pas de date."
+  if (session.status === 'cancelled') return 'La session est annulée.'
+  return null
+}
 
 // Copies `text`, and says so for a moment.
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -85,12 +104,26 @@ function RaEventRecord({ session, event }: { session: Session; event: RaEventCon
   )
 }
 
-// The panel that opens under the session's "Événement RA" while it has none: the content of its event, as the server
-// gives it, to create it on RA by hand, and the field its link is pasted in, which saves it as the session's event.
-export function RaEventPanel({ session, onSaved, onCancel }: { session: Session; onSaved: (session: Session) => void; onCancel: () => void }) {
+// The panel that opens under the session's "Événement RA" while it has none: « Publier sur RA », the content of its
+// event, as the server gives it, to create it on RA by hand, and the field its link is pasted in, which saves it as the
+// session's event. `created` is the event the bookmarklet just created, which fills the field in.
+export function RaEventPanel({
+  session,
+  created,
+  onSaved,
+  onCancel,
+}: {
+  session: Session
+  created: string | null
+  onSaved: (session: Session) => void
+  onCancel: () => void
+}) {
   // Again whenever the session changes, its sets included, since the event's content follows them.
   const loaded = useApi('/api/admin/sessions/{id}/ra-event', { params: { path: { id: session.id } }, version: session })
-  const [link, setLink] = useState('')
+  const environment = useEnvironment()
+  // Outside production, the event is created on RA all the same.
+  const stamp = useEnvironmentStamp()
+  const [link, setLink] = useState(created ? raEventUrl(created) : '')
   const [linkError, setLinkError] = useState<string | null>(null)
   const [error, setError] = useState<ReactNode>(null)
   const [busy, setBusy] = useState(false)
@@ -116,8 +149,28 @@ export function RaEventPanel({ session, onSaved, onCancel }: { session: Session;
 
   return (
     <div className="admin-ra-panel">
+      {created && (
+        <p className="admin-notice" role="status">
+          L'événement RA n°&nbsp;{created} vient d'être créé sur RA&nbsp;: enregistrez-le dans la session.
+        </p>
+      )}
+      <div className="admin-toolbar">
+        <Button
+          unavailable={whyNotPublished(session)}
+          disabled={loaded.kind !== 'loaded' || environment === undefined}
+          onClick={() => loaded.kind === 'loaded' && environment && window.open(publishUrl(session, loaded.value.event, environment), '_blank', 'noopener')}
+        >
+          Publier sur RA
+        </Button>
+      </div>
+      {stamp && (
+        <p className="admin-error">
+          Attention&nbsp;: l'événement sera vraiment créé sur RA, à partir d'une session de {stamp}.
+        </p>
+      )}
       <p>
-        Créez l'événement{' '}
+        «&nbsp;Publier sur RA&nbsp;» ouvre RA, où le favori «&nbsp;Parking Radio → RA&nbsp;» (voir{' '}
+        <Link to="/admin/configuration">Configuration</Link>) crée l'événement. Ou créez-le{' '}
         <a href={RA_CREATE_EVENT} target="_blank" rel="noreferrer">
           sur RA
         </a>{' '}

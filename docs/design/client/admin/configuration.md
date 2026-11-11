@@ -5,6 +5,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
+- "Publier sur RA": the bookmarklet that creates sessions' events on Resident Advisor.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -45,6 +46,17 @@ Under that, a form replaces them, like the SoundCloud app's credentials: the cha
 one, and the key, whose field only shows dots in its place, since it's never sent back, and has to be typed. "vérifier"
 asks YouTube whether it accepts the key and finds the channel, without saving them, and "enregistrer" saves them, which
 it only allows once they've been verified, each with a check mark like the SoundCloud app's.
+
+## Publier sur RA
+
+The bookmarklet that creates a session's event on Resident Advisor from its page (see
+[Publier sur RA](publier-sur-ra.md)). It's a link, « Parking Radio → RA », followed outside production by the
+environment's stamp, e.g. « Parking Radio → RA [TEST] », so that admins tell their bookmarks apart (see
+[Environment](../architecture.md#environment)), to drag into the browser's bookmarks, whose code loads the bookmarklet's
+script from the site it's on (see [The bookmarklet](publier-sur-ra.md#the-bookmarklet)), and clicking it on this page
+does nothing. The section says how to use it: under a session's « Événement RA », click « créer », then « Publier sur
+RA », log in to RA if needed, then click the bookmark, which shows the event before creating it. It also says that the
+bookmark loads its code from the site each time, so that it never needs to be installed again.
 
 ## Features
 

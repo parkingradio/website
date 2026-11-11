@@ -99,11 +99,19 @@ saved.
 ## Creating its event on RA
 
 While a session has no event on Resident Advisor, "créer", after its "Événement RA", opens a panel under it, to create
-the event on RA by hand, from the content the server gives (see [Events on RA](../../server/sessions.md#events-on-ra)),
-and save it as the session's:
+the event on RA, with the bookmarklet or by hand, from the content the server gives (see
+[Events on RA](../../server/sessions.md#events-on-ra)), and save it as the session's:
 
-- A sentence says to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields,
-  then to paste its link below.
+- « Publier sur RA », which opens RA's form, for the bookmarklet that creates the event (see
+  [Publier sur RA](publier-sur-ra.md)). It can't be used while the session has no date, saying « La session n'a pas de
+  date. », or is cancelled, saying « La session est annulée. » (see
+  [Controls that can't be used](layout.md#controls-that-cant-be-used)), and waits for the content to be read and for the
+  environment to be known. Outside production, a warning in red follows it: « Attention : l'événement sera vraiment créé
+  sur RA, à partir d'une session de TEST. », with the environment's stamp (see
+  [Environment](../architecture.md#environment)).
+- A sentence says that « Publier sur RA » opens RA, where the bookmarklet creates the event, linking to Configuration
+  for it, or to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields, then
+  to paste its link below.
 - The event's title ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer
   per line, Parking Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, and its
   description ("Description"), whole, with its line breaks, or "-" when it has none. A "copier" button, after the first
@@ -117,6 +125,11 @@ and save it as the session's:
   link, says so, and sends nothing.
 
 Once the session has its event on RA, its "Événement RA" only links to it: "modifier" still changes it.
+
+When the bookmarklet leads back to the session's page with the event it created on RA, `?raEvent=<id>`, the page opens
+the panel, while the session has no event on RA, with the event's link in its field, under a notice, « L'événement RA n°
+<id> vient d'être créé sur RA : enregistrez-le dans la session. ». Only « enregistrer » saves it (see
+[Back to the session](publier-sur-ra.md#back-to-the-session)).
 
 ## The session form
 

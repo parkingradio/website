@@ -589,6 +589,15 @@ dl.admin-record {
   white-space: pre-wrap;
 }
 
+/* The bookmarklet, which is dragged to the bookmarks rather than clicked. */
+.admin-bookmarklet {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: grab;
+}
+
 /* Creating a session's event on RA by hand, under its "Événement RA". */
 .admin-ra-panel {
   margin-top: 0.5rem;
@@ -596,7 +605,7 @@ dl.admin-record {
   border: 1px solid #ddd;
 }
 
-.admin-ra-panel > p:first-child {
+.admin-ra-panel > :first-child {
   margin-top: 0;
 }
 

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
+import { raEventId } from '../../session-links'
 import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
 import type { Session, SessionStatus, StudioSet } from '../../session-fields'
 import { Button } from './button'
@@ -342,7 +343,12 @@ type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: s
 function LoadedSession({ loaded }: { loaded: Session }) {
   // The session as the last change left it, which replaces the one loaded.
   const [session, setSession] = useState(loaded)
-  const [open, setOpen] = useState<OpenForm>(null)
+  // The event on RA that the bookmarklet just created for the session, from the address it led back to (see
+  // docs/design/client/admin/publier-sur-ra.md), while it has none. It opens the panel of its event on RA with it, until
+  // a form opens or closes: only saving it saves it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const created = session.raEvent ? null : raEventId(searchParams.get('raEvent') ?? '')
+  const [open, setOpen] = useState<OpenForm>(created ? { kind: 'raEvent' } : null)
   const [busy, setBusy] = useState(false)
   // Why the session's status couldn't be changed, or why it couldn't be deleted.
   const [error, setError] = useState<ReactNode>(null)
@@ -366,6 +372,10 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     setOpen(form)
     setError(null)
     setSetsError(null)
+    if (!searchParams.has('raEvent')) return
+    const params = new URLSearchParams(searchParams)
+    params.delete('raEvent')
+    setSearchParams(params, { replace: true })
   }
   // A change that the server answered with the session as it is now, which closes the form.
   const changed = (session: Session) => {
@@ -495,12 +505,13 @@ function LoadedSession({ loaded }: { loaded: Session }) {
               ) : (
                 <>
                   {MISSING}{' '}
-                  {open?.kind !== 'raEvent' && (
+                  {open?.kind === 'raEvent' ? (
+                    <RaEventPanel session={session} created={created} onSaved={changed} onCancel={() => openForm(null)} />
+                  ) : (
                     <button type="button" onClick={() => openForm({ kind: 'raEvent' })}>
                       créer
                     </button>
                   )}
-                  {open?.kind === 'raEvent' && <RaEventPanel session={session} onSaved={changed} onCancel={() => openForm(null)} />}
                 </>
               )}
             </dd>
