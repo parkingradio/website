@@ -704,6 +704,24 @@ describe('radio routes', () => {
       return app.inject({ method: 'POST', url, payload: body as object, cookies: await sessionCookies() })
     }
 
+    // Runs `change` while a request for what's on air is under way, once it has started loading the credentials and the
+    // chosen playlist, which it's then given as it was before `change`. Returns what that request answers.
+    async function duringStaleRequest(app: App, change: () => Promise<unknown>) {
+      const previous = chosen
+      const credentialsLoads = loadCredentials.mock.calls.length
+      let resolveStale: ((settings: RadioSettings | null) => void) | undefined
+      loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+      const stale = radio(app)
+      await vi.waitFor(() => {
+        expect(resolveStale).toBeDefined()
+        expect(loadCredentials.mock.calls.length).toBeGreaterThan(credentialsLoads)
+      })
+
+      await change()
+      resolveStale!(previous)
+      return stale
+    }
+
     // Sends `body` as JSON, whatever it is, e.g. `null`, or no body at all when it's undefined.
     async function sendJson(app: App, method: 'POST' | 'PUT', url: string, body: unknown, headers: Record<string, string> = {}) {
       const json = body === undefined ? {} : { headers: { 'content-type': 'application/json', ...headers }, payload: JSON.stringify(body) }
@@ -1094,6 +1112,36 @@ describe('radio routes', () => {
         expect((await radio(app)).current).toMatchObject({ track: { id: '2' }, startedAt: '2026-10-01T09:00:00-04:00' })
       })
 
+      it('keeps the playlist just chosen when a request that loaded the previous one goes on after it was chosen', async () => {
+        otherPlaylistAtLink()
+        const app = await buildApp()
+        await radio(app)
+        // By then, the previous playlist would have moved on to its second track.
+        vi.advanceTimersByTime(70 * MINUTE)
+        save.mockClear()
+
+        const stale = await duringStaleRequest(app, () => post(app, '/api/admin/radio/playlist', { link: LINK }))
+
+        expect(stale.current.track.id).toBe('8')
+        await radio(app)
+
+        // The previous playlist never went back on air.
+        expect(save).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ playlistId: '9', trackId: '8' }))
+        expect(playlist.mock.calls).toEqual([['7', null], ['9', 's-AbC123']])
+      })
+
+      it('reads a playlist chosen again with a new private link through it, when a request that loaded the old one goes on after', async () => {
+        chosen = { ...CHOSEN, secretToken: 's-Old' }
+        resolvePlaylist.mockResolvedValue({ id: '7', secretToken: 's-New' })
+        const app = await buildApp()
+        await radio(app)
+
+        await duringStaleRequest(app, () => post(app, '/api/admin/radio/playlist', { link: `${ROTATION.url}/s-New` }))
+        await radio(app)
+
+        expect(playlist.mock.calls).toEqual([['7', 's-Old'], ['7', 's-New']])
+      })
+
       it('still streams the tracks of the previous playlist for as long as they last, so that their listeners can finish them', async () => {
         otherPlaylistAtLink()
         playlist.mockImplementation(async (id) =>
@@ -1262,15 +1310,8 @@ describe('radio routes', () => {
       it('keeps reading through new credentials when a request that loaded the old ones goes on after they were saved', async () => {
         const app = await buildApp()
         await radio(app)
-        let resolveStale: ((settings: RadioSettings) => void) | undefined
-        loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
-        const stale = radio(app)
-        await vi.waitFor(() => expect(resolveStale).toBeDefined())
-        await vi.waitFor(() => expect(loadCredentials).toHaveBeenCalledTimes(2))
 
-        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
-        resolveStale!(CHOSEN)
-        await stale
+        await duringStaleRequest(app, () => put(app, { clientId: 'new-id', clientSecret: 'new-secret' }))
         await radio(app)
 
         // Once at first, then once through the new credentials, which the request that loaded the old ones went on with.
