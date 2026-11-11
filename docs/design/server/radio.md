@@ -8,7 +8,7 @@ The server reads the playlist through a SoundCloud app, whose credentials are en
 [The SoundCloud app](#the-soundcloud-app)): until they are, it can't read any playlist, so the radio is off air. The
 server reads the playlist again every 5 minutes, so that changes made to it on SoundCloud get on the radio. If
 SoundCloud can't be reached, or none of the playlist's tracks can be played in full anymore, the radio goes on with what
-it read before.
+it read before, and the server tries again a minute later.
 
 The playlist can be private, and so can a private playlist's tracks: they play like the others, and their private
 links aren't handed out to listeners. A private playlist can only be read through its private link, which ends with its

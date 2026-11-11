@@ -25,8 +25,7 @@ The credentials of the SoundCloud app the server reads SoundCloud through: the r
 [sets](sessions.md) (see [The SoundCloud app](../../server/radio.md#the-soundcloud-app)). It says that they're found in the
 apps of the SoundCloud account it belongs to, linking to them (`https://soundcloud.com/you/apps`). It shows which admin
 last changed the credentials, and when, or, until they're entered, that the radio is off air, and that sets' SoundCloud
-links can't be checked. When the radio's last read of its playlist failed, it says why: « La dernière lecture de la
-playlist de la radio a échoué », then the error.
+links can't be checked. When the radio's last read of its playlist failed, it says why.
 
 Under that, a form replaces the credentials: the client ID, filled in with the current one, and the secret. The secret
 is never sent back once it's entered, so its field only shows dots in its place, and it has to be typed to replace

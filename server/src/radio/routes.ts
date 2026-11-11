@@ -176,10 +176,10 @@ type Chosen = {
   error: string | null
 }
 
-// The rotation read from the playlist of `settings`, through `soundcloud`.
+// The rotation read from the playlist of `settings`, through the client of `entered`.
 type Source = {
   settings: RadioSettings
-  soundcloud: SoundCloudClient
+  entered: EnteredApp
   // The rotation as it was last read successfully, if it was.
   rotation(): Rotation | null
   read(): Promise<Pick<Chosen, 'rotation' | 'error'>>
@@ -300,13 +300,13 @@ export async function radioRoutes(
   // The radio goes on with `start`, if any, until the playlist is read again: right away, unless `start` was just read.
   function sourceFor(
     settings: RadioSettings,
-    soundcloud: SoundCloudClient,
+    entered: EnteredApp,
     { rotation: start, justRead = false }: { rotation: Rotation | null; justRead?: boolean } = { rotation: null },
   ): Source {
     const refresh = cached(
       async () => {
         try {
-          const rotation = await readPlaylist(soundcloud, settings.playlistId, settings.secretToken)
+          const rotation = await readPlaylist(entered.client, settings.playlistId, settings.secretToken)
           // There would be nothing to put on air.
           if (rotation.tracks.length === 0) throw new Error('None of the tracks of the playlist can be played in full')
           return rotation
@@ -322,7 +322,7 @@ export async function radioRoutes(
     let error: string | null = null
     return {
       settings,
-      soundcloud,
+      entered,
       rotation: () => rotation,
       async read() {
         try {
@@ -336,11 +336,14 @@ export async function radioRoutes(
     }
   }
 
-  // Reads the rotation from the playlist of `settings` through `soundcloud`, unless it was read recently.
-  async function readRotation(settings: RadioSettings, soundcloud: SoundCloudClient): Promise<Chosen> {
-    if (!source || !samePlaylist(source.settings, settings)) source = sourceFor(settings, soundcloud)
+  // Reads the rotation from the playlist of `settings` through the client of `entered`, unless it was read recently.
+  // Credentials that a request loaded before newer ones were saved, e.g. while they were being saved, are ignored, so that
+  // the source of the newer ones isn't replaced.
+  async function readRotation(settings: RadioSettings, entered: EnteredApp): Promise<Chosen> {
+    const newest = source && source.entered.credentials.updatedAt > entered.credentials.updatedAt ? source.entered : entered
+    if (!source || !samePlaylist(source.settings, settings)) source = sourceFor(settings, newest)
     // With other credentials, the playlist is read again right away, while the radio goes on with what it read before.
-    else if (source.soundcloud !== soundcloud) source = sourceFor(settings, soundcloud, { rotation: source.rotation() })
+    else if (source.entered.client !== newest.client) source = sourceFor(settings, newest, { rotation: source.rotation() })
     const { rotation, error } = await source.read()
     if (rotation && rotation.tracks !== lastTracks) rotationRead(rotation.tracks)
     return { settings, rotation, error }
@@ -354,7 +357,7 @@ export async function radioRoutes(
     if (!settings) return { radio: null, entered }
     // Nothing can be read until then, which isn't a failure to read the playlist.
     if (!entered) return { radio: { settings, rotation: null, error: null }, entered }
-    return { radio: await readRotation(settings, entered.client), entered }
+    return { radio: await readRotation(settings, entered), entered }
   }
 
   // Where to stream a track from, through `soundcloud`.
@@ -490,7 +493,7 @@ export async function radioRoutes(
   // The playlist that `link` leads to, read like the rotation is, or the error to respond with.
   async function readLink(
     link: string,
-  ): Promise<{ soundcloud: SoundCloudClient; playlist: PlaylistLink; rotation: Rotation } | { status: 400 | 404 | 409 | 502; error: string }> {
+  ): Promise<{ entered: EnteredApp; playlist: PlaylistLink; rotation: Rotation } | { status: 400 | 404 | 409 | 502; error: string }> {
     const normalized = playlistLink(link)
     if (!normalized) return { status: 400, error: 'Not a link to a SoundCloud playlist' }
     const entered = await soundcloudApp.current()
@@ -499,7 +502,7 @@ export async function radioRoutes(
     try {
       const playlist = await soundcloud.resolvePlaylist(normalized)
       if (!playlist) return { status: 404, error: 'SoundCloud shows no playlist at this link' }
-      return { soundcloud, playlist, rotation: await readPlaylist(soundcloud, playlist.id, playlist.secretToken) }
+      return { entered, playlist, rotation: await readPlaylist(soundcloud, playlist.id, playlist.secretToken) }
     } catch (error) {
       app.log.error(error, 'Failed to read a playlist from SoundCloud')
       return { status: 502, error: `The playlist cannot be read from SoundCloud: ${errorMessage(error)}` }
@@ -546,7 +549,7 @@ export async function radioRoutes(
     async (request, reply) => {
       const read = await readLink(request.body.link)
       if ('error' in read) return reply.status(read.status).send({ ok: false, error: read.error })
-      const { soundcloud, playlist, rotation } = read
+      const { entered, playlist, rotation } = read
       if (rotation.tracks.length === 0) {
         return reply.status(400).send({ ok: false, error: 'None of the tracks of this playlist can be played in full' })
       }
@@ -563,7 +566,7 @@ export async function radioRoutes(
       // The playlist was just read, so it goes on air without being read again. Its first track goes on air
       // with the next request, since the track on air is from another playlist (unless the same playlist was
       // chosen again), and the tracks of the previous playlist can still be streamed for a while.
-      source = sourceFor(settings, soundcloud, { rotation, justRead: true })
+      source = sourceFor(settings, entered, { rotation, justRead: true })
       request.log.info({ playlistId: playlist.id, title: settings.title, by: settings.updatedBy }, 'Chose the playlist of the radio rotation')
       return { ok: true as const }
     },
@@ -642,7 +645,7 @@ export async function radioRoutes(
       // The client already has a token, so it's used rather than one that would ask for another.
       await soundcloudApp.save(saved, soundcloud)
       request.log.info({ clientId: credentials.clientId, by: saved.updatedBy }, 'Changed the credentials of the SoundCloud app of the radio')
-      const error = settings ? (await readRotation(settings, soundcloud)).error : null
+      const error = settings ? (await readRotation(settings, { credentials: saved, client: soundcloud })).error : null
       return credentialsResponse(saved, error)
     },
   )

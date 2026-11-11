@@ -1165,7 +1165,7 @@ describe('radio routes', () => {
         expect(playlist).toHaveBeenCalledTimes(3)
       })
 
-      it('says why, without the secret, when SoundCloud stops issuing tokens for the credentials', async () => {
+      it('says why, keeping the secret out of the error, when SoundCloud stops issuing tokens for the credentials', async () => {
         vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })))
         newClient.mockImplementationOnce(soundCloudClient)
         const app = await buildApp()
@@ -1245,7 +1245,36 @@ describe('radio routes', () => {
         expect((await radio(app)).current.track.id).toBe('1')
         // It already has a token for them, so no other client asks for one.
         expect(newClient).toHaveBeenCalledOnce()
+        // /api/radio didn't read the playlist again.
         expect(playlist).toHaveBeenCalledOnce()
+      })
+
+      it('shows who entered the same credentials again elsewhere, and when, keeping their client', async () => {
+        const app = await buildApp()
+        await credentials(app)
+
+        entered = { ...ENTERED, updatedBy: 'other@example.com', updatedAt: new Date(NOW - MINUTE) }
+
+        expect((await credentials(app)).credentials).toMatchObject({ updatedBy: 'other@example.com', updatedAt: inQuebecTime(new Date(NOW - MINUTE)) })
+        expect(newClient).toHaveBeenCalledOnce()
+      })
+
+      it('keeps reading through new credentials when a request that loaded the old ones goes on after they were saved', async () => {
+        const app = await buildApp()
+        await radio(app)
+        let resolveStale: ((settings: RadioSettings) => void) | undefined
+        loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+        const stale = radio(app)
+        await vi.waitFor(() => expect(resolveStale).toBeDefined())
+        await vi.waitFor(() => expect(loadCredentials).toHaveBeenCalledTimes(2))
+
+        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+        resolveStale!(CHOSEN)
+        await stale
+        await radio(app)
+
+        // Once at first, then once through the new credentials, which the request that loaded the old ones went on with.
+        expect(playlist).toHaveBeenCalledTimes(2)
       })
 
       it('says why reading the playlist through new credentials failed, though they were saved, and the radio goes on with what it read before', async () => {
