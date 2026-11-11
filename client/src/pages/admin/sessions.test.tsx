@@ -920,6 +920,7 @@ describe("A session's event on RA", () => {
   const RA_URL = '/api/admin/sessions/session-1/ra-event'
   const UNPUBLISHED = { ...SESSION, raEvent: null }
   const UNPUBLISHED_PAGE = { ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: UNPUBLISHED } }
+  const SAVED = { ...SESSION, raEvent: { id: '2400123', url: 'https://ra.co/events/2400123' } }
   const writeText = vi.fn<(text: string) => Promise<void>>()
 
   beforeEach(() => {
@@ -971,12 +972,13 @@ describe("A session's event on RA", () => {
     // Closing it saves nothing.
     fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
     expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
   })
 
-  it("saves the link of the event created by hand as the session's, with the rest of the session as it was", async () => {
-    const saved = { ...SESSION, raEvent: { id: '2400123', url: 'https://ra.co/events/2400123' } }
-    mockFetch({ ...UNPUBLISHED_PAGE, 'PUT /api/admin/sessions/session-1': { ok: true, session: saved } })
+  it("saves only the event's link, then shows the session as the server returns it", async () => {
+    // With a description someone else gave it since the page loaded it.
+    const saved = { ...SAVED, description: 'Changée entre-temps.', effectiveDescription: 'Changée entre-temps.' }
+    mockFetch({ ...UNPUBLISHED_PAGE, 'PATCH /api/admin/sessions/session-1': { ok: true, session: saved } })
     renderAt('/admin/sessions/session-1')
     await openPanel()
 
@@ -986,30 +988,24 @@ describe("A session's event on RA", () => {
     fireEvent.change(field, { target: { value: 'https://ra.co/clubs/288529' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByText("Ce n'est pas le lien d'un événement RA, p. ex. https://ra.co/events/6683745.")).toBeInTheDocument()
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
 
     // With or without its https://.
     fireEvent.change(field, { target: { value: 'ra.co/events/2400123' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(value('Événement RA')).toHaveTextContent(/^https:\/\/ra\.co\/events\/2400123$/))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toEqual({
-      start: '2026-11-14T21:00-05:00',
-      durationMinutes: 240,
-      type: 'takeover',
-      takeover: 'collective-1',
-      name: '',
-      raEvent: '2400123',
-      description: '',
-    })
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toEqual({ raEvent: '2400123' })
+    expect(value('Description')).toHaveTextContent(/^Changée entre-temps\.$/)
   })
 
   it("shows the server's error when the link can't be saved", async () => {
-    mockFetch({ ...UNPUBLISHED_PAGE, 'PUT /api/admin/sessions/session-1': { ok: false, error: 'Something went wrong' } })
+    mockFetch({ ...UNPUBLISHED_PAGE, 'PATCH /api/admin/sessions/session-1': { ok: false, error: 'Something went wrong' } })
     renderAt('/admin/sessions/session-1')
     await openPanel()
     fireEvent.change(screen.getByRole('textbox', { name: "Lien de l'événement RA" }), { target: { value: '2400123' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("L'événement RA n'a pas pu être enregistré : Something went wrong")
+    expect(screen.getByRole('button', { name: 'enregistrer' })).toBeEnabled()
   })
 
   it('shows a session without a date as such, and a missing description without a button', async () => {
@@ -1075,18 +1071,17 @@ describe("A session's event on RA", () => {
   })
 
   it('opens the panel with the event on RA the bookmarklet created, saving it only with « enregistrer »', async () => {
-    const saved = { ...SESSION, raEvent: { id: '2400123', url: 'https://ra.co/events/2400123' } }
-    mockFetch({ ...UNPUBLISHED_PAGE, 'PUT /api/admin/sessions/session-1': { ok: true, session: saved } })
+    mockFetch({ ...UNPUBLISHED_PAGE, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SAVED } })
     renderAt('/admin/sessions/session-1?raEvent=2400123')
 
     const notice = "L'événement RA n° 2400123 vient d'être créé sur RA : enregistrez-le dans la session."
     expect(await screen.findByText(notice, { normalizer: (text) => text.replace(/\s+/g, ' ') })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveValue('https://ra.co/events/2400123')
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(value('Événement RA')).toHaveTextContent(/^https:\/\/ra\.co\/events\/2400123$/))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '2400123', name: '', description: '' })
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toEqual({ raEvent: '2400123' })
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
   })
 
@@ -1101,7 +1096,7 @@ describe("A session's event on RA", () => {
     renderAt('/admin/sessions/session-1?raEvent=javascript:alert(1)')
     await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
     expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
   })
 
   it('says when its content could not be loaded', async () => {
