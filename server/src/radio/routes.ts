@@ -337,16 +337,17 @@ export async function radioRoutes(
   }
 
   // Reads the rotation from the playlist of `settings` through the client of `entered`, unless it was read recently.
-  // Credentials that a request loaded before newer ones were saved, e.g. while they were being saved, are ignored, so that
-  // the source of the newer ones isn't replaced.
+  // Settings and credentials that a request loaded before newer ones were saved, e.g. while another playlist was being
+  // chosen, are ignored, so that the source of the newer ones isn't replaced, and the request goes on with the newer ones.
   async function readRotation(settings: RadioSettings, entered: EnteredApp): Promise<Chosen> {
-    const newest = source && source.entered.credentials.updatedAt > entered.credentials.updatedAt ? source.entered : entered
-    if (!source || !samePlaylist(source.settings, settings)) source = sourceFor(settings, newest)
+    const newestSettings = source && source.settings.updatedAt > settings.updatedAt ? source.settings : settings
+    const newestEntered = source && source.entered.credentials.updatedAt > entered.credentials.updatedAt ? source.entered : entered
+    if (!source || !samePlaylist(source.settings, newestSettings)) source = sourceFor(newestSettings, newestEntered)
     // With other credentials, the playlist is read again right away, while the radio goes on with what it read before.
-    else if (source.entered.client !== newest.client) source = sourceFor(settings, newest, { rotation: source.rotation() })
+    else if (source.entered.client !== newestEntered.client) source = sourceFor(newestSettings, newestEntered, { rotation: source.rotation() })
     const { rotation, error } = await source.read()
     if (rotation && rotation.tracks !== lastTracks) rotationRead(rotation.tracks)
-    return { settings, rotation, error }
+    return { settings: newestSettings, rotation, error }
   }
 
   // What the radio knows of the playlist chosen for the rotation, or null until one is chosen, and the SoundCloud app's
