@@ -32,6 +32,7 @@ import { compareText, search, useSearchQuery, useSort, useStatusFilter } from '.
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ArtistsFailure, CollectivesFailure } from './profile-details'
+import { RaEventPanel } from './ra-event'
 import { failure, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import type { SessionFormProps } from './session-form'
@@ -334,8 +335,9 @@ function SessionById({ id }: { id: string }) {
   return <LoadedSession loaded={loaded.value.session} />
 }
 
-// The one form open on a session's page, if any: the session's, or a set's, by its id, or a new one's (null).
-type OpenForm = { kind: 'session' } | { kind: 'set'; id: string | null } | null
+// The one form open on a session's page, if any: the session's, its event on RA's, or a set's, by its id, or a new one's
+// (null).
+type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null } | null
 
 function LoadedSession({ loaded }: { loaded: Session }) {
   // The session as the last change left it, which replaces the one loaded.
@@ -463,7 +465,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
               modifier
             </button>
           </div>
-          <dl className="admin-record">
+          <dl className="admin-record" aria-label="Session">
             <dt>Quand</dt>
             <dd>{sessionWhen(session)}</dd>
             <dt>Durée</dt>
@@ -487,7 +489,21 @@ function LoadedSession({ loaded }: { loaded: Session }) {
             <dt>Flyer</dt>
             <dd>{session.hasFlyer ? <img src={flyerUrl(session)} alt={`Flyer de ${session.title}`} /> : 'Pas de flyer'}</dd>
             <dt>Événement RA</dt>
-            <dd>{linkOrMissing(session.raEvent)}</dd>
+            <dd>
+              {session.raEvent ? (
+                linkOrMissing(session.raEvent)
+              ) : (
+                <>
+                  {MISSING}{' '}
+                  {open?.kind !== 'raEvent' && (
+                    <button type="button" onClick={() => openForm({ kind: 'raEvent' })}>
+                      créer
+                    </button>
+                  )}
+                  {open?.kind === 'raEvent' && <RaEventPanel session={session} onSaved={changed} onCancel={() => openForm(null)} />}
+                </>
+              )}
+            </dd>
           </dl>
         </>
       )}

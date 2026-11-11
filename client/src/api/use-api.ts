@@ -7,8 +7,8 @@ import type { paths } from './schema'
 export type Loaded<T> = { kind: 'loading' } | { kind: 'loaded'; value: T } | { kind: 'error'; message: string }
 
 type Options<Path extends PathsWith<'get'>> = ParamsOption<paths[Path]['get']> & {
-  // GETs it again whenever this changes.
-  version?: number
+  // GETs it again whenever this changes, e.g. a counter, or an object that's replaced when it changes.
+  version?: unknown
 }
 
 // GETs `path`, with the parameters it needs if it has any, e.g. `useApi('/api/admin/features')`, and again whenever the

@@ -1605,6 +1605,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/sessions/{id}/ra-event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The content of a session's event on Resident Advisor, which an admin creates there from it */
+        get: operations["get_session_ra_event"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/sessions/{id}/flyer": {
         parameters: {
             query?: never;
@@ -2566,6 +2583,21 @@ export interface components {
             event: string | null;
             date: string | null;
             durationMs: number;
+        };
+        RaEventContent: {
+            title: string;
+            /** @description The session's start, or null when it has none. RA takes it in Québec time, without its offset */
+            start: string | null;
+            /** @description The session's end, or null when it has no start. RA takes it in Québec time, without its offset */
+            end: string | null;
+            /** @description One performer per line: those of its sets that aren't cancelled, in order, without repeated lines, or else OPEN JAM for a synth meetup, or its title */
+            lineup: string;
+            /** @description Parking Radio's venue on RA */
+            venueId: string;
+            /** @description Parking Radio's promoter page on RA */
+            promoterIds: string[];
+            /** @description Its effective description */
+            content: string;
         };
         Reference: {
             id: string;
@@ -4713,6 +4745,68 @@ export interface operations {
             };
             /** @description Default Response */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_session_ra_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        event: components["schemas"]["RaEventContent"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

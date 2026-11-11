@@ -39,7 +39,7 @@ describe('the tools of the API', () => {
         ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective'],
         ...['list_applications', 'get_application', 'create_application', 'update_application', 'update_application_status'],
         ...['delete_application', 'get_application_recipients'],
-        ...['list_sessions', 'get_session', 'create_session', 'update_session', 'update_session_status', 'delete_session'],
+        ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'delete_session'],
         ...['create_set', 'update_set', 'update_set_status', 'delete_set'],
       ].sort(),
     )

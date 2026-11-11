@@ -17,7 +17,7 @@ import { sessionsRoutes } from './routes.js'
 // rules of sessions, which the integration tests and the property-based tests cover against a real database (see
 // integration-tests/021-sessions.sh and rules.db.test.ts): the tests below make it throw what the real one would.
 let rows: StoredSession[] = []
-const NAMES: Record<string, string> = { 'artist-1': 'Ana', 'artist-2': 'Brume', 'collective-1': 'Les Ondes' }
+const NAMES: Record<string, string> = { 'artist-1': 'Ana', 'artist-2': 'Brume', 'artist-3': 'Cyan', 'artist-4': 'Dune', 'collective-1': 'Les Ondes' }
 let nextId = 0
 const CREATED_AT = new Date('2026-11-01T12:00:00Z')
 
@@ -209,6 +209,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/sessions?artist=a&artist=b' }),
       app.inject({ method: 'GET', url: '/api/admin/sessions?from=x' }),
       app.inject({ method: 'GET', url: '/api/admin/sessions/session-1' }),
+      app.inject({ method: 'GET', url: '/api/admin/sessions/session-1/ra-event' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
@@ -641,6 +642,74 @@ describe('sessions routes', () => {
       expect(found.id).toBe('session-1')
       expect(found.sets.map((row: { id: string }) => row.id)).toEqual(['set-2'])
       const response = await send(app, 'GET', '/api/admin/sessions/session-9')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such session' })
+    })
+  })
+
+  describe('GET /api/admin/sessions/:id/ra-event', () => {
+    const raEvent = async (app: App, id = 'session-1') => send(app, 'GET', `/api/admin/sessions/${id}/ra-event`)
+
+    it("gives the content of the session's event on RA, with its performers in order, once, from its sets that aren't cancelled", async () => {
+      const app = await buildApp()
+      await createSession(app, { name: '' })
+      const track = { soundcloudTrack: null, youtubeVideo: null }
+      await addSet(app, 'session-1', { ...track, performers: [{ id: 'artist-1' }, { id: 'artist-2' }] })
+      await addSet(app, 'session-1', { ...track, performers: [{ id: 'artist-2' }, { id: 'artist-3' }] })
+      await addSet(app, 'session-1', { ...track, performers: [{ id: 'artist-4' }] })
+      await addSet(app, 'session-1', { ...track, performers: [{ id: 'artist-1' }], offsetMinutes: null })
+      await send(app, 'PUT', '/api/admin/sets/set-4/status', { status: 'cancelled' })
+
+      const response = await raEvent(app)
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({
+        ok: true,
+        event: {
+          title: 'LES ONDES TAKEOVER',
+          start: '2026-11-14T21:00:00-05:00',
+          end: '2026-11-15T01:00:00-05:00',
+          lineup: 'Ana\nBrume\nCyan',
+          venueId: '288529',
+          promoterIds: ['183980'],
+          content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+        },
+      })
+    })
+
+    it('gives its start and end in Québec time, with the offset then, or none without a start', async () => {
+      const app = await buildApp()
+      await createSession(app, { start: '2026-07-01T21:00-04:00', durationMinutes: 120 })
+      // Across the night the clocks go back.
+      await createSession(app, { start: '2026-10-31T23:00-04:00', durationMinutes: 240 })
+      await createSession(app, { start: null })
+      const times = async (id: string) => {
+        const { start, end } = (await raEvent(app, id)).json().event
+        return [start, end]
+      }
+      expect(await times('session-1')).toEqual(['2026-07-01T21:00:00-04:00', '2026-07-01T23:00:00-04:00'])
+      expect(await times('session-2')).toEqual(['2026-10-31T23:00:00-04:00', '2026-11-01T02:00:00-05:00'])
+      expect(await times('session-3')).toEqual([null, null])
+    })
+
+    it('has OPEN JAM as the lineup of a synth meetup without performers, or else its title, and its own description', async () => {
+      const app = await buildApp()
+      await createSession(app, { type: 'synth-meetup', takeover: null, name: '' })
+      await createSession(app, { start: null, type: 'other', takeover: null, name: 'LISTENING PARTY', description: 'Une écoute.' })
+      // Its only set is cancelled.
+      await createSession(app, { start: null, type: 'guest-mixes', takeover: null, name: '' })
+      await addSet(app, 'session-3', { soundcloudTrack: null, youtubeVideo: null })
+      await send(app, 'PUT', '/api/admin/sets/set-4/status', { status: 'cancelled' })
+
+      const meetup = (await raEvent(app, 'session-1')).json().event
+      expect(meetup).toMatchObject({ title: 'SYNTH MEETUPS', lineup: 'OPEN JAM' })
+      expect(meetup.content).toMatch(/^SYNTH MEETUPS\n\nRencontres hebdomadaires/)
+      expect((await raEvent(app, 'session-2')).json().event).toMatchObject({ title: 'LISTENING PARTY', lineup: 'LISTENING PARTY', content: 'Une écoute.' })
+      expect((await raEvent(app, 'session-3')).json().event).toMatchObject({ title: 'GUEST MIXES', lineup: 'GUEST MIXES' })
+    })
+
+    it('responds 404 for a session that does not exist', async () => {
+      const app = await buildApp()
+      const response = await raEvent(app, 'session-9')
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'No such session' })
     })

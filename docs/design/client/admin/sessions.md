@@ -71,7 +71,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   how long it lasts ("Durée"), its type ("Type"), for a takeover its collective ("Takeover de"), linking to it, its title
   ("Nom"), faded out when it's the name its type gives it, its description ("Description"), with its line breaks,
   faded out when it's the one its type gives it, or "-" when it has none, its flyer ("Flyer"), or "Pas de flyer" in its
-  place, so that the team notices, and its event on RA ("Événement RA"), linking to it, or "-" when it has none.
+  place, so that the team notices, and its event on RA ("Événement RA"), linking to it, or "-" when it has none, with
+  "créer", which opens the panel to create it under it (see [Creating its event on RA](#creating-its-event-on-ra)).
   "modifier" changes the session in a form in its place (see [The session form](#the-session-form)).
 - "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
   linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
@@ -91,8 +92,31 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
   takeover's collective, stay, which the page says of those it has.
 
-Only one form is open at a time on a session's page, the session's or a set's: opening one closes the other, losing what
-wasn't saved.
+Only one form is open at a time on a session's page, the session's, the panel of its event on RA (see
+[Creating its event on RA](#creating-its-event-on-ra)), or a set's: opening one closes the other, losing what wasn't
+saved.
+
+## Creating its event on RA
+
+While a session has no event on Resident Advisor, "créer", after its "Événement RA", opens a panel under it, to create
+the event on RA by hand, from the content the server gives (see [Events on RA](../../server/sessions.md#events-on-ra)),
+and save it as the session's:
+
+- A sentence says to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields,
+  then to paste its link below.
+- The event's title ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer
+  per line, Parking Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, and its
+  description ("Description"), whole, with its line breaks, or "-" when it has none. A "copier" button, after the first
+  line of the title, the lineup and the description, copies it, then says "copié", or "échec de la copie", for a
+  moment: the times, the venue and the promoter are picked in RA's form rather than typed. The content is read when the
+  panel opens, and again whenever the session or its sets change, and the panel says when it can't be read.
+- "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
+  [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's
+  event on RA, which then shows in place of the panel, and "annuler" closes the panel. Since the session is replaced
+  whole, saving sends its own fields as the page has them, with the event. An empty field, or one that isn't an event's
+  link, says so, and sends nothing.
+
+Once the session has its event on RA, its "Événement RA" only links to it: "modifier" still changes it.
 
 ## The session form
 
@@ -187,6 +211,7 @@ named. Changing a status shows these the same way.
 - `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status` and
   `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
+- `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status` and
   `DELETE /api/admin/sets/:id`, for its sets.

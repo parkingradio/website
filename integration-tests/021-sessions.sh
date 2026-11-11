@@ -10,7 +10,8 @@
 # has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
 # including while other transactions change sessions, sets that don't fit in their session or overlap each other, which
 # they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
-# collective's takeover, or changing a set, while that collective, or one of its performers, is deleted.
+# collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, and the content
+# of a session's event on RA, from its sets' performers.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -359,6 +360,11 @@ expect_body_contains '"offsetMinutes":0,"durationMinutes":60,"start":"2026-11-14
 expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerformanceType":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
+
+echo "  the content of a session's event on RA has its title, its times in Québec time, and its sets' performers"
+json GET "${SESSIONS}/${first}/ra-event"
+expect_status 200
+expect_body_contains '"event":{"title":"HAUTE RIVE TAKEOVER","start":"2026-11-14T21:00:00-05:00","end":"2026-11-15T01:00:00-05:00","lineup":"Brume\nAna","venueId":"288529","promoterIds":["183980"]'
 
 echo "  performers have to be artists who exist, a set's session has to exist, and nothing is saved otherwise"
 for performer in "$NOBODY" not-a-uuid "$ondes"; do
@@ -771,6 +777,8 @@ expect_body_contains "{\"id\":\"${later}\",\"performers\":[]"
 echo "  a session or a set that doesn't exist can't be viewed, changed or deleted"
 for id in "$NOBODY" not-a-uuid; do
     json GET "${SESSIONS}/${id}"
+    expect_status 404
+    json GET "${SESSIONS}/${id}/ra-event"
     expect_status 404
     session_form PUT "${SESSIONS}/${id}" "$(session_json null 60)"
     expect_status 404

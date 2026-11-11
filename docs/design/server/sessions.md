@@ -257,6 +257,22 @@ Responses give each one as an object, or null when there's none, with an `id` an
 | `soundcloudTrack` | SoundCloud's id for the track, which doesn't change when the track is renamed | The link it was resolved from, reduced as above: a private track's private link mustn't be shown to the public |
 | `youtubeVideo` | The video's id | `https://www.youtube.com/watch?v=<id>` |
 
+## Events on RA
+
+Parking Radio announces its sessions on Resident Advisor, under its promoter page (see [Events](events.md)). A session's
+event there is its `raEvent` (see [Links](#links)), which an admin creates on RA from the content the server gives for
+the session, whatever its status (see [`GET /api/admin/sessions/:id/ra-event`](#get-apiadminsessionsidra-event-admin)),
+then sets as its `raEvent`. The server never creates events on RA itself. The content is:
+
+| Field | Type | |
+|---|---|---|
+| `title` | string | The session's `title` |
+| `start`, `end` | string or null | The session's `start` and `end`, as it gives them, or null when it has no `start`. RA takes them in Québec time without their offset |
+| `lineup` | string | One performer per line: the performers of the session's sets that aren't cancelled, in the order of its `sets`, each set's in their order, without repeated lines, e.g. `"Aurore\nBrume"` for a set of Aurore and Brume. RA needs one, so a session without such performers has `"OPEN JAM"` for a `"synth-meetup"`, as Parking Radio's synth meetups do on RA, or else its `title` |
+| `venueId` | string | Parking Radio's venue on RA, `"288529"` (`https://ra.co/clubs/288529`) |
+| `promoterIds` | list of strings | Parking Radio's promoter page on RA, `["183980"]` (`https://ra.co/promoters/183980`) |
+| `content` | string | The session's `effectiveDescription` |
+
 ## `GET /api/admin/sessions` (admin)
 
 Every query parameter can be left out, and the list only has the sessions that match all of those given:
@@ -284,6 +300,15 @@ or if `from` isn't before `to`.
 |---|---|---|
 | `ok` | `true` | |
 | `session` | session | |
+
+Fails with 404 when there's no such session.
+
+## `GET /api/admin/sessions/:id/ra-event` (admin)
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `event` | object | The content of the session's event on RA, as above (see [Events on RA](#events-on-ra)) |
 
 Fails with 404 when there's no such session.
 
