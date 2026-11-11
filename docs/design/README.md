@@ -63,6 +63,7 @@ design: when they disagree, these documents still win.
 | [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Candidatures](client/admin/candidatures.md) | Going through applications |
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
+| [Publier sur RA](client/admin/publier-sur-ra.md) | Creating a session's event on Resident Advisor, with a bookmarklet |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
 | [Admins](client/admin/admins.md) | Who can access the admin pages, and connecting Claude to them |
 | [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin |

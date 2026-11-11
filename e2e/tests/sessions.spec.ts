@@ -364,3 +364,45 @@ test.describe('in another time zone', () => {
     expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
   })
 })
+
+test("a session's event on RA is published from the panel under its « Événement RA », then saved once the bookmarklet leads back to it", async ({ page }, testInfo) => {
+  const { unique, day } = own(testInfo)
+  await logIn(page)
+  await expect(adminMenu(page)).toBeVisible()
+  const fields = { start: `${day}T21:00-04:00`, durationMinutes: 120, type: 'other', takeover: null, name: `E2E ${unique}`, raEvent: null, description: 'Une soirée.' }
+  const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
+  expect(created.ok()).toBe(true)
+  const id: string = (await created.json()).session.id
+  await mockEvents(page)
+
+  // The server under test isn't production, so publishing warns that the event will be created on RA all the same.
+  const createButton = () => value(page, 'Événement RA').getByRole('button', { name: 'créer' })
+  await page.goto(`/admin/sessions/${id}`)
+  await createButton().click()
+  await expect(page.getByText("Attention : l'événement sera vraiment créé sur RA, à partir d'une session de DEV.")).toBeVisible()
+  await expect(raValue(page, 'Line-up').locator('span')).toHaveText(`E2E ${unique}`)
+  // RA's form opens in a new tab, with the event in its fragment, which these tests only read, since they never reach RA.
+  await page.evaluate(() => {
+    window.open = (url) => {
+      document.body.dataset.opened = String(url)
+      return null
+    }
+  })
+  await page.getByRole('button', { name: 'Publier sur RA' }).click()
+  const opened = new URL((await page.locator('body').getAttribute('data-opened'))!)
+  expect(opened.origin + opened.pathname).toBe('https://ra.co/pro/event/create')
+  const sent = JSON.parse(decodeURIComponent(opened.hash.slice('#parking-radio='.length)))
+  expect(sent).toMatchObject({ site: new URL(page.url()).origin, environment: 'development', session: id, event: { title: `E2E ${unique}`, start: `${day}T21:00:00-04:00`, content: 'Une soirée.' } })
+
+  // The bookmarklet leads back with the event it created, which is only saved with « enregistrer ».
+  await page.goto(`/admin/sessions/${id}?raEvent=2400123`)
+  await expect(page.getByText("L'événement RA n° 2400123 vient d'être créé sur RA : enregistrez-le dans la session.")).toBeVisible()
+  await expect(page.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveValue('https://ra.co/events/2400123')
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(page.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveCount(0)
+  await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/2400123')
+  await expect(page).toHaveURL(new RegExp(`/admin/sessions/${id}$`))
+  await expect(createButton()).toHaveCount(0)
+
+  expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
+})

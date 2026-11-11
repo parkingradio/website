@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
-import { mockFetch } from '../../test-utils'
+import { CONFIG, mockFetch } from '../../test-utils'
 
 // Who applications are emailed to, the SoundCloud app, the YouTube channel and the feature flags have their own tests, in
 // configuration/recipients.test.tsx, configuration/soundcloud.test.tsx, configuration/youtube.test.tsx and
@@ -34,7 +34,7 @@ function renderAt(path: string) {
 }
 
 describe('The configuration section', () => {
-  it('shows who applications are emailed to, then the SoundCloud app, then the YouTube channel, then the feature flags', async () => {
+  it('shows who applications are emailed to, then the SoundCloud app, then the YouTube channel, then the bookmarklet, then the feature flags', async () => {
     mockFetch(PAGE)
     renderAt('/admin/configuration')
 
@@ -43,6 +43,7 @@ describe('The configuration section', () => {
       'Envoi des candidatures par e-mail',
       'Connexion SoundCloud',
       'Connexion YouTube',
+      'Publier sur RA',
       'Features',
     ])
     await screen.findByText('Aucune feature pour le moment.')
@@ -67,5 +68,27 @@ describe('The configuration section', () => {
     await screen.findByText('Aucune feature pour le moment.')
     await screen.findByRole('textbox', { name: 'Client ID' })
     expect(screen.queryByRole('textbox', { name: "Adresse e-mail d'un destinataire" })).not.toBeInTheDocument()
+  })
+
+  it('gives the bookmarklet, which loads its code from this site each time', async () => {
+    mockFetch(PAGE)
+    renderAt('/admin/configuration')
+
+    const link = await screen.findByText('Parking Radio → RA')
+    const href = link.getAttribute('href')!
+    expect(href).toMatch(/^javascript:/)
+    // Clicking it here does nothing: it's dragged to the bookmarks.
+    expect(fireEvent.click(link)).toBe(false)
+    new Function(decodeURIComponent(href.slice('javascript:'.length)))()
+    const scripts = document.body.querySelectorAll('script')
+    expect(scripts[scripts.length - 1].src).toMatch(new RegExp(`^${location.origin}/ra-bookmarklet\\.js\\?\\d+$`))
+    scripts[scripts.length - 1].remove()
+  })
+
+  it("names the bookmarklet after the environment outside production, so that admins tell their bookmarks apart", async () => {
+    mockFetch({ ...PAGE, '/api/config': { ...CONFIG, environment: 'test' } })
+    renderAt('/admin/configuration')
+
+    expect(await screen.findByText('Parking Radio → RA [TEST]')).toHaveAttribute('href', expect.stringMatching(/^javascript:/))
   })
 })

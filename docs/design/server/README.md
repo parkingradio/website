@@ -86,7 +86,10 @@ Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-
 [Autoriser une application](../client/admin/autoriser.md)).
 
 The names of the files under `/assets` change with their content, so they can be cached for good. The app itself is
-checked again every time it's loaded, so that a deploy shows right away.
+checked again every time it's loaded, so that a deploy shows right away, and so are its other files, e.g.
+`/ra-bookmarklet.js`, the script of the bookmarklet that creates sessions' events on RA (see
+[Publier sur RA](../client/admin/publier-sur-ra.md)), whose path doesn't change. RA's pages load it, as a classic
+script, which needs no CORS: it's public, and holds no secrets.
 
 ## `GET /healthz`
 
