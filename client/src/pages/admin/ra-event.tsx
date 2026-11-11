@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link } from 'react-router'
-import { api, formData } from '../../api/client'
+import { api } from '../../api/client'
 import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import { useEnvironment, useEnvironmentStamp } from '../../config-context'
-import { checkSession, sessionFormValues } from '../../session-fields'
 import type { Session } from '../../session-fields'
 import { raEventId, raEventUrl } from '../../session-links'
 import { Button } from './button'
@@ -128,7 +127,8 @@ export function RaEventPanel({
   const [error, setError] = useState<ReactNode>(null)
   const [busy, setBusy] = useState(false)
 
-  // Saves the event as the session's, with the rest of the session as it was loaded, since the API replaces it whole.
+  // Saves the event as the session's, and only it: the session's other fields stay as they are, even if they changed since
+  // the page loaded it.
   const save = async (event: FormEvent) => {
     event.preventDefault()
     const typed = link.trim()
@@ -136,12 +136,9 @@ export function RaEventPanel({
     const id = raEventId(typed) ?? raEventId(`https://${typed}`)
     if (!id) return setLinkError(typed ? "Ce n'est pas le lien d'un événement RA, p. ex. https://ra.co/events/6683745." : "Collez le lien de l'événement RA.")
     setLinkError(null)
-    const { fields } = checkSession({ ...sessionFormValues(session), raEvent: { id, url: raEventUrl(id) } })
-    // The session's own fields, as the server gave them, always pass.
-    if (!fields) return setError("L'événement RA n'a pas pu être enregistré.")
     setBusy(true)
     setError(null)
-    const result = await api.PUT('/api/admin/sessions/{id}', { params: { path: { id: session.id } }, body: { session: fields }, bodySerializer: formData })
+    const result = await api.PATCH('/api/admin/sessions/{id}', { params: { path: { id: session.id } }, body: { raEvent: id } })
     setBusy(false)
     if (!result.ok) return setError(failure("L'événement RA n'a pas pu être enregistré", result, session.id))
     onSaved(result.session)

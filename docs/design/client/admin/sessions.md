@@ -120,9 +120,10 @@ the event on RA, with the bookmarklet or by hand, from the content the server gi
   panel opens, and again whenever the session or its sets change, and the panel says when it can't be read.
 - "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
   [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's
-  event on RA, which then shows in place of the panel, and "annuler" closes the panel. Since the session is replaced
-  whole, saving sends its own fields as the page has them, with the event. An empty field, or one that isn't an event's
-  link, says so, and sends nothing.
+  event on RA, which then shows in place of the panel, and "annuler" closes the panel. Saving only changes the session's
+  event, and leaves its other fields as they are, even if they changed since the page loaded (see
+  [Changes, in Conventions](../../server/README.md#conventions)). An empty field, or one that isn't an event's link,
+  says so, and sends nothing.
 
 Once the session has its event on RA, its "Événement RA" only links to it: "modifier" still changes it.
 
@@ -224,7 +225,8 @@ named. Changing a status shows these the same way.
 - `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status` and
   `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
-- `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it.
+- `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
+  `PATCH /api/admin/sessions/:id`, to save the event as the session's.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status` and
   `DELETE /api/admin/sets/:id`, for its sets.
