@@ -3,7 +3,10 @@
 At `/admin/admins`: manages who can access the admin pages (see [Admins](../../server/admins.md)), and connects Claude
 to them.
 
-- "Inviter un admin": emails an invite to a given address.
+- "Inviter un admin": emails an invite to a given address. It checks the address as the server does first (see
+  [`POST /api/admin/invite`](../../server/admins.md#post-apiadmininvite-admin)): when it isn't an email address, even
+  when it's blank, nothing is sent, and "Adresse e-mail invalide." shows under the field, in place of what the previous
+  invite said, until the field changes.
 - "Admins existants": lists the admins by email, with "(vous)" next to the admin's own, their status ("actif",
   "invitation envoyée" with when it expires, or "invitation expirée"), and when they were added and by whom. "révoquer"
   revokes another admin after confirming, which ends their sessions and connections, or cancels their invite if they

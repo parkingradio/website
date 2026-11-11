@@ -3,8 +3,10 @@ import type { FormEvent } from 'react'
 import { api } from '../../api/client'
 import type { ApiError, Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
+import { EMAIL_MAX_LENGTH, isEmailAddress } from '../../artist-profile'
 import { ConnectClaude, ConnectedApps } from './connections'
 import { dateFormat, dateTimeFormat } from './describe'
+import { Labeled } from './fields'
 
 // The admins section: inviting admins, and the admins there are, who can be invited again until they accept, and revoked,
 // then connecting Claude, and the apps the admin connected.
@@ -117,10 +119,20 @@ export function Admins() {
   const [version, setVersion] = useState(0)
   const reload = () => setVersion((version) => version + 1)
 
+  // What's wrong with the address, once the form was sent with it.
+  const [emailError, setEmailError] = useState<string | null>(null)
+
   const invite = async (event: FormEvent) => {
     event.preventDefault()
+    // Checked as the server does (see server/src/admins/routes.ts), blank included.
+    const address = email.trim()
+    if (!isEmailAddress(address)) {
+      setEmailError('Adresse e-mail invalide.')
+      setStatus({ kind: 'idle' })
+      return
+    }
     setStatus({ kind: 'sending' })
-    const result = await api.POST('/api/admin/invite', { body: { email } })
+    const result = await api.POST('/api/admin/invite', { body: { email: address } })
     if (result.ok) {
       setStatus({ kind: 'success' })
       setEmail('')
@@ -135,11 +147,19 @@ export function Admins() {
       <h1>Admins</h1>
 
       <h2>Inviter un admin</h2>
-      <form className="admin-form" onSubmit={invite}>
-        <label>
-          Courriel
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-        </label>
+      <form className="admin-form" onSubmit={invite} noValidate>
+        <Labeled label="Courriel" error={emailError}>
+          <input
+            type="email"
+            value={email}
+            maxLength={EMAIL_MAX_LENGTH}
+            aria-invalid={emailError ? true : undefined}
+            onChange={(event) => {
+              setEmail(event.target.value)
+              setEmailError(null)
+            }}
+          />
+        </Labeled>
         <button type="submit" disabled={status.kind === 'sending'}>
           envoyer l'invitation
         </button>

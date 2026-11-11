@@ -460,6 +460,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** @description An email address, which is trimmed, up to 200 characters */
                         email: string;
                     };
                 };
