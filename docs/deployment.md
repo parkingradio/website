@@ -75,13 +75,10 @@ environment has:
   contains (see `mask-aws-account-id` in the workflows).
 - Secret `CLOUDFLARE_API_TOKEN`: An API token for the account under which the domain name is configured.
   The token needs the following capabilities, scoped to the domain name zone: `Zone:DNS:Edit`,
-  `Zone:SSL and Certificates:Edit`, `Zone:Email Routing Rules:Edit`, `Zone:Zone Settings:Edit`, and
-  `Zone:Single Redirect:Edit`. It also needs `Account:Email Routing Addresses:Edit` and `Account:Turnstile:Edit`,
-  scoped to the account (these are account-level concepts in Cloudflare).
+  `Zone:SSL and Certificates:Edit`, and `Zone:Single Redirect:Edit`. It also needs `Account:Turnstile:Edit`,
+  scoped to the account (Turnstile widgets are an account-level concept in Cloudflare).
 - Variables `DOMAIN` and `CLOUDFLARE_ZONE_ID`: The domain name in use and the Cloudflare zone ID of that domain.
   Those are not sensitive.
-- Variable `MANAGE_MAIL`: `true` or `false`. Whether Terraform manages mail for the domain. This can only be
-  `true` for a domain at the zone apex.
 
 ## Building and pushing the app image
 
@@ -200,30 +197,9 @@ Each deployment gets a private S3 bucket for the files only the app reads and wr
 assets. The bucket is versioned and keeps the previous versions of files for as long as the database's backups
 are kept.
 
-## Mail aliases
+## Email
 
-Terraform only manages mail when `manage_mail` is `true`. It defaults to `false`, so nothing in this
-section applies unless you turn it on. The rest of this section assumes Terraform is managing the mail
-setup.
-
-Note that only an environment deployed at the zone apex can manage mail. Cloudflare Email Routing is
-enabled for the whole zone, so letting a subdomain environment manage it would mean that tearing that
-environment down disables mail for every domain in the zone.
-
-`deployment/main/mail-aliases.tf` is a table of `name@<domain>` aliases (e.g. `contact`, or a team member's
-first name) and the mailbox each one forwards to. To add or remove an alias, edit that table and re-apply
-Terraform. Each entry gets:
-
-- A Cloudflare Email Routing rule forwarding `name@<domain>` to its mailbox. The first time a given
-  destination mailbox is used, Cloudflare emails it a confirmation link that someone has to click before
-  forwarding actually works.
-- Its own SMTP credentials (via a dedicated IAM user), restricted so it can only send as that one address,
-  stored in Secrets Manager.
-
-Note that running `terraform apply` twice may be required: the first time will fail if the destination
-mailbox is not already approved (for Cloudflare) and the `apply` will stop partway. Then, verify the mailbox
-and re-run `apply`, which should succeed. Another way to do this without running `apply` twice is to add the
-destination mailbox manually in Cloudflare and get the mailbox verified *before* running `apply`.
-
-To let someone send as their alias from their own mail client (e.g. Gmail), get their SMTP username and password
-from Secrets Manager and hand it over to them, so they can set it up using e.g. "send-as" in Gmail.
+The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES
+identity, with its DKIM records in Cloudflare, and lets the app's instance send as that one address only. The domain's
+MX, SPF and DMARC records, if any, are left to whoever handles its mail, so deploying doesn't conflict with an existing
+mail setup.

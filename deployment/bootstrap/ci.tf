@@ -134,9 +134,6 @@ resource "aws_iam_role_policy" "deploy_scoped" {
         Resource = [
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/parking-radio-*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/parking-radio-*",
-          # The per-alias SMTP users created in mail.tf, along with their access keys and inline
-          # policies: those all authorize against the user's ARN.
-          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/parking-radio-*",
         ]
       },
       {
