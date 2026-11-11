@@ -8,7 +8,7 @@ import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { PhotoFolder, SentPhoto } from '../artists/store.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
-import { Conflict, NoSuchReference } from './store.js'
+import { BrokenFields, Conflict, NoSuchReference } from './store.js'
 import type { SessionsStore, StoredSession, StoredSet } from './store.js'
 import type { Status } from './fields.js'
 import { sessionsRoutes } from './routes.js'
@@ -66,7 +66,7 @@ const store: SessionsStore = {
     const row = rows.find((session) => session.id === id)
     if (!row) return null
     const before = { ...row }
-    Object.assign(row, changes, takeover(changes.takeoverId))
+    Object.assign(row, defined(changes), changes.takeoverId !== undefined && takeover(changes.takeoverId))
     return { before, after: row }
   }),
   setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => {
@@ -87,7 +87,7 @@ const store: SessionsStore = {
     session.sets.push({ id: `set-${++nextId}`, createdAt: CREATED_AT, ...NEW, ...set, sessionId, ...performers(sent) })
     return session
   }),
-  updateSet: vi.fn<SessionsStore['updateSet']>(async (id, { performers: sent, ...changes }) => changeSet(id, { ...changes, ...performers(sent) })),
+  updateSet: vi.fn<SessionsStore['updateSet']>(async (id, { performers: sent, ...changes }) => changeSet(id, { ...changes, ...(sent && performers(sent)) })),
   setSetStatus: vi.fn<SessionsStore['setSetStatus']>(async (id, change) => changeSet(id, change)),
   deleteSet: async (id) => {
     const session = sessionOf(id)
@@ -158,7 +158,7 @@ async function buildApp(logs?: string[]) {
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: object) {
+async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
@@ -212,10 +212,12 @@ describe('sessions routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/sessions/session-1/ra-event' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
+      app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set() }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-1', payload: set() }),
+      app.inject({ method: 'PATCH', url: '/api/admin/sets/set-1', payload: set() }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-1/status', payload: { status: 'done' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sets/set-1' }),
     ]
@@ -234,10 +236,12 @@ describe('sessions routes', () => {
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/sessions', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()), ...options }),
+      app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { name: 'X' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set(), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-2', payload: set(), ...options }),
+      app.inject({ method: 'PATCH', url: '/api/admin/sets/set-2', payload: { genres: [] }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-2/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sets/set-2', ...options }),
     ]
@@ -245,6 +249,27 @@ describe('sessions routes', () => {
       expect(response.statusCode).toBe(403)
     }
     expect(rows).toEqual([expect.objectContaining({ status: 'planned', updatedBy: null, sets: [expect.objectContaining({ status: 'planned', updatedBy: null })] })])
+  })
+
+  it("refuses the fields of a session or a set they don't take, naming them, e.g. what the endpoints return", async () => {
+    const app = await buildApp()
+    await sessionWithSet(app)
+    vi.clearAllMocks()
+    const responses = [
+      await sendSession(app, 'POST', '/api/admin/sessions', { ...session(), title: 'X' }),
+      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', { ...session(), title: 'X' }),
+      await send(app, 'POST', '/api/admin/sessions/session-1/sets', { ...set(), title: 'X' }),
+      await send(app, 'PUT', '/api/admin/sets/set-2', { ...set(), title: 'X' }),
+    ]
+    for (const response of responses) {
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `title`' })
+    }
+    expect(store.create).not.toHaveBeenCalled()
+    expect(store.update).not.toHaveBeenCalled()
+    expect(resolveTrack).not.toHaveBeenCalled()
+    // But not the fields of a set's performers, so that they can be sent back as the set returns them.
+    expect((await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-1', name: 'Ana' }] }))).statusCode).toBe(200)
   })
 
   it('refuses the NUL character in whatever sessions and sets keep or look up, before saving or asking SoundCloud', async () => {
@@ -810,6 +835,78 @@ describe('sessions routes', () => {
     })
   })
 
+  describe('PATCH /api/admin/sessions/:id', () => {
+    it('changes only the fields it is sent, keeps its flyer, says who changed it, and moves its sets with its start', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      rows[0].flyerKey = 'sessions/flyer.png'
+      rows[0].flyerType = 'image/png'
+      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', { start: '2026-11-21T20:00-05:00', raEvent: null })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session).toMatchObject({
+        start: '2026-11-21T20:00:00-05:00',
+        durationMinutes: 240,
+        type: 'takeover',
+        takeover: { id: 'collective-1' },
+        name: 'HAUTE RIVE TAKEOVER',
+        raEvent: null,
+        hasFlyer: true,
+        updatedBy: 'admin@example.com',
+        sets: [{ id: 'set-2', start: '2026-11-21T21:00:00-05:00' }],
+      })
+      expect(store.update).toHaveBeenLastCalledWith('session-1', {
+        startAt: new Date('2026-11-22T01:00:00Z'),
+        raEventId: null,
+        updatedBy: 'admin@example.com',
+        updatedAt: expect.any(Date),
+      })
+    })
+
+    it('removes its flyer when asked to, and deletes it', async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: PNG })
+      expect((await send(app, 'PATCH', '/api/admin/sessions/session-1', { removeFlyer: false })).json().session.hasFlyer).toBe(true)
+      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', { removeFlyer: true })
+      expect(response.json().session).toMatchObject({ hasFlyer: false, name: 'HAUTE RIVE TAKEOVER' })
+      expect(stored.size).toBe(0)
+    })
+
+    it('explains what is wrong with what it is sent, and with the session it would make, without changing it', async () => {
+      const app = await buildApp()
+      await createSession(app)
+      const invalid = [
+        [{ durationMinutes: 0 }, 'The duration must be a whole number of minutes, from 1 to 1440'],
+        [{ title: 'X' }, 'Unknown field: `title`'],
+        [{ removeFlyer: 'true' }, 'removeFlyer must be true or false'],
+        [{}, 'There must be at least one field to change'],
+        [[], 'The changes must be an object with the fields to change'],
+      ] as const
+      for (const [changes, error] of invalid) {
+        const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', changes)
+        expect(response.statusCode, JSON.stringify(changes)).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      // The rules that involve several fields are the store's, which checks them on the session as it is saved.
+      vi.mocked(store.update).mockRejectedValueOnce(new BrokenFields('Only a takeover has a collective'))
+      const broken = await send(app, 'PATCH', '/api/admin/sessions/session-1', { type: 'guest-mixes' })
+      expect(broken.statusCode).toBe(400)
+      expect(broken.json()).toEqual({ ok: false, error: 'Only a takeover has a collective' })
+      expect(store.update).toHaveBeenCalledTimes(1)
+      expect(rows[0].updatedBy).toBeNull()
+    })
+
+    it('responds 404 for a session that does not exist, and 409 when it would overlap another one, with that one', async () => {
+      const app = await buildApp()
+      const { session: before } = (await createSession(app)).json()
+      expect((await send(app, 'PATCH', '/api/admin/sessions/session-9', { name: 'X' })).statusCode).toBe(404)
+      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', rows[0]))
+      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', { durationMinutes: 300 })
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: before, set: null })
+    })
+  })
+
   describe('PUT /api/admin/sessions/:id/status', () => {
     it('changes the status, and says who changed it, without changing the session', async () => {
       const app = await buildApp()
@@ -1074,6 +1171,65 @@ describe('sessions routes', () => {
     })
   })
 
+  describe('PATCH /api/admin/sets/:id', () => {
+    it('changes only the fields it is sent, without resolving the track it is not sent, and returns its session', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      resolveTrack.mockClear()
+      const response = await send(app, 'PATCH', '/api/admin/sets/set-2', { genres: ['techno', 'techno'], offsetMinutes: 0 })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session.sets[0]).toMatchObject({
+        performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
+        offsetMinutes: 0,
+        durationMinutes: 60,
+        genres: ['techno'],
+        soundcloudTrack: { id: '42' },
+        youtubeVideo: { id: 'dQw4w9WgXcQ' },
+        updatedBy: 'admin@example.com',
+      })
+      expect(store.updateSet).toHaveBeenLastCalledWith('set-2', { genres: ['techno'], offsetMinutes: 0, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+      expect(resolveTrack).not.toHaveBeenCalled()
+    })
+
+    it('resolves the track when it is sent, and changes the performers and the video when they are', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app, { soundcloudTrack: null })
+      resolveTrack.mockResolvedValueOnce('43')
+      const response = await send(app, 'PATCH', '/api/admin/sets/set-2', {
+        soundcloudTrack: 'https://soundcloud.com/parkingdotradio/b2b',
+        youtubeVideo: null,
+        performers: [{ id: 'artist-3' }],
+      })
+      expect(response.json().session.sets[0]).toMatchObject({
+        soundcloudTrack: { id: '43', url: 'https://soundcloud.com/parkingdotradio/b2b' },
+        youtubeVideo: null,
+        performers: [{ id: 'artist-3', name: 'Cyan' }],
+      })
+      resolveTrack.mockRejectedValueOnce(new NoSoundCloudCredentials())
+      expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { soundcloudTrack: 'https://soundcloud.com/parkingdotradio/c' })).statusCode).toBe(409)
+    })
+
+    it('explains what is wrong, or responds 404 before asking SoundCloud', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      resolveTrack.mockClear()
+      const invalid = [
+        [{ performers: [] }, 'A set has at least one performer'],
+        [{ start: '2026-11-14T21:00-05:00' }, 'Unknown field: `start`'],
+        [{}, 'There must be at least one field to change'],
+      ] as const
+      for (const [changes, error] of invalid) {
+        expect((await send(app, 'PATCH', '/api/admin/sets/set-2', changes)).json(), JSON.stringify(changes)).toEqual({ ok: false, error })
+      }
+      vi.mocked(store.updateSet).mockRejectedValueOnce(new BrokenFields('A set with an offset also has a duration'))
+      expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { offsetMinutes: 30 })).json()).toEqual({ ok: false, error: 'A set with an offset also has a duration' })
+      const missing = await send(app, 'PATCH', '/api/admin/sets/set-9', { soundcloudTrack: 'https://soundcloud.com/parkingdotradio/x' })
+      expect(missing.statusCode).toBe(404)
+      expect(resolveTrack).not.toHaveBeenCalled()
+    })
+  })
+
   describe('PUT /api/admin/sets/:id/status', () => {
     it('changes the status, says who changed it, without changing the set, and returns its session', async () => {
       const app = await buildApp()
@@ -1096,6 +1252,8 @@ describe('sessions routes', () => {
       let response = await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'scheduled' })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'The status must be one of planned, done, cancelled' })
+      response = await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'done', by: 'x' })
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `by`' })
       response = await send(app, 'PUT', '/api/admin/sets/set-9/status', { status: 'done' })
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'No such set' })

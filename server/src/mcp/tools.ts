@@ -53,8 +53,8 @@ export function collectToolRoutes(app: FastifyInstance): ToolRoute[] {
 const TOOL_SESSION_SECONDS = 60
 
 // The parts of a request that a tool's arguments go to: for a multipart request, its part that's JSON, e.g. an artist's
-// profile, and the field that removes its file, e.g. `removePhoto`.
-type Part = 'path' | 'query' | 'body' | 'json' | 'remove'
+// profile.
+type Part = 'path' | 'query' | 'body' | 'json'
 
 // The JSON Schema of `schema`, as it's received, with the schemas it refers to written in it, since an argument's schema
 // can't refer to another tool's.
@@ -73,16 +73,16 @@ function jsonSchema(schema: z.ZodType): JsonObject {
   return inline(json) as JsonObject
 }
 
-// What a multipart request sends: its part that's JSON, e.g. an artist's profile, its file, e.g. "photo", which tools
-// can't send, and the field that removes that file, if it has one, e.g. "removePhoto".
-function multipartParts(multipart: z.ZodObject): { json: [string, z.ZodObject]; file: string; remove: string | undefined } {
+// What a multipart request sends: its part that's JSON, e.g. an artist's profile, and its file, e.g. "photo", which tools
+// can't send. Only the tools that add an artist, a collective or a session send one: those that change them send JSON.
+function multipartParts(multipart: z.ZodObject): { json: [string, z.ZodObject]; file: string } {
   const parts = Object.entries(multipart.shape)
   const json = parts.filter(([, part]) => part instanceof z.ZodObject)
   const files = parts.filter(([, part]) => (part instanceof z.ZodOptional ? part.unwrap() : part) instanceof z.ZodFile)
-  if (json.length !== 1 || files.length !== 1) throw new Error('A multipart tool takes one part that is JSON, and one file')
-  const file = files[0][0]
-  const remove = `remove${file[0].toUpperCase()}${file.slice(1)}`
-  return { json: json[0] as [string, z.ZodObject], file, remove: remove in multipart.shape ? remove : undefined }
+  if (json.length !== 1 || files.length !== 1 || parts.length !== 2) {
+    throw new Error('A multipart tool takes one part that is JSON, one file, and nothing else')
+  }
+  return { json: json[0] as [string, z.ZodObject], file: files[0][0] }
 }
 
 // The tools' arguments and where each one goes, from the route's schemas. Two arguments with the same name, e.g. a path
@@ -92,7 +92,7 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
   const required: string[] = []
   const parts = new Map<string, Part>()
   // The fields of a POST's body that can be null, which can be left out, and are then sent as null, e.g. a new set's
-  // SoundCloud track. A PUT replaces everything, so its tool takes them all.
+  // SoundCloud track. A PATCH takes any of its fields anyway.
   const nullable: string[] = []
   const add = (schema: z.ZodType | undefined, part: Part) => {
     if (!schema) return
@@ -120,13 +120,9 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
   add(route.schema.body as z.ZodType | undefined, 'body')
   let json: string | undefined
   if (route.schema.multipart) {
-    const { json: [name, schema], file, remove } = multipartParts(route.schema.multipart)
+    const { json: [name, schema] } = multipartParts(route.schema.multipart)
     json = name
     add(schema, 'json')
-    if (remove) {
-      parts.set(remove, 'remove')
-      properties[remove] = { type: 'boolean', description: `Whether to remove the ${file}. Tools can't send one` }
-    }
   }
   return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, json, nullable }
 }
@@ -154,15 +150,11 @@ function descriptionOf(route: ToolRoute, name: string): string {
   const summary = route.schema.summary ?? ''
   const sentences = [readFirst(areaOf(route.url)), /[.!?]$/.test(summary) ? summary : `${summary}.`]
   if (name in SUMMARIES) sentences.push(`Gives a summary of each one: \`get_${name.slice('list_'.length, -1)}\` gives all of it.`)
-  // The tools that replace a whole item, rather than one of its fields, e.g. `update_set` but not `update_set_status`.
-  if (route.method === 'PUT' && /^update_[a-z]+$/.test(name)) {
-    sentences.push("It replaces it: what's left out is erased, except what it says it keeps, so read it first.")
-  }
+  // The tools that change some of an item's fields (see "Changes" in docs/design/server/README.md).
+  if (route.method === 'PATCH') sentences.push("What it isn't given stays as it is, and a list or an object it's given replaces the whole one.")
   if (route.schema.multipart) sentences.push(`Tools can't send a ${multipartParts(route.schema.multipart).file}.`)
   if (hasContactDetails(route) && route.method !== 'DELETE') sentences.push('Emails and phone numbers are never shown.')
-  if (route.schema.multipart && hasContactDetails(route) && route.method === 'PUT') {
-    sentences.push('Replacing a profile keeps the email and phone it isn\'t given, and null or "" removes them.')
-  }
+  if (hasContactDetails(route) && route.method === 'PATCH') sentences.push('Given as null or "", the email or phone is removed.')
   return sentences.join(' ')
 }
 
@@ -281,7 +273,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const path = route.url.replace(/:(\w+)/g, (_, param: string) => segment(args[param])!)
       // The path has to lead to the tool's route, with the parameters it was given. Encoded, a parameter is one segment
       // of it, but a segment can still be that of another route, which the router prefers to a parameter, e.g.
-      // `update_application({ id: "recipients" })` would lead to PUT /api/admin/applications/recipients. The router
+      // `get_application({ id: "recipients" })` would lead to GET /api/admin/applications/recipients. The router
       // then finds other parameters, or none, so asking it is what keeps every tool to its route, whatever the routes.
       const found = new URL(path, 'http://localhost').pathname === path ? app.findRoute({ method: route.method, url: path }) : null
       const params = [...route.url.matchAll(/:(\w+)/g)].map(([, param]) => param)
@@ -294,31 +286,18 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const send = await sender(as)
       const query = new URLSearchParams()
       const body: JsonObject = {}
-      // The field that removes the file, when it's given as true, e.g. "removePhoto".
-      let remove: string | undefined
       for (const [arg, value] of Object.entries(args)) {
         const part = parts.get(arg)
         if (part === 'query' && value !== undefined) query.set(arg, String(value))
         if (part === 'body' || part === 'json') body[arg] = value
-        if (part === 'remove' && value === true) remove = arg
       }
       for (const field of nullable) if (!(field in body)) body[field] = null
       const url = query.size > 0 ? `${path}?${query}` : path
 
       let payload: Payload | undefined
       if (json) {
-        // A profile that's replaced keeps the email and phone it isn't given, since tools never show them, which loses a
-        // change another admin makes to them in the meantime.
-        if (route.method === 'PUT' && hasContactDetails(route) && (!('email' in body) || !('phone' in body))) {
-          const current = await send('GET', path)
-          if (current.status !== 200) return failure(current.status, current.body)
-          const saved = (current.body as JsonObject)[json] as JsonObject | null | undefined
-          if (!saved || typeof saved !== 'object') return failure(500, { error: `The ${json} couldn't be read` })
-          for (const field of ['email', 'phone']) if (!(field in body)) body[field] = saved[field]
-        }
         const form = new FormData()
         form.append(json, JSON.stringify(body))
-        if (remove) form.append(remove, 'true')
         const encoded = new Response(form)
         payload = { body: Buffer.from(await encoded.arrayBuffer()), contentType: encoded.headers.get('content-type')! }
       } else if (route.schema.body) {

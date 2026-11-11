@@ -55,6 +55,31 @@ export const ById = z.object({ id: z.string() })
 export const Reference = z.object({ id: z.string(), name: z.string() }).meta({ id: 'Reference' })
 export type Reference = z.infer<typeof Reference>
 
+// The error of an object, e.g. an artist's profile, that has fields it doesn't take, which it names, so that a misspelled
+// field doesn't go unnoticed (see "Unknown fields" in docs/design/server/README.md). Only admins send these objects, so
+// it's in English.
+export function unknownFields(keys: string[]): string {
+  return `Unknown field${keys.length > 1 ? 's' : ''}: ${keys.map((key) => `\`${key}\``).join(', ')}`
+}
+
+// The errors of an object that refuses fields it doesn't take (`z.strictObject`): `unknownFields` for those, and `error`
+// for the others, e.g. when it isn't an object. Only for the object itself: its fields have their own errors.
+export function objectError(error: string) {
+  return (issue: { code?: string; keys?: string[] }) => (issue.code === 'unrecognized_keys' ? unknownFields(issue.keys ?? []) : error)
+}
+
+const NOT_CHANGES = 'The changes must be an object with the fields to change'
+const NO_CHANGES = 'There must be at least one field to change'
+
+// What a PATCH endpoint takes (see "Changes" in docs/design/server/README.md): any of the fields of `shape`, which are
+// those its PUT takes, each with its rules, but at least one, and no other.
+export function changesTo<Shape extends z.ZodRawShape>(shape: Shape) {
+  return z
+    .strictObject(z.object(shape).partial().shape, { error: objectError(NOT_CHANGES) })
+    .refine((changes) => Object.keys(changes).length > 0, NO_CHANGES)
+    .meta({ minProperties: 1 })
+}
+
 // A credential of a service the server reads, e.g. the SoundCloud app's client ID, or a YouTube API key. The client has its
 // own copy of the length, for its forms (see client/src/pages/admin/configuration/credentials-form.tsx).
 const CREDENTIAL_MAX_LENGTH = 200

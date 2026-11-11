@@ -216,7 +216,7 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await logIn(page)
   // The test's own artist is added through the API, with the session, once there's one.
   await expect(adminMenu(page)).toBeVisible()
-  const created = await page.request.post('/api/admin/artists', { multipart: { artist: JSON.stringify({ kind: 'artist', name: known }) } })
+  const created = await page.request.post('/api/admin/artists', { multipart: { artist: JSON.stringify({ name: known }) } })
   expect(created.ok()).toBe(true)
   const knownId: string = (await created.json()).artist.id
 

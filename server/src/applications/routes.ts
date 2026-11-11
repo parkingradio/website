@@ -1,11 +1,11 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
-import { ApiError, ById, Day, Ok, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Day, Ok, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
-import { ApplicationFields, ApplicationStatus, BAD_STATUS, PerformanceTypeId, ReceivedAt, TimeSlot } from './fields.js'
+import { ApplicationFields, ApplicationStatus, BAD_STATUS, NO_DATE, PerformanceTypeId, ReceivedAt, TimeSlot } from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import { NoSuchArtist, NoSuchCollective } from './store.js'
-import type { ApplicationOwner, ApplicationsStore, StoredApplication } from './store.js'
+import type { ApplicationChange, ApplicationOwner, ApplicationsStore, StoredApplication } from './store.js'
 
 // Admin routes for applications: create, view, change, accept or reject, and delete them, and choose who the ones artists
 // send are emailed to (see docs/design/server/applications.md).
@@ -40,12 +40,16 @@ const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such ar
 const NO_SUCH_COLLECTIVE: z.infer<typeof ApiError> = { ok: false, error: 'No such collective' }
 const ONE_OWNER = 'An application belongs to either an artist or a collective: send either artistId or collectiveId'
 
-// What admins send to change an application, and to create one, with the artist or the collective it's for. Their errors
-// are those of the first field that's wrong (see `firstIssue`), in the order the fields are checked in: the
-// application's, when it was received, in French like the application's, then the artist or the collective, in English,
-// since only admins send ids.
-const ApplicationChanges = ApplicationFields.extend({ receivedAt: ReceivedAt.optional() })
-const NewApplication = ApplicationChanges.extend({
+// What admins send to replace an application's fields, to change some of them, and to create one, with the artist or
+// the collective it's for. Their errors are those of the first field that's wrong (see `firstIssue`), in the order the
+// fields are checked in: the application's, when it was received, in French like the application's, then the artist or
+// the collective, in English, since only admins send ids. Unlike artists applying, admins can't send other fields (see
+// `objectError`), which are in English too. Anything that isn't an object gets the error of the dates, which it doesn't
+// have, like `ApplicationFields`.
+const APPLICATION_FIELDS = { ...ApplicationFields.shape, receivedAt: ReceivedAt.optional() }
+const ApplicationReplacement = z.strictObject(APPLICATION_FIELDS, { error: objectError(NO_DATE) })
+const ApplicationChanges = changesTo(APPLICATION_FIELDS)
+const NewApplication = ApplicationReplacement.extend({
   artistId: z.string({ error: NO_SUCH_ARTIST.error }).optional().meta({ description: 'The artist who applies. Not with `collectiveId`' }),
   collectiveId: z
     .string({ error: NO_SUCH_COLLECTIVE.error })
@@ -195,7 +199,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       schema: {
         summary: 'Chooses who applications from artists are emailed to',
         tags: ['Applications'],
-        body: z.object({ recipients: Recipients }, { error: NOT_RECIPIENTS }),
+        body: z.strictObject({ recipients: Recipients }, { error: objectError(NOT_RECIPIENTS) }),
         response: { 200: ApplicationRecipients },
       },
     },
@@ -254,24 +258,43 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
     },
   )
 
+  // Saves the changes to the application `id`, all of its fields or some of them, as `by`, and responds with it.
+  async function update(id: string, changes: ApplicationChange, by: string, reply: FastifyReply) {
+    const row = await store.update(id, { ...changes, updatedBy: by, updatedAt: new Date() })
+    if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
+    return { ok: true as const, application: application(row) }
+  }
+
+  // Not a tool: tools change applications with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
   api.put(
+    '/api/admin/applications/:id',
+    {
+      config: { admin: true, tool: null },
+      schema: {
+        summary: "Replaces an application's fields",
+        tags: ['Applications'],
+        params: ById,
+        body: ApplicationReplacement,
+        response: { 200: ApplicationResponse, 404: ApiError },
+      },
+    },
+    async (request, reply) => update(request.params.id, request.body, request.user!.email, reply),
+  )
+
+  api.patch(
     '/api/admin/applications/:id',
     {
       config: { admin: true, tool: { title: 'Modifier une candidature' } },
       schema: {
         operationId: 'update_application',
-        summary: 'Changes an application',
+        summary: "Changes an application, only the fields it's given",
         tags: ['Applications'],
         params: ById,
         body: ApplicationChanges,
         response: { 200: ApplicationResponse, 404: ApiError },
       },
     },
-    async (request, reply) => {
-      const row = await store.update(request.params.id, { ...request.body, updatedBy: request.user!.email, updatedAt: new Date() })
-      if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
-      return { ok: true as const, application: application(row) }
-    },
+    async (request, reply) => update(request.params.id, request.body, request.user!.email, reply),
   )
 
   api.put(
@@ -283,7 +306,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
         summary: 'Accepts or rejects an application, or gives it another status',
         tags: ['Applications'],
         params: ById,
-        body: z.object({ status: ApplicationStatus }, { error: BAD_STATUS }),
+        body: z.strictObject({ status: ApplicationStatus }, { error: objectError(BAD_STATUS) }),
         response: { 200: ApplicationResponse, 404: ApiError },
       },
     },

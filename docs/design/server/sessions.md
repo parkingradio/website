@@ -9,8 +9,10 @@ with admins' sessions, which are about logging in (see [Sessions, in Admins](adm
 
 Each session is a row of the `sessions` table (`server/src/db/schema.ts`), and each set a row of `sets`, with its
 performers in `set_performers`. The rules each of their fields follows are the schemas `SessionFields` and `SetFields`
-of `server/src/sessions/fields.ts`. The server checks every session and set it's sent against them, then against the
-[rules](#rules) that involve other sessions and sets. Its errors are in English, since only admins see them.
+of `server/src/sessions/fields.ts`. The server checks the fields it's sent against them, then the rules that involve
+several fields on the session or the set as it will be once it's added or changed, with the fields a change doesn't send
+as they are, then the [rules](#rules) that involve other sessions and sets. Its errors are in English, since only admins
+see them.
 
 ## Sessions
 
@@ -86,7 +88,8 @@ year 2999, in UTC, and can be in the past or in the future.
 
 A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
 moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set
-with an offset also has a duration. A set is meant to take place during its session, but doesn't have to (see
+with an offset also has a duration: giving an offset to a set without a duration takes giving it one in the same
+request. A set is meant to take place during its session, but doesn't have to (see
 [Sets' places](#sets-places)).
 
 Durations and offsets are whole numbers of minutes, of time that actually passes, whatever the clocks say: a session
@@ -166,8 +169,9 @@ case of its id, is dropped, keeping the first. A performer that isn't an object 
 
 Responses list them as objects with the `id` and `name` of each one, in order.
 
-Deleting an artist takes them out of their sets, which stay as they are, even without performers. Changing such a set
-then takes at least one performer again, but its status can still be changed.
+Deleting an artist takes them out of their sets, which stay as they are, even without performers. Replacing such a
+set's fields, or changing its performers, then takes at least one performer again, but its other fields and its status
+can still be changed on their own.
 
 ## Types and names
 
@@ -200,7 +204,10 @@ live-performance, takeover, synth-meetup, other"`). They send `takeover` as the 
 string, when there's none. A `takeover` that isn't a string or null fails with 400 (`"The takeover must be a
 collective's id, or null"`), and so does a takeover without a collective (`"A takeover has a collective"`), a session of
 another type with one (`"Only a takeover has a collective"`), a session of type `"other"` without a `name` (`"A session
-of type other has a name"`), and a string that isn't the id of a collective that exists (`"No such collective"`).
+of type other has a name"`), and a string that isn't the id of a collective that exists (`"No such collective"`). These
+are checked on the session as it would then be: turning a takeover into another type takes sending `takeover` as null
+in the same request, and turning a session into a takeover, or into an `"other"`, takes sending its collective, or its
+`name`, unless it already has one.
 Responses give `takeover` as an object with the collective's `id` and `name`, or null.
 
 ## Descriptions
@@ -243,8 +250,9 @@ Requests send each of these as a string, or null, or a blank string, when there'
   SoundCloud's app shares, fail with 400. The link is reduced to `https://soundcloud.com/<account>/<track>`, with
   `/s-<secret>` for a private link. When the set is saved, the server resolves it to the track through the SoundCloud
   app (see [The SoundCloud app](radio.md#the-soundcloud-app)), and refuses links where SoundCloud shows no track. The
-  track can be any track SoundCloud shows. A link that reduces to the set's track's `url` isn't resolved again, so that
-  a set can be changed while SoundCloud can't be reached.
+  track can be any track SoundCloud shows. A link that reduces to the set's track's `url` isn't resolved again, and a
+  change that doesn't send `soundcloudTrack` keeps the set's track without resolving it, so that a set can be changed
+  while SoundCloud can't be reached.
 - A set's `youtubeVideo`: a link to the video on YouTube, as `youtube.com/watch?v=<id>`, `youtu.be/<id>`,
   `youtube.com/live/<id>`, `youtube.com/shorts/<id>` or `youtube.com/embed/<id>`, or the video's id itself, which is 11
   letters, digits, `-` or `_`. The link is reduced to the video's id. It isn't checked against YouTube.
@@ -349,6 +357,15 @@ its own, unless there's also a `removeFlyer` field set to `true`, which removes 
 `POST /api/admin/sessions`, with the session as it is then, and fails like it, with 400 when there's both a flyer and
 `removeFlyer`, and with 404 when there's no such session.
 
+## `PATCH /api/admin/sessions/:id` (admin)
+
+Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, and leaves the others as they are (see
+[Changes, in Conventions](README.md#conventions)). It takes JSON, with any of its `start`, `durationMinutes`, `type`,
+`takeover`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the session's flyer, and
+deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its `type`, `takeover` and
+`name` are checked together, and it's checked against the other sessions, as the session would then be. Responds like
+`PUT`, and fails like it, but with 400 when there's no field.
+
 ## `PUT /api/admin/sessions/:id/status` (admin)
 
 | Request field | Type | |
@@ -392,6 +409,14 @@ Replaces a set's fields, even when its session is cancelled, but not its session
 request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it is then, and fails like it, but
 with 404 when there's no such set, which is checked before the track is resolved, and without the 409 for a cancelled
 session.
+
+## `PATCH /api/admin/sets/:id` (admin)
+
+Changes the fields of a set it's sent, like `PUT /api/admin/sets/:id`, and leaves the others as they are (see
+[Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT` takes. `performers`, when it's
+sent, replaces the set's performers, and `soundcloudTrack` is only resolved when it's sent. An offset and a duration are
+checked together, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when there's no
+field.
 
 ## `PUT /api/admin/sets/:id/status` (admin)
 

@@ -6,8 +6,8 @@ import type { FastifyBaseLogger, FastifyInstance } from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Timestamp, zodRoutes, useZodSchemas } from '../api/schemas.js'
-import { jsonField, readPhotoForm, readProfileForm } from '../artists/photo-form.js'
+import { ApiError, ById, Timestamp, changesTo, zodRoutes, useZodSchemas } from '../api/schemas.js'
+import { readProfileForm } from '../artists/photo-form.js'
 import { createLogger } from '../core/logger.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import type { AccessGrant, OAuthStore } from '../oauth/store.js'
@@ -65,46 +65,50 @@ async function buildApp(logs?: string[], environment = 'test') {
         return { ok: true as const, size: request.body.size }
       },
     )
-    // Like an artist, whose emails and phone numbers tools don't give.
-    for (const method of ['GET', 'PUT'] as const) {
-      api.route({
-        method,
-        url: '/api/admin/artists/:id',
-        config: { admin: true, tool: { title: method === 'GET' ? 'Voir un artiste' : 'Modifier un artiste' } },
+    // Like an artist, whose emails and phone numbers tools don't give, added as multipart/form-data, and changed as JSON.
+    api.get(
+      '/api/admin/artists/:id',
+      { config: { admin: true, tool: { title: 'Voir un artiste' } }, schema: { operationId: 'get_artist', summary: 'An artist', params: ById } },
+      async () => ({ ok: true, artist: { id: 'a', ...saved } }),
+    )
+    api.post(
+      '/api/admin/artists',
+      {
+        config: { admin: true, tool: { title: 'Ajouter un artiste' } },
+        schema: { operationId: 'create_artist', summary: 'Adds an artist', multipart: z.object({ artist: Profile, photo: z.file().optional() }) },
+      },
+      async (request, reply) => {
+        const sent = await readProfileForm(request, 'artist', Profile)
+        if ('status' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
+        saved = sent.profile
+        return { ok: true, artist: { id: 'a', ...saved } }
+      },
+    )
+    api.patch(
+      '/api/admin/artists/:id',
+      {
+        config: { admin: true, tool: { title: 'Modifier un artiste' } },
         schema: {
-          operationId: method === 'GET' ? 'get_artist' : 'update_artist',
-          summary: method === 'GET' ? 'An artist' : "Changes an artist's profile",
+          operationId: 'update_artist',
+          summary: "Changes an artist's profile",
           params: ById,
-          ...(method === 'PUT' && { multipart: z.object({ artist: Profile, photo: z.file().optional(), removePhoto: z.string().optional() }) }),
+          body: changesTo({ ...Profile.shape, removePhoto: z.boolean() }),
         },
-        handler: async (request, reply) => {
-          if (method === 'PUT') {
-            const sent = await readProfileForm(request, 'artist', Profile)
-            if ('status' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
-            saved = sent.profile
-            return { ok: true, artist: { id: 'a', ...saved, removedPhoto: sent.removePhoto } }
-          }
-          return { ok: true, artist: { id: 'a', ...saved } }
-        },
-      })
-    }
-    // Like a session, which has no contact details, and a flyer rather than a photo.
-    api.put(
+      },
+      async (request) => {
+        const { removePhoto, ...changes } = request.body
+        saved = { ...saved, ...changes }
+        return { ok: true, artist: { id: 'a', ...saved }, removePhoto: removePhoto ?? null }
+      },
+    )
+    // Like a session, which has no contact details.
+    api.patch(
       '/api/admin/sessions/:id',
       {
         config: { admin: true, tool: { title: 'Modifier une session' } },
-        schema: {
-          operationId: 'update_session',
-          summary: 'Changes a session',
-          params: ById,
-          multipart: z.object({ session: z.object({ name: z.string() }), flyer: z.file().optional(), removeFlyer: z.string().optional() }),
-        },
+        schema: { operationId: 'update_session', summary: 'Changes a session', params: ById, body: changesTo({ name: z.string(), removeFlyer: z.boolean() }) },
       },
-      async (request, reply) => {
-        const form = await readPhotoForm(request, { photoPart: 'flyer' })
-        if (form === 'malformed' || 'tooLarge' in form) return reply.status(400).send({ ok: false, error: 'Invalid request' })
-        return { ok: true, session: jsonField(form.fields.session), removeFlyer: form.fields.removeFlyer ?? null }
-      },
+      async (request) => ({ ok: true, session: request.body }),
     )
     // Its dates and times, which tools give as the route does, in Québec time, and a body with a field that can be null.
     const Times = z.object({ at: Timestamp, maybe: Timestamp.nullable(), list: z.array(z.object({ at: Timestamp, note: z.string() })) })
@@ -367,7 +371,10 @@ describe('the MCP server', () => {
       const app = await buildApp()
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
-      expect(tools.map(({ name }) => name)).toEqual(['get_thing', 'update_thing', 'get_artist', 'update_artist', 'update_session', 'create_times', 'list_artists', 'read_documentation'])
+      expect(tools.map(({ name }) => name)).toEqual([
+        ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'list_artists'],
+        'read_documentation',
+      ])
       const get = tools.find(({ name }) => name === 'get_thing')!
       // A route that isn't in an area's document points to read_documentation all the same. No real tool is like that:
       // tools.test.ts checks that each one is in an area.
@@ -380,9 +387,7 @@ describe('the MCP server', () => {
       })
       const update = tools.find(({ name }) => name === 'update_thing')!
       expect(update.annotations).toEqual({ title: 'Modifier une chose', destructiveHint: true, openWorldHint: false })
-      expect(update.description).toBe(
-        `${readFirst(undefined)} Changes a thing. It replaces it: what's left out is erased, except what it says it keeps, so read it first.`,
-      )
+      expect(update.description).toBe(`${readFirst(undefined)} Changes a thing.`)
       expect(tools.find(({ name }) => name === 'get_artist')!.description.startsWith(`${readFirst('artists')} An artist.`)).toBe(true)
     })
 
@@ -440,25 +445,36 @@ describe('the MCP server', () => {
       expect(JSON.parse(response.json().result.content[0].text).by).toBe(USER.email)
     })
 
-    it('never give the emails and phone numbers of artists, and keep those a profile that replaces theirs leaves out', async () => {
+    it('never give the emails and phone numbers of artists, and only change those they are given', async () => {
       const app = await buildApp()
       expect((await call(app, 'get_artist', { id: 'a' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore' } })
-      expect((await call(app, 'update_artist', { id: 'a', name: 'Aurore B.' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore B.', removedPhoto: false } })
+      expect((await call(app, 'update_artist', { id: 'a', name: 'Aurore B.' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore B.' }, removePhoto: null })
       expect(saved).toEqual({ name: 'Aurore B.', email: 'aurore@example.com', phone: '555 0100' })
-      await call(app, 'update_artist', { id: 'a', name: 'Aurore', email: null, phone: '', removePhoto: true })
-      expect(saved).toEqual({ name: 'Aurore', email: null, phone: '' })
+      expect((await call(app, 'update_artist', { id: 'a', email: null, phone: '', removePhoto: true })).body.removePhoto).toBe(true)
+      expect(saved).toEqual({ name: 'Aurore B.', email: null, phone: '' })
     })
 
-    it('send a multipart request with its part that is JSON, and the field that removes its file, which they cannot send', async () => {
+    it('say what changing only some fields does, and that artists\' emails and phone numbers are never shown', async () => {
       const app = await buildApp()
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
-      const update = response.json().result.tools.find(({ name }: { name: string }) => name === 'update_session')
-      expect(update.description).toContain("Tools can't send a flyer.")
-      expect(update.description).not.toContain('email')
-      expect(update.inputSchema.properties.removeFlyer).toEqual({ type: 'boolean', description: "Whether to remove the flyer. Tools can't send one" })
-      // Without reading the session first, which has no email or phone to keep: there's no route to read it here.
-      expect((await call(app, 'update_session', { id: 's', name: 'X', removeFlyer: true })).body).toEqual({ ok: true, session: { name: 'X' }, removeFlyer: 'true' })
-      expect((await call(app, 'update_session', { id: 's', name: 'X' })).body).toEqual({ ok: true, session: { name: 'X' }, removeFlyer: null })
+      const tools = response.json().result.tools as { name: string; description: string; inputSchema: { required?: string[] } }[]
+      const description = (name: string) => tools.find((tool) => tool.name === name)!.description
+      const patch = "What it isn't given stays as it is, and a list or an object it's given replaces the whole one."
+      expect(description('update_artist')).toBe(
+        `${readFirst('artists')} Changes an artist's profile. ${patch} Emails and phone numbers are never shown. Given as null or "", the email or phone is removed.`,
+      )
+      expect(description('update_session')).toBe(`${readFirst('sessions')} Changes a session. ${patch}`)
+      expect(tools.find((tool) => tool.name === 'update_session')!.inputSchema.required).toEqual(['id'])
+    })
+
+    it('send a multipart request with its part that is JSON, and no file, which they cannot send', async () => {
+      const app = await buildApp()
+      const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      const create = response.json().result.tools.find(({ name }: { name: string }) => name === 'create_artist')
+      expect(create.description).toBe(`${readFirst('artists')} Adds an artist. Tools can't send a photo. Emails and phone numbers are never shown.`)
+      expect(Object.keys(create.inputSchema.properties)).toEqual(['name', 'email', 'phone'])
+      expect((await call(app, 'create_artist', { name: 'Brume', email: 'b@example.com', phone: '' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Brume' } })
+      expect(saved).toEqual({ name: 'Brume', email: 'b@example.com', phone: '' })
     })
 
     it('give the dates and times of their responses as their routes do, in Québec time, errors included', async () => {

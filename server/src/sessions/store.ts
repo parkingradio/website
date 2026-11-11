@@ -5,8 +5,8 @@ import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { NO_SUCH_ARTIST, NO_SUCH_COLLECTIVE } from './fields.js'
-import type { SentPerformer, Status } from './fields.js'
+import { NO_SUCH_ARTIST, NO_SUCH_COLLECTIVE, brokenSessionRule, brokenSetRule } from './fields.js'
+import type { BrokenRule, SentPerformer, Status } from './fields.js'
 
 // Keeps sessions, their sets and the sets' performers in the database (see docs/design/server/sessions.md).
 
@@ -31,6 +31,22 @@ export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpda
 // Thrown when a session or a set can't be saved because the takeover's collective, or one of its performers, doesn't
 // exist. The message says which.
 export class NoSuchReference extends Error {}
+
+// Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
+// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts). The message says
+// which.
+export class BrokenFields extends Error {}
+
+// `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
+// column when it's given undefined.
+function changed<Row extends object>(row: Row, changes: Partial<Row>): Row {
+  return { ...row, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
+}
+
+// Throws a BrokenFields with the rule that's `broken`, if there's one.
+function check(broken: BrokenRule | null) {
+  if (broken) throw new BrokenFields(broken.message)
+}
 
 // Thrown when saving a session or a set, or deleting a collective that has takeovers, would break one of the rules of
 // sessions. The message says which, and `session` and `set` are what's in the way: `set` is a set, if it's one, and
@@ -87,12 +103,12 @@ export type SessionsStore = {
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned". Throws a NoSuchReference or a Conflict.
   create(session: SessionChanges & StoredFlyer & { createdBy: string }): Promise<StoredSession>
-  // Replaces the session's fields, and its flyer when there's a new one, or nulls to remove it, but not its status or its
-  // sets. Returns the session as it was, so that a flyer that was replaced or removed can be deleted, and as it is then.
-  // Throws a NoSuchReference or a Conflict.
+  // Changes the session's fields that `changes` has, all of them when they're replaced, and its flyer when there's a new
+  // one, or nulls to remove it, but not its status or its sets. Returns the session as it was, so that a flyer that was
+  // replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a NoSuchReference or a Conflict.
   update(
     id: string,
-    changes: SessionChanges & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<SessionChanges> & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: SessionRow; after: StoredSession } | null>
   // Cancelling a session cancels its sets that aren't, as the same admin, at the same time. Throws a Conflict.
   setStatus(id: string, change: StatusChange): Promise<StoredSession | null>
@@ -103,8 +119,9 @@ export type SessionsStore = {
   getSet(id: string): Promise<SetRow | null>
   // Adds a set to the session `sessionId`, as "planned". Throws a NoSuchReference or a Conflict.
   addSet(sessionId: string, set: SetChanges & { createdBy: string }): Promise<StoredSession | null>
-  // Replaces the set's fields and performers, but not its session or its status. Throws a NoSuchReference or a Conflict.
-  updateSet(id: string, changes: SetChanges & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
+  // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
+  // but not its session or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
+  updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
   // Throws a Conflict.
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Returns false if the set didn't exist. Its performers stay.
@@ -332,8 +349,11 @@ export function sessionsStore(db: Queryable): SessionsStore {
         await lockSessions(tx)
         const before = await sessionRow(tx, id)
         if (!before) return null
-        await checkTakeover(tx, changes.takeoverId)
-        await checkingSessionRules(tx, id, changes, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
+        // The rules are about the session as it will be, with the fields that aren't changed as they are.
+        const session = changed(before, changes)
+        check(brokenSessionRule({ type: session.type, takeover: session.takeoverId, name: session.name }))
+        await checkTakeover(tx, session.takeoverId)
+        await checkingSessionRules(tx, id, session, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
         return { before, after: (await sessionWithId(tx, id))! }
       })
     },
@@ -390,13 +410,19 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const session = await sessionOfSet(tx, id)
-        if (!session) return null
-        await checkPerformers(tx, performers)
-        await checkingSetRules(tx, id, changes, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
-        await tx.delete(setPerformers).where(eq(setPerformers.setId, id))
-        await addPerformers(tx, id, performers)
-        return sessionWithId(tx, session.id)
+        const [before] = await tx.select().from(sets).where(eq(sets.id, id))
+        if (!before) return null
+        // The rules are about the set as it will be, with the fields that aren't changed as they are, its performers
+        // included, which stay as they are when they're left out.
+        const set = changed(before, changes)
+        check(brokenSetRule(set))
+        if (performers) await checkPerformers(tx, performers)
+        await checkingSetRules(tx, id, set, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
+        if (performers) {
+          await tx.delete(setPerformers).where(eq(setPerformers.setId, id))
+          await addPerformers(tx, id, performers)
+        }
+        return sessionWithId(tx, before.sessionId)
       })
     },
 

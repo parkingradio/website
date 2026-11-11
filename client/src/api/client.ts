@@ -45,7 +45,7 @@ const client = createClient<paths>({
 })
 
 type Client = typeof client
-type Method = 'get' | 'put' | 'post' | 'delete'
+type Method = 'get' | 'put' | 'patch' | 'post' | 'delete'
 export type PathsWith<M extends Method> = ClientPathsWithMethod<Client, M>
 // A multipart/form-data body has to say that it's sent with `formData`, rather than as JSON.
 type Serializer<Operation> = Operation extends { requestBody?: infer Body }
@@ -107,7 +107,7 @@ function method<M extends Method>(name: M) {
     settle(client.request(name, path, init as never), path.startsWith('/api/admin/')) as Promise<Result<Data<M, Path>, ErrorOf<M, Path>>>
 }
 
-export const api = { GET: method('get'), PUT: method('put'), POST: method('post'), DELETE: method('delete') }
+export const api = { GET: method('get'), PUT: method('put'), PATCH: method('patch'), POST: method('post'), DELETE: method('delete') }
 
 // Sends a body as multipart/form-data (see `api`): each of its fields as a part, files as they are, a list of files as a
 // part for each, in order (none for an empty list), and anything else that isn't text, e.g. a profile, as JSON, in a field rather than a file.

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { objectError } from '../api/schemas.js'
 
 // An artist's profile: the lists and rules every profile has to follow (see docs/design/server/artists.md), as the zod
 // schemas the server checks profiles with, which openapi.json is generated from. Two artists can't have the same email
@@ -435,8 +436,9 @@ function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
 // answers.
 // An artist's email is the same rule either way, but TypeScript can't tell that it's never left out: it's said again, in
 // the same place among the fields, since the first error is the one the server answers.
+// Admins' profiles refuse the fields they don't take (see `objectError` in api/schemas.ts), while artists' ignore them.
 export const ArtistProfile = profile({ canLeaveOut: false }).extend({ email: emailAddress() })
-export const AdminArtistProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminArtistProfile' })
+export const AdminArtistProfile = z.strictObject(profile({ canLeaveOut: true }).shape, { error: objectError(NO_NAME) }).meta({ id: 'AdminArtistProfile' })
 
 // What's saved of a profile, whoever sent it.
 export type Profile = z.output<typeof AdminArtistProfile>

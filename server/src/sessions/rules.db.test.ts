@@ -15,6 +15,7 @@ import { collectivesStore } from '../collectives/store.js'
 import { artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
+import { SESSION_FIELDS, SET_FIELDS } from './fields.js'
 import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
@@ -157,7 +158,7 @@ function setBody(context: Context, { performers, ...fields }: SetArgs) {
   }
 }
 
-function send({ app, cookies }: Context, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, payload?: object) {
+function send({ app, cookies }: Context, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   return app.inject({ method, url, payload, cookies })
 }
 
@@ -211,6 +212,15 @@ function period(start: string, durationMinutes: number) {
   return { start: Date.parse(start), end: Date.parse(start) + durationMinutes * 60_000 }
 }
 
+// Only the fields of `body` that are `sent`, as a change with PATCH sends them.
+function only(body: Record<string, unknown>, sent: string[]): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(body).filter(([field]) => sent.includes(field)))
+}
+
+// The fields a PATCH can send: all of them, so that a field that's added is sent too.
+const SESSION_FIELD_NAMES = Object.keys(SESSION_FIELDS)
+const SET_FIELD_NAMES = Object.keys(SET_FIELDS)
+
 // Every operation, by name. A step that adds an operation adds it here.
 const OPERATIONS = {
   createSession: {
@@ -233,6 +243,24 @@ const OPERATIONS = {
         expectOverlappingSession(body.session, pick(context.ids.sessions, session), period(fields.start!, fields.durationMinutes)),
     },
   } satisfies Operation<{ session: number; fields: SessionArgs }>,
+
+  // Changes some of the session's fields: the rules are checked on the session as it would then be.
+  patchSession: {
+    weight: 3,
+    args: fc.record({ session: fc.nat(), fields: SessionFields, sent: fc.subarray(SESSION_FIELD_NAMES, { minLength: 1 }) }),
+    run: (context, { session, fields, sent }) =>
+      send(context, 'PATCH', `/api/admin/sessions/${pick(context.ids.sessions, session)}`, only(sessionBody(context, fields), sent)),
+    conflicts: {
+      // The session is as it was, since the request failed, but for what was sent.
+      [SESSION_OVERLAPS]: async (body, { session, fields, sent }, context) => {
+        const id = pick(context.ids.sessions, session)
+        const before = (await send(context, 'GET', `/api/admin/sessions/${id}`)).json().session as Session
+        const start = sent.includes('start') ? fields.start : before.start
+        const durationMinutes = sent.includes('durationMinutes') ? fields.durationMinutes : before.durationMinutes
+        expectOverlappingSession(body.session, id, period(start!, durationMinutes))
+      },
+    },
+  } satisfies Operation<{ session: number; fields: SessionArgs; sent: string[] }>,
 
   setSessionStatus: {
     weight: 2,
@@ -281,6 +309,15 @@ const OPERATIONS = {
     run: (context, { set, fields }) => send(context, 'PUT', `/api/admin/sets/${pick(context.ids.sets, set)}`, setBody(context, fields)),
     conflicts: setConflicts<{ set: number; fields: SetArgs }>(({ set }, context) => pick(context.ids.sets, set)),
   } satisfies Operation<{ set: number; fields: SetArgs }>,
+
+  // Changes some of the set's fields: its place is checked as it would then be, and its track is only resolved when it's
+  // sent.
+  patchSet: {
+    weight: 5,
+    args: fc.record({ set: fc.nat(), fields: SetFields, sent: fc.subarray(SET_FIELD_NAMES, { minLength: 1 }) }),
+    run: (context, { set, fields, sent }) => send(context, 'PATCH', `/api/admin/sets/${pick(context.ids.sets, set)}`, only(setBody(context, fields), sent)),
+    conflicts: setConflicts<{ set: number; fields: SetArgs; sent: string[] }>(({ set }, context) => pick(context.ids.sets, set)),
+  } satisfies Operation<{ set: number; fields: SetArgs; sent: string[] }>,
 
   setSetStatus: {
     weight: 3,

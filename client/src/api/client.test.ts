@@ -21,6 +21,14 @@ describe('api', () => {
     expect(new Headers(request.headers).get('Content-Type')).toBe('application/json')
   })
 
+  it('sends the fields that PATCH changes as JSON', async () => {
+    mockFetch({ 'PATCH /api/admin/sessions/session-1': { ok: false, error: 'Stop' } })
+    await api.PATCH('/api/admin/sessions/{id}', { params: { path: { id: 'session-1' } }, body: { raEvent: '6683745' } })
+    const [request] = requestsTo('PATCH', '/api/admin/sessions/session-1')
+    expect(jsonBody(request)).toEqual({ raEvent: '6683745' })
+    expect(new Headers(request.headers).get('Content-Type')).toBe('application/json')
+  })
+
   it('sends a multipart/form-data body with `formData`: files as they are, objects as JSON, and nothing for undefined', async () => {
     mockFetch({ 'PUT /api/admin/artists/artist-1': { ok: false, error: 'Stop' } })
     const photo = new File(['photo'], 'photo.png', { type: 'image/png' })

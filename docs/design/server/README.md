@@ -67,6 +67,20 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
   in responses as in requests. So removing a value from a list, or renaming one, has to change the stored data that
   still uses it, in the same change: until then, every response that would include the old value fails.
+- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions and sets refuse the fields they
+  don't take in the JSON they're sent: its body, or the part of a `multipart/form-data` request that has an item's
+  fields, e.g. an artist's profile. Such a request fails with 400, and the error names the field: otherwise, a
+  misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it follow their own
+  rules, e.g. the other fields of a collective's members are ignored. The parts of a `multipart/form-data` request that
+  the endpoint doesn't read are ignored too, e.g. a form's submit button.
+- **Changes.** An artist, a collective, an application, a session or a set is changed with `PUT`, which replaces its
+  fields, all of them sent, or with `PATCH`, which only changes the fields it's sent, and leaves the others as they are.
+  `PATCH` takes JSON, never `multipart/form-data`, with any of the fields its `PUT` takes, at least one, each following
+  the same rules: a field that's sent replaces the item's as a whole, even a list or an object, e.g. an artist's
+  `links`, rather than being merged into it, and null, or a blank string, where `PUT` takes it, removes it the same way.
+  The rules that involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are
+  checked on the item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field
+  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.
@@ -154,18 +168,21 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/artists/:id`](artists.md#get-apiadminartistsid-admin) | admin | An artist |
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
-| [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Changing an artist's profile, or replacing or removing their photo |
+| [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Replacing an artist's profile, and replacing or removing their photo |
+| [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent, or removing their photo |
 | [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, and taking them out of their collectives and their sets |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
-| [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Changing a collective's profile and members, or replacing or removing its photo |
+| [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Replacing a collective's profile and members, and replacing or removing its photo |
+| [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent, or removing its photo |
 | [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo and its applications, but not its members |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
-| [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Changing an application |
+| [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Replacing an application's fields |
+| [`PATCH /api/admin/applications/:id`](applications.md#patch-apiadminapplicationsid-admin) | admin | Changing an application, only the fields it's sent |
 | [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
 | [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |
 | [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
@@ -176,11 +193,13 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/sessions/:id/ra-event`](sessions.md#get-apiadminsessionsidra-event-admin) | admin | The content of a session's event on Resident Advisor |
 | [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer |
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer |
-| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Changing a session, or replacing or removing its flyer |
+| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Replacing a session's fields, and replacing or removing its flyer |
+| [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent, or removing its flyer |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled |
 | [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session |
-| [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Changing a set |
+| [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Replacing a set's fields |
+| [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |

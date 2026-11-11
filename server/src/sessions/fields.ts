@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { DATE_TIME_DESCRIPTION, QUEBEC_TIME_RULE, instantWith } from '../api/formats.js'
+import { objectError } from '../api/schemas.js'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
 import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
@@ -112,37 +113,62 @@ const description = z
     description: `Its own description, as plain text, which replaces the one its type gives it: send back the session's \`description\`, not its \`effectiveDescription\`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to ${DESCRIPTION_MAX_LENGTH} characters. Empty for none`,
   })
 
+// The rule involving several fields of a session or a set that it breaks, if any: its message, and the field it's
+// about. The schemas below check them, and so does the store, on what a change would make of the session or the set,
+// with the fields it doesn't send as they are (see "Changes" in docs/design/server/README.md).
+export type BrokenRule = { message: string; field: string }
+
+// The rules of a session's type, its takeover's collective, by its id, and its name (see "Types and names" in
+// docs/design/server/sessions.md).
+export function brokenSessionRule({ type, takeover, name }: { type: SessionType; takeover: string | null; name: string }): BrokenRule | null {
+  if (type === 'takeover' && takeover === null) return { message: 'A takeover has a collective', field: 'takeover' }
+  if (type !== 'takeover' && takeover !== null) return { message: 'Only a takeover has a collective', field: 'takeover' }
+  if (type === 'other' && name === '') return { message: 'A session of type other has a name', field: 'name' }
+  return null
+}
+
+// The rule of a set's place in its session (see "Times" in docs/design/server/sessions.md).
+export function brokenSetRule({ offsetMinutes, durationMinutes }: { offsetMinutes: number | null; durationMinutes: number | null }): BrokenRule | null {
+  return offsetMinutes !== null && durationMinutes === null ? { message: 'A set with an offset also has a duration', field: 'durationMinutes' } : null
+}
+
+// Checks the rule that `broken` finds, as a schema's refinement.
+function checking<T>(broken: (value: T) => BrokenRule | null) {
+  return (value: T, context: z.RefinementCtx) => {
+    const rule = broken(value)
+    if (rule) context.addIssue({ code: 'custom', message: rule.message, path: [rule.field] })
+  }
+}
+
 // A session's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
-// sessions/links.ts).
-export const SessionFields = z
-  .object(
-    {
-      start: orNone(
-        (sent) => {
-          const parsed = startTime.safeParse(sent)
-          return parsed.success ? parsed.data : null
-        },
-        START,
-        `${DATE_TIME_DESCRIPTION}, from 2000 to 2999 in UTC`,
-      ),
-      durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES),
-      type: SessionType,
-      takeover: orNone(
-        lowerCase,
-        "The takeover must be a collective's id, or null",
-        'The id of the collective whose takeover the session is: a takeover has one, and the other types none',
-      ),
-      name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`).meta({
-        description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
-      }),
-      raEvent: orNone(raEventId, 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"', "The event's id on RA, or a link to it"),
-      description,
+// sessions/links.ts). Each one on its own, as a change can send some of them (see `changesTo` in api/schemas.ts), then
+// together, in `SessionFields`.
+export const SESSION_FIELDS = {
+  start: orNone(
+    (sent) => {
+      const parsed = startTime.safeParse(sent)
+      return parsed.success ? parsed.data : null
     },
-    { error: 'A session must be an object with its fields' },
-  )
-  .refine(({ type, takeover }) => type !== 'takeover' || takeover !== null, { message: 'A takeover has a collective', path: ['takeover'] })
-  .refine(({ type, takeover }) => type === 'takeover' || takeover === null, { message: 'Only a takeover has a collective', path: ['takeover'] })
-  .refine(({ type, name }) => type !== 'other' || name !== '', { message: 'A session of type other has a name', path: ['name'] })
+    START,
+    `${DATE_TIME_DESCRIPTION}, from 2000 to 2999 in UTC`,
+  ),
+  durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES),
+  type: SessionType,
+  takeover: orNone(
+    lowerCase,
+    "The takeover must be a collective's id, or null",
+    'The id of the collective whose takeover the session is: a takeover has one, and the other types none',
+  ),
+  name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`).meta({
+    description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
+  }),
+  raEvent: orNone(raEventId, 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"', "The event's id on RA, or a link to it"),
+  description,
+}
+
+export const SessionFields = z
+  .strictObject(SESSION_FIELDS, { error: objectError('A session must be an object with its fields') })
+  .superRefine(checking(brokenSessionRule))
   .meta({ id: 'SessionFields' })
 export type SessionFields = z.output<typeof SessionFields>
 
@@ -172,38 +198,34 @@ export const Genre = z.enum(GENRES, { error: BAD_GENRE })
 
 // A set's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
 // sessions/links.ts), performance types are in the order of PERFORMANCE_TYPES, and performance types and genres are
-// without duplicates.
+// without duplicates. Each one on its own, like a session's, then together, in `SetFields`.
+export const SET_FIELDS = {
+  performers: Performers,
+  offsetMinutes: minutes(`The offset must be a whole number of minutes, from 0 to ${MAX_MINUTES - 1}, or null`, 0, MAX_MINUTES - 1)
+    .nullable()
+    .meta({ description: "When the set starts, in minutes after its session's start. Null when that isn't known yet" }),
+  durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}, or null`, 1, MAX_MINUTES)
+    .nullable()
+    .meta({ description: "Null when that isn't known yet, which a set with an offset can't be" }),
+  performanceTypes: z
+    .array(PerformanceType, { error: BAD_PERFORMANCE_TYPE })
+    .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))
+    .meta({ description: 'In any order, even more than once: saved in the order of the list, without duplicates' }),
+  otherPerformanceType: line(OTHER_PERFORMANCE_TYPE_MAX_LENGTH, `The other performance type must be text, up to ${OTHER_PERFORMANCE_TYPE_MAX_LENGTH} characters`),
+  genres: z
+    .array(Genre, { error: BAD_GENRE })
+    .overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))
+    .meta({ description: 'Most important first. Those that are there twice are dropped, keeping the first' }),
+  soundcloudTrack: orNone(
+    soundcloudTrackLink,
+    'The SoundCloud track must be a link to it on soundcloud.com, e.g. "https://soundcloud.com/parkingdotradio/3tons"',
+    'A link to the track on soundcloud.com, or its private link',
+  ),
+  youtubeVideo: orNone(youtubeVideoId, 'The YouTube video must be a link to it, or its id', 'A link to the video on YouTube, or its id'),
+}
+
 export const SetFields = z
-  .object(
-    {
-      performers: Performers,
-      offsetMinutes: minutes(`The offset must be a whole number of minutes, from 0 to ${MAX_MINUTES - 1}, or null`, 0, MAX_MINUTES - 1)
-        .nullable()
-        .meta({ description: "When the set starts, in minutes after its session's start. Null when that isn't known yet" }),
-      durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}, or null`, 1, MAX_MINUTES)
-        .nullable()
-        .meta({ description: "Null when that isn't known yet, which a set with an offset can't be" }),
-      performanceTypes: z
-        .array(PerformanceType, { error: BAD_PERFORMANCE_TYPE })
-        .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))
-        .meta({ description: 'In any order, even more than once: saved in the order of the list, without duplicates' }),
-      otherPerformanceType: line(OTHER_PERFORMANCE_TYPE_MAX_LENGTH, `The other performance type must be text, up to ${OTHER_PERFORMANCE_TYPE_MAX_LENGTH} characters`),
-      genres: z
-        .array(Genre, { error: BAD_GENRE })
-        .overwrite((ids) => ids.filter((id, i) => ids.indexOf(id) === i))
-        .meta({ description: 'Most important first. Those that are there twice are dropped, keeping the first' }),
-      soundcloudTrack: orNone(
-        soundcloudTrackLink,
-        'The SoundCloud track must be a link to it on soundcloud.com, e.g. "https://soundcloud.com/parkingdotradio/3tons"',
-        'A link to the track on soundcloud.com, or its private link',
-      ),
-      youtubeVideo: orNone(youtubeVideoId, 'The YouTube video must be a link to it, or its id', 'A link to the video on YouTube, or its id'),
-    },
-    { error: 'A set must be an object with its fields' },
-  )
-  .refine(({ offsetMinutes, durationMinutes }) => offsetMinutes === null || durationMinutes !== null, {
-    message: 'A set with an offset also has a duration',
-    path: ['durationMinutes'],
-  })
+  .strictObject(SET_FIELDS, { error: objectError('A set must be an object with its fields') })
+  .superRefine(checking(brokenSetRule))
   .meta({ id: 'SetFields' })
 export type SetFields = z.output<typeof SetFields>

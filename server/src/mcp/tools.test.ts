@@ -67,19 +67,18 @@ describe('the tools of the API', () => {
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
       expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone', 'removePhoto']),
     )
-    expect(update.description).toContain("Tools can't send a photo.")
+    expect(update.description).toContain("What it isn't given stays as it is")
+    expect(update.description).toContain('Given as null or "", the email or phone is removed.')
+    expect(tools.find(({ name }) => name === 'create_artist')!.description).toContain("Tools can't send a photo.")
     const updateSession = tools.find(({ name }) => name === 'update_session')!
     expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description', 'removeFlyer']))
-    expect(updateSession.description).toContain("Tools can't send a flyer.")
+    expect(tools.find(({ name }) => name === 'create_session')!.description).toContain("Tools can't send a flyer.")
     expect(updateSession.description).not.toMatch(/email|photo/)
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {
     const { tools } = await apiTools()
-    for (const [name, args] of [
-      ['get_application', { id: 'recipients' }],
-      ['update_application', { id: 'recipients', recipients: [] }],
-    ] as const) {
+    for (const [name, args] of [['get_application', { id: 'recipients' }]] as const) {
       const { result, failed } = await tools.find((tool) => tool.name === name)!.call(args, { id: 'admin-id', email: 'admin@example.com', sessionVersion: 0 })
       expect(result.isError, name).toBe(true)
       expect(failed, name).toEqual({ status: 400, error: 'The `id` given leads to another endpoint' })
@@ -92,14 +91,22 @@ describe('the tools of the API', () => {
     expect(() => buildTools([route], Fastify())).toThrow("its tool's arguments have to be an object's properties")
   })
 
-  it("take the fields of a POST's body that can be null as optional, but every field of a PUT's", async () => {
+  it("take the fields of a POST's body that can be null as optional, and every field of a PATCH's", async () => {
     const { tools } = await apiTools()
     const required = (name: string) => (tools.find((tool) => tool.name === name)!.inputSchema.required as string[]).sort()
     expect(required('create_set')).toEqual(['genres', 'id', 'otherPerformanceType', 'performanceTypes', 'performers'])
     expect(required('create_session')).toEqual(['description', 'durationMinutes', 'name', 'type'])
-    expect(required('update_set')).toEqual(
-      ['durationMinutes', 'genres', 'id', 'offsetMinutes', 'otherPerformanceType', 'performanceTypes', 'performers', 'soundcloudTrack', 'youtubeVideo'],
+    for (const name of ['update_artist', 'update_collective', 'update_application', 'update_session', 'update_set']) expect(required(name), name).toEqual(['id'])
+  })
+
+  it('change artists, collectives, applications, sessions and sets with PATCH, rather than PUT, which replaces them', async () => {
+    const { routes } = await apiTools()
+    const updates = routes.filter((route) => /^update_[a-z]+$/.test(route.schema.operationId!))
+    expect(updates.map(({ method, url }) => `${method} ${url}`).sort()).toEqual(
+      ['artists', 'collectives', 'applications', 'sessions', 'sets'].map((items) => `PATCH /api/admin/${items}/:id`).sort(),
     )
+    // The only tools of PUT endpoints change a status.
+    expect(routes.filter(({ method, url }) => method === 'PUT' && !url.endsWith('/status'))).toEqual([])
   })
 
   // So that a new endpoint can't give them without the tools leaving them out.

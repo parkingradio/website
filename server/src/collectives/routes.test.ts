@@ -61,8 +61,9 @@ const store: CollectivesStore = {
   update: vi.fn<CollectivesStore['update']>(async (id, changes) => {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
-    if (emailTaken(changes.email, id)) throw new EmailTaken()
-    const after = { ...before, ...changes, members: members(changes.members) }
+    if (emailTaken(changes.email ?? null, id)) throw new EmailTaken()
+    // Its members stay as they are when they're left out.
+    const after = { ...before, ...changes, members: changes.members ? members(changes.members) : before.members }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
   }),
@@ -145,6 +146,11 @@ async function request(app: App, method: 'GET' | 'DELETE', url: string) {
   return app.inject({ method, url, cookies: await sessionCookies() })
 }
 
+// Changes some of the collective's fields, as JSON.
+async function patch(app: App, url: string, changes: unknown) {
+  return app.inject({ method: 'PATCH', url, payload: JSON.stringify(changes), headers: { 'content-type': 'application/json' }, cookies: await sessionCookies() })
+}
+
 describe('collectives routes', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret'
@@ -171,6 +177,7 @@ describe('collectives routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/collectives/collective-1/photo' }),
       app.inject({ method: 'POST', url: '/api/admin/collectives', ...multipart(profile()) }),
       app.inject({ method: 'PUT', url: '/api/admin/collectives/collective-1', ...multipart(profile()) }),
+      app.inject({ method: 'PATCH', url: '/api/admin/collectives/collective-1', payload: { name: 'X' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/collectives/collective-1' }),
     ]
     for (const response of await Promise.all(requests)) expect(response.statusCode).toBe(401)
@@ -399,6 +406,69 @@ describe('collectives routes', () => {
       expect(missing.json()).toEqual({ ok: false, error: 'No such collective' })
       expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
       expect(rows[0]).toMatchObject({ email: 'contact@example.com', updatedBy: null })
+    })
+
+    it("refuses the profile's fields it doesn't take, naming them, but ignores those of its members", async () => {
+      const app = await buildApp()
+      await create(app)
+      const members = [{ id: 'artist-ana', name: 'Ana', extra: true }]
+      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', { ...profile({ members }), hasPhoto: true }, null)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `hasPhoto`' })
+      expect((await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members }), null)).statusCode).toBe(200)
+    })
+  })
+
+  describe('PATCH /api/admin/collectives/:id', () => {
+    it('changes only the fields it is sent, keeps its members and its photo, and says who changed it', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await patch(app, '/api/admin/collectives/collective-1', { description: 'Autre.', email: null })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().collective).toMatchObject({
+        name: 'Les Ondes',
+        description: 'Autre.',
+        email: null,
+        phone: '418 555-0123',
+        members: [{ id: 'artist-ana', name: 'Ana' }, { id: 'artist-brume', name: 'Brume' }],
+        hasPhoto: true,
+        updatedBy: 'admin@example.com',
+      })
+      expect(store.update).toHaveBeenLastCalledWith('collective-1', { description: 'Autre.', email: null, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+    })
+
+    it('replaces its members when they are sent, creating those sent by name', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await patch(app, '/api/admin/collectives/collective-1', { members: [{ name: 'Cyan' }, { id: 'artist-ana' }] })
+      expect(response.json().collective.members.map(({ name }: { name: string }) => name)).toEqual(['Cyan', 'Ana'])
+      expect((await patch(app, '/api/admin/collectives/collective-1', { members: [] })).json()).toEqual({ ok: false, error: 'Indiquez au moins un artiste du collectif.' })
+      expect((await patch(app, '/api/admin/collectives/collective-1', { members: [{ id: 'nobody' }] })).json()).toEqual({ ok: false, error: NO_SUCH_MEMBER })
+    })
+
+    it('removes the photo when asked to, and deletes it', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await patch(app, '/api/admin/collectives/collective-1', { removePhoto: true })
+      expect(response.json().collective).toMatchObject({ name: 'Les Ondes', hasPhoto: false })
+      expect(stored.size).toBe(0)
+    })
+
+    it('explains what is wrong, or responds 404 or 409, without changing the collective', async () => {
+      const app = await buildApp()
+      await create(app)
+      await create(app, profile({ name: 'Autres', email: 'autre@example.com' }), null)
+      expect((await patch(app, '/api/admin/collectives/collective-1', { email: 'Autre@example.com' })).statusCode).toBe(409)
+      expect((await patch(app, '/api/admin/collectives/nobody', { name: 'X' })).statusCode).toBe(404)
+      for (const [changes, error] of [
+        [{ name: ' ' }, 'Indiquez le nom du collectif.'],
+        [{ genres: [] }, 'Unknown field: `genres`'],
+        [{ removePhoto: 1 }, '« removePhoto » doit être true ou false.'],
+        [{}, 'There must be at least one field to change'],
+      ] as const) {
+        expect((await patch(app, '/api/admin/collectives/collective-1', changes)).json()).toEqual({ ok: false, error })
+      }
+      expect(rows[0]).toMatchObject({ updatedBy: null, photoKey: 'collectives/photo-1.jpeg' })
     })
   })
 
