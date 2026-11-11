@@ -40,7 +40,7 @@ const store: ArtistsStore = {
   update: vi.fn<ArtistsStore['update']>(async (id, changes) => {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
-    if (emailTaken(changes.email, id)) throw new EmailTaken()
+    if (emailTaken(changes.email ?? null, id)) throw new EmailTaken()
     const after = { ...before, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
@@ -126,6 +126,11 @@ async function create(app: App, artist: object | string = profile(), photo?: Buf
   return send(app, 'POST', '/api/admin/artists', artist, photo)
 }
 
+// Changes some of the artist's fields, as JSON.
+async function patch(app: App, url: string, changes: unknown) {
+  return app.inject({ method: 'PATCH', url, payload: JSON.stringify(changes), headers: { 'content-type': 'application/json' }, cookies: await sessionCookies() })
+}
+
 async function get(app: App, url: string) {
   return app.inject({ method: 'GET', url, cookies: await sessionCookies() })
 }
@@ -153,6 +158,7 @@ describe('artists routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/artists/artist-1/photo' }),
       app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(profile()) }),
       app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', ...multipart(profile()) }),
+      app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', payload: { name: 'X' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1' }),
     ]
     for (const response of await Promise.all(requests)) {
@@ -182,6 +188,7 @@ describe('artists routes', () => {
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
       app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
+      app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', payload: { name: 'X' }, headers, cookies }),
       app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', headers, cookies }),
     ]
     for (const response of await Promise.all(requests)) {
@@ -309,6 +316,14 @@ describe('artists routes', () => {
         cookies: await sessionCookies(),
       })
       expect(response.statusCode).toBe(200)
+    })
+
+    it("refuses the profile's fields it doesn't take, naming them, without storing the photo", async () => {
+      const app = await buildApp()
+      const response = await create(app, { ...profile(), id: 'artist-9', hasPhoto: true })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown fields: `id`, `hasPhoto`' })
+      expect(photos.store).not.toHaveBeenCalled()
     })
 
     it('refuses more than one photo, without storing any', async () => {
@@ -638,6 +653,82 @@ describe('artists routes', () => {
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ genres: ['polka' as never] }), null)).statusCode).toBe(400)
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), Buffer.from('%PDF-1.7'))).statusCode).toBe(400)
       expect(rows[0].updatedBy).toBeNull()
+    })
+  })
+
+  describe('PATCH /api/admin/artists/:id', () => {
+    it('changes only the fields it is sent, keeps the others and the photo, and says who changed it', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await patch(app, '/api/admin/artists/artist-1', { bio: '  Une nouvelle bio. ', links: { web: 'example.com' } })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({
+        ...profile({ bio: 'Une nouvelle bio.', links: { web: 'https://example.com' } }),
+        hasPhoto: true,
+        updatedBy: 'admin@example.com',
+      })
+      expect(response.json().artist.updatedAt).toEqual(expect.any(String))
+      expect(store.update).toHaveBeenCalledWith('artist-1', { bio: 'Une nouvelle bio.', links: { web: 'https://example.com' }, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+      expect(photos.store).toHaveBeenCalledTimes(1)
+    })
+
+    it('removes the fields sent as null or blank, as when they are left out of a profile', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await patch(app, '/api/admin/artists/artist-1', { country: null, city: ' ', genres: null, bio: '', links: {}, email: null, phone: '' })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ name: 'DJ Test', ...LEFT_OUT })
+    })
+
+    it('removes the photo when asked to, and deletes it, or keeps it', async () => {
+      const app = await buildApp()
+      await create(app)
+      expect((await patch(app, '/api/admin/artists/artist-1', { removePhoto: false })).json().artist.hasPhoto).toBe(true)
+      expect(stored.size).toBe(1)
+      const response = await patch(app, '/api/admin/artists/artist-1', { removePhoto: true })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ name: 'DJ Test', bio: 'Une bio.', hasPhoto: false })
+      expect(stored.size).toBe(0)
+    })
+
+    it("refuses an email that's another artist's, and an artist that doesn't exist, keeping the photo", async () => {
+      const app = await buildApp()
+      await create(app)
+      await create(app, profile({ email: 'other@example.com' }), null)
+      const taken = await patch(app, '/api/admin/artists/artist-1', { email: 'Other@example.com', removePhoto: true })
+      expect(taken.statusCode).toBe(409)
+      expect(taken.json()).toEqual({ ok: false, error: 'Another artist has this email address' })
+      expect((await patch(app, '/api/admin/artists/nobody', { name: 'X' })).statusCode).toBe(404)
+      expect(stored.size).toBe(1)
+    })
+
+    it('explains what is wrong, the profile in French, without changing the artist', async () => {
+      const app = await buildApp()
+      await create(app)
+      const invalid = [
+        [{ name: '' }, "Indiquez le nom d'artiste."],
+        [{ genres: ['polka'] }, "Un des genres n'est pas dans la liste."],
+        [{ name: 'X\u0000' }, "Le nom d'artiste contient un caractère invalide."],
+        [{ name: 'X', hasPhoto: false }, 'Unknown field: `hasPhoto`'],
+        [{ removePhoto: 'true' }, 'Invalid input: expected boolean, received string'],
+        [{}, 'There must be at least one field to change'],
+        [null, 'The changes must be an object with the fields to change'],
+      ] as const
+      for (const [changes, error] of invalid) {
+        const response = await patch(app, '/api/admin/artists/artist-1', changes)
+        expect(response.statusCode, JSON.stringify(changes)).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(rows[0].updatedBy).toBeNull()
+    })
+
+    it('refuses a multipart request, which only PUT takes', async () => {
+      const app = await buildApp()
+      await create(app)
+      const response = await app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', ...multipart(profile(), PNG), cookies: await sessionCookies() })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'The changes must be an object with the fields to change' })
+      expect(photos.store).toHaveBeenCalledTimes(1)
     })
   })
 

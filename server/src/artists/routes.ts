@@ -1,11 +1,12 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Reference, Timestamp, Total, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
+import type { Profile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
-import type { ArtistsStore, Photos, StoredArtist } from './store.js'
+import type { ArtistsStore, Photos, SentPhoto, StoredArtist } from './store.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them (see docs/design/server/artists.md).
 
@@ -41,6 +42,12 @@ const ArtistForm = NewArtistForm.extend({
     .string()
     .optional()
     .meta({ description: '"true" removes the artist\'s photo, when there\'s no new one. Anything else keeps it' }),
+})
+
+// What changing some of an artist's fields sends, as JSON.
+const ArtistChanges = changesTo({
+  ...AdminArtistProfile.shape,
+  removePhoto: z.boolean().meta({ description: "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out" }),
 })
 
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
@@ -167,13 +174,43 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     },
   )
 
+  // Saves `changes` to the artist with the id of `request`, the whole profile or some of its fields, with `photo`, which
+  // replaces theirs, or none when `removePhoto`, and responds with the artist as they are then.
+  async function update(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    changes: Partial<Profile>,
+    sentPhoto: SentPhoto | null,
+    removePhoto: boolean,
+  ) {
+    // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
+    const photo = sentPhoto || removePhoto ? await storePhoto(photos, sentPhoto, 'artists') : null
+    let changed: Awaited<ReturnType<ArtistsStore['update']>>
+    try {
+      changed = await store.update(request.params.id, { ...changes, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
+    } catch (error) {
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
+      throw error
+    }
+    if (!changed) {
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      return reply.status(404).send(NO_SUCH_ARTIST)
+    }
+
+    // The photo the artist had, which was replaced or removed.
+    if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
+    return { ok: true as const, artist: artist(changed.after) }
+  }
+
+  // Not a tool: tools change artists with PATCH, which only sends what it changes, and so keeps the email and phone they
+  // never see (see docs/design/server/mcp.md).
   api.put(
     '/api/admin/artists/:id',
     {
-      config: { admin: true, tool: { title: 'Modifier un artiste' } },
+      config: { admin: true, tool: null },
       schema: {
-        operationId: 'update_artist',
-        summary: "Changes an artist's profile, and replaces or removes their photo",
+        summary: "Replaces an artist's profile, and replaces or removes their photo",
         tags: ['Artists'],
         params: ById,
         multipart: ArtistForm,
@@ -185,25 +222,28 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       const sent = await readProfileForm(request, 'artist', AdminArtistProfile)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
       if (sent.photo && sent.removePhoto) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
+      return update(request, reply, sent.profile, sent.photo, sent.removePhoto)
+    },
+  )
 
-      // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
-      const photo = sent.photo || sent.removePhoto ? await storePhoto(photos, sent.photo, 'artists') : null
-      let changed: Awaited<ReturnType<ArtistsStore['update']>>
-      try {
-        changed = await store.update(request.params.id, { ...sent.profile, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
-      } catch (error) {
-        await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
-        if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
-        throw error
-      }
-      if (!changed) {
-        await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
-        return reply.status(404).send(NO_SUCH_ARTIST)
-      }
-
-      // The photo the artist had, which was replaced or removed.
-      if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
-      return { ok: true as const, artist: artist(changed.after) }
+  api.patch(
+    '/api/admin/artists/:id',
+    {
+      config: { admin: true, tool: { title: 'Modifier un artiste' } },
+      schema: {
+        operationId: 'update_artist',
+        summary: "Changes an artist's profile, only the fields it's given, or removes their photo",
+        tags: ['Artists'],
+        params: ById,
+        body: ArtistChanges,
+        response: { 200: ArtistResponse, 400: ApiError, 404: ApiError, 409: ApiError },
+      },
+      // The profile's errors are whole sentences, in French, like those of `readProfileForm`.
+      schemaErrorFormatter: firstIssue,
+    },
+    async (request, reply) => {
+      const { removePhoto, ...changes } = request.body
+      return update(request, reply, changes, null, removePhoto === true)
     },
   )
 

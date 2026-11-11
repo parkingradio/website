@@ -1,12 +1,13 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Reference, Timestamp, Total, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import type { Photos, SentPhoto } from '../artists/store.js'
 import { AdminCollectiveProfile } from './profile.js'
+import type { CollectiveProfile } from './profile.js'
 import { ConflictError, conflictBody } from '../sessions/routes.js'
 import { Conflict } from '../sessions/store.js'
 import { InvalidMember } from './store.js'
@@ -46,6 +47,12 @@ const CollectiveForm = NewCollectiveForm.extend({
     .string()
     .optional()
     .meta({ description: '"true" removes the collective\'s photo, when there\'s no new one. Anything else keeps it' }),
+})
+
+// What changing some of a collective's fields sends, as JSON.
+const CollectiveChanges = changesTo({
+  ...AdminCollectiveProfile.shape,
+  removePhoto: z.boolean().meta({ description: "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out" }),
 })
 
 const NO_SUCH_COLLECTIVE: z.infer<typeof ApiError> = { ok: false, error: 'No such collective' }
@@ -164,13 +171,43 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
     },
   )
 
+  // Saves `changes` to the collective with the id of `request`, the whole profile or some of its fields, with `photo`,
+  // which replaces its own, or none when `removePhoto`, and responds with the collective as it is then.
+  async function update(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    changes: Partial<CollectiveProfile>,
+    sentPhoto: SentPhoto | null,
+    removePhoto: boolean,
+  ) {
+    // The collective's new photo, or none if it's removed. Otherwise, the collective keeps its own.
+    const photo = sentPhoto || removePhoto ? await storePhoto(photos, sentPhoto, 'collectives') : null
+    let changed: Awaited<ReturnType<CollectivesStore['update']>>
+    try {
+      changed = await store.update(request.params.id, { ...changes, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
+    } catch (error) {
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
+      if (error instanceof InvalidMember) return reply.status(400).send({ ok: false, error: error.message })
+      throw error
+    }
+    if (!changed) {
+      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      return reply.status(404).send(NO_SUCH_COLLECTIVE)
+    }
+
+    // The photo the collective had, which was replaced or removed.
+    if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
+    return { ok: true as const, collective: collective(changed.after) }
+  }
+
+  // Not a tool, like PUT /api/admin/artists/:id (see artists/routes.ts).
   api.put(
     '/api/admin/collectives/:id',
     {
-      config: { admin: true, tool: { title: 'Modifier un collectif' } },
+      config: { admin: true, tool: null },
       schema: {
-        operationId: 'update_collective',
-        summary: "Changes a collective's profile and members, and replaces or removes its photo",
+        summary: "Replaces a collective's profile and members, and replaces or removes its photo",
         tags: ['Collectives'],
         params: ById,
         multipart: CollectiveForm,
@@ -181,26 +218,28 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
       const sent = await readProfileForm(request, 'collective', AdminCollectiveProfile)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
       if (sent.photo && sent.removePhoto) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
+      return update(request, reply, sent.profile, sent.photo, sent.removePhoto)
+    },
+  )
 
-      // The collective's new photo, or none if it's removed. Otherwise, the collective keeps its own.
-      const photo = sent.photo || sent.removePhoto ? await storePhoto(photos, sent.photo, 'collectives') : null
-      let changed: Awaited<ReturnType<CollectivesStore['update']>>
-      try {
-        changed = await store.update(request.params.id, { ...sent.profile, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
-      } catch (error) {
-        await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
-        if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
-        if (error instanceof InvalidMember) return reply.status(400).send({ ok: false, error: error.message })
-        throw error
-      }
-      if (!changed) {
-        await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
-        return reply.status(404).send(NO_SUCH_COLLECTIVE)
-      }
-
-      // The photo the collective had, which was replaced or removed.
-      if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
-      return { ok: true as const, collective: collective(changed.after) }
+  api.patch(
+    '/api/admin/collectives/:id',
+    {
+      config: { admin: true, tool: { title: 'Modifier un collectif' } },
+      schema: {
+        operationId: 'update_collective',
+        summary: "Changes a collective's profile and members, only the fields it's given, or removes its photo",
+        tags: ['Collectives'],
+        params: ById,
+        body: CollectiveChanges,
+        response: { 200: CollectiveResponse, 400: ApiError, 404: ApiError, 409: ApiError },
+      },
+      // The profile's errors are whole sentences, in French, like those of `readProfileForm`.
+      schemaErrorFormatter: firstIssue,
+    },
+    async (request, reply) => {
+      const { removePhoto, ...changes } = request.body
+      return update(request, reply, changes, null, removePhoto === true)
     },
   )
 

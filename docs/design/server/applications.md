@@ -7,9 +7,10 @@ the same fields either way: for a collective's, "the artist" below means the col
 show as a whole, e.g. its performance types aren't each member's.
 
 The server checks every application against the rules in `server/src/applications/fields.ts` (the `ApplicationFields`
-schema). These rules only make sure the data is valid: every field below has to be there, with its type, even when it's
-empty. Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are in
-French, like for [profiles](artists.md#profiles), because artists see them.
+schema). These rules only make sure the data is valid: every field below has to be there when an application is created,
+or its fields replaced, with its type, even when it's empty. Suggestions and limits, like which dates or time slots to
+offer, are up to the forms. Error messages are in French, like for [profiles](artists.md#profiles), because artists see
+them.
 
 Applications are created in two ways:
 
@@ -93,6 +94,13 @@ Replaces an application's fields. The request is the same as for `POST /api/admi
 or `collectiveId`, and leaving `receivedAt` out keeps the one the application has. The artist or collective and the
 status don't change. The response is the same as for `POST /api/admin/applications`, with the updated application.
 Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
+
+## `PATCH /api/admin/applications/:id` (admin)
+
+Changes the fields of an application it's sent, and leaves the others as they are (see
+[Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT /api/admin/applications/:id`
+takes, `receivedAt` included, which can't be null either. Responds like `PUT`, and fails like it, but with 400 when
+there's no field.
 
 ## `PUT /api/admin/applications/:id/status` (admin)
 

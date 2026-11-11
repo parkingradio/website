@@ -62,10 +62,15 @@ artist="$(sql "select id from artists where lower(email) = '${EMAIL}'")"
 [ -n "$artist" ] || fail "expected the artist to be added"
 [ "$(sql "select created_by from artists where id = '${artist}'")" = "$ADMIN_EMAIL" ] || fail "expected the admin to have added the artist"
 
-echo "  replacing the artist's profile keeps the email and phone it leaves out"
+echo "  changing the artist only changes what it's given, which keeps the email and phone, unless it's given them as null"
 call update_artist "{\"id\":\"${artist}\",\"name\":\"MCP Integration 2\"}"
 expect_body_contains '\"name\":\"MCP Integration 2\"'
+expect_body_contains '\"links\":{\"web\":\"https://example.com\"}'
 [ "$(sql "select email || ' ' || phone from artists where id = '${artist}'")" = "${EMAIL} 514 555 0123" ] || fail "expected the email and phone to stay"
+call update_artist "{\"id\":\"${artist}\",\"email\":null}"
+expect_body_lacks '"isError"'
+[ "$(sql "select coalesce(email, 'none') || ' ' || phone from artists where id = '${artist}'")" = "none 514 555 0123" ] \
+    || fail "expected the email to be removed, and the phone to stay"
 
 echo "  the artists are listed as summaries, with their total"
 call list_artists '{}'
@@ -75,9 +80,9 @@ expect_body_lacks '\"bio\"'
 expect_body_lacks "$EMAIL"
 
 echo "  a tool that fails says so, with the route's error"
-call create_artist "{\"name\":\"Another\",\"email\":\"${EMAIL}\"}"
+call update_artist '{"id":"00000000-0000-4000-8000-000000000000","name":"Personne"}'
 expect_body_contains '"isError":true'
-expect_body_contains '\"status\":409'
+expect_body_contains '\"status\":404'
 
 echo "  read_documentation gives the instructions, then the rules from the image's design documents"
 call read_documentation '{"area":"sessions"}'
@@ -113,12 +118,13 @@ call list_sessions '{"from":"2026-11-15T03:00+01:00"}'
 expect_body_contains '"isError":true'
 expect_body_contains 'must be a single date and time in Québec time, with the offset from UTC in effect then'
 
-echo "  a session is changed as multipart/form-data, keeping its flyer, which tools can't send, unless it's removed"
+echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, unless it's removed"
 sql "update sessions set flyer_key = 'sessions/mcp.png', flyer_type = 'image/png' where id = '${session}'" >/dev/null
-call update_session "{\"id\":\"${session}\",\"start\":null,\"durationMinutes\":120,\"type\":\"other\",\"takeover\":null,\"name\":\"MCP\",\"raEvent\":null,\"description\":\"Par MCP.\"}"
+call update_session "{\"id\":\"${session}\",\"description\":\"Par MCP.\"}"
+expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\"'
 expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":true'
-call update_session "{\"id\":\"${session}\",\"start\":null,\"durationMinutes\":120,\"type\":\"other\",\"takeover\":null,\"name\":\"MCP\",\"raEvent\":null,\"description\":\"\",\"removeFlyer\":true}"
-expect_body_contains '\"description\":\"\",\"effectiveDescription\":\"\",\"hasFlyer\":false'
+call update_session "{\"id\":\"${session}\",\"removeFlyer\":true}"
+expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":false'
 call delete_session "{\"id\":\"${session}\"}"
 
 call delete_artist "{\"id\":\"${artist}\"}"

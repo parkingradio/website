@@ -30,12 +30,13 @@ export type CollectivesStore = {
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
   // sent by name are created, as artists whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
   create(collective: CollectiveProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredCollective>
-  // Replaces the collective's profile and members, and its photo when there's a new one, or nulls to remove it. The
-  // members sent by name are created, as artists whom `updatedBy` adds. Returns the collective as it was, so that a
-  // photo that was replaced or removed can be deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
+  // Changes the fields of the collective's profile that `changes` has, all of them when it's replaced, its members when
+  // it has them, and its photo when there's a new one, or nulls to remove it. The members sent by name are created, as
+  // artists whom `updatedBy` adds. Returns the collective as it was, so that a photo that was replaced or removed can be
+  // deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
   update(
     id: string,
-    changes: CollectiveProfile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<CollectiveProfile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: CollectiveRow; after: StoredCollective } | null>
   // Returns the collective as it was, so that its photo can be deleted too. Its members stay. Throws a Conflict, with one
   // of its takeovers in the way, when it has some, which need it (see "Rules" in docs/design/server/sessions.md).
@@ -146,10 +147,13 @@ export function collectivesStore(db: Queryable): CollectivesStore {
           // whose takeover the collective is (see `lockSessions` in sessions/store.ts).
           const [before] = await tx.select().from(collectives).where(eq(collectives.id, id)).for('no key update')
           if (!before) return null
-          await lockMembers(tx, members)
+          // Its members stay as they are when they're left out.
+          if (members) await lockMembers(tx, members)
           const [after] = await tx.update(collectives).set(changes).where(eq(collectives.id, id)).returning()
-          await tx.delete(collectiveMembers).where(eq(collectiveMembers.collectiveId, id))
-          await addMembers(tx, id, members, changes.updatedBy)
+          if (members) {
+            await tx.delete(collectiveMembers).where(eq(collectiveMembers.collectiveId, id))
+            await addMembers(tx, id, members, changes.updatedBy)
+          }
           return { before, after: await withMembers(tx, after) }
         }),
       )

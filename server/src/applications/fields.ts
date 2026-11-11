@@ -33,7 +33,7 @@ export type ApplicationStatus = z.infer<typeof ApplicationStatus>
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 const DETAILS_MAX_LENGTH = 2000
 
-const NO_DATE = 'Choisissez au moins une date.'
+export const NO_DATE = 'Choisissez au moins une date.'
 const BAD_SLOT = 'Une des plages horaires est invalide.'
 
 const time = z.string({ error: BAD_SLOT }).regex(TIME_OF_DAY, BAD_SLOT)

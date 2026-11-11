@@ -79,11 +79,12 @@ export type ArtistsStore = {
   // as one of a collective's artists.
   // Throws an EmailTaken.
   create(artist: Profile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
-  // Replaces the artist's profile, and their photo when there's a new one, or nulls to remove it. Returns the artist as
-  // they were, so that a photo that was replaced or removed can be deleted, and as they are then. Throws an EmailTaken.
+  // Changes the fields of the artist's profile that `changes` has, all of them when it's replaced, and their photo when
+  // there's a new one, or nulls to remove it. Returns the artist as they were, so that a photo that was replaced or
+  // removed can be deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
-    changes: Profile & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<Profile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: ArtistRow; after: StoredArtist } | null>
   // Returns the artist as they were, so that their photo can be deleted too. They're taken out of their collectives and
   // their sets.

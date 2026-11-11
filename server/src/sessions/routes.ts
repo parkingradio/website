@@ -3,18 +3,18 @@ import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
-import { ApiError, ById, Ok, Reference, Timestamp, Total, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
 import { FlyerResponse, INVALID_REQUEST, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import { forgetPhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
-import { BAD_STATUS, Genre, PerformanceType, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
+import { BAD_STATUS, Genre, PerformanceType, SESSION_FIELDS, SET_FIELDS, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
-import { Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
-import type { SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
+import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
+import type { SessionChanges, SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
 
 // Admin routes for sessions and their sets: add, view, change, mark as planned, done or cancelled, and delete them (see
 // docs/design/server/sessions.md).
@@ -119,6 +119,21 @@ const SessionForm = NewSessionForm.extend({
     .optional()
     .meta({ description: '"true" removes the session\'s flyer, when there\'s no new one. Anything else keeps it' }),
 })
+
+// What changing some of a session's fields sends, as JSON, and some of a set's.
+const SessionChangesBody = changesTo({
+  ...SESSION_FIELDS,
+  removeFlyer: z.boolean().meta({ description: "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out" }),
+})
+const SetChangesBody = changesTo(SET_FIELDS)
+
+// What's saved of a session's fields that were sent, all of them, or some of them for a change, whose others are then
+// undefined, which leaves them as they are (see `changed` in sessions/store.ts).
+function sessionChanges(fields: SessionFields): SessionChanges
+function sessionChanges(fields: Partial<SessionFields>): Partial<SessionChanges>
+function sessionChanges({ start, durationMinutes, type, takeover, name, raEvent, description }: Partial<SessionFields>): Partial<SessionChanges> {
+  return { startAt: start, durationMinutes, type, takeoverId: takeover, name, raEventId: raEvent, description }
+}
 
 // Reads the session's fields, as JSON from the "session" part, and the flyer from a request that adds or changes a
 // session, and checks them, like an artist's profile and photo (see `readProfileForm`), along with the "removeFlyer"
@@ -266,7 +281,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       saved = await save()
     } catch (error) {
       await forgetPhoto(photos, reply.log, newFlyer)
-      if (error instanceof NoSuchReference) return fail(reply, { status: 400, error: error.message })
+      if (error instanceof NoSuchReference || error instanceof BrokenFields) return fail(reply, { status: 400, error: error.message })
       if (error instanceof Conflict) return fail(reply, { status: 409, error: error.message, session: error.session, set: error.set })
       throw error
     }
@@ -295,17 +310,18 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     }
   }
 
-  // What's saved of the fields that were sent, for the set as it was, `before`, if it's changed, or the error to respond
-  // with.
-  async function setChanges(fields: SetFields, before: SetRow | null): Promise<SetChanges | Failure> {
+  // What's saved of the fields that were sent, all of them, or some of them for a change, whose others are then
+  // undefined, which leaves them as they are, for the set as it was, `before`, if it's changed, or the error to respond
+  // with. The track is only resolved when it's sent.
+  async function setChanges(fields: SetFields, before: null): Promise<SetChanges | Failure>
+  async function setChanges(fields: Partial<SetFields>, before: SetRow): Promise<Partial<SetChanges> | Failure>
+  async function setChanges(fields: Partial<SetFields>, before: SetRow | null): Promise<Partial<SetChanges> | Failure> {
     const { soundcloudTrack, youtubeVideo, ...rest } = fields
+    const changes = { ...rest, youtubeVideoId: youtubeVideo }
+    if (soundcloudTrack === undefined) return changes
     const track = soundcloudTrack === null ? null : await trackId(soundcloudTrack, before)
     if (typeof track === 'object' && track !== null) return track
-    return { ...rest, soundcloudTrackId: track, soundcloudTrackUrl: soundcloudTrack, youtubeVideoId: youtubeVideo }
-  }
-
-  function sessionChanges({ start, durationMinutes, type, takeover, name, raEvent, description }: SessionFields) {
-    return { startAt: start, durationMinutes, type, takeoverId: takeover, name, raEventId: raEvent, description }
+    return { ...changes, soundcloudTrackId: track, soundcloudTrackUrl: soundcloudTrack }
   }
 
   function statusChange(status: z.infer<typeof Status>, by: string) {
@@ -424,13 +440,34 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
   )
 
+  // Saves `fields` to the session with the id of `request`, all of them or some of them, with `sentFlyer`, which replaces
+  // its own, or none when `removeFlyer`, and responds with the session as it is then.
+  async function updateSession(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+    fields: Partial<SessionFields>,
+    sentFlyer: SentPhoto | null,
+    removeFlyer: boolean,
+  ) {
+    // The session's new flyer, or none if it's removed. Otherwise, the session keeps its own.
+    const flyer = sentFlyer || removeFlyer ? await storeFlyer(sentFlyer) : null
+    const changes = { ...sessionChanges(fields), ...flyer, updatedBy: request.user!.email, updatedAt: new Date() }
+    const update = async () => {
+      const changed = await store.update(request.params.id, changes)
+      // The flyer the session had, which was replaced or removed, once the session is saved.
+      if (changed && flyer) await forgetPhoto(photos, request.log, changed.before.flyerKey)
+      return changed?.after ?? null
+    }
+    return saving(reply, NO_SUCH_SESSION, update, flyer?.flyerKey)
+  }
+
+  // Not a tool: tools change sessions with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
   api.put(
     '/api/admin/sessions/:id',
     {
-      config: { admin: true, tool: { title: 'Modifier une session' } },
+      config: { admin: true, tool: null },
       schema: {
-        operationId: 'update_session',
-        summary: 'Changes a session, and replaces or removes its flyer, but not its status or its sets, which move with its start',
+        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status or its sets, which move with its start",
         tags: ['Sessions'],
         params: ById,
         multipart: SessionForm,
@@ -441,17 +478,26 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const sent = await readSessionForm(request)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
       if (sent.flyer && sent.removeFlyer) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
+      return updateSession(request, reply, sent.fields, sent.flyer, sent.removeFlyer)
+    },
+  )
 
-      // The session's new flyer, or none if it's removed. Otherwise, the session keeps its own.
-      const flyer = sent.flyer || sent.removeFlyer ? await storeFlyer(sent.flyer) : null
-      const changes = { ...sessionChanges(sent.fields), ...flyer, updatedBy: request.user!.email, updatedAt: new Date() }
-      const update = async () => {
-        const changed = await store.update(request.params.id, changes)
-        // The flyer the session had, which was replaced or removed, once the session is saved.
-        if (changed && flyer) await forgetPhoto(photos, request.log, changed.before.flyerKey)
-        return changed?.after ?? null
-      }
-      return saving(reply, NO_SUCH_SESSION, update, flyer?.flyerKey)
+  api.patch(
+    '/api/admin/sessions/:id',
+    {
+      config: { admin: true, tool: { title: 'Modifier une session' } },
+      schema: {
+        operationId: 'update_session',
+        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status or its sets, which move with its start",
+        tags: ['Sessions'],
+        params: ById,
+        body: SessionChangesBody,
+        response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError },
+      },
+    },
+    async (request, reply) => {
+      const { removeFlyer, ...fields } = request.body
+      return updateSession(request, reply, fields, null, removeFlyer === true)
     },
   )
 
@@ -520,28 +566,48 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
   )
 
+  // Saves `fields` to the set with the id of `request`, all of them or some of them, and responds with its session as it
+  // is then.
+  async function updateSet(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply, fields: Partial<SetFields>) {
+    // Before the track is resolved, which it isn't when it's the set's already.
+    const before = await store.getSet(request.params.id)
+    if (!before) return reply.status(404).send(NO_SUCH_SET)
+    const saved = await setChanges(fields, before)
+    if ('error' in saved) return fail(reply, saved)
+    const changes = { ...saved, updatedBy: request.user!.email, updatedAt: new Date() }
+    return saving(reply, NO_SUCH_SET, () => store.updateSet(before.id, changes))
+  }
+
+  // Not a tool: tools change sets with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
   api.put(
     '/api/admin/sets/:id',
     {
-      config: { admin: true, tool: { title: 'Modifier un set' } },
+      config: { admin: true, tool: null },
       schema: {
-        operationId: 'update_set',
-        summary: 'Changes a set, but not its session or its status, and returns its session',
+        summary: "Replaces a set's fields, but not its session or its status, and returns its session",
         tags: ['Sessions'],
         params: ById,
         body: SetFields,
         response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError, 502: ApiError },
       },
     },
-    async (request, reply) => {
-      // Before the track is resolved, which it isn't when it's the set's already.
-      const before = await store.getSet(request.params.id)
-      if (!before) return reply.status(404).send(NO_SUCH_SET)
-      const saved = await setChanges(request.body, before)
-      if ('error' in saved) return fail(reply, saved)
-      const changes = { ...saved, updatedBy: request.user!.email, updatedAt: new Date() }
-      return saving(reply, NO_SUCH_SET, () => store.updateSet(before.id, changes))
+    async (request, reply) => updateSet(request, reply, request.body),
+  )
+
+  api.patch(
+    '/api/admin/sets/:id',
+    {
+      config: { admin: true, tool: { title: 'Modifier un set' } },
+      schema: {
+        operationId: 'update_set',
+        summary: "Changes a set, only the fields it's given, but not its session or its status, and returns its session",
+        tags: ['Sessions'],
+        params: ById,
+        body: SetChangesBody,
+        response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError, 502: ApiError },
+      },
     },
+    async (request, reply) => updateSet(request, reply, request.body),
   )
 
   api.put(

@@ -25,6 +25,10 @@ export type StoredApplication = typeof applications.$inferSelect
 export class NoSuchArtist extends Error {}
 export class NoSuchCollective extends Error {}
 
+// What changing an application saves: all of its fields, when they're replaced, or some of them, and when it was
+// received, unless that's left out.
+export type ApplicationChange = Partial<ApplicationFields> & { receivedAt?: Date }
+
 // Who an application belongs to: an artist or a collective, by their id.
 export type ApplicationOwner = { artistId: string; collectiveId?: undefined } | { collectiveId: string; artistId?: undefined }
 
@@ -37,8 +41,8 @@ export type ApplicationsStore = {
   // `createdBy` is the email of the admin who creates the application, or null if the artist sends it themselves.
   // `receivedAt` is when the artist sent it, now if it's left out. Throws a NoSuchArtist or a NoSuchCollective.
   create(application: ApplicationFields & ApplicationOwner & { createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
-  // Replaces the application's fields, and `receivedAt` unless it's left out, and returns the updated application.
-  update(id: string, changes: ApplicationFields & { receivedAt?: Date; updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
+  // Changes the application's fields that `changes` has, and returns the updated application.
+  update(id: string, changes: ApplicationChange & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
   // Changes the application's status, and returns the updated application.
   setStatus(id: string, change: { status: ApplicationStatus; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
   // Returns false if the application didn't exist.

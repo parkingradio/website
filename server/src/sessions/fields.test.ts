@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SESSION_TYPES, SessionFields, SetFields, sessionTitle } from './fields.js'
+import { SESSION_TYPES, SessionFields, SetFields, brokenSessionRule, brokenSetRule, sessionTitle } from './fields.js'
 
 // The rules in sessions/fields.ts, which every session and set has to follow. The server answers with the first error.
 
@@ -290,5 +290,34 @@ describe('SetFields', () => {
     for (const youtubeVideo of ['https://example.com', 'https://youtu.be/dQw4w9WgXcQ\0', undefined]) {
       expect(setError(setFields({ youtubeVideo })), String(youtubeVideo)).toBe('The YouTube video must be a link to it, or its id')
     }
+  })
+})
+
+describe('the rules that involve several fields', () => {
+  it("are those of a session's type, its takeover and its name, which a change checks on the session it would make", () => {
+    expect(brokenSessionRule({ type: 'takeover', takeover: 'c', name: '' })).toBeNull()
+    expect(brokenSessionRule({ type: 'other', takeover: null, name: 'ATELIER' })).toBeNull()
+    expect(brokenSessionRule({ type: 'takeover', takeover: null, name: 'X' })).toEqual({ message: 'A takeover has a collective', field: 'takeover' })
+    expect(brokenSessionRule({ type: 'guest-mixes', takeover: 'c', name: '' })).toEqual({ message: 'Only a takeover has a collective', field: 'takeover' })
+    expect(brokenSessionRule({ type: 'other', takeover: null, name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
+  })
+
+  it("are those of a set's place", () => {
+    expect(brokenSetRule({ offsetMinutes: null, durationMinutes: null })).toBeNull()
+    expect(brokenSetRule({ offsetMinutes: 0, durationMinutes: 60 })).toBeNull()
+    expect(brokenSetRule({ offsetMinutes: 0, durationMinutes: null })).toEqual({ message: 'A set with an offset also has a duration', field: 'durationMinutes' })
+  })
+
+  it('are checked by the schemas too, after the fields', () => {
+    expect(SessionFields.safeParse(sessionFields({ type: 'takeover' })).error?.issues[0]).toMatchObject({ message: 'A takeover has a collective', path: ['takeover'] })
+    expect(SetFields.safeParse(setFields({ offsetMinutes: 0, durationMinutes: null })).error?.issues[0]).toMatchObject({
+      message: 'A set with an offset also has a duration',
+      path: ['durationMinutes'],
+    })
+  })
+
+  it("refuse the fields they don't take, naming them", () => {
+    expect(SessionFields.safeParse({ ...sessionFields(), title: 'X' }).error?.issues[0].message).toBe('Unknown field: `title`')
+    expect(SetFields.safeParse({ ...setFields(), id: 'set-1' }).error?.issues[0].message).toBe('Unknown field: `id`')
   })
 })

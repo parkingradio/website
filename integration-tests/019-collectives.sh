@@ -195,6 +195,18 @@ expect_body_contains '"members":[]'
 admin GET "${ARTISTS}?collective=${aube}"
 expect_body_contains '"artists":[]'
 
+echo "  some of a collective's fields are changed as JSON, keeping its members, even none, unless they're sent"
+json PATCH "${COLLECTIVES}/${aube}" '{"description":"Sans membres."}'
+expect_status 200
+expect_body_contains '"description":"Sans membres."'
+expect_body_contains '"members":[]'
+json PATCH "${COLLECTIVES}/${aube}" '{"members":[]}'
+expect_status 400
+json PATCH "${COLLECTIVES}/${ondes}" '{"city":"Lévis"}'
+expect_status 200
+expect_body_contains "\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"}]"
+expect_body_contains '"city":"Lévis","description":"Une description."'
+
 echo "  changing a collective while one of its members is deleted doesn't deadlock"
 send artist POST "$ARTISTS" '{"name":"Éphémère"}'
 passing="$(first_id)"

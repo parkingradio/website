@@ -15,9 +15,11 @@ when they apply.
 
 Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, bio, links,
 email or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't
-always ask for them, or whom they only know by name. What's left out is stored as an empty string, or an empty list or
-object, except the email, which is null, so that any number of artists can be without one. An artist applying alone
-with `POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
+always ask for them, or whom they only know by name. When an artist is added, or their profile replaced, what's left
+out, or sent as null, is stored as an empty string, or an empty list or object, except the email, which is null, so that
+any number of artists can be without one. When some of their fields are changed, what's left out stays as it is, and
+what's sent as null, or empty, is removed, and stored the same way. An artist applying alone with
+`POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
 
 A profile has:
 
@@ -101,6 +103,14 @@ Replaces an artist's profile. It takes the same request as `POST /api/admin/arti
 artist's, which is deleted. Without one, the artist keeps theirs, unless there's also a `removePhoto` field set to
 `true`, which removes it, and deletes it. Responds like `POST /api/admin/artists`, with the artist as they are then,
 and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404 when there's no such artist.
+
+## `PATCH /api/admin/artists/:id` (admin)
+
+Changes the fields of an artist's profile it's sent, and leaves the others as they are (see
+[Changes, in Conventions](README.md#conventions)). It takes JSON, with any of the fields of a profile, and
+`removePhoto`, a boolean: `true` removes the artist's photo, and deletes it, and `false` keeps it, like leaving it out. A
+photo is only replaced with `PUT`. Responds like `PUT /api/admin/artists/:id`, and fails like it, but with 400 when
+there's no field, and never with 413.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 

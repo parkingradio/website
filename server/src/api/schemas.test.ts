@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
 import { inQuebecTime, instantIn } from './formats.js'
-import { ApiError, Day, Ok, Timestamp, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
+import { ApiError, Day, Ok, Timestamp, changesTo, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
 
@@ -236,5 +236,23 @@ describe('instantIn', () => {
   it("reads the time in Québec's time zone when Intl doesn't know the one it's given", () => {
     expect(at('Mars/Olympus_Mons', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
     expect(at('', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
+  })
+})
+
+describe('changesTo', () => {
+  const Changes = changesTo({ name: z.string().min(1, 'A name'), size: z.number().nullable(), tags: z.array(z.string()) })
+  const error = (sent: unknown) => Changes.safeParse(sent).error?.issues[0].message
+
+  it('takes any of the fields, each with its rules, and leaves out those it is not sent', () => {
+    expect(Changes.parse({ size: null })).toEqual({ size: null })
+    expect(Changes.parse({ name: 'x', tags: [] })).toEqual({ name: 'x', tags: [] })
+    expect(error({ name: '' })).toBe('A name')
+  })
+
+  it('refuses no field, fields it does not take, which it names, and what is not an object', () => {
+    expect(error({})).toBe('There must be at least one field to change')
+    expect(error({ name: 'x', nmae: 'y' })).toBe('Unknown field: `nmae`')
+    expect(error({ a: 1, b: 2 })).toBe('Unknown fields: `a`, `b`')
+    for (const sent of [null, [], 'name', undefined]) expect(error(sent)).toBe('The changes must be an object with the fields to change')
   })
 })

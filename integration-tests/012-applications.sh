@@ -31,6 +31,12 @@ application() {
         "$1" "${2:-}" "${3:+,$3}"
 }
 
+# fields [<details>] [<more JSON fields>] -- an application's fields, as JSON, as changing it sends them, without its
+# artist.
+fields() {
+    application "" "$@" | sed 's/^{"artistId":"",/{/'
+}
+
 # application_of <collective id> [<more JSON fields>] -- an application for that collective, as JSON.
 application_of() {
     printf '{"collectiveId":"%s","dates":["2027-02-01"],"timeSlots":[],"performanceTypes":["full-band"],"otherPerformanceType":"","details":""%s}' \
@@ -113,12 +119,20 @@ json PUT "${BASE_URL}/api/admin/applications/${first}" \
 expect_status 200
 expect_body_contains '"dates":["2026-12-10"],"timeSlots":[],"performanceTypes":["live-performance","full-band"],"otherPerformanceType":"Synthé modulaire"'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
-json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" changed '"receivedAt":"2026-03-27T00:00-04:00"')"
+json PUT "${BASE_URL}/api/admin/applications/${third}" "$(fields changed '"receivedAt":"2026-03-27T00:00-04:00"')"
 expect_status 200
 expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
-json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist" 'changed again')"
+json PUT "${BASE_URL}/api/admin/applications/${third}" "$(fields 'changed again')"
 expect_status 200
 expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
+json PATCH "${BASE_URL}/api/admin/applications/${third}" '{"details":"changed once more"}'
+expect_status 200
+expect_body_contains '"dates":["2020-02-29","2027-01-15"]'
+expect_body_contains '"details":"changed once more"'
+expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
+json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist")"
+expect_status 400
+expect_body_contains '"error":"Unknown field: `artistId`"'
 for status in accepted scheduled done rejected new; do
     json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
     expect_status 200
@@ -138,7 +152,9 @@ echo "  an application that doesn't exist can't be viewed, changed or deleted"
 for id in "$NOBODY" not-a-uuid; do
     json GET "${BASE_URL}/api/admin/applications/${id}"
     expect_status 404
-    json PUT "${BASE_URL}/api/admin/applications/${id}" "$(application "$artist")"
+    json PUT "${BASE_URL}/api/admin/applications/${id}" "$(fields)"
+    expect_status 404
+    json PATCH "${BASE_URL}/api/admin/applications/${id}" '{"details":""}'
     expect_status 404
     json PUT "${BASE_URL}/api/admin/applications/${id}/status" '{"status":"accepted"}'
     expect_status 404

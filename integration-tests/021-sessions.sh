@@ -318,6 +318,16 @@ session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${next}"
 expect_body_contains '"start":"2026-11-15T01:00:00-05:00","end":"2026-11-15T02:00:00-05:00"'
+# Changing its duration alone, the session it would be, with its start, is checked.
+json PATCH "${SESSIONS}/${first}" '{"durationMinutes":300}'
+expect_conflict 'Another session overlaps this one' "$next"
+
+echo "  a session's fields are taken as JSON in their own part, which can't have other fields, unlike the request"
+session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 '"title":"X"')"
+expect_status 400
+expect_body_contains '"error":"Unknown field: `title`"'
+session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60)" --form-string 'submit=enregistrer'
+expect_status 200
 
 echo "  a session lasts the minutes that actually pass, for the database too, e.g. the night the clocks go back"
 # From midnight, for 4 hours: the clocks then say 3:00, an hour behind.
@@ -753,8 +763,13 @@ echo "  a collective can't be deleted while it has takeovers, which the 409 name
 readonly HAS_TAKEOVERS='This collective has takeovers: give them another collective, or another type, first'
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_conflict "$HAS_TAKEOVERS" "$canned"
-session_form PUT "${SESSIONS}/${canned}" "$(session_json null 240)"
+# Changing its type alone, the takeover it would be without a collective's type is refused.
+json PATCH "${SESSIONS}/${canned}" '{"type":"guest-mixes"}'
+expect_status 400
+expect_body_contains '"error":"Only a takeover has a collective"'
+json PATCH "${SESSIONS}/${canned}" '{"type":"guest-mixes","takeover":null}'
 expect_status 200
+expect_body_contains '"type":"guest-mixes","takeover":null'
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_conflict "$HAS_TAKEOVERS" "$first"
 json GET "${COLLECTIVES}/${ondes}"
@@ -764,10 +779,17 @@ expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
 
-echo "  a set without performers takes one again to be changed, but its status can still be changed"
+echo "  a set without performers takes one again to be replaced, but its other fields and its status can still be changed"
 json PUT "${SETS}/${later}" "$(set_json '[]' 0 60)"
 expect_status 400
 expect_body_contains '"error":"A set has at least one performer"'
+json PATCH "${SETS}/${later}" '{"offsetMinutes":null,"durationMinutes":null,"genres":["ambient"]}'
+expect_status 200
+expect_body_contains "{\"id\":\"${later}\",\"performers\":[],\"offsetMinutes\":null,\"durationMinutes\":null"
+# Its place is checked as the set would be, without a duration.
+json PATCH "${SETS}/${later}" '{"offsetMinutes":30}'
+expect_status 400
+expect_body_contains '"error":"A set with an offset also has a duration"'
 json PUT "${SESSIONS}/${next}/status" '{"status":"planned"}'
 expect_status 200
 json PUT "${SETS}/${later}/status" '{"status":"done"}'

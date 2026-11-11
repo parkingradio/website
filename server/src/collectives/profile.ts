@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { objectError } from '../api/schemas.js'
 import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, city, country, email, emailAddress, line, links, orLeftOut, phone, text } from '../artists/profile.js'
 
 // A collective's profile: the rules every collective's profile has to follow (see docs/design/server/collectives.md), as
@@ -15,6 +16,8 @@ import { BIO_MAX_LENGTH, NAME_MAX_LENGTH, city, country, email, emailAddress, li
 export const NO_SUCH_MEMBER = 'No such artist'
 
 export const NO_MEMBER = 'Indiquez au moins un artiste du collectif.'
+// The error of a profile that's missing everything, starting with the name, e.g. one that isn't an object.
+const NO_NAME = 'Indiquez le nom du collectif.'
 const NO_MEMBER_NAME = "Indiquez le nom de chaque artiste du collectif."
 
 // Whether a member, as it's sent, is an artist who exists, by their id, rather than one to create, by their name.
@@ -54,7 +57,7 @@ const Members = z
 function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
   const description = text('La description', BIO_MAX_LENGTH, 'Écrivez quelques lignes de description.', { canBeEmpty: canLeaveOut })
   return z.object({
-    name: line('Le nom du collectif', NAME_MAX_LENGTH, 'Indiquez le nom du collectif.'),
+    name: line('Le nom du collectif', NAME_MAX_LENGTH, NO_NAME),
     members: Members,
     country: country({ canLeaveOut }),
     city: city({ canLeaveOut }),
@@ -68,7 +71,10 @@ function profile({ canLeaveOut }: { canLeaveOut: boolean }) {
 // A collective's profile, as admins send it: they can leave out the country, city, description, links, email and phone,
 // as for an artist, e.g. for collectives the team only knows by name. What's there still has to be valid. It's cleaned up
 // as it's checked, and the first error is what the server answers.
-export const AdminCollectiveProfile = profile({ canLeaveOut: true }).meta({ id: 'AdminCollectiveProfile' })
+// Like an artist's (see `AdminArtistProfile` in artists/profile.ts), it refuses the fields it doesn't take.
+export const AdminCollectiveProfile = z
+  .strictObject(profile({ canLeaveOut: true }).shape, { error: objectError(NO_NAME) })
+  .meta({ id: 'AdminCollectiveProfile' })
 
 // A collective's profile, as it sends it when it applies (see `Applicant` in applications/applicant.ts), with nothing left
 // out. Its members are artists who apply with it, rather than members as admins send them. Its email is said again, as

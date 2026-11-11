@@ -93,6 +93,28 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_header Content-Type 'image/png'
 [ "$(photos_on_disk)" = 2 ] || fail "expected the replaced photo to be deleted"
 
+echo "  some of an artist's fields are changed as JSON, keeping the others and their photo, or removing it"
+json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"bio":"Une bio changée.","phone":null}'
+expect_status 200
+expect_body_contains '"bio":"Une bio changée."'
+expect_body_contains '"email":"artiste@integration.test","phone":""'
+expect_body_contains '"links":{"soundcloud":"parkingdotradio"}'
+expect_body_contains '"hasPhoto":true'
+json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"email":"OTHER@integration.test"}'
+expect_status 409
+json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"bio":"x","hasPhoto":false}'
+expect_status 400
+expect_body_contains 'Unknown field: `hasPhoto`'
+artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE%\}},\"hasPhoto\":false}"
+expect_status 400
+expect_body_contains 'Unknown field: `hasPhoto`'
+photos="$(photos_on_disk)"
+json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"removePhoto":true}'
+expect_status 200
+expect_body_contains '"bio":"Une bio changée."'
+expect_body_contains '"hasPhoto":false'
+[ "$(photos_on_disk)" = "$((photos - 1))" ] || fail "expected the removed photo to be deleted"
+
 echo "  an artist is deleted, with their photo"
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200

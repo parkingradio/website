@@ -79,6 +79,9 @@ endpoints, `GET /api/radio` and `GET /api/events`, except:
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints of photos and flyers, which aren't JSON.
+- The `PUT` endpoints that replace an artist, a collective, an application, a session or a set: their `PATCH` endpoints
+  are the tools that change them, e.g. `update_artist`, which only send what they change, so that they can't erase what
+  they leave out, e.g. the email and the phone they never see.
 
 There's also [`read_documentation`](#read_documentation).
 
@@ -95,19 +98,16 @@ when an app asks them to confirm a change, e.g. "Supprimer un artiste".
 ### Arguments
 
 A tool's arguments are its endpoint's path parameters, its query parameters, which reach it as they're given, and the
-fields of its body. For the endpoints that take an artist or a collective with a photo, or a session with a flyer, which
+fields of its body. For the endpoints that add an artist or a collective with a photo, or a session with a flyer, which
 are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin)), they're the fields
-of the profile or the session, and `removePhoto` or `removeFlyer` for those that change one. Tools can't send photos or
-flyers: what's added with a tool has none, and what's changed with a tool keeps its own, unless `removePhoto` or
-`removeFlyer` is `true`.
-
-The descriptions of the tools that replace an artist, a collective, an application, a session or a set say that what's
-left out is erased, except what their endpoint says it keeps, e.g. an application's `receivedAt`: what they replace has
-to be read first.
+of the profile or the session. Tools can't send photos or flyers: what's added with a tool has none, and what's changed
+with a tool keeps its own, unless `removePhoto` or `removeFlyer` is `true`.
 
 In the tools of `POST` endpoints, a field of the body that can be null can be left out, which sends it as null, e.g. a
 new set's `soundcloudTrack`, or a new session's `start`, which makes a session whose date isn't known yet. The tools of
-`PUT` endpoints don't: they take what their endpoint requires, since they replace everything.
+`PATCH` endpoints take every field as optional, as their endpoints do, and their descriptions say that only what they're
+given changes, and that a list or an object they're given replaces the whole one (see
+[Changes, in Conventions](README.md#conventions)).
 
 ### Results
 
@@ -129,9 +129,9 @@ it. A summary has these fields of the full item, with the same names and shapes:
 
 **Contact details.** The email and the phone of artists and collectives are never in what tools give: whatever a tool
 gives is sent to the model's provider, and these are people's personal contact details. Tools take them, though, since
-what an admin asks the model to save is already in the conversation. A tool that replaces an artist's or a collective's
-profile keeps the email and the phone it isn't given, rather than erasing them, and its description says so. Given as
-`null` or a blank string, they're left out of the profile, as the endpoint takes them.
+what an admin asks the model to save is already in the conversation. A tool that changes an artist's or a collective's
+profile only changes the email and the phone when it's given them, as its `PATCH` endpoint does, and its description
+says that given as `null` or a blank string, they're removed.
 
 ### Hints
 

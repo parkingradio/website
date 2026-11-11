@@ -192,7 +192,8 @@
         },
         "required": [
           "name"
-        ]
+        ],
+        "additionalProperties": false
       },
       "AdminCollectiveProfile": {
         "type": "object",
@@ -348,7 +349,8 @@
         "required": [
           "name",
           "members"
-        ]
+        ],
+        "additionalProperties": false
       },
       "ApiError": {
         "type": "object",
@@ -2247,7 +2249,8 @@
           "name",
           "raEvent",
           "description"
-        ]
+        ],
+        "additionalProperties": false
       },
       "SessionLink": {
         "type": "object",
@@ -2636,7 +2639,8 @@
           "genres",
           "soundcloudTrack",
           "youtubeVideo"
-        ]
+        ],
+        "additionalProperties": false
       },
       "TimeSlot": {
         "type": "object",
@@ -4588,8 +4592,7 @@
         }
       },
       "put": {
-        "operationId": "update_artist",
-        "summary": "Changes an artist's profile, and replaces or removes their photo",
+        "summary": "Replaces an artist's profile, and replaces or removes their photo",
         "tags": [
           "Artists"
         ],
@@ -4713,6 +4716,254 @@
             }
           },
           "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_artist",
+        "summary": "Changes an artist's profile, only the fields it's given, or removes their photo",
+        "tags": [
+          "Artists"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+                  },
+                  "country": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Country"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^\\s*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "genres": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/GenreId"
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "bio": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "description": "Trimmed, then up to 5000 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "links": {
+                    "anyOf": [
+                      {
+                        "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                        "type": "object",
+                        "properties": {
+                          "soundcloud": {
+                            "type": "string"
+                          },
+                          "instagram": {
+                            "type": "string"
+                          },
+                          "web": {
+                            "type": "string"
+                          },
+                          "bandcamp": {
+                            "type": "string"
+                          },
+                          "mixcloud": {
+                            "type": "string"
+                          },
+                          "ra": {
+                            "type": "string"
+                          },
+                          "youtube": {
+                            "type": "string"
+                          },
+                          "spotify": {
+                            "type": "string"
+                          },
+                          "tiktok": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 200 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "removePhoto": {
+                    "type": "boolean",
+                    "description": "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -5174,8 +5425,7 @@
         }
       },
       "put": {
-        "operationId": "update_collective",
-        "summary": "Changes a collective's profile and members, and replaces or removes its photo",
+        "summary": "Replaces a collective's profile and members, and replaces or removes its photo",
         "tags": [
           "Collectives"
         ],
@@ -5299,6 +5549,275 @@
             }
           },
           "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_collective",
+        "summary": "Changes a collective's profile and members, only the fields it's given, or removes its photo",
+        "tags": [
+          "Collectives"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+                  },
+                  "members": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100,
+                              "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then between 1 and 100 characters"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      ]
+                    },
+                    "description": "In order, at least one, once ids that are there twice are dropped. Each one is an artist who exists, by their `id`, or one to create, by their `name`, with everything else left out. Other fields are ignored, and the id is what counts when there are both"
+                  },
+                  "country": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Country"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^\\s*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "city": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "description": "Trimmed, then up to 5000 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "links": {
+                    "anyOf": [
+                      {
+                        "description": "By site, a link to the profile or the profile name, or the address for \"web\". It's saved as the profile name (or the address), which can't be longer than 200 characters. Blank ones are dropped.",
+                        "type": "object",
+                        "properties": {
+                          "soundcloud": {
+                            "type": "string"
+                          },
+                          "instagram": {
+                            "type": "string"
+                          },
+                          "web": {
+                            "type": "string"
+                          },
+                          "bandcamp": {
+                            "type": "string"
+                          },
+                          "mixcloud": {
+                            "type": "string"
+                          },
+                          "ra": {
+                            "type": "string"
+                          },
+                          "youtube": {
+                            "type": "string"
+                          },
+                          "spotify": {
+                            "type": "string"
+                          },
+                          "tiktok": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 200 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 40 characters"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "removePhoto": {
+                    "type": "boolean",
+                    "description": "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -5654,7 +6173,8 @@
                   "performanceTypes",
                   "otherPerformanceType",
                   "details"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -5937,8 +6457,7 @@
         }
       },
       "put": {
-        "operationId": "update_application",
-        "summary": "Changes an application",
+        "summary": "Replaces an application's fields",
         "tags": [
           "Applications"
         ],
@@ -5993,7 +6512,153 @@
                   "performanceTypes",
                   "otherPerformanceType",
                   "details"
-                ]
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "application": {
+                      "$ref": "#/components/schemas/Application"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "application"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_application",
+        "summary": "Changes an application, only the fields it's given",
+        "tags": [
+          "Applications"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dates": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "description": "Saved sorted, without duplicates. Past days are allowed"
+                  },
+                  "timeSlots": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/TimeSlotInput"
+                    },
+                    "description": "Saved sorted, without duplicates. None means any time"
+                  },
+                  "performanceTypes": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PerformanceTypeId"
+                    },
+                    "description": "In any order, even more than once: saved in the order of the list, without duplicates"
+                  },
+                  "otherPerformanceType": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters"
+                  },
+                  "details": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "Trimmed, then up to 2000 characters"
+                  },
+                  "receivedAt": {
+                    "description": "A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then. From the year 2000, in UTC, and not in the future",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -6736,8 +7401,7 @@
         }
       },
       "put": {
-        "operationId": "update_session",
-        "summary": "Changes a session, and replaces or removes its flyer, but not its status or its sets, which move with its start",
+        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status or its sets, which move with its start",
         "tags": [
           "Sessions"
         ],
@@ -6866,6 +7530,167 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_session",
+        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status or its sets, which move with its start",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "description": "A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "durationMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  "type": {
+                    "$ref": "#/components/schemas/SessionType"
+                  },
+                  "takeover": {
+                    "description": "The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none"
+                  },
+                  "raEvent": {
+                    "description": "The event's id on RA, or a link to it. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 5000,
+                    "description": "Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to 5000 characters. Empty for none"
+                  },
+                  "removeFlyer": {
+                    "type": "boolean",
+                    "description": "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
                 }
               }
             }
@@ -7386,8 +8211,7 @@
     },
     "/api/admin/sets/{id}": {
       "put": {
-        "operationId": "update_set",
-        "summary": "Changes a set, but not its session or its status, and returns its session",
+        "summary": "Replaces a set's fields, but not its session or its status, and returns its session",
         "tags": [
           "Sessions"
         ],
@@ -7397,6 +8221,254 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/SetFields"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_set",
+        "summary": "Changes a set, only the fields it's given, but not its session or its status, and returns its session",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "performers": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SentPerformer"
+                    },
+                    "description": "Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped"
+                  },
+                  "offsetMinutes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1439
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "When the set starts, in minutes after its session's start. Null when that isn't known yet"
+                  },
+                  "durationMinutes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1440
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Null when that isn't known yet, which a set with an offset can't be"
+                  },
+                  "performanceTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "dj",
+                        "vinyl",
+                        "live-performance",
+                        "rap",
+                        "full-band"
+                      ]
+                    },
+                    "description": "In any order, even more than once: saved in the order of the list, without duplicates"
+                  },
+                  "otherPerformanceType": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 60 characters. Empty for none"
+                  },
+                  "genres": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "house",
+                        "deep-house",
+                        "tech-house",
+                        "afro-house",
+                        "amapiano",
+                        "disco",
+                        "nu-disco",
+                        "italo",
+                        "techno",
+                        "hard-techno",
+                        "minimal",
+                        "acid",
+                        "electro",
+                        "trance",
+                        "ebm-industrial",
+                        "drum-and-bass",
+                        "jungle",
+                        "breakbeat",
+                        "uk-garage",
+                        "dubstep",
+                        "bass",
+                        "footwork-juke",
+                        "baile-funk",
+                        "hip-hop",
+                        "rap",
+                        "trap",
+                        "rnb",
+                        "funk-soul",
+                        "jazz",
+                        "reggae-dub",
+                        "dancehall",
+                        "reggaeton-latin",
+                        "afrobeat",
+                        "cumbia",
+                        "ambient",
+                        "downtempo",
+                        "experimental",
+                        "noise",
+                        "leftfield",
+                        "pop",
+                        "indie-rock",
+                        "punk",
+                        "synthwave",
+                        "hardcore-gabber"
+                      ]
+                    },
+                    "description": "Most important first. Those that are there twice are dropped, keeping the first"
+                  },
+                  "soundcloudTrack": {
+                    "description": "A link to the track on soundcloud.com, or its private link. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "youtubeVideo": {
+                    "description": "A link to the video on YouTube, or its id. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
               }
             }
           }
