@@ -47,11 +47,20 @@ export async function testDatabase({ before }: { before?: string } = {}): Promis
   const own = new URL(url)
   own.pathname = `/${name}`
   const pool = new Pool({ connectionString: own.toString() })
+  // pg's `pool.end()` resolves before the pool's connections have closed, so `drop` waits for each one's 'end' too. It
+  // drops the database without `force`, so that any other connection still open to it fails the drop rather than being
+  // terminated. (A connection the tests never released makes `pool.end()` hang instead.)
+  const closed: Promise<void>[] = []
+  pool.on('connect', (client) => closed.push(new Promise((resolve) => client.once('end', resolve))))
   const db = drizzle(pool)
   const drop = async () => {
-    await pool.end()
-    await server.query(`drop database if exists ${name} with (force)`)
-    await server.end()
+    try {
+      await pool.end()
+      await Promise.all(closed)
+      await server.query(`drop database if exists ${name}`)
+    } finally {
+      await server.end()
+    }
   }
   try {
     await (before === undefined ? migrateDatabase(db) : migrateUntil(db, before))
