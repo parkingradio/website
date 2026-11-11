@@ -1805,12 +1805,20 @@
                   "updatedAt": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "error": {
+                    "description": "Why the radio's last read of its playlist failed, or null",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 },
                 "required": [
                   "clientId",
                   "updatedBy",
-                  "updatedAt"
+                  "updatedAt",
+                  "error"
                 ],
                 "additionalProperties": false
               },
@@ -3789,7 +3797,7 @@
     "/api/admin/radio/credentials": {
       "get": {
         "operationId": "get_soundcloud_app",
-        "summary": "The SoundCloud app the radio reads playlists through",
+        "summary": "The SoundCloud app the radio reads playlists through, and why the last read of its playlist failed, if it did",
         "tags": [
           "Radio"
         ],

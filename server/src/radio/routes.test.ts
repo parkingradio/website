@@ -7,6 +7,7 @@ import { useZodSchemas } from '../api/schemas.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import type { OnAir } from './on-air.js'
 import type { RadioSettings } from './settings.js'
+import { soundCloudClient } from './soundcloud.js'
 import type { HlsStream, PlaylistTracks, SoundCloudClient, SoundCloudCredentials, SoundCloudTrack } from './soundcloud.js'
 import type { StoredSoundCloudCredentials } from './soundcloud-credentials.js'
 import { soundCloudApp } from './soundcloud-app.js'
@@ -147,6 +148,7 @@ describe('radio routes', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     delete process.env.JWT_SECRET
   })
 
@@ -1117,6 +1119,7 @@ describe('radio routes', () => {
 
     describe('/api/admin/radio/credentials', () => {
       const URL = '/api/admin/radio/credentials'
+      const PLAYLIST_FAILED = 'SoundCloud responded to /playlists with 500'
 
       async function credentials(app: App) {
         return (await app.inject({ method: 'GET', url: URL, cookies: await sessionCookies() })).json()
@@ -1140,9 +1143,73 @@ describe('radio routes', () => {
 
         expect(response).toEqual({
           ok: true,
-          credentials: { clientId: 'client-id', updatedBy: 'someone@example.com', updatedAt: inQuebecTime(ENTERED.updatedAt) },
+          credentials: { clientId: 'client-id', updatedBy: 'someone@example.com', updatedAt: inQuebecTime(ENTERED.updatedAt), error: null },
         })
         expect(JSON.stringify(response)).not.toContain('client-secret')
+      })
+
+      it("says why the radio's last read of its playlist failed, reading it again when that's due, and a read that succeeds clears it", async () => {
+        const app = await buildApp()
+        await radio(app)
+
+        playlist.mockRejectedValue(new Error(PLAYLIST_FAILED))
+        vi.advanceTimersByTime(6 * MINUTE)
+        expect((await credentials(app)).credentials.error).toBe(PLAYLIST_FAILED)
+        expect(playlist).toHaveBeenCalledTimes(2)
+
+        playlist.mockResolvedValue(soundCloudTracks(track(1, 'A')))
+        vi.advanceTimersByTime(MINUTE - 1)
+        expect((await credentials(app)).credentials.error).toBe(PLAYLIST_FAILED)
+        vi.advanceTimersByTime(1)
+        expect((await credentials(app)).credentials.error).toBeNull()
+        expect(playlist).toHaveBeenCalledTimes(3)
+      })
+
+      it('says why, keeping the secret out of the error, when SoundCloud stops issuing tokens for the credentials', async () => {
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })))
+        newClient.mockImplementationOnce(soundCloudClient)
+        const app = await buildApp()
+
+        const response = await credentials(app)
+
+        expect(response.credentials.error).toBe('SoundCloud refused to issue a token: 401')
+        expect(JSON.stringify(response)).not.toContain('client-secret')
+        expect(JSON.stringify(response)).not.toContain(Buffer.from('client-id:client-secret').toString('base64'))
+      })
+
+      it('has no error while no playlist is chosen, since nothing is read', async () => {
+        chosen = null
+        const app = await buildApp()
+
+        expect((await credentials(app)).credentials.error).toBeNull()
+        expect(playlist).not.toHaveBeenCalled()
+      })
+
+      it('keeps the error through previews, whether they succeed or fail', async () => {
+        resolvePlaylist.mockRejectedValue(new Error('SoundCloud responded to /resolve with 500'))
+        const app = await buildApp()
+        await radio(app)
+        expect((await post(app, '/api/admin/radio/preview', { link: LINK })).statusCode).toBe(502)
+        expect((await credentials(app)).credentials.error).toBeNull()
+
+        playlist.mockRejectedValue(new Error(PLAYLIST_FAILED))
+        vi.advanceTimersByTime(6 * MINUTE)
+        expect((await credentials(app)).credentials.error).toBe(PLAYLIST_FAILED)
+        otherPlaylistAtLink()
+        expect((await post(app, '/api/admin/radio/preview', { link: LINK })).statusCode).toBe(200)
+        expect((await credentials(app)).credentials.error).toBe(PLAYLIST_FAILED)
+      })
+
+      it('clears the error when a playlist is chosen, since it was just read', async () => {
+        playlist.mockRejectedValue(new Error(PLAYLIST_FAILED))
+        const app = await buildApp()
+        expect((await credentials(app)).credentials.error).toBe(PLAYLIST_FAILED)
+
+        otherPlaylistAtLink()
+        expect((await post(app, '/api/admin/radio/playlist', { link: LINK })).statusCode).toBe(200)
+
+        expect((await credentials(app)).credentials.error).toBeNull()
+        expect(playlist.mock.calls).toEqual([['7', null], ['9', 's-AbC123']])
       })
 
       it('saves the credentials, trimmed, once SoundCloud accepts them, and returns them without the secret', async () => {
@@ -1154,7 +1221,7 @@ describe('radio routes', () => {
         expect(response.statusCode).toBe(200)
         expect(response.json()).toEqual({
           ok: true,
-          credentials: { clientId: 'new-id', updatedBy: 'admin@example.com', updatedAt: '2026-10-01T08:00:00-04:00' },
+          credentials: { clientId: 'new-id', updatedBy: 'admin@example.com', updatedAt: '2026-10-01T08:00:00-04:00', error: null },
         })
         expect(newClient).toHaveBeenCalledExactlyOnceWith({ clientId: 'new-id', clientSecret: 'new-secret' })
         expect(checkCredentials).toHaveBeenCalledOnce()
@@ -1166,29 +1233,89 @@ describe('radio routes', () => {
         })
       })
 
-      it('puts the radio on air through them right away, with the client that checked them', async () => {
+      it('puts the radio on air through them right away, reading the playlist with the client that checked them', async () => {
         entered = null
         const app = await buildApp()
         expect((await app.inject({ method: 'GET', url: '/api/radio' })).statusCode).toBe(502)
 
-        await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+        const response = await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
 
+        expect(response.json().credentials.error).toBeNull()
+        expect(playlist).toHaveBeenCalledOnce()
         expect((await radio(app)).current.track.id).toBe('1')
-        // It already has a token for them.
+        // It already has a token for them, so no other client asks for one.
+        expect(newClient).toHaveBeenCalledOnce()
+        // /api/radio didn't read the playlist again.
+        expect(playlist).toHaveBeenCalledOnce()
+      })
+
+      it('shows who entered the same credentials again elsewhere, and when, keeping their client', async () => {
+        const app = await buildApp()
+        await credentials(app)
+
+        entered = { ...ENTERED, updatedBy: 'other@example.com', updatedAt: new Date(NOW - MINUTE) }
+
+        expect((await credentials(app)).credentials).toMatchObject({ updatedBy: 'other@example.com', updatedAt: inQuebecTime(new Date(NOW - MINUTE)) })
         expect(newClient).toHaveBeenCalledOnce()
       })
 
-      it('reads the playlist again right away through new credentials, going on with what it read before if that fails', async () => {
+      it('keeps reading through new credentials when a request that loaded the old ones goes on after they were saved', async () => {
         const app = await buildApp()
         await radio(app)
+        let resolveStale: ((settings: RadioSettings) => void) | undefined
+        loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+        const stale = radio(app)
+        await vi.waitFor(() => expect(resolveStale).toBeDefined())
+        await vi.waitFor(() => expect(loadCredentials).toHaveBeenCalledTimes(2))
 
         await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
-        playlist.mockRejectedValue(new Error('SoundCloud responded with 500'))
+        resolveStale!(CHOSEN)
+        await stale
+        await radio(app)
 
+        // Once at first, then once through the new credentials, which the request that loaded the old ones went on with.
+        expect(playlist).toHaveBeenCalledTimes(2)
+      })
+
+      it('says why reading the playlist through new credentials failed, though they were saved, and the radio goes on with what it read before', async () => {
+        const app = await buildApp()
+        await radio(app)
+        playlist.mockRejectedValue(new Error(PLAYLIST_FAILED))
+
+        const response = await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json().credentials).toMatchObject({ clientId: 'new-id', error: PLAYLIST_FAILED })
+        expect(saveCredentials).toHaveBeenCalledOnce()
         expect((await radio(app)).current.track.id).toBe('1')
         expect(playlist).toHaveBeenCalledTimes(2)
         // The one that checked them.
         expect(newClient).toHaveBeenCalledTimes(2)
+      })
+
+      it('reads nothing while no playlist is chosen', async () => {
+        chosen = null
+        const app = await buildApp()
+
+        const response = await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+        expect(response.json().credentials).toMatchObject({ clientId: 'new-id', error: null })
+        expect(playlist).not.toHaveBeenCalled()
+      })
+
+      it('needs nothing more from the database once the credentials are saved', async () => {
+        const app = await buildApp()
+        saveCredentials.mockImplementationOnce(async (credentials) => {
+          entered = credentials
+          loadSettings.mockRejectedValue(new Error('Connection terminated'))
+          loadCredentials.mockRejectedValue(new Error('Connection terminated'))
+        })
+
+        const response = await put(app, { clientId: 'new-id', clientSecret: 'new-secret' })
+
+        expect(response.statusCode).toBe(200)
+        expect(response.json().credentials).toMatchObject({ clientId: 'new-id', error: null })
+        expect(playlist).toHaveBeenCalledOnce()
       })
 
       it('ignores credentials that a request loaded before newer ones were saved', async () => {

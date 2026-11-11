@@ -8,7 +8,7 @@ The server reads the playlist through a SoundCloud app, whose credentials are en
 [The SoundCloud app](#the-soundcloud-app)): until they are, it can't read any playlist, so the radio is off air. The
 server reads the playlist again every 5 minutes, so that changes made to it on SoundCloud get on the radio. If
 SoundCloud can't be reached, or none of the playlist's tracks can be played in full anymore, the radio goes on with what
-it read before.
+it read before, and the server tries again a minute later.
 
 The playlist can be private, and so can a private playlist's tracks: they play like the others, and their private
 links aren't handed out to listeners. A private playlist can only be read through its private link, which ends with its
@@ -37,10 +37,15 @@ pattern is used whole as the artist, with no event or date.
 The server reads playlists, and resolves the links to the tracks of [sets](sessions.md#links), through a SoundCloud app,
 whose credentials (a client ID and a secret) are found in the apps of the SoundCloud account it belongs to. They're kept
 in the database rather than set when the site is deployed, so that they can be changed without deploying it again. Its
-secret is never sent back once it's entered: it can only be replaced.
+secret is never sent back once it's entered: it can only be replaced. It never appears in the logs, or in any error.
 
 The server checks credentials with SoundCloud before it saves them, so that a typo can't take the radio off air, and
 the radio reads its playlist through them right away.
+
+Their `error` is why the radio's last read of its playlist failed, which is the chosen playlist's `error` (see
+[`GET /api/admin/radio`](#get-apiadminradio-admin)), or null when that read succeeded, or while no playlist is chosen.
+Previewing a playlist doesn't change it. It's only kept in memory, so it's null after the server restarts, until a read
+fails.
 
 ## Tracks
 
@@ -140,12 +145,13 @@ Fails like the preview, and with 400 when none of the playlist's tracks can be p
 
 ## `GET /api/admin/radio/credentials` (admin)
 
-The SoundCloud app the server reads SoundCloud through (see [The SoundCloud app](#the-soundcloud-app)).
+The SoundCloud app the server reads SoundCloud through (see [The SoundCloud app](#the-soundcloud-app)). Like
+`GET /api/admin/radio`, it reads the playlist again when that's due, so that `error` is up to date.
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `credentials` | object or null | The app's `clientId`, and who last changed the credentials (`updatedBy`, an admin's email) and when (`updatedAt`). Null until they're entered: until then, the radio is off air |
+| `credentials` | object or null | The app's `clientId`, who last changed the credentials (`updatedBy`, an admin's email) and when (`updatedAt`), and `error` (see [The SoundCloud app](#the-soundcloud-app)). Null until they're entered: until then, the radio is off air |
 
 ## `PUT /api/admin/radio/credentials` (admin)
 
@@ -154,9 +160,10 @@ The SoundCloud app the server reads SoundCloud through (see [The SoundCloud app]
 | `clientId` | string | The app's client ID, up to 200 characters. Trimmed |
 | `clientSecret` | string | The app's client secret, up to 200 characters. Trimmed |
 
-Asks SoundCloud for a token with the credentials, and only if it gives one, saves them and responds like
-`GET /api/admin/radio/credentials`. The radio reads its playlist through them right away. Fails with 400 (either one
-is blank or too long, or SoundCloud refuses them) or 502 (SoundCloud can't be reached).
+Asks SoundCloud for a token with the credentials, and only if it gives one, saves them, reads the radio's playlist
+through them, if one is chosen, and responds like `GET /api/admin/radio/credentials`: its `error` is that of this read,
+which can fail even though they were saved. Fails with 400 (either one is blank or too long, or SoundCloud refuses them)
+or 502 (SoundCloud can't be reached).
 
 ## `POST /api/admin/radio/credentials/check` (admin)
 

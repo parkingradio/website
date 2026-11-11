@@ -157,7 +157,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/radio`](radio.md#get-apiadminradio-admin) | admin | The playlist the radio's rotation is read from |
 | [`POST /api/admin/radio/preview`](radio.md#post-apiadminradiopreview-admin) | admin | What the radio would read from a playlist |
 | [`POST /api/admin/radio/playlist`](radio.md#post-apiadminradioplaylist-admin) | admin | Choosing the playlist the rotation is read from |
-| [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the server reads SoundCloud through |
+| [`GET /api/admin/radio/credentials`](radio.md#get-apiadminradiocredentials-admin) | admin | The SoundCloud app the server reads SoundCloud through, and why the last read failed, if it did |
 | [`PUT /api/admin/radio/credentials`](radio.md#put-apiadminradiocredentials-admin) | admin | Entering the credentials of that SoundCloud app |
 | [`POST /api/admin/radio/credentials/check`](radio.md#post-apiadminradiocredentialscheck-admin) | admin | Whether SoundCloud accepts credentials, without saving them |
 | [`GET /api/video`](video.md#get-apivideo) | public | The video the site shows now |

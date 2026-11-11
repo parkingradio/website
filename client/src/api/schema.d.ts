@@ -693,7 +693,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The SoundCloud app the radio reads playlists through */
+        /** The SoundCloud app the radio reads playlists through, and why the last read of its playlist failed, if it did */
         get: operations["get_soundcloud_app"];
         /** Entering the credentials of the SoundCloud app */
         put: {
@@ -3046,6 +3046,8 @@ export interface components {
                 updatedBy: string;
                 /** Format: date-time */
                 updatedAt: string;
+                /** @description Why the radio's last read of its playlist failed, or null */
+                error: string | null;
             } | null;
         };
         RadioPlaylist: {

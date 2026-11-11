@@ -26,7 +26,10 @@ export function SoundCloudCredentials() {
       save={({ id, secret }) => api.PUT('/api/admin/radio/credentials', { body: { clientId: id, clientSecret: secret } })}
       status={(saved) =>
         saved ? (
-          <p className="admin-meta">{byWhom('Changés', saved.updatedBy, saved.updatedAt)}</p>
+          <>
+            <p className="admin-meta">{byWhom('Changés', saved.updatedBy, saved.updatedAt)}</p>
+            {saved.error && <p className="admin-error">La dernière lecture de la playlist de la radio a échoué&nbsp;: {saved.error}</p>}
+          </>
         ) : (
           <p className="admin-placeholder">
             Aucun identifiant&nbsp;: la radio ne peut lire aucune playlist, elle est hors ondes, et les liens SoundCloud des sets ne peuvent
