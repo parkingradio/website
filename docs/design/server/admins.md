@@ -12,9 +12,9 @@ who forgot their password a link to choose a new one.
 
 Admins invite others by email. The invite links to the client's `/accept-invite?token=<token>` page (see
 [Accepting an invite](../client/admin/admins.md#accepting-an-invite)), which sets the admin's password with
-`POST /api/auth/accept-invite`. An invite lasts 24 hours and can only be used once. Inviting an address again replaces
-its earlier invite, but keeps when and by whom the admin was first invited. Invites can't be sent when `MAIL_DOMAIN`
-isn't set (see [Conventions](README.md#conventions)).
+`POST /api/auth/accept-invite`. An invite lasts 24 hours and can only be used once. Inviting an address again, whatever
+its case, replaces its earlier invite, but keeps the address as it was first invited, and when and by whom. Invites
+can't be sent when `MAIL_DOMAIN` isn't set (see [Conventions](README.md#conventions)).
 
 ## Sessions
 
@@ -74,11 +74,11 @@ Tells whether there's a session, and whose.
 
 | Request field | Type | |
 |---|---|---|
-| `email` | string | Who to invite |
+| `email` | string | Who to invite: an email address like an artist's (see [Profiles](artists.md#profiles)), up to 200 characters. It's trimmed |
 
-Emails an invite to `email` (see [Invites](#invites)), and responds `{"ok": true}`. Fails with 400 (missing email), 409
-(already an admin who accepted their invite) or 500 (the server isn't set up to send email). An email that fails to send
-is only logged.
+Emails an invite to `email` (see [Invites](#invites)), and responds `{"ok": true}`. Fails with 400 (an `email` that
+isn't such an address), 409 (already an admin who accepted their invite) or 500 (the server isn't set up to send email).
+An email that fails to send is only logged.
 
 ## `GET /api/admin/admins` (admin)
 

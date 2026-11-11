@@ -4,6 +4,7 @@ import { ApiError, Ok, Timestamp, Total, zodRoutes } from '../api/schemas.js'
 import { AdminStatus, adminStatus, inviteLink } from './store.js'
 import type { AdminsStore, StoredAdmin } from './store.js'
 import type { SendEmail } from '../core/email.js'
+import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
 
 // Admin routes for the admins themselves: see them, invite them, and revoke them. Logging in is in
 // admins/auth-routes.ts.
@@ -26,6 +27,16 @@ const Admin = z
   .meta({ id: 'Admin' })
 
 const NO_SUCH_ADMIN: z.infer<typeof ApiError> = { ok: false, error: 'No such admin' }
+
+// Who to invite: an email address like an artist's (see artists/profile.ts), trimmed. Whatever's wrong with it gets the
+// same single error, which doesn't repeat it.
+const NOT_AN_EMAIL_ADDRESS = 'Not an email address'
+const InviteEmail = z
+  .string()
+  .trim()
+  .max(EMAIL_MAX_LENGTH, { error: NOT_AN_EMAIL_ADDRESS, abort: true })
+  .refine(isEmailAddress, NOT_AN_EMAIL_ADDRESS)
+  .meta({ description: `An email address, which is trimmed, up to ${EMAIL_MAX_LENGTH} characters` })
 
 // An admin, as the admin pages show them to `you`, the admin who asked, `now`.
 function admin(stored: StoredAdmin, you: string, now: Date): z.infer<typeof Admin> {
@@ -102,7 +113,7 @@ export async function adminRoutes(app: FastifyInstance, { store, sendEmail, orig
       schema: {
         summary: 'Invites an admin by email',
         tags: ['Admins'],
-        body: z.object({ email: z.string().min(1) }),
+        body: z.object({ email: InviteEmail }),
         // 500 when the server can't send emails.
         response: { 200: Ok, 409: ApiError, 500: ApiError },
       },

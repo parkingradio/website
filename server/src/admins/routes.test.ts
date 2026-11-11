@@ -175,13 +175,35 @@ describe('admin routes', () => {
       expect(send).not.toHaveBeenCalled()
     })
 
-    it('fails with 400 without an email, saying why', async () => {
+    it('invites the address trimmed, as it was typed otherwise, up to 200 characters', async () => {
       const app = await buildApp()
+      const longest = `${'x'.repeat(200 - '@example.com'.length)}@example.com`
+      for (const [sent, invited] of [
+        ['  New-Admin@example.com \n', 'New-Admin@example.com'],
+        [longest, longest],
+      ]) {
+        expect((await request(app, 'POST', '/api/admin/invite', { email: sent })).statusCode).toBe(200)
+        expect(store.invite).toHaveBeenLastCalledWith(invited, { active: 'refuse', invitedBy: TEST_ADMIN.email })
+        expect(send.mock.lastCall![0].to).toEqual([invited])
+      }
+    })
+
+    it('fails with 400 for anything but an email address, saying why once', async () => {
+      const app = await buildApp()
+      const notAnAddress = '`email`: Not an email address'
       const refused: [unknown, string][] = [
         [{}, '`email`: Invalid input: expected string, received undefined'],
-        [{ email: '' }, '`email`: Too small: expected string to have >=1 characters'],
         [{ email: ['new-admin@example.com'] }, '`email`: Invalid input: expected string, received array'],
         [null, 'body: Invalid input: expected object, received null'],
+        [{ email: '' }, notAnAddress],
+        [{ email: '   ' }, notAnAddress],
+        [{ email: 'foo' }, notAnAddress],
+        [{ email: 'new-admin@example' }, notAnAddress],
+        [{ email: 'New Admin <new-admin@example.com>' }, notAnAddress],
+        [{ email: 'new-admin@example.com, other@example.com' }, notAnAddress],
+        // Too long, whether it looks like an address or not.
+        [{ email: `${'x'.repeat(201 - '@example.com'.length)}@example.com` }, notAnAddress],
+        [{ email: 'x'.repeat(201) }, notAnAddress],
       ]
       for (const [body, error] of refused) {
         const response = await app.inject({

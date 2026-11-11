@@ -54,6 +54,27 @@ describe('Admins', () => {
     await waitFor(() => expect(requestsTo('GET', '/api/admin/admins')).toHaveLength(2))
   })
 
+  it('says what is wrong with an address that is not one, blank included, rather than sending it', async () => {
+    mockFetch({ ...LOADED, 'POST /api/admin/invite': { ok: true } })
+    render(<Admins />)
+    await row('me@example.com')
+    invite('new-admin@example.com')
+    await screen.findByText('Invitation envoyée.')
+
+    for (const address of ['foo', 'Admin <admin@example.com>', '']) {
+      invite(address)
+      expect(screen.getByText('Adresse e-mail invalide.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Courriel')).toHaveAttribute('aria-invalid', 'true')
+      // What an earlier invite said no longer stays.
+      expect(screen.queryByText('Invitation envoyée.')).not.toBeInTheDocument()
+    }
+    expect(requestsTo('POST', '/api/admin/invite')).toHaveLength(1)
+
+    fireEvent.change(screen.getByLabelText('Courriel'), { target: { value: 'new' } })
+    expect(screen.queryByText('Adresse e-mail invalide.')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Courriel')).not.toHaveAttribute('aria-invalid')
+  })
+
   it('shows the error after a failed invite', async () => {
     mockFetch({
       ...LOADED,

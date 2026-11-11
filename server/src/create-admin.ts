@@ -1,5 +1,5 @@
 import { adminsStore, createAdmin } from './admins/store.js'
-import { isEmailAddress } from './artists/profile.js'
+import { EMAIL_MAX_LENGTH, isEmailAddress } from './artists/profile.js'
 import { config } from './core/config.js'
 import { db } from './db/connection.js'
 
@@ -10,7 +10,8 @@ import { db } from './db/connection.js'
 // (see tools/create-admin), and in development, with `npm run create-admin -w server -- <email>`.
 
 const args = process.argv.slice(2)
-if (args.length !== 1 || !isEmailAddress(args[0])) {
+// Like the addresses admins are invited with from the admin pages (see admins/routes.ts), but not trimmed.
+if (args.length !== 1 || !isEmailAddress(args[0]) || args[0].length > EMAIL_MAX_LENGTH) {
   console.error(args.length === 1 ? `Not an email address: ${args[0]}` : 'usage: create-admin <email>')
   process.exit(2)
 }
