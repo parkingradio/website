@@ -46,9 +46,9 @@ be reached.
 
 ## `GET /api/admin/video/credentials` (admin)
 
-The YouTube channel the server reads the video from (see [The YouTube credentials](#the-youtube-credentials)). Unlike
-the other credentials' endpoints, it reads YouTube too, like `GET /api/video`, and shares what that reads, so that
-`error` is up to date: still at most once a minute.
+The YouTube channel the server reads the video from (see [The YouTube credentials](#the-youtube-credentials)). It reads
+YouTube too, like `GET /api/video`, and shares what that reads, so that `error` is up to date: still at most once a
+minute.
 
 | Response field | Type | |
 |---|---|---|

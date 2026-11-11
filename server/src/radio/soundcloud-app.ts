@@ -15,17 +15,18 @@ export class NoSoundCloudCredentials extends Error {
   }
 }
 
+// The credentials that were entered, and the client that uses them.
+export type EnteredApp = { credentials: StoredSoundCloudCredentials; client: SoundCloudClient }
+
 export type SoundCloudApp = {
   // Builds a client for SoundCloud that uses the credentials it's given, e.g. to check them.
   newClient: (credentials: SoundCloudCredentials) => SoundCloudClient
-  // The credentials that were entered, or null until they are.
-  loadCredentials(): Promise<StoredSoundCloudCredentials | null>
   // Saves the credentials, and uses `client`, which uses them, from now on.
   save(credentials: StoredSoundCloudCredentials, client: SoundCloudClient): Promise<void>
-  // The client for the credentials that were entered, or null until they are. They're loaded every time, so that every
-  // server picks up a change. Credentials loaded before newer ones were saved, by a request that was already under way,
-  // are ignored.
-  client(): Promise<SoundCloudClient | null>
+  // The credentials that were entered, with their client, or null until they are. They're loaded every time, so that
+  // every server picks up a change. Credentials loaded before newer ones were saved, by a request that was already under
+  // way, are ignored.
+  current(): Promise<EnteredApp | null>
   // The id of the track a link to it on soundcloud.com leads to, or null when SoundCloud shows no track there. Throws a
   // NoSoundCloudCredentials until the credentials are entered, or SoundCloud's error.
   resolveTrack(link: string): Promise<string | null>
@@ -33,8 +34,8 @@ export type SoundCloudApp = {
 
 // Only keeps what it's given until it's used, so that it can be built without a database, e.g. by generate-openapi.ts.
 export function soundCloudApp(newClient: SoundCloudApp['newClient'], credentials: SoundCloudCredentialsStore): SoundCloudApp {
-  // The client for the credentials that were entered last, replaced whenever they change.
-  let last: { credentials: StoredSoundCloudCredentials; client: SoundCloudClient } | null = null
+  // The credentials that were entered last, with their client, which is replaced whenever they change.
+  let last: EnteredApp | null = null
 
   function sameCredentials(a: SoundCloudCredentials, b: SoundCloudCredentials): boolean {
     return a.clientId === b.clientId && a.clientSecret === b.clientSecret
@@ -42,25 +43,25 @@ export function soundCloudApp(newClient: SoundCloudApp['newClient'], credentials
 
   const app: SoundCloudApp = {
     newClient,
-    loadCredentials: () => credentials.load(),
 
     async save(saved, client) {
       await credentials.save(saved)
       last = { credentials: saved, client }
     },
 
-    async client() {
+    async current() {
       const loaded = await credentials.load()
       if (!loaded) return null
-      if (last && (sameCredentials(last.credentials, loaded) || last.credentials.updatedAt > loaded.updatedAt)) return last.client
-      last = { credentials: loaded, client: newClient(loaded) }
-      return last.client
+      if (last && last.credentials.updatedAt > loaded.updatedAt) return last
+      // The same credentials, entered again, keep their client, and its token.
+      last = { credentials: loaded, client: last && sameCredentials(last.credentials, loaded) ? last.client : newClient(loaded) }
+      return last
     },
 
     async resolveTrack(link) {
-      const client = await app.client()
-      if (!client) throw new NoSoundCloudCredentials()
-      return client.resolveTrack(link)
+      const entered = await app.current()
+      if (!entered) throw new NoSoundCloudCredentials()
+      return entered.client.resolveTrack(link)
     },
   }
   return app
