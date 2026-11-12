@@ -63,6 +63,13 @@ button gives the same view. Without `sort`, a list is in the order its page give
 statuses. `sort` without `order` sorts that way when it names the column that order is by, and in ascending order
 otherwise.
 
+## Tables
+
+A table too wide for its space, e.g. on phones, scrolls sideways rather than squeezing its columns. Since phones hide
+the scrollbar, a light shadow along its left or right edge shows that there's more of it on that side, until it's
+scrolled to that end. Every table of the admin pages does this. The shadow doesn't keep what's under it from being read
+or used.
+
 ## Status colors
 
 Wherever the admin pages list applications, sessions or sets, the rows of those that are done are greyed out, text, links

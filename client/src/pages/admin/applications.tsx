@@ -8,6 +8,7 @@ import { APPLICATION_STATUSES } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import { AdminTable } from './admin-table'
 import { ApplicationForm } from './application-form'
 import {
   KIND_LABELS,
@@ -121,7 +122,7 @@ export function ApplicationsTable({
       <th>{label}</th>
     )
   return (
-    <table className="admin-table" aria-labelledby={labelledBy}>
+    <AdminTable aria-labelledby={labelledBy}>
       <thead>
         <tr>
           {header('received', 'Reçue le')}
@@ -182,7 +183,7 @@ export function ApplicationsTable({
           )
         })}
       </tbody>
-    </table>
+    </AdminTable>
   )
 }
 

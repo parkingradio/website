@@ -7,6 +7,7 @@ import type { Loaded } from '../../api/use-api'
 import { raEventId } from '../../session-links'
 import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
 import type { Session, SessionStatus, StudioSet } from '../../session-fields'
+import { AdminTable } from './admin-table'
 import { Button } from './button'
 import {
   MISSING,
@@ -129,7 +130,7 @@ function SessionsTable({
       <th>{label}</th>
     )
   return (
-    <table className="admin-table" aria-labelledby={labelledBy}>
+    <AdminTable aria-labelledby={labelledBy}>
       <thead>
         <tr>
           {header('date', 'Date')}
@@ -160,7 +161,7 @@ function SessionsTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </AdminTable>
   )
 }
 
@@ -203,7 +204,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
         (sets.length === 0 ? (
           <p className="admin-placeholder">Aucun set.</p>
         ) : (
-          <table className="admin-table" aria-labelledby={headingId}>
+          <AdminTable aria-labelledby={headingId}>
             <thead>
               <tr>
                 <th>Date</th>
@@ -236,7 +237,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
                 </tr>
               ))}
             </tbody>
-          </table>
+          </AdminTable>
         ))}
     </>
   )
@@ -638,7 +639,7 @@ function SetsTable({
   onDelete: (set: StudioSet) => void
 }) {
   return (
-    <table className="admin-table admin-table-controls" aria-label="Sets">
+    <AdminTable className="admin-table-controls" aria-label="Sets">
       <thead>
         <tr>
           <th>Heure</th>
@@ -685,7 +686,7 @@ function SetsTable({
           </tr>
         ))}
       </tbody>
-    </table>
+    </AdminTable>
   )
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../../api/client'
 import type { Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
+import { AdminTable } from './admin-table'
 import { dateTimeFormat } from './describe'
 
 // The Admins page's sections about apps: connecting Claude to the admin pages, and the apps the admin connected (see
@@ -105,7 +106,7 @@ export function ConnectedApps() {
     list = <p className="admin-placeholder">Aucune application connectée.</p>
   } else {
     list = (
-      <table className="admin-table">
+      <AdminTable>
         <thead>
           <tr>
             <th>Application</th>
@@ -119,7 +120,7 @@ export function ConnectedApps() {
             <ConnectionRow key={connection.id} connection={connection} onChange={() => setVersion((version) => version + 1)} />
           ))}
         </tbody>
-      </table>
+      </AdminTable>
     )
   }
 

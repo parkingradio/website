@@ -4,6 +4,7 @@ import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import { AdminTable } from './admin-table'
 import { ArtistForm } from './artist-form'
 import { OwnApplications } from './applications'
 import { OwnSets } from './sessions'
@@ -90,7 +91,7 @@ function ArtistsList({ query }: { query: string }) {
     )
   }
   return (
-    <table className="admin-table">
+    <AdminTable>
       <thead>
         <tr>
           <SortHeader column="name" sorting={sorting}>
@@ -117,7 +118,7 @@ function ArtistsList({ query }: { query: string }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </AdminTable>
   )
 }
 

@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type { ApiError, Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../../artist-profile'
+import { AdminTable } from './admin-table'
 import { ConnectClaude, ConnectedApps } from './connections'
 import { dateFormat, dateTimeFormat } from './describe'
 import { Labeled } from './fields'
@@ -94,7 +95,7 @@ function AdminsList({ version, onChange }: { version: number; onChange: () => vo
     )
   }
   return (
-    <table className="admin-table">
+    <AdminTable>
       <thead>
         <tr>
           <th>Courriel</th>
@@ -108,7 +109,7 @@ function AdminsList({ version, onChange }: { version: number; onChange: () => vo
           <AdminRow key={admin.id} admin={admin} onChange={onChange} />
         ))}
       </tbody>
-    </table>
+    </AdminTable>
   )
 }
 

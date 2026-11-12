@@ -333,10 +333,45 @@
   color: #666;
 }
 
-/* Lists of artists and applications. */
+/* A table (see admin-table.tsx), which scrolls sideways when it's too wide for its space, rather than squeezing its
+   columns, with a shadow on each side that has more of it, since phones hide the scrollbar. The shadows are over the
+   table, but light enough that it can still be read, and let clicks and taps through.
+
+   The scroller has room around the table (`--room`), which the frame takes back with its margins, so that the table is
+   where it would be without them, but the focus outlines at its edges aren't cut off, e.g. those of the first column's
+   links, which have no padding on their left. */
+.admin-table-frame {
+  --room: 4px;
+  position: relative;
+  margin: calc(1.5rem - var(--room)) calc(-1 * var(--room)) calc(-1 * var(--room));
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  padding: var(--room);
+}
+
+.admin-table-frame[data-more-before]::before,
+.admin-table-frame[data-more-after]::after {
+  content: '';
+  position: absolute;
+  inset-block: var(--room);
+  width: 12px;
+  pointer-events: none;
+}
+
+.admin-table-frame::before {
+  left: 0;
+  background: linear-gradient(to right, rgb(0 0 0 / 15%), transparent);
+}
+
+.admin-table-frame::after {
+  right: 0;
+  background: linear-gradient(to left, rgb(0 0 0 / 15%), transparent);
+}
+
 .admin-table {
   width: 100%;
-  margin-top: 1.5rem;
   border-collapse: collapse;
 }
 
@@ -856,12 +891,6 @@ dl.admin-record {
   .admin .admin-search {
     flex-basis: 100%;
     margin-left: 0;
-  }
-
-  /* Too wide for phones, tables scroll sideways rather than squeezing their columns. */
-  .admin-table {
-    display: block;
-    overflow-x: auto;
   }
 
   .admin-record dl,

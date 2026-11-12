@@ -28,6 +28,16 @@ if (!('showModal' in HTMLDialogElement.prototype)) {
   })
 }
 
+// Nor ResizeObserver: elements never change size in jsdom, so it never calls back. Assigned once, so that a test can stub
+// one of its own, which `vi.unstubAllGlobals` takes away.
+if (!('ResizeObserver' in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}
+
 beforeEach(() => {
   // ConfigProvider fetches /api/config on mount, so every test that renders it needs that request
   // answered. Tests stubbing fetch themselves override this.

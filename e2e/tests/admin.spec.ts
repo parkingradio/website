@@ -2,7 +2,7 @@ import { test, expect, admin, adminMenu, logIn, submitLogin, PHOTO } from './fix
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
 // photo, the database, the private bucket and back, then removing the photo, searching the seeded artists and
-// collectives, and the applications of collectives.
+// collectives, the applications of collectives, and tables too wide for their space.
 
 test.describe('logging in', () => {
   test('a wrong password is refused, and the login form stays', async ({ page }) => {
@@ -289,4 +289,34 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await expect(page.getByText('Collectifs', { exact: true })).toBeHidden()
 
   for (const id of [knownId, addedId]) expect((await page.request.delete(`/api/admin/artists/${id}`)).ok()).toBe(true)
+})
+
+test('a table too wide for its space scrolls sideways, with a shadow on each side that has more of it', async ({ page, hasDrawer }) => {
+  // A phone's screen, or, on a computer, a window narrow enough that the menu leaves the section too little room.
+  if (!hasDrawer) await page.setViewportSize({ width: 800, height: 800 })
+  await logIn(page, { at: '/admin/sessions?status=all' })
+  const scroller = page.getByRole('table').locator('xpath=..')
+  const frame = scroller.locator('xpath=..')
+  // Once every session is listed.
+  await expect(page.getByRole('table')).toContainText('ONDE COMMUNE TAKEOVER')
+  const { scrollWidth, clientWidth } = await scroller.evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }))
+  expect(scrollWidth, 'the list of sessions is too wide for the screen').toBeGreaterThan(clientWidth)
+
+  // Which sides have a shadow, as drawn.
+  const shadows = () =>
+    frame.evaluate((element) => ({
+      before: getComputedStyle(element, '::before').content !== 'none',
+      after: getComputedStyle(element, '::after').content !== 'none',
+    }))
+
+  // At its start, the shadow is only on its right.
+  await expect(frame).not.toHaveAttribute('data-more-before')
+  await expect(frame).toHaveAttribute('data-more-after')
+  expect(await shadows()).toEqual({ before: false, after: true })
+
+  // At its end, only on its left.
+  await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }))
+  await expect(frame).toHaveAttribute('data-more-before')
+  await expect(frame).not.toHaveAttribute('data-more-after')
+  expect(await shadows()).toEqual({ before: true, after: false })
 })
