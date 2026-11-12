@@ -162,9 +162,9 @@ The SoundCloud app the server reads SoundCloud through (see [The SoundCloud app]
 | `clientSecret` | string | The app's client secret, up to 200 characters. Trimmed |
 
 Asks SoundCloud for a token with the credentials, and only if it gives one, saves them, reads the radio's playlist
-through them, if one is chosen, and responds like `GET /api/admin/radio/credentials`: its `error` is that of this read,
-which can fail even though they were saved. Fails with 400 (either one is blank or too long, or SoundCloud refuses them)
-or 502 (SoundCloud can't be reached).
+through the newest credentials, if one is chosen, and responds like `GET /api/admin/radio/credentials`, with those
+credentials: its `error` is that of this read, which can fail even though they were saved. Fails with 400 (either one is
+blank or too long, or SoundCloud refuses them) or 502 (SoundCloud can't be reached).
 
 ## `POST /api/admin/radio/credentials/check` (admin)
 

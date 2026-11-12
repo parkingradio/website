@@ -117,9 +117,11 @@ async function streamStatus(app: App, id: string) {
   return (await app.inject({ method: 'GET', url: `/api/radio/tracks/${id}/stream` })).statusCode
 }
 
+const CREDENTIALS_URL = '/api/admin/radio/credentials'
+
 // Enters the credentials of the SoundCloud app.
 async function put(app: App, body: unknown) {
-  return app.inject({ method: 'PUT', url: '/api/admin/radio/credentials', payload: body as object, cookies: await sessionCookies() })
+  return app.inject({ method: 'PUT', url: CREDENTIALS_URL, payload: body as object, cookies: await sessionCookies() })
 }
 
 // Runs `change` while `request` is under way, once it has started loading the credentials and the chosen playlist, which
@@ -1187,11 +1189,10 @@ describe('radio routes', () => {
     })
 
     describe('/api/admin/radio/credentials', () => {
-      const URL = '/api/admin/radio/credentials'
       const PLAYLIST_FAILED = 'SoundCloud responded to /playlists with 500'
 
       async function credentials(app: App) {
-        return (await app.inject({ method: 'GET', url: URL, cookies: await sessionCookies() })).json()
+        return (await app.inject({ method: 'GET', url: CREDENTIALS_URL, cookies: await sessionCookies() })).json()
       }
 
       it('returns null until the credentials have been entered', async () => {
@@ -1456,7 +1457,7 @@ describe('radio routes', () => {
 
         const response = await app.inject({
           method: 'POST',
-          url: `${URL}/check`,
+          url: `${CREDENTIALS_URL}/check`,
           payload: { clientId: ' new-id ', clientSecret: ' new-secret ' },
           cookies: await sessionCookies(),
         })
@@ -1473,8 +1474,8 @@ describe('radio routes', () => {
 
       // Saving them checks them too, the same way.
       describe.each([
-        ['PUT', URL],
-        ['POST', `${URL}/check`],
+        ['PUT', CREDENTIALS_URL],
+        ['POST', `${CREDENTIALS_URL}/check`],
       ] as const)('%s %s', (method, url) => {
         const send = (app: App, body: unknown) => sendJson(app, method, url, body)
 
