@@ -47,7 +47,7 @@ describe('SynthMeetups', () => {
   it('renders the banner and one thumbnail button per poster', () => {
     render(<SynthMeetups />)
     expect(screen.getByAltText('Synth Meetups')).toBeInTheDocument()
-    expect(screen.getAllByRole('button')).toHaveLength(9)
+    expect(screen.getAllByRole('button')).toHaveLength(10)
   })
 
   it('expands a poster into a lightbox on click, and closes it on a second click', () => {
