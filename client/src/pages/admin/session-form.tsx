@@ -16,8 +16,8 @@ import {
   checkSession,
   durationOf,
   endTimeAfter,
-  minutesOf,
   isCollectivesApplication,
+  minutesOf,
   sessionTimes,
   typeName,
 } from '../../session-fields'

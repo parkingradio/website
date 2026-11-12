@@ -663,7 +663,7 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
 }
 
 // A set's links, by the names of their sites, each leading to it, then the application it comes from, if any, leading
-// to its page, and named by when it was received for screen readers and in a tooltip.
+// to its page, and named by when it was received for screen readers.
 function SetLinks({ set }: { set: StudioSet }) {
   const links = [
     { name: 'SoundCloud', link: set.soundcloudTrack },
@@ -678,7 +678,7 @@ function SetLinks({ set }: { set: StudioSet }) {
   if (set.application) {
     const label = `Candidature ${receivedOn(set.application)}`
     links.push(
-      <Link key="application" to={applicationPath(set.application)} aria-label={label} title={label}>
+      <Link key="application" to={applicationPath(set.application)} aria-label={label}>
         Candidature
       </Link>,
     )

@@ -11,7 +11,7 @@ import { FieldError } from './fields'
 
 const NO_APPLICATION: ComboboxOption = { key: '', label: 'Aucune candidature' }
 
-// E.g. "Reçue le 28 mars 2026".
+// `text` with its first letter in upper case, e.g. "Reçue le 28 mars 2026" for "reçue le 28 mars 2026".
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 type ApplicationFieldProps = {
@@ -26,7 +26,8 @@ type ApplicationFieldProps = {
   // Who an application is for, as its label starts with in a set's form. In a session's, it's the takeover's collective,
   // which is left out.
   ownerName?: (application: Application) => string | undefined
-  // What the field says while there's nothing to pick, e.g. before the set has performers.
+  // What the field says while there's nothing to pick, e.g. before the set has performers, once the applications are
+  // loaded.
   empty: string
   onChange: (application: ApplicationLink | null) => void
   error?: string
@@ -53,8 +54,9 @@ export function ApplicationField({ candidates, applications, own, selected, owne
       link !== null && !candidates.some(({ id }) => id === link.id) && links.findIndex((other) => other?.id === link.id) === i,
   )
   const options = [...kept, ...candidates].map(optionOf)
-  // Without anything to pick, the field shows what it says instead.
-  if (options.length > 0) options.unshift(NO_APPLICATION)
+  // Without anything to pick, the field shows what it says instead, unless the applications couldn't be loaded, since
+  // there might be some.
+  if (options.length > 0 || applications === null) options.unshift(NO_APPLICATION)
   return (
     <div className="admin-field">
       <label htmlFor={id}>Candidature</label>
@@ -70,7 +72,8 @@ export function ApplicationField({ candidates, applications, own, selected, owne
         invalid={!!error}
         placeholder={empty}
       />
-      <FieldError message={error} />
+      {/* Announced, since changing another field, e.g. the set's performers, can make it wrong. */}
+      <FieldError message={error} alert />
     </div>
   )
 }

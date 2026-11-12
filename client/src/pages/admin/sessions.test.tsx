@@ -744,6 +744,17 @@ describe("A session's page", () => {
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-2', application: 'application-5' })
   })
 
+  it("keeps the takeover's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
+    mockFetch({ ...PAGE, ...EVENTS, '/api/admin/collectives': { ok: true, collectives: [ONDES] }, '/api/admin/applications': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
+    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 1 septembre 2026')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Candidature' }))
+    expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026'])
+  })
+
   it('sends no application for another type than a takeover', async () => {
     mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
@@ -1589,9 +1600,24 @@ describe("A set's form", () => {
     expect(applicationPicker()).toHaveAttribute('placeholder', "Choisissez d'abord les artistes.")
     pick('Aurore')
     expect(applicationPicker()).toHaveValue('')
+    expect(applicationPicker()).toHaveAttribute('placeholder', 'Aucune candidature de cet artiste.')
+    pick('Cyan')
     expect(applicationPicker()).toHaveAttribute('placeholder', 'Aucune candidature de ces artistes.')
     pick('Brume')
     expect(applicationPicker()).toHaveValue('Aucune candidature')
+  })
+
+  it('offers no application but none to a set without one when the applications could not be loaded', async () => {
+    mockFetch({ ...PAGE, ...ARTISTS, '/api/admin/applications': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    expect(screen.getByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
+    pick('Aurore')
+    // Rather than saying that Aurore has none, which the form doesn't know.
+    expect(applicationPicker()).toHaveValue('Aucune candidature')
+    fireEvent.click(applicationPicker())
+    expect(options()).toEqual(['Aucune candidature'])
   })
 
   it("keeps the set's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
@@ -1813,15 +1839,46 @@ describe('Adding a session', () => {
     const first = renderAt('/admin/sessions/nouvelle?takeover=collective-1')
     expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
     expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
+    // Its application is picked among the collective's.
+    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Candidature' }))
+    expect(options()).toEqual(['Aucune candidature', 'Reçue le 1 septembre 2026retenue · 14 nov. 2026, 21 nov. 2026'])
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Reçue le 1 septembre 2026/ }))
     await fillIn({ type: null })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
-    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1' })
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1', application: 'application-1' })
     first.unmount()
 
     renderAt('/admin/sessions/nouvelle?takeover=unknown')
     expect(await screen.findByRole('radio', { name: 'Takeover' })).not.toBeChecked()
     expect(screen.queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+  })
+
+  it("says when there is no application to pick, before the takeover's collective is picked, or when it has none", async () => {
+    const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
+    mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] } })
+    renderAt('/admin/sessions/nouvelle')
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Takeover' }))
+    const picker = screen.getByRole('combobox', { name: 'Candidature' })
+    expect(picker).toHaveValue('')
+    expect(picker).toHaveAttribute('placeholder', "Choisissez d'abord le collectif.")
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    expect(picker).toHaveValue('')
+    expect(picker).toHaveAttribute('placeholder', 'Aucune candidature de ce collectif.')
+  })
+
+  it('offers no application but none when the applications could not be loaded, which it says', async () => {
+    mockFetch({ ...NEW, '/api/admin/applications': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/nouvelle?takeover=collective-1')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
+    // Rather than saying that the collective has none, which the form doesn't know.
+    expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Candidature' }))
+    expect(options()).toEqual(['Aucune candidature'])
   })
 
   it("shows the server's error, linking to the session it would overlap", async () => {

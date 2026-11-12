@@ -50,7 +50,7 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
   const suggested =
     artists && form.genres.length === 0 ? membersGenres(form.performers, new Map(artists.map((artist) => [artist.id, artist]))).slice(0, SUGGESTED_GENRES) : []
 
-  // The applications of its performers, in their order.
+  // The applications of its performers, in their order: each performer's on their own, to keep that order.
   const candidates = form.performers.flatMap((performer) => applications?.filter((application) => isPerformersApplication(application, [performer])) ?? [])
   const artistName = (application: Application) => (artists ?? form.performers).find((artist) => artist.id === application.artistId)?.name
 
@@ -81,7 +81,11 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
         own={initial.application}
         selected={form.application}
         ownerName={artistName}
-        empty={form.performers.length === 0 ? "Choisissez d'abord les artistes." : 'Aucune candidature de ces artistes.'}
+        empty={
+          form.performers.length === 0
+            ? "Choisissez d'abord les artistes."
+            : `Aucune candidature ${form.performers.length === 1 ? 'de cet artiste' : 'de ces artistes'}.`
+        }
         onChange={(application) => update({ application })}
         error={shown('application')}
         onLeave={leave('application')}

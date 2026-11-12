@@ -67,30 +67,32 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
   sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
   [Status](../../server/sessions.md#status)).
-- "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer"),
-  how long it lasts ("Durée"), its type ("Type"), for a takeover its collective ("Takeover de"), linking to it, and the
+- "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer");
+  how long it lasts ("Durée"); its type ("Type"); for a takeover, its collective ("Takeover de"), linking to it, and the
   application it comes from ("Candidature"), named by when it was received, e.g. "reçue le 1 septembre 2026", linking to
-  its page, or "-" when it has none, its title ("Nom"), faded out when it's the name its type gives it, its description ("Description"), with its line breaks,
-  faded out when it's the one its type gives it, or "-" when it has none, its flyer ("Flyer"), or "Pas de flyer" in its
-  place, so that the team notices, and its event on RA ("Événement RA"), linking to it, or "-" when it has none, with
-  "créer", which opens the panel to create it under it (see [Creating its event on RA](#creating-its-event-on-ra)).
-  "modifier" changes the session in a form in its place (see [The session form](#the-session-form)).
+  its page, or "-" when it has none; its title ("Nom"), faded out when it's the name its type gives it; its description
+  ("Description"), with its line breaks, faded out when it's the one its type gives it, or "-" when it has none; its
+  flyer ("Flyer"), or "Pas de flyer" in its place, so that the team notices; and its event on RA ("Événement RA"),
+  linking to it, or "-" when it has none, with "créer", which opens the panel to create it under it (see
+  [Creating its event on RA](#creating-its-event-on-ra)). "modifier" changes the session in a form in its place (see
+  [The session form](#the-session-form)).
 - "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
   linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
   its links ("Liens": "SoundCloud", "YouTube", each linking to it, then "Candidature", linking to the page of the
-  application it comes from, which its tooltip and screen readers name by when it was received), its status, as buttons that change it, "modifier",
-  which opens its form (see [A set's form](#a-sets-form)), and "×", which deletes it for good after confirming, its
-  artists staying. When a status can't be changed, or a set can't be deleted, the section says why above the sets,
-  naming it. "ajouter un set" opens the form of a new one. While the session is cancelled, "ajouter un set" can't be
-  used, saying « La session est annulée : on ne peut pas lui ajouter de set. », and neither can its sets' "planifié"
-  and "joué", saying « La session est annulée : on ne peut pas rétablir ses sets. » (see [Controls that can't be
-  used](layout.md#controls-that-cant-be-used)). A set that isn't cancelled, and doesn't fit in the
-  session or overlaps another set that isn't cancelled (see [Sets' places](../../server/sessions.md#sets-places)), has a
-  "⚠" after its times, whose tooltip (see [Tooltips](layout.md#tooltips)) says why, a sentence per line: first « Commence
-  après la session. » when it starts at or after the session's end, « Finit après la session. » when it ends after it,
-  or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
-  « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
-  [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
+  application it comes from, which screen readers name by when it was received, e.g. "Candidature reçue le 1 septembre
+  2026"), its status, as buttons that change it, "modifier", which opens its form (see [A set's form](#a-sets-form)),
+  and "×", which deletes it for good after confirming, its artists staying. When a status can't be changed, or a set
+  can't be deleted, the section says why above the sets, naming it. "ajouter un set" opens the form of a new one. While
+  the session is cancelled, "ajouter un set" can't be used, saying « La session est annulée : on ne peut pas lui ajouter
+  de set. », and neither can its sets' "planifié" and "joué", saying « La session est annulée : on ne peut pas rétablir
+  ses sets. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)). A set that isn't cancelled, and
+  doesn't fit in the session or overlaps another set that isn't cancelled (see [Sets'
+  places](../../server/sessions.md#sets-places)), has a "⚠" after its times, whose tooltip (see
+  [Tooltips](layout.md#tooltips)) says why, a sentence per line: first « Commence après la session. » when it starts at
+  or after the session's end, « Finit après la session. » when it ends after it, or « Dure plus longtemps que la
+  session. » when its place isn't known but it lasts longer than the session, then « Chevauche le set de Cyan,
+  22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see [Names](#names)). This doesn't prevent
+  anything, since times are changed one at a time.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
   takeover's collective, stay, which the page says of those it has.
 
@@ -225,15 +227,16 @@ form, each one is named by its artist and when it was received, e.g. "Aurore, re
 session's by when it was received, e.g. "Reçue le 1 septembre 2026", followed by its status and the first few days the
 artist would like to play, written as [Candidatures](candidatures.md) lists them, e.g. "retenue · 14 nov. 2026, 21 nov.
 2026". While there's none to pick, the field says why: "Choisissez d'abord les artistes." or "Choisissez d'abord le
-collectif.", or "Aucune candidature de ces artistes." or "Aucune candidature de ce collectif.". The set's or the
-session's own application stays among the options, and so does the one picked, even when it isn't one of those
-anymore, e.g. once its artist is taken out of the set.
+collectif.", or "Aucune candidature de cet artiste.", "Aucune candidature de ces artistes." or "Aucune candidature de ce
+collectif.", unless the applications couldn't be loaded (see below), when "Aucune candidature" can always be picked. The
+set's or the session's own application stays among the options, and so does the one picked, even when it isn't one of
+those anymore, e.g. once its artist is taken out of the set.
 
 The forms never take the application away on their own: as soon as the set's performers, or the takeover's collective,
-change so that its application isn't theirs anymore, the field says so, e.g. « La candidature doit être celle d'un des
-artistes du set : choisissez-en une autre, ou « Aucune candidature ». », and the form can't be sent until another one,
-or none, is picked. The only exception is a session saved as another type than a takeover, which loses it, like its
-collective (see [The session form](#the-session-form)).
+change so that its application isn't theirs anymore, the field says so, which screen readers announce, e.g. « La
+candidature doit être celle d'un des artistes du set : choisissez-en une autre, ou « Aucune candidature ». », and the
+form can't be sent until another one, or none, is picked. The only exception is a session saved as another type than a
+takeover, which loses it, like its collective (see [The session form](#the-session-form)).
 
 The applications are loaded each time a form opens, along with the artists or the collectives. When they can't be, the
 form says so above it, and only the set's or the session's own application, named by when it was received, and
