@@ -254,6 +254,35 @@ describe("a session's application", () => {
   })
 })
 
+describe('the application', () => {
+  it("doesn't change, its status included, when sets and sessions are given it, have it taken away, or are deleted", async () => {
+    const aurore = await createArtist('Aurore')
+    const collective = await createCollective('Haute Rive', [{ id: aurore }])
+    const [artists, collectives] = [await createApplication({ artistId: aurore }), await createApplication({ collectiveId: collective })]
+    for (const id of [artists, collectives]) {
+      expect((await request('PUT', `/api/admin/applications/${id}/status`, { status: 'accepted' })).statusCode).toBe(200)
+      expect((await request('PATCH', `/api/admin/applications/${id}`, { details: 'Changée.' })).statusCode).toBe(200)
+    }
+    const tracked = async (id: string) => {
+      const { status, statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt } = await application(id)
+      return { status, statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt }
+    }
+    const before = [await tracked(artists), await tracked(collectives)]
+    expect(before[0]).toMatchObject({ status: 'accepted', updatedBy: 'admin@example.com' })
+
+    const session = await sessionId({ type: 'takeover', takeover: collective, application: collectives })
+    const set = await setId(session, { performers: [{ id: aurore }], application: artists })
+    expect((await request('PATCH', `/api/admin/sets/${set}`, { application: null })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sessions/${session}`, { application: null })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sets/${set}`, { application: artists })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sessions/${session}`, { application: collectives })).statusCode).toBe(200)
+    expect([await tracked(artists), await tracked(collectives)]).toEqual(before)
+    expect((await request('DELETE', `/api/admin/sets/${set}`)).statusCode).toBe(200)
+    expect((await request('DELETE', `/api/admin/sessions/${session}`)).statusCode).toBe(200)
+    expect([await tracked(artists), await tracked(collectives)]).toEqual(before)
+  })
+})
+
 describe('deleting', () => {
   it('an application takes it from its sets and sessions, which stay, without counting as a change', async () => {
     const aurore = await createArtist('Aurore')

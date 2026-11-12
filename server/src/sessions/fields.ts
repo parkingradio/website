@@ -128,7 +128,7 @@ export type BrokenRule = { message: string; field: string }
 
 // The rules of a session's type, its takeover's collective and its application, by their ids, and its name (see "Types
 // and names" and "Applications" in docs/design/server/sessions.md). The store checks the rest of its application's rule,
-// which needs the application (see `checkApplication` in sessions/store.ts).
+// which needs the application (see `checkSessionApplication` in sessions/store.ts).
 export function brokenSessionRule({
   type,
   takeover,
@@ -142,8 +142,8 @@ export function brokenSessionRule({
 }): BrokenRule | null {
   if (type === 'takeover' && takeover === null) return { message: 'A takeover has a collective', field: 'takeover' }
   if (type !== 'takeover' && takeover !== null) return { message: 'Only a takeover has a collective', field: 'takeover' }
-  if (type !== 'takeover' && application !== null) return { message: 'Only a takeover has an application', field: 'application' }
   if (type === 'other' && name === '') return { message: 'A session of type other has a name', field: 'name' }
+  if (type !== 'takeover' && application !== null) return { message: 'Only a takeover has an application', field: 'application' }
   return null
 }
 

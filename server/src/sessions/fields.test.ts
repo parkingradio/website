@@ -335,6 +335,8 @@ describe('the rules that involve several fields', () => {
       field: 'application',
     })
     expect(brokenSessionRule({ type: 'other', ...none, name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
+    // After the rules of the other fields.
+    expect(brokenSessionRule({ type: 'other', ...none, application: 'a', name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
   })
 
   it("are those of a set's place", () => {

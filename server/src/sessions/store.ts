@@ -53,7 +53,7 @@ export class NoSuchReference extends Error {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
 // it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts), or its application
-// (see `checkApplication`). The message says which.
+// (see `checkSessionApplication` and `checkSetApplication`). The message says which.
 export class BrokenFields extends Error {}
 
 // `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
@@ -151,7 +151,7 @@ export type SessionsStore = {
 }
 
 // The application with `id`, and when it was received, as a set or a session gives it, or null for none.
-function applicationLink(id: string | null, receivedAt: Date | null): StoredApplicationLink | null {
+function storedApplicationLink(id: string | null, receivedAt: Date | null): StoredApplicationLink | null {
   return id === null ? null : { id, receivedAt: receivedAt! }
 }
 
@@ -180,7 +180,7 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
   const found = new Map<string, StoredSet[]>()
   for (const { set, receivedAt } of rows) {
     if (!found.has(set.sessionId)) found.set(set.sessionId, [])
-    found.get(set.sessionId)!.push({ ...set, performers: performersOf.get(set.id) ?? [], application: applicationLink(set.applicationId, receivedAt) })
+    found.get(set.sessionId)!.push({ ...set, performers: performersOf.get(set.id) ?? [], application: storedApplicationLink(set.applicationId, receivedAt) })
   }
   return found
 }
@@ -204,7 +204,7 @@ async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: numb
   return rows.map(({ session, takeoverName, receivedAt }) => ({
     ...session,
     takeover: session.takeoverId === null ? null : { id: session.takeoverId, name: takeoverName! },
-    application: applicationLink(session.applicationId, receivedAt),
+    application: storedApplicationLink(session.applicationId, receivedAt),
     sets: setsBySession.get(session.id) ?? [],
   }))
 }
@@ -296,12 +296,11 @@ async function checkSessionApplication(tx: Queryable, { applicationId, takeoverI
   if ((await applicationOwner(tx, applicationId)).collectiveId !== takeoverId) throw new BrokenFields(NOT_THE_SESSIONS_APPLICATION)
 }
 
-// Checks that a set's application, if it has one, is that of one of its performers, `performerIds`, which it reads only
-// then, once they're checked. Throws a NoSuchReference or a BrokenFields.
-async function checkSetApplication(tx: Queryable, applicationId: string | null, performerIds: () => Promise<string[]>) {
-  if (applicationId === null) return
+// Checks that a set's application is that of one of its performers, `performerIds`, once they're checked. Throws a
+// NoSuchReference or a BrokenFields.
+async function checkSetApplication(tx: Queryable, applicationId: string, performerIds: string[]) {
   const { artistId } = await applicationOwner(tx, applicationId)
-  if (artistId === null || !(await performerIds()).includes(artistId)) throw new BrokenFields(NOT_THE_SETS_APPLICATION)
+  if (artistId === null || !performerIds.includes(artistId)) throw new BrokenFields(NOT_THE_SETS_APPLICATION)
 }
 
 // The ids of the performers of the set `setId`, as they're saved.
@@ -472,7 +471,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
         if (!session) return null
         if (session.status === 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, sessionId))
         await checkPerformers(tx, performers)
-        await checkSetApplication(tx, set.applicationId, async () => idsOf(performers))
+        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
         const row = { ...set, sessionId }
         const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }))
         await addPerformers(tx, id, performers)
@@ -492,7 +491,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
         check(brokenSetRule(set))
         if (performers) await checkPerformers(tx, performers)
         // Against its new performers, or else those it has.
-        await checkSetApplication(tx, set.applicationId, async () => (performers ? idsOf(performers) : savedPerformerIds(tx, id)))
+        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, performers ? idsOf(performers) : await savedPerformerIds(tx, id))
         await checkingSetRules(tx, id, set, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
         if (performers) {
           await tx.delete(setPerformers).where(eq(setPerformers.setId, id))

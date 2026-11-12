@@ -226,10 +226,12 @@ isn't the id of an application that exists (`"No such application"`), and an app
 (`"A set's application is one of its performers'"`) or the session (`"Only a takeover has an application"`, or `"A
 session's application is that of the collective whose takeover it is"`). These are checked on the set or the session as
 it would then be, after its other fields, the rules between them, and whether its takeover's collective or its
-performers exist. So taking the application's artist out of a set's performers, or changing the type of a session that
-has an application, or its takeover's collective, takes sending another `application`, or null, in the same request,
-and a change that only sends `application` is checked against the performers, or the type and the collective, that the
-set or the session already has. These rules hold even for requests sent at the same time.
+performers exist. So, in the same request, taking the application's artist out of a set's performers takes sending
+`application` as null, or as an application of one of its other performers, changing a session that has an application
+to another type takes sending `application` as null, and changing its takeover's collective takes sending it as null,
+or as an application of the new collective. A change that only sends `application` is checked against the performers,
+or the type and the collective, that the set or the session already has. These rules hold even for requests sent at the
+same time.
 
 Deleting an application takes it from its sets and sessions, which stay, without one, and so does deleting an artist,
 which deletes their applications. A collective with an application that's a session's can't be deleted anyway, since

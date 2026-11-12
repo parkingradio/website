@@ -338,7 +338,7 @@ function applicationFields({ days, timeSlots, performanceTypes, otherPerformance
 }
 
 // The day that's `offset` days after today (before, if negative), as "YYYY-MM-DD", in local time.
-function day(offset: number): string {
+export function day(offset: number): string {
   const today = new Date()
   const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
