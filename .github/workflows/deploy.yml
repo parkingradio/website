@@ -29,7 +29,20 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      TF_VAR_ghcr_image: ghcr.io/parkingradio/website
     steps:
+      # The new instance pulls the image without credentials: make sure it works.
+      - name: Check that the image can be pulled anonymously
+        env:
+          APP_IMAGE_TAG: ${{ inputs.app_image_tag }}
+        run: |
+          image="$TF_VAR_ghcr_image:$APP_IMAGE_TAG"
+          if ! DOCKER_CONFIG="$(mktemp -d)" docker manifest inspect "$image" > /dev/null; then
+            echo "::error::$image can't be pulled anonymously: the tag may not exist, or the package may not be public"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: aws-actions/configure-aws-credentials@v6
