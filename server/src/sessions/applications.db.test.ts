@@ -191,9 +191,9 @@ describe("a set's application", () => {
     const { sets } = await application(applied)
     // In the order of the list of sessions: those without a start first, then the most recent first.
     expect(sets).toEqual([
-      { id: someday, start: null, end: null, status: 'planned', session: { id: undated, title: 'UN JOUR', start: null } },
-      { id: rebooked, start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T22:00:00-05:00', status: 'planned', session: { id: later, title: 'PLUS TARD', start: '2026-11-21T21:00:00-05:00' } },
-      { id: cancelled, start: null, end: null, status: 'cancelled', session: { id: first, title: 'ANNULÉE', start: '2026-11-14T21:00:00-05:00' } },
+      { id: someday, start: null, end: null, offsetMinutes: null, durationMinutes: null, status: 'planned', session: { id: undated, title: 'UN JOUR', start: null } },
+      { id: rebooked, start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T22:00:00-05:00', offsetMinutes: 0, durationMinutes: 60, status: 'planned', session: { id: later, title: 'PLUS TARD', start: '2026-11-21T21:00:00-05:00' } },
+      { id: cancelled, start: null, end: null, offsetMinutes: null, durationMinutes: null, status: 'cancelled', session: { id: first, title: 'ANNULÉE', start: '2026-11-14T21:00:00-05:00' } },
     ])
     const listed = (await request('GET', `/api/admin/applications?artist=${aurore}`)).json().applications
     expect(listed).toEqual([expect.objectContaining({ id: applied, sets, sessions: [] })])
@@ -211,7 +211,7 @@ describe("a session's application", () => {
     expect(response.json().session.application).toEqual({ id: applied, receivedAt: '2026-10-01T12:00:00-04:00' })
     expect(await application(applied)).toMatchObject({
       sets: [],
-      sessions: [{ id, title: 'HAUTE RIVE TAKEOVER', start: '2026-11-14T21:00:00-05:00', end: '2026-11-15T00:00:00-05:00', status: 'planned' }],
+      sessions: [{ id, title: 'HAUTE RIVE TAKEOVER', start: '2026-11-14T21:00:00-05:00', end: '2026-11-15T00:00:00-05:00', durationMinutes: 180, status: 'planned' }],
     })
     await checkSessionsInvariants(database.db)
   })

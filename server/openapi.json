@@ -906,6 +906,9 @@
             ],
             "description": "Its start plus its duration. Null when its start is"
           },
+          "durationMinutes": {
+            "type": "number"
+          },
           "status": {
             "$ref": "#/components/schemas/SessionStatus"
           }
@@ -915,6 +918,7 @@
           "title",
           "start",
           "end",
+          "durationMinutes",
           "status"
         ],
         "additionalProperties": false
@@ -948,6 +952,18 @@
               }
             ],
             "description": "Its start plus its duration. Null when its start is"
+          },
+          "offsetMinutes": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMinutes": {
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SessionStatus"
@@ -988,6 +1004,8 @@
           "id",
           "start",
           "end",
+          "offsetMinutes",
+          "durationMinutes",
           "status",
           "session"
         ],

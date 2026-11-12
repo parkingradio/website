@@ -57,9 +57,9 @@ An application can lead to sets, for an artist's, or to sessions, for a collecti
 `application` it then is, which follows the rules there, and the application lists them, so that each can be found from
 the other. It can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it. Linking them
 doesn't change the application's status, which admins still change themselves. Each one is listed with its `id`,
-`start`, `end` and `status`, as its endpoints give them, in the order of `GET /api/admin/sessions`, then of a session's
-sets: a session with its `title` too, and a set with its `session`, an object with its session's `id`, `title` and
-`start`. Deleting an application takes it from its sets and sessions, which stay.
+`start`, `end`, `durationMinutes` and `status`, as its endpoints give them, in the order of `GET /api/admin/sessions`,
+then of a session's sets: a session with its `title` too, and a set with its `offsetMinutes`, and its `session`, an
+object with its session's `id`, `title` and `start`. Deleting an application takes it from its sets and sessions, which stay.
 
 ## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
 

@@ -511,8 +511,9 @@ describe('applications routes', () => {
       const session = { id: 'session-2', title: 'GUEST MIXES', start: '2026-11-14T21:00:00-05:00' }
       expect(artists.json().application).toMatchObject({
         sets: [
-          { id: 'set-3', start: '2026-11-14T22:00:00-05:00', end: '2026-11-14T23:00:00-05:00', status: 'cancelled', session },
-          { id: 'set-4', start: null, end: null, status: 'planned', session },
+          { id: 'set-3', start: '2026-11-14T22:00:00-05:00', end: '2026-11-14T23:00:00-05:00', offsetMinutes: 60, durationMinutes: 60, status: 'cancelled', session },
+          // Without a place in its session.
+          { id: 'set-4', start: null, end: null, offsetMinutes: null, durationMinutes: 60, status: 'planned', session },
         ],
         sessions: [],
       })
@@ -520,7 +521,7 @@ describe('applications routes', () => {
       const collectives = await send(app, 'GET', '/api/admin/applications/application-2')
       expect(collectives.json().application).toMatchObject({
         sets: [],
-        sessions: [{ id: 'session-1', title: 'LES ONDES TAKEOVER', start: null, end: null, status: 'planned' }],
+        sessions: [{ id: 'session-1', title: 'LES ONDES TAKEOVER', start: null, end: null, durationMinutes: 240, status: 'planned' }],
       })
       const list = (await send(app, 'GET', '/api/admin/applications')).json().applications
       expect(list.map(({ id, sets, sessions }: { id: string; sets: unknown[]; sessions: unknown[] }) => [id, sets.length, sessions.length])).toEqual([

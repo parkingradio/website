@@ -782,10 +782,10 @@ json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$candidate")"
 expect_status 200
 rebooked="$(last_set)"
 json GET "${APPLICATIONS}/${artists_application}"
-expect_body_contains "\"sets\":[{\"id\":\"${applied_set}\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T17:00:00-04:00\",\"status\":\"planned\",\"session\":{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\"}},{\"id\":\"${rebooked}\""
+expect_body_contains "\"sets\":[{\"id\":\"${applied_set}\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T17:00:00-04:00\",\"offsetMinutes\":0,\"durationMinutes\":60,\"status\":\"planned\",\"session\":{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\"}},{\"id\":\"${rebooked}\""
 expect_body_contains '"sessions":[]'
 json GET "${APPLICATIONS}/${collectives_application}"
-expect_body_contains "\"sets\":[],\"sessions\":[{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T18:00:00-04:00\",\"status\":\"planned\"}]"
+expect_body_contains "\"sets\":[],\"sessions\":[{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T18:00:00-04:00\",\"durationMinutes\":120,\"status\":\"planned\"}]"
 
 echo "  a change that would break those rules fails, and leaves the set or the session as it was"
 for change in "{\"application\":\"${collectives_application}\"}" "{\"application\":\"${rivals_application}\"}" "{\"performers\":[{\"id\":\"${rival}\"}]}"; do

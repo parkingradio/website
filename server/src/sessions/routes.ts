@@ -264,8 +264,8 @@ export function conflictBody({ error, session, set }: { error: string; session?:
 
 // The sets and the sessions that come from an application, as its endpoints return them (see "Applications" in
 // docs/design/server/applications.md).
-const ApplicationSession = SessionBody.pick({ id: true, title: true, start: true, end: true, status: true }).meta({ id: 'ApplicationSession' })
-const ApplicationSet = SetBody.pick({ id: true, start: true, end: true, status: true })
+const ApplicationSession = SessionBody.pick({ id: true, title: true, start: true, end: true, durationMinutes: true, status: true }).meta({ id: 'ApplicationSession' })
+const ApplicationSet = SetBody.pick({ id: true, start: true, end: true, offsetMinutes: true, durationMinutes: true, status: true })
   .extend({ session: SessionBody.pick({ id: true, title: true, start: true }).meta({ description: "The set's session" }) })
   .meta({ id: 'ApplicationSet' })
 export const ApplicationLinks = {
@@ -290,14 +290,14 @@ export function linksByApplication(sessions: StoredSession[]): Map<string, Appli
   }
   for (const session of sessions) {
     if (session.application) {
-      const { id, title, start, end, status } = sessionBody(session)
-      of(session.application.id).sessions.push({ id, title, start, end, status })
+      const { id, title, start, end, durationMinutes, status } = sessionBody(session)
+      of(session.application.id).sessions.push({ id, title, start, end, durationMinutes, status })
     }
     const ofSession = { id: session.id, title: sessionTitle(session), start: session.startAt?.toISOString() ?? null }
     for (const set of session.sets) {
       if (!set.application) continue
-      const { id, start, end, status } = setBody(set, session)
-      of(set.application.id).sets.push({ id, start, end, status, session: ofSession })
+      const { id, start, end, offsetMinutes, durationMinutes, status } = setBody(set, session)
+      of(set.application.id).sets.push({ id, start, end, offsetMinutes, durationMinutes, status, session: ofSession })
     }
   }
   return links

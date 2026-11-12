@@ -2909,6 +2909,7 @@ export interface components {
             start: string | null;
             /** @description Its start plus its duration. Null when its start is */
             end: string | null;
+            durationMinutes: number;
             status: components["schemas"]["SessionStatus"];
         };
         ApplicationSet: {
@@ -2917,6 +2918,8 @@ export interface components {
             start: string | null;
             /** @description Its start plus its duration. Null when its start is */
             end: string | null;
+            offsetMinutes: number | null;
+            durationMinutes: number | null;
             status: components["schemas"]["SessionStatus"];
             /** @description The set's session */
             session: {
