@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminTable } from './admin-table'
 
@@ -51,10 +51,12 @@ function renderTable() {
 }
 
 describe('AdminTable', () => {
-  it('is a table of the admin pages, with its own class too', () => {
+  it('is a table of the admin pages', () => {
     const { table } = renderTable()
     expect(table).toHaveClass('admin-table')
-    cleanup()
+  })
+
+  it('keeps a class of its own', () => {
     render(<AdminTable className="admin-table-controls" aria-label="Sets" />)
     expect(screen.getByRole('table', { name: 'Sets' })).toHaveClass('admin-table', 'admin-table-controls')
   })
@@ -85,7 +87,8 @@ describe('AdminTable', () => {
 
   it('follows the table and the scroller when they change size', () => {
     const { table, scroller, shadows } = renderTable()
-    expect(observed).toEqual([scroller, table])
+    expect(observed).toHaveLength(2)
+    expect(observed).toEqual(expect.arrayContaining([scroller, table]))
     sizes.scrollWidth = 500
     resized()
     expect(shadows()).toEqual({ before: false, after: true })

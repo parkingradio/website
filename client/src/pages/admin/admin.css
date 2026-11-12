@@ -339,7 +339,8 @@
 
    The scroller has room around the table (`--room`), which the frame takes back with its margins, so that the table is
    where it would be without them, but the focus outlines at its edges aren't cut off, e.g. those of the first column's
-   links, which have no padding on their left. */
+   links, which have no padding on their left. Once scrolled, the rows, and the shadows, then reach into that room, a
+   little past the section's edges. */
 .admin-table-frame {
   --room: 4px;
   position: relative;
