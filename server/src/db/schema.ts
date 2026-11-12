@@ -237,6 +237,9 @@ export const sessions = pgTable(
     // The collective whose takeover the session is, which only takeovers have, and they always do. So a collective can't
     // be deleted while it has takeovers, which the server checks first, under the sessions' lock (see sessions/store.ts).
     takeoverId: uuid('takeover_id').references(() => collectives.id, { onDelete: 'restrict' }),
+    // The application the session comes from, which is its takeover's collective's, as the server checks, under the
+    // sessions' lock (see sessions/store.ts). Deleting the application takes it from the session, which stays.
+    applicationId: uuid('application_id').references(() => applications.id, { onDelete: 'set null' }),
     raEventId: text('ra_event_id'),
     description: text('description').notNull().default(''), // plain text, "" for none, which its type's then replaces
     // Where the flyer is stored (see `Photos` in artists/store.ts), and its MIME type, as checked from its contents. Both
@@ -254,6 +257,7 @@ export const sessions = pgTable(
   },
   (table) => [
     index('sessions_takeover_id_idx').on(table.takeoverId),
+    index('sessions_application_id_idx').on(table.applicationId),
     check('sessions_duration', sql`${table.durationMinutes} between 1 and 1440`),
     check('sessions_status', oneOf(table.status, STATUSES)),
     check('sessions_type', oneOf(table.type, SESSION_TYPES)),
@@ -289,6 +293,9 @@ export const sets = pgTable(
     soundcloudTrackId: text('soundcloud_track_id'),
     soundcloudTrackUrl: text('soundcloud_track_url'),
     youtubeVideoId: text('youtube_video_id'),
+    // The application the set comes from, which is one of its performers', as the server checks, under the sessions' lock
+    // (see sessions/store.ts). Deleting the application takes it from the set, which stays.
+    applicationId: uuid('application_id').references(() => applications.id, { onDelete: 'set null' }),
     // The email of the admin who last changed the set, and when (null until then). Status changes don't count.
     updatedBy: text('updated_by'),
     updatedAt: timestamp('updated_at', { withTimezone: true }),
@@ -299,6 +306,7 @@ export const sets = pgTable(
   },
   (table) => [
     index('sets_session_id_idx').on(table.sessionId),
+    index('sets_application_id_idx').on(table.applicationId),
     // A track, or a video, belongs to at most one set.
     uniqueIndex('sets_soundcloud_track_id_idx').on(table.soundcloudTrackId),
     uniqueIndex('sets_youtube_video_id_idx').on(table.youtubeVideoId),

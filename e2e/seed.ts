@@ -256,13 +256,33 @@ async function setStatus(server: Server, id: string, status: ApplicationStatus):
   if (status !== 'new') await server.call('PUT', `/api/admin/applications/${id}/status`, { status })
 }
 
+// The id of the application of the artist or the collective whose days are `days` (see `SeedApplication`), or null when
+// they have none, e.g. when they were seeded on another day, from which its days were counted.
+async function applicationWithDays(server: Server, owner: { artist: string } | { collective: string }, days: number[]): Promise<string | null> {
+  const { applications } = await server.call<ApplicationsResponse>('GET', `/api/admin/applications?${new URLSearchParams(owner)}`)
+  // The server sorts them.
+  const dates = days.map(day).sort().join()
+  return applications.find((application) => application.dates.join() === dates)?.id ?? null
+}
+
+// The id of the application of one of `performers` whose days are `days`, or null when none of them has one (see
+// `applicationWithDays`).
+async function performersApplication(server: Server, performers: { id: string }[], days: number[]): Promise<string | null> {
+  for (const { id } of performers) {
+    const found = await applicationWithDays(server, { artist: id }, days)
+    if (found) return found
+  }
+  return null
+}
+
 // Adds the session and its sets as an admin would, with their statuses: its takeover's collective, in `collectiveIds`, and
 // its sets' performers, in `artistIds`, each by their email, or else, for those without one, by their name (see
-// `seedKey`). Each set is given its status once it's added, and the session once its sets are, since a
-// cancelled session can't be added to.
+// `seedKey`), and the applications they come from, unless they can't be found (see `applicationWithDays`). Each set is
+// given its status once it's added, and the session once its sets are, since a cancelled session can't be added to.
 async function addSession(server: Server, session: SeedSession, artistIds: Map<string, string>, collectiveIds: Map<string, string>): Promise<void> {
   const takeover = session.takeover === undefined ? null : collectiveIds.get(seedKeyOf(session.takeover))
   if (takeover === undefined) throw new Error(`A session's takeover, ${session.takeover}, isn't a collective that was seeded`)
+  const application = takeover && session.application ? await applicationWithDays(server, { collective: takeover }, session.application) : null
   let start: string | null = null
   if (session.when) {
     // The day in Québec, then the time there, as the admin pages take them.
@@ -276,6 +296,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     durationMinutes: session.durationMinutes,
     type: session.type,
     takeover,
+    application,
     name: session.name ?? '',
     raEvent: session.raEvent ?? null,
     description: session.description ?? '',
@@ -301,6 +322,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
       genres: set.genres ?? [],
       soundcloudTrack: null,
       youtubeVideo: set.youtubeVideo ?? null,
+      application: set.application ? await performersApplication(server, performers, set.application) : null,
     }
     const { sets } = (await server.call<SessionResponse>('POST', `/api/admin/sessions/${id}/sets`, fields)).session
     // The set just added, the one that wasn't there before.

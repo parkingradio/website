@@ -141,7 +141,8 @@ function checkStartEnd<T extends { start: string; end: string }>({ start, end }:
 
 // A session as the form has it: its day and times in Québec time, as "YYYY-MM-DD" and "HH:MM", or its duration when its
 // date isn't known yet (`undated`), its type, or null until it's picked, its takeover's collective as it's shown, which
-// it keeps while another type is picked, but only a takeover sends, and the rest as it's typed.
+// it keeps while another type is picked, but only a takeover sends, the id of the application it comes from, which the
+// form sends back as it is, and the rest as it's typed.
 export type SessionFormValues = {
   undated: boolean
   day: string
@@ -153,6 +154,7 @@ export type SessionFormValues = {
   opened?: { day: string; start: string; end: string; startAt: Date; durationMinutes: number }
   type: SessionType | null
   takeover: Reference | null
+  application: string | null
   name: string
   raEvent: RaEvent | null
   description: string
@@ -166,6 +168,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   duration: EMPTY_DURATION,
   type: null,
   takeover: null,
+  application: null,
   name: '',
   raEvent: null,
   description: '',
@@ -178,6 +181,7 @@ export function sessionFormValues(session: Session): SessionFormValues {
     duration: durationOf(session.durationMinutes),
     type: session.type,
     takeover: session.takeover,
+    application: session.application?.id ?? null,
     name: session.name,
     raEvent: session.raEvent,
     description: session.description,
@@ -256,6 +260,7 @@ export function checkSession(
       durationMinutes: times.durationMinutes,
       type: form.type,
       takeover: takeover?.id ?? null,
+      application: form.application,
       name: name.value!,
       raEvent: form.raEvent?.id ?? null,
       description: description.value!,
@@ -284,6 +289,8 @@ export type SetFormValues = {
   genres: GenreId[]
   soundcloudTrack: string
   youtubeVideo: string
+  // The id of the application it comes from, which the form sends back as it is.
+  application: string | null
 }
 
 // The session a set is in, as far as its place goes.
@@ -301,6 +308,7 @@ const EMPTY_SET_FORM: SetFormValues = {
   genres: [],
   soundcloudTrack: '',
   youtubeVideo: '',
+  application: null,
 }
 
 // A set's place as the form shows it: in a session with a date, the times it starts and ends, which stand for its offset
@@ -322,6 +330,7 @@ export function setFormValues(set: StudioSet, session: SessionPlace): SetFormVal
     genres: set.genres,
     soundcloudTrack: set.soundcloudTrack?.url ?? '',
     youtubeVideo: set.youtubeVideo?.url ?? '',
+    application: set.application?.id ?? null,
   }
   // A set with an offset has a duration.
   if (set.offsetMinutes === null || set.durationMinutes === null) return { ...values, unplaced: true, duration: durationOf(set.durationMinutes) }
@@ -415,6 +424,7 @@ export function checkSet(
       genres: form.genres,
       soundcloudTrack: soundcloudTrack || null,
       youtubeVideo: youtubeVideo || null,
+      application: form.application,
     },
   }
 }

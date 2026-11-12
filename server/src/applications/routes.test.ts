@@ -6,6 +6,7 @@ import fastifyCookie from '@fastify/cookie'
 import { NoSuchArtist, NoSuchCollective } from './store.js'
 import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
+import type { SessionsStore, StoredSession, StoredSet } from '../sessions/store.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { applicationsRoutes } from './routes.js'
 import { inQuebecTime } from '../api/formats.js'
@@ -67,6 +68,14 @@ const store: ApplicationsStore = {
   },
 }
 
+// The sessions that come from applications, or that have sets that do, as the database would find them.
+let linked: StoredSession[] = []
+const sessions: Pick<SessionsStore, 'ofApplications'> = {
+  ofApplications: vi.fn<SessionsStore['ofApplications']>(async (ids) =>
+    linked.filter((session) => [session, ...session.sets].some(({ applicationId }) => applicationId !== null && ids.includes(applicationId))),
+  ),
+}
+
 // Who applications are emailed to, as the database would keep them.
 let savedSettings: ApplicationsSettings | null = null
 const settings: ApplicationsSettingsStore = {
@@ -99,7 +108,7 @@ async function buildApp(logs?: string[]) {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
-  await app.register(applicationsRoutes, { store, settings })
+  await app.register(applicationsRoutes, { store, settings, sessions })
   return app
 }
 
@@ -107,6 +116,54 @@ type App = Awaited<ReturnType<typeof buildApp>>
 
 async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
+}
+
+const TRACKED = { createdAt: new Date('2026-11-01T12:00:00Z'), createdBy: 'admin@example.com', updatedBy: null, updatedAt: null, status: 'planned' as const }
+const UNTRACKED_STATUS = { statusUpdatedBy: null, statusUpdatedAt: null }
+
+// A session, a takeover of Les Ondes without a date by default, as the sessions' store would find it.
+function storedSession(changes: Partial<StoredSession>): StoredSession {
+  return {
+    id: 'session',
+    ...TRACKED,
+    ...UNTRACKED_STATUS,
+    startAt: null,
+    durationMinutes: 240,
+    type: 'takeover',
+    name: '',
+    takeoverId: 'collective-1',
+    takeover: { id: 'collective-1', name: 'Les Ondes' },
+    applicationId: null,
+    application: null,
+    raEventId: null,
+    description: '',
+    flyerKey: null,
+    flyerType: null,
+    sets: [],
+    ...changes,
+  }
+}
+
+// A set of an hour, without performers, as the sessions' store would find it.
+function storedSet(changes: Partial<StoredSet>): StoredSet {
+  return {
+    id: 'set',
+    sessionId: 'session',
+    ...TRACKED,
+    ...UNTRACKED_STATUS,
+    offsetMinutes: null,
+    durationMinutes: 60,
+    performers: [],
+    performanceTypes: [],
+    otherPerformanceType: '',
+    genres: [],
+    soundcloudTrackId: null,
+    soundcloudTrackUrl: null,
+    youtubeVideoId: null,
+    applicationId: null,
+    application: null,
+    ...changes,
+  }
 }
 
 async function create(app: App, changes: object = {}) {
@@ -117,6 +174,7 @@ describe('applications routes', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
+    linked = []
     nextId = 0
     savedSettings = null
     vi.clearAllMocks()
@@ -214,8 +272,12 @@ describe('applications routes', () => {
           status: 'new',
           statusUpdatedBy: null,
           statusUpdatedAt: null,
+          sets: [],
+          sessions: [],
         },
       })
+      // A new application has none.
+      expect(sessions.ofApplications).not.toHaveBeenCalled()
     })
 
     it('explains, in French, what is wrong with an invalid application', async () => {
@@ -420,6 +482,52 @@ describe('applications routes', () => {
     it('responds 404 for an application that does not exist', async () => {
       const app = await buildApp()
       expect((await send(app, 'GET', '/api/admin/applications/nothing')).statusCode).toBe(404)
+    })
+
+    it('lists the sets and the sessions that come from the application, in the order the sessions are found', async () => {
+      const app = await buildApp()
+      await create(app)
+      await create(app, { artistId: undefined, collectiveId: 'collective-1' })
+      const link = (id: string) => ({ applicationId: id, application: { id, receivedAt: new Date() } })
+      linked = [
+        // A takeover without a date, which comes from the collective's application, with a set that comes from another one.
+        storedSession({ id: 'session-1', ...link('application-2'), sets: [storedSet({ id: 'set-1', offsetMinutes: 0, ...link('application-3') })] }),
+        // An evening where the artist's set was cancelled, then the one that replaced it, which comes from the same
+        // application.
+        storedSession({
+          id: 'session-2',
+          type: 'guest-mixes',
+          takeoverId: null,
+          takeover: null,
+          startAt: new Date('2026-11-15T02:00:00Z'),
+          sets: [
+            storedSet({ id: 'set-2', offsetMinutes: 0 }),
+            storedSet({ id: 'set-3', offsetMinutes: 60, status: 'cancelled', ...link('application-1') }),
+            storedSet({ id: 'set-4', offsetMinutes: null, ...link('application-1') }),
+          ],
+        }),
+      ]
+      const artists = await send(app, 'GET', '/api/admin/applications/application-1')
+      const session = { id: 'session-2', title: 'GUEST MIXES', start: '2026-11-14T21:00:00-05:00' }
+      expect(artists.json().application).toMatchObject({
+        sets: [
+          { id: 'set-3', start: '2026-11-14T22:00:00-05:00', end: '2026-11-14T23:00:00-05:00', status: 'cancelled', session },
+          { id: 'set-4', start: null, end: null, status: 'planned', session },
+        ],
+        sessions: [],
+      })
+      expect(sessions.ofApplications).toHaveBeenCalledWith(['application-1'])
+      const collectives = await send(app, 'GET', '/api/admin/applications/application-2')
+      expect(collectives.json().application).toMatchObject({
+        sets: [],
+        sessions: [{ id: 'session-1', title: 'LES ONDES TAKEOVER', start: null, end: null, status: 'planned' }],
+      })
+      const list = (await send(app, 'GET', '/api/admin/applications')).json().applications
+      expect(list.map(({ id, sets, sessions }: { id: string; sets: unknown[]; sessions: unknown[] }) => [id, sets.length, sessions.length])).toEqual([
+        ['application-2', 0, 1],
+        ['application-1', 2, 0],
+      ])
+      expect(sessions.ofApplications).toHaveBeenLastCalledWith(['application-2', 'application-1'])
     })
   })
 

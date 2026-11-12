@@ -24,6 +24,7 @@ A session has:
 | `durationMinutes` | number | How long the session lasts: see [Times](#times) |
 | `type` | string | What kind of session it is, which gives it its name: see [Types and names](#types-and-names) |
 | `takeover` | object or null | The collective whose takeover the session is, which only takeovers have, and they always do: see [Types and names](#types-and-names) |
+| `application` | object or null | The application the session comes from, a takeover's collective's: see [Applications](#applications) |
 | `name` | string | The session's own name, which replaces the one its type gives it, as free text: see [Types and names](#types-and-names). Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 100 characters, or `""` when there's none |
 | `raEvent` | object or null | The session's event on Resident Advisor: see [Links](#links) |
 | `description` | string | The session's own description, which replaces the one its type gives it, as plain text: see [Descriptions](#descriptions). Its line breaks become `\n`, and it's trimmed, then up to 5000 characters, or `""` when there's none |
@@ -40,7 +41,7 @@ A session, as the endpoints below return it, also has:
 | `sets` | list of sets | Its sets, by `offsetMinutes`, then `createdAt`, the sets without an offset last, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, or renaming the takeover's collective |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -59,6 +60,7 @@ in their sessions, and the `total` of a list of sessions counts sessions, not se
 | `genres` | list of strings | The set's genres: ids of `GENRES` in `server/src/artists/profile.ts`, like an artist's (see [Profiles](artists.md#profiles)), most important first, or none. They describe the set, which can differ from its performers' genres, e.g. an ambient set by a techno artist. A genre that's there twice is dropped, keeping the first, and other values fail with 400 |
 | `soundcloudTrack` | object or null | The set's track on SoundCloud: see [Links](#links) |
 | `youtubeVideo` | object or null | The set's video on YouTube: see [Links](#links) |
+| `application` | object or null | The application the set comes from, one of its performers': see [Applications](#applications) |
 
 A set, as the endpoints below return it, also has:
 
@@ -70,7 +72,7 @@ A set, as the endpoints below return it, also has:
 | `overlappingSets` | list of strings | The ids of the other sets of its session that aren't cancelled and that it overlaps, in the order of the session's `sets`: see [Sets' places](#sets-places) |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, or a performer being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -210,6 +212,33 @@ in the same request, and turning a session into a takeover, or into an `"other"`
 `name`, unless it already has one.
 Responses give `takeover` as an object with the collective's `id` and `name`, or null.
 
+## Applications
+
+A set or a session can have the application it comes from (see [Applications](applications.md)), e.g. to go from one to
+the other: its `application`, which neither has to have. A set's is an artist's application, whose artist is one of the
+set's performers, and a session's is a collective's application, whose collective is the one whose takeover the session
+is. An application can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it, and it lists
+them (see [Applications](applications.md)). Neither changes the other's status: admins change each one's themselves.
+
+Requests send `application` as the application's id, or null, or a blank string, when there's none. One that isn't a
+string or null fails with 400 (`"The application must be an application's id, or null"`), and so does a string that
+isn't the id of an application that exists (`"No such application"`), and an application that doesn't go with the set
+(`"A set's application is one of its performers'"`) or the session (`"Only a takeover has an application"`, or `"A
+session's application is that of the collective whose takeover it is"`). These are checked on the set or the session as
+it would then be, after its other fields, the rules between them, and whether its takeover's collective or its
+performers exist. So taking the application's artist out of a set's performers, or changing the type of a session that
+has an application, or its takeover's collective, takes sending another `application`, or null, in the same request,
+and a change that only sends `application` is checked against the performers, or the type and the collective, that the
+set or the session already has. These rules hold even for requests sent at the same time.
+
+Deleting an application takes it from its sets and sessions, which stay, without one, and so does deleting an artist,
+which deletes their applications. A collective with an application that's a session's can't be deleted anyway, since
+the session is its takeover (see [Types and names](#types-and-names)). Deleting a set or a session leaves its
+application as it is.
+
+Responses give `application` as an object with the application's `id` and `receivedAt` (see
+[Applications](applications.md)), or null.
+
 ## Descriptions
 
 A session's `description` is its own text, e.g. for a special evening, which replaces the one its type gives it. It's
@@ -329,8 +358,8 @@ Fails with 404 when there's no such session, when it has no flyer, or when its f
 
 Adds a session, as `"planned"`, without sets. It's `multipart/form-data`, like
 [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin), with two parts: `session`, the session's fields as
-JSON, in a field rather than a file, which are its `start`, `durationMinutes`, `type`, `takeover`, `name`, `raEvent` and
-`description`, as above, none of them left out, and `flyer`, its flyer, which can be left out. A few other fields or
+JSON, in a field rather than a file, which are its `start`, `durationMinutes`, `type`, `takeover`, `application`, `name`,
+`raEvent` and `description`, as above, none of them left out, and `flyer`, its flyer, which can be left out. A few other fields or
 files are ignored, but a second flyer isn't: the request fails.
 
 | Response field | Type | |
@@ -342,7 +371,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, `raEvent` isn't one of the links above, or the flyer isn't a JPEG, PNG or WebP image |
+| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, or the flyer isn't a JPEG, PNG or WebP image |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)) |
 | 413 | The flyer is larger than 10 MB |
 
@@ -361,9 +390,9 @@ its own, unless there's also a `removeFlyer` field set to `true`, which removes 
 
 Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, and leaves the others as they are (see
 [Changes, in Conventions](README.md#conventions)). It takes JSON, with any of its `start`, `durationMinutes`, `type`,
-`takeover`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the session's flyer, and
-deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its `type`, `takeover` and
-`name` are checked together, and it's checked against the other sessions, as the session would then be. Responds like
+`takeover`, `application`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the session's flyer, and
+deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its `type`, `takeover`,
+`application` and `name` are checked together, and it's checked against the other sessions, as the session would then be. Responds like
 `PUT`, and fails like it, but with 400 when there's no field.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
@@ -378,14 +407,15 @@ there's no such session, or 409 when the session would then overlap another one,
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 
-Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay. Fails with
+Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay, and so do
+their applications. Fails with
 404 when there's no such session.
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
 Adds a set to a session, as `"planned"`. The request has the set's `performers`, `offsetMinutes`, `durationMinutes`,
-`performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack` and `youtubeVideo`, as above, none of them left
-out.
+`performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack`, `youtubeVideo` and `application`, as above, none
+of them left out.
 
 | Response field | Type | |
 |---|---|---|
@@ -396,7 +426,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | A field isn't valid, a performer doesn't exist, a link isn't one of those above, or SoundCloud shows no track at `soundcloudTrack` |
+| 400 | A field isn't valid, a performer doesn't exist, the application doesn't exist or isn't one of the performers' (see [Applications](#applications)), a link isn't one of those above, or SoundCloud shows no track at `soundcloudTrack` |
 | 404 | There's no such session, which is checked before the track is resolved |
 | 409 | The session is cancelled, which is checked before the track is resolved too, or the set's track or its video is another set's, with what's in the way in `session` and `set` (see [Rules](#rules)). Or `soundcloudTrack` has to be resolved and the credentials of the SoundCloud app haven't been entered yet, with both null |
 | 502 | `soundcloudTrack` has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
@@ -415,7 +445,7 @@ session.
 Changes the fields of a set it's sent, like `PUT /api/admin/sets/:id`, and leaves the others as they are (see
 [Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT` takes. `performers`, when it's
 sent, replaces the set's performers, and `soundcloudTrack` is only resolved when it's sent. An offset and a duration are
-checked together, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when there's no
+checked together, and so are the performers and the application, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when there's no
 field.
 
 ## `PUT /api/admin/sets/:id/status` (admin)
@@ -430,4 +460,4 @@ with that session in `session`.
 
 ## `DELETE /api/admin/sets/:id` (admin)
 
-Deletes a set, and responds `{"ok": true}`. Its performers stay. Fails with 404 when there's no such set.
+Deletes a set, and responds `{"ok": true}`. Its performers stay, and so does its application. Fails with 404 when there's no such set.

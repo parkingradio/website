@@ -10,8 +10,9 @@
 # has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
 # including while other transactions change sessions, sets that don't fit in their session or overlap each other, which
 # they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
-# collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, and the content
-# of a session's event on RA, from its sets' performers.
+# collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, the applications
+# sets and sessions come from, which applications list, their rules, and deleting them, even while a set is given one,
+# and the content of a session's event on RA, from its sets' performers.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -49,10 +50,10 @@ performers() {
 }
 
 # session_json <start> <duration> [<more JSON fields>] -- a session, as JSON, starting at <start>, as JSON (e.g. a quoted
-# date and time, or null), of guest mixes, with a name of its own, without a takeover, an RA event or a description unless
-# they're given (the last of two fields with the same name is the one that counts).
+# date and time, or null), of guest mixes, with a name of its own, without a takeover, an application, an RA event or a
+# description unless they're given (the last of two fields with the same name is the one that counts).
 session_json() {
-    printf '{"start":%s,"durationMinutes":%s,"type":"guest-mixes","takeover":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null,"description":""%s}' \
+    printf '{"start":%s,"durationMinutes":%s,"type":"guest-mixes","takeover":null,"application":null,"name":"HAUTE RIVE TAKEOVER","raEvent":null,"description":""%s}' \
         "$1" "$2" "${3:+,$3}"
 }
 
@@ -69,10 +70,10 @@ collective_json() {
     printf '{"name":"%s","members":[{"id":"%s"}],"email":"ondes@sessions.test"}' "$1" "$ana"
 }
 
-# set_json <performers JSON> <offset> <duration> [<more JSON fields>] -- a set, as JSON, without links unless they're
-# given.
+# set_json <performers JSON> <offset> <duration> [<more JSON fields>] -- a set, as JSON, without links or an application
+# unless they're given.
 set_json() {
-    printf '{"performers":%s,"offsetMinutes":%s,"durationMinutes":%s,"performanceTypes":["dj"],"otherPerformanceType":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null%s}' \
+    printf '{"performers":%s,"offsetMinutes":%s,"durationMinutes":%s,"performanceTypes":["dj"],"otherPerformanceType":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null,"application":null%s}' \
         "$1" "$2" "$3" "${4:+,$4}"
 }
 
@@ -205,7 +206,7 @@ echo "  a session is called by its own name, or else the one its type gives it, 
 session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"name\":\"\"")"
 expect_status 200
 named="$(first_id)"
-expect_body_contains "\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"},\"name\":\"\",\"title\":\"LES ONDES TAKEOVER\""
+expect_body_contains "\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"},\"application\":null,\"name\":\"\",\"title\":\"LES ONDES TAKEOVER\""
 request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes Côtières')" "${COLLECTIVES}/${ondes}"
 expect_status 200
 json GET "${SESSIONS}/${named}"
@@ -216,11 +217,11 @@ expect_status 200
 for type in guest-mixes:GUEST\ MIXES live-performance:LIVE\ PERFORMANCE synth-meetup:SYNTH\ MEETUPS; do
     session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
     expect_status 200
-    expect_body_contains "\"type\":\"${type%%:*}\",\"takeover\":null,\"name\":\"\",\"title\":\"${type#*:}\""
+    expect_body_contains "\"type\":\"${type%%:*}\",\"takeover\":null,\"application\":null,\"name\":\"\",\"title\":\"${type#*:}\""
 done
 session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
 expect_status 200
-expect_body_contains '"type":"other","takeover":null,"name":"ATELIER DE DJing POUR FEMMES","title":"ATELIER DE DJing POUR FEMMES"'
+expect_body_contains '"type":"other","takeover":null,"application":null,"name":"ATELIER DE DJing POUR FEMMES","title":"ATELIER DE DJing POUR FEMMES"'
 json DELETE "${SESSIONS}/${named}"
 expect_status 200
 
@@ -750,6 +751,104 @@ expect_status 400
 expect_body_contains '"error":"No such artist"'
 json GET "${SESSIONS}/${next}"
 expect_body_contains "{\"id\":\"${later}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"}]"
+
+echo "  a set can come from one of its performers' applications, and a takeover from its collective's, which list them"
+readonly APPLICATIONS="${BASE_URL}/api/admin/applications"
+readonly SETS_APPLICATION="A set's application is one of its performers'"
+readonly SESSIONS_APPLICATION="A session's application is that of the collective whose takeover it is"
+# application_for <"artistId" or "collectiveId"> <id> -- add an application for that artist or collective, and print its id.
+application_for() {
+    json POST "$APPLICATIONS" "{\"$1\":\"$2\",\"dates\":[\"2027-04-01\"],\"timeSlots\":[],\"performanceTypes\":[],\"otherPerformanceType\":\"\",\"details\":\"\"}"
+    expect_status 200
+    first_id
+}
+request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Candidate"}' "$ARTISTS"
+candidate="$(first_id)"
+request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Rival"}' "$ARTISTS"
+rival="$(first_id)"
+request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Candidats\",\"members\":[{\"id\":\"${candidate}\"}]}" "$COLLECTIVES"
+candidates="$(first_id)"
+artists_application="$(application_for artistId "$candidate")"
+rivals_application="$(application_for artistId "$rival")"
+collectives_application="$(application_for collectiveId "$candidates")"
+session_form POST "$SESSIONS" "$(session_json '"2027-04-01T16:00-04:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${candidates}\",\"application\":\"${collectives_application}\",\"name\":\"\"")"
+expect_status 200
+applied="$(first_id)"
+expect_body_contains "\"application\":{\"id\":\"${collectives_application}\",\"receivedAt\":\""
+json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$brume" "$candidate")" 0 60 "\"application\":\"${artists_application}\"")"
+expect_status 200
+applied_set="$(last_set)"
+json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$candidate")" 60 60 "\"application\":\"${artists_application}\"")"
+expect_status 200
+rebooked="$(last_set)"
+json GET "${APPLICATIONS}/${artists_application}"
+expect_body_contains "\"sets\":[{\"id\":\"${applied_set}\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T17:00:00-04:00\",\"status\":\"planned\",\"session\":{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\"}},{\"id\":\"${rebooked}\""
+expect_body_contains '"sessions":[]'
+json GET "${APPLICATIONS}/${collectives_application}"
+expect_body_contains "\"sets\":[],\"sessions\":[{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T18:00:00-04:00\",\"status\":\"planned\"}]"
+
+echo "  a change that would break those rules fails, and leaves the set or the session as it was"
+for change in "{\"application\":\"${collectives_application}\"}" "{\"application\":\"${rivals_application}\"}" "{\"performers\":[{\"id\":\"${rival}\"}]}"; do
+    json PATCH "${SETS}/${applied_set}" "$change"
+    expect_status 400
+    expect_body_contains "\"error\":\"${SETS_APPLICATION}\""
+done
+json PATCH "${SETS}/${applied_set}" "{\"application\":\"${NOBODY}\"}"
+expect_status 400
+expect_body_contains '"error":"No such application"'
+json PATCH "${SESSIONS}/${applied}" "{\"application\":\"${artists_application}\"}"
+expect_status 400
+expect_body_contains "\"error\":\"${SESSIONS_APPLICATION}\""
+json PATCH "${SESSIONS}/${applied}" "{\"takeover\":\"${ondes}\"}"
+expect_status 400
+expect_body_contains "\"error\":\"${SESSIONS_APPLICATION}\""
+json PATCH "${SESSIONS}/${applied}" '{"type":"guest-mixes","takeover":null}'
+expect_status 400
+expect_body_contains '"error":"Only a takeover has an application"'
+[ "$(sql "select count(*) from sets where session_id = '${applied}' and (updated_by is not null or application_id is distinct from '${artists_application}')")" = 0 ] \
+    || fail "expected the sets to be as they were"
+[ "$(sql "select takeover_id = '${candidates}' and application_id = '${collectives_application}' and updated_by is null from sessions where id = '${applied}'")" = t ] \
+    || fail "expected the session to be as it was"
+# Unless the application is changed in the same request.
+json PATCH "${SETS}/${applied_set}" "{\"performers\":[{\"id\":\"${rival}\"}],\"application\":\"${rivals_application}\"}"
+expect_status 200
+
+echo "  deleting an application takes it from its sets and sessions, which stay, unchanged otherwise"
+json DELETE "${APPLICATIONS}/${collectives_application}"
+expect_status 200
+json GET "${SESSIONS}/${applied}"
+expect_body_contains "\"takeover\":{\"id\":\"${candidates}\",\"name\":\"Candidats\"},\"application\":null"
+[ "$(sql "select updated_by is null from sessions where id = '${applied}'")" = t ] || fail "expected the session not to count as changed"
+
+echo "  giving a set an application while the application is deleted fails, rather than fail unexpectedly"
+# Another transaction holds the application's row while it's deleted, which takes the sessions' lock first, like
+# changing the set, which then waits for it, and finds no application.
+hold_row applications "$artists_application"
+delete_in_background "${APPLICATIONS}/${artists_application}" delete
+wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"applications\"%')"
+send_in_background PATCH "${SETS}/${applied_set}" "{\"performers\":[{\"id\":\"${candidate}\"}],\"application\":\"${artists_application}\"}"
+wait_for_sessions_lock
+release_row
+wait_for_background
+[ "$(cat "${FILES}/delete")" = 200 ] || fail "expected the application to be deleted, got $(cat "${FILES}/delete")"
+expect_status 400
+expect_body_contains '"error":"No such application"'
+json GET "${SESSIONS}/${applied}"
+expect_body_contains "{\"id\":\"${rebooked}\",\"performers\":[{\"id\":\"${candidate}\",\"name\":\"Candidate\"}],"
+[ "$(sql "select count(*) from sets where session_id = '${applied}' and application_id is not null")" = 1 ] \
+    || fail "expected only the set with the other application to keep it"
+
+echo "  deleting an artist takes their applications from their sets"
+json DELETE "${ARTISTS}/${rival}"
+expect_status 200
+[ "$(sql "select count(*) from sets where session_id = '${applied}' and application_id is not null")" = 0 ] \
+    || fail "expected the artist's application to be taken from their set"
+json DELETE "${SESSIONS}/${applied}"
+expect_status 200
+json DELETE "${COLLECTIVES}/${candidates}"
+expect_status 200
+json DELETE "${ARTISTS}/${candidate}"
+expect_status 200
 
 echo "  deleting an artist takes them out of their sets, which stay, even without performers"
 json DELETE "${ARTISTS}/${brume}"

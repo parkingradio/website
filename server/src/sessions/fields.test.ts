@@ -9,6 +9,7 @@ function sessionFields(changes: Record<string, unknown> = {}) {
     durationMinutes: 240,
     type: 'guest-mixes',
     takeover: null,
+    application: null,
     name: 'GUEST MIXES SPÉCIAL',
     raEvent: null,
     description: '',
@@ -26,6 +27,7 @@ function setFields(changes: Record<string, unknown> = {}) {
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
+    application: null,
     ...changes,
   }
 }
@@ -73,19 +75,21 @@ describe('SessionFields', () => {
   const sessionError = (sent: unknown) => error(SessionFields, sent)
 
   it('keeps what was sent, with its start as a date and its links reduced', () => {
-    expect(parse({ type: 'takeover', takeover: ' Collective-1 ', name: 'VKT TAKEOVER', raEvent: ' https://ra.co/events/6683745 ' })).toEqual({
+    const sent = { type: 'takeover', takeover: ' Collective-1 ', application: ' Application-1 ', name: 'VKT TAKEOVER', raEvent: ' https://ra.co/events/6683745 ' }
+    expect(parse(sent)).toEqual({
       start: new Date('2026-11-15T02:00:00Z'),
       durationMinutes: 240,
       type: 'takeover',
       takeover: 'collective-1',
+      application: 'application-1',
       name: 'VKT TAKEOVER',
       raEvent: '6683745',
       description: '',
     })
   })
 
-  it('takes null, or a blank string, for no start, no takeover and no RA event', () => {
-    expect(parse({ start: null, takeover: ' ', raEvent: '' })).toMatchObject({ start: null, takeover: null, raEvent: null })
+  it('takes null, or a blank string, for no start, no takeover, no application and no RA event', () => {
+    expect(parse({ start: null, takeover: ' ', application: ' ', raEvent: '' })).toMatchObject({ start: null, takeover: null, application: null, raEvent: null })
     expect(parse({ start: ' ' }).start).toBeNull()
   })
 
@@ -165,6 +169,23 @@ describe('SessionFields', () => {
     }
   })
 
+  it('refuses an application that is not an id, or that is left out', () => {
+    for (const application of [42, undefined, 'application-1\0']) {
+      expect(sessionError(sessionFields({ type: 'takeover', takeover: 'collective-1', application })), String(application)).toBe(
+        "The application must be an application's id, or null",
+      )
+    }
+  })
+
+  it('takes an application for a takeover only, once its collective is checked', () => {
+    expect(parse({ type: 'takeover', takeover: 'collective-1', application: 'application-1' }).application).toBe('application-1')
+    for (const type of SESSION_TYPES.filter((type) => type !== 'takeover')) {
+      const named = { type, name: 'ATELIER' }
+      expect(sessionError(sessionFields({ ...named, application: 'application-1' })), type).toBe('Only a takeover has an application')
+      expect(sessionError(sessionFields({ ...named, takeover: 'collective-1', application: 'application-1' })), type).toBe('Only a takeover has a collective')
+    }
+  })
+
   it('takes a name for every type, which a session of type other needs, kept in its case', () => {
     for (const type of SESSION_TYPES) {
       const takeover = type === 'takeover' ? 'collective-1' : null
@@ -218,6 +239,7 @@ describe('SetFields', () => {
         genres: ['ambient', 'techno', 'ambient'],
         soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons?si=x',
         youtubeVideo: 'https://youtu.be/dQw4w9WgXcQ',
+        application: ' Application-1 ',
       }),
     ).toEqual({
       performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
@@ -230,7 +252,15 @@ describe('SetFields', () => {
       genres: ['ambient', 'techno'],
       soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
       youtubeVideo: 'dQw4w9WgXcQ',
+      application: 'application-1',
     })
+  })
+
+  it('takes null, or a blank string, for no application, and refuses one that is not an id, or that is left out', () => {
+    expect(parse({ application: '' }).application).toBeNull()
+    for (const application of [42, undefined, { id: 'application-1' }]) {
+      expect(setError(setFields({ application })), String(application)).toBe("The application must be an application's id, or null")
+    }
   })
 
   it('drops performers that are there twice, whatever the case of their ids, and ignores their other fields', () => {
@@ -294,12 +324,17 @@ describe('SetFields', () => {
 })
 
 describe('the rules that involve several fields', () => {
-  it("are those of a session's type, its takeover and its name, which a change checks on the session it would make", () => {
-    expect(brokenSessionRule({ type: 'takeover', takeover: 'c', name: '' })).toBeNull()
-    expect(brokenSessionRule({ type: 'other', takeover: null, name: 'ATELIER' })).toBeNull()
-    expect(brokenSessionRule({ type: 'takeover', takeover: null, name: 'X' })).toEqual({ message: 'A takeover has a collective', field: 'takeover' })
-    expect(brokenSessionRule({ type: 'guest-mixes', takeover: 'c', name: '' })).toEqual({ message: 'Only a takeover has a collective', field: 'takeover' })
-    expect(brokenSessionRule({ type: 'other', takeover: null, name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
+  it("are those of a session's type, its takeover, its application and its name, which a change checks on the session it would make", () => {
+    const none = { takeover: null, application: null }
+    expect(brokenSessionRule({ type: 'takeover', takeover: 'c', application: 'a', name: '' })).toBeNull()
+    expect(brokenSessionRule({ type: 'other', ...none, name: 'ATELIER' })).toBeNull()
+    expect(brokenSessionRule({ type: 'takeover', ...none, name: 'X' })).toEqual({ message: 'A takeover has a collective', field: 'takeover' })
+    expect(brokenSessionRule({ type: 'guest-mixes', ...none, takeover: 'c', name: '' })).toEqual({ message: 'Only a takeover has a collective', field: 'takeover' })
+    expect(brokenSessionRule({ type: 'guest-mixes', ...none, application: 'a', name: '' })).toEqual({
+      message: 'Only a takeover has an application',
+      field: 'application',
+    })
+    expect(brokenSessionRule({ type: 'other', ...none, name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
   })
 
   it("are those of a set's place", () => {

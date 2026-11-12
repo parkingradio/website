@@ -497,6 +497,8 @@ describe('collectives routes', () => {
         name: '',
         takeoverId: 'collective-1',
         takeover: { id: 'collective-1', name: 'Les Ondes' },
+        applicationId: null,
+        application: null,
         raEventId: null,
         description: '',
         flyerKey: null,

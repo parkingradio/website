@@ -209,6 +209,9 @@ top to bottom, the form has:
 
 When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked.
 
+Neither form shows the application a session or a set comes from (see
+[Applications](../../server/sessions.md#applications)) yet: they send it back as it is, or none for a new one.
+
 ## Errors
 
 The forms say what's wrong with each field once it's left, like the artist form (see [Artistes](artistes.md)): they

@@ -77,7 +77,8 @@ It goes through the server's API, as an admin of its own, `seed@example.com`, wh
 who is then listed among the admins. You still log in as your own admin. Seeding again only adds the artists and the
 collectives that aren't there, by their email, or by their name for those without one, so to seed an artist or a
 collective again, delete them first. It only seeds the sessions while there are none, so to seed them again, delete them
-all first. It doesn't change any setting, e.g. feature flags.
+all first. Some sets and sessions come from seeded applications, which they're only linked to when those were seeded
+the same day, since their days are counted from it. It doesn't change any setting, e.g. feature flags.
 
 A few artists and collectives apply through the "Appliquer" form, which needs Cloudflare to be reachable, and the
 Turnstile test keys from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send

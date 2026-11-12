@@ -56,7 +56,7 @@ async function createCollective(name: string, members: object[]): Promise<string
 }
 
 async function createSession(fields: object): Promise<string> {
-  const session = { start: '2026-11-14T21:00-05:00', durationMinutes: 120, type: 'guest-mixes', takeover: null, name: '', raEvent: null, description: '', ...fields }
+  const session = { start: '2026-11-14T21:00-05:00', durationMinutes: 120, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '', ...fields }
   const response = await sendForm('POST', '/api/admin/sessions', 'session', session)
   expect(response.statusCode).toBe(200)
   return response.json().session.id
@@ -64,7 +64,7 @@ async function createSession(fields: object): Promise<string> {
 
 // Adds a set to the session, and returns its id.
 async function createSet(sessionId: string, fields: object): Promise<string> {
-  const set = { performers: [], offsetMinutes: null, durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, ...fields }
+  const set = { performers: [], offsetMinutes: null, durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
   const response = await request('POST', `/api/admin/sessions/${sessionId}/sets`, set)
   expect(response.statusCode).toBe(200)
   return response.json().session.sets.at(-1).id

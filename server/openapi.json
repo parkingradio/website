@@ -732,6 +732,20 @@
                 "type": "null"
               }
             ]
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationSet"
+            },
+            "description": "The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationSession"
+            },
+            "description": "The sessions that come from it, which only a collective's application has, in the order of the sessions"
           }
         },
         "required": [
@@ -750,7 +764,9 @@
           "updatedAt",
           "status",
           "statusUpdatedBy",
-          "statusUpdatedAt"
+          "statusUpdatedAt",
+          "sets",
+          "sessions"
         ],
         "additionalProperties": false
       },
@@ -799,6 +815,24 @@
           "details"
         ]
       },
+      "ApplicationLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "receivedAt"
+        ],
+        "additionalProperties": false,
+        "description": "The application it comes from, and when it was received"
+      },
       "ApplicationRecipients": {
         "type": "object",
         "properties": {
@@ -835,6 +869,127 @@
           "recipients",
           "updatedBy",
           "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while the session's date isn't known"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its start plus its duration. Null when its start is"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start",
+          "end",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationSet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its session's start plus its offset. Null when either is"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its start plus its duration. Null when its start is"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SessionStatus"
+          },
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string",
+                "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null while the session's date isn't known"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "start"
+            ],
+            "additionalProperties": false,
+            "description": "The set's session"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "status",
+          "session"
         ],
         "additionalProperties": false
       },
@@ -2101,6 +2256,16 @@
             ],
             "description": "The collective whose takeover the session is, which only takeovers have"
           },
+          "application": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplicationLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "type": "string",
             "description": "Its own name, which replaces the one its type gives it, or empty for none: the one to send back"
@@ -2189,6 +2354,7 @@
           "durationMinutes",
           "type",
           "takeover",
+          "application",
           "name",
           "title",
           "raEvent",
@@ -2231,6 +2397,13 @@
               "null"
             ]
           },
+          "application": {
+            "description": "The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "name": {
             "type": "string",
             "maxLength": 100,
@@ -2254,6 +2427,7 @@
           "durationMinutes",
           "type",
           "takeover",
+          "application",
           "name",
           "raEvent",
           "description"
@@ -2445,6 +2619,16 @@
               }
             ]
           },
+          "application": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplicationLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -2504,6 +2688,7 @@
           "genres",
           "soundcloudTrack",
           "youtubeVideo",
+          "application",
           "createdAt",
           "createdBy",
           "updatedBy",
@@ -2636,6 +2821,13 @@
               "string",
               "null"
             ]
+          },
+          "application": {
+            "description": "The id of the application the set comes from: an artist's, who is one of its performers. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2646,7 +2838,8 @@
           "otherPerformanceType",
           "genres",
           "soundcloudTrack",
-          "youtubeVideo"
+          "youtubeVideo",
+          "application"
         ],
         "additionalProperties": false
       },
@@ -6767,7 +6960,7 @@
       },
       "delete": {
         "operationId": "delete_application",
-        "summary": "Deletes an application",
+        "summary": "Deletes an application, but not its sets and sessions, which stay without it",
         "tags": [
           "Applications"
         ],
@@ -7590,6 +7783,13 @@
                   },
                   "takeover": {
                     "description": "The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "application": {
+                    "description": "The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none",
                     "type": [
                       "string",
                       "null"
@@ -8478,6 +8678,13 @@
                   },
                   "youtubeVideo": {
                     "description": "A link to the video on YouTube, or its id. Null, or blank, for none",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "application": {
+                    "description": "The id of the application the set comes from: an artist's, who is one of its performers. Null, or blank, for none",
                     "type": [
                       "string",
                       "null"

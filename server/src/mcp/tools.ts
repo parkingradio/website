@@ -192,7 +192,7 @@ const SUMMARIES: Record<string, (body: JsonObject, send: Send) => Promise<JsonOb
     for (const [field, { body }] of [['artists', owners[0]], ['collectives', owners[1]]] as const) {
       for (const { id, name } of ((body as JsonObject)[field] ?? []) as { id: string; name: string }[]) names.set(id, name)
     }
-    const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates']).map((summary) => ({
+    const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates', 'sets', 'sessions']).map((summary) => ({
       ...summary,
       name: names.get((summary.artistId ?? summary.collectiveId) as string) ?? null,
     }))
@@ -201,8 +201,8 @@ const SUMMARIES: Record<string, (body: JsonObject, send: Send) => Promise<JsonOb
   list_sessions: async ({ sessions, ...rest }) => ({
     ...rest,
     sessions: (sessions as JsonObject[]).map((session) => ({
-      ...pickOne(session, ['id', 'start', 'end', 'type', 'title', 'takeover', 'status']),
-      sets: pick(session.sets, ['id', 'start', 'end', 'status', 'performers']),
+      ...pickOne(session, ['id', 'start', 'end', 'type', 'title', 'takeover', 'application', 'status']),
+      sets: pick(session.sets, ['id', 'start', 'end', 'status', 'performers', 'application']),
     })),
   }),
 }

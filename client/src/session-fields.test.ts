@@ -43,6 +43,7 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
+    application: null,
     ...TRACKED,
     ...fields,
   }
@@ -56,6 +57,7 @@ function session(start: string | null, durationMinutes: number, sets: StudioSet[
     durationMinutes,
     type: 'guest-mixes',
     takeover: null,
+    application: null,
     name: '',
     title: 'GUEST MIXES',
     raEvent: null,
@@ -161,17 +163,20 @@ describe('checkSession', () => {
     end: '01:00',
     type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
+    application: 'application-1',
     name: '  HAUTE   RIVE\nTAKEOVER ',
     raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
   }
 
-  it('returns what the server is sent: the start with its offset, the duration, the id, the name cleaned up and the event on RA by its id', () => {
+  it('returns what the server is sent: the start with its offset, the duration, the ids, the name cleaned up and the event on RA by its id', () => {
     expect(checkSession(FORM)).toEqual({
       fields: {
         start: '2026-11-14T21:00-05:00',
         durationMinutes: 240,
         type: 'takeover',
         takeover: 'collective-1',
+        // As the session has it.
+        application: 'application-1',
         name: 'HAUTE RIVE TAKEOVER',
         raEvent: '6683745',
         description: '',
@@ -183,6 +188,8 @@ describe('checkSession', () => {
       durationMinutes: 180,
       type: 'live-performance',
       takeover: null,
+      // Even for another type, which the server refuses.
+      application: 'application-1',
       name: 'HAUTE RIVE TAKEOVER',
       raEvent: null,
       description: '',
@@ -358,6 +365,7 @@ describe('checkSet', () => {
     genres: ['ambient', 'techno'],
     soundcloudTrack: ' https://soundcloud.com/parkingdotradio/3tons ',
     youtubeVideo: '',
+    application: 'application-1',
   }
 
   it('returns what the server is sent: the ids, the offset and duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
@@ -371,6 +379,7 @@ describe('checkSet', () => {
         genres: ['ambient', 'techno'],
         soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
         youtubeVideo: null,
+        application: 'application-1',
       },
     })
   })

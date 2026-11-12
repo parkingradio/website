@@ -196,7 +196,12 @@ export const SEED_ARTISTS: SeedArtist[] = [
   {
     // Known only by name.
     profile: { name: 'Marée Basse', ...LEFT_OUT },
-    applications: [application([-180], 'done', { receivedDaysAgo: 280 })],
+    applications: [
+      // Her set at the guest mixes was cancelled, then she was booked again for Les Nuits Basses' takeover, which was
+      // cancelled too: two sets come from it.
+      application([30, 60], 'scheduled', { performanceTypes: ['live-performance'], receivedDaysAgo: 40 }),
+      application([-180], 'done', { receivedDaysAgo: 280 }),
+    ],
   },
   {
     profile: {
@@ -625,6 +630,9 @@ export type SeedSet = Pick<SetFields, 'offsetMinutes' | 'durationMinutes'> &
     // The video's id on YouTube, which isn't checked against YouTube. Sets have no SoundCloud track, which the server
     // would have to find on SoundCloud.
     youtubeVideo?: string
+    // The application the set comes from, one of its performers', by its days (see `SeedApplication`), which tell it from
+    // their other applications.
+    application?: number[]
     status: Status
   }
 
@@ -632,6 +640,9 @@ export type SeedSession = {
   type: SessionType
   // For a takeover, its collective, by its email, or by its name for one without.
   takeover?: string
+  // For a takeover, the application it comes from, its collective's, by its days (see `SeedApplication`), which tell it
+  // from the collective's other applications.
+  application?: number[]
   // Its own name, which replaces the one its type gives it.
   name?: string
   // The event's id on RA, which isn't checked against RA.
@@ -653,7 +664,7 @@ export type SeedSession = {
 // The sessions are clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or happen
 // twice, and their sets' times wouldn't be as they look.
 export const SEED_SESSIONS: SeedSession[] = [
-  // Onde Commune's takeover: its three artists, one after the other.
+  // Onde Commune's takeover: its three artists, one after the other, the first of whom applied for it on her own.
   {
     type: 'takeover',
     takeover: 'onde.commune@example.com',
@@ -664,16 +675,26 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 180,
     status: 'done',
     sets: [
-      { performers: ['clementine@example.com'], offsetMinutes: 0, durationMinutes: 60, performanceTypes: ['dj'], genres: ['techno', 'acid'], youtubeVideo: 'oNdEcOmMuN1', status: 'done' },
+      {
+        performers: ['clementine@example.com'],
+        offsetMinutes: 0,
+        durationMinutes: 60,
+        performanceTypes: ['dj'],
+        genres: ['techno', 'acid'],
+        youtubeVideo: 'oNdEcOmMuN1',
+        application: [-30],
+        status: 'done',
+      },
       { performers: ['boreale@example.com'], offsetMinutes: 60, durationMinutes: 60, performanceTypes: ['vinyl'], genres: ['house'], youtubeVideo: 'oNdEcOmMuN2', status: 'done' },
       { performers: ['kwame@example.com'], offsetMinutes: 120, durationMinutes: 60, performanceTypes: ['dj'], youtubeVideo: 'oNdEcOmMuN3', status: 'done' },
     ],
   },
-  // Collectif Béton's takeover, with a name of its own: a guest who isn't one of its artists, then two of its artists
-  // together, until after midnight.
+  // Collectif Béton's takeover, which comes from its application, with a name of its own: a guest who isn't one of its
+  // artists, then two of its artists together, until after midnight.
   {
     type: 'takeover',
     takeover: 'beton@example.com',
+    application: [-60],
     name: 'BÉTON 140',
     when: { day: -60, start: '20:30' },
     durationMinutes: 300,
@@ -692,10 +713,11 @@ export const SEED_SESSIONS: SeedSession[] = [
       },
     ],
   },
-  // Without links.
+  // Without links, but from its collective's application.
   {
     type: 'takeover',
     takeover: 'dub.laurentides@example.com',
+    application: [-10],
     when: { day: -10, start: '14:00' },
     durationMinutes: 120,
     status: 'done',
@@ -717,7 +739,14 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 150,
     status: 'planned',
     sets: [
-      { performers: ['Marée Basse'], offsetMinutes: 30, durationMinutes: 60, performanceTypes: ['live-performance'], status: 'cancelled' },
+      {
+        performers: ['Marée Basse'],
+        offsetMinutes: 30,
+        durationMinutes: 60,
+        performanceTypes: ['live-performance'],
+        application: [30, 60],
+        status: 'cancelled',
+      },
       { performers: ['clementine@example.com', 'clement.brule@example.com'], offsetMinutes: 0, durationMinutes: 90, performanceTypes: ['dj'], status: 'planned' },
       { performers: ['kwame@example.com'], offsetMinutes: 90, durationMinutes: 60, performanceTypes: ['dj'], genres: ['deep-house'], status: 'planned' },
     ],
@@ -758,7 +787,7 @@ export const SEED_SESSIONS: SeedSession[] = [
     status: 'cancelled',
     sets: [
       { performers: ['Sable Mouvant'], offsetMinutes: 0, durationMinutes: 60, status: 'planned' },
-      { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, status: 'planned' },
+      { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, application: [30, 60], status: 'planned' },
     ],
   },
   // A live performance, coming up, with its own description, but no flyer yet.

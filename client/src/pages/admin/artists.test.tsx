@@ -95,6 +95,7 @@ const STUB_SET: StudioSet = {
   genres: [],
   soundcloudTrack: null,
   youtubeVideo: null,
+  application: null,
   createdAt: '2026-10-01T16:00:00.000Z',
   createdBy: 'admin@example.com',
   updatedBy: null,
@@ -142,6 +143,8 @@ function application(id: string, artistId: string, changes: Partial<Application>
     status: 'new',
     statusUpdatedBy: null,
     statusUpdatedAt: null,
+    sets: [],
+    sessions: [],
     ...changes,
   }
 }
