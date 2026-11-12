@@ -36,7 +36,14 @@ and when, if anyone did. From top to bottom, it then shows:
   page. A collective's lists its artists, linking to them, and its genres are theirs.
 - "Candidature": everything in the application, and a button that changes it in a form in its place, including the day
   it was received.
-- "Supprimer": deletes the application for good, after confirming. The artist or the collective stays.
+- "Sets", for an artist's application, or "Sessions", for a collective's: those that come from it (see
+  [Applications, in Sessions](../../server/sessions.md#applications)), in the server's order, each with its day
+  ("Date"), its times ("Heure"), written like on a session's page (see [Times](sessions.md#times)), its session's title
+  ("Session", linking to the session's page, for a set, or "Nom", for a session, whose day links to its page), and its
+  status ("Statut"). Without any, it says so, and that they're linked from the form of a set of the artist, or of a
+  takeover of the collective (see [Applications](sessions.md#applications)). They're only shown here.
+- "Supprimer": deletes the application for good, after confirming. The artist or the collective stays, and so do the
+  sets or sessions that come from it, which the page says when it has some.
 
 "nouvelle candidature" creates an application by hand, at `/admin/candidatures/nouvelle`, e.g. to bring in one that came
 through the original Google Form: a form with the artist or the collective, picked in a single field from those in the

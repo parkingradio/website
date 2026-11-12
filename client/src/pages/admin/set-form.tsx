@@ -1,10 +1,12 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { Application } from '../../application-fields'
 import type { Artist, GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
 import { quebecDayAndTime } from '../../quebec-time'
-import { after, checkSet, durationOf, setPlace } from '../../session-fields'
+import { after, checkSet, durationOf, isPerformersApplication, setPlace } from '../../session-fields'
 import type { Reference, Session, SetFields, SetFormValues, SetPlace } from '../../session-fields'
+import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
 import { artistOption, formatDuration, genreNames, membersGenres, nextDay, sessionWithin } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
@@ -27,17 +29,19 @@ type SetFormProps = {
   // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
   // they are.
   artists: Artist[] | null
+  // The applications the set's is picked from, or null when they couldn't be loaded, which leaves the set's as it is.
+  applications: Application[] | null
   submitLabel: string
   // Sends the set's fields, and returns the error, if it failed.
   onSubmit: (fields: SetFields) => Promise<ReactNode | null>
   onCancel: () => void
 }
 
-export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ session, initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const place = setPlace(form, session)
-  const checked = checkSet(form, session, place)
+  const checked = checkSet(form, session, place, applications)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!))
@@ -45,6 +49,10 @@ export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCa
   // The performers' first genres, in the order of a collective's genres, which are suggested while the set has none.
   const suggested =
     artists && form.genres.length === 0 ? membersGenres(form.performers, new Map(artists.map((artist) => [artist.id, artist]))).slice(0, SUGGESTED_GENRES) : []
+
+  // The applications of its performers, in their order.
+  const candidates = form.performers.flatMap((performer) => applications?.filter((application) => isPerformersApplication(application, [performer])) ?? [])
+  const artistName = (application: Application) => (artists ?? form.performers).find((artist) => artist.id === application.artistId)?.name
 
   const input = (field: 'soundcloudTrack' | 'youtubeVideo') => ({
     value: form[field],
@@ -58,9 +66,25 @@ export function SetForm({ session, initial, artists, submitLabel, onSubmit, onCa
       <PerformersField
         performers={form.performers}
         artists={artists}
-        onChange={(performers) => update({ performers })}
+        onChange={(performers) => {
+          update({ performers })
+          // So that it says right away when its application isn't one of theirs anymore.
+          leave('application')()
+        }}
         error={shown('performers')}
         onLeave={leave('performers')}
+      />
+
+      <ApplicationField
+        candidates={candidates}
+        applications={applications}
+        own={initial.application}
+        selected={form.application}
+        ownerName={artistName}
+        empty={form.performers.length === 0 ? "Choisissez d'abord les artistes." : 'Aucune candidature de ces artistes.'}
+        onChange={(application) => update({ application })}
+        error={shown('application')}
+        onLeave={leave('application')}
       />
 
       <PlaceField
