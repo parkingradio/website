@@ -117,6 +117,29 @@ async function streamStatus(app: App, id: string) {
   return (await app.inject({ method: 'GET', url: `/api/radio/tracks/${id}/stream` })).statusCode
 }
 
+// Enters the credentials of the SoundCloud app.
+async function put(app: App, body: unknown) {
+  return app.inject({ method: 'PUT', url: '/api/admin/radio/credentials', payload: body as object, cookies: await sessionCookies() })
+}
+
+// Runs `change` while `request` is under way, once it has started loading the credentials and the chosen playlist, which
+// it's then given as they were before `change`. Returns what `request` answers.
+async function duringStaleRequest<T>(request: () => Promise<T>, change: () => Promise<unknown>): Promise<T> {
+  const previous = chosen
+  const credentialsLoads = loadCredentials.mock.calls.length
+  let resolveStale: ((settings: RadioSettings | null) => void) | undefined
+  loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
+  const stale = request()
+  await vi.waitFor(() => {
+    expect(resolveStale).toBeDefined()
+    expect(loadCredentials.mock.calls.length).toBeGreaterThan(credentialsLoads)
+  })
+
+  await change()
+  resolveStale!(previous)
+  return stale
+}
+
 describe('radio routes', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -640,6 +663,22 @@ describe('radio routes', () => {
       expect(newClient).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: 'other-id' }))
     })
 
+    it('streams through new credentials when a request that loaded the old ones goes on after they were saved', async () => {
+      const app = await buildApp()
+      await radio(app)
+      // The old ones were revoked, e.g., which is why new ones are saved.
+      const revoked = newClient.mock.results[0].value
+      hlsStream.mockImplementation(async function (this: SoundCloudClient, id: string) {
+        if (this === revoked) throw new Error('SoundCloud refused to issue a token: 401')
+        return streamFor(Number(id))
+      })
+
+      const stale = await duringStaleRequest(() => streamStatus(app, '1'), () => put(app, { clientId: 'new-id', clientSecret: 'new-secret' }))
+
+      expect(stale).toBe(200)
+      expect(hlsStream).toHaveBeenCalledOnce()
+    })
+
     it('responds 502 when SoundCloud fails to give a stream, and tries again 30 seconds later', async () => {
       hlsStream.mockRejectedValueOnce(new Error('SoundCloud did not redirect to a stream'))
       const app = await buildApp()
@@ -702,24 +741,6 @@ describe('radio routes', () => {
 
     async function post(app: App, url: string, body: unknown) {
       return app.inject({ method: 'POST', url, payload: body as object, cookies: await sessionCookies() })
-    }
-
-    // Runs `change` while a request for what's on air is under way, once it has started loading the credentials and the
-    // chosen playlist, which it's then given as it was before `change`. Returns what that request answers.
-    async function duringStaleRequest(app: App, change: () => Promise<unknown>) {
-      const previous = chosen
-      const credentialsLoads = loadCredentials.mock.calls.length
-      let resolveStale: ((settings: RadioSettings | null) => void) | undefined
-      loadSettings.mockImplementationOnce(() => new Promise((resolve) => (resolveStale = resolve)))
-      const stale = radio(app)
-      await vi.waitFor(() => {
-        expect(resolveStale).toBeDefined()
-        expect(loadCredentials.mock.calls.length).toBeGreaterThan(credentialsLoads)
-      })
-
-      await change()
-      resolveStale!(previous)
-      return stale
     }
 
     // Sends `body` as JSON, whatever it is, e.g. `null`, or no body at all when it's undefined.
@@ -1120,7 +1141,7 @@ describe('radio routes', () => {
         vi.advanceTimersByTime(70 * MINUTE)
         save.mockClear()
 
-        const stale = await duringStaleRequest(app, () => post(app, '/api/admin/radio/playlist', { link: LINK }))
+        const stale = await duringStaleRequest(() => radio(app), () => post(app, '/api/admin/radio/playlist', { link: LINK }))
 
         expect(stale.current.track.id).toBe('8')
         await radio(app)
@@ -1136,7 +1157,7 @@ describe('radio routes', () => {
         const app = await buildApp()
         await radio(app)
 
-        await duringStaleRequest(app, () => post(app, '/api/admin/radio/playlist', { link: `${ROTATION.url}/s-New` }))
+        await duringStaleRequest(() => radio(app), () => post(app, '/api/admin/radio/playlist', { link: `${ROTATION.url}/s-New` }))
         await radio(app)
 
         expect(playlist.mock.calls).toEqual([['7', 's-Old'], ['7', 's-New']])
@@ -1171,10 +1192,6 @@ describe('radio routes', () => {
 
       async function credentials(app: App) {
         return (await app.inject({ method: 'GET', url: URL, cookies: await sessionCookies() })).json()
-      }
-
-      async function put(app: App, body: unknown) {
-        return app.inject({ method: 'PUT', url: URL, payload: body as object, cookies: await sessionCookies() })
       }
 
       it('returns null until the credentials have been entered', async () => {
@@ -1311,11 +1328,54 @@ describe('radio routes', () => {
         const app = await buildApp()
         await radio(app)
 
-        await duringStaleRequest(app, () => put(app, { clientId: 'new-id', clientSecret: 'new-secret' }))
+        await duringStaleRequest(() => radio(app), () => put(app, { clientId: 'new-id', clientSecret: 'new-secret' }))
         await radio(app)
 
         // Once at first, then once through the new credentials, which the request that loaded the old ones went on with.
         expect(playlist).toHaveBeenCalledTimes(2)
+      })
+
+      it('responds with new credentials, and their error, when a request that loaded the old ones goes on after they were saved', async () => {
+        const app = await buildApp()
+        await radio(app)
+        playlist.mockRejectedValue(new Error(PLAYLIST_FAILED))
+
+        const stale = await duringStaleRequest(() => credentials(app), () => put(app, { clientId: 'new-id', clientSecret: 'new-secret' }))
+
+        expect(stale.credentials).toEqual({
+          clientId: 'new-id',
+          updatedBy: 'admin@example.com',
+          updatedAt: inQuebecTime(new Date(NOW)),
+          error: PLAYLIST_FAILED,
+        })
+      })
+
+      it('responds with newer credentials saved while saving them, since the playlist is then read through those', async () => {
+        const app = await buildApp()
+        await radio(app)
+        let finishSaving: (() => void) | undefined
+        saveCredentials.mockImplementationOnce(
+          (credentials) =>
+            new Promise((resolve) => {
+              finishSaving = () => {
+                entered = credentials
+                resolve()
+              }
+            }),
+        )
+        const first = put(app, { clientId: 'first-id', clientSecret: 'first-secret' })
+        await vi.waitFor(() => expect(finishSaving).toBeDefined())
+
+        vi.advanceTimersByTime(MINUTE)
+        await put(app, { clientId: 'second-id', clientSecret: 'second-secret' })
+        finishSaving!()
+
+        expect((await first).json().credentials).toEqual({
+          clientId: 'second-id',
+          updatedBy: 'admin@example.com',
+          updatedAt: inQuebecTime(new Date(NOW + MINUTE)),
+          error: null,
+        })
       })
 
       it('says why reading the playlist through new credentials failed, though they were saved, and the radio goes on with what it read before', async () => {
