@@ -4,7 +4,8 @@ import { normalize } from '../../normalize'
 
 // What the lists of artists and applications share: a field that searches them, and columns that sort them. Both are
 // kept in the URL, like the applications' status, so that going back to a list from one of its entries with the
-// browser finds it as it was. The field and the columns' headers are in list-controls.tsx.
+// browser finds it as it was, and an application's page goes through the list it was opened from. The field and the
+// columns' headers are in list-controls.tsx.
 
 // The entries that have every word of `query` in one of their `fields`, whatever its case, accents and ligatures, e.g.
 // "soeurs" for "Sœurs" (see normalize), and allowing for a typo or so, e.g. "monreal" for "Montréal". A date counts as
@@ -168,11 +169,23 @@ export function useSort<K extends string, T>(columns: Record<K, SortColumn<T>>, 
   }
 }
 
-// The status a list is filtered by, or null for every status, and what changes it. The URL says which, with `all` for
-// every status, and without one of `statuses`, the list shows `initial`, its default view.
-export function useStatusFilter<S extends string>(statuses: readonly S[], initial: NoInfer<S>): [S | null, (status: S | null) => void] {
+// The status a list is filtered by, or null for every status, what changes it, and whether the URL gives it. The URL says
+// which, with `all` for every status, and without one of `statuses`, the list shows `initial`, its default view.
+export function useStatusFilter<S extends string>(statuses: readonly S[], initial: NoInfer<S>): [S | null, (status: S | null) => void, boolean] {
   const [params, change] = useQueryParams()
   const param = params.get('status')
-  const status = param === 'all' ? null : (statuses.find((status) => status === param) ?? initial)
-  return [status, (status) => change({ status: status ?? 'all' })]
+  const given = statuses.find((status) => status === param)
+  const status = param === 'all' ? null : (given ?? initial)
+  return [status, (status) => change({ status: status ?? 'all' }), param === 'all' || given !== undefined]
+}
+
+// The query that keeps a list as it is in another address, e.g. its entries' pages': its `status`, or `all`, even for its
+// default view, so that those pages tell they were opened from the list, then its search and order, as the URL has them.
+export function listQuery(params: URLSearchParams, status: string | null): string {
+  const query = new URLSearchParams({ status: status ?? 'all' })
+  for (const name of ['search', 'sort', 'order']) {
+    const value = params.get(name)
+    if (value !== null) query.set(name, value)
+  }
+  return `?${query}`
 }

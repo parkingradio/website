@@ -153,12 +153,13 @@ test('collectives are listed and searched with the artists, and lead to their ar
   await expect(collectives).toHaveText(['Les Nuits Basses', 'Onde Commune'])
 })
 
-// With the seeded application of Onde Commune (see seed-data.ts).
-test("a collective's application is listed with its city and its artists' genres, and on its page, which leads to another one", async ({
+// With the seeded applications of Onde Commune, of Les Nuits Basses and of Kwame Asante, who's in both, and whom searching
+// for finds them (see seed-data.ts).
+test("a collective's application is listed with its city and its artists' genres, and on its page, which goes through the list and leads to another one", async ({
   page,
 }) => {
   await logIn(page, { at: '/admin/candidatures?status=all' })
-  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('onde commune')
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('kwame asante')
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Onde Commune', exact: true }) })
   await expect(row).toContainText('Onde Commune (collectif)')
   await expect(row).toContainText('Montréal, Canada')
@@ -170,6 +171,17 @@ test("a collective's application is listed with its city and its artists' genres
   await expect(page.getByText('Nous aimerions jouer toute la soirée, chacun son tour.')).toBeVisible()
   const genres = page.locator('dt', { hasText: 'Genres de ses artistes' }).locator('+ dd')
   await expect(genres).toHaveText('techno, deep house, afrobeat, acid, afro house, minimal, amapiano')
+
+  // The most recently received first: Kwame's own, sent through the form as it was seeded, Les Nuits Basses', then this one.
+  await expect(page.getByText('3 / 3')).toBeVisible()
+  await page.getByRole('link', { name: '← précédente' }).click()
+  await expect(page.getByRole('heading', { name: 'Candidature de Les Nuits Basses', exact: true })).toBeVisible()
+  await expect(page.getByText('2 / 3')).toBeVisible()
+  await page.getByRole('link', { name: '← candidatures' }).click()
+  await expect(page.getByRole('searchbox', { name: 'Rechercher' })).toHaveValue('kwame asante')
+  await page.goBack()
+  await page.getByRole('link', { name: 'suivante →' }).click()
+  await expect(page.getByRole('heading', { name: 'Candidature de Onde Commune', exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: 'Onde Commune', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
@@ -259,7 +271,8 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await page.getByRole('button', { name: 'créer la candidature' }).click()
   await expect(page.getByRole('heading', { name: `Candidature de ${name}`, exact: true })).toBeVisible()
   const applicationPage = new URL(page.url()).pathname
-  const listed = page.locator(`a[href="${applicationPage}"]`)
+  // Whatever the list's parameters, which its links keep.
+  const listed = page.locator(`a[href^="${applicationPage}?"]`)
   await adminMenu(page).getByRole('link', { name: 'candidatures' }).click()
   const row = page.getByRole('row').filter({ has: listed })
   await expect(row).toContainText(`${name} (collectif)`)
