@@ -58,7 +58,7 @@ function Consent({ email }: { email: string }) {
         return browser.go(redirect)
       }
       let message = `Ce lien n'est pas valide (${result.error}). Recommencez la connexion depuis l'application.`
-      if (unknownClient) message = 'Seuls Claude et Claude Code peuvent se connecter à Parking Radio.'
+      if (unknownClient) message = 'Cette application ne peut pas se connecter à Parking Radio.'
       if (result.fromServer === false) {
         message = `La demande n'a pas pu être vérifiée\u00a0: ${result.error.replace(/\.$/, '')}. Rechargez la page pour réessayer.`
       }

@@ -26,6 +26,14 @@ export const OAUTH_CLIENTS: OAuthClient[] = [
     redirectUris: ['http://localhost/callback', 'http://127.0.0.1/callback'],
     local: true,
   },
+  // The `parkingradio` command-line tool, whose document is ours, client/public/oauth/parkingradio-cli.json, which has to
+  // change with this.
+  {
+    id: 'https://parking.radio/oauth/parkingradio-cli.json',
+    name: 'Parking Radio CLI',
+    redirectUris: ['http://localhost/callback', 'http://127.0.0.1/callback'],
+    local: true,
+  },
 ]
 
 export function findClient(id: string): OAuthClient | undefined {

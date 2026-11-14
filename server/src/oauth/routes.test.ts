@@ -119,7 +119,7 @@ describe('OAuth routes', () => {
       const clientId = `https://example.com/${'x'.repeat(300)}`
       const response = await getAuthorization(app, new URLSearchParams(params({ client_id: clientId })).toString())
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Only Claude and Claude Code can connect', unknownClient: true })
+      expect(response.json()).toEqual({ ok: false, error: "This app can't connect", unknownClient: true })
       const logged = logs.map((line) => JSON.parse(line)).find((line) => line.msg === "An app that the server doesn't know asked to connect")
       expect(logged.clientId).toBe(clientId.slice(0, 200))
     })

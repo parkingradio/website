@@ -53,7 +53,7 @@ describe('checkAuthorization', () => {
   })
 
   it("says when the app isn't one of the clients", () => {
-    expect(check({ client_id: 'https://example.com/client.json' })).toEqual({ ok: false, error: 'Only Claude and Claude Code can connect', unknownClient: true })
+    expect(check({ client_id: 'https://example.com/client.json' })).toEqual({ ok: false, error: "This app can't connect", unknownClient: true })
   })
 
   it('checks client_id and redirect_uri before anything else', () => {

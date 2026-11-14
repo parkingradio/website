@@ -57,7 +57,7 @@ export function checkAuthorization(params: AuthorizationParams, { issuer, userSc
   const clientId = params.client_id
   if (typeof clientId !== 'string') return { ok: false, error: '`client_id` is missing, or there more than once', unknownClient: false }
   const client = findClient(clientId)
-  if (!client) return { ok: false, error: 'Only Claude and Claude Code can connect', unknownClient: true }
+  if (!client) return { ok: false, error: "This app can't connect", unknownClient: true }
   const redirectUri = params.redirect_uri
   if (typeof redirectUri !== 'string' || !isRedirectUri(client, redirectUri)) {
     return { ok: false, error: "`redirect_uri` isn't one of the app's", unknownClient: false }
