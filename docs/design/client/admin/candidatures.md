@@ -36,14 +36,15 @@ and when, if anyone did. From top to bottom, it then shows:
   page. A collective's lists its artists, linking to them, and its genres are theirs.
 - "Candidature": everything in the application, and a button that changes it in a form in its place, including the day
   it was received.
-- "Sets", for an artist's application, or "Sessions", for a collective's: those that come from it (see
-  [Applications, in Sessions](../../server/sessions.md#applications)), in the server's order, each with its day
-  ("Date"), its times ("Heure"), written like on a session's page (see [Times](sessions.md#times)), its session's title
-  ("Session", linking to the session's page, for a set, or "Nom", for a session, whose day links to its page), and its
-  status ("Statut"). Without any, it says so, and that they're linked from the form of a set of the artist, or of a
-  takeover of the collective (see [Applications](sessions.md#applications)). They're only shown here.
+- "Sets", for an artist's application, or "Sessions", for a collective's: the sets or sessions that come from it (see
+  [Applications, in Sessions](../../server/sessions.md#applications)), in the server's order. Each row shows the day
+  ("Date"), the times ("Heure", written as on a session's page, see [Times](sessions.md#times)) and the status
+  ("Statut"). A set also shows its session's title ("Session"), which links to the session's page. A session shows its
+  own title ("Nom"), and its day links to its page. When there are none, the section says so, and that they're linked
+  from the form of one of the artist's sets, or of one of the collective's takeovers (see
+  [Applications](sessions.md#applications)). They can't be changed from here.
 - "Supprimer": deletes the application for good, after confirming. The artist or the collective stays, and so do the
-  sets or sessions that come from it, which the page says when it has some: « Les sets associés restent. », or « Les
+  sets or sessions that come from it. When there are some, the page says « Les sets associés restent. » or « Les
   sessions associées restent. ».
 
 "nouvelle candidature" creates an application by hand, at `/admin/candidatures/nouvelle`, e.g. to bring in one that came
