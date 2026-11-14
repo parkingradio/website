@@ -143,7 +143,7 @@ describe('The list of applications', () => {
     expect(statusRows[2]).toHaveClass('admin-status-accepted')
     expect(statusRows[3]).toHaveClass('admin-status-new')
     expect(within(statusRows[3]).getAllByRole('cell').at(-1)).toHaveClass('admin-status')
-    expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
+    expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1?status=all')
     expect(screen.getByRole('link', { name: 'Brume' })).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle')
   })
@@ -696,8 +696,11 @@ describe('Sorting the list of applications', () => {
 describe('An application’s page', () => {
   const PAGE = {
     ...LOGGED_IN,
+    ...ARTISTS,
     '/api/admin/applications/application-1': { ok: true, application: APPLICATION },
     '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
+    // For précédente and suivante.
+    '/api/admin/applications': { ok: true, applications: [APPLICATION] },
   }
 
   it('says when the artist sent the application themselves', async () => {
@@ -983,7 +986,7 @@ describe('An application’s page', () => {
     expect(screen.getByRole('button', { name: 'enregistrer' })).toBeEnabled()
   })
 
-  it('deletes the application once confirmed, and goes back to the list', async () => {
+  it('deletes the application once confirmed, and goes back to the list, in its default view', async () => {
     mockFetch({
       ...PAGE,
       ...ARTISTS,
@@ -999,7 +1002,7 @@ describe('An application’s page', () => {
     expect(requestsTo('DELETE', '/api/admin/applications/application-1')).toHaveLength(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'supprimer la candidature' }))
-    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/))
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=new$/))
   })
 
   it('lists the sets that come from it, with their sessions, linking to them, which stay once it is deleted', async () => {
@@ -1042,6 +1045,8 @@ describe('An application’s page', () => {
     const OF_ONDES = { ...APPLICATION, artistId: null, collectiveId: 'collective-1' }
     const COLLECTIVE_PAGE = {
       ...LOGGED_IN,
+      ...ARTISTS,
+      '/api/admin/applications': { ok: true, applications: [OF_ONDES] },
       '/api/admin/applications/application-1': { ok: true, application: OF_ONDES },
       '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
       '/api/admin/artists?collective=collective-1': { ok: true, artists: [BRUME, AURORE] },
@@ -1072,7 +1077,8 @@ describe('An application’s page', () => {
       expect(screen.getByText(/^Aucune session ne vient de cette candidature/)).toHaveTextContent(
         "Aucune session ne vient de cette candidature : on la choisit dans le formulaire d'un takeover du collectif.",
       )
-      expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
+      // Every artist is only loaded for précédente and suivante, to go through the list.
+      expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(1)
     })
 
     it('lists the sessions that come from it, linking to them, which stay once it is deleted', async () => {
@@ -1148,6 +1154,243 @@ describe('An application’s page', () => {
     renderAt('/admin/candidatures/nope')
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("La candidature n'a pas pu être chargée : No such application"))
+  })
+})
+
+describe('Going through the list from an application’s page', () => {
+  // Two more new ones, received after the others: Aurore's, who would like to play in February, and Brume's. The new
+  // ones, oldest first, are then Aurore's from March (application-1), these two.
+  const LATER: Application = { ...APPLICATION, id: 'application-5', receivedAt: '2026-10-09T16:00:00.000Z', createdAt: '2026-10-09T16:00:00.000Z', dates: ['2027-02-04'] }
+  const LATEST: Application = { ...APPLICATION, id: 'application-6', artistId: 'artist-2', receivedAt: '2026-10-10T16:00:00.000Z', createdAt: '2026-10-10T16:00:00.000Z' }
+  const ALL = [LATEST, LATER, ...APPLICATIONS]
+
+  // The list, as `listed`, and each of its applications' pages.
+  function pages(listed = ALL) {
+    return {
+      ...LOGGED_IN,
+      ...ARTISTS,
+      '/api/admin/applications': { ok: true, applications: listed },
+      ...Object.fromEntries(listed.map((each) => [`/api/admin/applications/${each.id}`, { ok: true, application: each }])),
+      '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
+      '/api/admin/artists/artist-2': { ok: true, artist: BRUME },
+    }
+  }
+  // Where the application is in the list, as it's shown, e.g. "2 / 3".
+  const position = () => screen.findByText(/^\d+ \/ \d+$/)
+  const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href')
+
+  it('is where the links of the list lead, which keep its status, even for the default view, its search and its order', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures')
+
+    expect(await screen.findByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1?status=new')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Rechercher' }), { target: { value: 'aurore' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Artiste' }))
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: '28 mars 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1?status=new&search=aurore&sort=artist&order=asc'),
+    )
+  })
+
+  it('goes through the default view, without the list’s parameters, and keeps it from then on', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures/application-5')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    // Read as "2 sur 3".
+    expect(screen.getByText('2 sur 3')).toBeInTheDocument()
+    expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new')
+    expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
+    expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
+
+    fireEvent.click(screen.getByRole('link', { name: 'suivante →' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Brume' })).toBeInTheDocument())
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\/application-6\?status=new$/)
+    expect(await position()).toHaveTextContent('3 / 3')
+    expect(href('← précédente')).toBe('/admin/candidatures/application-5?status=new')
+    expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
+    // The last one has no next one.
+    const next = screen.getByRole('button', { name: 'suivante →' })
+    expect(next).toHaveAttribute('aria-disabled', 'true')
+    expect(next).toHaveAccessibleDescription("C'est la dernière candidature de la liste.")
+  })
+
+  it('has no previous one at the start of the list', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures/application-1?status=new')
+
+    expect(await position()).toHaveTextContent('1 / 3')
+    const previous = screen.getByRole('button', { name: '← précédente' })
+    expect(previous).toHaveAttribute('aria-disabled', 'true')
+    expect(previous).toHaveAccessibleDescription("C'est la première candidature de la liste.")
+    expect(href('suivante →')).toBe('/admin/candidatures/application-5?status=new')
+  })
+
+  it('goes through what the search finds, in the order of the list, and leads back to it as it was', async () => {
+    mockFetch(pages())
+    const query = '?status=all&search=aurore&sort=dates&order=desc'
+    renderAt(`/admin/candidatures/application-1${query}`)
+
+    // Aurore's, the last day she'd like to play first: in February, then December, November and October.
+    expect(await position()).toHaveTextContent('2 / 4')
+    expect(href('← précédente')).toBe(`/admin/candidatures/application-5${query}`)
+    expect(href('suivante →')).toBe(`/admin/candidatures/application-2${query}`)
+    expect(href('← candidatures')).toBe(`/admin/candidatures${query}`)
+  })
+
+  it('has no previous or next one, without the list’s parameters, unless it is new', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures/application-2')
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Aurore' })).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: /précédente/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente/ })).not.toBeInTheDocument()
+    expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(0)
+  })
+
+  it('counts a status that the list does not know as no status', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures/application-2?status=bogus')
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Aurore' })).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: /précédente/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente/ })).not.toBeInTheDocument()
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(0)
+  })
+
+  it('leads back to the list with the search and order that précédente and suivante keep, without a status', async () => {
+    mockFetch(pages())
+    renderAt('/admin/candidatures/application-5?search=aurore')
+
+    // Aurore's new ones.
+    expect(await position()).toHaveTextContent('2 / 2')
+    expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new&search=aurore')
+    expect(href('← candidatures')).toBe('/admin/candidatures?status=new&search=aurore')
+  })
+
+  it('keeps its place in the list once it has left it, e.g. when coming back to it once it was accepted', async () => {
+    mockFetch(pages([LATEST, { ...LATER, status: 'accepted' }, ...APPLICATIONS]))
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new')
+    expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
+  })
+
+  it('keeps its place among the applications it ties with in the list’s order', async () => {
+    // Four new ones, as the server lists them, three of which would like to play on December 20th first.
+    const tie = (id: string, day: string, first: string): Application => ({ ...APPLICATION, id, receivedAt: `2026-10-${day}T16:00:00.000Z`, dates: [first] })
+    const [b, c, d] = [tie('tie-b', '24', '2026-12-20'), tie('tie-c', '23', '2026-12-20'), tie('tie-d', '22', '2026-12-20')]
+    const listed = [b, c, d, tie('tie-a', '21', '2026-12-01')]
+    const query = '?status=new&sort=dates'
+    mockFetch(pages(listed))
+    const { unmount } = renderAt(`/admin/candidatures/tie-c${query}`)
+
+    expect(await position()).toHaveTextContent('3 / 4')
+    expect(href('← précédente')).toBe(`/admin/candidatures/tie-b${query}`)
+    expect(href('suivante →')).toBe(`/admin/candidatures/tie-d${query}`)
+    unmount()
+
+    // Once it's been accepted, it's still between the same ones.
+    mockFetch(pages(listed.map((each) => (each === c ? { ...c, status: 'accepted' as const } : each))))
+    renderAt(`/admin/candidatures/tie-c${query}`)
+    expect(await position()).toHaveTextContent('3 / 4')
+    expect(href('← précédente')).toBe(`/admin/candidatures/tie-b${query}`)
+    expect(href('suivante →')).toBe(`/admin/candidatures/tie-d${query}`)
+  })
+
+  it('keeps its place once its status is changed, which the next one’s précédente then skips', async () => {
+    const accepted = { ...LATER, status: 'accepted' as const }
+    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5/status': { ok: true, application: accepted } })
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    fireEvent.click(screen.getByRole('button', { name: 'retenue' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'retenue' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
+
+    // The next one's page loads the list again, which it has left.
+    mockFetch(pages([LATEST, accepted, ...APPLICATIONS]))
+    fireEvent.click(screen.getByRole('link', { name: 'suivante →' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Brume' })).toBeInTheDocument())
+    expect(await position()).toHaveTextContent('2 / 2')
+    expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new')
+  })
+
+  it('keeps précédente and suivante for a new one opened without the list’s parameters once its status is changed', async () => {
+    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5/status': { ok: true, application: { ...LATER, status: 'accepted' } } })
+    renderAt('/admin/candidatures/application-5')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    fireEvent.click(screen.getByRole('button', { name: 'retenue' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'retenue' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
+  })
+
+  it('keeps précédente and suivante while the application is changed in its form, and once it is saved', async () => {
+    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5': { ok: true, application: { ...LATER, details: 'Autre chose.' } } })
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    await position()
+    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    expect(screen.getByRole('button', { name: 'enregistrer' })).toBeInTheDocument()
+    expect(href('← précédente')).toBe('/admin/candidatures/application-1?status=new')
+    expect(href('suivante →')).toBe('/admin/candidatures/application-6?status=new')
+
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.getByText('Autre chose.')).toBeInTheDocument())
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
+  })
+
+  it('goes back to the list as it was once the application is deleted', async () => {
+    mockFetch({ ...pages(), 'DELETE /api/admin/applications/application-5': { ok: true } })
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    renderAt('/admin/candidatures/application-5?status=new&search=aurore')
+
+    await position()
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer la candidature' }))
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\?status=new&search=aurore$/))
+  })
+
+  it('can’t go to the previous or next one for a moment, while the list loads', async () => {
+    mockFetch(pages())
+    const answer = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation((input, options) =>
+      String(input instanceof Request ? input.url : input).endsWith('/api/admin/applications') ? new Promise(() => {}) : answer(input, options),
+    )
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Aurore' })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+    expect(screen.queryByText(/^\d+ \/ \d+$/)).not.toBeInTheDocument()
+  })
+
+  it('can’t go to the previous or next one for a moment while the application loads, and loads the list meanwhile, with a status', async () => {
+    mockFetch(pages())
+    const answer = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation((input, options) =>
+      String(input instanceof Request ? input.url : input).endsWith('/api/admin/applications/application-5') ? new Promise(() => {}) : answer(input, options),
+    )
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    await waitFor(() => expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+    expect(screen.queryByText(/^\d+ \/ \d+$/)).not.toBeInTheDocument()
+  })
+
+  it.each(['/api/admin/applications', '/api/admin/artists', '/api/admin/collectives'])('says when the list could not be loaded, without %s', async (failed) => {
+    mockFetch({ ...pages(), [failed]: { ok: false, error: 'Boom' } })
+    renderAt('/admin/candidatures/application-5?status=new')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("La liste des candidatures n'a pas pu être chargée : Boom"))
+    expect(screen.queryByRole('link', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente|suivante/ })).not.toBeInTheDocument()
   })
 })
 

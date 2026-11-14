@@ -474,6 +474,7 @@ describe('An artist’s page', () => {
     expect(screen.queryByText(/retiré de ses collectifs/)).not.toBeInTheDocument()
 
     await waitFor(() => expect(screen.getAllByRole('link', { name: '5 octobre 2026' })).toHaveLength(2))
+    // Without the parameters of the list of applications, which only its own links have.
     expect(screen.getAllByRole('link', { name: '5 octobre 2026' })[0]).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(screen.getByRole('link', { name: 'nouvelle candidature' })).toHaveAttribute('href', '/admin/candidatures/nouvelle?artist=artist-1')
   })

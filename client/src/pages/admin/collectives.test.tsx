@@ -185,6 +185,7 @@ describe('A collective’s page', () => {
 
     const table = await screen.findByRole('table')
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Reçue le', 'Dates', 'Prestations', 'Statut'])
+    // Without the parameters of the list of applications, which only its own links have.
     expect(within(table).getByRole('link', { name: '5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(within(table).getByText('DJ, Full Band')).toBeInTheDocument()
     // Only shown.
