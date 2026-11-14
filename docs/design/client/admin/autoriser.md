@@ -19,9 +19,9 @@ The page shows:
 "autoriser" allows the app and "refuser" refuses, and either one sends the browser back to the app, which says how it
 went. When what the app asks for isn't valid, the page sends the browser back to the app right away, which says what's
 wrong, except when it can't (see [Authorizing an app](../../server/oauth.md#authorizing-an-app)): the page then says
-that the link isn't valid, or, for an app the site doesn't know (`unknownClient`), that only Claude and Claude Code can
-connect. The server's errors are shown as it gives them, in English, inside the page's sentences, like on the admin
-pages.
+that the link isn't valid, or, for an app the site doesn't know (`unknownClient`), that this app can't connect to
+Parking Radio. The server's errors are shown as it gives them, in English, inside the page's sentences, like on the
+admin pages.
 
 ## Endpoints
 

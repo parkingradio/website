@@ -151,11 +151,11 @@ describe('Autoriser une application', () => {
     await waitFor(() => expect(go).toHaveBeenCalledWith(wrong))
   })
 
-  it("says that only Claude and Claude Code can connect, for an app the site doesn't know", async () => {
-    mockFetch({ ...LOGGED_IN, [CHECK]: { ok: false, error: 'Only Claude and Claude Code can connect', unknownClient: true } })
+  it("says that the app can't connect, for an app the site doesn't know", async () => {
+    mockFetch({ ...LOGGED_IN, [CHECK]: { ok: false, error: "This app can't connect", unknownClient: true } })
     renderAt()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Seuls Claude et Claude Code peuvent se connecter à Parking Radio.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cette application ne peut pas se connecter à Parking Radio.')
     expect(go).not.toHaveBeenCalled()
   })
 

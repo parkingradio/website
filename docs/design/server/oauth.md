@@ -47,11 +47,19 @@ apps can connect:
 |---|---|---|
 | `https://claude.ai/oauth/mcp-oauth-client-metadata` | Claude | `https://claude.ai/api/mcp/auth_callback` |
 | `https://claude.ai/oauth/claude-code-client-metadata` | Claude Code | `http://localhost/callback` and `http://127.0.0.1/callback`, on any port |
+| `https://parking.radio/oauth/parkingradio-cli.json` | Parking Radio CLI | `http://localhost/callback` and `http://127.0.0.1/callback`, on any port |
 
-The first is Claude's, on claude.ai and in its apps, whose servers connect to the MCP server. The second is Claude
-Code's, which runs on the user's computer, and listens there for the browser, on a new port each time. When an app
-changes its document, e.g. its redirect URIs, this list has to change with it. Apps can't register themselves (dynamic
-client registration). The name the pages show is the one of this list, not the one an app gives itself.
+Claude, on claude.ai and in its apps, connects to the MCP server from its servers. Claude Code and the Parking Radio
+CLI, the `parkingradio` command-line tool of [parkingradio/tools](https://github.com/parkingradio/tools), run on the
+user's computer, and listen there for the browser, on a new port each time. When an app changes its document, e.g. its
+redirect URIs, this list has to change with it. Apps can't register themselves (dynamic client registration). The name
+the pages show is the one of this list, not the one an app gives itself.
+
+The Parking Radio CLI's document is a file of the site, at `/oauth/parkingradio-cli.json`. Its `client_id` is that
+file's address on the production site, as a client ID metadata document's `client_id` must be. It also has the
+`client_name` and the `redirect_uris` of this list, `grant_types` `authorization_code` and `refresh_token`,
+`response_types` `code`, and `token_endpoint_auth_method` `none`. Every environment serves it as it is: like Claude's
+and Claude Code's ids, which are always on claude.ai, the id names the app, not the site it connects to.
 
 ## Scopes
 

@@ -58,6 +58,23 @@ request "${BASE_URL}/.well-known/oauth-protected-resource/mcp"
 expect_status 200
 expect_body_contains "\"resource\":\"${ISSUER}/mcp\""
 
+echo "  the site serves the Parking Radio CLI's document, whose id, name and redirect URIs are those the server knows"
+request "${BASE_URL}/oauth/parkingradio-cli.json"
+expect_status 200
+expect_header Content-Type 'application/json'
+expect_body_lacks '<!doctype html>'
+cli="$(body_field client_id)"
+[ "$cli" = "https://parking.radio/oauth/parkingradio-cli.json" ] || fail "expected the production client_id, got: ${cli}"
+[ "$(body_field client_name)" = "Parking Radio CLI" ] || fail "expected the client_name the pages show"
+# Its redirect URIs, on localhost and 127.0.0.1, with the port the app would listen on.
+cli_document="$BODY"
+for host in localhost 127.0.0.1; do
+    callback="$(printf '%s' "$cli_document" | grep -o "\"http://${host//./\\.}/[^\"]*\"" | tr -d '"' | sed "s|${host}|&:3118|")"
+    json GET "${AUTHORIZATION}?response_type=code&client_id=${cli}&redirect_uri=${callback}&code_challenge=${CHALLENGE}&code_challenge_method=S256"
+    expect_status 200
+    expect_body_contains "\"client\":\"Parking Radio CLI\",\"redirectHost\":\"${host}\",\"local\":true"
+done
+
 echo "  an app is allowed, exchanges its code for tokens, and is listed with its connection"
 connect
 expect_header Cache-Control 'no-store'

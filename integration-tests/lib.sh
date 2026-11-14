@@ -117,10 +117,10 @@ photos_on_disk() {
     docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi" | wc -l | tr -d ' '
 }
 
-# body_field <name> -- the string field with this name in the body of the last request (the last one, if there are
-# several).
+# body_field <name> -- the string field with this name in the body of the last request (in compact JSON, the last one if
+# there are several).
 body_field() {
-    printf '%s' "$BODY" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"
+    printf '%s' "$BODY" | sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p"
 }
 
 # body_id -- the "id" in the body of the last request, e.g. of what it created.
