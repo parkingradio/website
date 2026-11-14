@@ -131,8 +131,8 @@ async function patch(app: App, url: string, changes: unknown) {
   return app.inject({ method: 'PATCH', url, payload: JSON.stringify(changes), headers: { 'content-type': 'application/json' }, cookies: await sessionCookies() })
 }
 
-async function get(app: App, url: string) {
-  return app.inject({ method: 'GET', url, cookies: await sessionCookies() })
+async function get(app: App, url: string, headers: Record<string, string> = {}) {
+  return app.inject({ method: 'GET', url, headers, cookies: await sessionCookies() })
 }
 
 describe('artists routes', () => {
@@ -456,32 +456,81 @@ describe('artists routes', () => {
   })
 
   describe('GET /api/admin/artists/:id/photo', () => {
-    it('returns the photo with the type it was checked to have, and is never cached', async () => {
+    const PHOTO = '/api/admin/artists/artist-1/photo'
+
+    it('returns the photo with the type it was checked to have, which browsers keep for the admin, and check again', async () => {
       const app = await buildApp()
       await create(app, profile(), PNG)
-      const response = await get(app, '/api/admin/artists/artist-1/photo')
+      const response = await get(app, PHOTO)
       expect(response.statusCode).toBe(200)
       expect(response.rawPayload).toEqual(PNG)
       expect(response.headers['content-type']).toBe('image/png')
       expect(response.headers['x-content-type-options']).toBe('nosniff')
-      expect(response.headers['cache-control']).toBe('private, no-store')
+      expect(response.headers['cache-control']).toBe('private, no-cache')
+      expect(response.headers.etag).toMatch(/^"[^"]+"$/)
     })
 
-    it('responds 404 for an artist that does not exist, or whose photo is missing', async () => {
+    it('responds 304 without the photo when the request has its ETag, even weakened or in a list', async () => {
       const app = await buildApp()
+      await create(app, profile(), PNG)
+      const etag = (await get(app, PHOTO)).headers.etag as string
+      photos.read.mockClear()
+      for (const ifNoneMatch of [etag, `W/${etag}`, `"other", ${etag}`, `W/"other",W/${etag}`]) {
+        const response = await get(app, PHOTO, { 'if-none-match': ifNoneMatch })
+        expect(response.statusCode).toBe(304)
+        expect(response.rawPayload).toHaveLength(0)
+        expect(response.headers).toMatchObject({ etag, 'cache-control': 'private, no-cache' })
+        expect(response.headers).not.toHaveProperty('content-type')
+      }
+      expect(photos.read).not.toHaveBeenCalled()
+
+      const other = await get(app, PHOTO, { 'if-none-match': '"other"' })
+      expect(other.statusCode).toBe(200)
+      expect(other.rawPayload).toEqual(PNG)
+    })
+
+    it('gives a new photo another ETag, and the replaced or removed one no longer gets a 304', async () => {
+      const app = await buildApp()
+      await create(app, profile(), PNG)
+      const etag = (await get(app, PHOTO)).headers.etag as string
+      await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), JPEG)
+      const replaced = await get(app, PHOTO, { 'if-none-match': etag })
+      expect(replaced.statusCode).toBe(200)
+      expect(replaced.rawPayload).toEqual(JPEG)
+      expect(replaced.headers.etag).not.toBe(etag)
+
+      await patch(app, '/api/admin/artists/artist-1', { removePhoto: true })
+      const removed = await get(app, PHOTO, { 'if-none-match': replaced.headers.etag as string })
+      expect(removed.statusCode).toBe(404)
+      expect(removed.json()).toEqual({ ok: false, error: 'This artist has no photo' })
+    })
+
+    it('responds 404 for an artist that does not exist, or whose photo is missing, unless the request has its ETag', async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
       expect((await get(app, '/api/admin/artists/nobody/photo')).statusCode).toBe(404)
       await create(app)
+      const etag = (await get(app, PHOTO)).headers.etag as string
       stored.clear()
-      expect((await get(app, '/api/admin/artists/artist-1/photo')).statusCode).toBe(404)
+      const kept = await get(app, PHOTO, { 'if-none-match': etag })
+      expect(kept.statusCode).toBe(304)
+      expect(logs.join('')).not.toContain('"level":50')
+
+      const missing = await get(app, PHOTO)
+      expect(missing.statusCode).toBe(404)
+      expect(missing.json()).toEqual({ ok: false, error: 'The photo of this artist is missing' })
+      expect(missing.headers).not.toHaveProperty('etag')
+      expect(logs.join('')).toContain('"level":50')
     })
 
-    it('responds 404 for an artist who has no photo, which is not an error worth logging', async () => {
+    it('responds 404 for an artist who has no photo, which is not an error worth logging, whatever the request has', async () => {
       const logs: string[] = []
       const app = await buildApp(logs)
       await create(app, profile(), null)
-      const response = await get(app, '/api/admin/artists/artist-1/photo')
+      const response = await get(app, PHOTO)
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'This artist has no photo' })
+      expect((await get(app, PHOTO, { 'if-none-match': '"anything"' })).statusCode).toBe(404)
       expect(photos.read).not.toHaveBeenCalled()
       expect(logs.join('')).not.toContain('"level":50')
     })

@@ -1261,7 +1261,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1271,6 +1271,13 @@ export interface paths {
                         "image/png": Blob;
                         "image/webp": Blob;
                     };
+                };
+                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Default Response */
                 400: {
@@ -1476,7 +1483,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1486,6 +1493,13 @@ export interface paths {
                         "image/png": Blob;
                         "image/webp": Blob;
                     };
+                };
+                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Default Response */
                 400: {
@@ -2036,7 +2050,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`) */
+                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2046,6 +2060,13 @@ export interface paths {
                         "image/png": Blob;
                         "image/webp": Blob;
                     };
+                };
+                /** @description The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Default Response */
                 400: {

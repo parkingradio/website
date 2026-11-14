@@ -80,8 +80,11 @@ Fails with 404 when there's no such artist.
 ## `GET /api/admin/artists/:id/photo` (admin)
 
 Responds with the photo itself, with the type it was checked to have, rather than JSON. Browsers are told not to
-guess another type (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`). Fails with
-404 when there's no such artist, when they have no photo, or when their photo is missing.
+guess another type (`X-Content-Type-Options: nosniff`), and that they can keep the photo, only in the admin's browser,
+never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private,
+no-cache`). It has an `ETag` of its own, which changes whenever the photo does, and a request with it in `If-None-Match`
+gets a 304 without the photo, even when the photo is missing. Otherwise, fails with 404 when there's no such artist,
+when they have no photo, or when their photo is missing.
 
 ## `POST /api/admin/artists` (admin)
 

@@ -142,8 +142,8 @@ async function create(app: App, collective: object = profile(), photo?: Buffer |
   return send(app, 'POST', '/api/admin/collectives', collective, photo)
 }
 
-async function request(app: App, method: 'GET' | 'DELETE', url: string) {
-  return app.inject({ method, url, cookies: await sessionCookies() })
+async function request(app: App, method: 'GET' | 'DELETE', url: string, headers: Record<string, string> = {}) {
+  return app.inject({ method, url, headers, cookies: await sessionCookies() })
 }
 
 // Changes some of the collective's fields, as JSON.
@@ -318,15 +318,18 @@ describe('collectives routes', () => {
   })
 
   describe('GET /api/admin/collectives/:id/photo', () => {
-    it('returns the photo like an artist\'s', async () => {
+    it('returns the photo like an artist\'s, or a 304 without it when the request has its ETag', async () => {
       const app = await buildApp()
       await create(app, profile(), PNG)
       const response = await request(app, 'GET', '/api/admin/collectives/collective-1/photo')
       expect(response.statusCode).toBe(200)
       expect(response.headers['content-type']).toBe('image/png')
       expect(response.headers['x-content-type-options']).toBe('nosniff')
-      expect(response.headers['cache-control']).toBe('private, no-store')
+      expect(response.headers['cache-control']).toBe('private, no-cache')
       expect(response.rawPayload).toEqual(PNG)
+
+      const kept = await request(app, 'GET', '/api/admin/collectives/collective-1/photo', { 'if-none-match': response.headers.etag as string })
+      expect(kept.statusCode).toBe(304)
     })
 
     it('responds 404 for a collective that does not exist, has no photo, or whose photo is missing', async () => {

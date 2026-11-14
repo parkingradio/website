@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from './photo-form.js'
+import { INVALID_REQUEST, PhotoResponses, readProfileForm, sendPhoto } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
@@ -135,7 +135,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
         summary: "An artist's photo",
         tags: ['Artists'],
         params: ById,
-        response: { 200: PhotoResponse, 404: ApiError },
+        response: { ...PhotoResponses, 404: ApiError },
       },
     },
     async (request, reply) => {

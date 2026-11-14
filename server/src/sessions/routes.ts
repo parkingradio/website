@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
-import { FlyerResponse, INVALID_REQUEST, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { FlyerResponses, INVALID_REQUEST, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import { forgetPhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
@@ -462,7 +462,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
         summary: "A session's flyer",
         tags: ['Sessions'],
         params: ById,
-        response: { 200: FlyerResponse, 404: ApiError },
+        response: { ...FlyerResponses, 404: ApiError },
       },
     },
     async (request, reply) => {

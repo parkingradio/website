@@ -123,21 +123,41 @@ export async function readProfileForm<Schema extends z.ZodType>(
 // checked against this schema, which only says it's a file.
 const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
 
-// The response of the endpoints that serve a photo, an artist's or a collective's, or a session's flyer (see
+// The responses of the endpoints that serve a photo, an artist's or a collective's, or a session's flyer (see
 // `sendPhoto`).
-function imageResponse(image: 'photo' | 'flyer') {
+function imageResponses(image: 'photo' | 'flyer') {
   return {
-    description:
-      `The ${image}, with the type it was checked to have. Browsers are told not to guess another ` +
-      '(`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)',
-    content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
+    200: {
+      description:
+        `The ${image}, with the type it was checked to have. Browsers are told not to guess another ` +
+        "(`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a " +
+        'shared cache, but have to check with the server before showing it again (`Cache-Control: private, ' +
+        `no-cache\`). Its \`ETag\` changes whenever the ${image} does`,
+      content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
+    },
+    // Without a body, which @fastify/swagger documents for a schema of type null.
+    304: z.null().meta({
+      description: `The request's \`If-None-Match\` has the ${image}'s \`ETag\`, so the browser already has it: it isn't sent again`,
+    }),
   }
 }
-export const PhotoResponse = imageResponse('photo')
-export const FlyerResponse = imageResponse('flyer')
+export const PhotoResponses = imageResponses('photo')
+export const FlyerResponses = imageResponses('flyer')
+
+// Browsers can keep photos, but have to check with the server before showing them again.
+const CACHE_CONTROL = 'private, no-cache'
+
+// Whether `ifNoneMatch`, a request's If-None-Match, a list of ETags, has `etag`. As HTTP says, they're compared weakly,
+// e.g. when Cloudflare weakened the one it passed on: W/"x" matches "x". `*` isn't supported, since browsers never send
+// it.
+function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
+  return ifNoneMatch?.split(',').some((tag) => tag.trim().replace(/^W\//, '') === etag) ?? false
+}
 
 // Sends the photo of an artist or a collective, or the flyer of a session (as `what` and `image` say), or a 404 when they
-// have none, or when it's missing.
+// have none, or when it's missing. A photo's ETag is its key, which is never used for another one: it changes exactly
+// when the photo does. So a request that already has it gets a 304 without the photo being read, even when it's
+// missing.
 export async function sendPhoto(
   reply: FastifyReply,
   log: FastifyBaseLogger,
@@ -147,6 +167,10 @@ export async function sendPhoto(
   image: 'photo' | 'flyer' = 'photo',
 ) {
   if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
+  const etag = `"${row.photoKey}"`
+  if (hasEtag(reply.request.headers['if-none-match'], etag)) {
+    return reply.status(304).header('ETag', etag).header('Cache-Control', CACHE_CONTROL).send()
+  }
   const photo = await photos.read(row.photoKey)
   if (!photo) {
     log.error({ key: row.photoKey }, `The ${image} of a ${what} is missing`)
@@ -156,6 +180,7 @@ export async function sendPhoto(
   return reply
     .header('Content-Type', row.photoType!)
     .header('X-Content-Type-Options', 'nosniff')
-    .header('Cache-Control', 'private, no-store')
+    .header('Cache-Control', CACHE_CONTROL)
+    .header('ETag', etag)
     .send(photo)
 }

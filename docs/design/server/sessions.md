@@ -353,8 +353,8 @@ Fails with 404 when there's no such session.
 
 ## `GET /api/admin/sessions/:id/flyer` (admin)
 
-Responds with the flyer itself, like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin).
-Fails with 404 when there's no such session, when it has no flyer, or when its flyer is missing.
+Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the flyer or a
+304. Otherwise, fails with 404 when there's no such session, when it has no flyer, or when its flyer is missing.
 
 ## `POST /api/admin/sessions` (admin)
 

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, PhotoResponse, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { INVALID_REQUEST, PhotoResponses, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
@@ -132,7 +132,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
         summary: "A collective's photo",
         tags: ['Collectives'],
         params: ById,
-        response: { 200: PhotoResponse, 404: ApiError },
+        response: { ...PhotoResponses, 404: ApiError },
       },
     },
     async (request, reply) => {
