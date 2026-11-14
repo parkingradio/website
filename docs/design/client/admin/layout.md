@@ -65,10 +65,10 @@ otherwise.
 
 ## Tables
 
-On narrow screens like phones, a table wider than the screen scrolls sideways rather than squeezing its columns. Since
-phones hide the scrollbar, a light shadow along its left or right edge shows that there's more of it on that side, until
-it's scrolled to that end. Every table of the admin pages does this. The shadow doesn't keep what's under it from being
-read or used.
+On narrow screens like phones, a table that's wider than the screen scrolls sideways instead of squeezing its columns.
+Phones hide the scrollbar, so a light shadow on the table's left or right edge shows that there's more on that side. It
+goes away once the table is scrolled to that end. Every admin table works this way. What's under the shadow can still
+be read and used.
 
 ## Status colors
 
