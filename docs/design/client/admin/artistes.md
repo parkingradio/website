@@ -21,13 +21,14 @@ genre only once, so that the first ones are still the most important.
 
 Clicking an artist opens their page at `/admin/artistes/<id>`, with everything about them, their photo (or "Pas de
 photo" in its place, so that the team notices), their links rebuilt from the profile names, the collectives they're in,
-linking to them, who added them (or that they came through the "Appliquer" form, alone or with a collective) and who
-last changed them. A button changes the artist in a form in its place. The form shows the artist's photo with an × that
-removes it once the artist is saved, and a photo that's chosen replaces it, shown in its place with an × that takes it
-back. Under it, their applications are listed like in [Candidatures](candidatures.md), with a button to create another
-one. Since they're all the artist's, the list doesn't show the artist, their city or genres, and since they're few, it
-can't be searched, filtered or sorted. The status of those applications is only shown. Under them, the sets they played,
-whatever their status, but not the other sets of the same sessions, are listed like a session's sets (see [A session's
+if any, linking to them, their bio, cut when it's long (see [Long bios and descriptions](#long-bios-and-descriptions)),
+who added them (or that they came through the "Appliquer" form, alone or with a collective) and who last changed them. A
+button changes the artist in a form in its place. The form shows the artist's photo with an × that removes it once the
+artist is saved, and a photo that's chosen replaces it, shown in its place with an × that takes it back. Under it, their
+applications are listed like in [Candidatures](candidatures.md), with a button to create another one. Since they're all
+the artist's, the list doesn't show the artist, their city or genres, and since they're few, it can't be searched,
+filtered or sorted. The status of those applications is only shown. Under them, the sets they played, whatever their
+status, but not the other sets of the same sessions, are listed like a session's sets (see [A session's
 page](sessions.md#a-sessions-page)), with their session's day ("Date") and title ("Session", see
 [Names](sessions.md#names)), linking to its page, but without being changed there: their status is only shown. Sets are
 added in their session, so there's no button to add one, and the list can't be searched, filtered or sorted either. At
@@ -38,18 +39,28 @@ They're then taken out of their collectives and their sets, which stay, which th
 
 Clicking a collective opens its page at `/admin/artistes/collectifs/<id>` (`/admin/artistes/collectifs` leads to the
 list), with everything about it, its photo (or "Pas de photo"), its links, its artists in order, each linking to their
-page (or that it has none, which happens once its artists are deleted), its genres, who added it (or that it applied by
-itself) and who last changed it. A button changes the collective in a form in its place, which shows its photo like an
-artist's. Under it, its applications are listed like an artist's, with a button to create another one, then the
-sessions of its takeovers, like in [Sessions](sessions.md) but without their type, with a button to add another one
-as its takeover ("nouvelle session"), and the list can't be searched, filtered or sorted either. At the bottom, the
-collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists
-stay, and so do their own applications. A collective that has takeovers can't be deleted (see
-[Types and names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used,
-saying « Un collectif avec des takeovers ne peut pas être supprimé. » (see
-[Controls that can't be used](layout.md#controls-that-cant-be-used)). When its sessions can't be loaded, it can be used,
-and the server's refusal shows if it has some, naming the takeover in the way and linking to it, like the errors of
+page (or that it has none, which happens once its artists are deleted), its genres, its description, cut like a bio when
+it's long (see [Long bios and descriptions](#long-bios-and-descriptions)), who added it (or that it applied by itself)
+and who last changed it. A button changes the collective in a form in its place, which shows its photo like an artist's.
+Under it, its applications are listed like an artist's, with a button to create another one, then the sessions of its
+takeovers, like in [Sessions](sessions.md) but without their type, with a button to add another one as its takeover
+("nouvelle session"), and the list can't be searched, filtered or sorted either. At the bottom, the collective can be
+deleted for good, with its photo, if it has one, and applications, after confirming. Its artists stay, and so do their
+own applications. A collective that has takeovers can't be deleted (see [Types and
+names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used, saying
+« Un collectif avec des takeovers ne peut pas être supprimé. » (see [Controls that can't be
+used](layout.md#controls-that-cant-be-used)). When its sessions can't be loaded, it can be used, and the server's
+refusal shows if it has some, naming the takeover in the way and linking to it, like the errors of
 [Sessions](sessions.md#errors).
+
+## Long bios and descriptions
+
+A bio or a description longer than 750 characters is cut: it's shown up to the end of the last word that fits in its
+first 750 characters, or only those characters when no word ends in them, without cutting a character such as an emoji
+in two, followed by "…" and a "lire la suite" button. Words are separated by whitespace, line breaks included, but not
+by no-break spaces, which French puts e.g. inside « » and before "!", so that a cut doesn't leave a « or a "!" on its
+own. The button shows the whole text in place, and then becomes "réduire", which cuts it again, scrolling the page back
+to the button if it's no longer in view.
 
 ## Adding an artist
 

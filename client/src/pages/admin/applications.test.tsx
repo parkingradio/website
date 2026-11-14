@@ -100,6 +100,8 @@ function renderAt(path: string) {
   )
 }
 
+// What a profile shows for `term`.
+const described = (term: string) => screen.getByText(term, { selector: 'dt' }).nextElementSibling
 const rows = () =>
   screen
     .queryAllByRole('row')
@@ -750,6 +752,30 @@ describe('An application’s page', () => {
     expect(screen.getByText(/^Une question/)).toHaveTextContent('Une question ? Une autre.')
   })
 
+  it('shows the artist as their page does, with their photo, links, collectives and bio, but not who added or changed them', async () => {
+    const changed: Artist = {
+      ...AURORE,
+      bio: `${'mot '.repeat(187)}dernier mot`,
+      collectives: [{ id: 'collective-1', name: 'Ondes' }],
+      updatedBy: 'admin@example.com',
+      updatedAt: '2026-10-06T16:00:00.000Z',
+    }
+    mockFetch({ ...PAGE, '/api/admin/artists/artist-1': { ok: true, artist: changed } })
+    renderAt('/admin/candidatures/application-1')
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Candidature de Aurore' })).toBeInTheDocument())
+    expect(described('Nom')).toHaveTextContent('Aurore (artiste)')
+    expect(screen.getByRole('img', { name: 'Photo de Aurore' }).getAttribute('src')).toMatch(/^\/api\/admin\/artists\/artist-1\/photo\?v=/)
+    expect(screen.getByRole('link', { name: 'Ondes' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
+    expect(described('Ville')).toHaveTextContent('Montréal, Canada')
+    expect(screen.getByRole('link', { name: 'aurore' })).toHaveAttribute('href', 'https://soundcloud.com/aurore')
+    expect(described('Téléphone')).toHaveTextContent('514 555 0101')
+    // Cut, like on their page.
+    expect(described('Bio')).toHaveTextContent(/^mot mot .* mot… lire la suite$/)
+    expect(screen.queryByText(/ajouté par/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Modifié par/)).not.toBeInTheDocument()
+  })
+
   it('says when an application has no time slot, performance type or details', async () => {
     const bare = { ...APPLICATION, timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }
     mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: bare } })
@@ -1020,7 +1046,6 @@ describe('An application’s page', () => {
       '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
       '/api/admin/artists?collective=collective-1': { ok: true, artists: [BRUME, AURORE] },
     }
-    const described = (term: string) => screen.getByText(term, { selector: 'dt' }).nextElementSibling
 
     it('shows who the collective is, with its artists and their genres', async () => {
       mockFetch(COLLECTIVE_PAGE)
@@ -1038,6 +1063,11 @@ describe('An application’s page', () => {
       ])
       expect(screen.getByRole('link', { name: 'ondes@example.com' })).toHaveAttribute('href', 'mailto:ondes@example.com')
       expect(described('Téléphone du contact')).toHaveTextContent(/^-$/)
+      // Like on its page, with what it left out.
+      expect(screen.getByText('Pas de photo')).toBeInTheDocument()
+      expect(described('Liens')).toHaveTextContent(/^-$/)
+      expect(described('Description')).toHaveTextContent(/^-$/)
+      expect(screen.queryByText(/ajouté par/)).not.toBeInTheDocument()
       expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. Le collectif reste\.$/)
       expect(screen.getByText(/^Aucune session ne vient de cette candidature/)).toHaveTextContent(
         "Aucune session ne vient de cette candidature : on la choisit dans le formulaire d'un takeover du collectif.",
@@ -1066,6 +1096,25 @@ describe('An application’s page', () => {
       expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(
         'La candidature sera supprimée pour de bon. Le collectif reste. Les sessions associées restent.',
       )
+    })
+
+    it("shows the collective's photo, links and description, but not who changed it", async () => {
+      const changed: Collective = {
+        ...ONDES,
+        hasPhoto: true,
+        links: { instagram: 'ondes.qc' },
+        description: 'Première ligne.\nDeuxième ligne.',
+        updatedBy: 'admin@example.com',
+        updatedAt: '2026-10-06T16:00:00.000Z',
+      }
+      mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/collectives/collective-1': { ok: true, collective: changed } })
+      renderAt('/admin/candidatures/application-1')
+
+      await waitFor(() => expect(screen.getByRole('img', { name: 'Photo de Ondes' })).toBeInTheDocument())
+      expect(screen.getByRole('img', { name: 'Photo de Ondes' }).getAttribute('src')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=/)
+      expect(screen.getByRole('link', { name: 'ondes.qc' })).toHaveAttribute('href', 'https://instagram.com/ondes.qc')
+      expect(described('Description')).toHaveTextContent('Première ligne. Deuxième ligne.')
+      expect(screen.queryByText(/^Modifié par/)).not.toBeInTheDocument()
     })
 
     it('shows "-" in place of the email of a collective without one', async () => {
