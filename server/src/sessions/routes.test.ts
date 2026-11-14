@@ -539,7 +539,8 @@ describe('sessions routes', () => {
   })
 
   describe('flyers', () => {
-    const get = async (app: App, url: string) => app.inject({ method: 'GET', url, cookies: await sessionCookies() })
+    const get = async (app: App, url: string, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'GET', url, headers, cookies: await sessionCookies() })
 
     it('adds the session with its flyer, whose type is told from its contents, and serves it', async () => {
       const app = await buildApp()
@@ -552,7 +553,10 @@ describe('sessions routes', () => {
       const served = await get(app, '/api/admin/sessions/session-1/flyer')
       expect(served.statusCode).toBe(200)
       expect(served.rawPayload).toEqual(PNG)
-      expect(served.headers).toMatchObject({ 'content-type': 'image/png', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store' })
+      expect(served.headers).toMatchObject({ 'content-type': 'image/png', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-cache' })
+
+      const kept = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
+      expect(kept.statusCode).toBe(304)
     })
 
     it('adds the session without a flyer when its part is empty', async () => {
@@ -610,10 +614,16 @@ describe('sessions routes', () => {
       expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
       expect(photos.delete).not.toHaveBeenCalled()
 
+      const etag = (await get(app, '/api/admin/sessions/session-1/flyer')).headers.etag as string
       response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
       expect(response.json().session.hasFlyer).toBe(true)
       expect(rows[0].flyerKey).toBe('sessions/flyer-2.png')
       expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+      // The new flyer has another ETag, so a browser that has the one it replaced gets it.
+      const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': etag })
+      expect(replaced.statusCode).toBe(200)
+      expect(replaced.rawPayload).toEqual(PNG)
+      expect(replaced.headers.etag).not.toBe(etag)
 
       // Changing only its flyer changes the session.
       rows[0].updatedBy = null

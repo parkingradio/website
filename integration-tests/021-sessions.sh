@@ -256,7 +256,15 @@ request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_status 200
 expect_header Content-Type 'image/jpeg'
 expect_header X-Content-Type-Options 'nosniff'
-expect_header Cache-Control 'private, no-store'
+expect_header Cache-Control 'private, no-cache'
+expect_header ETag '"[^"]+"'
+# A browser that has the flyer gets a 304 without it, with the same ETag, compared as text rather than as a regex.
+etag_of_response() { printf '%s\n' "$HEADERS" | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p'; }
+etag="$(etag_of_response)"
+request --header "Cookie: ${cookie}" --header "If-None-Match: ${etag}" "${SESSIONS}/${described}/flyer"
+expect_status 304
+[ -z "$BODY" ] || fail "expected no flyer with the 304"
+[ "$(etag_of_response)" = "$etag" ] || fail "expected the 304 to have the flyer's ETag"
 curl --silent --header "Cookie: ${cookie}" --output "${FILES}/served" "${SESSIONS}/${described}/flyer"
 cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
 # A flyer sent with a session that isn't saved is deleted: one that would overlap the first session, or a takeover of a

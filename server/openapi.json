@@ -5304,7 +5304,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -5325,6 +5325,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -6169,7 +6172,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -6190,6 +6193,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -8125,7 +8131,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`) or to keep it (`Cache-Control: private, no-store`)",
+            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -8146,6 +8152,9 @@
                 }
               }
             }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
