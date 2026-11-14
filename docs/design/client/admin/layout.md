@@ -65,10 +65,10 @@ otherwise.
 
 ## Tables
 
-A table too wide for its space, e.g. on phones, scrolls sideways rather than squeezing its columns. Since phones hide
-the scrollbar, a light shadow along its left or right edge shows that there's more of it on that side, until it's
-scrolled to that end. Every table of the admin pages does this. The shadow doesn't keep what's under it from being read
-or used.
+On narrow screens like phones, a table wider than the screen scrolls sideways rather than squeezing its columns. Since
+phones hide the scrollbar, a light shadow along its left or right edge shows that there's more of it on that side, until
+it's scrolled to that end. Every table of the admin pages does this. The shadow doesn't keep what's under it from being
+read or used.
 
 ## Status colors
 

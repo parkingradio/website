@@ -1,8 +1,9 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'
 
-// A table of the admin pages, which every one of them is, so that it scrolls sideways when it's too wide for its space,
-// with a shadow on each side that has more of it (see `.admin-table-frame` in admin.css).
+// A table of the admin pages, which every one of them is, so that on phones it scrolls sideways when it's too wide for
+// the screen, with a shadow on each side that has more of it (see `.admin-table-frame` in admin.css). The sides are
+// measured at every width, but the shadows are only drawn on phones.
 export function AdminTable({ className, ...props }: ComponentProps<'table'>) {
   const scroller = useRef<HTMLDivElement>(null)
   const table = useRef<HTMLTableElement>(null)
