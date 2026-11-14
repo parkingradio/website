@@ -112,7 +112,8 @@ describe('Layout environment', () => {
 
     const navigationBar = within(screen.getByRole('navigation'))
     expect(await navigationBar.findByText('TEST')).toBeInTheDocument()
-    expect(document.title).toBe('[TEST] parking.radio')
+    // The title is set by an effect, which React can run after the stamp shows.
+    await waitFor(() => expect(document.title).toBe('[TEST] parking.radio'))
     // The logo's link keeps its name.
     expect(navigationBar.getAllByRole('link', { name: 'parking.radio' })).toHaveLength(2)
   })
