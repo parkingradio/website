@@ -53,7 +53,9 @@ Tuesdays the 5th, but "mar 5 jan" only Tuesday, January 5th, and "jeu 5 mar" Thu
 the date "3 déc", then the word "26".
 
 The search and the order are kept in the page's address, along with the status of applications or sessions, so that
-going back to a list from one of its entries with the browser's back button finds it as it was. The address's parameters
+going back to a list from one of its entries with the browser's back button finds it as it was. The list of
+applications also gives them to the applications' pages, to go through it from them (see
+[Going through the list](candidatures.md#going-through-the-list)). The address's parameters
 are `search` (what's searched for), `sort` (the column the list is sorted by, as each page names it), `order` (`asc` or
 `desc`, which only counts along with `sort`) and `status` (as the server names it, e.g. `accepted`, or `all` for every
 status). A value the page doesn't know is ignored, as if the parameter weren't there.

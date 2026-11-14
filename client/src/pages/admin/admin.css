@@ -340,6 +340,27 @@
   color: #666;
 }
 
+/* Above an application's title: back to the list, then, at the other end, précédente and suivante. */
+.admin-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-page-links .admin-back {
+  margin-bottom: 0;
+}
+
+.admin-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Lists of artists and applications. */
 .admin-table {
   width: 100%;
