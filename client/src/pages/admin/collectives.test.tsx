@@ -90,6 +90,8 @@ const APPLICATION: Application = {
   status: 'accepted',
   statusUpdatedBy: null,
   statusUpdatedAt: null,
+  sets: [],
+  sessions: [],
 }
 
 function CurrentPath() {
@@ -557,6 +559,7 @@ describe('A collective’s page', () => {
       durationMinutes: 180,
       type: 'takeover',
       takeover: { id: 'collective-1', name: 'Ondes' },
+      application: null,
       name: '',
       title: 'ONDES TAKEOVER',
       raEvent: null,
@@ -597,6 +600,7 @@ describe('A collective’s page', () => {
       durationMinutes: 180,
       type: 'takeover',
       takeover: { id: 'collective-1', name: 'Ondes' },
+      application: null,
       name: '',
       title: 'ONDES TAKEOVER',
       raEvent: null,

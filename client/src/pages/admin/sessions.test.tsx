@@ -98,6 +98,7 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
+    application: null,
     ...TRACKED,
     ...fields,
   }
@@ -112,6 +113,7 @@ const SESSION: Session = {
   durationMinutes: 240,
   type: 'takeover',
   takeover: { id: 'collective-1', name: 'Ondes' },
+  application: { id: 'application-1', receivedAt: '2026-09-01T16:00:00.000Z' },
   name: '',
   title: 'ONDES TAKEOVER',
   raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
@@ -142,6 +144,7 @@ const SESSION: Session = {
       performanceTypes: ['live-performance'],
       otherPerformanceType: 'Synthé',
       genres: ['ambient'],
+      application: { id: 'application-2', receivedAt: '2026-09-02T16:00:00.000Z' },
       status: 'done',
     }),
     studioSet('set-3', { durationMinutes: 60, status: 'cancelled' }),
@@ -159,6 +162,7 @@ const UNDATED: Session = {
   durationMinutes: 180,
   type: 'guest-mixes',
   takeover: null,
+  application: null,
   name: '',
   title: 'GUEST MIXES',
   raEvent: null,
@@ -181,6 +185,7 @@ const SESSIONS: Session[] = [
     durationMinutes: 60,
     type: 'other',
     takeover: null,
+    application: null,
     name: 'SOIRÉE',
     title: 'SOIRÉE',
     raEvent: null,
@@ -651,6 +656,8 @@ describe("A session's page", () => {
       durationMinutes: 240,
       type: 'takeover',
       takeover: 'collective-1',
+      // Sent back as it is.
+      application: 'application-1',
       name: 'AUTRE',
       raEvent: '6683745',
       description: '',
@@ -890,6 +897,7 @@ describe("A session's page", () => {
       durationMinutes: 180,
       type: 'guest-mixes',
       takeover: null,
+      application: null,
       name: '',
       raEvent: null,
       description: '',
@@ -1158,6 +1166,7 @@ describe("A set's form", () => {
       genres: ['house', 'techno', 'acid'],
       soundcloudTrack: null,
       youtubeVideo: null,
+      application: null,
     })
   })
 
@@ -1191,6 +1200,8 @@ describe("A set's form", () => {
       performanceTypes: ['live-performance'],
       otherPerformanceType: 'Synthé',
       genres: ['ambient'],
+      // Sent back as it is.
+      application: 'application-2',
     })
   })
 
@@ -1469,6 +1480,7 @@ describe('Adding a session', () => {
       durationMinutes: 240,
       type: 'guest-mixes',
       takeover: null,
+      application: null,
       name: 'HAUTE RIVE',
       raEvent: null,
       description: '',

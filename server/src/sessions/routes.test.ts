@@ -30,6 +30,15 @@ function find(kind: 'artist' | 'collective', id: string) {
 const takeover = (takeoverId: string | null) => ({ takeover: takeoverId === null ? null : find('collective', takeoverId) })
 const performers = (sent: { id: string }[]) => ({ performers: sent.map(({ id }) => find('artist', id)) })
 
+// The application a session or a set comes from, as the database would find it: every id that starts with "application"
+// is one, received at RECEIVED_AT.
+const RECEIVED_AT = new Date('2026-10-01T16:00:00Z')
+function application(applicationId: string | null | undefined) {
+  if (applicationId === undefined) return {}
+  if (applicationId !== null && !applicationId.startsWith('application')) throw new NoSuchReference('No such application')
+  return { application: applicationId === null ? null : { id: applicationId, receivedAt: RECEIVED_AT } }
+}
+
 // Like the database, which leaves a column as it is when it's given undefined.
 function defined<T extends object>(changes: T): Partial<T> {
   return Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) as Partial<T>
@@ -58,7 +67,16 @@ const store: SessionsStore = {
   ),
   get: async (id) => rows.find((session) => session.id === id) ?? null,
   create: vi.fn<SessionsStore['create']>(async (session) => {
-    const row: StoredSession = { id: `session-${++nextId}`, createdAt: CREATED_AT, ...NEW, ...session, ...takeover(session.takeoverId), sets: [] }
+    const row: StoredSession = {
+      id: `session-${++nextId}`,
+      createdAt: CREATED_AT,
+      ...NEW,
+      ...session,
+      ...takeover(session.takeoverId),
+      application: null,
+      ...application(session.applicationId),
+      sets: [],
+    }
     rows.push(row)
     return row
   }),
@@ -66,7 +84,7 @@ const store: SessionsStore = {
     const row = rows.find((session) => session.id === id)
     if (!row) return null
     const before = { ...row }
-    Object.assign(row, defined(changes), changes.takeoverId !== undefined && takeover(changes.takeoverId))
+    Object.assign(row, defined(changes), changes.takeoverId !== undefined && takeover(changes.takeoverId), application(changes.applicationId))
     return { before, after: row }
   }),
   setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => {
@@ -84,10 +102,12 @@ const store: SessionsStore = {
   addSet: vi.fn<SessionsStore['addSet']>(async (sessionId, { performers: sent, ...set }) => {
     const session = rows.find((row) => row.id === sessionId)
     if (!session) return null
-    session.sets.push({ id: `set-${++nextId}`, createdAt: CREATED_AT, ...NEW, ...set, sessionId, ...performers(sent) })
+    session.sets.push({ id: `set-${++nextId}`, createdAt: CREATED_AT, ...NEW, ...set, sessionId, ...performers(sent), application: null, ...application(set.applicationId) })
     return session
   }),
-  updateSet: vi.fn<SessionsStore['updateSet']>(async (id, { performers: sent, ...changes }) => changeSet(id, { ...changes, ...(sent && performers(sent)) })),
+  updateSet: vi.fn<SessionsStore['updateSet']>(async (id, { performers: sent, ...changes }) =>
+    changeSet(id, { ...changes, ...(sent && performers(sent)), ...application(changes.applicationId) }),
+  ),
   setSetStatus: vi.fn<SessionsStore['setSetStatus']>(async (id, change) => changeSet(id, change)),
   deleteSet: async (id) => {
     const session = sessionOf(id)
@@ -95,6 +115,7 @@ const store: SessionsStore = {
     session.sets = session.sets.filter((set) => set.id !== id)
     return true
   },
+  ofApplications: async () => [],
 }
 
 // Sessions' flyers, as the bucket would keep them.
@@ -126,6 +147,7 @@ function session(changes: object = {}) {
     type: 'takeover',
     takeover: 'collective-1',
     name: 'HAUTE RIVE TAKEOVER',
+    application: null,
     raEvent: '6683745',
     description: '',
     ...changes,
@@ -142,6 +164,7 @@ function set(changes: object = {}) {
     genres: ['ambient'],
     soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons?si=abc',
     youtubeVideo: 'https://www.youtube.com/live/dQw4w9WgXcQ',
+    application: null,
     ...changes,
   }
 }
@@ -332,6 +355,7 @@ describe('sessions routes', () => {
           durationMinutes: 240,
           type: 'takeover',
           takeover: { id: 'collective-1', name: 'Les Ondes' },
+          application: null,
           name: 'HAUTE RIVE TAKEOVER',
           title: 'HAUTE RIVE TAKEOVER',
           raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
@@ -410,6 +434,74 @@ describe('sessions routes', () => {
       vi.mocked(store.create).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
       response = await createSession(app)
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: null, set: null })
+    })
+  })
+
+  describe('applications', () => {
+    it('saves the application a session or a set comes from, and returns it with when it was received', async () => {
+      const app = await buildApp()
+      const added = await createSession(app, { application: ' Application-1 ' })
+      expect(added.json().session.application).toEqual({ id: 'application-1', receivedAt: '2026-10-01T12:00:00-04:00' })
+      expect(store.create).toHaveBeenLastCalledWith(expect.objectContaining({ applicationId: 'application-1' }))
+      const set = await addSet(app, 'session-1', { application: 'application-2' })
+      expect(set.json().session.sets[0].application).toEqual({ id: 'application-2', receivedAt: '2026-10-01T12:00:00-04:00' })
+      expect(store.addSet).toHaveBeenLastCalledWith('session-1', expect.objectContaining({ applicationId: 'application-2' }))
+    })
+
+    it('takes it from a session or a set with null, or a blank string, and leaves it as it is when a change does not send it', async () => {
+      const app = await buildApp()
+      await createSession(app, { application: 'application-1' })
+      await addSet(app, 'session-1', { application: 'application-2' })
+      expect((await send(app, 'PATCH', '/api/admin/sessions/session-1', { name: '' })).json().session.application).toMatchObject({ id: 'application-1' })
+      expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { genres: [] })).json().session.sets[0].application).toMatchObject({ id: 'application-2' })
+      expect((await send(app, 'PATCH', '/api/admin/sessions/session-1', { application: ' ' })).json().session.application).toBeNull()
+      expect(store.update).toHaveBeenLastCalledWith('session-1', expect.objectContaining({ applicationId: null }))
+      expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { application: null })).json().session.sets[0].application).toBeNull()
+      expect(store.updateSet).toHaveBeenLastCalledWith('set-2', expect.objectContaining({ applicationId: null }))
+    })
+
+    it('needs it, or null, to add a session or a set, or replace their fields', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      const error = { ok: false, error: "The application must be an application's id, or null" }
+      const withoutApplication = { ...session(), application: undefined }
+      const setWithoutApplication = { ...set(), application: undefined }
+      for (const response of [
+        await sendSession(app, 'POST', '/api/admin/sessions', withoutApplication),
+        await sendSession(app, 'PUT', '/api/admin/sessions/session-1', withoutApplication),
+        await send(app, 'POST', '/api/admin/sessions/session-1/sets', setWithoutApplication),
+        await send(app, 'PUT', '/api/admin/sets/set-2', setWithoutApplication),
+        await send(app, 'PATCH', '/api/admin/sets/set-2', { application: 42 }),
+      ]) {
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual(error)
+      }
+      const notATakeover = await createSession(app, { type: 'guest-mixes', takeover: null, application: 'application-1' })
+      expect(notATakeover.json()).toEqual({ ok: false, error: 'Only a takeover has an application' })
+      expect(rows).toHaveLength(1)
+    })
+
+    it("explains why the store refuses an application that doesn't exist or doesn't go with the session or the set", async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      for (const [response, error] of [
+        [await createSession(app, { application: 'nothing' }), 'No such application'],
+        [await addSet(app, 'session-1', { application: 'nothing' }), 'No such application'],
+      ] as const) {
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      const sessionsApplication = "A session's application is that of the collective whose takeover it is"
+      vi.mocked(store.update).mockRejectedValueOnce(new BrokenFields(sessionsApplication))
+      const session = await send(app, 'PATCH', '/api/admin/sessions/session-1', { application: 'application-1' })
+      expect(session.statusCode).toBe(400)
+      expect(session.json()).toEqual({ ok: false, error: sessionsApplication })
+      vi.mocked(store.updateSet).mockRejectedValueOnce(new BrokenFields("A set's application is one of its performers'"))
+      const set = await send(app, 'PATCH', '/api/admin/sets/set-2', { performers: [{ id: 'artist-3' }] })
+      expect(set.statusCode).toBe(400)
+      expect(set.json()).toEqual({ ok: false, error: "A set's application is one of its performers'" })
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ application: null, updatedBy: null, sets: [{ application: null, updatedBy: null }] })
     })
   })
 
@@ -772,6 +864,8 @@ describe('sessions routes', () => {
         offsetMinutes,
         durationMinutes,
         performers: [],
+        application: null,
+        applicationId: null,
         performanceTypes: [],
         otherPerformanceType: '',
         genres: [],
@@ -975,6 +1069,7 @@ describe('sessions routes', () => {
           genres: ['ambient'],
           soundcloudTrack: { id: '42', url: 'https://soundcloud.com/parkingdotradio/3tons' },
           youtubeVideo: { id: 'dQw4w9WgXcQ', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+          application: null,
           createdAt: '2026-11-01T07:00:00-05:00',
           createdBy: 'admin@example.com',
           updatedBy: null,

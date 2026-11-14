@@ -88,7 +88,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(videoRoutes, { youtube: deps.youtube, credentials: deps.youtubeCredentials })
   await app.register(artistsRoutes, { store: deps.artists, photos: deps.photos })
   await app.register(collectivesRoutes, { store: deps.collectives, photos: deps.photos })
-  await app.register(applicationsRoutes, { store: deps.applications, settings: deps.applicationsSettings })
+  await app.register(applicationsRoutes, { store: deps.applications, settings: deps.applicationsSettings, sessions: deps.sessions })
   await app.register(applyRoutes, {
     store: deps.apply,
     photos: deps.photos,

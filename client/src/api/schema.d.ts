@@ -1730,7 +1730,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Deletes an application */
+        /** Deletes an application, but not its sets and sessions, which stay without it */
         delete: operations["delete_application"];
         options?: never;
         head?: never;
@@ -2871,6 +2871,10 @@ export interface components {
             status: components["schemas"]["ApplicationStatus"];
             statusUpdatedBy: string | null;
             statusUpdatedAt: string | null;
+            /** @description The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets */
+            sets: components["schemas"]["ApplicationSet"][];
+            /** @description The sessions that come from it, which only a collective's application has, in the order of the sessions */
+            sessions: components["schemas"]["ApplicationSession"][];
         };
         ApplicationFields: {
             /** @description Saved sorted, without duplicates. Past days are allowed */
@@ -2884,12 +2888,47 @@ export interface components {
             /** @description Trimmed, then up to 2000 characters */
             details: string;
         };
+        /** @description The application it comes from, and when it was received */
+        ApplicationLink: {
+            id: string;
+            /** Format: date-time */
+            receivedAt: string;
+        };
         ApplicationRecipients: {
             /** @constant */
             ok: true;
             recipients: string[];
             updatedBy: string | null;
             updatedAt: string | null;
+        };
+        ApplicationSession: {
+            id: string;
+            /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+            title: string;
+            /** @description Null while the session's date isn't known */
+            start: string | null;
+            /** @description Its start plus its duration. Null when its start is */
+            end: string | null;
+            durationMinutes: number;
+            status: components["schemas"]["SessionStatus"];
+        };
+        ApplicationSet: {
+            id: string;
+            /** @description Its session's start plus its offset. Null when either is */
+            start: string | null;
+            /** @description Its start plus its duration. Null when its start is */
+            end: string | null;
+            offsetMinutes: number | null;
+            durationMinutes: number | null;
+            status: components["schemas"]["SessionStatus"];
+            /** @description The set's session */
+            session: {
+                id: string;
+                /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+                title: string;
+                /** @description Null while the session's date isn't known */
+                start: string | null;
+            };
         };
         /** @enum {string} */
         ApplicationStatus: "new" | "accepted" | "scheduled" | "done" | "rejected";
@@ -3111,6 +3150,7 @@ export interface components {
             type: components["schemas"]["SessionType"];
             /** @description The collective whose takeover the session is, which only takeovers have */
             takeover: components["schemas"]["Reference"] | null;
+            application: components["schemas"]["ApplicationLink"] | null;
             /** @description Its own name, which replaces the one its type gives it, or empty for none: the one to send back */
             name: string;
             /** @description What the session is called: its name, or else the one its type gives it. Never empty */
@@ -3139,6 +3179,8 @@ export interface components {
             type: components["schemas"]["SessionType"];
             /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
             takeover: string | null;
+            /** @description The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none */
+            application: string | null;
             /** @description Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
             name: string;
             /** @description The event's id on RA, or a link to it. Null, or blank, for none */
@@ -3180,6 +3222,7 @@ export interface components {
             /** @description SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public */
             soundcloudTrack: components["schemas"]["SessionLink"] | null;
             youtubeVideo: components["schemas"]["SessionLink"] | null;
+            application: components["schemas"]["ApplicationLink"] | null;
             /** Format: date-time */
             createdAt: string;
             createdBy: string;
@@ -3206,6 +3249,8 @@ export interface components {
             soundcloudTrack: string | null;
             /** @description A link to the video on YouTube, or its id. Null, or blank, for none */
             youtubeVideo: string | null;
+            /** @description The id of the application the set comes from: an artist's, who is one of its performers. Null, or blank, for none */
+            application: string | null;
         };
         /** @description In Québec time, ending later the same day */
         TimeSlot: {
@@ -5192,6 +5237,8 @@ export interface operations {
                     type?: components["schemas"]["SessionType"];
                     /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
                     takeover?: string | null;
+                    /** @description The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none */
+                    application?: string | null;
                     /** @description Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
                     name?: string;
                     /** @description The event's id on RA, or a link to it. Null, or blank, for none */
@@ -5609,6 +5656,8 @@ export interface operations {
                     soundcloudTrack?: string | null;
                     /** @description A link to the video on YouTube, or its id. Null, or blank, for none */
                     youtubeVideo?: string | null;
+                    /** @description The id of the application the set comes from: an artist's, who is one of its performers. Null, or blank, for none */
+                    application?: string | null;
                 };
             };
         };

@@ -12,7 +12,10 @@ import { artistsStore } from '../artists/store.js'
 import type { Photos } from '../artists/store.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
-import { artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
+import { applicationsRoutes } from '../applications/routes.js'
+import { applicationsSettingsStore } from '../applications/settings.js'
+import { applicationsStore } from '../applications/store.js'
+import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { SESSION_FIELDS, SET_FIELDS } from './fields.js'
@@ -20,7 +23,7 @@ import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
 
-// Property-based tests of the rules of sessions and sets (see "Rules" in docs/design/server/sessions.md), against a real
+// Property-based tests of the rules of sessions and sets (see "Rules" and "Applications" in docs/design/server/sessions.md), against a real
 // database: random sequences of requests, through the routes, after each of which every rule must still hold (see
 // test-invariants.ts), the server must not have failed, and a 409 must be about a rule, with what's really in the way.
 //
@@ -32,8 +35,9 @@ import { checkSessionsInvariants } from './test-invariants.js'
 //
 // FC_SEED and FC_PATH replay a failure, as fast-check prints them, and FC_NUM_RUNS changes how many sequences are tried.
 
-// What exists, by kind, in the order it was added, and what the operations are run with.
-type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives: string[] }
+// What exists, by kind, in the order it was added, applications with the artist or the collective they belong to, and what
+// the operations are run with.
+type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives: string[]; applications: { id: string; owner: string }[] }
 type Context = { app: FastifyInstance; database: TestDatabase; cookies: Record<string, string>; ids: Ids }
 type Body = { error: string; session: Session | null; set: StudioSet | null }
 type StudioSet = { id: string; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
@@ -82,6 +86,22 @@ function rarely<T>(value: fc.Arbitrary<T>): fc.Arbitrary<T | null> {
   return fc.oneof({ arbitrary: fc.constant(null), weight: 2 }, { arbitrary: value, weight: 1 })
 }
 
+// A set's or a session's application: mostly none, or else mostly one that goes with it, an application of one of the
+// set's performers, or of the takeover's collective, which is found when it's sent, or else any application, by its index
+// into them, which may not go with it.
+type ApplicationArg = { own: boolean; index: number } | null
+const Application: fc.Arbitrary<ApplicationArg> = rarely(
+  fc.record({ own: fc.oneof({ arbitrary: fc.constant(true), weight: 3 }, { arbitrary: fc.constant(false), weight: 1 }), index: fc.nat() }),
+)
+
+// The id of the application that `application` stands for, among those of `owners`, by their ids, when it's one that goes
+// with the set or the session.
+function applicationId(context: Context, application: ApplicationArg, owners: string[]): string | null {
+  if (application === null) return null
+  const { applications } = context.ids
+  return pick((application.own ? applications.filter(({ owner }) => owners.includes(owner)) : applications).map(({ id }) => id), application.index)
+}
+
 // A session's type, its collective, as an index into the collectives, and its name: mostly a takeover, with a collective,
 // or another type, without one, and a name for those of type other, and sometimes what doesn't go together.
 type Kind = { type: string; takeover: number | null; name: string }
@@ -107,11 +127,22 @@ const SessionFields = fc.record({
   ),
   durationMinutes: mostly<number>(fc.constantFrom(1, 60, 120, 240, 1440), fc.constantFrom(0, 1441)),
   kind: Kind,
+  application: Application,
 })
 type SessionArgs = typeof SessionFields extends fc.Arbitrary<infer T> ? T : never
 
-function sessionBody(context: Context, { start, durationMinutes, kind: { type, takeover, name } }: SessionArgs) {
-  return { start, durationMinutes, type, takeover: takeover === null ? null : pick(context.ids.collectives, takeover), name, raEvent: null, description: '' }
+function sessionBody(context: Context, { start, durationMinutes, kind: { type, takeover, name }, application }: SessionArgs) {
+  const takeoverId = takeover === null ? null : pick(context.ids.collectives, takeover)
+  return {
+    start,
+    durationMinutes,
+    type,
+    takeover: takeoverId,
+    application: applicationId(context, application, takeoverId === null ? [] : [takeoverId]),
+    name,
+    raEvent: null,
+    description: '',
+  }
 }
 
 // Adds or changes a session, which is sent as multipart/form-data, without a flyer.
@@ -144,14 +175,17 @@ const SetFields = fc
     place: Place,
     soundcloudTrack: rarely(mostly(fc.constantFrom(...Object.keys(TRACKS).filter((link) => TRACKS[link])), fc.constant(MISSING_TRACK))),
     youtubeVideo: rarely(fc.constantFrom(...VIDEOS)),
+    application: Application,
   })
   .map(({ place, ...fields }) => ({ ...fields, ...place }))
 type SetArgs = typeof SetFields extends fc.Arbitrary<infer T> ? T : never
 
-function setBody(context: Context, { performers, ...fields }: SetArgs) {
+function setBody(context: Context, { performers, application, ...fields }: SetArgs) {
+  const performerIds = performers.map((index) => pick(context.ids.artists, index))
   return {
     ...fields,
-    performers: performers.map((index) => ({ id: pick(context.ids.artists, index) })),
+    performers: performerIds.map((id) => ({ id })),
+    application: applicationId(context, application, performerIds),
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -166,11 +200,16 @@ function send({ app, cookies }: Context, method: 'GET' | 'POST' | 'PUT' | 'PATCH
 async function remove(context: Context, url: string) {
   const response = await send(context, 'DELETE', url)
   if (response.statusCode !== 200) return response
-  for (const kind of ['sessions', 'sets', 'artists', 'collectives'] as const) {
+  const existing = async (kind: string) => {
     const { rows } = await context.database.db.execute<{ id: string }>(sql`select id from ${sql.identifier(kind)}`)
-    const existing = new Set(rows.map((row) => row.id))
-    context.ids[kind] = context.ids[kind].filter((id) => existing.has(id))
+    return new Set(rows.map((row) => row.id))
   }
+  for (const kind of ['sessions', 'sets', 'artists', 'collectives'] as const) {
+    const ids = await existing(kind)
+    context.ids[kind] = context.ids[kind].filter((id) => ids.has(id))
+  }
+  const applicationIds = await existing('applications')
+  context.ids.applications = context.ids.applications.filter(({ id }) => applicationIds.has(id))
   return response
 }
 
@@ -338,7 +377,14 @@ const OPERATIONS = {
     run: (context, set) => remove(context, `/api/admin/sets/${pick(context.ids.sets, set)}`),
   } satisfies Operation<number>,
 
-  // Takes the artist out of their sets.
+  // Takes the application from its sets and sessions.
+  deleteApplication: {
+    weight: 1,
+    args: fc.nat(),
+    run: (context, application) => remove(context, `/api/admin/applications/${pick(context.ids.applications.map(({ id }) => id), application)}`),
+  } satisfies Operation<number>,
+
+  // Takes the artist out of their sets, and their applications from them.
   deleteArtist: {
     weight: 1,
     args: fc.nat(),
@@ -387,12 +433,15 @@ async function buildApp(database: TestDatabase) {
   await app.register(sessionsRoutes, { store: sessionsStore(database.db), photos: NO_PHOTOS, resolveTrack: async (link) => TRACKS[link] ?? null })
   await app.register(artistsRoutes, { store: artistsStore(database.db), photos: NO_PHOTOS })
   await app.register(collectivesRoutes, { store: collectivesStore(database.db), photos: NO_PHOTOS })
+  await app.register(applicationsRoutes, { store: applicationsStore(database.db), settings: applicationsSettingsStore(database.db), sessions: sessionsStore(database.db) })
   return app
 }
 
-// Empties the database, but for 4 artists, 2 collectives, and 2 sessions of 4 hours, one of them without a date, which is
-// the second collective's takeover, each with 2 sets, one after the other, so that even short sequences act on sets and
-// on a collective with a takeover, and returns their ids, in the order they were added.
+// Empties the database, but for 4 artists, 2 collectives, an application of each, and 2 sessions of 4 hours, one of them
+// without a date, which is the second collective's takeover, and comes from its application, each with 2 sets, one after
+// the other, the first of which comes from its performer's application, so that even short sequences act on sets, on a
+// collective with a takeover and on applications that sets and sessions come from, and returns their ids, in the order
+// they were added.
 async function reset(database: TestDatabase): Promise<Ids> {
   await database.db.execute(sql`truncate sessions, artists, collectives cascade`)
   const profile = { country: '' as const, city: '', links: {}, phone: '' }
@@ -408,24 +457,33 @@ async function reset(database: TestDatabase): Promise<Ids> {
       .returning({ id: collectives.id }),
   ])
   const [artistIds, collectiveIds] = added.map((rows) => rows.map(({ id }) => id))
+  const application = { dates: ['2026-11-14'], timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }
+  const applicationRows = await database.db
+    .insert(applications)
+    .values([...artistIds.map((artistId) => ({ ...application, artistId })), ...collectiveIds.map((collectiveId) => ({ ...application, collectiveId }))])
+    .returning({ id: applications.id, artistId: applications.artistId, collectiveId: applications.collectiveId })
+  const applicationIds = applicationRows.map(({ id, artistId, collectiveId }) => ({ id, owner: (artistId ?? collectiveId)! }))
+  const applicationOf = (owner: string) => applicationIds.find((candidate) => candidate.owner === owner)!.id
   const sessionRows = await database.db
     .insert(sessions)
     .values([
       { startAt: new Date('2026-11-15T02:00:00Z'), type: 'guest-mixes' as const, takeoverId: null },
-      { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[1] },
+      { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[1], applicationId: applicationOf(collectiveIds[1]) },
     ].map((session) => ({ ...session, durationMinutes: 240, name: '', createdBy: 'seed' })))
     .returning({ id: sessions.id })
   const sessionIds = sessionRows.map(({ id }) => id)
   const setIds: string[] = []
   for (const sessionId of sessionIds) {
     for (const offsetMinutes of [0, 60]) {
-      const set = { sessionId, offsetMinutes, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], createdBy: 'seed' }
+      const artistId = artistIds[setIds.length % artistIds.length]
+      const applicationId = offsetMinutes === 0 ? applicationOf(artistId) : null
+      const set = { sessionId, offsetMinutes, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], applicationId, createdBy: 'seed' }
       const [{ id }] = await database.db.insert(sets).values(set).returning({ id: sets.id })
-      await database.db.insert(setPerformers).values({ setId: id, artistId: artistIds[setIds.length % artistIds.length], position: 0 })
+      await database.db.insert(setPerformers).values({ setId: id, artistId, position: 0 })
       setIds.push(id)
     }
   }
-  return { sessions: sessionIds, sets: setIds, artists: artistIds, collectives: collectiveIds }
+  return { sessions: sessionIds, sets: setIds, artists: artistIds, collectives: collectiveIds, applications: applicationIds }
 }
 
 function numberFromEnv(name: string): number | undefined {

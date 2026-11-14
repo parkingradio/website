@@ -72,6 +72,8 @@ const APPLICATION: Application = {
   status: 'new',
   statusUpdatedBy: null,
   statusUpdatedAt: null,
+  sets: [],
+  sessions: [],
 }
 
 // The most recently received first, as the server lists them. The last one came by email in March, and was created after

@@ -369,7 +369,7 @@ test("a session's event on RA is published from the panel under its « Événeme
   const { unique, day } = own(testInfo)
   await logIn(page)
   await expect(adminMenu(page)).toBeVisible()
-  const fields = { start: `${day}T21:00-04:00`, durationMinutes: 120, type: 'other', takeover: null, name: `E2E ${unique}`, raEvent: null, description: 'Une soirée.' }
+  const fields = { start: `${day}T21:00-04:00`, durationMinutes: 120, type: 'other', takeover: null, application: null, name: `E2E ${unique}`, raEvent: null, description: 'Une soirée.' }
   const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
   expect(created.ok()).toBe(true)
   const id: string = (await created.json()).session.id

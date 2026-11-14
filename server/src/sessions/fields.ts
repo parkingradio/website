@@ -50,6 +50,9 @@ export function sessionTitle({ type, name, takeover }: { type: SessionType; name
 
 export const NO_SUCH_ARTIST = 'No such artist'
 export const NO_SUCH_COLLECTIVE = 'No such collective'
+export const NO_SUCH_APPLICATION = 'No such application'
+export const NOT_THE_SETS_APPLICATION = "A set's application is one of its performers'"
+export const NOT_THE_SESSIONS_APPLICATION = "A session's application is that of the collective whose takeover it is"
 
 // The longest a session or a set lasts, in minutes: 24 hours, so that a typo can't make a session overlap days of others.
 // A set's offset is less than that, since it starts within its session.
@@ -79,6 +82,11 @@ function orNone<T>(parse: (sent: string) => T | null, message: string, descripti
 // Ids are UUIDs, whatever their case, so they're lower-cased, as the database returns them, so that the same id in two
 // cases is the same artist or collective.
 const lowerCase = (id: string) => id.toLowerCase()
+
+// The application a set or a session comes from, by its id (see "Applications" in docs/design/server/sessions.md).
+function application(description: string) {
+  return orNone(lowerCase, "The application must be an application's id, or null", `The id of the application ${description}`)
+}
 
 // A number of minutes, from `min` to `max`.
 function minutes(message: string, min: number, max: number) {
@@ -118,12 +126,24 @@ const description = z
 // with the fields it doesn't send as they are (see "Changes" in docs/design/server/README.md).
 export type BrokenRule = { message: string; field: string }
 
-// The rules of a session's type, its takeover's collective, by its id, and its name (see "Types and names" in
-// docs/design/server/sessions.md).
-export function brokenSessionRule({ type, takeover, name }: { type: SessionType; takeover: string | null; name: string }): BrokenRule | null {
+// The rules of a session's type, its takeover's collective and its application, by their ids, and its name (see "Types
+// and names" and "Applications" in docs/design/server/sessions.md). The store checks the rest of its application's rule,
+// which needs the application (see `checkSessionApplication` in sessions/store.ts).
+export function brokenSessionRule({
+  type,
+  takeover,
+  application,
+  name,
+}: {
+  type: SessionType
+  takeover: string | null
+  application: string | null
+  name: string
+}): BrokenRule | null {
   if (type === 'takeover' && takeover === null) return { message: 'A takeover has a collective', field: 'takeover' }
   if (type !== 'takeover' && takeover !== null) return { message: 'Only a takeover has a collective', field: 'takeover' }
   if (type === 'other' && name === '') return { message: 'A session of type other has a name', field: 'name' }
+  if (type !== 'takeover' && application !== null) return { message: 'Only a takeover has an application', field: 'application' }
   return null
 }
 
@@ -159,6 +179,7 @@ export const SESSION_FIELDS = {
     "The takeover must be a collective's id, or null",
     'The id of the collective whose takeover the session is: a takeover has one, and the other types none',
   ),
+  application: application('the session comes from: a collective\'s, whose takeover the session is'),
   name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`).meta({
     description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
   }),
@@ -222,6 +243,7 @@ export const SET_FIELDS = {
     'A link to the track on soundcloud.com, or its private link',
   ),
   youtubeVideo: orNone(youtubeVideoId, 'The YouTube video must be a link to it, or its id', 'A link to the video on YouTube, or its id'),
+  application: application("the set comes from: an artist's, who is one of its performers"),
 }
 
 export const SetFields = z

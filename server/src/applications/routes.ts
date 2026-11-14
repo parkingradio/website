@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { ApiError, ById, Day, Ok, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
+import { ApplicationLinks, NO_LINKS, linksByApplication } from '../sessions/routes.js'
+import type { SessionsStore, StoredSession } from '../sessions/store.js'
 import { ApplicationFields, ApplicationStatus, BAD_STATUS, NO_DATE, PerformanceTypeId, ReceivedAt, TimeSlot } from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import { NoSuchArtist, NoSuchCollective } from './store.js'
@@ -29,6 +31,7 @@ const Application = z
     status: ApplicationStatus,
     statusUpdatedBy: z.string().nullable(),
     statusUpdatedAt: Timestamp.nullable(),
+    ...ApplicationLinks,
   })
   .meta({ id: 'Application' })
 type Application = z.infer<typeof Application>
@@ -64,7 +67,8 @@ function ownerOf(artistId: string | undefined, collectiveId: string | undefined)
 }
 
 // The fields are listed one by one, so that a column added to the table doesn't end up in the API unless it's added here.
-function application(row: StoredApplication): Application {
+// With the sets and the sessions that come from it, which a new application doesn't have.
+function application(row: StoredApplication, links: ApplicationLinks = NO_LINKS): Application {
   return {
     id: row.id,
     artistId: row.artistId,
@@ -82,6 +86,7 @@ function application(row: StoredApplication): Application {
     status: row.status,
     statusUpdatedBy: row.statusUpdatedBy,
     statusUpdatedAt: row.statusUpdatedAt?.toISOString() ?? null,
+    ...links,
   }
 }
 
@@ -140,12 +145,28 @@ function recipientsResponse(settings: ApplicationsSettings | null): ApplicationR
 type ApplicationsOptions = {
   store: ApplicationsStore
   settings: ApplicationsSettingsStore
+  // Where the sets and the sessions that come from applications are found.
+  sessions: Pick<SessionsStore, 'ofApplications'>
 }
 
-export async function applicationsRoutes(app: FastifyInstance, { store, settings }: ApplicationsOptions) {
+export async function applicationsRoutes(app: FastifyInstance, { store, settings, sessions }: ApplicationsOptions) {
   const api = zodRoutes(app)
   // The messages of these routes' schemas are whole sentences, e.g. in French for applications, which are sent as they are.
   app.setSchemaErrorFormatter(firstIssue)
+
+  // The applications `rows`, as the endpoints return them, with their sets and sessions, which are found in `linked`.
+  function withLinks(rows: StoredApplication[], linked: StoredSession[]): Application[] {
+    const links = linksByApplication(linked)
+    return rows.map((row) => application(row, links.get(row.id)))
+  }
+
+  // Responds with the application `id` that `found` finds, or changes, or 404 when there's none. Its sets and sessions are
+  // found at the same time, since changing an application doesn't change them.
+  async function respond(reply: FastifyReply, id: string, found: Promise<StoredApplication | null>) {
+    const [row, linked] = await Promise.all([found, sessions.ofApplications([id])])
+    if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
+    return { ok: true as const, application: withLinks([row], linked)[0] }
+  }
 
   api.get(
     '/api/admin/applications',
@@ -172,7 +193,8 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
     },
     async (request) => {
       const owner = ownerOf(request.query.artist, request.query.collective)
-      const applications = (await store.list(owner)).map(application)
+      const rows = await store.list(owner)
+      const applications = withLinks(rows, await sessions.ofApplications(rows.map(({ id }) => id)))
       return { ok: true as const, total: applications.length, applications }
     },
   )
@@ -222,11 +244,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
         response: { 200: ApplicationResponse, 404: ApiError },
       },
     },
-    async (request, reply) => {
-      const row = await store.get(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
-      return { ok: true as const, application: application(row) }
-    },
+    async (request, reply) => respond(reply, request.params.id, store.get(request.params.id)),
   )
 
   // Unlike applications that artists send, these aren't emailed to the recipients, nor confirmed to the artist: the admin
@@ -260,9 +278,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
 
   // Saves the changes to the application `id`, all of its fields or some of them, as `by`, and responds with it.
   async function update(id: string, changes: ApplicationChange, by: string, reply: FastifyReply) {
-    const row = await store.update(id, { ...changes, updatedBy: by, updatedAt: new Date() })
-    if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
-    return { ok: true as const, application: application(row) }
+    return respond(reply, id, store.update(id, { ...changes, updatedBy: by, updatedAt: new Date() }))
   }
 
   // Not a tool: tools change applications with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
@@ -312,9 +328,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
     },
     async (request, reply) => {
       const change = { status: request.body.status, statusUpdatedBy: request.user!.email, statusUpdatedAt: new Date() }
-      const row = await store.setStatus(request.params.id, change)
-      if (!row) return reply.status(404).send(NO_SUCH_APPLICATION)
-      return { ok: true as const, application: application(row) }
+      return respond(reply, request.params.id, store.setStatus(request.params.id, change))
     },
   )
 
@@ -324,7 +338,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       config: { admin: true, tool: { title: 'Supprimer une candidature' } },
       schema: {
         operationId: 'delete_application',
-        summary: 'Deletes an application',
+        summary: 'Deletes an application, but not its sets and sessions, which stay without it',
         tags: ['Applications'],
         params: ById,
         response: { 200: Ok, 404: ApiError },

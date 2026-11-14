@@ -166,7 +166,8 @@ export function artistsStore(db: Queryable): ArtistsStore {
     async delete(id) {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
-        // Deleting them deletes their rows in set_performers, which writes sets' performers (see `lockSessions`).
+        // Deleting them deletes their rows in set_performers, which writes sets' performers, and their applications, which
+        // takes them from their sets (see `lockSessions`).
         await lockSessions(tx)
         const [row] = await tx.delete(artists).where(eq(artists.id, id)).returning()
         return row ?? null

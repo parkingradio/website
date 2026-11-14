@@ -1,40 +1,59 @@
-import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
-import { artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
+import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { NO_SUCH_ARTIST, NO_SUCH_COLLECTIVE, brokenSessionRule, brokenSetRule } from './fields.js'
+import {
+  NOT_THE_SESSIONS_APPLICATION,
+  NOT_THE_SETS_APPLICATION,
+  NO_SUCH_APPLICATION,
+  NO_SUCH_ARTIST,
+  NO_SUCH_COLLECTIVE,
+  brokenSessionRule,
+  brokenSetRule,
+} from './fields.js'
 import type { BrokenRule, SentPerformer, Status } from './fields.js'
 
 // Keeps sessions, their sets and the sets' performers in the database (see docs/design/server/sessions.md).
 
-// A set, as the database keeps it, with its performers, in order.
-export type SetRow = typeof sets.$inferSelect
-export type StoredSet = SetRow & { performers: Reference[] }
+// The application a set or a session comes from, as they give it.
+export type StoredApplicationLink = { id: string; receivedAt: Date }
 
-// A session, as the database keeps it, with the collective whose takeover it is, and its sets, in order.
+// A set, as the database keeps it, with its performers, in order, and its application.
+export type SetRow = typeof sets.$inferSelect
+export type StoredSet = SetRow & { performers: Reference[]; application: StoredApplicationLink | null }
+
+// A session, as the database keeps it, with the collective whose takeover it is, its application, and its sets, in order.
 export type SessionRow = typeof sessions.$inferSelect
-export type StoredSession = SessionRow & { takeover: Reference | null; sets: StoredSet[] }
+export type StoredSession = SessionRow & { takeover: Reference | null; application: StoredApplicationLink | null; sets: StoredSet[] }
 
 // What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status, and a
 // session's flyer, which is where it's stored (see `Photos` in artists/store.ts), and its MIME type, or nulls for none.
-export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'raEventId' | 'description'>
+export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'applicationId' | 'raEventId' | 'description'>
 export type StoredFlyer = { flyerKey: string; flyerType: string } | { flyerKey: null; flyerType: null }
 export type SetChanges = Pick<
   SetRow,
-  'offsetMinutes' | 'durationMinutes' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'soundcloudTrackId' | 'soundcloudTrackUrl' | 'youtubeVideoId'
+  | 'offsetMinutes'
+  | 'durationMinutes'
+  | 'performanceTypes'
+  | 'otherPerformanceType'
+  | 'genres'
+  | 'soundcloudTrackId'
+  | 'soundcloudTrackUrl'
+  | 'youtubeVideoId'
+  | 'applicationId'
 > & { performers: SentPerformer[] }
 export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpdatedAt: Date }
 
-// Thrown when a session or a set can't be saved because the takeover's collective, or one of its performers, doesn't
-// exist. The message says which.
+// Thrown when a session or a set can't be saved because the takeover's collective, one of its performers, or its
+// application, doesn't exist. The message says which.
 export class NoSuchReference extends Error {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
-// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts). The message says
-// which.
+// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts), or its application
+// (see `checkSessionApplication` and `checkSetApplication`). The message says which.
 export class BrokenFields extends Error {}
 
 // `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
@@ -126,13 +145,22 @@ export type SessionsStore = {
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Returns false if the set didn't exist. Its performers stay.
   deleteSet(id: string): Promise<boolean>
+  // The sessions that come from one of the applications `applicationIds`, or that have a set that does, in the order of
+  // `list`, with all their sets.
+  ofApplications(applicationIds: string[]): Promise<StoredSession[]>
+}
+
+// The application with `id`, and when it was received, as a set or a session gives it, or null for none.
+function storedApplicationLink(id: string | null, receivedAt: Date | null): StoredApplicationLink | null {
+  return id === null ? null : { id, receivedAt: receivedAt! }
 }
 
 // The sets of the sessions `sessionIds`, by session, in order, with their performers.
 async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, StoredSet[]>> {
   const rows = await db
-    .select()
+    .select({ set: sets, receivedAt: applications.receivedAt })
     .from(sets)
+    .leftJoin(applications, eq(applications.id, sets.applicationId))
     .where(inArray(sets.sessionId, sessionIds))
     .orderBy(sql`${sets.offsetMinutes} asc nulls last`, asc(sets.createdAt))
   const performers =
@@ -142,7 +170,7 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
           .select({ setId: setPerformers.setId, id: artists.id, name: artists.name })
           .from(setPerformers)
           .innerJoin(artists, eq(artists.id, setPerformers.artistId))
-          .where(inArray(setPerformers.setId, rows.map((set) => set.id)))
+          .where(inArray(setPerformers.setId, rows.map(({ set }) => set.id)))
           .orderBy(asc(setPerformers.position))
   const performersOf = new Map<string, Reference[]>()
   for (const { setId, ...performer } of performers) {
@@ -150,9 +178,9 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
     performersOf.get(setId)!.push(performer)
   }
   const found = new Map<string, StoredSet[]>()
-  for (const set of rows) {
+  for (const { set, receivedAt } of rows) {
     if (!found.has(set.sessionId)) found.set(set.sessionId, [])
-    found.get(set.sessionId)!.push({ ...set, performers: performersOf.get(set.id) ?? [] })
+    found.get(set.sessionId)!.push({ ...set, performers: performersOf.get(set.id) ?? [], application: storedApplicationLink(set.applicationId, receivedAt) })
   }
   return found
 }
@@ -161,9 +189,10 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
 // their sets.
 async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {
   const query = db
-    .select({ session: sessions, takeoverName: collectives.name })
+    .select({ session: sessions, takeoverName: collectives.name, receivedAt: applications.receivedAt })
     .from(sessions)
     .leftJoin(collectives, eq(collectives.id, sessions.takeoverId))
+    .leftJoin(applications, eq(applications.id, sessions.applicationId))
     .where(where)
     .orderBy(sql`${sessions.startAt} desc nulls first`, desc(sessions.createdAt))
   const rows = await (limit === undefined ? query : query.limit(limit))
@@ -172,9 +201,10 @@ async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: numb
     db,
     rows.map(({ session }) => session.id),
   )
-  return rows.map(({ session, takeoverName }) => ({
+  return rows.map(({ session, takeoverName, receivedAt }) => ({
     ...session,
     takeover: session.takeoverId === null ? null : { id: session.takeoverId, name: takeoverName! },
+    application: storedApplicationLink(session.applicationId, receivedAt),
     sets: setsBySession.get(session.id) ?? [],
   }))
 }
@@ -198,17 +228,23 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 }
 
 // Every transaction that writes sessions, sets or their performers takes this lock first, and so do deleting an artist,
-// which writes them too, by deleting the artist's rows in set_performers, and deleting a collective, which mustn't have
-// takeovers (see artists/store.ts and collectives/store.ts). They're done one at a time, so that:
+// which writes them too, by deleting the artist's rows in set_performers, and their applications (see below), deleting a
+// collective, which mustn't have takeovers, and deleting an application, which takes it from its sets and sessions (see
+// artists/store.ts, collectives/store.ts and applications/store.ts). They're done one at a time, so that:
 // - Two sessions that would overlap can't both be inserted into the index of the exclusion constraint sessions_no_overlap,
 //   then each wait for the other to end before it could tell whether they overlap, which Postgres would end as a
-//   deadlock, rather than with the constraint's error.
+//   deadlock, rather than with the constraint's error. Taking an application from a session rewrites its row, which
+//   checks the constraint again too.
 // - What a write reads can't change until it's done: the rule that spans sessions and sets (a cancelled session only has
-//   cancelled sets), whether the session, the set, the takeover's collective and the performers exist, and so whether
-//   the foreign keys hold, without locking their rows, which would keep their profiles from being changed in the
-//   meantime, and whether a collective that's deleted has takeovers.
+//   cancelled sets), whether the session, the set, the takeover's collective, the performers and the application exist,
+//   and so whether the foreign keys hold, rather than failing unexpectedly once they're checked, without locking their
+//   rows, which would keep their profiles from being changed in the meantime, whether a collective that's deleted has
+//   takeovers, and who an application belongs to, which its rules are about (see "Applications" in
+//   docs/design/server/sessions.md).
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
-//   deadlock.
+//   deadlock. Nor can saving a set or a session, which takes a lock on its application's row to check its foreign key
+//   once its own row is written, and deleting that application, which writes the set's or the session's row once it has
+//   locked its own.
 // Every transaction that takes it takes it before any other lock, so it can't be part of a deadlock itself. The
 // constraints still hold for anything that doesn't take it.
 const SESSIONS_LOCK = 0x5e55 // "sess"
@@ -240,6 +276,40 @@ function checkPerformers(tx: Queryable, performers: SentPerformer[]) {
     NO_SUCH_ARTIST,
   )
 }
+
+// Who the application `id` belongs to, which it does until the transaction `tx`, which holds the sessions' lock, ends,
+// since deleting it takes it too (see `lockSessions`), and its owner doesn't change. Throws a NoSuchReference when
+// there's no such application.
+async function applicationOwner(tx: Queryable, id: string): Promise<Pick<typeof applications.$inferSelect, 'artistId' | 'collectiveId'>> {
+  const [found] = isUuid(id)
+    ? await tx.select({ artistId: applications.artistId, collectiveId: applications.collectiveId }).from(applications).where(eq(applications.id, id))
+    : []
+  if (!found) throw new NoSuchReference(NO_SUCH_APPLICATION)
+  return found
+}
+
+// Checks that a session's application, if it has one, is that of the collective whose takeover it is (see
+// "Applications" in docs/design/server/sessions.md), once its fields are checked, so that it's a takeover (see
+// `brokenSessionRule`), and its collective exists. Throws a NoSuchReference or a BrokenFields.
+async function checkSessionApplication(tx: Queryable, { applicationId, takeoverId }: Pick<SessionRow, 'applicationId' | 'takeoverId'>) {
+  if (applicationId === null) return
+  if ((await applicationOwner(tx, applicationId)).collectiveId !== takeoverId) throw new BrokenFields(NOT_THE_SESSIONS_APPLICATION)
+}
+
+// Checks that a set's application is that of one of its performers, `performerIds`, once they're checked. Throws a
+// NoSuchReference or a BrokenFields.
+async function checkSetApplication(tx: Queryable, applicationId: string, performerIds: string[]) {
+  const { artistId } = await applicationOwner(tx, applicationId)
+  if (artistId === null || !performerIds.includes(artistId)) throw new BrokenFields(NOT_THE_SETS_APPLICATION)
+}
+
+// The ids of the performers of the set `setId`, as they're saved.
+async function savedPerformerIds(tx: Queryable, setId: string): Promise<string[]> {
+  const rows = await tx.select({ id: setPerformers.artistId }).from(setPerformers).where(eq(setPerformers.setId, setId))
+  return rows.map(({ id }) => id)
+}
+
+const idsOf = (performers: SentPerformer[]) => performers.map(({ id }) => id)
 
 // Saves the performers of the set `setId`, which has none, in order, once checkPerformers has checked them.
 async function addPerformers(tx: Queryable, setId: string, performers: SentPerformer[]) {
@@ -338,6 +408,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         await checkTakeover(tx, session.takeoverId)
+        await checkSessionApplication(tx, session)
         const [row] = await checkingSessionRules(tx, null, session, (savepoint) => savepoint.insert(sessions).values(session).returning({ id: sessions.id }))
         return (await sessionWithId(tx, row.id))!
       })
@@ -351,8 +422,9 @@ export function sessionsStore(db: Queryable): SessionsStore {
         if (!before) return null
         // The rules are about the session as it will be, with the fields that aren't changed as they are.
         const session = changed(before, changes)
-        check(brokenSessionRule({ type: session.type, takeover: session.takeoverId, name: session.name }))
+        check(brokenSessionRule({ type: session.type, takeover: session.takeoverId, application: session.applicationId, name: session.name }))
         await checkTakeover(tx, session.takeoverId)
+        await checkSessionApplication(tx, session)
         await checkingSessionRules(tx, id, session, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
         return { before, after: (await sessionWithId(tx, id))! }
       })
@@ -399,6 +471,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
         if (!session) return null
         if (session.status === 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, sessionId))
         await checkPerformers(tx, performers)
+        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
         const row = { ...set, sessionId }
         const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }))
         await addPerformers(tx, id, performers)
@@ -417,6 +490,8 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const set = changed(before, changes)
         check(brokenSetRule(set))
         if (performers) await checkPerformers(tx, performers)
+        // Against its new performers, or else those it has.
+        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, performers ? idsOf(performers) : await savedPerformerIds(tx, id))
         await checkingSetRules(tx, id, set, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
         if (performers) {
           await tx.delete(setPerformers).where(eq(setPerformers.setId, id))
@@ -447,6 +522,13 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const deleted = await tx.delete(sets).where(eq(sets.id, id)).returning({ id: sets.id })
         return deleted.length > 0
       })
+    },
+
+    async ofApplications(applicationIds) {
+      const ids = applicationIds.filter(isUuid)
+      if (ids.length === 0) return []
+      const ofTheirSets = db.select({ id: sets.sessionId }).from(sets).where(inArray(sets.applicationId, ids))
+      return sessionsWhere(db, or(inArray(sessions.applicationId, ids), inArray(sessions.id, ofTheirSets)))
     },
   }
 }
