@@ -256,7 +256,7 @@ export function ApplicationSets({ sets }: { sets: Application['sets'] }) {
       {sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un set de l'artiste.</p>
       ) : (
-        <table className="admin-table" aria-labelledby={headingId}>
+        <AdminTable aria-labelledby={headingId}>
           <thead>
             <tr>
               <th>Date</th>
@@ -277,7 +277,7 @@ export function ApplicationSets({ sets }: { sets: Application['sets'] }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </AdminTable>
       )}
     </>
   )
@@ -295,7 +295,7 @@ export function ApplicationSessions({ sessions }: { sessions: Application['sessi
           Aucune session ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un takeover du collectif.
         </p>
       ) : (
-        <table className="admin-table" aria-labelledby={headingId}>
+        <AdminTable aria-labelledby={headingId}>
           <thead>
             <tr>
               <th>Date</th>
@@ -316,7 +316,7 @@ export function ApplicationSessions({ sessions }: { sessions: Application['sessi
               </tr>
             ))}
           </tbody>
-        </table>
+        </AdminTable>
       )}
     </>
   )
