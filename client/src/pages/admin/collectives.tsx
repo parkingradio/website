@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
-import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { OwnApplications } from './applications'
 import { Button } from './button'
@@ -11,8 +10,8 @@ import { CollectiveForm } from './collective-form'
 import { failure } from './session-errors'
 import { OwnSessions } from './sessions'
 import type { CollectiveFormProps } from './collective-form'
-import { ArtistsFailure, BackToArtists, LinksList, LoadFailure, MembersList, PhotoOrNone } from './profile-details'
-import { MISSING, addedBy, byWhom, collectiveGenreNames, deletedWith, entryPath, photoUrl, place } from './describe'
+import { ArtistsFailure, BackToArtists, CollectiveDetails, LoadFailure } from './profile-details'
+import { addedBy, byWhom, deletedWith, entryPath } from './describe'
 
 // The pages of the artists section about collectives: a collective's page, where it's changed or deleted, and adding one
 // by hand. They're listed with the artists (see artists.tsx).
@@ -127,36 +126,6 @@ function CollectiveFormWithArtists(props: Omit<CollectiveFormProps, 'artists'>) 
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       <CollectiveForm {...props} artists={artists.kind === 'loaded' ? artists.value.artists : null} />
     </>
-  )
-}
-
-// Everything about a collective: its photo, or that it has none, then its profile, with its artists, linking to them, and
-// their genres, from its `members`, unless they couldn't be loaded, which leaves them blank.
-function CollectiveDetails({ collective, members }: { collective: Collective; members: Artist[] | null }) {
-  return (
-    <div className="admin-record">
-      <PhotoOrNone url={collective.hasPhoto ? photoUrl('collectives', collective) : null} name={collective.name} />
-      <dl>
-        <dt>Artistes du collectif</dt>
-        <dd>
-          <MembersList members={collective.members} />
-        </dd>
-        <dt>Ville</dt>
-        <dd>{place(collective)}</dd>
-        <dt>Genres de ses artistes</dt>
-        <dd>{collectiveGenreNames(collective, members)}</dd>
-        <dt>Liens</dt>
-        <dd>
-          <LinksList links={collective.links} />
-        </dd>
-        <dt>Adresse e-mail du contact</dt>
-        <dd>{collective.email ? <a href={`mailto:${collective.email}`}>{collective.email}</a> : MISSING}</dd>
-        <dt>Téléphone du contact</dt>
-        <dd>{collective.phone ? <a href={`tel:${collective.phone}`}>{collective.phone}</a> : MISSING}</dd>
-        <dt>Description</dt>
-        <dd className="admin-text">{collective.description || MISSING}</dd>
-      </dl>
-    </div>
   )
 }
 

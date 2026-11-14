@@ -32,8 +32,10 @@ that's the day it was created), who created it and when, or that it was sent thr
 and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when.
-- "Artiste" or "Collectif": who the artist is, with their city and genres, and how to reach them, linking to their
-  page. A collective's lists its artists, linking to them, and its genres are theirs.
+- "Artiste" or "Collectif": the artist's or the collective's photo and profile, as their page shows them (see
+  [An artist's page](artistes.md#an-artists-page) and [A collective's page](artistes.md#a-collectives-page)), starting
+  with their name, which links to their page. It leaves out who added them and who last changed them, and what their
+  page shows under their profile, e.g. their applications.
 - "Candidature": everything in the application, and a button that changes it in a form in its place, including the day
   it was received.
 - "Sets", for an artist's application, or "Sessions", for a collective's: the sets or sessions that come from it (see
@@ -65,5 +67,6 @@ refuses what the form accepted, the form shows the server's message.
 - `POST /api/admin/applications`, for "nouvelle candidature".
 - `GET /api/admin/artists` and `GET /api/admin/collectives`, for the names, cities and genres of artists and collectives
   in the list, to search the applications by them, and to pick who a new application is for.
-- `GET /api/admin/artists/:id`, for the artist on an application's page, or `GET /api/admin/collectives/:id` and
-  `GET /api/admin/artists?collective=<id>`, for the collective and its genres.
+- `GET /api/admin/artists/:id` and `GET /api/admin/artists/:id/photo`, for the artist on an application's page, or
+  `GET /api/admin/collectives/:id`, `GET /api/admin/collectives/:id/photo` and `GET /api/admin/artists?collective=<id>`,
+  for the collective, its photo and its genres.

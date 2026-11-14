@@ -212,6 +212,16 @@ describe('A collective’s page', () => {
     }
   })
 
+  it('cuts a long description like a bio, and shows it whole', async () => {
+    const description = `${'mot '.repeat(187)}dernier mot`
+    mockFetch({ ...ONDES_PAGE, '/api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, description } } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await waitFor(() => expect(described('Description')).toHaveTextContent(/^mot mot .* mot… lire la suite$/))
+    fireEvent.click(screen.getByRole('button', { name: 'lire la suite' }))
+    expect(described('Description')?.textContent).toBe(`${description} réduire`)
+  })
+
   it('says when the collective could not be loaded', async () => {
     mockFetch({ ...ONDES_PAGE, '/api/admin/collectives/collective-1': { ok: false, error: 'No such collective' } })
     renderAt('/admin/artistes/collectifs/collective-1')

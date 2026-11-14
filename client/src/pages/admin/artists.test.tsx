@@ -493,6 +493,55 @@ describe('An artist’s page', () => {
     }
   })
 
+  describe('with a long bio', () => {
+    // 748 characters, which end with a space.
+    const WORDS = 'mot '.repeat(187)
+    // What the bio shows, without normalizing its whitespace, as toHaveTextContent does.
+    const bio = () => screen.getByText('Bio', { selector: 'dt' }).nextElementSibling?.textContent
+    async function renderWithBio(text: string) {
+      mockFetch({ ...AURORE_PAGE, '/api/admin/artists/artist-1': { ok: true, artist: { ...AURORE, bio: text } } })
+      renderAt('/admin/artistes/artist-1')
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Aurore' })).toBeInTheDocument())
+    }
+
+    it('cuts it after the last word that fits in its first 750 characters, and shows it whole, then cut again', async () => {
+      const text = `${WORDS}dernier mot`
+      Element.prototype.scrollIntoView = vi.fn()
+      await renderWithBio(text)
+
+      expect(bio()).toBe(`${WORDS.trimEnd()}… lire la suite`)
+      // The same button, which keeps the focus.
+      const button = screen.getByRole('button', { name: 'lire la suite' })
+      fireEvent.click(button)
+      expect(bio()).toBe(`${text} réduire`)
+      expect(screen.getByRole('button', { name: 'réduire' })).toBe(button)
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
+      fireEvent.click(button)
+      expect(bio()).toBe(`${WORDS.trimEnd()}… lire la suite`)
+      // Brought back into view, since the end of the bio, where it was, can be far below.
+      expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toEqual([button])
+      // Only when it's out of view.
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    })
+
+    it.each([
+      ['shows a bio of 750 characters whole', `${WORDS}xy`, `${WORDS}xy`],
+      ['keeps a word that ends at the 750th character', `${WORDS}xy\n\nSuite.`, `${WORDS}xy… lire la suite`],
+      ['cuts a bio without whitespace at its 750th character', 'a'.repeat(800), `${'a'.repeat(750)}… lire la suite`],
+      // "« citation »" is one word, whose no-break spaces don't separate it.
+      [
+        "doesn't cut at a no-break space",
+        `${'mot '.repeat(186)}«\u00A0citation\u202F»`,
+        `${'mot '.repeat(186).trimEnd()}… lire la suite`,
+      ],
+      // The emoji is the 750th and 751st characters.
+      ["doesn't cut an emoji in two", `${'a'.repeat(749)}🎧${'b'.repeat(10)}`, `${'a'.repeat(749)}… lire la suite`],
+    ])('%s', async (_, text, shown) => {
+      await renderWithBio(text)
+      expect(bio()).toBe(shown)
+    })
+  })
+
   it('says that an artist came through the form', async () => {
     mockFetch({
       ...LOGGED_IN,
