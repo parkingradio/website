@@ -162,6 +162,76 @@ test('a seeded session marks its sets that overlap, and those that end after it,
   await expect(mark('Jah Pierre')).toBeFocused()
 })
 
+// With Collectif Béton's takeover, BÉTON 140, which comes from its application (see seed-data.ts).
+test("a seeded takeover links to the application it comes from, whose page links back to it", async ({ page }) => {
+  await logIn(page, { at: '/admin/sessions?status=all' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('béton 140')
+  await rowsOf(page, 'BÉTON 140').getByRole('link').first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
+  await value(page, 'Candidature').getByRole('link', { name: /^reçue le / }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Candidature de Collectif Béton' })).toBeVisible()
+  const sessions = page.getByRole('table', { name: 'Sessions' })
+  await expect(rowsOf(sessions, 'BÉTON 140')).toContainText('jouée')
+  await rowsOf(sessions, 'BÉTON 140').getByRole('link').click()
+  await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
+})
+
+test('a takeover and its set are given the applications they come from in their forms, which link to them, until they are taken away', async ({ page }, testInfo) => {
+  const { unique, day } = own(testInfo)
+  await logIn(page)
+  const mine = await addOwnCollective(page, unique)
+  const apply = async (owner: object) => {
+    const fields = { dates: [day], timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '' }
+    const created = await page.request.post('/api/admin/applications', { data: { ...fields, ...owner } })
+    expect(created.ok()).toBe(true)
+    return (await created.json()).application.id as string
+  }
+  const collectives = await apply({ collectiveId: mine.collective.id })
+  const artists = await apply({ artistId: mine.artist.id })
+  const fields = { start: `${day}T21:00-04:00`, durationMinutes: 120, type: 'takeover', takeover: mine.collective.id, application: null, name: `E2E ${unique}`, raEvent: null, description: '' }
+  const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
+  expect(created.ok()).toBe(true)
+  const id: string = (await created.json()).session.id
+  const set = { performers: [{ id: mine.artist.id }], offsetMinutes: 0, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
+  expect((await page.request.post(`/api/admin/sessions/${id}/sets`, { data: set })).ok()).toBe(true)
+  await mockEvents(page)
+
+  // The takeover's, among its collective's.
+  await page.goto(`/admin/sessions/${id}`)
+  await expect(value(page, 'Candidature')).toHaveText('-')
+  await page.getByRole('button', { name: 'modifier', exact: true }).click()
+  const picker = page.getByRole('combobox', { name: 'Candidature' })
+  await expect(picker).toHaveValue('Aucune candidature')
+  await picker.click()
+  await page.getByRole('option', { name: /^Reçue le / }).click()
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(value(page, 'Candidature').getByRole('link')).toHaveAttribute('href', `/admin/candidatures/${collectives}`)
+
+  // The set's, among its performer's.
+  const sets = page.getByRole('table', { name: 'Sets' })
+  await sets.getByRole('button', { name: /^modifier : / }).click()
+  await picker.click()
+  await page.getByRole('option', { name: new RegExp(`^${mine.artist.name}, reçue le `) }).click()
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await sets.getByRole('link', { name: /^Candidature reçue le / }).click()
+  await expect(page).toHaveURL(`/admin/candidatures/${artists}`)
+  const listed = page.getByRole('table', { name: 'Sets' })
+  await expect(listed.getByRole('row')).toHaveCount(2)
+  await expect(listed).toContainText('21 h – 22 h')
+  await expect(page.getByText(/^La candidature sera supprimée/)).toContainText('Les sets associés restent.')
+  await listed.getByRole('link', { name: `E2E ${unique}` }).click()
+
+  // Taken away.
+  await sets.getByRole('button', { name: /^modifier : / }).click()
+  await picker.click()
+  await page.getByRole('option', { name: 'Aucune candidature' }).click()
+  await page.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(sets.getByRole('link', { name: /^Candidature/ })).toHaveCount(0)
+
+  expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
+  await deleteOwn(page, mine)
+})
+
 // What a test's own entities are named after, two days for its sessions, from 2100 to 2899, in July, when clocks don't
 // change, and a YouTube video id of 11 characters. They're derived from its unique name, so that other tests' sessions,
 // even those left from a run that failed, are very unlikely to have them.

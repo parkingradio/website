@@ -738,7 +738,11 @@ describe('An application’s page', () => {
     expect(screen.getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
     expect(screen.getByText('Genres', { selector: 'dt' }).nextElementSibling).toHaveTextContent('techno, ambient')
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')
-    expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent("La candidature sera supprimée pour de bon. L'artiste reste.")
+    expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. L'artiste reste\.$/)
+    expect(screen.getByRole('heading', { level: 2, name: 'Sets' })).toBeInTheDocument()
+    expect(screen.getByText(/^Aucun set ne vient de cette candidature/)).toHaveTextContent(
+      "Aucun set ne vient de cette candidature : on la choisit dans le formulaire d'un set de l'artiste.",
+    )
     expect(screen.getByText('jeudi 10 décembre 2026')).toBeInTheDocument()
     expect(screen.getByText('jeudi 14 janvier 2027')).toBeInTheDocument()
     expect(screen.getByText('18:00 à 22:00')).toBeInTheDocument()
@@ -972,6 +976,42 @@ describe('An application’s page', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/))
   })
 
+  it('lists the sets that come from it, with their sessions, linking to them, which stay once it is deleted', async () => {
+    const session = (id: string, title: string, start: string | null) => ({ id, title, start })
+    const sets = [
+      // In a session without a date, one placed in it, and one that isn't.
+      { id: 'set-1', start: null, end: null, offsetMinutes: 60, durationMinutes: 90, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
+      { id: 'set-2', start: null, end: null, offsetMinutes: null, durationMinutes: 60, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
+      {
+        id: 'set-3',
+        start: '2026-11-15T02:00:00.000Z',
+        end: '2026-11-15T03:00:00.000Z',
+        offsetMinutes: 0,
+        durationMinutes: 60,
+        status: 'cancelled',
+        session: session('session-2', 'GUEST MIXES', '2026-11-15T02:00:00.000Z'),
+      },
+    ] as const
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, sets } } })
+    renderAt('/admin/candidatures/application-1')
+
+    const table = await screen.findByRole('table', { name: 'Sets' })
+    const rows = within(table)
+      .getAllByRole('row')
+      .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
+      .slice(1)
+    expect(rows).toEqual([
+      ['date à déterminer', '+1 h – +2 h 30', 'ONDES TAKEOVER', 'planifié'],
+      ['date à déterminer', 'horaire à déterminer (1 h)', 'ONDES TAKEOVER', 'planifié'],
+      ['sam. 14 nov. 2026', '21 h – 22 h', 'GUEST MIXES', 'annulé'],
+    ])
+    expect(within(table).getAllByRole('link', { name: 'ONDES TAKEOVER' })[0]).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(table).getAllByRole('row')[3]).toHaveClass('admin-status-cancelled')
+    expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(
+      "La candidature sera supprimée pour de bon. L'artiste reste. Les sets associés restent.",
+    )
+  })
+
   describe('of a collective', () => {
     const OF_ONDES = { ...APPLICATION, artistId: null, collectiveId: 'collective-1' }
     const COLLECTIVE_PAGE = {
@@ -998,8 +1038,34 @@ describe('An application’s page', () => {
       ])
       expect(screen.getByRole('link', { name: 'ondes@example.com' })).toHaveAttribute('href', 'mailto:ondes@example.com')
       expect(described('Téléphone du contact')).toHaveTextContent(/^-$/)
-      expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent('La candidature sera supprimée pour de bon. Le collectif reste.')
+      expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. Le collectif reste\.$/)
+      expect(screen.getByText(/^Aucune session ne vient de cette candidature/)).toHaveTextContent(
+        "Aucune session ne vient de cette candidature : on la choisit dans le formulaire d'un takeover du collectif.",
+      )
       expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
+    })
+
+    it('lists the sessions that come from it, linking to them, which stay once it is deleted', async () => {
+      const sessions = [
+        { id: 'session-1', title: 'ONDES TAKEOVER', start: null, end: null, durationMinutes: 240, status: 'planned' },
+        { id: 'session-2', title: 'ONDES TAKEOVER', start: '2026-11-15T02:00:00.000Z', end: '2026-11-15T06:00:00.000Z', durationMinutes: 240, status: 'done' },
+      ] as const
+      mockFetch({ ...COLLECTIVE_PAGE, '/api/admin/applications/application-1': { ok: true, application: { ...OF_ONDES, sessions } } })
+      renderAt('/admin/candidatures/application-1')
+
+      const table = await screen.findByRole('table', { name: 'Sessions' })
+      const rows = within(table)
+        .getAllByRole('row')
+        .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
+        .slice(1)
+      expect(rows).toEqual([
+        ['date à déterminer', '4 h', 'ONDES TAKEOVER', 'planifiée'],
+        ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'jouée'],
+      ])
+      expect(within(table).getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-1')
+      expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(
+        'La candidature sera supprimée pour de bon. Le collectif reste. Les sessions associées restent.',
+      )
     })
 
     it('shows "-" in place of the email of a collective without one', async () => {

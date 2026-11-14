@@ -217,6 +217,25 @@ export function formatShortDay(day: string): string {
   return shortDayFormat.format(new Date(day))
 }
 
+// The address of an application's page.
+export function applicationPath({ id }: { id: string }): string {
+  return `/admin/candidatures/${id}`
+}
+
+// How many of an application's dates are listed, before saying how many more there are.
+export const LISTED_DATES = 3
+
+// An application's dates, as they're listed, e.g. "10 déc. 2026, 12 déc. 2026, 7 janv. 2027 (+2)".
+export function listedDates(dates: string[]): string {
+  const more = dates.length - LISTED_DATES
+  return `${dates.slice(0, LISTED_DATES).map(formatShortDay).join(', ')}${more > 0 ? ` (+${more})` : ''}`
+}
+
+// When an application was received, as the admin pages say it, e.g. "reçue le 28 mars 2026".
+export function receivedOn({ receivedAt }: { receivedAt: string }): string {
+  return `reçue le ${dateFormat.format(new Date(receivedAt))}`
+}
+
 // E.g. "Aurore, sa photo et ses candidatures".
 function enumerate(items: string[]): string {
   return items.length > 1 ? `${items.slice(0, -1).join(', ')} et ${items.at(-1)}` : (items[0] ?? '')

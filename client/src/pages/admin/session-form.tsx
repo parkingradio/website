@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Loaded } from '../../api/use-api'
 import type { Body, Schema } from '../../api/client'
+import type { Application } from '../../application-fields'
 import { pickedPhotoError } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
@@ -15,12 +16,14 @@ import {
   checkSession,
   durationOf,
   endTimeAfter,
+  isCollectivesApplication,
   minutesOf,
   sessionTimes,
   typeName,
 } from '../../session-fields'
 import type { RaEvent, Reference, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
+import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
@@ -42,6 +45,9 @@ export type SessionFormProps = {
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
   // is.
   collectives: Collective[] | null
+  // The applications a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
+  // is.
+  applications: Application[] | null
   // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
   submitLabel: string
@@ -51,14 +57,24 @@ export type SessionFormProps = {
   onCancel?: () => void
 }
 
-export function SessionForm({ initial, hasSets = false, flyer: current = null, collectives, events, submitLabel, onSubmit, onCancel }: SessionFormProps) {
+export function SessionForm({
+  initial,
+  hasSets = false,
+  flyer: current = null,
+  collectives,
+  applications,
+  events,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: SessionFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SessionFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const [flyer, setFlyer] = useState<File | null>(null)
   // Whether to remove the session's flyer, which only happens once the form is sent.
   const [removeFlyer, setRemoveFlyer] = useState(false)
   const times = sessionTimes(form)
-  const checked = checkSession(form, times)
+  const checked = checkSession(form, times, applications)
   const errors: Partial<Record<keyof SessionFormValues | 'flyer', string>> = { ...checked.errors }
   const flyerProblem = pickedPhotoError(flyer, 'flyer')
   if (flyerProblem) errors.flyer = flyerProblem
@@ -81,13 +97,29 @@ export function SessionForm({ initial, hasSets = false, flyer: current = null, c
       <TypeField type={form.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
 
       {form.type === 'takeover' && (
-        <TakeoverField
-          takeover={form.takeover}
-          collectives={collectives}
-          onChange={(takeover) => update({ takeover })}
-          error={shown('takeover')}
-          onLeave={leave('takeover')}
-        />
+        <>
+          <TakeoverField
+            takeover={form.takeover}
+            collectives={collectives}
+            onChange={(takeover) => {
+              update({ takeover })
+              // So that it says right away when its application isn't the collective's.
+              leave('application')()
+            }}
+            error={shown('takeover')}
+            onLeave={leave('takeover')}
+          />
+          <ApplicationField
+            candidates={applications?.filter((application) => isCollectivesApplication(application, form.takeover)) ?? []}
+            applications={applications}
+            own={initial.application}
+            selected={form.application}
+            empty={form.takeover ? 'Aucune candidature de ce collectif.' : "Choisissez d'abord le collectif."}
+            onChange={(application) => update({ application })}
+            error={shown('application')}
+            onLeave={leave('application')}
+          />
+        </>
       )}
 
       <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />

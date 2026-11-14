@@ -44,6 +44,14 @@ export function CollectivesFailure({ message }: { message: string }) {
   )
 }
 
+export function ApplicationsFailure({ message }: { message: string }) {
+  return (
+    <p className="admin-error" role="alert">
+      Les candidatures n'ont pas pu être chargées&nbsp;: {message}
+    </p>
+  )
+}
+
 // A collective's artists, in order, each linking to their page, or that it has none, which happens once they're deleted.
 export function MembersList({ members }: { members: Schema<'Reference'>[] }) {
   if (members.length === 0) return 'Aucun artiste.'

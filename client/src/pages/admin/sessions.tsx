@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
+import type { Application } from '../../application-fields'
 import { raEventId } from '../../session-links'
 import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
 import type { Session, SessionStatus, StudioSet } from '../../session-fields'
@@ -14,12 +15,14 @@ import {
   SESSION_STATUS_PLURALS,
   SESSION_TYPE_LABELS,
   SET_STATUS_LABELS,
+  applicationPath,
   byWhom,
   describePerformanceTypes,
   entryPath,
   flyerUrl,
   formatDuration,
   genreNames,
+  receivedOn,
   sessionDay,
   sessionHours,
   sessionLongDay,
@@ -32,7 +35,7 @@ import {
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
-import { ArtistsFailure, CollectivesFailure } from './profile-details'
+import { ApplicationsFailure, ArtistsFailure, CollectivesFailure } from './profile-details'
 import { RaEventPanel } from './ra-event'
 import { failure, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
@@ -238,6 +241,82 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
             </tbody>
           </table>
         ))}
+    </>
+  )
+}
+
+// The sets that come from an artist's application, on its page, with their sessions, linking to them, where they're only
+// shown, like the artist's sets on their page (see `OwnSets`).
+export function ApplicationSets({ sets }: { sets: Application['sets'] }) {
+  const headingId = useId()
+  return (
+    <>
+      <h2 id={headingId}>Sets</h2>
+      {sets.length === 0 ? (
+        <p className="admin-placeholder">Aucun set ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un set de l'artiste.</p>
+      ) : (
+        <table className="admin-table" aria-labelledby={headingId}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Heure</th>
+              <th>Session</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sets.map((set) => (
+              <tr key={set.id} className={`admin-status-${set.status}`}>
+                <td className="admin-day">{sessionDay(set.session)}</td>
+                <td className="admin-day">{setHours(set)}</td>
+                <td>
+                  <Link to={sessionPath(set.session)}>{set.session.title}</Link>
+                </td>
+                <td>{SET_STATUS_LABELS[set.status]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  )
+}
+
+// The sessions that come from a collective's application, on its page, linking to them, where they're only shown, like
+// the collective's sessions on its page (see `OwnSessions`).
+export function ApplicationSessions({ sessions }: { sessions: Application['sessions'] }) {
+  const headingId = useId()
+  return (
+    <>
+      <h2 id={headingId}>Sessions</h2>
+      {sessions.length === 0 ? (
+        <p className="admin-placeholder">
+          Aucune session ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un takeover du collectif.
+        </p>
+      ) : (
+        <table className="admin-table" aria-labelledby={headingId}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Heure</th>
+              <th>Nom</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session) => (
+              <tr key={session.id} className={`admin-status-${session.status}`}>
+                <td className="admin-day">
+                  <Link to={sessionPath(session)}>{sessionDay(session)}</Link>
+                </td>
+                <td className="admin-day">{sessionHours(session)}</td>
+                <td>{session.title}</td>
+                <td>{SESSION_STATUS_LABELS[session.status]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </>
   )
 }
@@ -488,6 +567,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
                 <dd>
                   <Link to={entryPath('collective', session.takeover.id)}>{session.takeover.name}</Link>
                 </dd>
+                <dt>Candidature</dt>
+                <dd>{session.application ? <Link to={applicationPath(session.application)}>{receivedOn(session.application)}</Link> : MISSING}</dd>
               </>
             )}
             <dt>Nom</dt>
@@ -581,18 +662,31 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// A set's links, by the names of their sites, each leading to it.
+// A set's links, by the names of their sites, each leading to it, then the application it comes from, if any, leading
+// to its page, and named by when it was received for screen readers.
 function SetLinks({ set }: { set: StudioSet }) {
   const links = [
     { name: 'SoundCloud', link: set.soundcloudTrack },
     { name: 'YouTube', link: set.youtubeVideo },
-  ].filter((link) => link.link)
-  return links.map(({ name, link }, i) => (
-    <Fragment key={name}>
-      {i > 0 && ' · '}
-      <a href={link!.url} target="_blank" rel="noreferrer">
+  ]
+    .filter((link) => link.link)
+    .map(({ name, link }) => (
+      <a key={name} href={link!.url} target="_blank" rel="noreferrer">
         {name}
       </a>
+    ))
+  if (set.application) {
+    const label = `Candidature ${receivedOn(set.application)}`
+    links.push(
+      <Link key="application" to={applicationPath(set.application)} aria-label={label}>
+        Candidature
+      </Link>,
+    )
+  }
+  return links.map((link, i) => (
+    <Fragment key={link.key}>
+      {i > 0 && ' · '}
+      {link}
     </Fragment>
   ))
 }
@@ -694,8 +788,9 @@ function SetsTable({
 // loaded, it says so. A set's form also says who added it and changed it.
 function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: StudioSet | null; onClose: () => void; onChanged: (session: Session) => void }) {
   const artists = useApi('/api/admin/artists')
+  const applications = useApi('/api/admin/applications')
   const headingId = useId()
-  if (artists.kind === 'loading') return null
+  if (artists.kind === 'loading' || applications.kind === 'loading') return null
 
   return (
     <section aria-labelledby={headingId}>
@@ -708,10 +803,12 @@ function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: 
         </>
       )}
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+      {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
       <SetForm
         session={session}
         initial={set ? setFormValues(set, session) : newSetFormValues(session)}
         artists={artists.kind === 'loaded' ? artists.value.artists : null}
+        applications={applications.kind === 'loaded' ? applications.value.applications : null}
         submitLabel={set ? 'enregistrer' : 'ajouter le set'}
         onCancel={onClose}
         onSubmit={async (fields) => {
@@ -734,20 +831,27 @@ const EVERY_EVENT_FROM = '2000-01-01T00:00-05:00'
 // The session form, with every collective to pick a takeover's from, loaded each time it opens, so that they're
 // current, and nothing until then, and every event read from RA, which it doesn't wait for. When the collectives can't
 // be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's one of them.
-function SessionFormWithChoices({ takeoverId, initial, ...props }: Omit<SessionFormProps, 'collectives' | 'events'> & { takeoverId?: string | null }) {
+function SessionFormWithChoices({
+  takeoverId,
+  initial,
+  ...props
+}: Omit<SessionFormProps, 'collectives' | 'applications' | 'events'> & { takeoverId?: string | null }) {
   const collectives = useApi('/api/admin/collectives')
+  const applications = useApi('/api/admin/applications')
   // Asked for along with them, but not waited for.
   const events = useApi('/api/events', { params: { query: { from: EVERY_EVENT_FROM } } })
-  if (collectives.kind === 'loading') return null
+  if (collectives.kind === 'loading' || applications.kind === 'loading') return null
   const collectiveList = collectives.kind === 'loaded' ? collectives.value.collectives : null
   const takeover = collectiveList?.find((collective) => collective.id === takeoverId)
   return (
     <>
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
+      {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
       <SessionForm
         {...props}
         initial={takeover ? { ...initial, type: 'takeover', takeover: { id: takeover.id, name: takeover.name } } : initial}
         collectives={collectiveList}
+        applications={applications.kind === 'loaded' ? applications.value.applications : null}
         events={events}
       />
     </>

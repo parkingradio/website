@@ -37,8 +37,10 @@
 
 .combobox-list li {
   display: flex;
+  /* A detail that doesn't fit next to its label, e.g. on a phone, goes under it, rather than squeezing both. */
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.1rem 1rem;
   padding: 0.4rem 0.6rem;
   cursor: pointer;
 }
