@@ -115,5 +115,6 @@ there's no field.
 ## `DELETE /api/admin/artists/:id` (admin)
 
 Deletes an artist, their photo if they have one and their own applications, but not those of their collectives, takes
-them out of their collectives and their [sets](sessions.md#performers), and responds `{"ok": true}`. Fails with 404
+them out of their collectives and their [sets](sessions.md#performers), and their applications out of the sets that come
+from them (see [Applications, in Sessions](sessions.md#applications)), and responds `{"ok": true}`. Fails with 404
 when there's no such artist.

@@ -28,6 +28,9 @@ const TRACKED = {
   statusUpdatedAt: null,
 }
 
+// An application, as a session or a set gives it.
+const link = (id: string) => ({ id, receivedAt: '2026-09-01T16:00:00.000Z' })
+
 function studioSet(fields: Partial<StudioSet>): StudioSet {
   return {
     id: 'set-1',
@@ -43,6 +46,7 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
     genres: [],
     soundcloudTrack: null,
     youtubeVideo: null,
+    application: null,
     ...TRACKED,
     ...fields,
   }
@@ -56,6 +60,7 @@ function session(start: string | null, durationMinutes: number, sets: StudioSet[
     durationMinutes,
     type: 'guest-mixes',
     takeover: null,
+    application: null,
     name: '',
     title: 'GUEST MIXES',
     raEvent: null,
@@ -161,17 +166,20 @@ describe('checkSession', () => {
     end: '01:00',
     type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
+    application: link('application-1'),
     name: '  HAUTE   RIVE\nTAKEOVER ',
     raEvent: { id: '6683745', url: 'https://ra.co/events/6683745' },
   }
 
-  it('returns what the server is sent: the start with its offset, the duration, the id, the name cleaned up and the event on RA by its id', () => {
+  it('returns what the server is sent: the start with its offset, the duration, the ids, the name cleaned up and the event on RA by its id', () => {
     expect(checkSession(FORM)).toEqual({
       fields: {
         start: '2026-11-14T21:00-05:00',
         durationMinutes: 240,
         type: 'takeover',
         takeover: 'collective-1',
+        // As the session has it.
+        application: 'application-1',
         name: 'HAUTE RIVE TAKEOVER',
         raEvent: '6683745',
         description: '',
@@ -183,6 +191,8 @@ describe('checkSession', () => {
       durationMinutes: 180,
       type: 'live-performance',
       takeover: null,
+      // Like its collective, it stays in the form, but only a takeover sends it.
+      application: null,
       name: 'HAUTE RIVE TAKEOVER',
       raEvent: null,
       description: '',
@@ -195,6 +205,25 @@ describe('checkSession', () => {
     expect(checkSession({ ...FORM, type: 'other', name: ' ' }).errors).toEqual({ name: 'Indiquez le nom de la session.' })
     expect(checkSession({ ...FORM, type: 'guest-mixes', name: ' ' }).fields).toMatchObject({ type: 'guest-mixes', takeover: null, name: '' })
     expect(checkSession({ ...FORM, type: 'other', name: 'ATELIER DE DJing' }).fields).toMatchObject({ type: 'other', name: 'ATELIER DE DJing' })
+  })
+
+  it("needs a takeover's application to be its collective's, once the applications are known", () => {
+    const applications = [
+      { id: 'application-1', artistId: null, collectiveId: 'collective-1' },
+      { id: 'application-2', artistId: null, collectiveId: 'collective-2' },
+      { id: 'application-3', artistId: 'artist-1', collectiveId: null },
+    ]
+    expect(checkSession(FORM, undefined, applications).fields).toMatchObject({ takeover: 'collective-1', application: 'application-1' })
+    const error = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
+    for (const application of ['application-2', 'application-3']) {
+      expect(checkSession({ ...FORM, application: link(application) }, undefined, applications).errors).toEqual({ application: error })
+    }
+    expect(checkSession({ ...FORM, takeover: { id: 'collective-2', name: 'Vagues' } }, undefined, applications).errors).toEqual({ application: error })
+    // Left to the server when they aren't known, or when it isn't one of them.
+    expect(checkSession({ ...FORM, application: link('application-2') }).fields).toMatchObject({ application: 'application-2' })
+    expect(checkSession({ ...FORM, application: link('application-9') }, undefined, applications).fields).toMatchObject({ application: 'application-9' })
+    // Another type doesn't send it, whatever it is.
+    expect(checkSession({ ...FORM, type: 'guest-mixes', application: link('application-3') }, undefined, applications).fields).toMatchObject({ application: null })
   })
 
   it('says what is wrong with each field', () => {
@@ -358,6 +387,7 @@ describe('checkSet', () => {
     genres: ['ambient', 'techno'],
     soundcloudTrack: ' https://soundcloud.com/parkingdotradio/3tons ',
     youtubeVideo: '',
+    application: link('application-1'),
   }
 
   it('returns what the server is sent: the ids, the offset and duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
@@ -371,8 +401,26 @@ describe('checkSet', () => {
         genres: ['ambient', 'techno'],
         soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
         youtubeVideo: null,
+        application: 'application-1',
       },
     })
+  })
+
+  it("needs its application to be one of its performers', once the applications are known", () => {
+    const applications = [
+      { id: 'application-1', artistId: 'artist-1', collectiveId: null },
+      { id: 'application-2', artistId: 'artist-3', collectiveId: null },
+      { id: 'application-3', artistId: null, collectiveId: 'collective-1' },
+    ]
+    expect(checkSet(FORM, SESSION, undefined, applications).fields).toMatchObject({ application: 'application-1' })
+    const error = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
+    for (const application of ['application-2', 'application-3']) {
+      expect(checkSet({ ...FORM, application: link(application) }, SESSION, undefined, applications).errors).toEqual({ application: error })
+    }
+    expect(checkSet({ ...FORM, performers: [{ id: 'artist-2', name: 'Brume' }] }, SESSION, undefined, applications).errors).toEqual({ application: error })
+    expect(checkSet({ ...FORM, application: null }, SESSION, undefined, applications).fields).toMatchObject({ application: null })
+    // Left to the server when they aren't known.
+    expect(checkSet({ ...FORM, application: link('application-2') }, SESSION).fields).toMatchObject({ application: 'application-2' })
   })
 
   it('says what is wrong with each field', () => {

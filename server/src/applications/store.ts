@@ -3,6 +3,7 @@ import { violatesConstraint } from '../api/errors.js'
 import type { Queryable } from '../db/connection.js'
 import { applications } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
+import { lockSessions } from '../sessions/store.js'
 import { ApplicationFields } from './fields.js'
 import type { ApplicationStatus } from './fields.js'
 
@@ -45,7 +46,7 @@ export type ApplicationsStore = {
   update(id: string, changes: ApplicationChange & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
   // Changes the application's status, and returns the updated application.
   setStatus(id: string, change: { status: ApplicationStatus; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
-  // Returns false if the application didn't exist.
+  // Returns false if the application didn't exist. Its sets and sessions stay, without it.
   delete(id: string): Promise<boolean>
 }
 
@@ -100,8 +101,12 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
 
     async delete(id) {
       if (!isUuid(id)) return false
-      const deleted = await db.delete(applications).where(eq(applications.id, id)).returning({ id: applications.id })
-      return deleted.length > 0
+      return db.transaction(async (tx) => {
+        // Deleting it takes it from its sets and sessions, which writes them (see `lockSessions`).
+        await lockSessions(tx)
+        const deleted = await tx.delete(applications).where(eq(applications.id, id)).returning({ id: applications.id })
+        return deleted.length > 0
+      })
     },
   }
 }

@@ -8,6 +8,10 @@ import './synth-meetups.css'
 // Most recent first, so the gallery shows newer posters higher up.
 const POSTERS = [
   {
+    key: 'synth_meetups_2026_novembre.jpg',
+    alt: 'Affiche des synth meetups des 11 et 25 novembre 2026',
+  },
+  {
     key: 'synth_meetups_2026_octobre.jpg',
     alt: 'Affiche des synth meetups des 7, 21 et 28 octobre 2026',
   },

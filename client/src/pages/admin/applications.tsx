@@ -12,10 +12,12 @@ import { AdminTable } from './admin-table'
 import { ApplicationForm } from './application-form'
 import {
   KIND_LABELS,
+  LISTED_DATES,
   MISSING,
   STATUS_LABELS,
   STATUS_PLURALS,
   applicationOwner,
+  applicationPath,
   artistEntry,
   byWhom,
   collectiveEntry,
@@ -28,18 +30,17 @@ import {
   formatShortDay,
   genreNames,
   place,
+  receivedOn,
 } from './describe'
 import type { Entry, EntryKind, Owner } from './describe'
-import { ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
+import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
+import { ApplicationSessions, ApplicationSets } from './sessions'
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in one that came through the original Google Form.
-
-// How many of an application's dates the list shows, before saying how many more there are.
-const LISTED_DATES = 3
 
 function BackToApplications() {
   return (
@@ -71,7 +72,7 @@ const unknownOwner = (kind: EntryKind) => `${KIND_LABELS[kind]} inconnu`
 // several.
 function applicationName(application: Application, owner: Entry | undefined): string {
   const name = owner?.name ?? unknownOwner(applicationOwner(application).kind)
-  return `Candidature de ${name}, reçue le ${dateFormat.format(new Date(application.receivedAt))}`
+  return `Candidature de ${name}, ${receivedOn(application)}`
 }
 
 // What the list of applications opens on.
@@ -147,7 +148,7 @@ export function ApplicationsTable({
           return (
             <tr key={application.id} className={`admin-status-${application.status}`}>
               <td>
-                <Link to={`/admin/candidatures/${application.id}`}>{dateFormat.format(new Date(application.receivedAt))}</Link>
+                <Link to={applicationPath(application)}>{dateFormat.format(new Date(application.receivedAt))}</Link>
               </td>
               {owners && (
                 <>
@@ -237,11 +238,7 @@ export function OwnApplications({ applications, newPath }: { applications: Loade
           nouvelle candidature
         </Link>
       </div>
-      {applications.kind === 'error' && (
-        <p className="admin-error" role="alert">
-          Les candidatures n'ont pas pu être chargées&nbsp;: {applications.message}
-        </p>
-      )}
+      {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
       {applications.kind === 'loaded' &&
         (applications.value.applications.length === 0 ? (
           <p className="admin-placeholder">Aucune candidature.</p>
@@ -533,8 +530,14 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
         <dd className="admin-text">{application.details || '—'}</dd>
       </dl>
 
+      {application.collectiveId === null ? <ApplicationSets sets={application.sets} /> : <ApplicationSessions sessions={application.sessions} />}
+
       <h2>Supprimer</h2>
-      <p>La candidature sera supprimée pour de bon. {stays}</p>
+      <p>
+        La candidature sera supprimée pour de bon. {stays}
+        {application.sets.length > 0 && ' Les sets associés restent.'}
+        {application.sessions.length > 0 && ' Les sessions associées restent.'}
+      </p>
       <button type="button" onClick={remove} disabled={busy}>
         supprimer la candidature
       </button>
@@ -625,7 +628,7 @@ export function NewApplicationPage() {
           const body = { ...fields, ...(owner.kind === 'artist' ? { artistId: owner.id } : { collectiveId: owner.id }) }
           const result = await api.POST('/api/admin/applications', { body })
           if (!result.ok) return `La candidature n'a pas pu être créée : ${result.error}`
-          navigate(`/admin/candidatures/${result.application.id}`)
+          navigate(applicationPath(result.application))
           return null
         }}
       />

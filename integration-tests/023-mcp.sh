@@ -117,12 +117,25 @@ expect_body_contains '\"soundcloudTrack\":null'
 echo "  sessions are listed by when they start, with bounds in Québec time, and other offsets are refused, with their type and title"
 call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
 expect_body_contains "\\\"total\\\":1,\\\"sessions\\\":[{\\\"id\\\":\\\"${session}\\\""
-expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"status\":\"planned\",\"sets\"'
+expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"application\":null,\"status\":\"planned\",\"sets\"'
 call list_sessions '{"from":"2026-11-14T21:01-05:00","to":"2026-11-14T23:00-05:00"}'
 expect_body_contains '\"total\":0,'
 call list_sessions '{"from":"2026-11-15T03:00+01:00"}'
 expect_body_contains '"isError":true'
 expect_body_contains 'must be a single date and time in Québec time, with the offset from UTC in effect then'
+
+echo "  a set can come from its performer's application, which lists it, and the lists' summaries say so"
+call create_application "{\"artistId\":\"${artist}\",\"dates\":[\"2026-11-14\"],\"timeSlots\":[],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"details\":\"\"}"
+application="$(sql "select id from applications where artist_id = '${artist}'")"
+set="$(sql "select id from sets where session_id = '${session}'")"
+call update_set "{\"id\":\"${set}\",\"application\":\"${application}\"}"
+expect_body_contains "\\\"application\\\":{\\\"id\\\":\\\"${application}\\\""
+call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
+# After the set's performers.
+expect_body_contains "}],\\\"application\\\":{\\\"id\\\":\\\"${application}\\\""
+call list_applications "{\"artist\":\"${artist}\"}"
+expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${set}\\\""
+expect_body_contains '\"sessions\":[]'
 
 echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, unless it's removed"
 sql "update sessions set flyer_key = 'sessions/mcp.png', flyer_type = 'image/png' where id = '${session}'" >/dev/null

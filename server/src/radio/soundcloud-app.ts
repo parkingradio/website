@@ -2,9 +2,9 @@ import type { SoundCloudClient, SoundCloudCredentials } from './soundcloud.js'
 import type { SoundCloudCredentialsStore, StoredSoundCloudCredentials } from './soundcloud-credentials.js'
 
 // The SoundCloud app the server reads SoundCloud through, whose credentials are entered on the admin pages (see "The
-// SoundCloud app" in docs/design/server/radio.md): the radio reads its playlist through it, and sets resolve their tracks
-// through it. They share the client for the credentials that were entered last, so that it only needs one token, since
-// SoundCloud limits how many an app can get.
+// SoundCloud app" in docs/design/server/radio.md): the radio reads its playlist, and gets the streams of its tracks,
+// through it, and sets resolve their tracks through it. They share the client for the credentials that were entered
+// last, so that it only needs one token, since SoundCloud limits how many an app can get.
 
 export const NO_CREDENTIALS = 'The credentials of the SoundCloud app have not been entered yet'
 

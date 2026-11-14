@@ -339,7 +339,8 @@ export async function radioRoutes(
   // Reads the rotation from the playlist of `settings` through the client of `entered`, unless it was read recently.
   // Settings and credentials that a request loaded before newer ones were saved, e.g. while another playlist was being
   // chosen, are ignored, so that the source of the newer ones isn't replaced, and the request goes on with the newer ones.
-  async function readRotation(settings: RadioSettings, entered: EnteredApp): Promise<Chosen> {
+  // Returns what was read, with the credentials it was read through, so that the request uses them too.
+  async function readRotation(settings: RadioSettings, entered: EnteredApp): Promise<{ radio: Chosen; entered: EnteredApp }> {
     const newestSettings = source && source.settings.updatedAt > settings.updatedAt ? source.settings : settings
     const newestEntered = source && source.entered.credentials.updatedAt > entered.credentials.updatedAt ? source.entered : entered
     if (!source || !samePlaylist(source.settings, newestSettings)) source = sourceFor(newestSettings, newestEntered)
@@ -347,18 +348,18 @@ export async function radioRoutes(
     else if (source.entered.client !== newestEntered.client) source = sourceFor(newestSettings, newestEntered, { rotation: source.rotation() })
     const { rotation, error } = await source.read()
     if (rotation && rotation.tracks !== lastTracks) rotationRead(rotation.tracks)
-    return { settings: newestSettings, rotation, error }
+    return { radio: { settings: newestSettings, rotation, error }, entered: newestEntered }
   }
 
   // What the radio knows of the playlist chosen for the rotation, or null until one is chosen, and the SoundCloud app's
-  // credentials, with their client, or null until they've been entered. The choice is loaded every time, rather than kept
-  // in memory, so that every server picks it up.
+  // credentials, with their client, or null until they've been entered: those the playlist was read through, if it was.
+  // The choice is loaded every time, rather than kept in memory, so that every server picks it up.
   async function current(): Promise<{ radio: Chosen | null; entered: EnteredApp | null }> {
     const [settings, entered] = await Promise.all([settingsStore.load(), soundcloudApp.current()])
     if (!settings) return { radio: null, entered }
     // Nothing can be read until then, which isn't a failure to read the playlist.
     if (!entered) return { radio: { settings, rotation: null, error: null }, entered }
-    return { radio: await readRotation(settings, entered), entered }
+    return readRotation(settings, entered)
   }
 
   // Where to stream a track from, through `soundcloud`.
@@ -646,8 +647,10 @@ export async function radioRoutes(
       // The client already has a token, so it's used rather than one that would ask for another.
       await soundcloudApp.save(saved, soundcloud)
       request.log.info({ clientId: credentials.clientId, by: saved.updatedBy }, 'Changed the credentials of the SoundCloud app of the radio')
-      const error = settings ? (await readRotation(settings, { credentials: saved, client: soundcloud })).error : null
-      return credentialsResponse(saved, error)
+      if (!settings) return credentialsResponse(saved, null)
+      // Newer credentials saved meanwhile, e.g. by another admin, are those the playlist is read through.
+      const read = await readRotation(settings, { credentials: saved, client: soundcloud })
+      return credentialsResponse(read.entered.credentials, read.radio.error)
     },
   )
 }

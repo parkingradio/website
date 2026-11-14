@@ -22,6 +22,11 @@ import type { SessionChanges, SessionsStore, SetChanges, SetRow, StoredFlyer, St
 // A link of a session or a set, as the endpoints return it.
 const Link = z.object({ id: z.string(), url: z.string() }).meta({ id: 'SessionLink' })
 
+// The application a session or a set comes from, as the endpoints return it.
+const ApplicationLink = z
+  .object({ id: z.string(), receivedAt: Timestamp })
+  .meta({ id: 'ApplicationLink', description: 'The application it comes from, and when it was received' })
+
 // Who added a session or a set, and when, who last changed it, and its status, as the endpoints return them.
 const Tracked = {
   createdAt: Timestamp,
@@ -56,6 +61,7 @@ const SetBody = z
       description: "SoundCloud's id for the track, and the link it was resolved from: a private track's private link must not be shown to the public",
     }),
     youtubeVideo: Link.nullable(),
+    application: ApplicationLink.nullable(),
     ...Tracked,
   })
   .meta({ id: 'Set' })
@@ -70,6 +76,7 @@ const SessionBody = z
     durationMinutes: z.number(),
     type: SessionType,
     takeover: Reference.nullable().meta({ description: 'The collective whose takeover the session is, which only takeovers have' }),
+    application: ApplicationLink.nullable(),
     name: z.string().meta({ description: 'Its own name, which replaces the one its type gives it, or empty for none: the one to send back' }),
     title: z.string().meta({ description: 'What the session is called: its name, or else the one its type gives it. Never empty' }),
     raEvent: Link.nullable(),
@@ -131,8 +138,8 @@ const SetChangesBody = changesTo(SET_FIELDS)
 // undefined, which leaves them as they are (see `changed` in sessions/store.ts).
 function sessionChanges(fields: SessionFields): SessionChanges
 function sessionChanges(fields: Partial<SessionFields>): Partial<SessionChanges>
-function sessionChanges({ start, durationMinutes, type, takeover, name, raEvent, description }: Partial<SessionFields>): Partial<SessionChanges> {
-  return { startAt: start, durationMinutes, type, takeoverId: takeover, name, raEventId: raEvent, description }
+function sessionChanges({ start, durationMinutes, type, takeover, application, name, raEvent, description }: Partial<SessionFields>): Partial<SessionChanges> {
+  return { startAt: start, durationMinutes, type, takeoverId: takeover, applicationId: application, name, raEventId: raEvent, description }
 }
 
 // Reads the session's fields, as JSON from the "session" part, and the flyer from a request that adds or changes a
@@ -162,6 +169,10 @@ type Failure = { status: 400 | 409 | 502; error: string; session?: StoredSession
 
 function link(id: string | null, url: (id: string) => string): z.infer<typeof Link> | null {
   return id === null ? null : { id, url: url(id) }
+}
+
+function applicationLink(row: StoredSession | StoredSet): z.infer<typeof ApplicationLink> | null {
+  return row.application && { id: row.application.id, receivedAt: row.application.receivedAt.toISOString() }
 }
 
 const MINUTE_MS = 60 * 1000
@@ -215,6 +226,7 @@ function setBody(row: StoredSet, session: StoredSession): SetBody {
     genres: row.genres,
     soundcloudTrack: row.soundcloudTrackId === null ? null : { id: row.soundcloudTrackId, url: row.soundcloudTrackUrl! },
     youtubeVideo: link(row.youtubeVideoId, youtubeVideoUrl),
+    application: applicationLink(row),
     ...tracked(row),
   }
 }
@@ -227,6 +239,7 @@ function sessionBody(row: StoredSession): SessionBody {
     durationMinutes: row.durationMinutes,
     type: row.type,
     takeover: row.takeover,
+    application: applicationLink(row),
     name: row.name,
     title: sessionTitle(row),
     raEvent: link(row.raEventId, raEventUrl),
@@ -247,6 +260,47 @@ export function conflictBody({ error, session, set }: { error: string; session?:
     // A set in the way always comes with its session.
     set: set && session ? setBody(set, session) : null,
   }
+}
+
+// The sets and the sessions that come from an application, as its endpoints return them (see "Applications" in
+// docs/design/server/applications.md).
+const ApplicationSession = SessionBody.pick({ id: true, title: true, start: true, end: true, durationMinutes: true, status: true }).meta({ id: 'ApplicationSession' })
+const ApplicationSet = SetBody.pick({ id: true, start: true, end: true, offsetMinutes: true, durationMinutes: true, status: true })
+  .extend({ session: SessionBody.pick({ id: true, title: true, start: true }).meta({ description: "The set's session" }) })
+  .meta({ id: 'ApplicationSet' })
+export const ApplicationLinks = {
+  sets: z
+    .array(ApplicationSet)
+    .meta({ description: "The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets" }),
+  sessions: z
+    .array(ApplicationSession)
+    .meta({ description: "The sessions that come from it, which only a collective's application has, in the order of the sessions" }),
+}
+export type ApplicationLinks = { sets: z.infer<typeof ApplicationSet>[]; sessions: z.infer<typeof ApplicationSession>[] }
+
+export const NO_LINKS: ApplicationLinks = { sets: [], sessions: [] }
+
+// The sets and the sessions of `sessions`, in the order of `GET /api/admin/sessions`, that come from an application, by
+// the application's id.
+export function linksByApplication(sessions: StoredSession[]): Map<string, ApplicationLinks> {
+  const links = new Map<string, ApplicationLinks>()
+  const of = (applicationId: string) => {
+    if (!links.has(applicationId)) links.set(applicationId, { sets: [], sessions: [] })
+    return links.get(applicationId)!
+  }
+  for (const session of sessions) {
+    if (session.application) {
+      const { id, title, start, end, durationMinutes, status } = sessionBody(session)
+      of(session.application.id).sessions.push({ id, title, start, end, durationMinutes, status })
+    }
+    const ofSession = { id: session.id, title: sessionTitle(session), start: session.startAt?.toISOString() ?? null }
+    for (const set of session.sets) {
+      if (!set.application) continue
+      const { id, start, end, offsetMinutes, durationMinutes, status } = setBody(set, session)
+      of(set.application.id).sets.push({ id, start, end, offsetMinutes, durationMinutes, status, session: ofSession })
+    }
+  }
+  return links
 }
 
 type SessionsOptions = {
@@ -316,8 +370,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
   async function setChanges(fields: SetFields, before: null): Promise<SetChanges | Failure>
   async function setChanges(fields: Partial<SetFields>, before: SetRow): Promise<Partial<SetChanges> | Failure>
   async function setChanges(fields: Partial<SetFields>, before: SetRow | null): Promise<Partial<SetChanges> | Failure> {
-    const { soundcloudTrack, youtubeVideo, ...rest } = fields
-    const changes = { ...rest, youtubeVideoId: youtubeVideo }
+    const { soundcloudTrack, youtubeVideo, application, ...rest } = fields
+    const changes = { ...rest, youtubeVideoId: youtubeVideo, applicationId: application }
     if (soundcloudTrack === undefined) return changes
     const track = soundcloudTrack === null ? null : await trackId(soundcloudTrack, before)
     if (typeof track === 'object' && track !== null) return track

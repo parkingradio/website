@@ -170,7 +170,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Replacing an artist's profile, and replacing or removing their photo |
 | [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent, or removing their photo |
-| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, and taking them out of their collectives and their sets |
+| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, which their sets lose, and taking them out of their collectives and their sets |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
@@ -184,7 +184,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Replacing an application's fields |
 | [`PATCH /api/admin/applications/:id`](applications.md#patch-apiadminapplicationsid-admin) | admin | Changing an application, only the fields it's sent |
 | [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
-| [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application |
+| [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application, but not its sets and sessions, which stay without it |
 | [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
 | [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |

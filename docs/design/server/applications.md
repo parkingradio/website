@@ -42,13 +42,24 @@ The endpoints below also return these fields:
 | `receivedAt` | string | When the artist sent the application, which isn't always when it was created: one that came by email, or through the original Google Form, can be brought in long after. For one sent through `POST /api/applications`, that's when it was created. For one an admin created, it's what the admin said, or else when it was created. Admins can change it either way |
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count, and neither do changes to its sets and sessions |
 | `status` | `"new"`, `"accepted"`, `"scheduled"`, `"done"` or `"rejected"` | See below |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+| `sets` | list of objects | The sets that come from the application, which only an artist's has: see below |
+| `sessions` | list of objects | The sessions that come from the application, which only a collective's has: see below |
 
 Every application starts as `"new"`, then is `"accepted"` or `"rejected"` as an admin decides, and an accepted one is
 `"scheduled"` once a date has been set with the artist, then `"done"` once they've played. That's only the usual order:
 admins can change a status to any other.
+
+An application can lead to sets, for an artist's, or to sessions, for a collective's, its takeovers (see
+[Applications, in Sessions](sessions.md#applications)). They're linked to it from the set or the session, whose
+`application` it then is, which follows the rules there, and the application lists them, so that each can be found from
+the other. It can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it. Linking them
+doesn't change the application's status, which admins still change themselves. Each one is listed with its `id`,
+`start`, `end`, `durationMinutes` and `status`, as its endpoints give them, in the order of `GET /api/admin/sessions`,
+then of a session's sets: a session with its `title` too, and a set with its `offsetMinutes`, and its `session`, an
+object with its session's `id`, `title` and `start`. Deleting an application takes it from its sets and sessions, which stay.
 
 ## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
 
@@ -113,7 +124,8 @@ Changes an application's status. The response is the same as for `POST /api/admi
 
 ## `DELETE /api/admin/applications/:id` (admin)
 
-Deletes an application, and responds `{"ok": true}`. The artist or the collective stays. Fails with 404 if the
+Deletes an application, and responds `{"ok": true}`. The artist or the collective stays, and so do the application's
+sets and sessions, without it. Fails with 404 if the
 application doesn't exist.
 
 ## Applying

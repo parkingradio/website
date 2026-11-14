@@ -27,6 +27,23 @@ export type SetFields = Schema<'SetFields'>
 export type Reference = Schema<'Reference'>
 // An event on RA, by its id and the link to its page, as sessions give it.
 export type RaEvent = Schema<'SessionLink'>
+// The application a session or a set comes from, by its id and when it was received, as they give it.
+export type ApplicationLink = Schema<'ApplicationLink'>
+// Who an application belongs to, by their id.
+type ApplicationOwner = Pick<Schema<'Application'>, 'id' | 'artistId' | 'collectiveId'>
+// Who the applications a session or a set can come from belong to, or null when they couldn't be loaded, which leaves
+// checking them to the server.
+export type ApplicationOwners = ApplicationOwner[] | null
+
+// Whether an application can be that of a set of `performers`, or of a takeover of the collective `takeover` (see
+// "Applications" in docs/design/server/sessions.md).
+export const isPerformersApplication = (application: ApplicationOwner, performers: { id: string }[]) =>
+  performers.some(({ id }) => id === application.artistId)
+export const isCollectivesApplication = (application: ApplicationOwner, takeover: { id: string } | null) =>
+  takeover !== null && application.collectiveId === takeover.id
+
+const NOT_THE_SETS_APPLICATION = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
+const NOT_THE_SESSIONS_APPLICATION = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
 
 // In the order sessions and sets go through them (see describe.ts for their names).
 export const STATUSES = everyOne<SessionStatus>()(['planned', 'done', 'cancelled'])
@@ -141,7 +158,8 @@ function checkStartEnd<T extends { start: string; end: string }>({ start, end }:
 
 // A session as the form has it: its day and times in Québec time, as "YYYY-MM-DD" and "HH:MM", or its duration when its
 // date isn't known yet (`undated`), its type, or null until it's picked, its takeover's collective as it's shown, which
-// it keeps while another type is picked, but only a takeover sends, and the rest as it's typed.
+// it keeps while another type is picked, but only a takeover sends, the application it comes from, likewise, and the rest
+// as it's typed.
 export type SessionFormValues = {
   undated: boolean
   day: string
@@ -153,6 +171,7 @@ export type SessionFormValues = {
   opened?: { day: string; start: string; end: string; startAt: Date; durationMinutes: number }
   type: SessionType | null
   takeover: Reference | null
+  application: ApplicationLink | null
   name: string
   raEvent: RaEvent | null
   description: string
@@ -166,6 +185,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   duration: EMPTY_DURATION,
   type: null,
   takeover: null,
+  application: null,
   name: '',
   raEvent: null,
   description: '',
@@ -178,6 +198,7 @@ export function sessionFormValues(session: Session): SessionFormValues {
     duration: durationOf(session.durationMinutes),
     type: session.type,
     takeover: session.takeover,
+    application: session.application,
     name: session.name,
     raEvent: session.raEvent,
     description: session.description,
@@ -232,17 +253,21 @@ export function endTimeAfter(day: string, start: string, minutes: number): strin
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
-// Checks a session as it's being filled in the form, with its `times` if they're worked out already, and returns what
-// the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from UTC,
-// and the event on RA by its id.
+// Checks a session as it's being filled in the form, with its `times` if they're worked out already, and who the
+// `applications` it can come from belong to, and returns what the server would be sent, or what's wrong with each field
+// instead. The start is sent with Québec's offset from UTC, and the event on RA by its id.
 export function checkSession(
   form: SessionFormValues,
   times = sessionTimes(form),
+  applications: ApplicationOwners = null,
 ): { fields: SessionFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SessionFormValues> } {
   const errors: FieldErrors<SessionFormValues> = 'errors' in times ? { ...times.errors } : {}
   if (form.type === null) errors.type = 'Choisissez le type de la session.'
   const takeover = form.type === 'takeover' ? form.takeover : null
   if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'
+  const application = form.type === 'takeover' ? form.application : null
+  const owner = applications?.find(({ id }) => id === application?.id)
+  if (takeover && owner && !isCollectivesApplication(owner, takeover)) errors.application = NOT_THE_SESSIONS_APPLICATION
   const name = checkLine(form.name, 'Le nom', NAME_MAX_LENGTH, form.type === 'other' ? 'Indiquez le nom de la session.' : null)
   if (name.error) errors.name = name.error
   // Each \r\n or \r becomes \n, as the server has it, but its spaces and line breaks are kept.
@@ -256,6 +281,7 @@ export function checkSession(
       durationMinutes: times.durationMinutes,
       type: form.type,
       takeover: takeover?.id ?? null,
+      application: application?.id ?? null,
       name: name.value!,
       raEvent: form.raEvent?.id ?? null,
       description: description.value!,
@@ -284,6 +310,8 @@ export type SetFormValues = {
   genres: GenreId[]
   soundcloudTrack: string
   youtubeVideo: string
+  // The application it comes from.
+  application: ApplicationLink | null
 }
 
 // The session a set is in, as far as its place goes.
@@ -301,6 +329,7 @@ const EMPTY_SET_FORM: SetFormValues = {
   genres: [],
   soundcloudTrack: '',
   youtubeVideo: '',
+  application: null,
 }
 
 // A set's place as the form shows it: in a session with a date, the times it starts and ends, which stand for its offset
@@ -322,6 +351,7 @@ export function setFormValues(set: StudioSet, session: SessionPlace): SetFormVal
     genres: set.genres,
     soundcloudTrack: set.soundcloudTrack?.url ?? '',
     youtubeVideo: set.youtubeVideo?.url ?? '',
+    application: set.application,
   }
   // A set with an offset has a duration.
   if (set.offsetMinutes === null || set.durationMinutes === null) return { ...values, unplaced: true, duration: durationOf(set.durationMinutes) }
@@ -383,16 +413,19 @@ export function setPlace(form: SetFormValues, session: SessionPlace): SetPlace |
   return place
 }
 
-// Checks a set of `session` as it's being filled in the form, with its `place` if it's worked out already, and returns
-// what the server would be sent, or what's wrong with each field instead. Links are sent as they're typed, but trimmed,
-// or null for none.
+// Checks a set of `session` as it's being filled in the form, with its `place` if it's worked out already, and who the
+// `applications` it can come from belong to, and returns what the server would be sent, or what's wrong with each field
+// instead. Links are sent as they're typed, but trimmed, or null for none.
 export function checkSet(
   form: SetFormValues,
   session: SessionPlace,
   place = setPlace(form, session),
+  applications: ApplicationOwners = null,
 ): { fields: SetFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SetFormValues> } {
   const errors: FieldErrors<SetFormValues> = {}
   if (form.performers.length === 0) errors.performers = 'Choisissez au moins un artiste.'
+  const owner = applications?.find(({ id }) => id === form.application?.id)
+  if (owner && !isPerformersApplication(owner, form.performers)) errors.application = NOT_THE_SETS_APPLICATION
   if ('errors' in place) Object.assign(errors, place.errors)
   const otherPerformanceType = checkLine(form.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
   if (otherPerformanceType.error) errors.otherPerformanceType = otherPerformanceType.error
@@ -415,6 +448,7 @@ export function checkSet(
       genres: form.genres,
       soundcloudTrack: soundcloudTrack || null,
       youtubeVideo: youtubeVideo || null,
+      application: form.application?.id ?? null,
     },
   }
 }

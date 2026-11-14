@@ -67,28 +67,49 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
   sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
   [Status](../../server/sessions.md#status)).
-- "Session": when it is ("Quand", e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer"),
-  how long it lasts ("Durée"), its type ("Type"), for a takeover its collective ("Takeover de"), linking to it, its title
-  ("Nom"), faded out when it's the name its type gives it, its description ("Description"), with its line breaks,
-  faded out when it's the one its type gives it, or "-" when it has none, its flyer ("Flyer"), or "Pas de flyer" in its
-  place, so that the team notices, and its event on RA ("Événement RA"), linking to it, or "-" when it has none, with
-  "créer", which opens the panel to create it under it (see [Creating its event on RA](#creating-its-event-on-ra)).
-  "modifier" changes the session in a form in its place (see [The session form](#the-session-form)).
-- "Sets": its sets, in the server's order, each a row with its times ("Heure"), its performers ("Artistes"), each
-  linking to their page, or "-" once they're all deleted, its performance types ("Prestation"), its genres ("Genres"),
-  its links ("Liens": "SoundCloud", "YouTube", each linking to it), its status, as buttons that change it, "modifier",
-  which opens its form (see [A set's form](#a-sets-form)), and "×", which deletes it for good after confirming, its
-  artists staying. When a status can't be changed, or a set can't be deleted, the section says why above the sets,
-  naming it. "ajouter un set" opens the form of a new one. While the session is cancelled, "ajouter un set" can't be
-  used, saying « La session est annulée : on ne peut pas lui ajouter de set. », and neither can its sets' "planifié"
-  and "joué", saying « La session est annulée : on ne peut pas rétablir ses sets. » (see [Controls that can't be
-  used](layout.md#controls-that-cant-be-used)). A set that isn't cancelled, and doesn't fit in the
-  session or overlaps another set that isn't cancelled (see [Sets' places](../../server/sessions.md#sets-places)), has a
-  "⚠" after its times, whose tooltip (see [Tooltips](layout.md#tooltips)) says why, a sentence per line: first « Commence
-  après la session. » when it starts at or after the session's end, « Finit après la session. » when it ends after it,
-  or « Dure plus longtemps que la session. » when its place isn't known but it lasts longer than the session, then
-  « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
-  [Names](#names)). This doesn't prevent anything, since times are changed one at a time.
+- "Session": the session's details, which "modifier" changes in a form in their place (see
+  [The session form](#the-session-form)):
+  - "Quand": when it is, e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
+  - "Durée": how long it lasts.
+  - "Type": its type.
+  - "Takeover de", for a takeover: its collective, linking to it.
+  - "Candidature", for a takeover: the application it comes from, linking to its page, and named by when it was
+    received, e.g. "reçue le 1 septembre 2026". "-" when it has none.
+  - "Nom": its title, faded out when it's the name its type gives it.
+  - "Description": its description, with its line breaks, faded out when it's the one its type gives it. "-" when it has
+    none.
+  - "Flyer": its flyer. When it has none, "Pas de flyer" is shown instead, so that the team notices.
+  - "Événement RA": its event on RA, linking to it, or "-" when it has none. "créer" opens a panel under it that creates
+    the event (see [Creating its event on RA](#creating-its-event-on-ra)).
+- "Sets": its sets, in the server's order. Each set is a row with:
+  - "Heure": its times.
+  - "Artistes": its performers, each linking to their page, or "-" once they've all been deleted.
+  - "Prestation": its performance types.
+  - "Genres": its genres.
+  - "Liens": "SoundCloud" and "YouTube", each linking to the recording, then "Candidature", linking to the page of the
+    application the set comes from. Screen readers name that last link by when the application was received, e.g.
+    "Candidature reçue le 1 septembre 2026".
+  - Its status, as buttons that change it.
+  - "modifier", which opens its form (see [A set's form](#a-sets-form)).
+  - "×", which deletes it for good, after confirming. Its artists stay.
+
+  When a status can't be changed, or a set can't be deleted, the section says why above the sets, naming the set.
+  "ajouter un set" opens the form of a new set.
+
+  While the session is cancelled, "ajouter un set" can't be used, and says « La session est annulée : on ne peut pas lui
+  ajouter de set. ». Its sets' "planifié" and "joué" can't be used either, and say « La session est annulée : on ne peut
+  pas rétablir ses sets. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)).
+
+  A set that isn't cancelled has a "⚠" after its times when it doesn't fit in the session, or overlaps another set that
+  isn't cancelled (see [Sets' places](../../server/sessions.md#sets-places)). Its tooltip (see
+  [Tooltips](layout.md#tooltips)) says why, one sentence per line:
+  - first, « Commence après la session. » when the set starts at or after the session's end, « Finit après la
+    session. » when it ends after it, or « Dure plus longtemps que la session. » when its place isn't known but it lasts
+    longer than the session;
+  - then « Chevauche le set de Cyan, 22 h – 23 h 30. » for each set it overlaps, in the order of the session's sets (see
+    [Names](#names)).
+
+  The "⚠" doesn't prevent anything, since times are changed one at a time.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
   takeover's collective, stay, which the page says of those it has.
 
@@ -149,6 +170,10 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
 - "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the
   collectives of [Artistes](artistes.md). Picking another type and then "Takeover" again, while the form is open, finds
   the collective that was picked; the server is only sent one for a takeover.
+- "Candidature", only for a takeover, like "Collectif": the application the session comes from, picked from its
+  collective's applications, or "Aucune candidature" (see [Applications](#applications)). Like the collective, it's
+  kept while another type is picked, and comes back when "Takeover" is picked again. Saving the session as another type
+  removes it.
 - "Nom": the session's own name, as free text, which an "Autre" needs, and which replaces the name the other types
   give (see [Types and names](../../server/sessions.md#types-and-names)). For those types, that name shows in the
   empty field ("NOM DU COLLECTIF TAKEOVER" until a takeover's collective is picked). For "Autre", or before a type is
@@ -189,6 +214,8 @@ top to bottom, the form has:
   (see [Adding a collective](artistes.md#adding-a-collective)), each picked from the artists of
   [Artistes](artistes.md). The set's performers are offered too, greyed out and marked "déjà dans le set", but can't be
   picked. Performers can't be created by typing a name: they're added in Artistes first.
+- "Candidature": the application the set comes from, picked from its performers' applications, or "Aucune
+  candidature" (see [Applications](#applications)).
 - "Horaire": in a session with a date, "Début" and "Fin", in Québec time (see [Times](#times)), then how long the set
   lasts; in a session without one, "Début", in hours and minutes after the session's start, and "Durée", which is needed
   once there's a start. With "horaire à déterminer" checked, e.g. while the order of the sets isn't known, only "Durée",
@@ -208,6 +235,39 @@ top to bottom, the form has:
 - "SoundCloud" and "YouTube": links to the set's track and video (see [Links](../../server/sessions.md#links)).
 
 When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked.
+
+## Applications
+
+A set or a session can come from an application (see [Applications](../../server/sessions.md#applications)). Its form
+picks that application in "Candidature", which offers "Aucune candidature" first, then:
+
+- in a set's form, its performers' applications, artist by artist, in the order of the performers;
+- in a takeover's form, its collective's applications.
+
+Each artist's or collective's applications are listed newest first, by when they were received. In a set's form, an
+option names the artist and when the application was received, e.g. "Aurore, reçue le 15 août 2026". In a takeover's form, it only
+says when, e.g. "Reçue le 1 septembre 2026". Each option then shows the application's status and the first few days the
+artist would like to play, written as [Candidatures](candidatures.md) lists them, e.g. "retenue · 14 nov. 2026, 21 nov.
+2026".
+
+When there's nothing to pick, the field says why: "Choisissez d'abord les artistes." or "Choisissez d'abord le
+collectif." when none are picked yet, or else "Aucune candidature de cet artiste.", "Aucune candidature de ces
+artistes." or "Aucune candidature de ce collectif.".
+
+The set's or the session's own application is always among the options, and so is the one picked. That's true even
+when it no longer belongs to the performers or the collective, e.g. once its artist is taken out of the set.
+
+The forms never remove the application on their own. When the set's performers, or the takeover's collective, change
+so that the application isn't theirs anymore, the field shows an error right away, which screen readers announce, e.g.
+« La candidature doit être celle d'un des artistes du set : choisissez-en une autre, ou « Aucune candidature ». ». The
+form can't be sent until another application, or "Aucune candidature", is picked. The one exception is a session saved
+as another type than a takeover: it loses its application, as it loses its collective (see
+[The session form](#the-session-form)).
+
+The applications are loaded each time a form opens, along with the artists or the collectives. When they can't be
+loaded, the form says so above it, and only "Aucune candidature" and the set's or the session's own application, named
+by when it was received, can be picked. The form then can't tell whose an application is, so the server's check is the
+one that counts (see [Errors](#errors)).
 
 ## Errors
 
@@ -232,5 +292,6 @@ named. Changing a status shows these the same way.
   `DELETE /api/admin/sets/:id`, for its sets.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
   set's form, to pick the performers and suggest their genres, each time the form opens.
+- `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens.
 - `GET /api/events`, in the session form, to pick the event on RA, each time it opens, from the year 2000 on, to get
   every one (see [Time ranges](../../server/events.md#time-ranges)).

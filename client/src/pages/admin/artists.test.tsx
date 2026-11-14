@@ -95,6 +95,7 @@ const STUB_SET: StudioSet = {
   genres: [],
   soundcloudTrack: null,
   youtubeVideo: null,
+  application: null,
   createdAt: '2026-10-01T16:00:00.000Z',
   createdBy: 'admin@example.com',
   updatedBy: null,
@@ -142,6 +143,8 @@ function application(id: string, artistId: string, changes: Partial<Application>
     status: 'new',
     statusUpdatedBy: null,
     statusUpdatedAt: null,
+    sets: [],
+    sessions: [],
     ...changes,
   }
 }
@@ -522,6 +525,8 @@ describe('An artist’s page', () => {
     // Cancelled, and with another artist, in a session that has another artist's set too.
     const played: StudioSet = { ...STUB_SET, performers: [...STUB_SET.performers, { id: 'artist-2', name: 'Brume' }], status: 'cancelled' }
     const other: StudioSet = { ...STUB_SET, id: 'set-2', performers: [{ id: 'artist-2', name: 'Brume' }], offsetMinutes: 60, start: '2026-11-15T03:00:00.000Z', end: '2026-11-15T04:00:00.000Z' }
+    // Which comes from one of her applications.
+    played.application = { id: 'application-1', receivedAt: '2026-10-05T16:00:00.000Z' }
     mockFetch({ ...AURORE_PAGE, '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [stubSession([played, other])] } })
     renderAt('/admin/artistes/artist-1')
 
@@ -531,7 +536,8 @@ describe('An artist’s page', () => {
         .getAllByRole('row')
         .slice(1)
         .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
-    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', '', 'annulé']])
+    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', 'Candidature', 'annulé']])
+    expect(within(table).getByRole('link', { name: 'Candidature reçue le 5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-cancelled')
     expect(within(table).getByRole('link', { name: 'ONDES TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(within(table).queryByRole('button')).not.toBeInTheDocument()
