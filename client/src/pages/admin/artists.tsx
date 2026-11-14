@@ -7,25 +7,12 @@ import type { Collective } from '../../collective-profile'
 import { ArtistForm } from './artist-form'
 import { OwnApplications } from './applications'
 import { OwnSets } from './sessions'
-import {
-  KIND_LABELS,
-  MISSING,
-  addedBy,
-  artistEntry,
-  byWhom,
-  collectiveEntry,
-  deletedWith,
-  comparePlaces,
-  entryPath,
-  genreNames,
-  photoUrl,
-  place,
-} from './describe'
+import { KIND_LABELS, addedBy, artistEntry, byWhom, collectiveEntry, deletedWith, comparePlaces, entryPath, genreNames, place } from './describe'
 import type { Entry } from './describe'
 import { compareText, search, useSearchQuery, useSort } from './list'
 import type { SortColumn } from './list'
 import { SearchField, SortHeader } from './list-controls'
-import { ArtistsFailure, BackToArtists, CollectivesFailure, LinksList, LoadFailure, PhotoOrNone } from './profile-details'
+import { ArtistDetails, ArtistsFailure, BackToArtists, CollectivesFailure, LoadFailure } from './profile-details'
 
 // The artists section: every artist and collective, each artist's page, where they're changed or deleted, and adding one
 // by hand, e.g. to bring in an artist who applied through the original Google Form. Collectives' pages are in
@@ -216,45 +203,6 @@ function ArtistById({ id }: { id: string }) {
         supprimer l'artiste
       </button>
     </>
-  )
-}
-
-// Everything about an artist: their photo, or that they have none, then their profile.
-function ArtistDetails({ artist }: { artist: Artist }) {
-  return (
-    <div className="admin-record">
-      <PhotoOrNone url={artist.hasPhoto ? photoUrl('artists', artist) : null} name={artist.name} />
-      <dl>
-        {artist.collectives.length > 0 && (
-          <>
-            <dt>Collectifs</dt>
-            <dd>
-              <ul>
-                {artist.collectives.map((collective) => (
-                  <li key={collective.id}>
-                    <Link to={entryPath('collective', collective.id)}>{collective.name}</Link>
-                  </li>
-                ))}
-              </ul>
-            </dd>
-          </>
-        )}
-        <dt>Ville</dt>
-        <dd>{place(artist)}</dd>
-        <dt>Genres</dt>
-        <dd>{genreNames(artist.genres)}</dd>
-        <dt>Liens</dt>
-        <dd>
-          <LinksList links={artist.links} />
-        </dd>
-        <dt>Adresse e-mail</dt>
-        <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>
-        <dt>Téléphone</dt>
-        <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
-        <dt>Bio</dt>
-        <dd className="admin-text">{artist.bio || MISSING}</dd>
-      </dl>
-    </div>
   )
 }
 

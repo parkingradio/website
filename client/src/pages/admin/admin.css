@@ -82,16 +82,23 @@
 }
 
 /* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
-   below), and the headers of the columns that sort a list (see also .admin-warning). */
+   below), the headers of the columns that sort a list, and the one that shows a long bio or description whole,
+   underlined like a link since nothing else says it can be clicked (see also .admin-warning). */
 .admin .radio-track-left-out button,
 .admin .radio-track-left-out button:hover,
 .admin .admin-sort,
-.admin .admin-sort:hover {
+.admin .admin-sort:hover,
+.admin .admin-more,
+.admin .admin-more:hover {
   padding: 0;
   border: none;
   background: none;
   color: inherit;
   text-align: left;
+}
+
+.admin .admin-more {
+  text-decoration: underline;
 }
 
 /* The menu on the left, the section on the right. */

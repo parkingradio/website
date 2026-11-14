@@ -12,7 +12,6 @@ import { ApplicationForm } from './application-form'
 import {
   KIND_LABELS,
   LISTED_DATES,
-  MISSING,
   STATUS_LABELS,
   STATUS_PLURALS,
   applicationOwner,
@@ -20,7 +19,6 @@ import {
   artistEntry,
   byWhom,
   collectiveEntry,
-  collectiveGenreNames,
   comparePlaces,
   dateFormat,
   describePerformanceTypes,
@@ -32,7 +30,7 @@ import {
   receivedOn,
 } from './describe'
 import type { Entry, EntryKind, Owner } from './describe'
-import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, MembersList } from './profile-details'
+import { ApplicationsFailure, ArtistDetails, ArtistsFailure, CollectiveDetails, CollectivesFailure } from './profile-details'
 import { ApplicationSessions, ApplicationSets } from './sessions'
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
@@ -388,7 +386,7 @@ function ArtistApplication({ loaded, artistId }: { loaded: Application; artistId
               L'artiste n'a pas pu être chargé&nbsp;: {artist.message}
             </p>
           )}
-          {artist.kind === 'loaded' && <ArtistSummary artist={artist.value.artist} />}
+          {artist.kind === 'loaded' && <ArtistDetails artist={artist.value.artist} named />}
         </>
       }
     />
@@ -414,7 +412,7 @@ function CollectiveApplication({ loaded, collectiveId }: { loaded: Application; 
           )}
           {members.kind === 'error' && <ArtistsFailure message={members.message} />}
           {collective.kind === 'loaded' && members.kind !== 'loading' && (
-            <CollectiveSummary collective={collective.value.collective} members={members.kind === 'loaded' ? members.value.artists : null} />
+            <CollectiveDetails collective={collective.value.collective} members={members.kind === 'loaded' ? members.value.artists : null} named />
           )}
         </>
       }
@@ -541,51 +539,6 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
         supprimer la candidature
       </button>
     </>
-  )
-}
-
-// Who the artist is and how to reach them. Everything else is on their page.
-function ArtistSummary({ artist }: { artist: Artist }) {
-  return (
-    <dl className="admin-record">
-      <dt>Nom</dt>
-      <dd>
-        <Link to={`/admin/artistes/${artist.id}`}>{artist.name}</Link> ({KIND_LABELS.artist})
-      </dd>
-      <dt>Ville</dt>
-      <dd>{place(artist)}</dd>
-      <dt>Genres</dt>
-      <dd>{genreNames(artist.genres)}</dd>
-      <dt>Adresse e-mail</dt>
-      <dd>{artist.email ? <a href={`mailto:${artist.email}`}>{artist.email}</a> : MISSING}</dd>
-      <dt>Téléphone</dt>
-      <dd>{artist.phone ? <a href={`tel:${artist.phone}`}>{artist.phone}</a> : MISSING}</dd>
-    </dl>
-  )
-}
-
-// Who a collective is, its artists, with their genres, unless the `members` couldn't be loaded, which leaves them blank,
-// and how to reach its contact. Everything else is on its page.
-function CollectiveSummary({ collective, members }: { collective: Collective; members: Artist[] | null }) {
-  return (
-    <dl className="admin-record">
-      <dt>Nom</dt>
-      <dd>
-        <Link to={entryPath('collective', collective.id)}>{collective.name}</Link> ({KIND_LABELS.collective})
-      </dd>
-      <dt>Ville</dt>
-      <dd>{place(collective)}</dd>
-      <dt>Genres de ses artistes</dt>
-      <dd>{collectiveGenreNames(collective, members)}</dd>
-      <dt>Artistes du collectif</dt>
-      <dd>
-        <MembersList members={collective.members} />
-      </dd>
-      <dt>Adresse e-mail du contact</dt>
-      <dd>{collective.email ? <a href={`mailto:${collective.email}`}>{collective.email}</a> : MISSING}</dd>
-      <dt>Téléphone du contact</dt>
-      <dd>{collective.phone ? <a href={`tel:${collective.phone}`}>{collective.phone}</a> : MISSING}</dd>
-    </dl>
   )
 }
 
