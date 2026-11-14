@@ -218,7 +218,7 @@ test('a takeover and its set are given the applications they come from in their 
   const listed = page.getByRole('table', { name: 'Sets' })
   await expect(listed.getByRole('row')).toHaveCount(2)
   await expect(listed).toContainText('21 h – 22 h')
-  await expect(page.getByText(/^La candidature sera supprimée/)).toContainText('Les sets qui en viennent restent.')
+  await expect(page.getByText(/^La candidature sera supprimée/)).toContainText('Les sets associés restent.')
   await listed.getByRole('link', { name: `E2E ${unique}` }).click()
 
   // Taken away.

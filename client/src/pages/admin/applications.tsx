@@ -534,8 +534,8 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
       <h2>Supprimer</h2>
       <p>
         La candidature sera supprimée pour de bon. {stays}
-        {application.sets.length > 0 && ' Les sets qui en viennent restent.'}
-        {application.sessions.length > 0 && ' Les sessions qui en viennent restent.'}
+        {application.sets.length > 0 && ' Les sets associés restent.'}
+        {application.sessions.length > 0 && ' Les sessions associées restent.'}
       </p>
       <button type="button" onClick={remove} disabled={busy}>
         supprimer la candidature

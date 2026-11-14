@@ -43,7 +43,8 @@ and when, if anyone did. From top to bottom, it then shows:
   status ("Statut"). Without any, it says so, and that they're linked from the form of a set of the artist, or of a
   takeover of the collective (see [Applications](sessions.md#applications)). They're only shown here.
 - "Supprimer": deletes the application for good, after confirming. The artist or the collective stays, and so do the
-  sets or sessions that come from it, which the page says when it has some.
+  sets or sessions that come from it, which the page says when it has some: « Les sets associés restent. », or « Les
+  sessions associées restent. ».
 
 "nouvelle candidature" creates an application by hand, at `/admin/candidatures/nouvelle`, e.g. to bring in one that came
 through the original Google Form: a form with the artist or the collective, picked in a single field from those in the

@@ -1008,7 +1008,7 @@ describe('An application’s page', () => {
     expect(within(table).getAllByRole('link', { name: 'ONDES TAKEOVER' })[0]).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(within(table).getAllByRole('row')[3]).toHaveClass('admin-status-cancelled')
     expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(
-      "La candidature sera supprimée pour de bon. L'artiste reste. Les sets qui en viennent restent.",
+      "La candidature sera supprimée pour de bon. L'artiste reste. Les sets associés restent.",
     )
   })
 
@@ -1064,7 +1064,7 @@ describe('An application’s page', () => {
       ])
       expect(within(table).getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-1')
       expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(
-        'La candidature sera supprimée pour de bon. Le collectif reste. Les sessions qui en viennent restent.',
+        'La candidature sera supprimée pour de bon. Le collectif reste. Les sessions associées restent.',
       )
     })
 
