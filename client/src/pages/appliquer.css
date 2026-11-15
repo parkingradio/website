@@ -196,15 +196,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.appliquer .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 /* ---------- pays, ville : a search field with a list under it (see combobox.css) ---------- */
 
 .appliquer .combobox:has(.combobox-caret) input {
