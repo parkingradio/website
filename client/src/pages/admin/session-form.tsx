@@ -161,7 +161,7 @@ export function SessionForm({
       </form>
       {sets && (
         <>
-          <ListedSets sets={sets.listed} session={listedIn} open={openSet} onChange={sets.onChange} onOpen={setOpenSet} />
+          <ListedSets sets={sets.listed} session={listedIn} open={openSet} busy={busy} onChange={sets.onChange} onOpen={setOpenSet} />
           {/* After the sets, whose forms can't be within the session's. */}
           <div className="admin-form admin-form-wide">
             <FormActions

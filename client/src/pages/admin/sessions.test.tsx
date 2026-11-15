@@ -2034,6 +2034,68 @@ describe("A new session's sets", () => {
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
   })
 
+  it("keeps what's changed in a set's form when another set is taken out of the list, and moves the focus to the next set's ×", async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore')
+    await addSet('Brume')
+    await addSet('Cyan')
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume, 22 h – 23 h' }))
+    await screen.findByRole('heading', { name: 'Set de Brume' })
+    fireEvent.change(setForm('Set de Brume').getByLabelText('Fin'), { target: { value: '23:30' } })
+
+    // Aurore's, before it in the list: the focus goes to the next set's ×.
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore, 21 h – 22 h' }))
+    expect(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h' })).toHaveFocus()
+    expect(setForm('Set de Brume').getByLabelText('Fin')).toHaveValue('23:30')
+    fireEvent.click(setForm('Set de Brume').getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Brume' })).not.toBeInTheDocument())
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['22 h – 23 h 30', '23 h – 0 h'])
+
+    // The last one's: the previous set's ×, then the heading of the sets once there are none.
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan, 23 h – 0 h' }))
+    expect(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h 30' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h 30' }))
+    expect(screen.getByRole('heading', { name: 'Sets' })).toHaveFocus()
+    expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+  })
+
+  it('opens the pages its sets link to in a new tab, so that the form is not left', async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore', (form) => {
+      fireEvent.click(form.getByRole('combobox', { name: 'Candidature' }))
+      fireEvent.mouseDown(form.getByRole('option', { name: /^Aurore, reçue le 15 août 2026/ }))
+    })
+    for (const name of ['Aurore', 'Candidature reçue le 15 août 2026']) {
+      expect(within(setsTable()).getByRole('link', { name })).toHaveAttribute('target', '_blank')
+    }
+  })
+
+  it("can't be changed while the session is sent", async () => {
+    let answer: (value: Response) => void = () => {}
+    mockFetch(NEW)
+    const answered = vi.mocked(fetch).getMockImplementation()!
+    // The session is sent until it's answered.
+    vi.mocked(fetch).mockImplementation((input, options) =>
+      (input instanceof Request ? input.method : options?.method) === 'POST' ? new Promise((resolve) => (answer = resolve)) : answered(input, options),
+    )
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore')
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'modifier : Set de Aurore, 21 h – 22 h' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'retirer : Set de Aurore, 21 h – 22 h' })).toBeDisabled()
+    answer(Response.json({ ok: false, error: 'Boom' }, { status: 500 }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeEnabled())
+  })
+
   it("names the set the server refuses, and what's in the way, another session's set, linked, or another of the sets", async () => {
     const refusing = (error: object) => mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: false, ...error } })
     refusing({ error: "This YouTube video is another set's", session: null, set: null, setIndex: 1, otherSetIndex: 0 })

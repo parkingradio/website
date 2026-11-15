@@ -128,8 +128,8 @@ linked to without another request. `set` is the set in the way, if it's a set, o
 in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
 the way, and a collective that has takeovers has one of them. When several things are in the way, it's one of them. Both
 are null for the 409s that aren't about a session or a set, and for a set whose track or video is that of another set
-added in the same request, which isn't saved: that set is given by its place in the request instead, `otherSetIndex` (see
-[`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
+added in the same request, which isn't saved: that set is given by its place in the request instead, `otherSetIndex`
+(see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
 ## Sets' places
 
@@ -374,8 +374,9 @@ isn't: the request fails.
 [`POST /api/admin/sessions/:id/sets`](#post-apiadminsessionsidsets-admin) takes, following the same rules, and refusing
 the fields it doesn't take. They're added to the session, in order, as `"planned"`, as if each one were added with that
 endpoint, right after the session and the sets before it: so a set's track or video can't be that of another set of the
-list. Leaving `sets` out adds the session without sets, like `[]`. The sets' tracks are only resolved once every field
-of the session and of its sets is valid.
+list. Leaving `sets` out adds the session without sets, like `[]`. The sets' tracks are resolved once every field of the
+session and of its sets is valid, before anything is checked against what's saved, e.g. that the session doesn't overlap
+another, or that a set's performers exist: an error about resolving a track comes first.
 
 | Response field | Type | |
 |---|---|---|
@@ -401,8 +402,8 @@ Replaces a session's fields, but not its status or its sets, which move with its
 shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It takes the same request as
 `POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which is deleted. Without one,
 the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it.
-Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors about
-its sets, and with 400 when there's both a flyer and `removeFlyer`, and with 404 when there's no such session.
+Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors
+about its sets, and with 400 when there's both a flyer and `removeFlyer`, and with 404 when there's no such session.
 
 ## `PATCH /api/admin/sessions/:id` (admin)
 

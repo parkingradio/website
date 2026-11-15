@@ -211,14 +211,17 @@ The form of a new session has "Sets" after its fields, before "ajouter la sessio
 only sent with the session, all at once (see
 [`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)). Each one is a row, as on a
 session's page, with its times ("Heure"), its performers ("Artistes"), its performance types ("Prestation"), its genres
-("Genres") and its links ("Liens"), in the order a session's page lists them, without a status, with:
+("Genres") and its links ("Liens"), in the order a session's page lists them, without a status. Its links open in a new
+tab, so that the form isn't left. Each one has:
 
 - "modifier", which opens its form (see [A set's form](#a-sets-form)), whose "enregistrer" changes it in the list;
-- "×", which takes it out of the list, without confirming, since it isn't saved yet.
+- "×", which takes it out of the list, without confirming, since it isn't saved yet. The focus then goes to the next
+  set's "×", or the previous one's, or else to "Sets".
 
 "ajouter un set" opens the form of a new set under them, whose "ajouter le set" adds it to the list, once the form has
 nothing wrong, without sending anything. As on a session's page, a new set starts by default when the last of the listed
-sets whose place is known ends. Only one set's form is open at a time, and "annuler" closes it.
+sets whose place is known ends. Only one set's form is open at a time, and "annuler" closes it. While the session is
+sent, the listed sets can't be changed.
 
 A set's place is kept relative to the session's start, as the server keeps it (see
 [Times](../../server/sessions.md#times)), so the listed sets move with the session when its times change, which the form
