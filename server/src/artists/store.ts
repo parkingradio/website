@@ -15,8 +15,16 @@ import { lockSessions } from '../sessions/store.js'
 // Checks the profiles and photos sent for artists against the rules in artists/profile.ts, keeps artists in the
 // database, and keeps their photos in the private bucket.
 
-// Thrown when a profile or photo is invalid. Its message tells the artist what's wrong, in French.
-export class InvalidProfile extends Error {}
+// Thrown when a profile or photo is invalid. Its message tells the artist what's wrong, in French. `path` is where in the
+// profile, when it's about one of its fields.
+export class InvalidProfile extends Error {
+  path: PropertyKey[]
+
+  constructor(message: string, path: PropertyKey[] = []) {
+    super(message)
+    this.path = path
+  }
+}
 
 // Checks a profile, an artist's or a collective's, against `schema`, which says who sent it, and returns what's saved of
 // it. Throws an InvalidProfile, saying what's wrong with the first field that's wrong, otherwise.
@@ -24,7 +32,7 @@ export function validateProfile(sent: unknown, schema: typeof AdminArtistProfile
 export function validateProfile<Schema extends z.ZodType>(sent: unknown, schema: Schema): z.output<Schema>
 export function validateProfile(sent: unknown, schema: z.ZodType): unknown {
   const result = schema.safeParse(sent)
-  if (!result.success) throw new InvalidProfile(result.error.issues[0].message)
+  if (!result.success) throw new InvalidProfile(result.error.issues[0].message, result.error.issues[0].path)
   return result.data
 }
 

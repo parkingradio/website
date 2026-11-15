@@ -155,10 +155,11 @@ the panel, while the session has no event on RA, with the event's link in its fi
 
 ## The session form
 
-"nouvelle session" adds a session, as planned, at `/admin/sessions/nouvelle`, then goes to its page, where its sets are
-added. A new session starts without a type, which has to be picked. A collective's page leads to it as its takeover,
-with "Takeover" and the collective picked (`?takeover=<id>`), unless it isn't one of the collectives loaded, e.g. when
-they can't be loaded, in which case nothing is picked. From top to bottom, the form has:
+"nouvelle session" adds a session, as planned, at `/admin/sessions/nouvelle`, with the sets added in its form, if any
+(see [A new session's sets](#a-new-sessions-sets)), then goes to its page, where more sets can be added. A new session
+starts without a type, which has to be picked. A collective's page leads to it as its takeover, with "Takeover" and the
+collective picked (`?takeover=<id>`), unless it isn't one of the collectives loaded, e.g. when they can't be loaded, in
+which case nothing is picked. From top to bottom, the form has:
 
 - "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
@@ -203,6 +204,30 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
   couldn't be.
 
 When the collectives can't be loaded, the form says so: the session's collective stays, but another one can't be picked.
+
+### A new session's sets
+
+The form of a new session has "Sets" after its fields, before "ajouter la session": the sets to add with it, which are
+only sent with the session, all at once (see
+[`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)). Each one is a row, as on a
+session's page, with its times ("Heure"), its performers ("Artistes"), its performance types ("Prestation"), its genres
+("Genres") and its links ("Liens"), in the order a session's page lists them, without a status, with:
+
+- "modifier", which opens its form (see [A set's form](#a-sets-form)), whose "enregistrer" changes it in the list;
+- "×", which takes it out of the list, without confirming, since it isn't saved yet.
+
+"ajouter un set" opens the form of a new set under them, whose "ajouter le set" adds it to the list, once the form has
+nothing wrong, without sending anything. As on a session's page, a new set starts by default when the last of the listed
+sets whose place is known ends. Only one set's form is open at a time, and "annuler" closes it.
+
+A set's place is kept relative to the session's start, as the server keeps it (see
+[Times](../../server/sessions.md#times)), so the listed sets move with the session when its times change, which the form
+says once it has sets, as it does for a session's page. An open set's form works from the session's times as they were
+when it opened. While the session's times aren't valid, the listed sets' times show as in a session without a date,
+counted from its start, e.g. "+0 h – +1 h", and "ajouter un set" and "modifier" can't be used, saying « Indiquez d'abord
+quand a lieu la session. ». While a set's form is open, "ajouter la session" can't be used, saying « Ajoutez d'abord le
+set, ou annulez-le. », or « Enregistrez d'abord le set, ou annulez-le. » for a listed set's (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)).
 
 ## A set's form
 
@@ -278,6 +303,11 @@ counts: if it refuses what the form accepted, the form shows the server's messag
 way, the message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set
 of the session whose page this is is named by its performers and times, without a link, and the session itself isn't
 named. Changing a status shows these the same way.
+
+When the server refuses one of a new session's sets (see [A new session's sets](#a-new-sessions-sets)), the error by
+"ajouter la session" names that set within its sentence, e.g. « Le set de Aurore, 21 h – 22 h n'a pas pu être ajouté :
+», then gives the server's message, and what's in the way: another session's set, named and linked as above, or another
+of the listed sets, named by its performers and times, without a link.
 
 ## Endpoints
 

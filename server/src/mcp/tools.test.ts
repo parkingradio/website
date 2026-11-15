@@ -96,6 +96,9 @@ describe('the tools of the API', () => {
     const required = (name: string) => (tools.find((tool) => tool.name === name)!.inputSchema.required as string[]).sort()
     expect(required('create_set')).toEqual(['genres', 'id', 'otherPerformanceType', 'performanceTypes', 'performers'])
     expect(required('create_session')).toEqual(['description', 'durationMinutes', 'name', 'type'])
+    // Its sets take theirs as optional too.
+    const sets = tools.find((tool) => tool.name === 'create_session')!.inputSchema.properties as { sets: { items: { required: string[] } } }
+    expect(sets.sets.items.required.sort()).toEqual(required('create_set').filter((name) => name !== 'id'))
     for (const name of ['update_artist', 'update_collective', 'update_application', 'update_session', 'update_set']) expect(required(name), name).toEqual(['id'])
   })
 

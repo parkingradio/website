@@ -87,25 +87,42 @@ function multipartParts(multipart: z.ZodObject): { json: [string, z.ZodObject]; 
 
 // The tools' arguments and where each one goes, from the route's schemas. Two arguments with the same name, e.g. a path
 // parameter and a field of the body, can't be told apart, so the server refuses to start.
-function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string, Part>; json?: string; nullable: string[] } {
+function argumentsOf(route: ToolRoute): {
+  schema: JsonObject
+  parts: Map<string, Part>
+  json?: string
+  nullable: string[]
+  nullableInLists: Map<string, string[]>
+} {
   const properties: JsonObject = {}
   const required: string[] = []
   const parts = new Map<string, Part>()
   // The fields of a POST's body that can be null, which can be left out, and are then sent as null, e.g. a new set's
-  // SoundCloud track. A PATCH takes any of its fields anyway.
+  // SoundCloud track, and likewise those of the objects in its lists, by the list, e.g. those of a new session's sets. A
+  // PATCH takes any of its fields anyway.
   const nullable: string[] = []
+  const nullableInLists = new Map<string, string[]>()
   const add = (schema: z.ZodType | undefined, part: Part) => {
     if (!schema) return
     const json = jsonSchema(schema) as { properties?: JsonObject; required?: string[] }
     // E.g. a union, whose arguments the tool couldn't name.
     if (!json.properties) throw new Error(`${route.method} ${route.url}: its tool's arguments have to be an object's properties`)
+    const posted = route.method === 'POST' && (part === 'body' || part === 'json')
     for (const [name, property] of Object.entries(json.properties)) {
       if (parts.has(name)) throw new Error(`${route.method} ${route.url}: two of its tool's arguments are named \`${name}\``)
       parts.set(name, part)
       properties[name] = property
+      const items = posted ? listItems(property) : undefined
+      if (items?.properties) {
+        const fields = (items.required ?? []).filter((field) => allowsNull(items.properties![field]))
+        if (fields.length > 0) {
+          nullableInLists.set(name, fields)
+          items.required = items.required!.filter((field) => !fields.includes(field))
+        }
+      }
     }
     for (const name of json.required ?? []) {
-      if (route.method === 'POST' && (part === 'body' || part === 'json') && allowsNull(json.properties[name])) nullable.push(name)
+      if (posted && allowsNull(json.properties[name])) nullable.push(name)
       else required.push(name)
     }
   }
@@ -124,7 +141,14 @@ function argumentsOf(route: ToolRoute): { schema: JsonObject; parts: Map<string,
     json = name
     add(schema, 'json')
   }
-  return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, json, nullable }
+  return { schema: { type: 'object', properties, required, additionalProperties: false }, parts, json, nullable, nullableInLists }
+}
+
+// The JSON Schema of the objects in a list, when `schema` is one.
+function listItems(schema: unknown): { properties?: JsonObject; required?: string[] } | undefined {
+  const list = alternatives(schema).find(({ type }) => type === 'array')
+  const items = list?.items
+  return items !== null && typeof items === 'object' && !Array.isArray(items) ? (items as { properties?: JsonObject; required?: string[] }) : undefined
 }
 
 // The schemas a value that follows a JSON Schema can follow: the schema, and its alternatives, e.g. a string, or null.
@@ -266,7 +290,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
     const name = route.schema.operationId!
     if (names.has(name)) throw new Error(`Two tools are named \`${name}\``)
     names.add(name)
-    const { schema, parts, json, nullable } = argumentsOf(route)
+    const { schema, parts, json, nullable, nullableInLists } = argumentsOf(route)
     const call = async (args: JsonObject, as: ToolUser): Promise<ToolCall> => {
       const invalid = [...route.url.matchAll(/:(\w+)/g)].find(([, param]) => segment(args[param]) === null)
       if (invalid) return failure(400, { error: `\`${invalid[1]}\` isn't valid` })
@@ -292,6 +316,13 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
         if (part === 'body' || part === 'json') body[arg] = value
       }
       for (const field of nullable) if (!(field in body)) body[field] = null
+      for (const [list, fields] of nullableInLists) {
+        const items = body[list]
+        if (!Array.isArray(items)) continue
+        body[list] = items.map((item) =>
+          item !== null && typeof item === 'object' && !Array.isArray(item) ? { ...Object.fromEntries(fields.map((field) => [field, null])), ...item } : item,
+        )
+      }
       const url = query.size > 0 ? `${path}?${query}` : path
 
       let payload: Payload | undefined

@@ -657,6 +657,35 @@ expect_conflict 'Another session overlaps this one' "$added"
 json DELETE "${SESSIONS}/${added}"
 expect_status 200
 
+echo "  a session is added with its sets, in order, or with none of them, the error saying which set and what's in the way"
+sessions_before="$(sql "select count(*) from sessions")"
+sets_before="$(sql "select count(*) from sets")"
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "00000000-0000-4000-8000-000000000000")" 60 60)]")"
+expect_status 400
+expect_body '^\{"ok":false,"error":"No such artist","setIndex":1\}$'
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "$brume")" 60 60 '"youtubeVideo":"https://youtu.be/iNtEgRaTeD1"')]")"
+expect_status 409
+expect_body '^\{"ok":false,"error":"This YouTube video is another set'"'"'s","session":null,"set":null,"setIndex":1,"otherSetIndex":0\}$'
+[ "$(sql "select count(*) from sessions")" = "$sessions_before" ] && [ "$(sql "select count(*) from sets")" = "$sets_before" ] \
+    || fail "expected nothing to be saved of a session whose sets can't all be added"
+# Given to another set while the request waits for the sessions' lock.
+hold_sessions_lock "update sets set youtube_video_id = 'iNtEgRaTeD1' where id = '${opening}';"
+send_in_background POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" null null),$(set_json "$(performers "$brume")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
+wait_for_sessions_lock
+release_sessions_lock
+wait_for_background
+expect_conflict "This YouTube video is another set's" "$first" "$opening"
+expect_body '"setIndex":1\}$'
+sql "update sets set youtube_video_id = 'dQw4w9WgXcQ' where id = '${opening}'" >/dev/null
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$brume")" null 60),$(set_json "$(performers "$ana")" null 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
+expect_status 200
+added="$(first_id)"
+# Neither has an offset, so they're in the order they were sent.
+expect_body "\"sets\":\\[\\{\"id\":\"[^\"]*\",\"performers\":\\[\\{\"id\":\"${brume}\""
+expect_body_contains "\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
+json DELETE "${SESSIONS}/${added}"
+expect_status 200
+
 echo "  a set added to a session, or un-cancelled, while another transaction cancels the session, waits for it, and is refused"
 # Only because of the sessions' lock: neither request locks the session's row, which they only read, so without it, they
 # would read the session before it's cancelled, and succeed.

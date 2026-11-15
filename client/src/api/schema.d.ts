@@ -1885,7 +1885,7 @@ export interface paths {
         /** Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, the most recent first */
         get: operations["list_sessions"];
         put?: never;
-        /** Adds a session, as planned, without sets, with or without a flyer */
+        /** Adds a session, as planned, with or without a flyer, and the sets it's given, if any, all of them or nothing */
         post: operations["create_session"];
         delete?: never;
         options?: never;
@@ -3084,6 +3084,44 @@ export interface components {
             /** @constant */
             ok: true;
             email: string;
+        };
+        NewSessionConflictError: {
+            /** @constant */
+            ok: false;
+            error: string;
+            /** @description The session in the way, or the set's in the way */
+            session: components["schemas"]["Session"] | null;
+            /** @description The set in the way, if it is one */
+            set: components["schemas"]["Set"] | null;
+            /** @description The place in `sets` of the set the error is about, from 0, only when it is about one of them */
+            setIndex?: number;
+            /** @description The place in `sets` of the set in the way, from 0, when it is another of them, which is not saved: `session` and `set` are then null */
+            otherSetIndex?: number;
+        };
+        NewSessionError: {
+            /** @constant */
+            ok: false;
+            error: string;
+            /** @description The place in `sets` of the set the error is about, from 0, only when it is about one of them */
+            setIndex?: number;
+        };
+        NewSessionFields: {
+            /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
+            start: string | null;
+            durationMinutes: number;
+            type: components["schemas"]["SessionType"];
+            /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
+            takeover: string | null;
+            /** @description The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none */
+            application: string | null;
+            /** @description Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
+            name: string;
+            /** @description The event's id on RA, or a link to it. Null, or blank, for none */
+            raEvent: string | null;
+            /** @description Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \r\n or \r becomes \n, and it is trimmed, then up to 5000 characters. Empty for none */
+            description: string;
+            /** @description The sets to add with the session, in order, each with the fields a new set takes. If one of them can't be added, nothing is saved, and the error's `setIndex` is its place in the list, from 0. Left out, none */
+            sets?: components["schemas"]["SetFields"][];
         };
         Ok: {
             /** @constant */
@@ -5032,7 +5070,7 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    session: components["schemas"]["SessionFields"];
+                    session: components["schemas"]["NewSessionFields"];
                     /**
                      * Format: binary
                      * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
@@ -5061,7 +5099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiError"];
+                    "application/json": components["schemas"]["NewSessionError"];
                 };
             };
             /** @description Default Response */
@@ -5088,7 +5126,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConflictError"];
+                    "application/json": components["schemas"]["NewSessionConflictError"];
                 };
             };
             /** @description Default Response */
@@ -5107,6 +5145,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewSessionError"];
                 };
             };
         };

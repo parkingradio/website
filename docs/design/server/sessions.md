@@ -38,7 +38,7 @@ A session, as the endpoints below return it, also has:
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
 | `effectiveDescription` | string | The session's description: its `description`, or else the one its type gives it, or `""` when neither has one: see [Descriptions](#descriptions) |
 | `hasFlyer` | boolean | Whether the session has a flyer: see [Flyers](#flyers) |
-| `sets` | list of sets | Its sets, by `offsetMinutes`, then `createdAt`, the sets without an offset last, cancelled ones included |
+| `sets` | list of sets | Its sets, by `offsetMinutes`, the sets without an offset last, then in the order they were added, those added with their session in the order they were sent, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
@@ -47,8 +47,11 @@ A session, as the endpoints below return it, also has:
 
 ## Sets
 
-Every set belongs to a session: the one it's added to, which doesn't change. Sets aren't listed on their own: they're
-in their sessions, and the `total` of a list of sessions counts sessions, not sets. A set has:
+Every set belongs to a session: the one it's added to, or added with, which doesn't change. Sets aren't listed on their
+own: they're in their sessions, and the `total` of a list of sessions counts sessions, not sets. A session can be added
+with its sets, in a single request: if one of them can't be added, nothing is saved, neither the session nor its other
+sets, and the error says which set it's about, by its place in the list of sets sent, `setIndex`, from 0 (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A set has:
 
 | Field | Type | |
 |---|---|---|
@@ -117,14 +120,16 @@ rule together, one of them fails. That's the case for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
 - adding a set to a cancelled session, or un-cancelling a set of a cancelled session,
-- giving a set a track or a video that's another set's,
+- giving a set a track or a video that's another set's, including another set added in the same request,
 - deleting a collective that has takeovers.
 
 These 409s also have `session` and `set`, what's in the way, as the endpoints return them, so that it can be named and
 linked to without another request. `set` is the set in the way, if it's a set, or else null, and `session` is the session
 in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
 the way, and a collective that has takeovers has one of them. When several things are in the way, it's one of them. Both
-are null for the 409s that aren't about a session or a set.
+are null for the 409s that aren't about a session or a set, and for a set whose track or video is that of another set
+added in the same request, which isn't saved: that set is given by its place in the request instead, `otherSetIndex` (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
 ## Sets' places
 
@@ -358,35 +363,46 @@ Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartist
 
 ## `POST /api/admin/sessions` (admin)
 
-Adds a session, as `"planned"`, without sets. It's `multipart/form-data`, like
+Adds a session, as `"planned"`, with the sets it's sent, if any. It's `multipart/form-data`, like
 [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin), with two parts: `session`, the session's fields as
 JSON, in a field rather than a file, which are its `start`, `durationMinutes`, `type`, `takeover`, `application`, `name`,
-`raEvent` and `description`, as above, none of them left out, and `flyer`, its flyer, which can be left out. A few other fields or
-files are ignored, but a second flyer isn't: the request fails.
+`raEvent` and `description`, as above, none of them left out, along with `sets`, the sets to add with it, which can be
+left out, and `flyer`, its flyer, which can be left out. A few other fields or files are ignored, but a second flyer
+isn't: the request fails.
+
+`sets` is a list of sets, each with the fields that
+[`POST /api/admin/sessions/:id/sets`](#post-apiadminsessionsidsets-admin) takes, following the same rules, and refusing
+the fields it doesn't take. They're added to the session, in order, as `"planned"`, as if each one were added with that
+endpoint, right after the session and the sets before it: so a set's track or video can't be that of another set of the
+list. Leaving `sets` out adds the session without sets, like `[]`. The sets' tracks are only resolved once every field
+of the session and of its sets is valid.
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `session` | session | As it was added |
+| `session` | session | As it was added, with its sets |
 
 Fails with:
 
 | Status | When |
 |---|---|
-| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, or the flyer isn't a JPEG, PNG or WebP image |
-| 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)) |
+| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 if it were added on its own |
+| 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)), or one of the sets would fail with 409 if it were added on its own, with what's in the way in `session` and `set`, or both null. When what's in the way is another set of the list, `session` and `set` are null, and `otherSetIndex` is its place in `sets` |
 | 413 | The flyer is larger than 10 MB |
+| 502 | One of the sets' tracks has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
 
-When it fails, nothing is saved.
+An error about one of the sets, and only such an error, also has `setIndex`, the place of that set in `sets`, from 0.
+
+When it fails, nothing is saved, neither the session nor any of its sets.
 
 ## `PUT /api/admin/sessions/:id` (admin)
 
 Replaces a session's fields, but not its status or its sets, which move with its start, and stay as they are when it's
 shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It takes the same request as
-`POST /api/admin/sessions`. With a flyer, it replaces the session's, which is deleted. Without one, the session keeps
-its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it. Responds like
-`POST /api/admin/sessions`, with the session as it is then, and fails like it, with 400 when there's both a flyer and
-`removeFlyer`, and with 404 when there's no such session.
+`POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which is deleted. Without one,
+the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it.
+Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors about
+its sets, and with 400 when there's both a flyer and `removeFlyer`, and with 404 when there's no such session.
 
 ## `PATCH /api/admin/sessions/:id` (admin)
 

@@ -95,14 +95,14 @@ export const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as cons
 // collective, and checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character
 // (see `refusingNul` in api/schemas.ts), along with the "removePhoto" field, which only changing one reads. Returns the
 // checked profile and photo (null when there's none), or the error to reply with when the request is malformed or
-// invalid. A session's fields and flyer are read the same way, with `photoPart` naming the flyer's part, `remove` the
-// field that removes it, and `errors` what's wrong with it.
+// invalid, with where in the profile, when it's about one of its fields. A session's fields and flyer are read the same
+// way, with `photoPart` naming the flyer's part, `remove` the field that removes it, and `errors` what's wrong with it.
 export async function readProfileForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   part: string,
   schema: Schema,
   { photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { photoPart?: string; remove?: string; errors?: PhotoErrors } = {},
-): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string }> {
+): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string; path?: PropertyKey[] }> {
   const form = await readPhotoForm(request, { photoPart })
   if (form === 'malformed') return INVALID_REQUEST
   if ('tooLarge' in form) return { status: 413, error: errors.tooLarge }
@@ -111,11 +111,11 @@ export async function readProfileForm<Schema extends z.ZodType>(
   try {
     const profile = validateProfile(sent, schema)
     const nul = nulError(profile)
-    if (nul) return { status: 400, error: nul }
+    if (nul) return { status: 400, ...nul }
     return { profile, photo: validatePhoto(form.photo, errors), removePhoto: form.fields[remove] === 'true' }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
-    return { status: 400, error: error.message }
+    return { status: 400, error: error.message, path: error.path }
   }
 }
 

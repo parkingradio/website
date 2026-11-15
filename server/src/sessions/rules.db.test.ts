@@ -39,7 +39,7 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // the operations are run with.
 type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives: string[]; applications: { id: string; owner: string }[] }
 type Context = { app: FastifyInstance; database: TestDatabase; cookies: Record<string, string>; ids: Ids }
-type Body = { error: string; session: Session | null; set: StudioSet | null }
+type Body = { error: string; session: Session | null; set: StudioSet | null; setIndex?: number; otherSetIndex?: number }
 type StudioSet = { id: string; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
 type Session = {
   id: string
@@ -179,6 +179,7 @@ const SetFields = fc
   })
   .map(({ place, ...fields }) => ({ ...fields, ...place }))
 type SetArgs = typeof SetFields extends fc.Arbitrary<infer T> ? T : never
+type NewSessionArgs = { session: SessionArgs; sets: SetArgs[] }
 
 function setBody(context: Context, { performers, application, ...fields }: SetArgs) {
   const performerIds = performers.map((index) => pick(context.ids.artists, index))
@@ -256,22 +257,66 @@ function only(body: Record<string, unknown>, sent: string[]): Record<string, unk
   return Object.fromEntries(Object.entries(body).filter(([field]) => sent.includes(field)))
 }
 
+// The 409s of adding a session with `sets`: what's in the way of one of them is an earlier one, with the same track or
+// video, or a set that was already there, which it names.
+function newSetConflict(has: (set: SetArgs, other: SetArgs) => boolean, hasIt: (set: SetArgs) => (other: StudioSet) => boolean) {
+  return (body: Body, { sets }: NewSessionArgs, context: Context) => {
+    expect(body.setIndex, 'the set that fails').toBeGreaterThanOrEqual(0)
+    expect(body.setIndex).toBeLessThan(sets.length)
+    const set = sets[body.setIndex!]
+    if (body.otherSetIndex !== undefined) {
+      expect(body.otherSetIndex).toBeLessThan(body.setIndex!)
+      expect(has(set, sets[body.otherSetIndex])).toBe(true)
+      expect(body.session).toBeNull()
+      expect(body.set).toBeNull()
+    } else {
+      expectSetWith(body, null, hasIt(set))
+      expect(context.ids.sets, 'the set in the way, which was there already').toContain(body.set!.id)
+    }
+  }
+}
+
 // The fields a PATCH can send: all of them, so that a field that's added is sent too.
 const SESSION_FIELD_NAMES = Object.keys(SESSION_FIELDS)
 const SET_FIELD_NAMES = Object.keys(SET_FIELDS)
 
 // Every operation, by name. A step that adds an operation adds it here.
 const OPERATIONS = {
+  // With up to 3 sets, all of them or nothing.
   createSession: {
     weight: 4,
-    args: SessionFields,
-    async run(context, args) {
-      const response = await sendSession(context, 'POST', '/api/admin/sessions', sessionBody(context, args))
-      if (response.statusCode === 200) context.ids.sessions.push(response.json().session.id)
+    args: fc.record({ session: SessionFields, sets: fc.array(SetFields, { maxLength: 3 }) }),
+    async run(context, { session, sets }) {
+      const count = async () => (await context.database.db.execute<{ count: number }>(sql`select (select count(*) from sessions) + (select count(*) from sets) as count`)).rows[0].count
+      const before = await count()
+      const response = await sendSession(context, 'POST', '/api/admin/sessions', { ...sessionBody(context, session), sets: sets.map((set) => setBody(context, set)) })
+      if (response.statusCode === 200) {
+        const added = response.json().session as Session
+        expect(added.sets).toHaveLength(sets.length)
+        context.ids.sessions.push(added.id)
+        context.ids.sets.push(...added.sets.map(({ id }) => id))
+      } else {
+        expect(await count(), 'what a request that failed saved').toBe(before)
+        const { setIndex } = response.json() as Body
+        if (setIndex !== undefined) expect(setIndex).toBeLessThan(sets.length)
+      }
       return response
     },
-    conflicts: { [SESSION_OVERLAPS]: (body, args) => expectOverlappingSession(body.session, null, period(args.start!, args.durationMinutes)) },
-  } satisfies Operation<SessionArgs>,
+    conflicts: {
+      [SESSION_OVERLAPS]: (body, { session }) => {
+        expect(body.setIndex).toBeUndefined()
+        expectOverlappingSession(body.session, null, period(session.start!, session.durationMinutes))
+      },
+      [TRACK_TAKEN]: newSetConflict(
+        (set, other) => TRACKS[set.soundcloudTrack!] === TRACKS[other.soundcloudTrack!],
+        (set) => (other) => other.soundcloudTrack?.id === TRACKS[set.soundcloudTrack!],
+      ),
+      [VIDEO_TAKEN]: newSetConflict(
+        (set, other) => set.youtubeVideo === other.youtubeVideo,
+        (set) => (other) => other.youtubeVideo?.id === set.youtubeVideo,
+      ),
+    },
+  } satisfies Operation<NewSessionArgs>,
 
   updateSession: {
     weight: 3,

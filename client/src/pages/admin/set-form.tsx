@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useApi } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import type { Artist, GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
@@ -11,6 +12,7 @@ import { leaving, useCheckedForm } from './checked-form'
 import { artistOption, formatDuration, genreNames, membersGenres, nextDay, sessionWithin } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
+import { ApplicationsFailure, ArtistsFailure } from './profile-details'
 import { GenresField } from './profile-fields'
 import type { GroupProps } from './profile-fields'
 
@@ -21,9 +23,12 @@ import type { GroupProps } from './profile-fields'
 // How many of its performers' genres a set's form suggests.
 const SUGGESTED_GENRES = 3
 
+// The session a set is in, as far as its form goes: one that's saved, or a new one, with its times as its form has them.
+export type SetSession = Pick<Session, 'start' | 'end' | 'durationMinutes'>
+
 type SetFormProps = {
   // The session the set is in, which its times are relative to.
-  session: Session
+  session: SetSession
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
   // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
@@ -32,8 +37,8 @@ type SetFormProps = {
   // The applications the set's is picked from, or null when they couldn't be loaded, which leaves the set's as it is.
   applications: Application[] | null
   submitLabel: string
-  // Sends the set's fields, and returns the error, if it failed.
-  onSubmit: (fields: SetFields) => Promise<ReactNode | null>
+  // Sends the set's fields, which `form` has, and returns the error, if it failed.
+  onSubmit: (fields: SetFields, form: SetFormValues) => Promise<ReactNode | null>
   onCancel: () => void
 }
 
@@ -44,7 +49,7 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
   const checked = checkSet(form, session, place, applications)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
-  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!))
+  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!, form))
 
   // The performers' first genres, in the order of a collective's genres, which are suggested while the set has none.
   const suggested =
@@ -126,6 +131,30 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
   )
 }
 
+// A set's form, under the heading `title`, and what `children` say of the set, with every artist and application to pick
+// from, loaded each time it opens, so that they're current, and nothing until then. When they can't be loaded, it says
+// so.
+export function SetFormWithChoices({ title, children, ...props }: Omit<SetFormProps, 'artists' | 'applications'> & { title: string; children?: ReactNode }) {
+  const artists = useApi('/api/admin/artists')
+  const applications = useApi('/api/admin/applications')
+  const headingId = useId()
+  if (artists.kind === 'loading' || applications.kind === 'loading') return null
+
+  return (
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId}>{title}</h3>
+      {children}
+      {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
+      {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
+      <SetForm
+        {...props}
+        artists={artists.kind === 'loaded' ? artists.value.artists : null}
+        applications={applications.kind === 'loaded' ? applications.value.applications : null}
+      />
+    </section>
+  )
+}
+
 function GenresSuggestion({ genres, onPick }: { genres: GenreId[]; onPick: () => void }) {
   return (
     <p className="admin-hint">
@@ -192,7 +221,7 @@ function PlaceField({
   onLeave,
 }: {
   form: SetFormValues
-  session: Session
+  session: SetSession
   // Its offset and duration, once its times are valid.
   place: SetPlace | null
   onChange: (changes: Partial<SetFormValues>) => void

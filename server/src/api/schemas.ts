@@ -141,10 +141,11 @@ function pathToNul(value: unknown): (string | number)[] | undefined {
 
 const NUL_ERROR = "Text can't contain the NUL character"
 
-// The error to refuse `value` with, what a schema kept of a request, if it has the NUL character anywhere, or null. For
-// what routes check themselves, e.g. the JSON part of a multipart request, as `refusingNul` does for the others.
-export function nulError(value: unknown): string | null {
-  return pathToNul(value) ? NUL_ERROR : null
+// The error to refuse `value` with, what a schema kept of a request, if it has the NUL character anywhere, and where, or
+// null. For what routes check themselves, e.g. the JSON part of a multipart request, as `refusingNul` does for the others.
+export function nulError(value: unknown): { error: string; path: (string | number)[] } | null {
+  const path = pathToNul(value)
+  return path ? { error: NUL_ERROR, path } : null
 }
 
 // Validates requests against their zod schema, then refuses those that send the NUL character, which the database can't

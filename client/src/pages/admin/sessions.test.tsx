@@ -1646,15 +1646,17 @@ describe("A set's form", () => {
   })
 })
 
+// Fills a new session's form in, on Saturday, November 14, 2026, from 21:00 to 1:00, as guest mixes, unless it's told
+// otherwise.
+async function fillIn({ day = '2026-11-14', start = '21:00', end = '01:00', type = 'Guest mixes' as string | null } = {}) {
+  fireEvent.change(await screen.findByLabelText('Date'), { target: { value: day } })
+  fireEvent.change(screen.getByLabelText('Début'), { target: { value: start } })
+  fireEvent.change(screen.getByLabelText('Fin'), { target: { value: end } })
+  if (type) fireEvent.click(screen.getByRole('radio', { name: type }))
+}
+
 describe('Adding a session', () => {
   const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS }
-
-  async function fillIn({ day = '2026-11-14', start = '21:00', end = '01:00', type = 'Guest mixes' as string | null } = {}) {
-    fireEvent.change(await screen.findByLabelText('Date'), { target: { value: day } })
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: start } })
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: end } })
-    if (type) fireEvent.click(screen.getByRole('radio', { name: type }))
-  }
 
   it('adds a session, ending the next day when the end time is not after the start time, and goes to its page', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
@@ -1675,6 +1677,7 @@ describe('Adding a session', () => {
       name: 'HAUTE RIVE',
       raEvent: null,
       description: '',
+      sets: [],
     })
   })
 
@@ -1907,5 +1910,160 @@ describe('Adding a session', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
     expect(screen.getByRole('radio', { name: 'Takeover' })).not.toBeChecked()
+  })
+})
+
+describe("A new session's sets", () => {
+  const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, ...ARTISTS }
+
+  // The open set's form, under its title.
+  const setForm = (title: string) => within(screen.getByRole('region', { name: title }))
+
+  // Adds a set of `performer` in a new set's form, at the times it starts with, unless `fill` changes them, or other
+  // fields.
+  async function addSet(performer: string, fill: (form: ReturnType<typeof setForm>) => void = () => {}) {
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    const form = setForm('Nouveau set')
+    fireEvent.click(form.getByRole('combobox', { name: 'Ajouter un artiste' }))
+    fireEvent.mouseDown(form.getByRole('option', { name: new RegExp(`^${performer}`) }))
+    fill(form)
+    fireEvent.click(form.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
+  }
+
+  const setsTable = () => screen.getByRole('table', { name: 'Sets' })
+
+  it('lists sets, each after the last, which are changed or taken out of the list, and sends them with the session in the order they were added', async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+    const times = (start: string, end: string) => (form: ReturnType<typeof setForm>) => {
+      fireEvent.change(form.getByLabelText('Début'), { target: { value: start } })
+      fireEvent.change(form.getByLabelText('Fin'), { target: { value: end } })
+    }
+    await addSet('Brume', times('22:00', '23:00'))
+    // After it, since it's the last one.
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    expect(setForm('Nouveau set').getByLabelText('Début')).toHaveValue('23:00')
+    fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
+    await addSet('Cyan', times('21:00', '22:00'))
+    await addSet('Aurore', (form) => {
+      fireEvent.click(form.getByLabelText('horaire à déterminer'))
+      fireEvent.change(form.getByLabelText('YouTube'), { target: { value: 'dQw4w9WgXcQ' } })
+    })
+
+    // As a session's page lists them, by their start.
+    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
+      ['21 h – 22 h', 'Cyan'],
+      ['22 h – 23 h', 'Brume'],
+      ['horaire à déterminer (1 h)', 'Aurore'],
+    ])
+    expect(within(setsTable()).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+    expect(screen.getByText('Ses sets se déplacent avec elle.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume, 22 h – 23 h' }))
+    await screen.findByRole('heading', { name: 'Set de Brume' })
+    expect(setForm('Set de Brume').getByLabelText('Début')).toHaveValue('22:00')
+    fireEvent.change(setForm('Set de Brume').getByLabelText('Fin'), { target: { value: '22:30' } })
+    fireEvent.click(setForm('Set de Brume').getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Brume' })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan, 21 h – 22 h' }))
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['22 h – 22 h 30', 'horaire à déterminer (1 h)'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/))
+    const empty = { performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, application: null }
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0]).sets).toEqual([
+      { ...empty, performers: [{ id: 'artist-2' }], offsetMinutes: 60, durationMinutes: 30, youtubeVideo: null },
+      { ...empty, performers: [{ id: 'artist-1' }], offsetMinutes: null, durationMinutes: 60, youtubeVideo: 'dQw4w9WgXcQ' },
+    ])
+  })
+
+  it("moves the sets with the session, which can't be added or changed while its times aren't valid, when they're counted from its start", async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore')
+    expect(rows(setsTable())[0][0]).toBe('21 h – 22 h')
+    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '20:00' } })
+    expect(rows(setsTable())[0][0]).toBe('20 h – 21 h')
+
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
+    expect(rows(setsTable())[0][0]).toBe('+0 h – +1 h')
+    for (const name of ['ajouter un set', 'modifier : Set de Aurore, +0 h – +1 h']) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      expect(button).toHaveAccessibleDescription("Indiquez d'abord quand a lieu la session.")
+      fireEvent.click(button)
+    }
+    expect(screen.queryByRole('region', { name: /^(Nouveau set|Set de)/ })).not.toBeInTheDocument()
+
+    // Without a date, from its start.
+    fireEvent.click(screen.getByLabelText('date à déterminer'))
+    fireEvent.change(screen.getByLabelText('heures'), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, +0 h – +1 h' }))
+    await screen.findByRole('heading', { name: 'Set de Aurore' })
+    expect(setForm('Set de Aurore').getByText('La session dure 4 h.')).toBeInTheDocument()
+  })
+
+  it("can't be sent with a set's form open, which it says", async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore')
+    const submit = screen.getByRole('button', { name: 'ajouter la session' })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    expect(submit).toHaveAttribute('aria-disabled', 'true')
+    expect(submit).toHaveAccessibleDescription("Ajoutez d'abord le set, ou annulez-le.")
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, 21 h – 22 h' }))
+    await screen.findByRole('heading', { name: 'Set de Aurore' })
+    expect(submit).toHaveAccessibleDescription("Enregistrez d'abord le set, ou annulez-le.")
+    fireEvent.click(submit)
+    expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+
+    fireEvent.click(setForm('Set de Aurore').getByRole('button', { name: 'annuler' }))
+    expect(submit).not.toHaveAttribute('aria-disabled')
+    fireEvent.click(submit)
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+  })
+
+  it("names the set the server refuses, and what's in the way, another session's set, linked, or another of the sets", async () => {
+    const refusing = (error: object) => mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: false, ...error } })
+    refusing({ error: "This YouTube video is another set's", session: null, set: null, setIndex: 1, otherSetIndex: 0 })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore')
+    await addSet('Brume')
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    let alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/^Le set de Brume, 22 h – 23 h n'a pas pu être ajouté : This YouTube video is another set's \(Set de Aurore, 21 h – 22 h\)$/)
+    expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
+
+    refusing({ error: "This YouTube video is another set's", session: SESSIONS[2], set: SESSIONS[2].sets[0], setIndex: 0 })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "Le set de Aurore, 21 h – 22 h n'a pas pu être ajouté : This YouTube video is another set's (Set de Brume, SOIRÉE, ven. 2 oct. 2026, 20 h – 21 h)",
+      ),
+    )
+    alert = screen.getByRole('alert')
+    expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-3')
+
+    refusing({ error: 'No such artist', setIndex: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^Le set de Brume, 22 h – 23 h n'a pas pu être ajouté : No such artist$/))
+
+    // About the session itself.
+    refusing({ error: 'Another session overlaps this one', session: SESSIONS[2], set: null })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^La session n'a pas pu être ajoutée : Another session overlaps this one \(SOIRÉE/))
   })
 })

@@ -5,11 +5,14 @@ import {
   checkSet,
   durationOf,
   endTimeAfter,
+  listedSet,
+  listedSetFields,
   minutesOf,
   newSetFormValues,
   sessionFormValues,
   sessionTimes,
   setFormValues,
+  shownSet,
   typeName,
   setPlace,
 } from './session-fields'
@@ -443,6 +446,47 @@ describe('checkSet', () => {
       otherPerformanceType: 'La prestation « Autre » dépasse 60 caractères.',
       soundcloudTrack: 'Le lien SoundCloud doit mener à la piste sur soundcloud.com, p. ex. « https://soundcloud.com/parkingdotradio/3tons ».',
       youtubeVideo: 'Le lien YouTube est invalide : collez le lien de la vidéo, ou son identifiant.',
+    })
+  })
+})
+
+describe("a new session's listed sets", () => {
+  const fields = {
+    performers: [{ id: 'artist-1' }],
+    offsetMinutes: 90,
+    durationMinutes: 60,
+    performanceTypes: [],
+    otherPerformanceType: '',
+    genres: [],
+    soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
+    youtubeVideo: 'https://youtu.be/dQw4w9WgXcQ',
+    application: 'application-1',
+  }
+  const listed = listedSet(fields, { performers: [{ id: 'artist-1', name: 'Aurore' }], application: { id: 'application-1', receivedAt: '2026-10-01T12:00:00-04:00' } })
+
+  it('are sent as their form sends them', () => {
+    expect(listedSetFields(listed)).toEqual(fields)
+  })
+
+  it("are placed relative to the session's start, so that they move with it, and counted from it without one", () => {
+    expect(shownSet(listed, { start: '2026-11-14T21:00:00-05:00', durationMinutes: 240 })).toMatchObject({
+      start: '2026-11-14T22:30-05:00',
+      end: '2026-11-14T23:30-05:00',
+      performers: [{ id: 'artist-1', name: 'Aurore' }],
+      status: 'planned',
+    })
+    expect(shownSet(listed, { start: '2026-11-15T20:00:00-05:00', durationMinutes: 240 })).toMatchObject({ start: '2026-11-15T21:30-05:00' })
+    expect(shownSet(listed, { start: null, durationMinutes: 240 })).toMatchObject({ start: null, end: null, offsetMinutes: 90 })
+  })
+
+  it('open their form as they were added, with the link to their video on YouTube', () => {
+    const session = { start: '2026-11-14T21:00:00-05:00', durationMinutes: 240 }
+    expect(setFormValues(shownSet(listed, session), session)).toMatchObject({
+      start: '22:30',
+      end: '23:30',
+      soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
+      youtubeVideo: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      application: { id: 'application-1' },
     })
   })
 })

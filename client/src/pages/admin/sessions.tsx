@@ -6,8 +6,8 @@ import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import { raEventId } from '../../session-links'
-import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues } from '../../session-fields'
-import type { Session, SessionStatus, StudioSet } from '../../session-fields'
+import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues, shownSet } from '../../session-fields'
+import type { ListedSet, Session, SessionPlace, SessionStatus, StudioSet } from '../../session-fields'
 import { Button } from './button'
 import {
   MISSING,
@@ -17,6 +17,7 @@ import {
   SET_STATUS_LABELS,
   applicationPath,
   byWhom,
+  capitalized,
   describePerformanceTypes,
   entryPath,
   flyerUrl,
@@ -35,12 +36,13 @@ import {
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
-import { ApplicationsFailure, ArtistsFailure, CollectivesFailure } from './profile-details'
+import { ApplicationsFailure, CollectivesFailure } from './profile-details'
 import { RaEventPanel } from './ra-event'
 import { failure, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import type { SessionFormProps } from './session-form'
-import { SetForm } from './set-form'
+import { Performers, SetLinks } from './set-cells'
+import { SetFormWithChoices } from './set-form'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
 // are its sets, and adding one.
@@ -80,16 +82,6 @@ function SessionsFailure({ message }: { message: string }) {
       Les sessions n'ont pas pu être chargées&nbsp;: {message}
     </p>
   )
-}
-
-// Performers, each linking to their page, separated by commas.
-function Performers({ performers }: { performers: StudioSet['performers'] }) {
-  return performers.map((performer, i) => (
-    <Fragment key={performer.id}>
-      {i > 0 && ', '}
-      <Link to={entryPath('artist', performer.id)}>{performer.name}</Link>
-    </Fragment>
-  ))
 }
 
 // The performers of a session's sets, set by set.
@@ -662,35 +654,6 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// A set's links, by the names of their sites, each leading to it, then the application it comes from, if any, leading
-// to its page, and named by when it was received for screen readers.
-function SetLinks({ set }: { set: StudioSet }) {
-  const links = [
-    { name: 'SoundCloud', link: set.soundcloudTrack },
-    { name: 'YouTube', link: set.youtubeVideo },
-  ]
-    .filter((link) => link.link)
-    .map(({ name, link }) => (
-      <a key={name} href={link!.url} target="_blank" rel="noreferrer">
-        {name}
-      </a>
-    ))
-  if (set.application) {
-    const label = `Candidature ${receivedOn(set.application)}`
-    links.push(
-      <Link key="application" to={applicationPath(set.application)} aria-label={label}>
-        Candidature
-      </Link>,
-    )
-  }
-  return links.map((link, i) => (
-    <Fragment key={link.key}>
-      {i > 0 && ' · '}
-      {link}
-    </Fragment>
-  ))
-}
-
 // What's wrong with where a set is, a sentence each, when it isn't cancelled: that it doesn't fit in its session, then
 // each set that it overlaps, in the order of the session's sets (see "Sets' places" in docs/design/server/sessions.md).
 function setProblems(set: StudioSet, session: Session): string[] {
@@ -783,18 +746,25 @@ function SetsTable({
   )
 }
 
-// The form of a set of `session`, or of a new one when `set` is null, under its sets, with every artist to pick the
-// performers from, loaded each time it opens, so that they're current, and nothing until then. When they can't be
-// loaded, it says so. A set's form also says who added it and changed it.
+// The form of a set of `session`, or of a new one when `set` is null, under its sets. A set's form also says who added
+// it and changed it.
 function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: StudioSet | null; onClose: () => void; onChanged: (session: Session) => void }) {
-  const artists = useApi('/api/admin/artists')
-  const applications = useApi('/api/admin/applications')
-  const headingId = useId()
-  if (artists.kind === 'loading' || applications.kind === 'loading') return null
-
   return (
-    <section aria-labelledby={headingId}>
-      <h3 id={headingId}>{set ? setTitle(set) : 'Nouveau set'}</h3>
+    <SetFormWithChoices
+      title={set ? setTitle(set) : 'Nouveau set'}
+      session={session}
+      initial={set ? setFormValues(set, session) : newSetFormValues(session)}
+      submitLabel={set ? 'enregistrer' : 'ajouter le set'}
+      onCancel={onClose}
+      onSubmit={async (fields) => {
+        const result = set
+          ? await api.PUT('/api/admin/sets/{id}', { params: { path: { id: set.id } }, body: fields })
+          : await api.POST('/api/admin/sessions/{id}/sets', { params: { path: { id: session.id } }, body: fields })
+        if (!result.ok) return failure(set ? "Le set n'a pas pu être enregistré" : "Le set n'a pas pu être ajouté", result, session.id)
+        onChanged(result.session)
+        return null
+      }}
+    >
       {set && (
         <>
           <p className="admin-meta">{byWhom('Ajouté', set.createdBy, set.createdAt)}</p>
@@ -802,25 +772,7 @@ function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: 
           {set.statusUpdatedBy && <p className="admin-meta">{byWhom('Statut changé', set.statusUpdatedBy, set.statusUpdatedAt)}</p>}
         </>
       )}
-      {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
-      {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
-      <SetForm
-        session={session}
-        initial={set ? setFormValues(set, session) : newSetFormValues(session)}
-        artists={artists.kind === 'loaded' ? artists.value.artists : null}
-        applications={applications.kind === 'loaded' ? applications.value.applications : null}
-        submitLabel={set ? 'enregistrer' : 'ajouter le set'}
-        onCancel={onClose}
-        onSubmit={async (fields) => {
-          const result = set
-            ? await api.PUT('/api/admin/sets/{id}', { params: { path: { id: set.id } }, body: fields })
-            : await api.POST('/api/admin/sessions/{id}/sets', { params: { path: { id: session.id } }, body: fields })
-          if (!result.ok) return failure(set ? "Le set n'a pas pu être enregistré" : "Le set n'a pas pu être ajouté", result, session.id)
-          onChanged(result.session)
-          return null
-        }}
-      />
-    </section>
+    </SetFormWithChoices>
   )
 }
 
@@ -858,10 +810,26 @@ function SessionFormWithChoices({
   )
 }
 
-// Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known.
+// Why a new session couldn't be added, with the sets listed in its form, `sets`, which were placed in `session`: the
+// server's message, and when it's about one of the sets, which one, and what's in the way, which can be another of them.
+function newSessionFailure(
+  result: { error: string; session?: Session | null; set?: StudioSet | null; setIndex?: number; otherSetIndex?: number },
+  session: SessionPlace,
+  sets: ListedSet[],
+): ReactNode {
+  const { setIndex, otherSetIndex } = result
+  if (setIndex === undefined) return failure("La session n'a pas pu être ajoutée", result)
+  const shown = (index: number) => shownSet(sets[index], session)
+  const other = otherSetIndex === undefined ? null : setName(shown(otherSetIndex))
+  return failure(`${capitalized(setInSentence(shown(setIndex)))} n'a pas pu être ajouté`, result, undefined, other)
+}
+
+// Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known, with
+// the sets listed in its form.
 export function NewSessionPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const [sets, setSets] = useState<ListedSet[]>([])
   return (
     <>
       <BackToSessions />
@@ -869,10 +837,11 @@ export function NewSessionPage() {
       <SessionFormWithChoices
         takeoverId={searchParams.get('takeover')}
         initial={EMPTY_SESSION_FORM}
+        sets={{ listed: sets, onChange: setSets }}
         submitLabel="ajouter la session"
         onSubmit={async (body) => {
           const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
-          if (!result.ok) return failure("La session n'a pas pu être ajoutée", result)
+          if (!result.ok) return newSessionFailure(result, body.session, sets)
           navigate(sessionPath(result.session))
           return null
         }}

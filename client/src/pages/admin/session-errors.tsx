@@ -12,10 +12,15 @@ export function sessionPath(session: Pick<Session, 'id'>): string {
 
 // Why something couldn't be done (`what`): the server's message, and what's in the way, if it names something, linking to
 // its session's page, unless that's the page of the session whose id is `here`, where a set is named without a link, and
-// the session itself isn't named.
-export function failure(what: string, result: { error: string; session?: Session | null; set?: StudioSet | null }, here?: string): ReactNode {
+// the session itself isn't named. What's in the way can also be given as it's `named`, when the server doesn't name it,
+// e.g. another of the sets listed in a new session's form.
+export function failure(
+  what: string,
+  result: { error: string; session?: Session | null; set?: StudioSet | null },
+  here?: string,
+  named: ReactNode = null,
+): ReactNode {
   const { session, set } = result
-  let named: ReactNode = null
   if (session && set) named = session.id === here ? setName(set) : <Link to={sessionPath(session)}>{setName(set, session)}</Link>
   else if (session && session.id !== here) named = <Link to={sessionPath(session)}>{sessionName(session)}</Link>
   return (
