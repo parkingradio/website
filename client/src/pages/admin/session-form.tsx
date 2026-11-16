@@ -20,7 +20,6 @@ import {
   listedSetFields,
   minutesOf,
   sessionTimes,
-  startAndEnd,
   typeName,
 } from '../../session-fields'
 import type { ListedSet, RaEvent, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
@@ -97,11 +96,8 @@ export function SessionForm({
     const session = sets ? { ...checked.fields!, sets: sets.map(listedSetFields) } : checked.fields!
     return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }, sets ?? [])
   })
-  // The session's times, which listed sets are placed in, or none while they aren't valid.
-  const listedIn: SetSession =
-    'errors' in times
-      ? { start: null, end: null, durationMinutes: null }
-      : { ...startAndEnd(times.start, times.durationMinutes), durationMinutes: times.durationMinutes }
+  // How long the session lasts, for its listed sets, or null while its times aren't valid.
+  const listedIn: SetSession = { durationMinutes: 'errors' in times ? null : times.durationMinutes }
 
   return (
     <>

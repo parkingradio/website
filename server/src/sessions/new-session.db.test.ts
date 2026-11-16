@@ -60,7 +60,7 @@ async function createApplication(artistId: string): Promise<string> {
 }
 
 function set(fields: object) {
-  return { performers: [], offsetMinutes: null, durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
+  return { performers: [], durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
 }
 
 async function createSession(fields: object, sets: object[]) {
@@ -104,36 +104,36 @@ beforeEach(async () => {
 })
 
 describe('a session added with its sets', () => {
-  it('has them, in the order they were sent where they are otherwise in the same place, with their performers and applications', async () => {
+  it('has them, in the order they were sent, with their performers and applications', async () => {
     const [aurore, brume] = [await createArtist('Aurore'), await createArtist('Brume')]
     const application = await createApplication(aurore)
     const response = await createSession({}, [
       set({ performers: [{ id: brume }], durationMinutes: 60 }),
-      set({ performers: [{ id: aurore }, { id: brume }], offsetMinutes: 60, durationMinutes: 60, application }),
+      set({ performers: [{ id: aurore }, { id: brume }], durationMinutes: 60, application }),
       set({ performers: [{ id: aurore }], soundcloudTrack: 'https://soundcloud.com/parkingdotradio/a' }),
-      set({ performers: [{ id: brume }], offsetMinutes: 60, durationMinutes: 30, youtubeVideo: 'aaaaaaaaaaa' }),
+      set({ performers: [{ id: brume }], durationMinutes: 30, youtubeVideo: 'aaaaaaaaaaa' }),
       // Sharing the application of another set.
-      set({ performers: [{ id: aurore }], offsetMinutes: 0, durationMinutes: 60, application }),
+      set({ performers: [{ id: aurore }], durationMinutes: 60, application }),
     ])
 
     expect(response.statusCode).toBe(200)
     const { sets } = response.json().session
     expect(sets.map(({ performers }: { performers: { name: string }[] }) => performers.map(({ name }) => name).join(' & '))).toEqual([
-      'Aurore',
-      'Aurore & Brume',
       'Brume',
+      'Aurore & Brume',
+      'Aurore',
       'Brume',
       'Aurore',
     ])
-    expect(sets.map(({ offsetMinutes }: { offsetMinutes: number | null }) => offsetMinutes)).toEqual([0, 60, 60, null, null])
+    expect(sets.map(({ durationMinutes }: { durationMinutes: number | null }) => durationMinutes)).toEqual([60, 60, null, 30, 60])
     expect(sets[1].application.id).toBe(application)
-    expect(sets[3].durationMinutes).toBe(60)
-    expect(sets[4].soundcloudTrack).toEqual({ id: '1', url: 'https://soundcloud.com/parkingdotradio/a' })
+    expect(sets[4].application.id).toBe(application)
+    expect(sets[2].soundcloudTrack).toEqual({ id: '1', url: 'https://soundcloud.com/parkingdotradio/a' })
     expect(sets.every(({ status }: { status: string }) => status === 'planned')).toBe(true)
     // As the session is read again, which doesn't depend on the order the database happens to return them in.
     expect((await request('GET', `/api/admin/sessions/${response.json().session.id}`)).json().session.sets).toEqual(sets)
-    const { rows } = await database.db.execute<{ count: number }>(sql`select count(distinct created_at)::int as count from sets`)
-    expect(rows[0].count).toBe(5)
+    const { rows } = await database.db.execute<{ position: number }>(sql`select position from sets order by position`)
+    expect(rows.map(({ position }) => position)).toEqual([0, 1, 2, 3, 4])
     await checkSessionsInvariants(database.db)
   })
 

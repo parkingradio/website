@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -12,7 +12,6 @@ import {
   NO_SUCH_ARTIST,
   NO_SUCH_COLLECTIVE,
   brokenSessionRule,
-  brokenSetRule,
 } from './fields.js'
 import type { BrokenRule, SentPerformer, Status } from './fields.js'
 
@@ -21,7 +20,8 @@ import type { BrokenRule, SentPerformer, Status } from './fields.js'
 // The application a set or a session comes from, as they give it.
 export type StoredApplicationLink = { id: string; receivedAt: Date }
 
-// A set, as the database keeps it, with its performers, in order, and its application.
+// A set, as the database keeps it, with its performers, in order, and its application. Its position is its place among
+// its session's sets, from 0 (see "sets" in db/schema.ts).
 export type SetRow = typeof sets.$inferSelect
 export type StoredSet = SetRow & { performers: Reference[]; application: StoredApplicationLink | null }
 
@@ -30,12 +30,12 @@ export type SessionRow = typeof sessions.$inferSelect
 export type StoredSession = SessionRow & { takeover: Reference | null; application: StoredApplicationLink | null; sets: StoredSet[] }
 
 // What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status, and a
-// session's flyer, which is where it's stored (see `Photos` in artists/store.ts), and its MIME type, or nulls for none.
+// session's flyer, which is where it's stored (see `Photos` in artists/store.ts), and its MIME type, or nulls for none,
+// and a set's position, which the store gives it.
 export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'applicationId' | 'raEventId' | 'description'>
 export type StoredFlyer = { flyerKey: string; flyerType: string } | { flyerKey: null; flyerType: null }
 export type SetChanges = Pick<
   SetRow,
-  | 'offsetMinutes'
   | 'durationMinutes'
   | 'performanceTypes'
   | 'otherPerformanceType'
@@ -60,8 +60,7 @@ class Refused extends Error {
 export class NoSuchReference extends Refused {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
-// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts, and
-// `checkAnnounced`), or its application (see `checkSessionApplication` and `checkSetApplication`). The message says
+// it doesn't change as they are (see `brokenSessionRule` in sessions/fields.ts, and `checkAnnounced`), or its application (see `checkSessionApplication` and `checkSetApplication`). The message says
 // which.
 export class BrokenFields extends Refused {}
 
@@ -153,14 +152,18 @@ export type SessionsStore = {
   delete(id: string): Promise<SessionRow | null>
   // The set as the database keeps it, without its performers.
   getSet(id: string): Promise<SetRow | null>
-  // Adds a set to the session `sessionId`, as "planned". Throws a NoSuchReference, a BrokenFields or a Conflict.
+  // Adds a set to the session `sessionId`, as "planned", after its other sets. Throws a NoSuchReference, a BrokenFields or
+  // a Conflict.
   addSet(sessionId: string, set: NewSet): Promise<StoredSession | null>
   // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
-  // but not its session or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
+  // but not its session, its position or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
   // Throws a Conflict.
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>
-  // Returns false if the set didn't exist. Its performers stay.
+  // Moves the set to `position` among its session's sets, or last when that's past the last, the others keeping their
+  // order. Doesn't count as changing it.
+  moveSet(id: string, position: number): Promise<StoredSession | null>
+  // Returns false if the set didn't exist. Its performers stay, and the session's other sets keep their order.
   deleteSet(id: string): Promise<boolean>
   // The sessions that come from one of the applications `applicationIds`, or that have a set that does, in the order of
   // `list`, with all their sets.
@@ -179,7 +182,7 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
     .from(sets)
     .leftJoin(applications, eq(applications.id, sets.applicationId))
     .where(inArray(sets.sessionId, sessionIds))
-    .orderBy(sql`${sets.offsetMinutes} asc nulls last`, asc(sets.createdAt))
+    .orderBy(asc(sets.position))
   const performers =
     rows.length === 0
       ? []
@@ -393,18 +396,24 @@ function checkingSetRules<T>(
   )
 }
 
-// Adds `set` to the session `sessionId`, in the transaction `tx`, which holds the sessions' lock, with `added` and
-// `createdAt` as `create` gives them when the set is added with its session, and returns its id. Throws a
-// NoSuchReference, a BrokenFields or a Conflict.
+// How many sets the session `sessionId` has, which is the position of the one that's added next.
+async function setCount(tx: Queryable, sessionId: string): Promise<number> {
+  const [{ sets: found }] = await tx.select({ sets: count() }).from(sets).where(eq(sets.sessionId, sessionId))
+  return found
+}
+
+// Adds `set` to the session `sessionId`, after its other sets, in the transaction `tx`, which holds the sessions' lock,
+// with `added` and its `position` as `create` gives them when the set is added with its session, and returns its id.
+// Throws a NoSuchReference, a BrokenFields or a Conflict.
 async function insertSet(
   tx: Queryable,
   sessionId: string,
   { performers, ...set }: NewSet,
-  { added, createdAt }: { added?: Map<string, number>; createdAt?: SQL } = {},
+  { added, position }: { added?: Map<string, number>; position?: number } = {},
 ): Promise<string> {
   await checkPerformers(tx, performers)
   if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
-  const row = { ...set, sessionId, ...(createdAt && { createdAt }) }
+  const row = { ...set, sessionId, position: position ?? (await setCount(tx, sessionId)) }
   const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }), added)
   await addPerformers(tx, id, performers)
   return id
@@ -463,10 +472,8 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const added = new Map<string, number>()
         for (const [setIndex, set] of newSets.entries()) {
           try {
-            // A microsecond apart, in order, so that the sets that are otherwise in the same place are in the order they
-            // were sent (see `setsOf`), rather than all added at the time the transaction started.
-            const createdAt = sql`now() + ${setIndex} * interval '1 microsecond'`
-            added.set(await insertSet(tx, row.id, set, { added, createdAt }), setIndex)
+            // A new session's sets are in the order they're sent.
+            added.set(await insertSet(tx, row.id, set, { added, position: setIndex }), setIndex)
           } catch (error) {
             if (error instanceof Refused) error.setIndex = setIndex
             throw error
@@ -559,7 +566,6 @@ export function sessionsStore(db: Queryable): SessionsStore {
         // The rules are about the set as it will be, with the fields that aren't changed as they are, its performers
         // included, which stay as they are when they're left out.
         const set = changed(before, changes)
-        check(brokenSetRule(set))
         if (performers) await checkPerformers(tx, performers)
         // Against its new performers, or else those it has.
         if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, performers ? idsOf(performers) : await savedPerformerIds(tx, id))
@@ -586,12 +592,41 @@ export function sessionsStore(db: Queryable): SessionsStore {
       })
     },
 
+    async moveSet(id, position) {
+      if (!isUuid(id)) return null
+      return db.transaction(async (tx) => {
+        await lockSessions(tx)
+        const [set] = await tx.select({ sessionId: sets.sessionId, position: sets.position }).from(sets).where(eq(sets.id, id))
+        if (!set) return null
+        // Past the last, it goes last, before anything reaches the database, whose integers are smaller than some numbers
+        // that are sent.
+        const to = Math.min(position, (await setCount(tx, set.sessionId)) - 1)
+        const from = set.position
+        if (to !== from) {
+          // The sets in between shift by one towards where it was. In a single statement, since each position is only
+          // once in a session, which is checked at the end of each statement (see "sets" in db/schema.ts).
+          const shift = to < from ? sql`${sets.position} + 1` : sql`${sets.position} - 1`
+          await tx
+            .update(sets)
+            .set({ position: sql`case when ${sets.id} = ${id} then ${to}::integer else ${shift} end` })
+            .where(and(eq(sets.sessionId, set.sessionId), sql`${sets.position} between ${Math.min(from, to)} and ${Math.max(from, to)}`))
+        }
+        return sessionWithId(tx, set.sessionId)
+      })
+    },
+
     async deleteSet(id) {
       if (!isUuid(id)) return false
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const deleted = await tx.delete(sets).where(eq(sets.id, id)).returning({ id: sets.id })
-        return deleted.length > 0
+        const [deleted] = await tx.delete(sets).where(eq(sets.id, id)).returning({ sessionId: sets.sessionId, position: sets.position })
+        if (!deleted) return false
+        // The sets after it move up, so that the positions are still 0 to n - 1.
+        await tx
+          .update(sets)
+          .set({ position: sql`${sets.position} - 1` })
+          .where(and(eq(sets.sessionId, deleted.sessionId), gt(sets.position, deleted.position)))
+        return true
       })
     },
 

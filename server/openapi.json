@@ -929,36 +929,6 @@
           "id": {
             "type": "string"
           },
-          "start": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its session's start plus its offset. Null when either is"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its start plus its duration. Null when its start is"
-          },
-          "offsetMinutes": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "durationMinutes": {
             "type": [
               "number",
@@ -1002,9 +972,6 @@
         },
         "required": [
           "id",
-          "start",
-          "end",
-          "offsetMinutes",
           "durationMinutes",
           "status",
           "session"
@@ -2463,7 +2430,7 @@
             "items": {
               "$ref": "#/components/schemas/Set"
             },
-            "description": "By offset, then by when they were added, those without an offset last"
+            "description": "In their order, which is the order they take place in, one after the other, cancelled ones included"
           },
           "createdAt": {
             "type": "string",
@@ -2670,52 +2637,15 @@
             },
             "description": "The artists who played, in order"
           },
-          "offsetMinutes": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "durationMinutes": {
             "type": [
               "number",
               "null"
             ]
           },
-          "start": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its session's start plus its offset. Null when either is"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Its start plus its duration. Null when its start is"
-          },
           "fitsInSession": {
             "type": "boolean",
-            "description": "Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits"
-          },
-          "overlappingSets": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order"
+            "description": "Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends"
           },
           "performanceTypes": {
             "type": "array",
@@ -2864,12 +2794,8 @@
         "required": [
           "id",
           "performers",
-          "offsetMinutes",
           "durationMinutes",
-          "start",
-          "end",
           "fitsInSession",
-          "overlappingSets",
           "performanceTypes",
           "otherPerformanceType",
           "genres",
@@ -2897,19 +2823,6 @@
             },
             "description": "Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped"
           },
-          "offsetMinutes": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 1439
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "When the set starts, in minutes after its session's start. Null when that isn't known yet"
-          },
           "durationMinutes": {
             "anyOf": [
               {
@@ -2921,7 +2834,7 @@
                 "type": "null"
               }
             ],
-            "description": "Null when that isn't known yet, which a set with an offset can't be"
+            "description": "Null while it isn't known, which counts as none for the sets after it: see \"Sets' order\" in the rules"
           },
           "performanceTypes": {
             "type": "array",
@@ -3019,7 +2932,6 @@
         },
         "required": [
           "performers",
-          "offsetMinutes",
           "durationMinutes",
           "performanceTypes",
           "otherPerformanceType",
@@ -3027,6 +2939,20 @@
           "soundcloudTrack",
           "youtubeVideo",
           "application"
+        ],
+        "additionalProperties": false
+      },
+      "SetPosition": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last"
+          }
+        },
+        "required": [
+          "position"
         ],
         "additionalProperties": false
       },
@@ -7811,7 +7737,7 @@
         }
       },
       "put": {
-        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
+        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
         "tags": [
           "Sessions"
         ],
@@ -7958,7 +7884,7 @@
       },
       "patch": {
         "operationId": "update_session",
-        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
+        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
         "tags": [
           "Sessions"
         ],
@@ -8623,7 +8549,7 @@
     "/api/admin/sessions/{id}/sets": {
       "post": {
         "operationId": "create_set",
-        "summary": "Adds a set to a session, as planned, and returns the session",
+        "summary": "Adds a set to a session, as planned, after its other sets, and returns the session",
         "tags": [
           "Sessions"
         ],
@@ -8749,7 +8675,7 @@
     },
     "/api/admin/sets/{id}": {
       "put": {
-        "summary": "Replaces a set's fields, but not its session or its status, and returns its session",
+        "summary": "Replaces a set's fields, but not its session, its place among the session's sets, or its status, and returns its session",
         "tags": [
           "Sessions"
         ],
@@ -8874,7 +8800,7 @@
       },
       "patch": {
         "operationId": "update_set",
-        "summary": "Changes a set, only the fields it's given, but not its session or its status, and returns its session",
+        "summary": "Changes a set, only the fields it's given, but not its session, its place among the session's sets, or its status, and returns its session",
         "tags": [
           "Sessions"
         ],
@@ -8893,19 +8819,6 @@
                     },
                     "description": "Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped"
                   },
-                  "offsetMinutes": {
-                    "anyOf": [
-                      {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 1439
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "description": "When the set starts, in minutes after its session's start. Null when that isn't known yet"
-                  },
                   "durationMinutes": {
                     "anyOf": [
                       {
@@ -8917,7 +8830,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Null when that isn't known yet, which a set with an offset can't be"
+                    "description": "Null while it isn't known, which counts as none for the sets after it: see \"Sets' order\" in the rules"
                   },
                   "performanceTypes": {
                     "type": "array",
@@ -9317,6 +9230,113 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sets/{id}/position": {
+      "put": {
+        "operationId": "update_set_position",
+        "summary": "Moves a set to another place among its session's sets, the others keeping their order, and returns its session",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPosition"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }

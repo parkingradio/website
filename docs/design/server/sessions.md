@@ -38,7 +38,7 @@ A session, as the endpoints below return it, also has:
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
 | `effectiveDescription` | string | The session's description: its `description`, or else the one its type gives it, or `""` when neither has one: see [Descriptions](#descriptions) |
 | `hasFlyer` | boolean | Whether the session has a flyer: see [Flyers](#flyers) |
-| `sets` | list of sets | Its sets, by `offsetMinutes`, the sets without an offset last, then in the order they were added, those added with their session in the order they were sent, cancelled ones included |
+| `sets` | list of sets | Its sets, in their order, cancelled ones included: see [Sets' order](#sets-order) |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
@@ -52,14 +52,13 @@ A session, as the endpoints below return it, also has:
 Every set belongs to a session: the one it's added to, or added with, which doesn't change. Sets aren't listed on their
 own: they're in their sessions, and the `total` of a list of sessions counts sessions, not sets. A session can be added
 with its sets, all of them or nothing, in a single request, whose errors about one of the sets say which it is, by its
-place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A
-set has:
+place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), and
+which keep the order they're sent in. A set has:
 
 | Field | Type | |
 |---|---|---|
 | `performers` | list | The artists who played, in order: see [Performers](#performers) |
-| `offsetMinutes` | number or null | When the set starts, in minutes after its session's start, or null when that isn't known yet: see [Times](#times) |
-| `durationMinutes` | number or null | How long the set lasts, or null when that isn't known yet: see [Times](#times) |
+| `durationMinutes` | number or null | How long the set lasts, or null when that isn't known yet: see [Times](#times) and [Sets' order](#sets-order) |
 | `performanceTypes` | list of strings | What the performers do: ids from `PERFORMANCE_TYPES` in `server/src/applications/fields.ts`, like an application's (see [Applications](applications.md)), e.g. `"dj"` or `"live-performance"`. Requests can list them in any order, even more than once, and other values fail with 400. Responses list them in the order of `PERFORMANCE_TYPES`. Can be empty |
 | `otherPerformanceType` | string | Anything else the performers do, in a few words, e.g. `"Synthé modulaire"`. Each run of spaces, tabs or line breaks becomes a single space, and it's trimmed, then up to 60 characters, or `""` when there's none |
 | `genres` | list of strings | The set's genres: ids of `GENRES` in `server/src/artists/profile.ts`, like an artist's (see [Profiles](artists.md#profiles)), most important first, or none. They describe the set, which can differ from its performers' genres, e.g. an ambient set by a techno artist. A genre that's there twice is dropped, keeping the first, and other values fail with 400 |
@@ -72,12 +71,10 @@ A set, as the endpoints below return it, also has:
 | Field | Type | |
 |---|---|---|
 | `id` | string | |
-| `start`, `end` | string or null | When the set starts and ends: its session's `start` plus its `offsetMinutes`, and that plus its `durationMinutes`. Null when its session has no `start`, or the set no `offsetMinutes` |
-| `fitsInSession` | boolean | Whether the set fits in its session, whatever its status: see [Sets' places](#sets-places) |
-| `overlappingSets` | list of strings | The ids of the other sets of its session that aren't cancelled and that it overlaps, in the order of the session's `sets`: see [Sets' places](#sets-places) |
+| `fitsInSession` | boolean | Whether the set fits in its session, whatever its status: see [Sets' order](#sets-order) |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, a performer being deleted, or its application being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -89,19 +86,16 @@ Québec time, with or without seconds, with the offset from UTC in effect then, 
 `"2026-07-01T21:00-04:00"` in summer, or as null, or a blank string, for none. Any other offset is refused, e.g.
 `"2026-11-14T21:00-04:00"`, and so is a time the clocks skip, e.g. 2:30 on March 14, 2027. A time they show twice, e.g.
 1:30 on November 1, 2026, takes the offset of the one it is: -04:00 for the first, -05:00 for the second. Responses give
-it, and the `start` and `end` the server works out, in Québec time, to the second, with the offset in effect then, e.g.
+it, and the `end` the server works out, in Québec time, to the second, with the offset in effect then, e.g.
 `"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from the year 2000 to the
 year 2999, in UTC, and can be in the past or in the future.
 
-A set's place in its session is relative to the session's start: its `offsetMinutes`, and its `durationMinutes`, so that
-moving a session moves its sets with it. Either can be null, e.g. while the order of the sets isn't known yet, but a set
-with an offset also has a duration: giving an offset to a set without a duration takes giving it one in the same
-request. A set is meant to take place during its session, but doesn't have to (see
-[Sets' places](#sets-places)).
+A set has a duration, which can be null while it isn't known yet, but no start: its place in its session is its place
+among the session's sets (see [Sets' order](#sets-order)).
 
-Durations and offsets are whole numbers of minutes, of time that actually passes, whatever the clocks say: a session
-from 21:00 to 2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A duration is from 1 minute to 24
-hours (1440 minutes), and an offset is from 0 to 1439 minutes.
+Durations are whole numbers of minutes, of time that actually passes, whatever the clocks say: a session from 21:00 to
+2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A duration is from 1 minute to 24 hours (1440
+minutes).
 
 To find the sessions of a period, e.g. next week, list them with `from` and `to`, instants like `start`, each with the
 offset in effect at that time: that gives the sessions that start at or after `from` and before `to`, and leaves out
@@ -133,25 +127,30 @@ are null for the 409s that aren't about a session or a set, and when the set in 
 request, which `otherSetIndex` gives instead, by its place in the list of sets sent, from 0 (see
 [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
-## Sets' places
+## Sets' order
 
-Each set is streamed as its own YouTube live, so there's meant to be one at a time: a session's sets are meant to take
-place during it, one after the other. The server doesn't require it, so that a session's times and its sets' can be
-changed one at a time, in any order, e.g. a session shortened before its last set is moved. But since it's usually a
-mistake, or a change that isn't finished, each set says where it stands:
+Each set is streamed as its own YouTube live, so a session's sets take place one at a time, one after the other, in the
+order admins give them, which is the order of the session's `sets`. There's no break between them: each set starts when
+the one before it ends. The server doesn't say when each set starts or ends, since sets don't keep to their times
+exactly: only their order and their durations are known. Every set has its place in the order, whatever its status: a
+cancelled set keeps its place, and its duration still counts.
 
-- **A set fits in its session** (`fitsInSession`) when its offset plus its duration, or its duration alone when it has
-  no offset, is no more than the session's duration. A set without a duration always fits. This is about the set's
-  times only, whatever its status.
-- **A set overlaps another set of its session** when both have an offset, and so a duration, and their times overlap.
-  A set takes from its offset, included, to its offset plus its duration, excluded, so a set can start when the one
-  before it ends. `overlappingSets` lists the other sets that a set overlaps, but only those that aren't cancelled,
-  since a cancelled set doesn't take place. So it isn't symmetric: a cancelled set lists the sets it would overlap if it
-  weren't cancelled, but they don't list it.
+A new set goes after the session's other sets, and the sets added with their session are in the order they're sent.
+Giving a set another place, e.g. one that was added last, takes moving it afterwards, with
+[`PUT /api/admin/sets/:id/position`](#put-apiadminsetsidposition-admin), to its place among the session's sets, from 0
+for the first, cancelled ones included: the other sets keep their order. Deleting a set leaves the others in their
+order.
 
-Only the sets that aren't cancelled are expected to fit in their session and to overlap no other set: those that don't
-are what's worth pointing out. Apps that change a session's or its sets' times should tell the admin about the sets
-that aren't cancelled and that they leave not fitting in their session, or overlapping another set.
+**A set fits in its session** (`fitsInSession`) when it ends no later than the session does: when its duration and those
+of the sets before it add up to no more than the session's duration. A duration that isn't known counts as none, so it
+doesn't push the sets after it, and a set without a duration fits when the durations of the sets before it add up to
+less than the session's duration, i.e. when it starts before the session ends. This is about the order and the
+durations only, whatever the sets' statuses. The server doesn't require sets to fit, so that a session and its sets can
+be changed one at a time, in any order, e.g. a session shortened before its last set is shortened too. But since a set that doesn't
+fit is usually a mistake, or a change that isn't finished, apps that change a session's duration, or its sets'
+durations or order, should tell the admin about the sets that aren't cancelled and that they leave not fitting. E.g. a
+cancelled set and the set that replaces it both count: removing the cancelled set's duration, or deleting it, keeps it
+from pushing the sets after it.
 
 ## Status
 
@@ -404,8 +403,8 @@ Only an error about one of the sets has `setIndex`: that set's place in `sets`, 
 
 ## `PUT /api/admin/sessions/:id` (admin)
 
-Replaces a session's fields, but not its status, whether it's announced, or its sets, which move with its start, and
-stay as they are when it's shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It
+Replaces a session's fields, but not its status, whether it's announced, or its sets, which keep their order, even
+when they don't fit in it anymore (see [Sets' order](#sets-order)). It
 takes the same request as `POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which
 is deleted. Without one, the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which
 removes it, and deletes it. Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it,
@@ -449,9 +448,9 @@ their applications. Fails with
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
-Adds a set to a session, as `"planned"`. The request has the set's `performers`, `offsetMinutes`, `durationMinutes`,
-`performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack`, `youtubeVideo` and `application`, as above, none
-of them left out.
+Adds a set to a session, as `"planned"`, after its other sets (see [Sets' order](#sets-order)). The request has the
+set's `performers`, `durationMinutes`, `performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack`,
+`youtubeVideo` and `application`, as above, none of them left out.
 
 | Response field | Type | |
 |---|---|---|
@@ -471,7 +470,8 @@ When it fails, nothing is saved.
 
 ## `PUT /api/admin/sets/:id` (admin)
 
-Replaces a set's fields, even when its session is cancelled, but not its session or its status. It takes the same
+Replaces a set's fields, even when its session is cancelled, but not its session, its place among its session's sets,
+or its status. It takes the same
 request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it is then, and fails like it, but
 with 404 when there's no such set, which is checked before the track is resolved, and without the 409 for a cancelled
 session.
@@ -480,9 +480,9 @@ session.
 
 Changes the fields of a set it's sent, like `PUT /api/admin/sets/:id`, and leaves the others as they are (see
 [Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT` takes. `performers`, when it's
-sent, replaces the set's performers, and `soundcloudTrack` is only resolved when it's sent. An offset and a duration are
-checked together, and so are the performers and the application, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when there's no
-field.
+sent, replaces the set's performers, and `soundcloudTrack` is only resolved when it's sent. The performers and the
+application are checked together, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when
+there's no field.
 
 ## `PUT /api/admin/sets/:id/status` (admin)
 
@@ -494,6 +494,18 @@ Changes a set's status, and responds like `POST /api/admin/sessions/:id/sets`. F
 these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
 with that session in `session`.
 
+## `PUT /api/admin/sets/:id/position` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `position` | number | The set's new place among its session's sets, from 0 for the first, cancelled ones included. Past the last, it goes last |
+
+Moves a set to another place among its session's sets, even when its session is cancelled, and leaves the others in
+their order (see [Sets' order](#sets-order)). It doesn't change the set's fields or its status, or who last changed it.
+Responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `position` isn't a whole number from 0, and 404 when
+there's no such set.
+
 ## `DELETE /api/admin/sets/:id` (admin)
 
-Deletes a set, and responds `{"ok": true}`. Its performers stay, and so does its application. Fails with 404 when there's no such set.
+Deletes a set, and responds `{"ok": true}`. The session's other sets keep their order. Its performers stay, and so does
+its application. Fails with 404 when there's no such set.

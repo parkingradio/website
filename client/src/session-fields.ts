@@ -14,7 +14,7 @@ import { isSoundcloudTrackLink, youtubeVideoId, youtubeVideoUrl } from './sessio
 // (see server/src/sessions/fields.ts), which must be changed together with these. Their messages are in French, unlike
 // the server's. The server's are the ones that count: when they disagree, the server's message shows. The rules that
 // involve other sessions or sets, e.g. that sessions don't overlap, are only the server's. Whether a set fits in its
-// session, or overlaps another set, isn't checked: the server allows it, and its session's page marks it.
+// session isn't checked: the server allows it, and its session's page marks it.
 
 export type Session = Schema<'Session'>
 // A set, as the endpoints return it. Not `Set`, which is JavaScript's.
@@ -106,9 +106,8 @@ En gros, l'artiste se pointe au parking avec son laptop et shoot ses visuels dir
 
 const NAME_MAX_LENGTH = 100
 export const DESCRIPTION_MAX_LENGTH = 5000
-// The longest a session or a set lasts, in minutes. A set's offset is less than that.
+// The longest a session or a set lasts, in minutes.
 const MAX_MINUTES = 24 * 60
-const LONGEST = 'Un set dure au plus 24 heures.'
 // Sessions start from 2000 to 2999, in UTC.
 const EARLIEST = Date.parse('2000-01-01T00:00:00Z')
 const LATEST = Date.parse('3000-01-01T00:00:00Z')
@@ -295,20 +294,11 @@ export function checkSession(
 
 // Sets.
 
-// A set as the form has it: its performers as they're shown, its place in its session, and the rest as it's typed. Its
-// place is its start and end times in Québec time, as "HH:MM", in a session with a date, or its start, as hours and
-// minutes after its session's start (`offset`), and its `duration`, in a session without one, or only its duration when
-// its place isn't known yet (`unplaced`).
+// A set as the form has it: its performers as they're shown, its duration, empty while it isn't known, and the rest as
+// it's typed. Its place among its session's sets isn't in its form: it's changed in the list of sets.
 export type SetFormValues = {
   performers: Reference[]
-  unplaced: boolean
-  start: string
-  end: string
-  offset: Duration
   duration: Duration
-  // The times the form opened with in a session with a date, e.g. a set's, and what they stood for: each one left as it
-  // was stands for what it stood for, even when a time happens twice and the one meant is the second (see `setPlace`).
-  opened?: { start: string; end: string; offsetMinutes: number; durationMinutes: number }
   performanceTypes: PerformanceTypeId[]
   otherPerformanceType: string
   genres: GenreId[]
@@ -318,28 +308,15 @@ export type SetFormValues = {
   application: ApplicationLink | null
 }
 
-// The session a set is in, as far as its place goes, which is relative to its start.
-export type SessionPlace = Pick<Session, 'start'>
-
-// When something that starts at `start`, or whose start isn't known when it's null, and lasts `durationMinutes` starts and
-// ends, as the endpoints give them.
-export function startAndEnd(start: Date | null, durationMinutes: number): Pick<Session, 'start' | 'end'> {
-  return { start: start && quebecDateTime(start), end: start && quebecDateTime(after(start, durationMinutes)) }
-}
-
 // A set as far as its form goes, which a set that's saved is, and so is one that's listed in a new session's form (see
 // `ListedSet`).
-export type SetValues = Pick<StudioSet, 'performers' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'application' | 'offsetMinutes' | 'durationMinutes'> & {
+export type SetValues = Pick<StudioSet, 'performers' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'application' | 'durationMinutes'> & {
   soundcloudTrack: { url: string } | null
   youtubeVideo: { url: string } | null
 }
 
 const EMPTY_SET_FORM: SetFormValues = {
   performers: [],
-  unplaced: false,
-  start: '',
-  end: '',
-  offset: EMPTY_DURATION,
   duration: EMPTY_DURATION,
   performanceTypes: [],
   otherPerformanceType: '',
@@ -349,20 +326,11 @@ const EMPTY_SET_FORM: SetFormValues = {
   application: null,
 }
 
-// A set's place as the form shows it: in a session with a date, the times it starts and ends, which stand for its offset
-// and duration while they're unchanged.
-function placeValues(session: SessionPlace, offsetMinutes: number, durationMinutes: number): Partial<SetFormValues> {
-  if (session.start === null) return { offset: durationOf(offsetMinutes), duration: durationOf(durationMinutes) }
-  const startAt = after(new Date(session.start), offsetMinutes)
-  const shown = { start: quebecDayAndTime(startAt).time, end: quebecDayAndTime(after(startAt, durationMinutes)).time }
-  return { ...shown, opened: { ...shown, offsetMinutes, durationMinutes } }
-}
-
-// A set of `session` as the form shows it, to change it.
-export function setFormValues(set: SetValues, session: SessionPlace): SetFormValues {
-  const values: SetFormValues = {
-    ...EMPTY_SET_FORM,
+// A set as the form shows it, to change it.
+export function setFormValues(set: SetValues): SetFormValues {
+  return {
     performers: set.performers,
+    duration: durationOf(set.durationMinutes),
     performanceTypes: set.performanceTypes,
     otherPerformanceType: set.otherPerformanceType,
     genres: set.genres,
@@ -370,82 +338,36 @@ export function setFormValues(set: SetValues, session: SessionPlace): SetFormVal
     youtubeVideo: set.youtubeVideo?.url ?? '',
     application: set.application,
   }
-  // A set with an offset has a duration.
-  if (set.offsetMinutes === null || set.durationMinutes === null) return { ...values, unplaced: true, duration: durationOf(set.durationMinutes) }
-  return { ...values, ...placeValues(session, set.offsetMinutes, set.durationMinutes) }
 }
 
-// What a new set of `session` starts with: when the last of its sets that isn't cancelled and whose place is known ends,
-// or at its start when there's none, for an hour, or until the session ends if that's sooner, or without times when
-// its sets fill it. A session whose duration is null, since its times aren't known yet, is never filled.
-export function newSetFormValues(
-  session: Pick<Session, 'start'> & { durationMinutes: number | null; sets: Pick<StudioSet, 'status' | 'offsetMinutes' | 'durationMinutes'>[] },
-): SetFormValues {
-  const ends = session.sets.filter((set) => set.status !== 'cancelled' && set.offsetMinutes !== null).map((set) => set.offsetMinutes! + set.durationMinutes!)
-  const offsetMinutes = Math.max(0, ...ends)
-  const durationMinutes = session.durationMinutes === null ? 60 : Math.min(60, session.durationMinutes - offsetMinutes)
-  if (durationMinutes <= 0) return EMPTY_SET_FORM
-  return { ...EMPTY_SET_FORM, ...placeValues(session, offsetMinutes, durationMinutes) }
+// How long a new set lasts by default, which goes after the other sets of a session of `durationMinutes`: an hour, or
+// what's left of the session after its sets, cancelled ones included, if that's less, or null when they fill it. A
+// session whose duration is null, since its times aren't known yet, is never filled.
+export function newSetDuration({ durationMinutes, sets }: { durationMinutes: number | null; sets: Pick<StudioSet, 'durationMinutes'>[] }): number | null {
+  if (durationMinutes === null) return 60
+  const left = durationMinutes - minutesBefore(sets, sets.length)
+  return left > 0 ? Math.min(60, left) : null
 }
 
-export type SetPlace = { offsetMinutes: number | null; durationMinutes: number | null }
-
-// Where a set is in `session`, from its times in Québec time, or its offset and duration (see "Times" in
-// docs/design/client/admin/sessions.md), or what's wrong with them instead. It doesn't have to be within the session.
-export function setPlace(form: SetFormValues, session: SessionPlace): SetPlace | { errors: FieldErrors<SetFormValues> } {
-  if (form.unplaced) {
-    const durationMinutes = minutesOf(form.duration)
-    if (durationMinutes === undefined || durationMinutes === 0) return { errors: { duration: 'La durée est invalide.' } }
-    if (durationMinutes !== null && durationMinutes > MAX_MINUTES) return { errors: { duration: LONGEST } }
-    return { offsetMinutes: null, durationMinutes }
-  }
-
-  let place: { offsetMinutes: number; durationMinutes: number }
-  if (session.start === null) {
-    const offsetMinutes = minutesOf(form.offset)
-    const durationMinutes = minutesOf(form.duration)
-    const errors: FieldErrors<SetFormValues> = {}
-    if (offsetMinutes === null) errors.offset = 'Indiquez quand le set commence.'
-    else if (offsetMinutes === undefined) errors.offset = 'Le début est invalide.'
-    if (durationMinutes === null) errors.duration = 'Indiquez la durée du set.'
-    else if (durationMinutes === undefined || durationMinutes === 0) errors.duration = 'La durée est invalide.'
-    if (Object.keys(errors).length > 0) return { errors }
-    place = { offsetMinutes: offsetMinutes!, durationMinutes: durationMinutes! }
-  } else {
-    const { opened } = form
-    const keptStart = opened?.start === form.start
-    if (keptStart && opened.end === form.end) place = opened
-    else {
-      const errors = checkStartEnd(form)
-      if (Object.keys(errors).length > 0) return { errors }
-      const sessionStart = new Date(session.start)
-      const startAt = keptStart ? after(sessionStart, opened.offsetMinutes) : quebecInstantFrom(sessionStart, form.start, { inclusive: true })
-      if (!startAt) return { errors: { start: SKIPPED } }
-      const endAt = quebecInstantFrom(startAt, form.end)
-      if (!endAt) return { errors: { end: SKIPPED } }
-      place = { offsetMinutes: minutesBetween(sessionStart, startAt), durationMinutes: minutesBetween(startAt, endAt) }
-    }
-  }
-  // Hours and minutes can be typed past these, and times of day can be up to 25 hours apart the night the clocks go back.
-  if (place.offsetMinutes > MAX_MINUTES - 1) return { errors: { [session.start === null ? 'offset' : 'start']: 'Un set commence au plus 23 h 59 après le début de la session.' } }
-  if (place.durationMinutes > MAX_MINUTES) return { errors: { [session.start === null ? 'duration' : 'end']: LONGEST } }
-  return place
+// What a new set of a session of `durationMinutes` with `sets` starts with (see `newSetDuration`).
+export function newSetFormValues(session: Parameters<typeof newSetDuration>[0]): SetFormValues {
+  return { ...EMPTY_SET_FORM, duration: durationOf(newSetDuration(session)) }
 }
 
-// Checks a set of `session` as it's being filled in the form, with its `place` if it's worked out already, and who the
-// `applications` it can come from belong to, and returns what the server would be sent, or what's wrong with each field
-// instead. Links are sent as they're typed, but trimmed, or null for none.
+// Checks a set as it's being filled in the form, and who the `applications` it can come from belong to, and returns
+// what the server would be sent, or what's wrong with each field instead. Links are sent as they're typed, but trimmed,
+// or null for none.
 export function checkSet(
   form: SetFormValues,
-  session: SessionPlace,
-  place = setPlace(form, session),
   applications: ApplicationOwners = null,
 ): { fields: SetFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SetFormValues> } {
   const errors: FieldErrors<SetFormValues> = {}
   if (form.performers.length === 0) errors.performers = 'Choisissez au moins un artiste.'
   const owner = applications?.find(({ id }) => id === form.application?.id)
   if (owner && !isPerformersApplication(owner, form.performers)) errors.application = NOT_THE_SETS_APPLICATION
-  if ('errors' in place) Object.assign(errors, place.errors)
+  const durationMinutes = minutesOf(form.duration)
+  if (durationMinutes === undefined || durationMinutes === 0) errors.duration = 'La durée est invalide.'
+  else if (durationMinutes !== null && durationMinutes > MAX_MINUTES) errors.duration = 'Un set dure au plus 24 heures.'
   const otherPerformanceType = checkLine(form.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
   if (otherPerformanceType.error) errors.otherPerformanceType = otherPerformanceType.error
   const soundcloudTrack = form.soundcloudTrack.trim()
@@ -455,12 +377,11 @@ export function checkSet(
   const youtubeVideo = form.youtubeVideo.trim()
   if (youtubeVideo && !youtubeVideoId(youtubeVideo)) errors.youtubeVideo = 'Le lien YouTube est invalide : collez le lien de la vidéo, ou son identifiant.'
 
-  if (Object.keys(errors).length > 0 || 'errors' in place) return { errors }
+  if (Object.keys(errors).length > 0 || durationMinutes === undefined) return { errors }
   return {
     fields: {
       performers: form.performers.map(({ id }) => ({ id })),
-      offsetMinutes: place.offsetMinutes,
-      durationMinutes: place.durationMinutes,
+      durationMinutes,
       // In the order of the list, like the server keeps them.
       performanceTypes: PERFORMANCE_TYPES.filter((id) => form.performanceTypes.includes(id)),
       otherPerformanceType: otherPerformanceType.value!,
@@ -472,9 +393,33 @@ export function checkSet(
   }
 }
 
+// Sets' order (see "Sets' order" in docs/design/server/sessions.md): a session's sets take place one after the other,
+// whatever their statuses, and an unknown duration counts as none.
+
+// How long the first `count` of `sets` last, an unknown duration counting as none.
+function minutesBefore(sets: Pick<StudioSet, 'durationMinutes'>[], count: number): number {
+  return sets.slice(0, count).reduce((sum, set) => sum + (set.durationMinutes ?? 0), 0)
+}
+
+// Whether the set at `index` among `sets` fits in a session of `durationMinutes`, as the server says it does, e.g. once
+// another set is deleted, which the server doesn't answer with the session: it ends no later than the session, or,
+// without a duration, it starts before the session ends.
+export function fitsInSession(sets: Pick<StudioSet, 'durationMinutes'>[], index: number, durationMinutes: number): boolean {
+  const before = minutesBefore(sets, index)
+  const own = sets[index].durationMinutes
+  return own === null ? before < durationMinutes : before + own <= durationMinutes
+}
+
+// Why the set at `index` of `session` doesn't fit in it, when it doesn't: it starts after the session, since the sets
+// before it fill it, or else it ends after it.
+export function whyNotFitting(session: Pick<Session, 'durationMinutes' | 'sets'>, index: number): string | null {
+  if (session.sets[index].fitsInSession) return null
+  return minutesBefore(session.sets, index) >= session.durationMinutes ? 'Commence après la session.' : 'Finit après la session.'
+}
+
 // A set listed in a new session's form, to be added with it (see "A new session's sets" in
 // docs/design/client/admin/sessions.md): what the server will be sent of it, with its performers and its application as
-// they're shown. Its place is relative to the session's start, so it moves with the session.
+// they're shown.
 export type ListedSet = Omit<SetFields, 'performers' | 'application'> & { performers: Reference[]; application: ApplicationLink | null }
 
 // The set that a set's form, `form`, sends as `fields`, as it's listed.
@@ -520,11 +465,10 @@ export function setValuesFromApplication(
   return { performers: [artist], performanceTypes, otherPerformanceType, application: applicationLink(application) }
 }
 
-// A set listed in a new session's form, filled in from an artist's application, whose place isn't known yet.
+// A set listed in a new session's form, filled in from an artist's application, whose duration isn't known yet.
 export function listedSetFromApplication(application: Parameters<typeof setValuesFromApplication>[0], artist: Reference): ListedSet {
   return {
     ...setValuesFromApplication(application, artist),
-    offsetMinutes: null,
     durationMinutes: null,
     genres: [],
     soundcloudTrack: null,
@@ -532,17 +476,14 @@ export function listedSetFromApplication(application: Parameters<typeof setValue
   }
 }
 
-// A listed set as a set of `session` is shown and changed, with its times once the session has a start, and planned.
-// Its links are as they were typed, which its form checked, but a video's is shown as YouTube's, since it can be its id.
-export function shownSet(set: ListedSet, session: SessionPlace): SetValues & Pick<StudioSet, 'start' | 'end' | 'status'> {
-  const start = session.start !== null && set.offsetMinutes !== null ? after(new Date(session.start), set.offsetMinutes) : null
+// A listed set as a set is shown and changed, planned. Its links are as they were typed, which its form checked, but a
+// video's is shown as YouTube's, since it can be its id.
+export function shownSet(set: ListedSet): SetValues & Pick<StudioSet, 'status'> {
   const videoId = set.youtubeVideo && youtubeVideoId(set.youtubeVideo)
   return {
     ...set,
     soundcloudTrack: set.soundcloudTrack === null ? null : { url: set.soundcloudTrack },
     youtubeVideo: videoId ? { url: youtubeVideoUrl(videoId) } : null,
-    // A set with an offset has a duration.
-    ...startAndEnd(start, set.durationMinutes!),
     status: 'planned',
   }
 }

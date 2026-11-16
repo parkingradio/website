@@ -1004,18 +1004,10 @@ describe('An application’s page', () => {
   it('lists the sets that come from it, with their sessions, linking to them, which stay once it is deleted', async () => {
     const session = (id: string, title: string, start: string | null) => ({ id, title, start })
     const sets = [
-      // In a session without a date, one placed in it, and one that isn't.
-      { id: 'set-1', start: null, end: null, offsetMinutes: 60, durationMinutes: 90, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
-      { id: 'set-2', start: null, end: null, offsetMinutes: null, durationMinutes: 60, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
-      {
-        id: 'set-3',
-        start: '2026-11-15T02:00:00.000Z',
-        end: '2026-11-15T03:00:00.000Z',
-        offsetMinutes: 0,
-        durationMinutes: 60,
-        status: 'cancelled',
-        session: session('session-2', 'GUEST MIXES', '2026-11-15T02:00:00.000Z'),
-      },
+      // In a session without a date, one whose duration is known, and one whose isn't.
+      { id: 'set-1', durationMinutes: 90, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
+      { id: 'set-2', durationMinutes: null, status: 'planned', session: session('session-1', 'ONDES TAKEOVER', null) },
+      { id: 'set-3', durationMinutes: 60, status: 'cancelled', session: session('session-2', 'GUEST MIXES', '2026-11-15T02:00:00.000Z') },
     ] as const
     mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, sets } } })
     renderAt('/admin/candidatures/application-1')
@@ -1026,9 +1018,9 @@ describe('An application’s page', () => {
       .map((row) => within(row).queryAllByRole('cell').map((cell) => cell.textContent))
       .slice(1)
     expect(rows).toEqual([
-      ['date à déterminer', '+1 h – +2 h 30', 'ONDES TAKEOVER', 'planifié'],
-      ['date à déterminer', 'horaire à déterminer (1 h)', 'ONDES TAKEOVER', 'planifié'],
-      ['sam. 14 nov. 2026', '21 h – 22 h', 'GUEST MIXES', 'annulé'],
+      ['date à déterminer', '1 h 30', 'ONDES TAKEOVER', 'planifié'],
+      ['date à déterminer', 'à déterminer', 'ONDES TAKEOVER', 'planifié'],
+      ['sam. 14 nov. 2026', '1 h', 'GUEST MIXES', 'annulé'],
     ])
     expect(within(table).getAllByRole('link', { name: 'ONDES TAKEOVER' })[0]).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(within(table).getAllByRole('row')[3]).toHaveClass('admin-status-cancelled')

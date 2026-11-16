@@ -10,7 +10,20 @@ import { forgetPhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
-import { BAD_STATUS, Genre, NewSessionFields, PerformanceType, SESSION_FIELDS, SET_FIELDS, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
+import {
+  BAD_STATUS,
+  Genre,
+  NewSessionFields,
+  PerformanceType,
+  SESSION_FIELDS,
+  SET_FIELDS,
+  SessionFields,
+  SessionType,
+  SetFields,
+  SetPosition,
+  Status,
+  sessionTitle,
+} from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
 import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
@@ -43,16 +56,10 @@ const SetBody = z
   .object({
     id: z.string(),
     performers: z.array(Reference).meta({ description: 'The artists who played, in order' }),
-    offsetMinutes: z.number().nullable(),
     durationMinutes: z.number().nullable(),
-    start: Timestamp.nullable().meta({ description: "Its session's start plus its offset. Null when either is" }),
-    end: Timestamp.nullable().meta({ description: 'Its start plus its duration. Null when its start is' }),
     fitsInSession: z.boolean().meta({
       description:
-        "Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits",
-    }),
-    overlappingSets: z.array(z.string()).meta({
-      description: "The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order",
+        "Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends",
     }),
     performanceTypes: z.array(PerformanceType),
     otherPerformanceType: z.string(),
@@ -83,7 +90,7 @@ const SessionBody = z
     description: z.string().meta({ description: 'Its own description, which replaces the one its type gives it, or empty for none: the one to send back' }),
     effectiveDescription: z.string().meta({ description: 'Its description, or else the one its type gives it, or empty when neither has one' }),
     hasFlyer: z.boolean(),
-    sets: z.array(SetBody).meta({ description: 'By offset, then by when they were added, those without an offset last' }),
+    sets: z.array(SetBody).meta({ description: 'In their order, which is the order they take place in, one after the other, cancelled ones included' }),
     ...Tracked,
     announced: z.boolean().meta({ description: 'Whether it is announced, which means it is meant to be public, with its sets' }),
     announcedUpdatedBy: z.string().nullable(),
@@ -224,32 +231,25 @@ function tracked(row: StoredSession | StoredSet) {
   }
 }
 
-// Whether a set fits in a session of `durationMinutes` (see "Sets' places" in docs/design/server/sessions.md).
-function fits(set: StoredSet, durationMinutes: number): boolean {
-  return set.durationMinutes === null || (set.offsetMinutes ?? 0) + set.durationMinutes <= durationMinutes
-}
-
-// Whether two sets of a session overlap, which needs both to have an offset, and so a duration. Each takes from its
-// offset, included, to its end, excluded.
-function overlap(a: StoredSet, b: StoredSet): boolean {
-  if (a.offsetMinutes === null || b.offsetMinutes === null) return false
-  return a.offsetMinutes < b.offsetMinutes + b.durationMinutes! && b.offsetMinutes < a.offsetMinutes + a.durationMinutes!
+// Whether the set `row` fits in `session`, whatever the statuses: it ends no later than the session, with an unknown
+// duration counting as none, or, without a duration, it starts before the session ends (see "Sets' order" in
+// docs/design/server/sessions.md).
+function fits(row: StoredSet, session: StoredSession): boolean {
+  let before = 0
+  for (const set of session.sets) {
+    if (set.id === row.id) break
+    before += set.durationMinutes ?? 0
+  }
+  return row.durationMinutes === null ? before < session.durationMinutes : before + row.durationMinutes <= session.durationMinutes
 }
 
 // The set `row` of `session`.
 function setBody(row: StoredSet, session: StoredSession): SetBody {
-  const start = session.startAt === null || row.offsetMinutes === null ? null : after(session.startAt, row.offsetMinutes)
   return {
     id: row.id,
     performers: row.performers,
-    offsetMinutes: row.offsetMinutes,
     durationMinutes: row.durationMinutes,
-    start: start?.toISOString() ?? null,
-    // A set with an offset has a duration.
-    end: start && after(start, row.durationMinutes!).toISOString(),
-    fitsInSession: fits(row, session.durationMinutes),
-    // A cancelled set doesn't take place, so it overlaps nothing, but it can list the sets it would overlap otherwise.
-    overlappingSets: session.sets.filter((other) => other.id !== row.id && other.status !== 'cancelled' && overlap(row, other)).map((other) => other.id),
+    fitsInSession: fits(row, session),
     performanceTypes: row.performanceTypes,
     otherPerformanceType: row.otherPerformanceType,
     genres: row.genres,
@@ -297,7 +297,7 @@ export function conflictBody({ error, session, set }: { error: string; session?:
 // The sets and the sessions that come from an application, as its endpoints return them (see "Applications" in
 // docs/design/server/applications.md).
 const ApplicationSession = SessionBody.pick({ id: true, title: true, start: true, end: true, durationMinutes: true, status: true }).meta({ id: 'ApplicationSession' })
-const ApplicationSet = SetBody.pick({ id: true, start: true, end: true, offsetMinutes: true, durationMinutes: true, status: true })
+const ApplicationSet = SetBody.pick({ id: true, durationMinutes: true, status: true })
   .extend({ session: SessionBody.pick({ id: true, title: true, start: true }).meta({ description: "The set's session" }) })
   .meta({ id: 'ApplicationSet' })
 export const ApplicationLinks = {
@@ -328,8 +328,7 @@ export function linksByApplication(sessions: StoredSession[]): Map<string, Appli
     const ofSession = { id: session.id, title: sessionTitle(session), start: session.startAt?.toISOString() ?? null }
     for (const set of session.sets) {
       if (!set.application) continue
-      const { id, start, end, offsetMinutes, durationMinutes, status } = setBody(set, session)
-      of(set.application.id).sets.push({ id, start, end, offsetMinutes, durationMinutes, status, session: ofSession })
+      of(set.application.id).sets.push({ id: set.id, durationMinutes: set.durationMinutes, status: set.status, session: ofSession })
     }
   }
   return links
@@ -568,7 +567,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     {
       config: { admin: true, tool: null },
       schema: {
-        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
+        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
         tags: ['Sessions'],
         params: ById,
         multipart: SessionForm,
@@ -589,7 +588,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Modifier une session' } },
       schema: {
         operationId: 'update_session',
-        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
+        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
         tags: ['Sessions'],
         params: ById,
         body: SessionChangesBody,
@@ -667,7 +666,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Ajouter un set' } },
       schema: {
         operationId: 'create_set',
-        summary: 'Adds a set to a session, as planned, and returns the session',
+        summary: "Adds a set to a session, as planned, after its other sets, and returns the session",
         tags: ['Sessions'],
         params: ById,
         body: SetFields,
@@ -704,7 +703,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     {
       config: { admin: true, tool: null },
       schema: {
-        summary: "Replaces a set's fields, but not its session or its status, and returns its session",
+        summary: "Replaces a set's fields, but not its session, its place among the session's sets, or its status, and returns its session",
         tags: ['Sessions'],
         params: ById,
         body: SetFields,
@@ -720,7 +719,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Modifier un set' } },
       schema: {
         operationId: 'update_set',
-        summary: "Changes a set, only the fields it's given, but not its session or its status, and returns its session",
+        summary: "Changes a set, only the fields it's given, but not its session, its place among the session's sets, or its status, and returns its session",
         tags: ['Sessions'],
         params: ById,
         body: SetChangesBody,
@@ -747,6 +746,22 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const change = statusChange(request.body.status, request.user!.email)
       return saving(reply, NO_SUCH_SET, () => store.setSetStatus(request.params.id, change))
     },
+  )
+
+  api.put(
+    '/api/admin/sets/:id/position',
+    {
+      config: { admin: true, tool: { title: 'Déplacer un set' } },
+      schema: {
+        operationId: 'update_set_position',
+        summary: "Moves a set to another place among its session's sets, the others keeping their order, and returns its session",
+        tags: ['Sessions'],
+        params: ById,
+        body: SetPosition,
+        response: { 200: SessionResponse, 400: ApiError, 404: ApiError },
+      },
+    },
+    async (request, reply) => saving(reply, NO_SUCH_SET, () => store.moveSet(request.params.id, request.body.position)),
   )
 
   api.delete(

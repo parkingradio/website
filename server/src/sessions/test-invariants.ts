@@ -28,6 +28,9 @@ const INVARIANTS: Record<string, SQL> = {
   "A session's application is that of the collective whose takeover it is": sql`
     select sessions.id::text from sessions join applications on applications.id = sessions.application_id
     where applications.collective_id is distinct from sessions.takeover_id`,
+  // The positions the server keeps them in, which the database's constraints only keep from being repeated.
+  "A session's sets are in an order: their positions are 0 to n - 1": sql`
+    select session_id::text from sets group by session_id having min(position) <> 0 or max(position) <> count(*) - 1 or count(distinct position) <> count(*)`,
   'A session starts from the year 2000 to the year 2999, in UTC': sql`
     select id::text from sessions where start_at < '2000-01-01T00:00:00Z' or start_at >= '3000-01-01T00:00:00Z'`,
 }

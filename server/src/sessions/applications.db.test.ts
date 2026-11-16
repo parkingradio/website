@@ -67,7 +67,7 @@ async function createSession(fields: object) {
 }
 
 async function addSet(sessionId: string, fields: object) {
-  const set = { performers: [], offsetMinutes: null, durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
+  const set = { performers: [], durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
   return request('POST', `/api/admin/sessions/${sessionId}/sets`, set)
 }
 
@@ -121,12 +121,12 @@ describe("a set's application", () => {
     const [aurore, brume] = [await createArtist('Aurore'), await createArtist('Brume')]
     const applied = await createApplication({ artistId: aurore })
     const session = await sessionId({ name: 'SOIRÉE' })
-    const response = await addSet(session, { performers: [{ id: brume }, { id: aurore }], offsetMinutes: 60, durationMinutes: 60, application: applied.toUpperCase() })
+    const response = await addSet(session, { performers: [{ id: brume }, { id: aurore }], durationMinutes: 60, application: applied.toUpperCase() })
     expect(response.statusCode).toBe(200)
     const set = response.json().session.sets[0]
     expect(set.application).toEqual({ id: applied, receivedAt: '2026-10-01T12:00:00-04:00' })
     expect(await application(applied)).toMatchObject({
-      sets: [{ id: set.id, start: '2026-11-14T22:00:00-05:00', end: '2026-11-14T23:00:00-05:00', status: 'planned', session: { id: session, title: 'SOIRÉE', start: '2026-11-14T21:00:00-05:00' } }],
+      sets: [{ id: set.id, durationMinutes: 60, status: 'planned', session: { id: session, title: 'SOIRÉE', start: '2026-11-14T21:00:00-05:00' } }],
       sessions: [],
       // It doesn't count as changing the application.
       updatedBy: null,
@@ -185,15 +185,15 @@ describe("a set's application", () => {
     const first = await sessionId({ name: 'ANNULÉE' })
     const cancelled = await setId(first, { performers: [{ id: aurore }], application: applied })
     expect((await request('PUT', `/api/admin/sets/${cancelled}/status`, { status: 'cancelled' })).statusCode).toBe(200)
-    const rebooked = await setId(later, { performers: [{ id: aurore }], offsetMinutes: 0, durationMinutes: 60, application: applied })
+    const rebooked = await setId(later, { performers: [{ id: aurore }], durationMinutes: 60, application: applied })
     const someday = await setId(undated, { performers: [{ id: aurore }], application: applied })
 
     const { sets } = await application(applied)
     // In the order of the list of sessions: those without a start first, then the most recent first.
     expect(sets).toEqual([
-      { id: someday, start: null, end: null, offsetMinutes: null, durationMinutes: null, status: 'planned', session: { id: undated, title: 'UN JOUR', start: null } },
-      { id: rebooked, start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T22:00:00-05:00', offsetMinutes: 0, durationMinutes: 60, status: 'planned', session: { id: later, title: 'PLUS TARD', start: '2026-11-21T21:00:00-05:00' } },
-      { id: cancelled, start: null, end: null, offsetMinutes: null, durationMinutes: null, status: 'cancelled', session: { id: first, title: 'ANNULÉE', start: '2026-11-14T21:00:00-05:00' } },
+      { id: someday, durationMinutes: null, status: 'planned', session: { id: undated, title: 'UN JOUR', start: null } },
+      { id: rebooked, durationMinutes: 60, status: 'planned', session: { id: later, title: 'PLUS TARD', start: '2026-11-21T21:00:00-05:00' } },
+      { id: cancelled, durationMinutes: null, status: 'cancelled', session: { id: first, title: 'ANNULÉE', start: '2026-11-14T21:00:00-05:00' } },
     ])
     const listed = (await request('GET', `/api/admin/applications?artist=${aurore}`)).json().applications
     expect(listed).toEqual([expect.objectContaining({ id: applied, sets, sessions: [] })])

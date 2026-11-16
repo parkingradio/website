@@ -268,7 +268,7 @@ export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: str
   return `${kind}, ${byWhom('ajouté', createdBy, createdAt) ?? `inscrit par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(createdAt))}.`}`
 }
 
-// Sessions' and sets' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
+// Sessions' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
 // and their names (see docs/design/client/admin/sessions.md).
 const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
 
@@ -294,11 +294,6 @@ function formatQuebecTime(instant: string): string {
 // E.g. "1 h", "1 h 30" or "45 min".
 export function formatDuration(minutes: number): string {
   return minutes < 60 ? `${minutes} min` : hoursAndMinutes(minutes)
-}
-
-// How long after its session's start a set starts, in a session without a date, e.g. "+0 h", "+1 h" or "+1 h 30".
-function formatOffset(minutes: number): string {
-  return `+${hoursAndMinutes(minutes)}`
 }
 
 // Whether an instant is on a later day than another, in Québec.
@@ -330,7 +325,7 @@ export function sessionHours({ start, end, durationMinutes }: SessionTimes): str
 }
 
 // E.g. "de 21 h à 1 h le lendemain", or "qui dure 4 h" for a session without a date.
-export function sessionWithin({ start, end, durationMinutes }: SessionTimes): string {
+function sessionWithin({ start, end, durationMinutes }: SessionTimes): string {
   if (start === null || end === null) return `qui dure ${formatDuration(durationMinutes)}`
   return `de ${formatQuebecTime(start)} à ${formatQuebecTime(end)}${laterDay(start, end) ? ' le lendemain' : ''}`
 }
@@ -365,13 +360,9 @@ export function sessionName(session: Pick<Session, 'title' | 'start'>): string {
   return `${session.title}, ${sessionDay(session)}`
 }
 
-// E.g. "21 h – 22 h", "+0 h – +1 h" in a session without a date, or "horaire à déterminer (1 h)" for a set whose place
-// isn't known.
-export function setHours(set: Pick<StudioSet, 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>): string {
-  if (set.start !== null && set.end !== null) return `${formatQuebecTime(set.start)} – ${formatQuebecTime(set.end)}`
-  // A set with an offset has a duration.
-  if (set.offsetMinutes !== null) return `${formatOffset(set.offsetMinutes)} – ${formatOffset(set.offsetMinutes + set.durationMinutes!)}`
-  return `horaire à déterminer${set.durationMinutes === null ? '' : ` (${formatDuration(set.durationMinutes)})`}`
+// How long a set lasts, e.g. "1 h 30", or "à déterminer" when that isn't known.
+export function setDuration({ durationMinutes }: Pick<StudioSet, 'durationMinutes'>): string {
+  return durationMinutes === null ? 'à déterminer' : formatDuration(durationMinutes)
 }
 
 // What a set is called: e.g. "Set de Aurore, Brume et Écume", or "Set" once its performers are all deleted.
@@ -379,15 +370,15 @@ export function setTitle(set: Pick<StudioSet, 'performers'>): string {
   return set.performers.length > 0 ? `Set de ${enumerate(set.performers.map((performer) => performer.name))}` : 'Set'
 }
 
-// A set as it's named on its session's page, e.g. "Set de Aurore, 21 h – 22 h", or outside it, with its session, e.g.
-// "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
-export function setName(set: Pick<StudioSet, 'performers' | 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>, session?: Pick<Session, 'title' | 'start'>): string {
-  return [setTitle(set), ...(session ? [sessionName(session)] : []), setHours(set)].join(', ')
+// A set as it's named on its session's page, e.g. "Set de Aurore", or outside it, with its session, e.g. "Set de Aurore,
+// HAUTE RIVE TAKEOVER, sam. 14 nov. 2026".
+export function setName(set: Pick<StudioSet, 'performers'>, session?: Pick<Session, 'title' | 'start'>): string {
+  return [setTitle(set), ...(session ? [sessionName(session)] : [])].join(', ')
 }
 
-// A set as it's named within a sentence on its session's page, e.g. "le set de Aurore, 21 h – 22 h", or "le set, 21 h –
-// 22 h" once its performers are all deleted.
-export function setInSentence(set: Pick<StudioSet, 'performers' | 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>): string {
+// A set as it's named within a sentence on its session's page, e.g. "le set de Aurore", or "le set" once its performers
+// are all deleted.
+export function setInSentence(set: Pick<StudioSet, 'performers'>): string {
   const names = set.performers.map((performer) => performer.name)
-  return `le set${names.length > 0 ? ` de ${enumerate(names)}` : ''}, ${setHours(set)}`
+  return `le set${names.length > 0 ? ` de ${enumerate(names)}` : ''}`
 }

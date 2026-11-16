@@ -1902,7 +1902,7 @@ export interface paths {
         };
         /** A session, with its sets */
         get: operations["get_session"];
-        /** Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start */
+        /** Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order */
         put: {
             parameters: {
                 query?: never;
@@ -2010,7 +2010,7 @@ export interface paths {
         delete: operations["delete_session"];
         options?: never;
         head?: never;
-        /** Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start */
+        /** Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order */
         patch: operations["update_session"];
         trace?: never;
     };
@@ -2157,7 +2157,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Adds a set to a session, as planned, and returns the session */
+        /** Adds a set to a session, as planned, after its other sets, and returns the session */
         post: operations["create_set"];
         delete?: never;
         options?: never;
@@ -2173,7 +2173,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Replaces a set's fields, but not its session or its status, and returns its session */
+        /** Replaces a set's fields, but not its session, its place among the session's sets, or its status, and returns its session */
         put: {
             parameters: {
                 query?: never;
@@ -2272,7 +2272,7 @@ export interface paths {
         delete: operations["delete_set"];
         options?: never;
         head?: never;
-        /** Changes a set, only the fields it's given, but not its session or its status, and returns its session */
+        /** Changes a set, only the fields it's given, but not its session, its place among the session's sets, or its status, and returns its session */
         patch: operations["update_set"];
         trace?: never;
     };
@@ -2286,6 +2286,23 @@ export interface paths {
         get?: never;
         /** Marks a set as planned, done or cancelled, and returns its session */
         put: operations["update_set_status"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sets/{id}/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Moves a set to another place among its session's sets, the others keeping their order, and returns its session */
+        put: operations["update_set_position"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2952,11 +2969,6 @@ export interface components {
         };
         ApplicationSet: {
             id: string;
-            /** @description Its session's start plus its offset. Null when either is */
-            start: string | null;
-            /** @description Its start plus its duration. Null when its start is */
-            end: string | null;
-            offsetMinutes: number | null;
             durationMinutes: number | null;
             status: components["schemas"]["SessionStatus"];
             /** @description The set's session */
@@ -3237,7 +3249,7 @@ export interface components {
             /** @description Its description, or else the one its type gives it, or empty when neither has one */
             effectiveDescription: string;
             hasFlyer: boolean;
-            /** @description By offset, then by when they were added, those without an offset last */
+            /** @description In their order, which is the order they take place in, one after the other, cancelled ones included */
             sets: components["schemas"]["Set"][];
             /** Format: date-time */
             createdAt: string;
@@ -3286,16 +3298,9 @@ export interface components {
             id: string;
             /** @description The artists who played, in order */
             performers: components["schemas"]["Reference"][];
-            offsetMinutes: number | null;
             durationMinutes: number | null;
-            /** @description Its session's start plus its offset. Null when either is */
-            start: string | null;
-            /** @description Its start plus its duration. Null when its start is */
-            end: string | null;
-            /** @description Whether its offset plus its duration, or its duration alone without an offset, is no more than its session's duration, whatever its status. A set without a duration always fits */
+            /** @description Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends */
             fitsInSession: boolean;
-            /** @description The ids of the other sets of its session that aren't cancelled and that it overlaps, in the session's order */
-            overlappingSets: string[];
             performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
             otherPerformanceType: string;
             genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
@@ -3315,9 +3320,7 @@ export interface components {
         SetFields: {
             /** @description Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped */
             performers: components["schemas"]["SentPerformer"][];
-            /** @description When the set starts, in minutes after its session's start. Null when that isn't known yet */
-            offsetMinutes: number | null;
-            /** @description Null when that isn't known yet, which a set with an offset can't be */
+            /** @description Null while it isn't known, which counts as none for the sets after it: see "Sets' order" in the rules */
             durationMinutes: number | null;
             /** @description In any order, even more than once: saved in the order of the list, without duplicates */
             performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
@@ -3331,6 +3334,10 @@ export interface components {
             youtubeVideo: string | null;
             /** @description The id of the application the set comes from: an artist's, who is one of its performers. Null, or blank, for none */
             application: string | null;
+        };
+        SetPosition: {
+            /** @description The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last */
+            position: number;
         };
         /** @description In Québec time, ending later the same day */
         TimeSlot: {
@@ -5808,9 +5815,7 @@ export interface operations {
                 "application/json": {
                     /** @description Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped */
                     performers?: components["schemas"]["SentPerformer"][];
-                    /** @description When the set starts, in minutes after its session's start. Null when that isn't known yet */
-                    offsetMinutes?: number | null;
-                    /** @description Null when that isn't known yet, which a set with an offset can't be */
+                    /** @description Null while it isn't known, which counts as none for the sets after it: see "Sets' order" in the rules */
                     durationMinutes?: number | null;
                     /** @description In any order, even more than once: saved in the order of the list, without duplicates */
                     performanceTypes?: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
@@ -5979,6 +5984,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_set_position: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPosition"];
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        session: components["schemas"]["Session"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

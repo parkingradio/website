@@ -123,12 +123,8 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
   return {
     id,
     performers: [],
-    offsetMinutes: null,
     durationMinutes: null,
-    start: null,
-    end: null,
     fitsInSession: true,
-    overlappingSets: [],
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -140,8 +136,8 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
   }
 }
 
-// Saturday, November 14th, 2026, from 21:00 to 1:00 in Québec: two sets one after the other, then one that's cancelled,
-// whose place isn't known, and whose performer was deleted.
+// Saturday, November 14th, 2026, from 21:00 to 1:00 in Québec: two sets, then one that's cancelled, whose performer was
+// deleted.
 const SESSION: Session = {
   id: 'session-1',
   start: '2026-11-15T02:00:00.000Z',
@@ -162,10 +158,7 @@ const SESSION: Session = {
         { id: 'artist-1', name: 'Aurore' },
         { id: 'artist-2', name: 'Brume' },
       ],
-      offsetMinutes: 0,
       durationMinutes: 60,
-      start: '2026-11-15T02:00:00.000Z',
-      end: '2026-11-15T03:00:00.000Z',
       performanceTypes: ['dj'],
       genres: ['techno'],
       soundcloudTrack: { id: '123', url: 'https://soundcloud.com/parkingdotradio/ondes' },
@@ -173,10 +166,7 @@ const SESSION: Session = {
     }),
     studioSet('set-2', {
       performers: [{ id: 'artist-3', name: 'Cyan' }],
-      offsetMinutes: 60,
       durationMinutes: 90,
-      start: '2026-11-15T03:00:00.000Z',
-      end: '2026-11-15T04:30:00.000Z',
       performanceTypes: ['live-performance'],
       otherPerformanceType: 'Synthé',
       genres: ['ambient'],
@@ -192,7 +182,7 @@ const SESSION: Session = {
 }
 const [SET, CYAN_SET] = SESSION.sets
 
-// A session whose date isn't known yet, with a set whose place is, after another one.
+// A session whose date isn't known yet, with two sets.
 const UNDATED: Session = {
   ...SESSION,
   id: 'session-2',
@@ -206,8 +196,8 @@ const UNDATED: Session = {
   title: 'GUEST MIXES',
   raEvent: null,
   sets: [
-    studioSet('set-4', { performers: [{ id: 'artist-2', name: 'Brume' }], offsetMinutes: 0, durationMinutes: 60 }),
-    studioSet('set-5', { performers: [{ id: 'artist-3', name: 'Cyan' }], offsetMinutes: 90, durationMinutes: 60 }),
+    studioSet('set-4', { performers: [{ id: 'artist-2', name: 'Brume' }], durationMinutes: 60 }),
+    studioSet('set-5', { performers: [{ id: 'artist-3', name: 'Cyan' }], durationMinutes: 60 }),
   ],
   createdAt: '2026-10-05T16:00:00.000Z',
 }
@@ -230,10 +220,7 @@ const SESSIONS: Session[] = [
     raEvent: null,
     sets: [studioSet('set-6', {
         performers: [{ id: 'artist-2', name: 'Brume' }],
-        offsetMinutes: 0,
         durationMinutes: 60,
-        start: '2026-10-03T00:00:00.000Z',
-        end: '2026-10-03T01:00:00.000Z',
         status: 'done',
       })],
     status: 'done',
@@ -519,9 +506,9 @@ describe("A session's page", () => {
     expect(within(value('Événement RA')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/6683745')
 
     expect(rows(setsTable())).toEqual([
-      ['21 h – 22 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifiéjouéannulé', 'modifier ×'],
-      ['22 h – 23 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'planifiéjouéannulé', 'modifier ×'],
-      ['horaire à déterminer (1 h)', '-', '', '-', '', 'planifiéjouéannulé', 'modifier ×'],
+      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
+      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
+      ['1 h', '-', '', '-', '', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
     ])
     const first = within(setsTable()).getAllByRole('row')[1]
     expect(within(first).getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
@@ -530,7 +517,7 @@ describe("A session's page", () => {
     const application = within(second).getByRole('link', { name: 'Candidature reçue le 2 septembre 2026' })
     expect(application).toHaveTextContent(/^Candidature$/)
     expect(application).toHaveAttribute('href', '/admin/candidatures/application-2')
-    expect(within(screen.getByRole('group', { name: 'Statut : Set de Cyan, 22 h – 23 h 30' })).getByRole('button', { name: 'joué' })).toHaveAttribute(
+    expect(within(screen.getByRole('group', { name: 'Statut : Set de Cyan' })).getByRole('button', { name: 'joué' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
@@ -573,7 +560,7 @@ describe("A session's page", () => {
     expect(screen.getByText('La session et son flyer seront supprimés pour de bon.')).toBeInTheDocument()
   })
 
-  it("shows a session whose date isn't known, its sets' times counted from its start", async () => {
+  it("shows a session whose date isn't known, and its sets' durations", async () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
@@ -583,7 +570,7 @@ describe("A session's page", () => {
     expect(value('Type')).toHaveTextContent(/^Guest mixes$/)
     expect(screen.queryByText('Takeover de', { selector: 'dt' })).not.toBeInTheDocument()
     expect(value('Événement RA')).toHaveTextContent('-')
-    expect(rows(setsTable()).map((row) => row[0])).toEqual(['+0 h – +1 h', '+1 h 30 – +2 h 30'])
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['1 h', '1 h'])
     expect(screen.getByText('La session et ses sets seront supprimés pour de bon. Leurs artistes restent.')).toBeInTheDocument()
   })
 
@@ -638,7 +625,7 @@ describe("A session's page", () => {
     expect(add).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas lui ajouter de set.')
     fireEvent.click(add)
     expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
-    const setStatuses = within(screen.getByRole('group', { name: 'Statut : Set de Cyan, 22 h – 23 h 30' }))
+    const setStatuses = within(screen.getByRole('group', { name: 'Statut : Set de Cyan' }))
     for (const status of ['planifié', 'joué']) {
       const button = setStatuses.getByRole('button', { name: status })
       expect(button).toHaveAttribute('aria-disabled', 'true')
@@ -726,15 +713,15 @@ describe("A session's page", () => {
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: true, session: done } })
     renderAt('/admin/sessions/session-1')
 
-    const statuses = within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume, 21 h – 22 h' }))
+    const statuses = within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume' }))
     fireEvent.click(statuses.getByRole('button', { name: 'joué' }))
     await waitFor(() => expect(statuses.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-1/status')[0])).toEqual({ status: 'done' })
 
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-3/status': { ok: false, error: 'This session is cancelled', session: SESSION, set: null } })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set, horaire à déterminer (1 h)' })).getByRole('button', { name: 'planifié' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set' })).getByRole('button', { name: 'planifié' }))
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/^Le statut de « Set, horaire à déterminer \(1 h\) » n'a pas pu être changé : This session is cancelled$/)
+    expect(alert).toHaveTextContent(/^Le statut de « Set » n'a pas pu être changé : This session is cancelled$/)
     expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
     expect(alert.compareDocumentPosition(setsTable()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -743,9 +730,9 @@ describe("A session's page", () => {
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'This session is cancelled', session: null, set: null } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume, 21 h – 22 h' })).getByRole('button', { name: 'annulé' }))
+    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'annulé' }))
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/^Le statut de « Set de Aurore et Brume, 21 h – 22 h » n'a pas pu être changé : This session is cancelled$/)
+    expect(alert).toHaveTextContent(/^Le statut de « Set de Aurore et Brume » n'a pas pu être changé : This session is cancelled$/)
   })
 
   it('changes the session in a form in its place, sending its start back as it was', async () => {
@@ -984,66 +971,83 @@ describe("A session's page", () => {
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
   })
 
-  it('marks the sets that are not cancelled and do not fit in the session, or overlap, saying why', async () => {
-    // Until 23:00, with a set that overlaps the first two, two more that don't fit, and a cancelled one that wouldn't fit
-    // either.
-    const [first, cyan, cancelled] = SESSION.sets
+  it('marks the sets that are not cancelled and do not fit in the session, saying why, and works it out again once one is deleted', async () => {
+    // Until 23:00: two sets, then one that ends after it, one without a duration that starts after it, and a cancelled one
+    // that doesn't fit either.
+    const [first, , cancelled] = SESSION.sets
     const crowded: Session = {
       ...SESSION,
       end: '2026-11-15T04:00:00.000Z',
       durationMinutes: 120,
       sets: [
-        { ...first, overlappingSets: ['set-4'] },
-        studioSet('set-4', {
-          performers: [{ id: 'artist-4', name: 'Dune' }],
-          offsetMinutes: 30,
-          durationMinutes: 60,
-          start: '2026-11-15T02:30:00.000Z',
-          end: '2026-11-15T03:30:00.000Z',
-          overlappingSets: ['set-1', 'set-2'],
-        }),
-        { ...cyan, fitsInSession: false, overlappingSets: ['set-4'] },
-        studioSet('set-5', {
-          performers: [{ id: 'artist-5', name: 'Écume' }],
-          offsetMinutes: 130,
-          durationMinutes: 30,
-          start: '2026-11-15T04:10:00.000Z',
-          end: '2026-11-15T04:40:00.000Z',
-          fitsInSession: false,
-        }),
-        { ...cancelled, durationMinutes: 180, fitsInSession: false },
-        studioSet('set-6', { performers: [{ id: 'artist-6', name: 'Flore' }], durationMinutes: 180, fitsInSession: false }),
+        first,
+        studioSet('set-4', { performers: [{ id: 'artist-4', name: 'Dune' }], durationMinutes: 45 }),
+        studioSet('set-5', { performers: [{ id: 'artist-5', name: 'Écume' }], durationMinutes: 30, fitsInSession: false }),
+        studioSet('set-6', { performers: [{ id: 'artist-6', name: 'Flore' }], fitsInSession: false }),
+        { ...cancelled, fitsInSession: false },
       ],
     }
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: crowded }, 'DELETE /api/admin/sets/set-4': { ok: true } })
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
-    expect(marks()).toEqual([
-      'Chevauche le set de Dune, 21 h 30 – 22 h 30.',
-      'Chevauche le set de Aurore et Brume, 21 h – 22 h. Chevauche le set de Cyan, 22 h – 23 h 30.',
-      'Finit après la session. Chevauche le set de Dune, 21 h 30 – 22 h 30.',
-      'Commence après la session.',
-      null,
-      'Dure plus longtemps que la session.',
-    ])
-    // After the times, as text rather than as an emoji.
-    expect(rows(setsTable())[0][0]).toBe('21 h – 22 h \u26a0\ufe0e')
+    expect(marks()).toEqual([null, null, 'Finit après la session.', 'Commence après la session.', null])
+    // After the duration, as text rather than as an emoji.
+    expect(rows(setsTable())[2][0]).toBe('30 min \u26a0\ufe0e')
+    expect(rows(setsTable())[3][0]).toBe('à déterminer \u26a0\ufe0e')
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
 
-    // Without the set that overlapped the others, they don't overlap anymore.
+    // Without the set before them, which the server doesn't answer with the session, they fit, and the cancelled one
+    // still doesn't, which isn't marked.
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
-    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Dune, 21 h 30 – 22 h 30' }))
-    await waitFor(() => expect(marks()).toHaveLength(5))
-    expect(marks()).toEqual([null, 'Finit après la session.', 'Commence après la session.', null, 'Dure plus longtemps que la session.'])
-    expect(rows(setsTable())[0][0]).toBe('21 h – 22 h')
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Dune' }))
+    await waitFor(() => expect(marks()).toHaveLength(4))
+    expect(marks()).toEqual([null, null, null, null])
+    expect(rows(setsTable())[1][0]).toBe('30 min')
   })
 
-  it('marks no set when every set fits in the session, without overlapping another', async () => {
+  it('marks no set when every set fits in the session', async () => {
     mockFetch(PAGE)
     renderAt('/admin/sessions/session-1')
     await screen.findByRole('table', { name: 'Sets' })
     expect(marks()).toEqual([null, null, null])
+  })
+
+  it('moves a set up or down among the sets, showing them as the server then has them, the focus staying on its arrow', async () => {
+    // 2 h 30, which its sets fill, the cancelled one included once it's moved before Cyan's.
+    const [first, cyan, cancelled] = SESSION.sets
+    const session = (...sets: StudioSet[]): Session => ({ ...SESSION, end: '2026-11-15T04:30:00.000Z', durationMinutes: 150, sets })
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/sessions/session-1': { ok: true, session: session(first, cyan, cancelled) },
+      'PUT /api/admin/sets/set-3/position': { ok: true, session: session(first, cancelled, { ...cyan, fitsInSession: false }) },
+      'PUT /api/admin/sets/set-2/position': { ok: true, session: session(first, cyan, { ...cancelled, fitsInSession: false }) },
+      'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    await screen.findByRole('table', { name: 'Sets' })
+    expect(screen.getByRole('button', { name: 'monter : Set de Aurore et Brume' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'descendre : Set' })).toBeDisabled()
+    expect(marks()).toEqual([null, null, null])
+
+    // The cancelled set keeps its place, so Cyan's no longer fits.
+    fireEvent.click(screen.getByRole('button', { name: 'monter : Set' }))
+    await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', '-', 'Cyan']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-3/position')[0])).toEqual({ position: 1 })
+    expect(screen.getByRole('button', { name: 'monter : Set' })).toHaveFocus()
+    expect(marks()).toEqual([null, null, 'Finit après la session.'])
+
+    // Moved back up, it fits again, and the focus goes to the other arrow, since it's the only one it can use there.
+    fireEvent.click(screen.getByRole('button', { name: 'monter : Set de Cyan' }))
+    await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2/position')[0])).toEqual({ position: 1 })
+    expect(screen.getByRole('button', { name: 'monter : Set de Cyan' })).toHaveFocus()
+    expect(marks()).toEqual([null, null, null])
+
+    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Aurore et Brume' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Le set « Set de Aurore et Brume » n'a pas pu être déplacé : Boom$/)
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-'])
   })
 
   it("has one form open at a time, the session's or a set's", async () => {
@@ -1055,7 +1059,7 @@ describe("A session's page", () => {
     fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
     expect(await screen.findByRole('heading', { name: 'Nouveau set' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Nom')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan' }))
     expect(await screen.findByRole('heading', { level: 3, name: 'Set de Cyan' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
@@ -1230,7 +1234,7 @@ describe("A session's event on RA", () => {
     await openPanel()
 
     mockFetch({ ...UNPUBLISHED_PAGE, [RA_URL]: { ok: true, event: { ...RA_EVENT, lineup: 'Cyan' } }, 'PUT /api/admin/sets/set-1/status': { ok: true, session: cancelled } })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume, 21 h – 22 h' })).getByRole('button', { name: 'annulé' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'annulé' }))
     await waitFor(() => expect(raValue('Line-up')).toHaveTextContent(/^Cyancopier$/))
   })
 
@@ -1325,17 +1329,19 @@ describe("A set's form", () => {
     fireEvent.mouseDown(screen.getByRole('option', { name: new RegExp(`^${name}`) }))
   }
 
-  it('adds a set when the last one ends, for an hour, with its performance types and its artists’ genres, and closes', async () => {
-    const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-3', name: 'Cyan' }], offsetMinutes: 150, durationMinutes: 60 })] }
+  // The hours and minutes of the set's duration in its form.
+  const duration = () => within(screen.getByRole('group', { name: 'Durée' }))
+  const durationValues = () => [duration().getByLabelText('heures'), duration().getByLabelText('minutes')].map((input) => (input as HTMLInputElement).value)
+
+  it('adds a set after the others, for what is left of the session, with its performance types and its artists’ genres, and closes', async () => {
+    const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-3', name: 'Cyan' }], durationMinutes: 30 })] }
     mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: added } })
     renderAt('/admin/sessions/session-1')
 
     await openNew()
-    // After Cyan's set, which ends at 23:30: the cancelled one, whose place isn't known, doesn't count.
-    expect(screen.getByLabelText('Début')).toHaveValue('23:30')
-    expect(screen.getByLabelText('Fin')).toHaveValue('00:30')
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 1 h, finit le lendemain, dimanche 15 novembre 2026.')
-    expect(screen.getByText('La session a lieu de 21 h à 1 h le lendemain. Heure du Québec.')).toBeInTheDocument()
+    // Its sets last 3 h 30, the cancelled one included, which keeps its place: half an hour is left.
+    expect(durationValues()).toEqual(['0', '30'])
+    expect(screen.getByText(/^La session dure 4 h\./)).toBeInTheDocument()
 
     pick('Cyan')
     pick('Aurore')
@@ -1356,8 +1362,7 @@ describe("A set's form", () => {
     expect(rows(setsTable())).toHaveLength(4)
     expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toEqual({
       performers: [{ id: 'artist-3' }, { id: 'artist-1' }],
-      offsetMinutes: 150,
-      durationMinutes: 60,
+      durationMinutes: 30,
       performanceTypes: ['dj'],
       otherPerformanceType: '',
       genres: ['house', 'techno', 'acid'],
@@ -1367,165 +1372,66 @@ describe("A set's form", () => {
     })
   })
 
-  it("changes a set, from times that are the next day, which it says, and doesn't check that it takes place within the session", async () => {
+  it("changes a set, its duration included, which doesn't have to fit in the session", async () => {
     mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
-    expect(await screen.findByLabelText('Début')).toHaveValue('22:00')
-    expect(screen.getByLabelText('Fin')).toHaveValue('23:30')
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
+    await screen.findByRole('heading', { name: 'Set de Cyan' })
+    expect(durationValues()).toEqual(['1', '30'])
     expect(screen.getByLabelText('Performance Live')).toBeChecked()
     expect(screen.getByLabelText('Autre')).toHaveValue('Synthé')
     expect(screen.getByRole('button', { name: 'retirer ambient' })).toBeInTheDocument()
     expect(screen.getByText(/^Ajouté par admin@example.com le/)).toBeInTheDocument()
 
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 1 h 30.')
-    // Before the session's start time, so the next day, after it ends.
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '20:00' } })
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '21:00' } })
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 1 h, commence le lendemain, dimanche 15 novembre 2026.')
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '00:30' } })
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '01:30' } })
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 1 h, commence le lendemain, dimanche 15 novembre 2026.')
+    fireEvent.change(duration().getByLabelText('heures'), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-2')).toHaveLength(1))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2')[0])).toMatchObject({
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2')[0])).toEqual({
       performers: [{ id: 'artist-3' }],
-      offsetMinutes: 210,
-      durationMinutes: 60,
+      durationMinutes: 330,
       performanceTypes: ['live-performance'],
       otherPerformanceType: 'Synthé',
       genres: ['ambient'],
+      soundcloudTrack: null,
+      youtubeVideo: null,
       // Sent back as it is.
       application: 'application-2',
     })
   })
 
-  it("places a set in a session without a date by its start after the session's and its duration, which it needs", async () => {
+  it('adds a set without a duration, or with one of at most a day, in a session without a date too', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'POST /api/admin/sessions/session-2/sets': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
     await openNew()
-    // After Cyan's set, which ends 2 h 30 after the start, until the session ends, half an hour later.
-    const start = within(screen.getByRole('group', { name: 'Début, après celui de la session' }))
-    const duration = within(screen.getByRole('group', { name: 'Durée' }))
-    expect(start.getByLabelText('heures')).toHaveValue(2)
-    expect(start.getByLabelText('minutes')).toHaveValue(30)
-    expect(duration.getByLabelText('heures')).toHaveValue(0)
-    expect(duration.getByLabelText('minutes')).toHaveValue(30)
-    expect(screen.getByText('La session dure 3 h.')).toBeInTheDocument()
+    // An hour of the 3 hours is left.
+    expect(durationValues()).toEqual(['1', '0'])
+    expect(screen.getByText(/^La session dure 3 h\./)).toBeInTheDocument()
     pick('Brume')
-
-    fireEvent.change(duration.getByLabelText('minutes'), { target: { value: '' } })
-    fireEvent.change(duration.getByLabelText('heures'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    expect(await screen.findByText('Indiquez la durée du set.')).toBeInTheDocument()
-    fireEvent.change(start.getByLabelText('heures'), { target: { value: '24' } })
-    fireEvent.change(start.getByLabelText('minutes'), { target: { value: '' } })
-    fireEvent.change(duration.getByLabelText('heures'), { target: { value: '1' } })
-    expect(await screen.findByText('Un set commence au plus 23 h 59 après le début de la session.')).toBeInTheDocument()
-
-    // Until after the session ends, which it doesn't have to.
-    fireEvent.change(start.getByLabelText('heures'), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-2/sets')[0])).toMatchObject({ offsetMinutes: 120, durationMinutes: 60 })
-  })
-
-  it('adds a set whose place is not known, with or without a duration, which can be longer than the session, but not a day', async () => {
-    mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: SESSION } })
-    renderAt('/admin/sessions/session-1')
-
-    await openNew()
-    pick('Brume')
-    fireEvent.click(screen.getByLabelText('horaire à déterminer'))
-    const duration = within(screen.getByRole('group', { name: 'Durée' }))
-    // As long as the times said.
-    expect(duration.getByLabelText('heures')).toHaveValue(1)
-    fireEvent.change(duration.getByLabelText('heures'), { target: { value: '25' } })
+    fireEvent.change(duration().getByLabelText('heures'), { target: { value: '24' } })
+    fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     expect(await screen.findByText('Un set dure au plus 24 heures.')).toBeInTheDocument()
+    fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '75' } })
+    expect(await screen.findByText('La durée est invalide.')).toBeInTheDocument()
+    expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(0)
 
-    fireEvent.change(duration.getByLabelText('heures'), { target: { value: '5' } })
+    fireEvent.change(duration().getByLabelText('heures'), { target: { value: '' } })
+    fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ offsetMinutes: null, durationMinutes: 300 })
-
-    await openNew()
-    pick('Brume')
-    fireEvent.click(screen.getByLabelText('horaire à déterminer'))
-    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures'), { target: { value: '' } })
-    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('minutes'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(2))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[1])).toMatchObject({ offsetMinutes: null, durationMinutes: null })
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(1))
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-2/sets')[0])).toMatchObject({ durationMinutes: null })
   })
 
-  it('keeps how long a set lasts when its place is no longer known', async () => {
-    mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
-    renderAt('/admin/sessions/session-1')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
-    fireEvent.click(await screen.findByLabelText('horaire à déterminer'))
-    const duration = within(screen.getByRole('group', { name: 'Durée' }))
-    expect(duration.getByLabelText('heures')).toHaveValue(1)
-    expect(duration.getByLabelText('minutes')).toHaveValue(30)
-    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-2')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2')[0])).toMatchObject({ offsetMinutes: null, durationMinutes: 90 })
-  })
-
-  it("starts without times when the session's sets fill it", async () => {
-    const full = { ...SESSION, sets: [{ ...SET, durationMinutes: 240, end: SESSION.end }] }
+  it("starts without a duration when the session's sets fill it", async () => {
+    const full = { ...SESSION, sets: [{ ...SET, durationMinutes: 240 }] }
     mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: full } })
     renderAt('/admin/sessions/session-1')
 
     await openNew()
-    expect(screen.getByLabelText('Début')).toHaveValue('')
-    expect(screen.getByLabelText('Fin')).toHaveValue('')
-    expect(screen.getByLabelText('horaire à déterminer')).not.toBeChecked()
-  })
-
-  it('sends a new set that starts at the second 1:00 of the night clocks fall back as it was proposed', async () => {
-    // From 23:00 in summer time to 2:00 in winter time, 4 hours later, where the first set ends at the second 1:00.
-    const night: Session = {
-      ...SESSION,
-      start: '2026-11-01T03:00:00.000Z',
-      end: '2026-11-01T07:00:00.000Z',
-      sets: [{ ...SET, offsetMinutes: 0, durationMinutes: 180, start: '2026-11-01T03:00:00.000Z', end: '2026-11-01T06:00:00.000Z' }],
-    }
-    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: night }, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: night } })
-    renderAt('/admin/sessions/session-1')
-
-    await openNew()
-    expect(screen.getByLabelText('Début')).toHaveValue('01:00')
-    expect(screen.getByLabelText('Fin')).toHaveValue('02:00')
-    pick('Brume')
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ offsetMinutes: 180, durationMinutes: 60 })
-  })
-
-  it("refuses a start that clocks skip as they spring forward, in a session that starts before they do", async () => {
-    // From 23:00 in winter time, on the night of March 7th, 2026, for 4 hours.
-    const night: Session = { ...SESSION, start: '2026-03-08T04:00:00.000Z', end: '2026-03-08T08:00:00.000Z', sets: [] }
-    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: night }, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: night } })
-    renderAt('/admin/sessions/session-1')
-
-    await openNew()
-    pick('Brume')
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '02:30' } })
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '03:30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    expect(await screen.findByText("Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été.")).toBeInTheDocument()
-
-    // 3:00 in summer time is 3 hours after 23:00 in winter time.
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '03:00' } })
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '04:00' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toMatchObject({ offsetMinutes: 180, durationMinutes: 60 })
+    expect(durationValues()).toEqual(['', ''])
   })
 
   it("shows the server's error, linking to another session's set it names, but not to the session it's on", async () => {
@@ -1537,14 +1443,14 @@ describe("A set's form", () => {
     fireEvent.change(screen.getByLabelText('YouTube'), { target: { value: 'dQw4w9WgXcQ' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     let alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent("Le set n'a pas pu être ajouté : This YouTube video is another set's (Set de Brume, SOIRÉE, ven. 2 oct. 2026, 20 h – 21 h)")
+    expect(alert).toHaveTextContent("Le set n'a pas pu être ajouté : This YouTube video is another set's (Set de Brume, SOIRÉE, ven. 2 oct. 2026)")
     expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-3')
 
     // A set of this session is named without a link.
     mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: false, error: "This YouTube video is another set's", session: SESSION, set: CYAN_SET } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/^Le set n'a pas pu être ajouté : This YouTube video is another set's \(Set de Cyan, 22 h – 23 h 30\)$/),
+      expect(screen.getByRole('alert')).toHaveTextContent(/^Le set n'a pas pu être ajouté : This YouTube video is another set's \(Set de Cyan\)$/),
     )
     alert = screen.getByRole('alert')
     expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
@@ -1570,9 +1476,9 @@ describe("A set's form", () => {
     mockFetch(SET_PAGE)
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set, horaire à déterminer (1 h)' }))
-    expect(await screen.findByLabelText('horaire à déterminer')).toBeChecked()
-    expect(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures')).toHaveValue(1)
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set' }))
+    await screen.findByRole('heading', { name: 'Set' })
+    expect(durationValues()).toEqual(['1', '0'])
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByText('Choisissez au moins un artiste.')).toBeInTheDocument()
     expect(requestsTo('PUT', '/api/admin/sets/set-3')).toHaveLength(0)
@@ -1582,14 +1488,14 @@ describe("A set's form", () => {
     mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-2': { ok: true } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
     expect(await screen.findByRole('heading', { level: 3, name: 'Set de Cyan' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /supprimer le set/ })).not.toBeInTheDocument()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
-    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
-    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set de Cyan, 22 h – 23 h 30) ? Ses artistes restent.')
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan' }))
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set de Cyan) ? Ses artistes restent.')
     expect(requestsTo('DELETE', '/api/admin/sets/set-2')).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan' }))
     // The focus goes to the next set's ×, in the commit that removes the row. It's read in the waitFor that sees the row
     // gone, which runs right after React's DOM changes and layout effects but before its passive effects, since waiting
     // for the focus would also pass if it only moved later, leaving it on the page in between.
@@ -1598,14 +1504,14 @@ describe("A set's form", () => {
       expect(rows(setsTable())).toHaveLength(2)
       focused = document.activeElement
     })
-    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set, horaire à déterminer (1 h)' }))
+    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set' }))
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
 
     mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-3': { ok: false, error: 'Boom' } })
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
-    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set, horaire à déterminer (1 h)' }))
-    expect(window.confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set, horaire à déterminer (1 h)) ?')
-    expect(await screen.findByRole('alert')).toHaveTextContent("Le set « Set, horaire à déterminer (1 h) » n'a pas pu être supprimé : Boom")
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set' }))
+    expect(window.confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set) ?')
+    expect(await screen.findByRole('alert')).toHaveTextContent("Le set « Set » n'a pas pu être supprimé : Boom")
     expect(rows(setsTable())).toHaveLength(2)
   })
 
@@ -1615,15 +1521,15 @@ describe("A set's form", () => {
     renderAt('/admin/sessions/session-1')
 
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Cyan' }))
     // Read as soon as the set is gone, as in the test above.
     let focused: Element | null = null
     await waitFor(() => {
       expect(rows(setsTable())).toHaveLength(1)
       focused = document.activeElement
     })
-    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume, 21 h – 22 h' }))
-    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume, 21 h – 22 h' }))
+    expect(focused).toBe(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume' }))
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Aurore et Brume' }))
     await waitFor(() => {
       expect(screen.getByText('Aucun set.')).toBeInTheDocument()
       focused = document.activeElement
@@ -1636,8 +1542,8 @@ describe("A set's form", () => {
     renderAt('/admin/sessions/session-1')
 
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Cyan, 22 h – 23 h 30' }))
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Cyan' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan' }))
     await waitFor(() => expect(rows(setsTable())).toHaveLength(2))
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
   })
@@ -1650,7 +1556,7 @@ describe("A set's form", () => {
     mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore et Brume, 21 h – 22 h' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore et Brume' }))
     expect(await screen.findByRole('heading', { name: 'Set de Aurore et Brume' })).toBeInTheDocument()
     expect(applicationPicker()).toHaveValue('Aucune candidature')
     fireEvent.click(applicationPicker())
@@ -1711,7 +1617,7 @@ describe("A set's form", () => {
     mockFetch({ ...PAGE, ...ARTISTS, '/api/admin/applications': { ok: false, error: 'Boom' }, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan, 22 h – 23 h 30' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
     // Named by when it was received only, since whose it is isn't known.
     expect(applicationPicker()).toHaveValue('Reçue le 2 septembre 2026')
@@ -2021,125 +1927,98 @@ describe("A new session's sets", () => {
 
   const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 
-  it('lists sets, each after the last, which are changed or taken out of the list, and sends them with the session in the order they were added', async () => {
+  // The hours and minutes of the duration in the set's form `form`.
+  const durationIn = (form: ReturnType<typeof setForm>) =>
+    within(form.getByRole('group', { name: 'Durée' }))
+      .getAllByRole('spinbutton')
+      .map((input) => (input as HTMLInputElement).value)
+  const lasting = (hours: string, minutes: string) => (form: ReturnType<typeof setForm>) => {
+    const group = within(form.getByRole('group', { name: 'Durée' }))
+    fireEvent.change(group.getByLabelText('heures'), { target: { value: hours } })
+    fireEvent.change(group.getByLabelText('minutes'), { target: { value: minutes } })
+  }
+
+  it('lists sets in the order they are added, which the arrows change, and sends them with the session in that order', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
 
     await fillIn()
     expect(screen.getByText('Aucun set.')).toBeInTheDocument()
-    const times = (start: string, end: string) => (form: ReturnType<typeof setForm>) => {
-      fireEvent.change(form.getByLabelText('Début'), { target: { value: start } })
-      fireEvent.change(form.getByLabelText('Fin'), { target: { value: end } })
-    }
-    await addSet('Brume', times('22:00', '23:00'))
-    // After it, since it's the last one.
+    await addSet('Brume', lasting('1', '30'))
+    // An hour, since 2 h 30 of the 4 hours are left.
     fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
     await screen.findByRole('heading', { name: 'Nouveau set' })
-    expect(setForm('Nouveau set').getByLabelText('Début')).toHaveValue('23:00')
+    expect(durationIn(setForm('Nouveau set'))).toEqual(['1', '0'])
+    expect(setForm('Nouveau set').getByText(/^La session dure 4 h\./)).toBeInTheDocument()
     fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
-    await addSet('Cyan', times('21:00', '22:00'))
+    await addSet('Cyan')
     await addSet('Aurore', (form) => {
-      fireEvent.click(form.getByLabelText('horaire à déterminer'))
+      lasting('', '')(form)
       fireEvent.change(form.getByLabelText('YouTube'), { target: { value: 'dQw4w9WgXcQ' } })
     })
 
-    // As a session's page lists them, by their start.
     expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
-      ['21 h – 22 h', 'Cyan'],
-      ['22 h – 23 h', 'Brume'],
-      ['horaire à déterminer (1 h)', 'Aurore'],
+      ['1 h 30', 'Brume'],
+      ['1 h', 'Cyan'],
+      ['à déterminer', 'Aurore'],
     ])
     expect(within(setsTable()).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume, 22 h – 23 h' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume' }))
     await screen.findByRole('heading', { name: 'Set de Brume' })
-    expect(setForm('Set de Brume').getByLabelText('Début')).toHaveValue('22:00')
-    fireEvent.change(setForm('Set de Brume').getByLabelText('Fin'), { target: { value: '22:30' } })
+    expect(durationIn(setForm('Set de Brume'))).toEqual(['1', '30'])
+    lasting('1', '0')(setForm('Set de Brume'))
     fireEvent.click(setForm('Set de Brume').getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Brume' })).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan, 21 h – 22 h' }))
-    expect(rows(setsTable()).map((row) => row[0])).toEqual(['22 h – 22 h 30', 'horaire à déterminer (1 h)'])
+    expect(rows(setsTable())[0][0]).toBe('1 h')
+
+    // Moved down, twice, the focus staying on its arrow, or going to the other one once it's last.
+    expect(screen.getByRole('button', { name: 'monter : Set de Brume' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'descendre : Set de Aurore' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Brume' }))
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', 'Brume', 'Aurore'])
+    expect(screen.getByRole('button', { name: 'descendre : Set de Brume' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Brume' }))
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', 'Aurore', 'Brume'])
+    expect(screen.getByRole('button', { name: 'monter : Set de Brume' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan' }))
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore', 'Brume'])
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/))
     const empty = { performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, application: null }
     expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0]).sets).toEqual([
-      { ...empty, performers: [{ id: 'artist-2' }], offsetMinutes: 60, durationMinutes: 30, youtubeVideo: null },
-      { ...empty, performers: [{ id: 'artist-1' }], offsetMinutes: null, durationMinutes: 60, youtubeVideo: 'dQw4w9WgXcQ' },
+      { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, youtubeVideo: 'dQw4w9WgXcQ' },
+      { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, youtubeVideo: null },
     ])
   })
 
-  it("lists sets before the session's times are known, counted from its start, then moves them with it", async () => {
+  it("lists sets before the session's times are known, for an hour by default, keeping its duration as it was when their form opened", async () => {
     mockFetch(NEW)
     renderAt('/admin/sessions/nouvelle')
 
-    // Before the session's times: as in a session without a date, whose duration isn't known, so for an hour.
     fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
     await screen.findByRole('heading', { name: 'Nouveau set' })
-    const form = setForm('Nouveau set')
-    expect(form.getByText("Quand a lieu la session n'est pas encore indiqué.")).toBeInTheDocument()
-    const durations = form.getAllByRole('group').filter((group) => group.classList.contains('admin-duration'))
-    expect(durations.map((group) => within(group).getAllByRole('spinbutton').map((input) => (input as HTMLInputElement).value))).toEqual([
-      ['0', '0'],
-      ['1', '0'],
-    ])
-    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
-    await addSet('Aurore')
-    await addSet('Brume')
-    expect(rows(setsTable()).map((row) => row[0])).toEqual(['+0 h – +1 h', '+1 h – +2 h'])
-
+    expect(setForm('Nouveau set').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
+    expect(durationIn(setForm('Nouveau set'))).toEqual(['1', '0'])
+    // Still so once the session's times are, while the form is open.
     await fillIn()
-    expect(rows(setsTable()).map((row) => row[0])).toEqual(['21 h – 22 h', '22 h – 23 h'])
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '20:00' } })
-    expect(rows(setsTable())[0][0]).toBe('20 h – 21 h')
+    expect(setForm('Nouveau set').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
+    fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
+
+    await addSet('Aurore', lasting('3', '30'))
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    expect(setForm('Nouveau set').getByText(/^La session dure 4 h\./)).toBeInTheDocument()
+    expect(durationIn(setForm('Nouveau set'))).toEqual(['0', '30'])
+    fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
 
     // Not valid anymore: they can still be changed.
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
-    expect(rows(setsTable())[0][0]).toBe('+0 h – +1 h')
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, +0 h – +1 h' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore' }))
     await screen.findByRole('heading', { name: 'Set de Aurore' })
-    expect(setForm('Set de Aurore').getByText("Quand a lieu la session n'est pas encore indiqué.")).toBeInTheDocument()
-    fireEvent.click(setForm('Set de Aurore').getByRole('button', { name: 'annuler' }))
-
-    // Without a date, from its start.
-    fireEvent.click(screen.getByLabelText('date à déterminer'))
-    fireEvent.change(screen.getByLabelText('heures'), { target: { value: '4' } })
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, +0 h – +1 h' }))
-    await screen.findByRole('heading', { name: 'Set de Aurore' })
-    expect(setForm('Set de Aurore').getByText('La session dure 4 h.')).toBeInTheDocument()
-  })
-
-  it("places a set as the session's times were when its form opened, even when they change while it's open", async () => {
-    mockFetch(NEW)
-    renderAt('/admin/sessions/nouvelle')
-
-    // Opened before the session's times: an hour after its start, whatever they become.
-    fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
-    await screen.findByRole('heading', { name: 'Nouveau set' })
-    let form = setForm('Nouveau set')
-    fireEvent.change(within(form.getByRole('group', { name: 'Début, après celui de la session' })).getByLabelText('heures'), { target: { value: '1' } })
-    await fillIn()
-    fireEvent.click(form.getByRole('combobox', { name: 'Ajouter un artiste' }))
-    fireEvent.mouseDown(form.getByRole('option', { name: /^Aurore/ }))
-    fireEvent.click(form.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
-    expect(rows(setsTable())[0][0]).toBe('22 h – 23 h')
-
-    // Opened while the session starts at 21:00: from 23:00, two hours after its start, even once it starts at 20:00.
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
-    await screen.findByRole('heading', { name: 'Nouveau set' })
-    form = setForm('Nouveau set')
-    fireEvent.change(form.getByLabelText('Début'), { target: { value: '23:00' } })
-    fireEvent.change(form.getByLabelText('Fin'), { target: { value: '00:00' } })
-    fireEvent.change(screen.getAllByLabelText('Début')[0], { target: { value: '20:00' } })
-    fireEvent.click(form.getByRole('combobox', { name: 'Ajouter un artiste' }))
-    fireEvent.mouseDown(form.getByRole('option', { name: /^Brume/ }))
-    fireEvent.click(form.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
-    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
-      ['21 h – 22 h', 'Aurore'],
-      ['22 h – 23 h', 'Brume'],
-    ])
+    expect(setForm('Set de Aurore').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
+    expect(durationIn(setForm('Set de Aurore'))).toEqual(['3', '30'])
   })
 
   it("can't be sent with a set's form open, which it says", async () => {
@@ -2153,7 +2032,7 @@ describe("A new session's sets", () => {
     await screen.findByRole('heading', { name: 'Nouveau set' })
     expect(submit).toHaveAttribute('aria-disabled', 'true')
     expect(submit).toHaveAccessibleDescription("Ajoutez d'abord le set, ou annulez-le.")
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, 21 h – 22 h' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore' }))
     await screen.findByRole('heading', { name: 'Set de Aurore' })
     expect(submit).toHaveAccessibleDescription("Enregistrez d'abord le set, ou annulez-le.")
     fireEvent.click(submit)
@@ -2173,22 +2052,25 @@ describe("A new session's sets", () => {
     await addSet('Aurore')
     await addSet('Brume')
     await addSet('Cyan')
-    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume, 22 h – 23 h' }))
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume' }))
     await screen.findByRole('heading', { name: 'Set de Brume' })
-    fireEvent.change(setForm('Set de Brume').getByLabelText('Fin'), { target: { value: '23:30' } })
+    lasting('1', '30')(setForm('Set de Brume'))
 
     // Aurore's, before it in the list: the focus goes to the next set's ×.
-    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore, 21 h – 22 h' }))
-    expect(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h' })).toHaveFocus()
-    expect(setForm('Set de Brume').getByLabelText('Fin')).toHaveValue('23:30')
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore' }))
+    expect(screen.getByRole('button', { name: 'retirer : Set de Brume' })).toHaveFocus()
+    expect(durationIn(setForm('Set de Brume'))).toEqual(['1', '30'])
     fireEvent.click(setForm('Set de Brume').getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Brume' })).not.toBeInTheDocument())
-    expect(rows(setsTable()).map((row) => row[0])).toEqual(['22 h – 23 h 30', '23 h – 0 h'])
+    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
+      ['1 h 30', 'Brume'],
+      ['1 h', 'Cyan'],
+    ])
 
     // The last one's: the previous set's ×, then the heading of the sets once there are none.
-    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan, 23 h – 0 h' }))
-    expect(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h 30' })).toHaveFocus()
-    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Brume, 22 h – 23 h 30' }))
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan' }))
+    expect(screen.getByRole('button', { name: 'retirer : Set de Brume' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Brume' }))
     expect(screen.getByRole('heading', { name: 'Sets' })).toHaveFocus()
     expect(screen.getByText('Aucun set.')).toBeInTheDocument()
   })
@@ -2221,8 +2103,8 @@ describe("A new session's sets", () => {
     await addSet('Aurore')
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeDisabled())
-    expect(screen.getByRole('button', { name: 'modifier : Set de Aurore, 21 h – 22 h' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'retirer : Set de Aurore, 21 h – 22 h' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'modifier : Set de Aurore' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'retirer : Set de Aurore' })).toBeDisabled()
     answer(Response.json({ ok: false, error: 'Boom' }, { status: 500 }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeEnabled())
   })
@@ -2237,14 +2119,14 @@ describe("A new session's sets", () => {
     await addSet('Brume')
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     let alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/^Le set de Brume, 22 h – 23 h n'a pas pu être ajouté : This YouTube video is another set's \(Set de Aurore, 21 h – 22 h\)$/)
+    expect(alert).toHaveTextContent(/^Le set de Brume n'a pas pu être ajouté : This YouTube video is another set's \(Set de Aurore\)$/)
     expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
 
     refusing({ error: "This YouTube video is another set's", session: SESSIONS[2], set: SESSIONS[2].sets[0], setIndex: 0 })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent(
-        "Le set de Aurore, 21 h – 22 h n'a pas pu être ajouté : This YouTube video is another set's (Set de Brume, SOIRÉE, ven. 2 oct. 2026, 20 h – 21 h)",
+        "Le set de Aurore n'a pas pu être ajouté : This YouTube video is another set's (Set de Brume, SOIRÉE, ven. 2 oct. 2026)",
       ),
     )
     alert = screen.getByRole('alert')
@@ -2252,7 +2134,7 @@ describe("A new session's sets", () => {
 
     refusing({ error: 'No such artist', setIndex: 1 })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^Le set de Brume, 22 h – 23 h n'a pas pu être ajouté : No such artist$/))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^Le set de Brume n'a pas pu être ajouté : No such artist$/))
 
     // About the session itself.
     refusing({ error: 'Another session overlaps this one', session: SESSIONS[2], set: null })
@@ -2272,8 +2154,8 @@ describe('From an application', () => {
   describe("on a session's page", () => {
     const SET_PAGE = { ...PAGE, ...WITH_AURORES }
 
-    it('opens a new set filled in from it, where a new set starts, focused, and removes it from the address once saved', async () => {
-      const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-1', name: 'Aurore' }], offsetMinutes: 150, durationMinutes: 60 })] }
+    it('opens a new set filled in from it, for what is left of the session, focused, and removes it from the address once saved', async () => {
+      const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-1', name: 'Aurore' }], durationMinutes: 30 })] }
       mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: added } })
       renderAt('/admin/sessions/session-1?application=application-3')
 
@@ -2282,15 +2164,13 @@ describe('From an application', () => {
       expect(newSet().getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aurore, reçue le 15 août 2026')
       expect(newSet().getByLabelText('DJ')).toBeChecked()
       expect(newSet().getByLabelText('Vinyl')).toBeChecked()
-      expect(newSet().getByLabelText('Début')).toHaveValue('23:30')
-      expect(newSet().getByLabelText('Fin')).toHaveValue('00:30')
+      expect(within(newSet().getByRole('group', { name: 'Durée' })).getByLabelText('minutes')).toHaveValue(30)
       fireEvent.click(newSet().getByRole('button', { name: 'ajouter le set' }))
 
       await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
       expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toEqual({
         performers: [{ id: 'artist-1' }],
-        offsetMinutes: 150,
-        durationMinutes: 60,
+        durationMinutes: 30,
         performanceTypes: ['dj', 'vinyl'],
         otherPerformanceType: 'Synthé',
         genres: [],
@@ -2351,7 +2231,7 @@ describe('From an application', () => {
     const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, ...WITH_AURORES }
     const reminder = () => within(screen.getByRole('region', { name: 'Candidature' }))
 
-    it("lists a set filled in from an artist's application, whose place isn't known, under when the artist would like to play", async () => {
+    it("lists a set filled in from an artist's application, whose duration isn't known, under when the artist would like to play", async () => {
       mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
       renderAt('/admin/sessions/nouvelle?application=application-3')
 
@@ -2367,7 +2247,7 @@ describe('From an application', () => {
       // Which doesn't fill in the session's times.
       expect(screen.getByLabelText('Date')).toHaveValue('')
       expect(screen.getByLabelText('Début')).toHaveValue('')
-      expect(rows(screen.getByRole('table', { name: 'Sets' })).map((row) => row.slice(0, 3))).toEqual([['horaire à déterminer', 'Aurore', 'DJ, Vinyl, autre : Synthé']])
+      expect(rows(screen.getByRole('table', { name: 'Sets' })).map((row) => row.slice(0, 3))).toEqual([['à déterminer', 'Aurore', 'DJ, Vinyl, autre : Synthé']])
       expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
 
       await fillIn()
@@ -2379,7 +2259,6 @@ describe('From an application', () => {
         sets: [
           {
             performers: [{ id: 'artist-1' }],
-            offsetMinutes: null,
             durationMinutes: null,
             performanceTypes: ['dj', 'vinyl'],
             otherPerformanceType: 'Synthé',
@@ -2397,11 +2276,10 @@ describe('From an application', () => {
       renderAt('/admin/sessions/nouvelle?application=application-3')
 
       await fillIn()
-      fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore, horaire à déterminer' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore' }))
       await screen.findByRole('heading', { name: 'Set de Aurore' })
       const form = within(screen.getByRole('region', { name: 'Set de Aurore' }))
-      expect(form.getByLabelText('horaire à déterminer')).toBeChecked()
-      expect(form.getByLabelText('Durée')).toBeInTheDocument()
+      expect(within(form.getByRole('group', { name: 'Durée' })).getByLabelText('heures')).toHaveValue(null)
       expect(form.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aurore, reçue le 15 août 2026')
       fireEvent.change(form.getByLabelText('YouTube'), { target: { value: 'dQw4w9WgXcQ' } })
       fireEvent.click(form.getByRole('button', { name: 'enregistrer' }))
@@ -2410,7 +2288,7 @@ describe('From an application', () => {
       expect(rows(table)).toHaveLength(1)
       expect(within(table).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 
-      fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore, horaire à déterminer' }))
+      fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore' }))
       expect(screen.getByText('Aucun set.')).toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'Sets' })).toHaveFocus()
       fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))

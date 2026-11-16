@@ -1,8 +1,8 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import type { ListedSet } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
-import { MISSING, describePerformanceTypes, genreNames, setHours, setName, setTitle } from './describe'
-import { Performers, SetLinks } from './set-cells'
+import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, setTitle } from './describe'
+import { MoveButtons, Performers, SetLinks } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { SetSession } from './set-form'
 
@@ -10,8 +10,8 @@ import type { SetSession } from './set-form'
 // docs/design/client/admin/sessions.md): each one is changed in its form, or taken out of the list, without sending
 // anything.
 
-// The set whose form is open: a listed one, by its place in the list, or a new one, with the session's times as they were
-// when it opened, which it works from.
+// The set whose form is open: a listed one, by its place in the list, or a new one, with the session's duration as it
+// was when it opened, which it works from.
 export type OpenListedSet = { index: number | null; session: SetSession }
 
 // A key for each listed set, which stays the same while it's listed, whatever its place in the list, e.g. once a set
@@ -32,7 +32,7 @@ export function ListedSets({
   onOpen,
 }: {
   sets: ListedSet[]
-  // The session's times, as its form has them.
+  // The session's duration, as its form has it.
   session: SetSession
   open: OpenListedSet | null
   // Whether the session is being sent, with its sets, which then can't be changed.
@@ -41,29 +41,38 @@ export function ListedSets({
   onOpen: (open: OpenListedSet | null) => void
 }) {
   const headingId = useId()
-  // What gets the focus once a set is taken out of the list, since its × is gone: another set's ×, by its key, or the
-  // heading of the sets, as on a session's page.
-  const focusAfterRemove = useRef<number | 'heading' | null>(null)
+  // What gets the focus once the sets change, since the button that changed them can be gone, disabled or moved, which
+  // loses it: a set's button, by its key and what it does, or the heading of the sets, as on a session's page.
+  const focusNext = useRef<{ key: number; action: 'up' | 'down' | 'remove' } | 'heading' | null>(null)
   useLayoutEffect(() => {
-    const next = focusAfterRemove.current
-    focusAfterRemove.current = null
+    const next = focusNext.current
+    focusNext.current = null
     if (next === 'heading') document.getElementById(headingId)?.focus()
-    else if (next !== null) document.querySelector<HTMLElement>(`[data-remove="${next}"]`)?.focus()
+    else if (next !== null) document.querySelector<HTMLElement>(`[data-set="${next.key}"][data-action="${next.action}"]`)?.focus()
   }, [sets, headingId])
 
-  // As a session's page lists them: by their start, those whose place isn't known last, then in the order they were
-  // added, which is their order in the list, and the server's.
-  const rows = sets
-    .map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set, session) }))
-    .sort((a, b) => (a.shown.offsetMinutes ?? Infinity) - (b.shown.offsetMinutes ?? Infinity) || a.index - b.index)
+  // In their order, which is the one they're added in.
+  const rows = sets.map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set) }))
   const remove = (index: number) => {
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
-    const row = rows.findIndex((row) => row.index === index)
-    focusAfterRemove.current = (rows[row + 1] ?? rows[row - 1])?.key ?? 'heading'
+    const next = rows[index + 1] ?? rows[index - 1]
+    focusNext.current = next ? { key: next.key, action: 'remove' } : 'heading'
     onChange(sets.filter((_, i) => i !== index))
     if (open?.index === index) onOpen(null)
     // The open form's set moves up in the list.
     else if (open?.index != null && open.index > index) onOpen({ ...open, index: open.index - 1 })
+  }
+  // Swaps the set at `index` with the one `by` places from it, the open form's set included.
+  const move = (index: number, by: -1 | 1) => {
+    const moved = [...sets]
+    ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
+    // The same arrow, unless the set is now at the end where it can't be used.
+    const end = by < 0 ? 0 : sets.length - 1
+    const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
+    focusNext.current = { key: keyOf(sets[index]), action: index + by === end ? other : arrow }
+    onChange(moved)
+    if (open?.index === index) onOpen({ ...open, index: index + by })
+    else if (open?.index === index + by) onOpen({ ...open, index })
   }
 
   return (
@@ -82,7 +91,7 @@ export function ListedSets({
         <table className="admin-table admin-table-controls" aria-label="Sets">
           <thead>
             <tr>
-              <th>Heure</th>
+              <th>Durée</th>
               <th>Artistes</th>
               <th>Prestation</th>
               <th>Genres</th>
@@ -93,7 +102,7 @@ export function ListedSets({
           <tbody>
             {rows.map(({ index, key, shown }) => (
               <tr key={key}>
-                <td className="admin-day">{setHours(shown)}</td>
+                <td className="admin-day">{setDuration(shown)}</td>
                 {/* Its links open in a new tab, so that the form isn't left. */}
                 <td>{shown.performers.length > 0 ? <Performers performers={shown.performers} newTab /> : MISSING}</td>
                 <td>{describePerformanceTypes(shown)}</td>
@@ -102,10 +111,25 @@ export function ListedSets({
                   <SetLinks set={shown} newTab />
                 </td>
                 <td>
+                  <MoveButtons
+                    name={setName(shown)}
+                    first={index === 0}
+                    last={index === rows.length - 1}
+                    disabled={busy}
+                    data={{ 'data-set': key }}
+                    onMove={(by) => move(index, by)}
+                  />{' '}
                   <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index, session })}>
                     modifier
                   </button>{' '}
-                  <button type="button" data-remove={key} aria-label={`retirer : ${setName(shown)}`} disabled={busy} onClick={() => remove(index)}>
+                  <button
+                    type="button"
+                    data-set={key}
+                    data-action="remove"
+                    aria-label={`retirer : ${setName(shown)}`}
+                    disabled={busy}
+                    onClick={() => remove(index)}
+                  >
                     ×
                   </button>
                 </td>
@@ -120,11 +144,7 @@ export function ListedSets({
           key={open.index === null ? 'new' : keyOf(sets[open.index])}
           title={open.index === null ? 'Nouveau set' : setTitle(sets[open.index])}
           session={open.session}
-          initial={
-            open.index === null
-              ? newSetFormValues({ ...open.session, sets: sets.map((set) => shownSet(set, open.session)) })
-              : setFormValues(shownSet(sets[open.index], open.session), open.session)
-          }
+          initial={open.index === null ? newSetFormValues({ ...open.session, sets }) : setFormValues(shownSet(sets[open.index]))}
           submitLabel={open.index === null ? 'ajouter le set' : 'enregistrer'}
           onCancel={() => onOpen(null)}
           onSubmit={async (fields, form) => {

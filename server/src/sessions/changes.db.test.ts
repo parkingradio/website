@@ -64,7 +64,7 @@ async function createSession(fields: object): Promise<string> {
 
 // Adds a set to the session, and returns its id.
 async function createSet(sessionId: string, fields: object): Promise<string> {
-  const set = { performers: [], offsetMinutes: null, durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
+  const set = { performers: [], durationMinutes: null, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null, ...fields }
   const response = await request('POST', `/api/admin/sessions/${sessionId}/sets`, set)
   expect(response.statusCode).toBe(200)
   return response.json().session.sets.at(-1).id
@@ -141,18 +141,23 @@ describe('PATCH /api/admin/sessions/:id', () => {
 })
 
 describe('PATCH /api/admin/sets/:id', () => {
-  it("checks a set's offset on the set as it would be, with the duration it isn't sent", async () => {
+  it("changes a set's duration, which says whether it and the sets after it fit, without moving it", async () => {
     const artist = await createArtist('Aurore')
     const session = await createSession({})
-    const id = await createSet(session, { performers: [{ id: artist }] })
+    const first = await createSet(session, { performers: [{ id: artist }], durationMinutes: 60 })
+    const second = await createSet(session, { performers: [{ id: artist }], durationMinutes: 60 })
 
-    const response = await request('PATCH', `/api/admin/sets/${id}`, { offsetMinutes: 30 })
-    expect(response.statusCode).toBe(400)
-    expect(response.json()).toEqual({ ok: false, error: 'A set with an offset also has a duration' })
-
-    const placed = await request('PATCH', `/api/admin/sets/${id}`, { offsetMinutes: 30, durationMinutes: 60 })
-    expect(placed.statusCode).toBe(200)
-    expect((await request('PATCH', `/api/admin/sets/${id}`, { offsetMinutes: 0 })).json().session.sets[0]).toMatchObject({ offsetMinutes: 0, durationMinutes: 60 })
+    const longer = await request('PATCH', `/api/admin/sets/${first}`, { durationMinutes: 90 })
+    expect(longer.statusCode).toBe(200)
+    expect(longer.json().session.sets).toMatchObject([
+      { id: first, durationMinutes: 90, fitsInSession: true },
+      { id: second, durationMinutes: 60, fitsInSession: false },
+    ])
+    const unknown = await request('PATCH', `/api/admin/sets/${first}`, { durationMinutes: null })
+    expect(unknown.json().session.sets).toMatchObject([
+      { id: first, durationMinutes: null, fitsInSession: true },
+      { id: second, fitsInSession: true },
+    ])
   })
 
   it('keeps its performers, its track and its video when they are not sent, without resolving the track again', async () => {

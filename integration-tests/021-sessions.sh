@@ -4,12 +4,11 @@
 # tests fake the database, and its property-based tests (server/src/sessions/rules.db.test.ts) only check that the rules
 # of sessions hold after random requests, so this is what covers the sessions, sets and set_performers tables: performers
 # kept in order, with their names, types and takeovers, and the names they give, which follow their collective's, the
-# checks that take the database (artists and collectives that exist), starts kept as instants and sets placed relative to
-# them, sessions listed those without a start first, then the most recent first, by artist, by takeover and by when they
+# checks that take the database (artists and collectives that exist), starts kept as instants and sets kept in their
+# order, even while they're moved, added and deleted at the same time, sessions listed those without a start first, then the most recent first, by artist, by takeover and by when they
 # start, the rules of sessions (sessions don't overlap, a video or a track in at most one set, a cancelled session only
 # has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
-# including while other transactions change sessions, sets that don't fit in their session or overlap each other, which
-# they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
+# including while other transactions change sessions, sets that don't fit in their session, which they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
 # collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, the applications
 # sets and sessions come from, which applications list, their rules, and deleting them, even while a set is given one,
 # the content of a session's event on RA, from its sets' performers, and announcing a session.
@@ -70,11 +69,11 @@ collective_json() {
     printf '{"name":"%s","members":[{"id":"%s"}],"email":"ondes@sessions.test"}' "$1" "$ana"
 }
 
-# set_json <performers JSON> <offset> <duration> [<more JSON fields>] -- a set, as JSON, without links or an application
-# unless they're given.
+# set_json <performers JSON> <duration> [<more JSON fields>] -- a set, as JSON, without links or an application unless
+# they're given.
 set_json() {
-    printf '{"performers":%s,"offsetMinutes":%s,"durationMinutes":%s,"performanceTypes":["dj"],"otherPerformanceType":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null,"application":null%s}' \
-        "$1" "$2" "$3" "${4:+,$4}"
+    printf '{"performers":%s,"durationMinutes":%s,"performanceTypes":["dj"],"otherPerformanceType":"","genres":[],"soundcloudTrack":null,"youtubeVideo":null,"application":null%s}' \
+        "$1" "$2" "${3:+,$3}"
 }
 
 # session_ids -- the ids of the sessions in the body of the last request, in order, on one line.
@@ -87,15 +86,10 @@ set_ids() {
     printf '%s' "$BODY" | grep -o '{"id":"[^"]*","performers"' | cut -d'"' -f4 | tr '\n' ' '
 }
 
-# expect_place <set id> <fits> [<set id>...] -- expect the body of the last request to have that set, saying whether it
-# fits in its session (true or false), and that it overlaps the other sets given, in order, and no others.
-expect_place() {
-    local id="$1" fits="$2" overlapping="" other
-    shift 2
-    for other in "$@"; do
-        overlapping="${overlapping:+${overlapping},}\"${other}\""
-    done
-    expect_body "\\{\"id\":\"${id}\",\"performers\":\\[[^]]*\\],[^{]*\"fitsInSession\":${fits},\"overlappingSets\":\\[${overlapping}\\]"
+# expect_fits <set id> <fits> -- expect the body of the last request to have that set, saying whether it fits in its
+# session (true or false).
+expect_fits() {
+    expect_body "\\{\"id\":\"$1\",\"performers\":\\[[^]]*\\],\"durationMinutes\":[^,]*,\"fitsInSession\":$2,"
 }
 
 # last_set -- the id of the set that was added last.
@@ -376,14 +370,14 @@ expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${canned}"
 expect_body_contains '"start":null'
 
-echo "  a set is added to a session, as planned, with its performers in order, and placed in it"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$ana")" 0 60 \
+echo "  a set is added to a session, as planned, with its performers in order, and its duration, but no times"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$ana")" 60 \
     '"performanceTypes":["live-performance","dj","dj"],"otherPerformanceType":" Synthé \n modulaire ","genres":["ambient","techno","ambient"],"youtubeVideo":"https://youtu.be/dQw4w9WgXcQ?si=x"')"
 expect_status 200
 opening="$(last_set)"
 expect_body_contains "\"id\":\"${first}\",\"start\":\"2026-11-14T21:00:00-05:00\""
 expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
-expect_body_contains '"offsetMinutes":0,"durationMinutes":60,"start":"2026-11-14T21:00:00-05:00","end":"2026-11-14T22:00:00-05:00"'
+expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,\"fitsInSession\":true,\"performanceTypes\""
 expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerformanceType":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
@@ -395,107 +389,99 @@ expect_body_contains '"event":{"title":"HAUTE RIVE TAKEOVER","start":"2026-11-14
 
 echo "  performers have to be artists who exist, a set's session has to exist, and nothing is saved otherwise"
 for performer in "$NOBODY" not-a-uuid "$ondes"; do
-    json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$performer")" 120 60)"
+    json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume" "$performer")" 60)"
     expect_status 400
     expect_body_contains '"error":"No such artist"'
 done
 for session in "$NOBODY" not-a-uuid; do
-    json POST "${SESSIONS}/${session}/sets" "$(set_json "$(performers "$ana")" 120 60)"
+    json POST "${SESSIONS}/${session}/sets" "$(set_json "$(performers "$ana")" 60)"
     expect_status 404
     expect_body_contains '"error":"No such session"'
 done
 json GET "${SESSIONS}/${first}"
 [ "$(set_ids)" = "${opening} " ] || { _show_body; fail "expected only the opening set"; }
 
-echo "  a set doesn't have to fit in its session, with or without an offset, which it says, and one without a duration fits"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 200 60)"
+echo "  a set doesn't have to fit in its session, which it says, from its duration and those before it, an unknown one counting as none"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 181)"
 expect_status 200
-expect_place "$(last_set)" false
+expect_fits "$(last_set)" false
 json DELETE "${SETS}/$(last_set)"
 expect_status 200
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null 241)"
-expect_status 200
-expect_place "$(last_set)" false
-json DELETE "${SETS}/$(last_set)"
-expect_status 200
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null 240)"
+# Until the session ends, which fits.
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 180)"
 expect_status 200
 whenever="$(last_set)"
-expect_place "$whenever" true
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null null)"
+expect_fits "$whenever" true
+# Without a duration, right after the sets that fill the session: it starts when it ends.
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null)"
 expect_status 200
 unplaced="$(last_set)"
-expect_body_contains "{\"id\":\"${unplaced}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":null,\"durationMinutes\":null,\"start\":null,\"end\":null"
+expect_body_contains "{\"id\":\"${unplaced}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":null,\"fitsInSession\":false,"
+# Nothing gives a set's times.
+if printf '%s' "$BODY" | grep -q -E '"offsetMinutes"|"overlappingSets"|"durationMinutes":[^,]*,"start"'; then _show_body; fail "expected sets without times"; fi
 
-echo "  a session's sets can overlap each other, when they're added or changed, which they say, but one can start when another ends"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 30 60)"
-expect_status 200
-across="$(last_set)"
-expect_place "$opening" true "$across"
-expect_place "$across" true "$opening"
-json PUT "${SETS}/${across}" "$(set_json "$(performers "$ana")" 60 60)"
-expect_status 200
-expect_place "$opening" true
-expect_place "$across" true
-json PUT "${SETS}/${across}" "$(set_json "$(performers "$ana")" 59 60)"
-expect_status 200
-expect_place "$across" true "$opening"
-json DELETE "${SETS}/${across}"
-expect_status 200
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60 60)"
+echo "  a session's sets are in the order they're added, which moving one changes, the others keeping their order"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60)"
 expect_status 200
 second="$(last_set)"
-json GET "${SESSIONS}/${first}"
-# By offset, those without one last, in the order they were added.
-[ "$(set_ids)" = "${opening} ${second} ${whenever} ${unplaced} " ] || { _show_body; fail "expected the sets by offset"; }
-expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60"
+[ "$(set_ids)" = "${opening} ${whenever} ${unplaced} ${second} " ] || { _show_body; fail "expected the sets in the order they were added"; }
+json PUT "${SETS}/${second}/position" '{"position":1}'
+expect_status 200
+[ "$(set_ids)" = "${opening} ${second} ${whenever} ${unplaced} " ] || { _show_body; fail "expected the set moved second"; }
+expect_fits "$second" true
+expect_fits "$whenever" false
+# Past the last, even past what the database's integers hold, it goes last.
+json PUT "${SETS}/${whenever}/position" '{"position":100000000000000000000}'
+expect_status 200
+[ "$(set_ids)" = "${opening} ${second} ${unplaced} ${whenever} " ] || { _show_body; fail "expected the set moved last"; }
+expect_fits "$unplaced" true
+for body in '{"position":-1}' '{"position":1.5}' '{"position":"1"}' '{"position":null}' '{}' '{"position":0,"id":"x"}'; do
+    json PUT "${SETS}/${whenever}/position" "$body"
+    expect_status 400
+done
+for set in "$NOBODY" not-a-uuid; do
+    json PUT "${SETS}/${set}/position" '{"position":0}'
+    expect_status 404
+    expect_body_contains '"error":"No such set"'
+done
+[ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected moving sets not to count as changing them"
+[ "$(sql "select string_agg(position::text, ' ' order by position) from sets where session_id = '${first}'")" = "0 1 2 3" ] \
+    || fail "expected the sets' positions to be 0 to 3"
 
-echo "  but the sets of two sessions can be at the same offsets"
-json POST "${SESSIONS}/${next}/sets" "$(set_json "$(performers "$brume")" 0 60)"
+echo "  but the sets of two sessions each have their own order"
+json POST "${SESSIONS}/${next}/sets" "$(set_json "$(performers "$brume")" 60)"
 expect_status 200
 later="$(last_set)"
-
-echo "  a cancelled set isn't among the sets the others overlap, but says which ones it would overlap"
-json PUT "${SETS}/${opening}/status" '{"status":"cancelled"}'
-expect_status 200
-expect_body_contains "\"status\":\"cancelled\",\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$brume")" 0 30)"
-expect_status 200
-instead="$(last_set)"
-expect_place "$instead" true
-expect_place "$opening" true "$instead"
-json PUT "${SETS}/${opening}/status" '{"status":"planned"}'
-expect_status 200
-expect_place "$instead" true "$opening"
-json DELETE "${SETS}/${instead}"
-expect_status 200
+[ "$(set_ids)" = "${later} " ] || { _show_body; fail "expected the other session's set alone"; }
 json PUT "${SETS}/${opening}/status" '{"status":"done"}'
 expect_status 200
 
-echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, cancelled ones included"
+echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, a cancelled set keeping its place"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
 session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 expect_body_contains '"durationMinutes":119'
-expect_place "$opening" true
-expect_place "$second" false
-expect_place "$whenever" false
+expect_fits "$opening" true
+expect_fits "$second" false
+# After the cancelled set, whose duration still counts.
+expect_fits "$unplaced" false
+expect_fits "$whenever" false
 json PUT "${SETS}/${second}/status" '{"status":"planned"}'
 expect_status 200
 json DELETE "${SETS}/${whenever}"
 expect_status 200
 
-echo "  moving a session moves its sets, which doesn't count as changing them, and so does taking its start away"
+echo "  moving a session leaves its sets as they are, which doesn't count as changing them, and so does taking its start away"
 session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
-expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":\"2026-11-21T22:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\""
+expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,\"fitsInSession\":true,"
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
 session_form PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
-expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"offsetMinutes\":60,\"durationMinutes\":60,\"start\":null,\"end\":null"
+[ "$(set_ids)" = "${opening} ${second} ${unplaced} " ] || { _show_body; fail "expected the sets in their order"; }
 session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 
@@ -506,13 +492,13 @@ expect_body_contains "\"status\":\"cancelled\",\"statusUpdatedBy\":\"${ADMIN_EMA
 [ "$(sql "select count(*) from sets where session_id = '${first}' and (status <> 'cancelled' or status_updated_by <> '${ADMIN_EMAIL}' or updated_by is not null)")" = 0 ] \
     || fail "expected every set of the session to be cancelled, as the admin, without being changed"
 echo "  and while it's cancelled, its sets can be changed, but not un-cancelled, and none can be added"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 180 60)"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60)"
 expect_conflict 'This session is cancelled' "$first"
 json PUT "${SETS}/${second}/status" '{"status":"planned"}'
 expect_conflict 'This session is cancelled' "$first"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
-json PUT "${SETS}/${second}" "$(set_json "$(performers "$ana" "$brume")" 60 60)"
+json PUT "${SETS}/${second}" "$(set_json "$(performers "$ana" "$brume")" 60)"
 expect_status 200
 echo "  un-cancelling a session leaves its sets cancelled, to be un-cancelled one by one"
 json PUT "${SESSIONS}/${first}/status" '{"status":"planned"}'
@@ -603,20 +589,20 @@ for session in "${dated[@]}"; do
 done
 
 echo "  a video belongs to at most one set, and the 409 names it and its session"
-json POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" null null '"youtubeVideo":"dQw4w9WgXcQ"')"
+json POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" null '"youtubeVideo":"dQw4w9WgXcQ"')"
 expect_conflict "This YouTube video is another set's" "$first" "$opening"
 
 echo "  a SoundCloud link has to be on soundcloud.com, and can't be resolved until the SoundCloud app's credentials are entered"
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 0 60 '"soundcloudTrack":"https://on.soundcloud.com/AbCdE"')"
+json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://on.soundcloud.com/AbCdE"')"
 expect_status 400
 expect_body_contains 'must be a link to it on soundcloud.com'
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 0 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons"')"
+json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons"')"
 expect_status 409
 expect_body_contains '"error":"The credentials of the SoundCloud app have not been entered yet","session":null,"set":null'
 
 echo "  but a set's own track isn't resolved again, so the set can be changed without SoundCloud"
 sql "update sets set soundcloud_track_id = '42', soundcloud_track_url = 'https://soundcloud.com/parkingdotradio/3tons' where id = '${later}'" >/dev/null
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$ana")" 0 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons?si=abc"')"
+json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons?si=abc"')"
 expect_status 200
 expect_body_contains '"soundcloudTrack":{"id":"42","url":"https://soundcloud.com/parkingdotradio/3tons"}'
 expect_body_contains "{\"id\":\"${later}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
@@ -634,7 +620,7 @@ echo "  and the 409 names the other set and its session"
 # with its track, then waits for the sessions' lock, while another transaction gives that track to the later set.
 sql "update sets set soundcloud_track_id = '43', soundcloud_track_url = 'https://soundcloud.com/parkingdotradio/b2b' where id = '${second}'" >/dev/null
 hold_sessions_lock "update sets set soundcloud_track_id = '44' where id = '${second}'; update sets set soundcloud_track_id = '43' where id = '${later}';"
-send_in_background PUT "${SETS}/${second}" "$(set_json "$(performers "$ana")" 60 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/b2b"')"
+send_in_background PUT "${SETS}/${second}" "$(set_json "$(performers "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/b2b"')"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
@@ -668,27 +654,27 @@ expect_status 200
 echo "  a session is added with its sets, in order, or with none of them, the error saying which set and what's in the way"
 sessions_before="$(sql "select count(*) from sessions")"
 sets_before="$(sql "select count(*) from sets")"
-session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "00000000-0000-4000-8000-000000000000")" 60 60)]")"
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "00000000-0000-4000-8000-000000000000")" 60)]")"
 expect_status 400
 expect_body '^\{"ok":false,"error":"No such artist","setIndex":1\}$'
-session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "$brume")" 60 60 '"youtubeVideo":"https://youtu.be/iNtEgRaTeD1"')]")"
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 60 '"youtubeVideo":"iNtEgRaTeD1"'),$(set_json "$(performers "$brume")" 60 '"youtubeVideo":"https://youtu.be/iNtEgRaTeD1"')]")"
 expect_status 409
 expect_body '^\{"ok":false,"error":"This YouTube video is another set'"'"'s","session":null,"set":null,"setIndex":1,"otherSetIndex":0\}$'
 [ "$(sql "select count(*) from sessions")" = "$sessions_before" ] && [ "$(sql "select count(*) from sets")" = "$sets_before" ] \
     || fail "expected nothing to be saved of a session whose sets can't all be added"
 # Given to another set while the request waits for the sessions' lock.
 hold_sessions_lock "update sets set youtube_video_id = 'iNtEgRaTeD1' where id = '${opening}';"
-send_in_background POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" null null),$(set_json "$(performers "$brume")" 0 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
+send_in_background POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" null),$(set_json "$(performers "$brume")" 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
 expect_conflict "This YouTube video is another set's" "$first" "$opening"
 expect_body '"setIndex":1\}$'
 sql "update sets set youtube_video_id = 'dQw4w9WgXcQ' where id = '${opening}'" >/dev/null
-session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$brume")" null 60),$(set_json "$(performers "$ana")" null 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$brume")" 60),$(set_json "$(performers "$ana")" 60 '"youtubeVideo":"iNtEgRaTeD1"')]")"
 expect_status 200
 added="$(first_id)"
-# Neither has an offset, so they're in the order they were sent.
+# In the order they were sent.
 expect_body "\"sets\":\\[\\{\"id\":\"[^\"]*\",\"performers\":\\[\\{\"id\":\"${brume}\""
 expect_body_contains "\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 json DELETE "${SESSIONS}/${added}"
@@ -698,12 +684,12 @@ echo "  a set added to a session, or un-cancelled, while another transaction can
 # Only because of the sessions' lock: neither request locks the session's row, which they only read, so without it, they
 # would read the session before it's cancelled, and succeed.
 hold_sessions_lock "update sessions set status = 'cancelled' where id = '${next}' or id = '${replacement}'; update sets set status = 'cancelled' where session_id = '${replacement}';"
-send_in_background POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" 0 30)"
+send_in_background POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" 30)"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
 expect_conflict 'This session is cancelled' "$replacement"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null null)"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null)"
 expect_status 200
 spare="$(last_set)"
 json PUT "${SETS}/${spare}/status" '{"status":"cancelled"}'
@@ -724,14 +710,35 @@ done
 echo "  a set added while another transaction shortens its session waits for it, and says if it doesn't fit anymore"
 # Only because of the sessions' lock too.
 hold_sessions_lock "update sessions set duration_minutes = 150 where id = '${first}';"
-send_in_background POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 120 60)"
+send_in_background POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60)"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
 expect_status 200
 expect_body_contains '"durationMinutes":150'
-expect_place "$(last_set)" false
+expect_fits "$(last_set)" false
 json DELETE "${SETS}/$(last_set)"
+expect_status 200
+
+echo "  sets moved, added and deleted at the same time wait for each other, and stay in an order"
+session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 30),$(set_json "$(performers "$brume")" 30),$(set_json "$(performers "$ana")" 30)]")"
+expect_status 200
+shuffled="$(first_id)"
+read -r -a shuffled_sets <<< "$(set_ids)"
+hold_sessions_lock ""
+send_in_background PUT "${SETS}/${shuffled_sets[0]}/position" '{"position":2}' move-last
+send_in_background PUT "${SETS}/${shuffled_sets[2]}/position" '{"position":0}' move-first
+send_in_background POST "${SESSIONS}/${shuffled}/sets" "$(set_json "$(performers "$brume")" 30)" add
+delete_in_background "${SETS}/${shuffled_sets[1]}" delete
+wait_for_sessions_lock 4
+release_sessions_lock
+wait
+for name in status-move-last status-move-first status-add delete; do
+    [ "$(cat "${FILES}/${name}")" = 200 ] || fail "expected ${name} to succeed, got $(cat "${FILES}/${name}")"
+done
+[ "$(sql "select string_agg(position::text, ' ' order by position) from sets where session_id = '${shuffled}'")" = "0 1 2" ] \
+    || fail "expected the session's sets to be at 0 to 2"
+json DELETE "${SESSIONS}/${shuffled}"
 expect_status 200
 
 echo "  deleting a session and deleting an artist who played two of its sets wait for each other"
@@ -741,8 +748,8 @@ session_form POST "$SESSIONS" "$(session_json '"2027-03-01T16:00-05:00"' 120)"
 doomed="$(first_id)"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Passager"}' "$ARTISTS"
 passenger="$(first_id)"
-for offset in 0 60; do
-    json POST "${SESSIONS}/${doomed}/sets" "$(set_json "$(performers "$passenger")" "$offset" 60)"
+for _ in 1 2; do
+    json POST "${SESSIONS}/${doomed}/sets" "$(set_json "$(performers "$passenger")" 60)"
     expect_status 200
 done
 hold_sessions_lock ""
@@ -778,7 +785,7 @@ expect_body_contains '"type":"guest-mixes","takeover":null'
 echo "  changing a set while one of its performers is deleted doesn't deadlock"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Éphémère"}' "$ARTISTS"
 passing="$(first_id)"
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$passing" "$brume")" 0 60)"
+json PUT "${SETS}/${later}" "$(set_json "$(performers "$passing" "$brume")" 60)"
 expect_status 200
 # Another transaction holds the artist's row while the artist is deleted, then while the set is changed to keep them.
 # Deleting the artist takes the sessions' lock, then waits for their row, so changing the set waits for that lock.
@@ -787,7 +794,7 @@ expect_status 200
 hold_row artists "$passing"
 delete_in_background "${ARTISTS}/${passing}" delete
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"artists\"%')"
-send_in_background PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$passing")" 0 60)"
+send_in_background PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$passing")" 60)"
 wait_for_sessions_lock
 release_row
 wait_for_background
@@ -820,14 +827,14 @@ session_form POST "$SESSIONS" "$(session_json '"2027-04-01T16:00-04:00"' 120 "\"
 expect_status 200
 applied="$(first_id)"
 expect_body_contains "\"application\":{\"id\":\"${collectives_application}\",\"receivedAt\":\""
-json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$brume" "$candidate")" 0 60 "\"application\":\"${artists_application}\"")"
+json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$brume" "$candidate")" 60 "\"application\":\"${artists_application}\"")"
 expect_status 200
 applied_set="$(last_set)"
-json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$candidate")" 60 60 "\"application\":\"${artists_application}\"")"
+json POST "${SESSIONS}/${applied}/sets" "$(set_json "$(performers "$candidate")" 60 "\"application\":\"${artists_application}\"")"
 expect_status 200
 rebooked="$(last_set)"
 json GET "${APPLICATIONS}/${artists_application}"
-expect_body_contains "\"sets\":[{\"id\":\"${applied_set}\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T17:00:00-04:00\",\"offsetMinutes\":0,\"durationMinutes\":60,\"status\":\"planned\",\"session\":{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\"}},{\"id\":\"${rebooked}\""
+expect_body_contains "\"sets\":[{\"id\":\"${applied_set}\",\"durationMinutes\":60,\"status\":\"planned\",\"session\":{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\"}},{\"id\":\"${rebooked}\""
 expect_body_contains '"sessions":[]'
 json GET "${APPLICATIONS}/${collectives_application}"
 expect_body_contains "\"sets\":[],\"sessions\":[{\"id\":\"${applied}\",\"title\":\"CANDIDATS TAKEOVER\",\"start\":\"2027-04-01T16:00:00-04:00\",\"end\":\"2027-04-01T18:00:00-04:00\",\"durationMinutes\":120,\"status\":\"planned\"}]"
@@ -924,16 +931,16 @@ json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
 
 echo "  a set without performers takes one again to be replaced, but its other fields and its status can still be changed"
-json PUT "${SETS}/${later}" "$(set_json '[]' 0 60)"
+json PUT "${SETS}/${later}" "$(set_json '[]' 60)"
 expect_status 400
 expect_body_contains '"error":"A set has at least one performer"'
-json PATCH "${SETS}/${later}" '{"offsetMinutes":null,"durationMinutes":null,"genres":["ambient"]}'
+json PATCH "${SETS}/${later}" '{"durationMinutes":null,"genres":["ambient"]}'
 expect_status 200
-expect_body_contains "{\"id\":\"${later}\",\"performers\":[],\"offsetMinutes\":null,\"durationMinutes\":null"
-# Its place is checked as the set would be, without a duration.
+expect_body_contains "{\"id\":\"${later}\",\"performers\":[],\"durationMinutes\":null"
+# Sets no longer have offsets.
 json PATCH "${SETS}/${later}" '{"offsetMinutes":30}'
 expect_status 400
-expect_body_contains '"error":"A set with an offset also has a duration"'
+expect_body_contains '"error":"Unknown field: `offsetMinutes`"'
 json PUT "${SESSIONS}/${next}/status" '{"status":"planned"}'
 expect_status 200
 json PUT "${SETS}/${later}/status" '{"status":"done"}'
@@ -952,7 +959,7 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
     json DELETE "${SESSIONS}/${id}"
     expect_status 404
-    json PUT "${SETS}/${id}" "$(set_json "$(performers "$ana")" null null)"
+    json PUT "${SETS}/${id}" "$(set_json "$(performers "$ana")" null)"
     expect_status 404
     expect_body_contains '"error":"No such set"'
     json PUT "${SETS}/${id}/status" '{"status":"done"}'

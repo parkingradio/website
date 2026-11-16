@@ -55,7 +55,6 @@ export const NOT_THE_SETS_APPLICATION = "A set's application is one of its perfo
 export const NOT_THE_SESSIONS_APPLICATION = "A session's application is that of the collective whose takeover it is"
 
 // The longest a session or a set lasts, in minutes: 24 hours, so that a typo can't make a session overlap days of others.
-// A set's offset is less than that, since it starts within its session.
 const MAX_MINUTES = 24 * 60
 
 // A value, or null, or a blank string, for none, that's sent as a string, which `parse` turns into what's kept, or null
@@ -147,11 +146,6 @@ export function brokenSessionRule({
   return null
 }
 
-// The rule of a set's place in its session (see "Times" in docs/design/server/sessions.md).
-export function brokenSetRule({ offsetMinutes, durationMinutes }: { offsetMinutes: number | null; durationMinutes: number | null }): BrokenRule | null {
-  return offsetMinutes !== null && durationMinutes === null ? { message: 'A set with an offset also has a duration', field: 'durationMinutes' } : null
-}
-
 // Checks the rule that `broken` finds, as a schema's refinement.
 function checking<T>(broken: (value: T) => BrokenRule | null) {
   return (value: T, context: z.RefinementCtx) => {
@@ -221,15 +215,13 @@ export const Genre = z.enum(GENRES, { error: BAD_GENRE })
 
 // A set's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
 // sessions/links.ts), performance types are in the order of PERFORMANCE_TYPES, and performance types and genres are
-// without duplicates. Each one on its own, like a session's, then together, in `SetFields`.
+// without duplicates. Each one on its own, like a session's, then together, in `SetFields`. A set's place among its
+// session's sets isn't one of them: it's changed on its own (see `SetPosition`).
 export const SET_FIELDS = {
   performers: Performers,
-  offsetMinutes: minutes(`The offset must be a whole number of minutes, from 0 to ${MAX_MINUTES - 1}, or null`, 0, MAX_MINUTES - 1)
-    .nullable()
-    .meta({ description: "When the set starts, in minutes after its session's start. Null when that isn't known yet" }),
   durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}, or null`, 1, MAX_MINUTES)
     .nullable()
-    .meta({ description: "Null when that isn't known yet, which a set with an offset can't be" }),
+    .meta({ description: 'Null while it isn\'t known, which counts as none for the sets after it: see "Sets\' order" in the rules' }),
   performanceTypes: z
     .array(PerformanceType, { error: BAD_PERFORMANCE_TYPE })
     .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))
@@ -248,11 +240,25 @@ export const SET_FIELDS = {
   application: application("the set comes from: an artist's, who is one of its performers"),
 }
 
-export const SetFields = z
-  .strictObject(SET_FIELDS, { error: objectError('A set must be an object with its fields') })
-  .superRefine(checking(brokenSetRule))
-  .meta({ id: 'SetFields' })
+export const SetFields = z.strictObject(SET_FIELDS, { error: objectError('A set must be an object with its fields') }).meta({ id: 'SetFields' })
 export type SetFields = z.output<typeof SetFields>
+
+// Where a set goes among its session's sets, when it's moved (see "Sets' order" in docs/design/server/sessions.md): from 0,
+// cancelled ones included. Past the last, it goes last, which the store sees to, since it's checked against what's saved.
+const BAD_POSITION = 'The position must be a whole number, from 0'
+export const SetPosition = z
+  .strictObject(
+    {
+      position: z
+        .number({ error: BAD_POSITION })
+        .min(0, BAD_POSITION)
+        // Any whole number, even past the integers zod's `int` takes, since past the last is last.
+        .refine(Number.isInteger, BAD_POSITION)
+        .meta({ description: "The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last" }),
+    },
+    { error: objectError(BAD_POSITION) },
+  )
+  .meta({ id: 'SetPosition' })
 
 // What adding a session sends: its fields, with the same rules as `SessionFields`, which can't be extended once it's
 // refined, and the sets to add with it, in order, each with the fields that adding a set takes. Leaving them out adds

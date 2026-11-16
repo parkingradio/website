@@ -84,12 +84,8 @@ const ONDES: Collective = {
 const STUB_SET: StudioSet = {
   id: 'set-1',
   performers: [{ id: 'artist-1', name: 'Aurore' }],
-  offsetMinutes: 0,
   durationMinutes: 60,
-  start: '2026-11-15T02:00:00.000Z',
-  end: '2026-11-15T03:00:00.000Z',
   fitsInSession: true,
-  overlappingSets: [],
   performanceTypes: ['dj'],
   otherPerformanceType: '',
   genres: [],
@@ -109,6 +105,7 @@ function stubSession(sets: StudioSet[]): Session {
   return {
     ...STUB_SET,
     id: 'session-1',
+    start: '2026-11-15T02:00:00.000Z',
     durationMinutes: 180,
     end: '2026-11-15T05:00:00.000Z',
     type: 'takeover',
@@ -577,7 +574,7 @@ describe('An artist’s page', () => {
   it("lists the sets they played, but not their sessions' other sets, only showing them, and says that deleting them takes them out", async () => {
     // Cancelled, and with another artist, in a session that has another artist's set too.
     const played: StudioSet = { ...STUB_SET, performers: [...STUB_SET.performers, { id: 'artist-2', name: 'Brume' }], status: 'cancelled' }
-    const other: StudioSet = { ...STUB_SET, id: 'set-2', performers: [{ id: 'artist-2', name: 'Brume' }], offsetMinutes: 60, start: '2026-11-15T03:00:00.000Z', end: '2026-11-15T04:00:00.000Z' }
+    const other: StudioSet = { ...STUB_SET, id: 'set-2', performers: [{ id: 'artist-2', name: 'Brume' }] }
     // Which comes from one of her applications.
     played.application = { id: 'application-1', receivedAt: '2026-10-05T16:00:00.000Z' }
     mockFetch({ ...AURORE_PAGE, '/api/admin/sessions?artist=artist-1': { ok: true, sessions: [stubSession([played, other])] } })
@@ -589,7 +586,7 @@ describe('An artist’s page', () => {
         .getAllByRole('row')
         .slice(1)
         .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent)),
-    ).toEqual([['sam. 14 nov. 2026', '21 h – 22 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', 'Candidature', 'annulé']])
+    ).toEqual([['sam. 14 nov. 2026', '1 h', 'ONDES TAKEOVER', 'Aurore, Brume', 'DJ', '-', 'Candidature', 'annulé']])
     expect(within(table).getByRole('link', { name: 'Candidature reçue le 5 octobre 2026' })).toHaveAttribute('href', '/admin/candidatures/application-1')
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-cancelled')
     expect(within(table).getByRole('link', { name: 'ONDES TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')

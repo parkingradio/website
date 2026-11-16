@@ -48,3 +48,34 @@ export function SetLinks({ set, newTab = false }: { set: Pick<SetValues, 'applic
     </Fragment>
   ))
 }
+
+// "↑" and "↓", which move a set one place up or down among its session's sets, like a set's artists (see
+// ordered-list.tsx), named after the set, `name`. The first one's "↑" and the last one's "↓" can't be used. Each says what
+// it does in `data-action`, along with `data`, e.g. the set it's about, so that the focus can follow the set once it's
+// moved.
+export function MoveButtons({
+  name,
+  first,
+  last,
+  disabled,
+  data,
+  onMove,
+}: {
+  name: string
+  first: boolean
+  last: boolean
+  disabled: boolean
+  data: Record<`data-${string}`, string | number>
+  onMove: (by: -1 | 1) => void
+}) {
+  return (
+    <>
+      <button type="button" {...data} data-action="up" aria-label={`monter : ${name}`} disabled={disabled || first} onClick={() => onMove(-1)}>
+        ↑
+      </button>{' '}
+      <button type="button" {...data} data-action="down" aria-label={`descendre : ${name}`} disabled={disabled || last} onClick={() => onMove(1)}>
+        ↓
+      </button>
+    </>
+  )
+}

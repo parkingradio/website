@@ -33,9 +33,10 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await undated.getByRole('link', { name: 'date à déterminer' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'LES SŒURS ONDES TAKEOVER' })).toBeVisible()
   const sets = page.getByRole('table', { name: 'Sets' })
-  await expect(rowsOf(sets, 'Ondine')).toContainText('+0 h – +1 h')
-  await expect(rowsOf(sets, 'Marée')).toContainText('+1 h – +2 h')
-  await expect(rowsOf(sets, 'Écume')).toContainText('horaire à déterminer (1 h)')
+  // In their order, by their durations.
+  await expect(sets.getByRole('row').nth(1)).toContainText('Ondine')
+  await expect(rowsOf(sets, 'Ondine').getByRole('cell').first()).toHaveText('1 h')
+  await expect(rowsOf(sets, 'Écume').getByRole('cell').first()).toHaveText('à déterminer')
   await page.goBack()
 
   // The cancelled one.
@@ -74,13 +75,13 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(value(page, 'Description')).toContainText('Trois artistes, trois heures')
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de ONDE COMMUNE TAKEOVER' })).toHaveJSProperty('naturalWidth', 64)
   const sessionPage = new URL(page.url()).pathname
-  await expect(rowsOf(sets, 'Kwame Asante')).toContainText('22 h – 23 h')
+  await expect(rowsOf(sets, 'Kwame Asante').getByRole('cell').first()).toHaveText('1 h')
 
   // His page lists his set, but not the session's other sets.
   await sets.getByRole('link', { name: 'Kwame Asante', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Kwame Asante', exact: true })).toBeVisible()
   const his = page.getByRole('table', { name: 'Sets' })
-  await expect(rowsOf(his, 'ONDE COMMUNE TAKEOVER')).toContainText('22 h – 23 h')
+  await expect(rowsOf(his, 'ONDE COMMUNE TAKEOVER').getByRole('cell').nth(1)).toHaveText('1 h')
   await expect(his.locator(`a[href="${sessionPage}"]`)).toHaveCount(1)
   await expect(his).not.toContainText('Clémentine Brûlée')
 
@@ -108,19 +109,19 @@ test("a seeded session's page shows the content of its event on RA, its performe
   await expect(page.getByRole('button', { name: 'copier le line-up' })).toBeVisible()
 })
 
-test('a seeded session marks its sets that overlap, and those that end after it, saying why in a tooltip', async ({ page, isMobile }) => {
+test('a seeded session marks its sets that end after it, saying why in a tooltip', async ({ page, isMobile }) => {
   await logIn(page, { at: '/admin/sessions' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('soirée à revoir')
   await rowsOf(page, 'SOIRÉE À REVOIR').getByRole('link').first().click()
-  // By their performers' links, since the tooltips of the rows' marks name the sets they overlap.
+  // By their performers' links.
   const sets = page.getByRole('table', { name: 'Sets' })
   const mark = (artist: string) =>
     sets
       .getByRole('row')
       .filter({ has: page.getByRole('link', { name: artist, exact: true }) })
       .getByRole('button', { name: 'avertissement' })
-  await expect(mark('Fréquence Boréale')).toHaveAccessibleDescription('Chevauche le set de Ondine, 20 h 30 – 21 h 30.')
-  await expect(mark('Ondine')).toHaveAccessibleDescription('Chevauche le set de Fréquence Boréale, 20 h – 21 h.')
+  await expect(mark('Fréquence Boréale')).toHaveCount(0)
+  await expect(mark('Ondine')).toHaveCount(0)
   await expect(mark('Jah Pierre')).toHaveAccessibleDescription('Finit après la session.')
   const tooltip = page.getByRole('tooltip').filter({ visible: true })
   await expect(tooltip).toHaveCount(0)
@@ -188,7 +189,7 @@ test('a takeover and its set are given the applications they come from in their 
   const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
   expect(created.ok()).toBe(true)
   const id: string = (await created.json()).session.id
-  const set = { performers: [{ id: mine.artist.id }], offsetMinutes: 0, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
+  const set = { performers: [{ id: mine.artist.id }], durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
   expect((await page.request.post(`/api/admin/sessions/${id}/sets`, { data: set })).ok()).toBe(true)
   await mockEvents(page)
 
@@ -213,7 +214,7 @@ test('a takeover and its set are given the applications they come from in their 
   await expect(page).toHaveURL(`/admin/candidatures/${artists}`)
   const listed = page.getByRole('table', { name: 'Sets' })
   await expect(listed.getByRole('row')).toHaveCount(2)
-  await expect(listed).toContainText('21 h – 22 h')
+  await expect(listed).toContainText('1 h')
   await expect(page.getByText(/^La candidature sera supprimée/)).toContainText('Les sets associés restent.')
   await listed.getByRole('link', { name: `E2E ${unique}` }).click()
 
@@ -240,7 +241,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const sets = page.getByRole('table', { name: 'Sets' })
   const sessionPicker = page.getByRole('combobox', { name: 'Session' })
 
-  // A new session, with the artist's set, whose place isn't known yet, under when they'd like to play.
+  // A new session, with the artist's set, whose duration isn't known yet, under when they'd like to play.
   await page.goto(`/admin/candidatures/${artists}`)
   await page.getByRole('button', { name: 'créer un set' }).click()
   await sessionPicker.click()
@@ -250,7 +251,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const reminder = page.getByRole('region', { name: 'Candidature' })
   await expect(reminder.getByRole('listitem')).toHaveText([longDay(day)])
   await expect(reminder).toContainText('20:00 à 23:00')
-  await expect(rowsOf(sets, mine.artist.name)).toContainText('horaire à déterminer')
+  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').first()).toHaveText('à déterminer')
   await expect(rowsOf(sets, mine.artist.name)).toContainText('DJ, autre : Synthé')
   await page.getByLabel('Date', { exact: true }).fill(day)
   await page.getByLabel('Début').fill('20:00')
@@ -260,7 +261,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
   const sessionPage = new URL(page.url()).pathname
-  await expect(rowsOf(sets, mine.artist.name)).toContainText('horaire à déterminer')
+  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').first()).toHaveText('à déterminer')
   await expect(sets.getByRole('link', { name: /^Candidature reçue le / })).toHaveAttribute('href', `/admin/candidatures/${artists}`)
 
   // Another one, in that session, which is on the day the artist would like to play.
@@ -276,14 +277,22 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await expect(newSet.getByRole('heading', { name: 'Nouveau set' })).toBeFocused()
   await expect(newSet.getByRole('heading', { name: 'Nouveau set' })).toBeInViewport()
   await expect(newSet.getByRole('combobox', { name: 'Candidature' })).toHaveValue(new RegExp(`^${mine.artist.name}, reçue le `))
-  await expect(newSet.getByLabel('Début')).toHaveValue('20:00')
-  await expect(newSet.getByLabel('Fin')).toHaveValue('21:00')
+  // An hour, after the first one, whose duration doesn't count.
+  await expect(newSet.getByRole('group', { name: 'Durée' }).getByLabel('heures')).toHaveValue('1')
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(page).toHaveURL(sessionPage)
   await expect(sets.getByRole('row')).toHaveCount(3)
-  // Which the page doesn't open again.
+  const durations = sets.getByRole('row').locator('td:first-child')
+  await expect(durations).toHaveText(['à déterminer', '1 h'])
+  // Moved up, which the session keeps, and which the page doesn't open again.
+  const second = sets.getByRole('row').nth(2)
+  await second.getByRole('button', { name: /^monter : / }).click()
+  await expect(durations).toHaveText(['1 h', 'à déterminer'])
+  // The focus goes to its other arrow, since it's first.
+  await expect(sets.getByRole('row').nth(1).getByRole('button', { name: /^descendre : / })).toBeFocused()
   await page.reload()
   await expect(sets.getByRole('row')).toHaveCount(3)
+  await expect(durations).toHaveText(['1 h', 'à déterminer'])
   await expect(page.getByRole('heading', { name: 'Nouveau set' })).toHaveCount(0)
   await page.goto(`/admin/candidatures/${artists}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
@@ -392,13 +401,13 @@ test("a collective's takeover is added from its page, until the next day, with i
   await page.getByRole('option', { name: /^GUEST MIXES, sam\. 10 oct\. 2026/ }).click()
   await expect(page.getByRole('link', { name: 'https://ra.co/events/1234567' })).toBeVisible()
 
-  // Its sets, listed in its form until it's added: one at the session's start, for an hour, unless it's changed, then
-  // one when it ends, with the same video.
+  // Its sets, listed in its form until it's added, each for an hour, of the 2 h 30 the session lasts, unless it's changed,
+  // the second with the same video. Both are called by their performer, the same one, so they're told apart by their rows.
   const listed = page.getByRole('table', { name: 'Sets' })
   const newSet = page.getByRole('region', { name: 'Nouveau set' })
+  const hours = (form: Locator) => form.getByRole('group', { name: 'Durée' }).getByLabel('heures')
   await page.getByRole('button', { name: 'ajouter un set' }).click()
-  await expect(newSet.getByLabel('Début')).toHaveValue('23:00')
-  await expect(newSet.getByLabel('Fin')).toHaveValue('00:00')
+  await expect(hours(newSet)).toHaveValue('1')
   await newSet.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
   await newSet.getByRole('option', { name: mine.artist.name }).click()
   await newSet.getByLabel('DJ').check()
@@ -408,8 +417,7 @@ test("a collective's takeover is added from its page, until the next day, with i
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(listed.getByRole('row')).toHaveCount(2)
   await page.getByRole('button', { name: 'ajouter un set' }).click()
-  await expect(newSet.getByLabel('Début')).toHaveValue('00:00')
-  await expect(newSet.getByLabel('Fin')).toHaveValue('01:00')
+  await expect(hours(newSet)).toHaveValue('1')
   await newSet.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
   await newSet.getByRole('option', { name: mine.artist.name }).click()
   await newSet.getByLabel('YouTube').fill(youtubeVideo)
@@ -419,17 +427,17 @@ test("a collective's takeover is added from its page, until the next day, with i
   // The server refuses the set it can't add, which the error names, and nothing is saved until it can add them all.
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('alert')).toHaveText(
-    `Le set de ${mine.artist.name}, 23 h – 0 h n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet`,
+    `Le set de ${mine.artist.name} n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet`,
   )
-  await page.getByRole('button', { name: `modifier : Set de ${mine.artist.name}, 23 h – 0 h` }).click()
+  await listed.getByRole('row').nth(1).getByRole('button', { name: /^modifier : / }).click()
   const listedSet = page.getByRole('region', { name: `Set de ${mine.artist.name}` })
   await listedSet.getByLabel('SoundCloud').fill('')
   await listedSet.getByRole('button', { name: 'enregistrer' }).click()
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('alert')).toHaveText(
-    `Le set de ${mine.artist.name}, 0 h – 1 h n'a pas pu être ajouté : This YouTube video is another set's (Set de ${mine.artist.name}, 23 h – 0 h)`,
+    `Le set de ${mine.artist.name} n'a pas pu être ajouté : This YouTube video is another set's (Set de ${mine.artist.name})`,
   )
-  await page.getByRole('button', { name: `retirer : Set de ${mine.artist.name}, 0 h – 1 h` }).click()
+  await listed.getByRole('row').nth(2).getByRole('button', { name: /^retirer : / }).click()
   await expect(listed.getByRole('row')).toHaveCount(2)
   await page.getByRole('button', { name: 'ajouter la session' }).click()
 
@@ -439,28 +447,27 @@ test("a collective's takeover is added from its page, until the next day, with i
   const sessionPage = new URL(page.url()).pathname
   const sets = page.getByRole('table', { name: 'Sets' })
   await expect(sets.getByRole('row')).toHaveCount(2)
-  await expect(sets.getByRole('row').nth(1)).toContainText('23 h – 0 h')
+  await expect(sets.getByRole('row').nth(1).getByRole('cell').first()).toHaveText('1 h')
   await expect(sets.getByRole('row').nth(1)).toContainText('DJ')
 
-  // The next one, added from its page, starts when it ends, and the server refuses another set's video, naming that set.
+  // The next one, added from its page, for an hour, after it, and the server refuses another set's video, naming that set.
   await page.getByRole('button', { name: 'ajouter un set' }).click()
-  await expect(page.getByLabel('Début')).toHaveValue('00:00')
-  await expect(page.getByLabel('Fin')).toHaveValue('01:00')
+  await expect(hours(newSet)).toHaveValue('1')
   await page.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
   await page.getByRole('option', { name: mine.artist.name }).click()
   await page.getByLabel('YouTube').fill(youtubeVideo)
   await page.getByRole('button', { name: 'ajouter le set' }).click()
-  await expect(page.getByRole('alert')).toContainText(`(Set de ${mine.artist.name}, 23 h – 0 h)`)
+  await expect(page.getByRole('alert')).toContainText(`(Set de ${mine.artist.name})`)
   await page.getByLabel('YouTube').fill('')
   await page.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(sets.getByRole('row')).toHaveCount(3)
-  await expect(sets.getByRole('row').nth(2)).toContainText('0 h – 1 h')
+  await expect(sets.getByRole('row').nth(2).getByRole('cell').first()).toHaveText('1 h')
 
-  const first = page.getByRole('group', { name: `Statut : Set de ${mine.artist.name}, 23 h – 0 h` })
+  const first = sets.getByRole('row').nth(1).getByRole('group', { name: /^Statut : / })
   await first.getByRole('button', { name: 'joué' }).click()
   await expect(first.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true')
 
-  // Moved to another day, with its sets.
+  // Moved to another day, its sets in their order.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('GUEST MIXES, sam. 10 oct. 2026')
   await page.getByLabel('Date', { exact: true }).fill(otherDay)
@@ -468,7 +475,7 @@ test("a collective's takeover is added from its page, until the next day, with i
   await expect(value(page, 'Quand')).toHaveText(`${longDay(otherDay)}, de 23 h à 1 h 30 le lendemain`)
   // Its event on RA kept.
   await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/1234567')
-  await expect(sets.getByRole('row').nth(1)).toContainText('23 h – 0 h')
+  await expect(first.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true')
 
   // Announced, which says who announced it.
   const announcement = page.getByRole('group', { name: 'Annonce' })
@@ -493,7 +500,7 @@ test("a collective's takeover is added from its page, until the next day, with i
   // The second set deleted with the × of its row, once confirmed.
   await page.goto(sessionPage)
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('button', { name: `supprimer : Set de ${mine.artist.name}, 0 h – 1 h` }).click()
+  await sets.getByRole('row').nth(2).getByRole('button', { name: /^supprimer : / }).click()
   await expect(sets.getByRole('row')).toHaveCount(2)
 
   // Cancelled, with its set, once confirmed.

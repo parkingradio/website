@@ -316,7 +316,6 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     })
     const fields: NewSet = {
       performers,
-      offsetMinutes: set.offsetMinutes,
       durationMinutes: set.durationMinutes,
       performanceTypes: set.performanceTypes ?? [],
       otherPerformanceType: set.otherPerformanceType ?? '',

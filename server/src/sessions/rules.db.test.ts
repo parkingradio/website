@@ -40,7 +40,7 @@ import { checkSessionsInvariants } from './test-invariants.js'
 type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives: string[]; applications: { id: string; owner: string }[] }
 type Context = { app: FastifyInstance; database: TestDatabase; cookies: Record<string, string>; ids: Ids }
 type Body = { error: string; session: Session | null; set: StudioSet | null; setIndex?: number; otherSetIndex?: number }
-type StudioSet = { id: string; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
+type StudioSet = { id: string; durationMinutes: number | null; fitsInSession: boolean; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
 type Session = {
   id: string
   start: string | null
@@ -160,24 +160,23 @@ const VIDEOS = ['a', 'b', 'c', 'd', 'e'].map((letter) => letter.repeat(11))
 
 const DURATION = fc.constantFrom(1, 30, 60, 120, 240, 1440)
 
-// A set's place: mostly an offset and a duration, from the start of a session to past its end.
-const Place = mostly<{ offsetMinutes: number | null; durationMinutes: number | null }>(
-  fc.oneof(
-    { arbitrary: fc.record({ offsetMinutes: fc.constantFrom(0, 30, 60, 120, 180, 1439), durationMinutes: DURATION }), weight: 3 },
-    { arbitrary: fc.record({ offsetMinutes: fc.constant(null), durationMinutes: fc.option(DURATION) }), weight: 1 },
-  ),
-  fc.record({ offsetMinutes: fc.constantFrom(null, 30, 1440), durationMinutes: fc.constantFrom(null, 0, 1441) }),
+// A set's duration: mostly one, sometimes none, which isn't known yet.
+const SetDuration = mostly<number | null>(
+  fc.oneof({ arbitrary: DURATION, weight: 3 }, { arbitrary: fc.constant(null), weight: 1 }),
+  fc.constantFrom(0, 1441),
 )
+
+// Where a set is moved to: mostly a place among a few sets, sometimes past the last, or else not a place.
+const Position = mostly<number>(fc.oneof({ arbitrary: fc.nat({ max: 4 }), weight: 9 }, { arbitrary: fc.constant(1e20), weight: 1 }), fc.constantFrom(-1, 1.5))
 
 const SetFields = fc
   .record({
     performers: mostly<number[]>(fc.array(fc.nat(), { minLength: 1, maxLength: 2 }), fc.constant([])),
-    place: Place,
+    durationMinutes: SetDuration,
     soundcloudTrack: rarely(mostly(fc.constantFrom(...Object.keys(TRACKS).filter((link) => TRACKS[link])), fc.constant(MISSING_TRACK))),
     youtubeVideo: rarely(fc.constantFrom(...VIDEOS)),
     application: Application,
   })
-  .map(({ place, ...fields }) => ({ ...fields, ...place }))
 type SetArgs = typeof SetFields extends fc.Arbitrary<infer T> ? T : never
 type NewSessionArgs = { session: SessionArgs; sets: SetArgs[] }
 
@@ -244,6 +243,17 @@ function setConflicts<Args extends { fields: SetArgs }>(id: (args: Args, context
       expectSetWith(body, id(args, context), (set) => set.soundcloudTrack?.id === TRACKS[args.fields.soundcloudTrack!]),
     [VIDEO_TAKEN]: (body: Body, args: Args, context: Context) =>
       expectSetWith(body, id(args, context), (set) => set.youtubeVideo?.id === args.fields.youtubeVideo),
+  }
+}
+
+// Checks that each set of `session` says whether it fits in it as "Sets' order" in docs/design/server/sessions.md says:
+// from its duration and those of the sets before it, an unknown one counting as none.
+function expectFits(session: Session) {
+  let before = 0
+  for (const set of session.sets) {
+    const fits = set.durationMinutes === null ? before < session.durationMinutes : before + set.durationMinutes <= session.durationMinutes
+    expect(set.fitsInSession, `whether ${set.id} fits`).toBe(fits)
+    before += set.durationMinutes ?? 0
   }
 }
 
@@ -402,8 +412,8 @@ const OPERATIONS = {
     conflicts: setConflicts<{ set: number; fields: SetArgs }>(({ set }, context) => pick(context.ids.sets, set)),
   } satisfies Operation<{ set: number; fields: SetArgs }>,
 
-  // Changes some of the set's fields: its place is checked as it would then be, and its track is only resolved when it's
-  // sent.
+  // Changes some of the set's fields: its performers and its application are checked as they would then be, and its track
+  // is only resolved when it's sent.
   patchSet: {
     weight: 5,
     args: fc.record({ set: fc.nat(), fields: SetFields, sent: fc.subarray(SET_FIELD_NAMES, { minLength: 1 }) }),
@@ -423,6 +433,25 @@ const OPERATIONS = {
       },
     },
   } satisfies Operation<{ set: number; status: string }>,
+
+  // Moves the set to `position` among its session's sets, or last when that's past the last, the others keeping their
+  // order.
+  moveSet: {
+    weight: 3,
+    args: fc.record({ set: fc.nat(), position: Position }),
+    run: async (context, { set, position }) => {
+      const id = pick(context.ids.sets, set)
+      const before = await send(context, 'GET', '/api/admin/sessions')
+      const sessionBefore = (before.json().sessions as Session[]).find((session) => session.sets.some((other) => other.id === id))
+      const response = await send(context, 'PUT', `/api/admin/sets/${id}/position`, { position })
+      if (response.statusCode === 200 && sessionBefore) {
+        const others = sessionBefore.sets.map((other) => other.id).filter((other) => other !== id)
+        others.splice(Math.min(position, others.length), 0, id)
+        expect((response.json().session as Session).sets.map((other) => other.id)).toEqual(others)
+      }
+      return response
+    },
+  } satisfies Operation<{ set: number; position: number }>,
 
   deleteSet: {
     weight: 1,
@@ -527,10 +556,10 @@ async function reset(database: TestDatabase): Promise<Ids> {
   const sessionIds = sessionRows.map(({ id }) => id)
   const setIds: string[] = []
   for (const sessionId of sessionIds) {
-    for (const offsetMinutes of [0, 60]) {
+    for (const position of [0, 1]) {
       const artistId = artistIds[setIds.length % artistIds.length]
-      const applicationId = offsetMinutes === 0 ? applicationOf(artistId) : null
-      const set = { sessionId, offsetMinutes, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], applicationId, createdBy: 'seed' }
+      const applicationId = position === 0 ? applicationOf(artistId) : null
+      const set = { sessionId, position, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], applicationId, createdBy: 'seed' }
       const [{ id }] = await database.db.insert(sets).values(set).returning({ id: sets.id })
       await database.db.insert(setPerformers).values({ setId: id, artistId, position: 0 })
       setIds.push(id)
@@ -574,6 +603,8 @@ describe('the rules of sessions and sets', () => {
             expect(check, `${where}: a 409 that isn't about one of the rules`).toBeDefined()
             await check!(body, args, context)
           }
+          const session = response.statusCode === 200 ? (response.json() as { session?: Session }).session : undefined
+          if (session) expectFits(session)
           await checkSessionsInvariants(database.db)
         }
       }),
