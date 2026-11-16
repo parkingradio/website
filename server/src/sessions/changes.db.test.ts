@@ -129,6 +129,15 @@ describe('PATCH /api/admin/sessions/:id', () => {
     const undated = await createSession({ start: null })
     expect((await request('PATCH', `/api/admin/sessions/${undated}`, { durationMinutes: 1440 })).statusCode).toBe(200)
   })
+
+  it("checks that an announced session keeps its start on the session as it would be, keeping the start it isn't sent", async () => {
+    const id = await createSession({})
+    await app.inject({ method: 'PUT', url: `/api/admin/sessions/${id}/announced`, payload: { announced: true }, cookies: await sessionCookies() })
+    const response = await request('PATCH', `/api/admin/sessions/${id}`, { start: null, name: 'X' })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({ ok: false, error: 'An announced session has a start' })
+    expect((await request('PATCH', `/api/admin/sessions/${id}`, { name: 'X' })).json().session).toMatchObject({ start: '2026-11-14T21:00:00-05:00', name: 'X', announced: true })
+  })
 })
 
 describe('PATCH /api/admin/sets/:id', () => {

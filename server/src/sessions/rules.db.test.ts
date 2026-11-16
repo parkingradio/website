@@ -360,6 +360,14 @@ const OPERATIONS = {
     },
   } satisfies Operation<{ session: number; status: string }>,
 
+  // Only a session with a start can be announced, whatever its status, which the database's own constraint enforces too,
+  // so that what the server doesn't refuse first fails unexpectedly.
+  setAnnounced: {
+    weight: 2,
+    args: fc.record({ session: fc.nat(), announced: fc.boolean() }),
+    run: (context, { session, announced }) => send(context, 'PUT', `/api/admin/sessions/${pick(context.ids.sessions, session)}/announced`, { announced }),
+  } satisfies Operation<{ session: number; announced: boolean }>,
+
   deleteSession: {
     weight: 1,
     args: fc.nat(),
@@ -483,10 +491,10 @@ async function buildApp(database: TestDatabase) {
 }
 
 // Empties the database, but for 4 artists, 2 collectives, an application of each, and 2 sessions of 4 hours, one of them
-// without a date, which is the second collective's takeover, and comes from its application, each with 2 sets, one after
-// the other, the first of which comes from its performer's application, so that even short sequences act on sets, on a
-// collective with a takeover and on applications that sets and sessions come from, and returns their ids, in the order
-// they were added.
+// announced, and the other without a date, which is the second collective's takeover, and comes from its application,
+// each with 2 sets, one after the other, the first of which comes from its performer's application, so that even short
+// sequences act on sets, on a collective with a takeover, on applications that sets and sessions come from, and on an
+// announced session, and returns their ids, in the order they were added.
 async function reset(database: TestDatabase): Promise<Ids> {
   await database.db.execute(sql`truncate sessions, artists, collectives cascade`)
   const profile = { country: '' as const, city: '', links: {}, phone: '' }
@@ -512,7 +520,7 @@ async function reset(database: TestDatabase): Promise<Ids> {
   const sessionRows = await database.db
     .insert(sessions)
     .values([
-      { startAt: new Date('2026-11-15T02:00:00Z'), type: 'guest-mixes' as const, takeoverId: null },
+      { startAt: new Date('2026-11-15T02:00:00Z'), type: 'guest-mixes' as const, takeoverId: null, announced: true },
       { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[1], applicationId: applicationOf(collectiveIds[1]) },
     ].map((session) => ({ ...session, durationMinutes: 240, name: '', createdBy: 'seed' })))
     .returning({ id: sessions.id })

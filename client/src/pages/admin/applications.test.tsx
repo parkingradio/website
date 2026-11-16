@@ -1532,6 +1532,9 @@ describe('Adding a set or a session from an application’s page', () => {
       status,
       statusUpdatedBy: null,
       statusUpdatedAt: null,
+      announced: false,
+      announcedUpdatedBy: null,
+      announcedUpdatedAt: null,
     }
   }
 

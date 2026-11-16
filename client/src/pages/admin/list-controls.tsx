@@ -32,8 +32,10 @@ export function SortHeader<K extends string>({ column, sorting: { sort, sortBy }
 }
 
 // Buttons that show only the entries with one of the `statuses`, in that order, or all of them (`all`, e.g. "toutes"),
-// each with how many entries it shows (`count`). `labels` names each status, in the plural.
+// each with how many entries it shows (`count`). `labels` names each status, in the plural. They're named `label`, e.g.
+// "Statut".
 export function StatusFilters<S extends string>({
+  label = 'Statut',
   all,
   statuses,
   labels,
@@ -41,6 +43,7 @@ export function StatusFilters<S extends string>({
   count,
   onChange,
 }: {
+  label?: string
   all: string
   statuses: readonly S[]
   labels: Record<S, string>
@@ -50,7 +53,7 @@ export function StatusFilters<S extends string>({
 }) {
   const filters: { status: S | null; label: string }[] = [{ status: null, label: all }, ...statuses.map((status) => ({ status, label: labels[status] }))]
   return (
-    <div className="admin-filters" role="group" aria-label="Statut">
+    <div className="admin-filters" role="group" aria-label={label}>
       {filters.map((filter) => (
         <button key={filter.label} type="button" aria-pressed={status === filter.status} onClick={() => onChange(filter.status)}>
           {filter.label} ({count(filter.status)})

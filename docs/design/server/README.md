@@ -80,7 +80,8 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   `links`, rather than being merged into it, and null, or a blank string, where `PUT` takes it, removes it the same way.
   The rules that involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are
   checked on the item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field
-  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes.
+  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes. Likewise, the endpoints that
+  change a status, or whether a session is announced, say who changed it and when even when it doesn't change.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.
@@ -196,6 +197,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Replacing a session's fields, and replacing or removing its flyer |
 | [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent, or removing its flyer |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled |
+| [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
 | [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session |
 | [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Replacing a set's fields |

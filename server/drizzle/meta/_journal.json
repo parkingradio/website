@@ -92,6 +92,13 @@
       "when": 1794448451299,
       "tag": "0012_application_links",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794793305862,
+      "tag": "0013_announced_sessions",
+      "breakpoints": true
     }
   ]
 }

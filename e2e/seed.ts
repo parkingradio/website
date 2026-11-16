@@ -278,7 +278,8 @@ async function performersApplication(server: Server, performers: { id: string }[
 // Adds the session and its sets as an admin would, with their statuses: its takeover's collective, in `collectiveIds`, and
 // its sets' performers, in `artistIds`, each by their email, or else, for those without one, by their name (see
 // `seedKey`), and the applications they come from, unless they can't be found (see `applicationWithDays`). Each set is
-// given its status once it's added, and the session once its sets are, since a cancelled session can't be added to.
+// given its status once it's added, and the session once its sets are, since a cancelled session can't be added to, then
+// it's announced, if it is.
 async function addSession(server: Server, session: SeedSession, artistIds: Map<string, string>, collectiveIds: Map<string, string>): Promise<void> {
   const takeover = session.takeover === undefined ? null : collectiveIds.get(seedKeyOf(session.takeover))
   if (takeover === undefined) throw new Error(`A session's takeover, ${session.takeover}, isn't a collective that was seeded`)
@@ -331,6 +332,7 @@ async function addSession(server: Server, session: SeedSession, artistIds: Map<s
     if (set.status !== 'planned') await server.call('PUT', `/api/admin/sets/${setId}/status`, { status: set.status })
   }
   if (session.status !== 'planned') await server.call('PUT', `/api/admin/sessions/${id}/status`, { status: session.status })
+  if (session.announced) await server.call('PUT', `/api/admin/sessions/${id}/announced`, { announced: true })
 }
 
 function applicationFields({ days, timeSlots, performanceTypes, otherPerformanceType, details }: SeedApplication) {

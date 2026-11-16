@@ -186,6 +186,9 @@ const SESSION: Session = {
     studioSet('set-3', { durationMinutes: 60, status: 'cancelled' }),
   ],
   ...TRACKED,
+  announced: false,
+  announcedUpdatedBy: null,
+  announcedUpdatedAt: null,
 }
 const [SET, CYAN_SET] = SESSION.sets
 
@@ -234,6 +237,7 @@ const SESSIONS: Session[] = [
         status: 'done',
       })],
     status: 'done',
+    announced: true,
   },
   { ...SESSION, id: 'session-4', start: '2026-09-01T00:00:00.000Z', end: '2026-09-01T01:00:00.000Z', durationMinutes: 60, type: 'live-performance', takeover: null, name: '', title: 'LIVE PERFORMANCE', raEvent: null, sets: [], status: 'cancelled' },
 ]
@@ -278,10 +282,10 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée'],
-      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée'],
-      ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', 'Autre', 'Brume', 'jouée'],
-      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée'],
+      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée', ''],
+      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée', ''],
+      ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', 'Autre', 'Brume', 'jouée', 'annoncée'],
+      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée', ''],
     ])
     // Done sessions are greyed out, and cancelled ones faded out in their own color.
     const sessionRows = screen.getAllByRole('row').slice(1)
@@ -309,6 +313,29 @@ describe('The list of sessions', () => {
     fireEvent.click(filters.getByRole('button', { name: 'toutes (4)' }))
     await expectSearch('brume', ['date à déterminer', 'sam. 14 nov. 2026', 'ven. 2 oct. 2026'])
     expect(filters.getAllByRole('button').map((button) => button.textContent)).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (1)', 'annulées (0)'])
+  })
+
+  it('lists only the announced sessions, or the others, once picked, each group of buttons counting what the other one and the search find', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const statuses = within(await screen.findByRole('group', { name: 'Statut' }))
+    const announced = within(screen.getByRole('group', { name: 'Annonce' }))
+    const labels = (group: typeof statuses) => group.getAllByRole('button').map((button) => button.textContent)
+    expect(labels(announced)).toEqual(['toutes (4)', 'annoncées (1)', 'non annoncées (3)'])
+    expect(announced.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(announced.getByRole('button', { name: 'non annoncées (3)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&announced=false$/)
+    expect(days()).toEqual(['date à déterminer', 'sam. 14 nov. 2026', 'lun. 31 août 2026'])
+    expect(labels(statuses)).toEqual(['toutes (3)', 'planifiées (2)', 'jouées (0)', 'annulées (1)'])
+
+    fireEvent.click(statuses.getByRole('button', { name: 'planifiées (2)' }))
+    expect(labels(announced)).toEqual(['toutes (2)', 'annoncées (0)', 'non annoncées (2)'])
+    fireEvent.click(announced.getByRole('button', { name: 'annoncées (0)' }))
+    expect(screen.getByText('Aucune session ne correspond à ces filtres.')).toBeInTheDocument()
+
+    fireEvent.click(announced.getByRole('button', { name: 'toutes (2)' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=planned$/)
   })
 
   it('searches the sessions by title, type, takeover, performer, and day, written out or as the list shows it', async () => {
@@ -602,7 +629,7 @@ describe("A session's page", () => {
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
     await waitFor(() => expect(statuses.getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
-    expect(screen.getByText(/^Changé par admin@example.com le/)).toBeInTheDocument()
+    expect(screen.getByText(/^Statut changé par admin@example.com le/)).toBeInTheDocument()
 
     // Its sets can't be added to, or un-cancelled, which the buttons say, greyed out, rather than the page.
     expect(visibleText(document.body)).not.toMatch(/La session est annulée/)
@@ -620,6 +647,67 @@ describe("A session's page", () => {
     fireEvent.click(setStatuses.getByRole('button', { name: 'joué' }))
     expect(requestsTo('PUT', '/api/admin/sets/set-2/status')).toHaveLength(0)
     expect(setStatuses.getByRole('button', { name: 'annulé' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('announces the session, and un-announces it, saying who did it', async () => {
+    const announced = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
+    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: announced } })
+    renderAt('/admin/sessions/session-1')
+
+    const group = within(await screen.findByRole('group', { name: 'Annonce' }))
+    expect(group.getAllByRole('button').map((button) => button.textContent)).toEqual(['non annoncée', 'annoncée'])
+    // Under "Statut", after the status, rather than under a heading of its own.
+    const follows = (before: HTMLElement, after: HTMLElement) => Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(screen.queryByRole('heading', { name: 'Annonce' })).not.toBeInTheDocument()
+    expect(follows(screen.getByRole('group', { name: 'Statut' }), screen.getByRole('group', { name: 'Annonce' }))).toBe(true)
+    expect(follows(screen.getByRole('group', { name: 'Annonce' }), screen.getByRole('heading', { level: 2, name: 'Session' }))).toBe(true)
+    expect(group.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText(/^Annonce changée par/)).not.toBeInTheDocument()
+    fireEvent.click(group.getByRole('button', { name: 'annoncée' }))
+    await waitFor(() => expect(group.getByRole('button', { name: 'annoncée' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
+    expect(screen.getByText(/^Annonce changée par admin@example.com le/)).toBeInTheDocument()
+    // Neither the status, nor who changed it.
+    expect(screen.queryByText(/^Statut changé par/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
+  })
+
+  it("says why it couldn't be announced, under its buttons", async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/announced': { ok: false, error: 'An announced session has a start' } })
+    renderAt('/admin/sessions/session-1')
+
+    const group = within(await screen.findByRole('group', { name: 'Annonce' }))
+    fireEvent.click(group.getByRole('button', { name: 'annoncée' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("L'annonce n'a pas pu être changée : An announced session has a start")
+    expect(alert.previousElementSibling).toBe(group.getByRole('button', { name: 'annoncée' }).closest('[role="group"]'))
+    expect(group.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it("can't announce a session without a date, which its button says", async () => {
+    mockFetch({ ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    renderAt('/admin/sessions/session-2')
+
+    const button = within(await screen.findByRole('group', { name: 'Annonce' })).getByRole('button', { name: 'annoncée' })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).toHaveAccessibleDescription("La session n'a pas de date.")
+    fireEvent.click(button)
+    expect(requestsTo('PUT', '/api/admin/sessions/session-2/announced')).toHaveLength(0)
+  })
+
+  it('says right away, in its form, that an announced session keeps its date', async () => {
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, announced: true } } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    const undated = await screen.findByLabelText('date à déterminer')
+    fireEvent.click(undated)
+    expect(screen.getByRole('alert')).toHaveTextContent("Une session annoncée a une date : retirez d'abord son annonce.")
+    expect(undated).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    fireEvent.click(undated)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it("says why the status couldn't be changed, linking to the session it would overlap", async () => {

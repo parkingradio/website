@@ -120,6 +120,9 @@ function stubSession(sets: StudioSet[]): Session {
     effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
     hasFlyer: false,
     sets,
+    announced: false,
+    announcedUpdatedBy: null,
+    announcedUpdatedAt: null,
   }
 }
 

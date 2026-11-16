@@ -120,6 +120,7 @@ async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
 
 const TRACKED = { createdAt: new Date('2026-11-01T12:00:00Z'), createdBy: 'admin@example.com', updatedBy: null, updatedAt: null, status: 'planned' as const }
 const UNTRACKED_STATUS = { statusUpdatedBy: null, statusUpdatedAt: null }
+const UNANNOUNCED = { announced: false, announcedUpdatedBy: null, announcedUpdatedAt: null }
 
 // A session, a takeover of Les Ondes without a date by default, as the sessions' store would find it.
 function storedSession(changes: Partial<StoredSession>): StoredSession {
@@ -127,6 +128,7 @@ function storedSession(changes: Partial<StoredSession>): StoredSession {
     id: 'session',
     ...TRACKED,
     ...UNTRACKED_STATUS,
+    ...UNANNOUNCED,
     startAt: null,
     durationMinutes: 240,
     type: 'takeover',

@@ -585,12 +585,15 @@ describe('A collective’s page', () => {
       status: 'done',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
+      announced: false,
+      announcedUpdatedBy: null,
+      announcedUpdatedAt: null,
     }
     mockFetch({ ...ONDES_PAGE, '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [session] } })
     renderAt('/admin/artistes/collectifs/collective-1')
     expect(await screen.findByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     const table = screen.getByRole('table', { name: 'Sessions' })
-    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut'])
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut', 'Annonce'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
     expect(within(table).getAllByRole('cell')[2]).toHaveTextContent('ONDES TAKEOVER')
 
@@ -626,6 +629,9 @@ describe('A collective’s page', () => {
       status: 'planned',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
+      announced: false,
+      announcedUpdatedBy: null,
+      announcedUpdatedAt: null,
     }
     const error = 'This collective has takeovers: give them another collective, or another type, first'
     mockFetch({

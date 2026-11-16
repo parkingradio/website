@@ -52,11 +52,12 @@ Tuesdays the 5th, but "mar 5 jan" only Tuesday, January 5th, and "jeu 5 mar" Thu
 "1er" or "01". Words are read from left to right, so "déc 26 janv 3" is the dates "déc 26" and "janv 3", and "3 déc 26"
 the date "3 déc", then the word "26".
 
-The search and the order are kept in the page's address, along with the status of applications or sessions, so that
-going back to a list from one of its entries with the browser's back button finds it as it was. The address's parameters
-are `search` (what's searched for), `sort` (the column the list is sorted by, as each page names it), `order` (`asc` or
-`desc`, which only counts along with `sort`) and `status` (as the server names it, e.g. `accepted`, or `all` for every
-status). A value the page doesn't know is ignored, as if the parameter weren't there.
+The search and the order are kept in the page's address, along with the status of applications or sessions, and whether
+sessions are announced, so that going back to a list from one of its entries with the browser's back button finds it as
+it was. The address's parameters are `search` (what's searched for), `sort` (the column the list is sorted by, as each
+page names it), `order` (`asc` or `desc`, which only counts along with `sort`), `status` (as the server names it, e.g.
+`accepted`, or `all` for every status) and `announced` (see [Sessions](sessions.md#the-list)). A value the page doesn't
+know is ignored, as if the parameter weren't there.
 
 Without `status`, a list that has statuses shows its default view, which its page names; picking that status with its
 button gives the same view. Without `sort`, a list is in the order its page gives, for the status shown when it has

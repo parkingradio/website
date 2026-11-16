@@ -48,6 +48,11 @@ function sessionOf(setId: string) {
   return rows.find((session) => session.sets.some((set) => set.id === setId)) ?? null
 }
 
+function changeSession(id: string, changes: Partial<StoredSession>) {
+  const session = rows.find((row) => row.id === id)
+  return session ? Object.assign(session, changes) : null
+}
+
 function changeSet(id: string, changes: Partial<StoredSet>) {
   const session = sessionOf(id)
   if (!session) return null
@@ -56,6 +61,7 @@ function changeSet(id: string, changes: Partial<StoredSet>) {
 }
 
 const NEW = { updatedBy: null, updatedAt: null, status: 'planned' as const, statusUpdatedBy: null, statusUpdatedAt: null }
+const UNANNOUNCED = { announced: false, announcedUpdatedBy: null, announcedUpdatedAt: null }
 
 // A set, as the database would add it to the session `sessionId`.
 function newSet(sessionId: string, { performers: sent, ...set }: NewSet): StoredSet {
@@ -76,6 +82,7 @@ const store: SessionsStore = {
       id: `session-${++nextId}`,
       createdAt: CREATED_AT,
       ...NEW,
+      ...UNANNOUNCED,
       ...session,
       ...takeover(session.takeoverId),
       application: null,
@@ -93,12 +100,8 @@ const store: SessionsStore = {
     Object.assign(row, defined(changes), changes.takeoverId !== undefined && takeover(changes.takeoverId), application(changes.applicationId))
     return { before, after: row }
   }),
-  setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => {
-    const session = rows.find((row) => row.id === id)
-    if (!session) return null
-    Object.assign(session, change)
-    return session
-  }),
+  setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => changeSession(id, change)),
+  setAnnounced: vi.fn<SessionsStore['setAnnounced']>(async (id, change) => changeSession(id, change)),
   delete: async (id) => {
     const row = rows.find((session) => session.id === id)
     rows = rows.filter((session) => session.id !== id)
@@ -243,6 +246,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set() }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-1', payload: set() }),
@@ -267,6 +271,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { name: 'X' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'done' }, ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set(), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-2', payload: set(), ...options }),
@@ -277,7 +282,9 @@ describe('sessions routes', () => {
     for (const response of await Promise.all(requests)) {
       expect(response.statusCode).toBe(403)
     }
-    expect(rows).toEqual([expect.objectContaining({ status: 'planned', updatedBy: null, sets: [expect.objectContaining({ status: 'planned', updatedBy: null })] })])
+    expect(rows).toEqual([
+      expect.objectContaining({ status: 'planned', announced: false, updatedBy: null, sets: [expect.objectContaining({ status: 'planned', updatedBy: null })] }),
+    ])
   })
 
   it("refuses the fields of a session or a set they don't take, naming them, e.g. what the endpoints return", async () => {
@@ -297,6 +304,14 @@ describe('sessions routes', () => {
     expect(store.create).not.toHaveBeenCalled()
     expect(store.update).not.toHaveBeenCalled()
     expect(resolveTrack).not.toHaveBeenCalled()
+    // Whether a session is announced is only changed with its own endpoint.
+    for (const response of [
+      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', { ...session(), announced: true }),
+      await send(app, 'PATCH', '/api/admin/sessions/session-1', { announced: true }),
+    ]) {
+      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `announced`' })
+    }
+    expect(store.update).not.toHaveBeenCalled()
     // But not the fields of a set's performers, so that they can be sent back as the set returns them.
     expect((await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-1', name: 'Ana' }] }))).statusCode).toBe(200)
   })
@@ -376,6 +391,9 @@ describe('sessions routes', () => {
           status: 'planned',
           statusUpdatedBy: null,
           statusUpdatedAt: null,
+          announced: false,
+          announcedUpdatedBy: null,
+          announcedUpdatedAt: null,
         },
       })
     })
@@ -1173,6 +1191,44 @@ describe('sessions routes', () => {
       response = await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'planned' })
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: expect.objectContaining({ id: 'session-1' }), set: null })
+    })
+  })
+
+  describe('PUT /api/admin/sessions/:id/announced', () => {
+    it('announces the session, or un-announces it, and says who did it, without changing the session', async () => {
+      const app = await buildApp()
+      await createSession(app)
+      let response = await send(app, 'PUT', '/api/admin/sessions/session-1/announced', { announced: true })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session).toMatchObject({
+        announced: true,
+        announcedUpdatedBy: 'admin@example.com',
+        announcedUpdatedAt: expect.any(String),
+        status: 'planned',
+        statusUpdatedBy: null,
+        updatedBy: null,
+        updatedAt: null,
+      })
+      response = await send(app, 'PUT', '/api/admin/sessions/session-1/announced', { announced: false })
+      expect(response.json().session).toMatchObject({ announced: false, announcedUpdatedBy: 'admin@example.com' })
+    })
+
+    it("refuses anything but a boolean, and responds 404, or 400 with the store's refusal", async () => {
+      const app = await buildApp()
+      await createSession(app)
+      for (const body of [{ announced: 'true' }, { announced: null }, {}, { announced: true, status: 'done' }]) {
+        const response = await send(app, 'PUT', '/api/admin/sessions/session-1/announced', body)
+        expect(response.statusCode, JSON.stringify(body)).toBe(400)
+      }
+      expect((await send(app, 'PUT', '/api/admin/sessions/session-1/announced', {})).json()).toEqual({ ok: false, error: 'announced must be true or false' })
+      expect(store.setAnnounced).not.toHaveBeenCalled()
+      let response = await send(app, 'PUT', '/api/admin/sessions/session-9/announced', { announced: true })
+      expect(response.statusCode).toBe(404)
+      vi.mocked(store.setAnnounced).mockRejectedValueOnce(new BrokenFields('An announced session has a start'))
+      response = await send(app, 'PUT', '/api/admin/sessions/session-1/announced', { announced: true })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'An announced session has a start' })
     })
   })
 

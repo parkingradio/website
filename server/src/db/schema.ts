@@ -246,14 +246,19 @@ export const sessions = pgTable(
     // null when the session has no flyer.
     flyerKey: text('flyer_key'),
     flyerType: text('flyer_type'),
-    // The email of the admin who last changed the session, and when (null until then). Status changes don't count, and
-    // neither do changes to its sets.
+    // The email of the admin who last changed the session, and when (null until then), which not every change counts as
+    // (see `updatedBy` in docs/design/server/sessions.md).
     updatedBy: text('updated_by'),
     updatedAt: timestamp('updated_at', { withTimezone: true }),
     // The status admins gave the session, and the email of the admin who last changed it, and when (null until then).
     status: text('status').$type<Status>().notNull().default('planned'),
     statusUpdatedBy: text('status_updated_by'),
     statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
+    // Whether admins announced the session, which only a session with a start can be, and the email of the admin who
+    // last announced or un-announced it, and when (null until then).
+    announced: boolean('announced').notNull().default(false),
+    announcedUpdatedBy: text('announced_updated_by'),
+    announcedUpdatedAt: timestamp('announced_updated_at', { withTimezone: true }),
   },
   (table) => [
     index('sessions_takeover_id_idx').on(table.takeoverId),
@@ -264,6 +269,7 @@ export const sessions = pgTable(
     check('sessions_takeover', sql`(${table.type} = 'takeover') = (${table.takeoverId} is not null)`),
     check('sessions_named', sql`${table.type} <> 'other' or ${table.name} <> ''`),
     check('sessions_flyer', sql`(${table.flyerKey} is null) = (${table.flyerType} is null)`),
+    check('sessions_announced', sql`not ${table.announced} or ${table.startAt} is not null`),
   ],
 )
 

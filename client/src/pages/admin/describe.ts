@@ -16,6 +16,12 @@ export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = { planned: '
 export const SESSION_STATUS_PLURALS: Record<SessionStatus, string> = { planned: 'planifiées', done: 'jouées', cancelled: 'annulées' }
 export const SET_STATUS_LABELS: Record<SessionStatus, string> = { planned: 'planifié', done: 'joué', cancelled: 'annulé' }
 
+// Whether a session is announced, as the list of sessions has it in its address (`announced`), and the same in the
+// plural, for the list's filters.
+export type Announced = 'true' | 'false'
+export const ANNOUNCED_LABELS: Record<Announced, string> = { true: 'annoncée', false: 'non annoncée' }
+export const ANNOUNCED_PLURALS: Record<Announced, string> = { true: 'annoncées', false: 'non annoncées' }
+
 // A session's type.
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   'guest-mixes': 'Guest mixes',
