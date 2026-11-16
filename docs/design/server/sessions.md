@@ -41,9 +41,11 @@ A session, as the endpoints below return it, also has:
 | `sets` | list of sets | Its sets, by `offsetMinutes`, the sets without an offset last, then in the order they were added, those added with their session in the order they were sent, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+| `announced` | boolean | Whether the session is announced: see [Announced](#announced) |
+| `announcedUpdatedBy`, `announcedUpdatedAt` | string or null | Who last announced or un-announced it (an admin's email), and when |
 
 ## Sets
 
@@ -162,6 +164,14 @@ exception: a cancelled session only has cancelled sets. Cancelling a session can
 already cancelled, done ones included, as the same admin, at the same time. Un-cancelling a session leaves its sets
 cancelled: each one is un-cancelled on its own, once the session isn't cancelled anymore. The sets of a cancelled session
 can still be changed, but not un-cancelled while it is.
+
+## Announced
+
+A session is prepared behind the scenes, then announced, which means that it's meant to be public, with its sets. A new
+session isn't announced. Whether it's announced doesn't depend on its status, e.g. a cancelled session can stay
+announced. Only a session with a start can be announced, and an announced session's start can't be removed until it's
+un-announced, which it always can be: requests that would leave an announced session without a start fail with 400
+(`"An announced session has a start"`), even when they're sent at the same time.
 
 ## Performers
 
@@ -393,12 +403,13 @@ Only an error about one of the sets has `setIndex`: that set's place in `sets`, 
 
 ## `PUT /api/admin/sessions/:id` (admin)
 
-Replaces a session's fields, but not its status or its sets, which move with its start, and stay as they are when it's
-shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It takes the same request as
-`POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which is deleted. Without one,
-the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it.
-Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors
-about its sets, and with 400 when there's both a flyer and `removeFlyer`, and with 404 when there's no such session.
+Replaces a session's fields, but not its status, whether it's announced, or its sets, which move with its start, and
+stay as they are when it's shortened, even when they don't fit in it anymore (see [Sets' places](#sets-places)). It
+takes the same request as `POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which
+is deleted. Without one, the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which
+removes it, and deletes it. Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it,
+but without the errors about its sets, and with 400 when there's both a flyer and `removeFlyer`, or when it would remove
+an announced session's start, and with 404 when there's no such session.
 
 ## `PATCH /api/admin/sessions/:id` (admin)
 
@@ -418,6 +429,16 @@ deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced 
 Changes a session's status, and its sets' when it's cancelled (see [Status](#status)), and responds like
 `POST /api/admin/sessions`, with its sets as they are then. Fails with 400 if `status` isn't one of these values, 404 when
 there's no such session, or 409 when the session would then overlap another one, with that session in `session`.
+
+## `PUT /api/admin/sessions/:id/announced` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `announced` | boolean | |
+
+Announces a session, or un-announces it (see [Announced](#announced)), and responds like `POST /api/admin/sessions`.
+Fails with 400 if `announced` isn't a boolean, or when it's announced without a start, and 404 when there's no such
+session.
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 

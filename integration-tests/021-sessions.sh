@@ -12,7 +12,7 @@
 # they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
 # collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, the applications
 # sets and sessions come from, which applications list, their rules, and deleting them, even while a set is given one,
-# and the content of a session's event on RA, from its sets' performers.
+# the content of a session's event on RA, from its sets' performers, and announcing a session.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
 
@@ -201,6 +201,14 @@ expect_status 200
 expect_body_contains "\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-15T01:00:00-05:00\",\"durationMinutes\":240,\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"}"
 expect_body_contains '"name":"HAUTE RIVE TAKEOVER","title":"HAUTE RIVE TAKEOVER","raEvent":{"id":"6683745","url":"https://ra.co/events/6683745"},"description":"","effectiveDescription":"LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC","hasFlyer":false,"sets":[]'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\",\"statusUpdatedBy\":null"
+
+echo "  a session is announced, and un-announced, which says who did it, apart from who changed it"
+json PUT "${SESSIONS}/${first}/announced" '{"announced":true}'
+expect_status 200
+expect_body_contains "\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\",\"statusUpdatedBy\":null,\"statusUpdatedAt\":null,\"announced\":true,\"announcedUpdatedBy\":\"${ADMIN_EMAIL}\",\"announcedUpdatedAt\":\"20"
+json PUT "${SESSIONS}/${first}/announced" '{"announced":false}'
+expect_status 200
+expect_body_contains '"announced":false'
 
 echo "  a session is called by its own name, or else the one its type gives it, from its collective's name as it is then"
 session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"name\":\"\"")"

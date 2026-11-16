@@ -46,6 +46,7 @@ export type SetChanges = Pick<
   | 'applicationId'
 > & { performers: SentPerformer[] }
 export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpdatedAt: Date }
+export type AnnouncedChange = Pick<SessionRow, 'announced'> & { announcedUpdatedBy: string; announcedUpdatedAt: Date }
 export type NewSet = SetChanges & { createdBy: string }
 
 // Thrown when a session or a set can't be saved. When it's about one of the sets added with a session, `setIndex` is that
@@ -59,8 +60,9 @@ class Refused extends Error {
 export class NoSuchReference extends Refused {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
-// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts), or its application
-// (see `checkSessionApplication` and `checkSetApplication`). The message says which.
+// it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts, and
+// `checkAnnounced`), or its application (see `checkSessionApplication` and `checkSetApplication`). The message says
+// which.
 export class BrokenFields extends Refused {}
 
 // `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
@@ -93,6 +95,7 @@ export class Conflict extends Refused {
 }
 
 export const SESSION_CANCELLED = 'This session is cancelled'
+export const ANNOUNCED_HAS_START = 'An announced session has a start'
 
 // The rules of sessions that the database enforces, by the constraint that enforces each one, with how to find what's
 // in the way of the session or the set that broke it, as it would have been saved.
@@ -134,14 +137,17 @@ export type SessionsStore = {
   // a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about one.
   create(session: SessionChanges & StoredFlyer & { createdBy: string }, sets: NewSet[]): Promise<StoredSession>
   // Changes the session's fields that `changes` has, all of them when they're replaced, and its flyer when there's a new
-  // one, or nulls to remove it, but not its status or its sets. Returns the session as it was, so that a flyer that was
-  // replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a NoSuchReference or a Conflict.
+  // one, or nulls to remove it, but not its status, whether it's announced, or its sets. Returns the session as it was,
+  // so that a flyer that was replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a
+  // NoSuchReference or a Conflict.
   update(
     id: string,
     changes: Partial<SessionChanges> & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: SessionRow; after: StoredSession } | null>
   // Cancelling a session cancels its sets that aren't, as the same admin, at the same time. Throws a Conflict.
   setStatus(id: string, change: StatusChange): Promise<StoredSession | null>
+  // Announces the session, or un-announces it. Throws a BrokenFields when it's announced without a start.
+  setAnnounced(id: string, change: AnnouncedChange): Promise<StoredSession | null>
   // Returns the session as it was, so that its flyer can be deleted too, or null if it didn't exist. Its sets are deleted
   // with it, but not their performers.
   delete(id: string): Promise<SessionRow | null>
@@ -404,6 +410,13 @@ async function insertSet(
   return id
 }
 
+// Checks that a session, as it would be, isn't announced without a start (see "Announced" in
+// docs/design/server/sessions.md), in a transaction that holds the sessions' lock, so that it can't be announced, or lose
+// its start, in the meantime. Throws a BrokenFields otherwise.
+function checkAnnounced(session: Pick<SessionRow, 'announced' | 'startAt'>) {
+  if (session.announced && session.startAt === null) throw new BrokenFields(ANNOUNCED_HAS_START)
+}
+
 // The session `id`, or null when there's no such session.
 async function sessionRow(tx: Queryable, id: string): Promise<SessionRow | null> {
   const [session] = await tx.select().from(sessions).where(eq(sessions.id, id))
@@ -472,6 +485,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
         // The rules are about the session as it will be, with the fields that aren't changed as they are.
         const session = changed(before, changes)
         check(brokenSessionRule({ type: session.type, takeover: session.takeoverId, application: session.applicationId, name: session.name }))
+        checkAnnounced(session)
         await checkTakeover(tx, session.takeoverId)
         await checkSessionApplication(tx, session)
         await checkingSessionRules(tx, id, session, (savepoint) => savepoint.update(sessions).set(changes).where(eq(sessions.id, id)))
@@ -493,6 +507,18 @@ export function sessionsStore(db: Queryable): SessionsStore {
             .set(change)
             .where(and(eq(sets.sessionId, id), ne(sets.status, 'cancelled')))
         }
+        return sessionWithId(tx, id)
+      })
+    },
+
+    async setAnnounced(id, change) {
+      if (!isUuid(id)) return null
+      return db.transaction(async (tx) => {
+        await lockSessions(tx)
+        const before = await sessionRow(tx, id)
+        if (!before) return null
+        checkAnnounced({ ...before, ...change })
+        await tx.update(sessions).set(change).where(eq(sessions.id, id))
         return sessionWithId(tx, id)
       })
     },

@@ -23,6 +23,8 @@ import type { Artist } from '../../artist-profile'
 import { ApplicationWishes } from './application-wishes'
 import { Button } from './button'
 import {
+  ANNOUNCED_LABELS,
+  ANNOUNCED_PLURALS,
   MISSING,
   SESSION_STATUS_LABELS,
   SESSION_STATUS_PLURALS,
@@ -47,7 +49,8 @@ import {
   setName,
   setTitle,
 } from './describe'
-import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
+import type { Announced } from './describe'
+import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
@@ -73,6 +76,11 @@ function BackToSessions() {
 
 // What the list of sessions opens on.
 const DEFAULT_STATUS: SessionStatus = 'planned'
+
+// The list's filters of announced sessions, after "toutes", and the buttons that announce a session or un-announce it.
+const ANNOUNCED_FILTERS: readonly Announced[] = ['true', 'false']
+const ANNOUNCED_CHOICES: readonly Announced[] = ['false', 'true']
+const announcedOf = (session: Session): Announced => (session.announced ? 'true' : 'false')
 
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
 type SessionColumn = 'date' | 'name' | 'status'
@@ -135,6 +143,7 @@ function SessionsTable({
           {withType && <th>Type</th>}
           <th>Artistes</th>
           {header('status', 'Statut')}
+          <th>Annonce</th>
         </tr>
       </thead>
       <tbody>
@@ -154,6 +163,7 @@ function SessionsTable({
               <SessionArtists session={session} />
             </td>
             <td>{SESSION_STATUS_LABELS[session.status]}</td>
+            <td>{session.announced && ANNOUNCED_LABELS.true}</td>
           </tr>
         ))}
       </tbody>
@@ -340,11 +350,13 @@ export function SessionsPage() {
   )
 }
 
-// The sessions with the status in the `status` query parameter, the default view without one, or every session, or those
-// of them that `query` finds. The status's buttons count the sessions the search finds.
+// The sessions with the status in the `status` query parameter, the default view without one, or every session, and
+// those that are announced, or not, as the `announced` query parameter says, or those of them that `query` finds. Each
+// filter's buttons count the sessions that the search and the other filter find.
 function SessionsList({ query }: { query: string }) {
   const sessions = useApi('/api/admin/sessions')
   const [status, setStatus] = useStatusFilter(STATUSES, DEFAULT_STATUS)
+  const [announced, setAnnounced] = useQueryFilter('announced', ANNOUNCED_FILTERS)
   const sorting = useSort(sessionColumns(status), 'date')
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
@@ -352,8 +364,15 @@ function SessionsList({ query }: { query: string }) {
 
   const all = sessions.value.sessions
   const found = search(all, query, sessionSearchFields)
-  const withStatus = (sessions: Session[]) => (status ? sessions.filter((session) => session.status === status) : sessions)
-  const listed = sorting.sorted(withStatus(found))
+  const withStatus = (sessions: Session[], shown = status) => (shown ? sessions.filter((session) => session.status === shown) : sessions)
+  const withAnnounced = (sessions: Session[], shown = announced) => (shown ? sessions.filter((session) => announcedOf(session) === shown) : sessions)
+  // What the search finds with each filter, which the other one's buttons count.
+  const foundAnnounced = withAnnounced(found)
+  const foundWithStatus = withStatus(found)
+  const listed = sorting.sorted(withStatus(foundAnnounced))
+  let empty = 'Aucune session ne correspond à la recherche.'
+  if (all.length === 0) empty = 'Aucune session.'
+  else if (listed.length === 0 && withStatus(withAnnounced(all)).length === 0) empty = announced ? 'Aucune session ne correspond à ces filtres.' : 'Aucune session avec ce statut.'
   return (
     <>
       <StatusFilters
@@ -361,13 +380,20 @@ function SessionsList({ query }: { query: string }) {
         statuses={STATUSES}
         labels={SESSION_STATUS_PLURALS}
         status={status}
-        count={(status) => (status ? found.filter((session) => session.status === status) : found).length}
+        count={(status) => withStatus(foundAnnounced, status).length}
         onChange={setStatus}
       />
+      <StatusFilters
+        label="Annonce"
+        all="toutes"
+        statuses={ANNOUNCED_FILTERS}
+        labels={ANNOUNCED_PLURALS}
+        status={announced}
+        count={(announced) => withAnnounced(foundWithStatus, announced).length}
+        onChange={setAnnounced}
+      />
       {listed.length === 0 ? (
-        <p className="admin-placeholder">
-          {all.length === 0 ? 'Aucune session.' : withStatus(all).length === 0 ? 'Aucune session avec ce statut.' : 'Aucune session ne correspond à la recherche.'}
-        </p>
+        <p className="admin-placeholder">{empty}</p>
       ) : (
         <SessionsTable sessions={listed} sorting={sorting} />
       )}
@@ -430,6 +456,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   const [busy, setBusy] = useState(false)
   // Why the session's status couldn't be changed, or why it couldn't be deleted.
   const [error, setError] = useState<ReactNode>(null)
+  // Why whether it's announced couldn't be changed.
+  const [announcedError, setAnnouncedError] = useState<ReactNode>(null)
   // Why a set's status couldn't be changed, or why it couldn't be deleted.
   const [setsError, setSetsError] = useState<ReactNode>(null)
   const setsHeadingId = useId()
@@ -458,6 +486,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   const openForm = (form: OpenForm) => {
     showForm(form)
     setError(null)
+    setAnnouncedError(null)
     setSetsError(null)
   }
   const close = () => showForm(null)
@@ -481,6 +510,15 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     setSession(result.session)
     // Sets can't be added to a cancelled session.
     if (status === 'cancelled' && open?.kind === 'set' && open.id === null) close()
+  }
+
+  const changeAnnounced = async (announced: Announced) => {
+    setBusy(true)
+    setAnnouncedError(null)
+    const result = await api.PUT('/api/admin/sessions/{id}/announced', { params, body: { announced: announced === 'true' } })
+    setBusy(false)
+    if (result.ok) setSession(result.session)
+    else setAnnouncedError(failure("L'annonce n'a pas pu être changée", result, session.id))
   }
 
   const changeSetStatus = async (set: StudioSet, status: SessionStatus) => {
@@ -537,11 +575,25 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       {session.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', session.statusUpdatedBy, session.statusUpdatedAt)}</p>}
       <ErrorMessage error={error} />
 
+      <h2>Annonce</h2>
+      <StatusButtons
+        label="Annonce"
+        statuses={ANNOUNCED_CHOICES}
+        labels={ANNOUNCED_LABELS}
+        status={announcedOf(session)}
+        disabled={busy}
+        unavailable={(announced) => (announced === 'true' && session.start === null ? "La session n'a pas de date." : null)}
+        onChange={changeAnnounced}
+      />
+      {session.announcedUpdatedBy && <p className="admin-meta">{byWhom('Changée', session.announcedUpdatedBy, session.announcedUpdatedAt)}</p>}
+      <ErrorMessage error={announcedError} />
+
       <h2>Session</h2>
       {open?.kind === 'session' ? (
         <SessionFormWithChoices
           initial={sessionFormValues(session)}
           hasSets={session.sets.length > 0}
+          announced={session.announced}
           flyer={session.hasFlyer ? flyerUrl(session) : null}
           submitLabel="enregistrer"
           onCancel={close}

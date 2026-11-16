@@ -74,6 +74,9 @@ function session(start: string | null, durationMinutes: number, sets: StudioSet[
     hasFlyer: false,
     sets,
     ...TRACKED,
+    announced: false,
+    announcedUpdatedBy: null,
+    announcedUpdatedAt: null,
   }
 }
 

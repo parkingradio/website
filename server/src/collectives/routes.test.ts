@@ -511,6 +511,9 @@ describe('collectives routes', () => {
         status: 'planned',
         statusUpdatedBy: null,
         statusUpdatedAt: null,
+        announced: false,
+        announcedUpdatedBy: null,
+        announcedUpdatedAt: null,
         sets: [],
       }
       vi.mocked(store.delete).mockRejectedValueOnce(new Conflict(HAS_TAKEOVERS, takeover))

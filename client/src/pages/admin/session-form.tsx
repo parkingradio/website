@@ -46,6 +46,8 @@ export type SessionFormProps = {
   initial: SessionFormValues
   // Whether the session has sets, which move with it.
   hasSets?: boolean
+  // Whether the session is announced, which it has to have a date for.
+  announced?: boolean
   // The address of the session's flyer, if it has one.
   flyer?: string | null
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
@@ -69,6 +71,7 @@ export type SessionFormProps = {
 export function SessionForm({
   initial,
   hasSets = false,
+  announced = false,
   flyer: current = null,
   collectives,
   applications,
@@ -86,7 +89,7 @@ export function SessionForm({
   // Whether to remove the session's flyer, which only happens once the form is sent.
   const [removeFlyer, setRemoveFlyer] = useState(false)
   const times = sessionTimes(form)
-  const checked = checkSession(form, times, applications)
+  const checked = checkSession(form, times, applications, announced)
   const errors: Partial<Record<keyof SessionFormValues | 'flyer', string>> = { ...checked.errors }
   const flyerProblem = pickedPhotoError(flyer, 'flyer')
   if (flyerProblem) errors.flyer = flyerProblem
@@ -110,8 +113,12 @@ export function SessionForm({
           form={form}
           times={times}
           hasSets={hasSets || (sets?.length ?? 0) > 0}
-          onChange={update}
-          errors={{ day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
+          onChange={(changes) => {
+            update(changes)
+            // So that it says right away when an announced session is left without a date.
+            if ('undated' in changes) leave('undated')()
+          }}
+          errors={{ undated: shown('undated'), day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
           onLeave={leave('day', 'start', 'end', 'duration')}
         />
 
@@ -198,7 +205,7 @@ function TimesField({
   times: ReturnType<typeof sessionTimes>
   hasSets: boolean
   onChange: (changes: Partial<SessionFormValues>) => void
-  errors: Partial<Record<'day' | 'start' | 'end' | 'duration', string>>
+  errors: Partial<Record<'undated' | 'day' | 'start' | 'end' | 'duration', string>>
   onLeave: () => void
 }) {
   // When the session starts and how long it lasts, once its day and times are valid.
@@ -215,10 +222,16 @@ function TimesField({
       <legend>Quand</legend>
       <div className="admin-choices">
         <label>
-          <input type="checkbox" checked={form.undated} onChange={(event) => setUndated(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={form.undated}
+            aria-invalid={errors.undated ? true : undefined}
+            onChange={(event) => setUndated(event.target.checked)}
+          />
           date à déterminer
         </label>
       </div>
+      <FieldError message={errors.undated} alert />
       {form.undated ? (
         <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
       ) : (

@@ -39,7 +39,8 @@ describe('the tools of the API', () => {
         ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective'],
         ...['list_applications', 'get_application', 'create_application', 'update_application', 'update_application_status'],
         ...['delete_application', 'get_application_recipients'],
-        ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'delete_session'],
+        ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'update_session_announced'],
+        'delete_session',
         ...['create_set', 'update_set', 'update_set_status', 'delete_set'],
       ].sort(),
     )
@@ -108,8 +109,8 @@ describe('the tools of the API', () => {
     expect(updates.map(({ method, url }) => `${method} ${url}`).sort()).toEqual(
       ['artists', 'collectives', 'applications', 'sessions', 'sets'].map((items) => `PATCH /api/admin/${items}/:id`).sort(),
     )
-    // The only tools of PUT endpoints change a status.
-    expect(routes.filter(({ method, url }) => method === 'PUT' && !url.endsWith('/status'))).toEqual([])
+    // No tool replaces what it acts on with PUT: the tools of PUT endpoints only change one of its values, e.g. a status.
+    expect(routes.filter(({ method, url }) => method === 'PUT' && url.endsWith('/:id'))).toEqual([])
   })
 
   // So that a new endpoint can't give them without the tools leaving them out.

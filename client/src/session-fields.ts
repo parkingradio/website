@@ -44,6 +44,7 @@ export const isCollectivesApplication = (application: ApplicationOwner, takeover
 
 const NOT_THE_SETS_APPLICATION = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
 const NOT_THE_SESSIONS_APPLICATION = 'La candidature doit être celle du collectif du takeover\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0».'
+const ANNOUNCED_HAS_A_DATE = "Une session annoncée a une date\u00a0: retirez d'abord son annonce."
 
 // In the order sessions and sets go through them (see describe.ts for their names).
 export const STATUSES = everyOne<SessionStatus>()(['planned', 'done', 'cancelled'])
@@ -253,15 +254,17 @@ export function endTimeAfter(day: string, start: string, minutes: number): strin
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
-// Checks a session as it's being filled in the form, with its `times` if they're worked out already, and who the
-// `applications` it can come from belong to, and returns what the server would be sent, or what's wrong with each field
-// instead. The start is sent with Québec's offset from UTC, and the event on RA by its id.
+// Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the
+// `applications` it can come from belong to, and whether it's `announced`, which it has to have a date for, and returns
+// what the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from UTC, and the event on RA by its id.
 export function checkSession(
   form: SessionFormValues,
   times = sessionTimes(form),
   applications: ApplicationOwners = null,
+  announced = false,
 ): { fields: SessionFields; errors?: undefined } | { fields?: undefined; errors: FieldErrors<SessionFormValues> } {
   const errors: FieldErrors<SessionFormValues> = 'errors' in times ? { ...times.errors } : {}
+  if (announced && form.undated) errors.undated = ANNOUNCED_HAS_A_DATE
   if (form.type === null) errors.type = 'Choisissez le type de la session.'
   const takeover = form.type === 'takeover' ? form.takeover : null
   if (form.type === 'takeover' && !takeover) errors.takeover = 'Choisissez le collectif du takeover.'

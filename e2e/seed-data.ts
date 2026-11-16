@@ -656,6 +656,8 @@ export type SeedSession = {
   when?: { day: number; start: string }
   durationMinutes: number
   status: Status
+  // Whether it's announced, which it's only once it's added, and which it needs a date for.
+  announced?: true
   // In order. Each set is given its status once it's added. Cancelling the session cancels them all, and marking it as
   // done marks none of them.
   sets: SeedSet[]
@@ -664,10 +666,12 @@ export type SeedSession = {
 // The sessions are clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or happen
 // twice, and their sets' times wouldn't be as they look.
 export const SEED_SESSIONS: SeedSession[] = [
-  // Onde Commune's takeover: its three artists, one after the other, the first of whom applied for it on her own.
+  // Onde Commune's takeover, announced: its three artists, one after the other, the first of whom applied for it on her
+  // own.
   {
     type: 'takeover',
     takeover: 'onde.commune@example.com',
+    announced: true,
     raEvent: '2201001',
     description: 'ONDE COMMUNE TAKEOVER\n\nTrois artistes, trois heures\u00a0: techno, acid et house.\n\nLIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
     flyer: '#2a9d8f',
@@ -777,10 +781,11 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Jah Pierre'], offsetMinutes: 90, durationMinutes: 60, status: 'planned' },
     ],
   },
-  // Les Nuits Basses' takeover, cancelled, which cancelled its sets.
+  // Les Nuits Basses' takeover, cancelled, which cancelled its sets, though it stays announced.
   {
     type: 'takeover',
     takeover: 'kwame@example.com',
+    announced: true,
     raEvent: '2302002',
     when: { day: 60, start: '20:00' },
     durationMinutes: 120,
@@ -790,9 +795,10 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Marée Basse'], offsetMinutes: 60, durationMinutes: 60, application: [30, 60], status: 'planned' },
     ],
   },
-  // A live performance, coming up, with its own description, but no flyer yet.
+  // A live performance, coming up and announced, with its own description, but no flyer yet.
   {
     type: 'live-performance',
+    announced: true,
     description: 'Ondine au synthé modulaire, une heure en direct du parking.',
     when: { day: 15, start: '20:00' },
     durationMinutes: 60,

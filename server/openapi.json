@@ -2508,6 +2508,27 @@
                 "type": "null"
               }
             ]
+          },
+          "announced": {
+            "type": "boolean",
+            "description": "Whether it is announced, which means it is meant to be public, with its sets"
+          },
+          "announcedUpdatedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "announcedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2531,7 +2552,10 @@
           "updatedAt",
           "status",
           "statusUpdatedBy",
-          "statusUpdatedAt"
+          "statusUpdatedAt",
+          "announced",
+          "announcedUpdatedBy",
+          "announcedUpdatedAt"
         ],
         "additionalProperties": false
       },
@@ -7787,7 +7811,7 @@
         }
       },
       "put": {
-        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status or its sets, which move with its start",
+        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
         "tags": [
           "Sessions"
         ],
@@ -7934,7 +7958,7 @@
       },
       "patch": {
         "operationId": "update_session",
-        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status or its sets, which move with its start",
+        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
         "tags": [
           "Sessions"
         ],
@@ -8463,6 +8487,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/{id}/announced": {
+      "put": {
+        "operationId": "update_session_announced",
+        "summary": "Announces a session, which means it is meant to be public, with its sets, or un-announces it",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "announced": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "announced"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }

@@ -3,8 +3,10 @@
 At `/admin/sessions`: the sessions at the studio and their sets: who played, when, and where their recordings are (see
 [Sessions](../../server/sessions.md)). A session's status is shown as "planifiée" (planned), "jouée" (done) or "annulée"
 (cancelled), and a set's as "planifié", "joué" or "annulé". The rows of sessions and sets are colored by status (see
-[Status colors](layout.md#status-colors)). A session's type is shown as "Guest mixes", "Live performance", "Takeover",
-"Synth meetup" or "Autre" (see [Types and names](../../server/sessions.md#types-and-names)).
+[Status colors](layout.md#status-colors)). Whether a session is announced (see
+[Announced](../../server/sessions.md#announced)) is shown as "annoncée" or "non annoncée". A session's type is shown
+as "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre" (see
+[Types and names](../../server/sessions.md#types-and-names)).
 
 ## Names
 
@@ -46,18 +48,21 @@ Durations, and the times of the sets of a session without a date, are entered in
 
 The section lists the sessions, each with its day ("Date"), linking to its page, its start and end ("Heure"), its title
 ("Nom"), its type ("Type"), which for a takeover links to its collective, its sets' performers ("Artistes"), set by set
-in their order, the sets separated by "·", each artist linking to their page, and its status.
+in their order, the sets separated by "·", each artist linking to their page, its status, and "annoncée" for an
+announced session ("Annonce").
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
 first, past ones included, then those without a date, the first added first. With another status or "toutes", those
-without a date come first, the most recently added first, then the others, the latest first.
+without a date come first, the most recently added first, then the others, the latest first. Another group of buttons,
+"Annonce", shows only the sessions that are announced ("annoncées"), or those that aren't ("non annoncées"), or both
+("toutes"), which it opens on, and which its address leaves out (`announced=true`, `announced=false`, or nothing).
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their title, their
 type, their takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026",
 which "14 nov" finds), or "date à déterminer". Clicking "Date" (`date`, by start, sessions without a date being later
 than any other, then by when they were added), "Nom" (`name`, by title) or "Statut" (`status`: planifiée, jouée, then
-annulée) sorts the list by that column, and clicking it again sorts it the other way around. The status buttons count
-the sessions the search finds.
+annulée) sorts the list by that column, and clicking it again sorts it the other way around. The buttons of each group
+count the sessions that the search, and the other group's buttons, find.
 
 ## A session's page
 
@@ -67,6 +72,9 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
   sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
   [Status](../../server/sessions.md#status)).
+- "Annonce": whether it's announced, as buttons, "non annoncée" and "annoncée", that change it, and which admin last
+  changed it, and when. While the session has no date, "annoncée" can't be used, and says « La session n'a pas de
+  date. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 - "Session": the session's details, which "modifier" changes in a form in their place (see
   [The session form](#the-session-form)):
   - "Quand": when it is, e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
@@ -170,7 +178,9 @@ bottom, the form has:
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
   times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
   after. The form says that the sets of a session move with it. It doesn't check that they still fit in it once it's
-  shorter: the session's page then marks those that don't (see [A session's page](#a-sessions-page)).
+  shorter: the session's page then marks those that don't (see [A session's page](#a-sessions-page)). While the session
+  is announced, checking "date à déterminer" shows an error right away, which screen readers announce, « Une session
+  annoncée a une date : retirez d'abord son annonce. », and the form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
   buttons, in this order.
 - "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the
@@ -316,7 +326,7 @@ sets, e.g. sessions that overlap (see [Rules](../../server/sessions.md#rules)). 
 counts: if it refuses what the form accepted, the form shows the server's message. When the server names what's in the
 way, the message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set
 of the session whose page this is is named by its performers and times, without a link, and the session itself isn't
-named. Changing a status shows these the same way.
+named. Changing a status, or whether the session is announced, shows these the same way.
 
 An error about one of a new session's sets names it, e.g. « Le set de Aurore, 21 h – 22 h n'a pas pu être ajouté : … »,
 and another of its sets in the way is named without a link.
@@ -324,8 +334,8 @@ and another of its sets in the way is named without a link.
 ## Endpoints
 
 - `GET /api/admin/sessions`, for the list.
-- `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status` and
-  `DELETE /api/admin/sessions/:id`, for a session's page.
+- `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status`,
+  `PUT /api/admin/sessions/:id/announced` and `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
 - `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
   `PATCH /api/admin/sessions/:id`, to save the event as the session's.

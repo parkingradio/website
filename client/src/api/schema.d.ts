@@ -1902,7 +1902,7 @@ export interface paths {
         };
         /** A session, with its sets */
         get: operations["get_session"];
-        /** Replaces a session's fields, and replaces or removes its flyer, but not its status or its sets, which move with its start */
+        /** Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start */
         put: {
             parameters: {
                 query?: never;
@@ -2010,7 +2010,7 @@ export interface paths {
         delete: operations["delete_session"];
         options?: never;
         head?: never;
-        /** Changes a session, only the fields it's given, or removes its flyer, but not its status or its sets, which move with its start */
+        /** Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start */
         patch: operations["update_session"];
         trace?: never;
     };
@@ -2124,6 +2124,23 @@ export interface paths {
         get?: never;
         /** Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled */
         put: operations["update_session_status"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sessions/{id}/announced": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Announces a session, which means it is meant to be public, with its sets, or un-announces it */
+        put: operations["update_session_announced"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3230,6 +3247,10 @@ export interface components {
             status: components["schemas"]["SessionStatus"];
             statusUpdatedBy: string | null;
             statusUpdatedAt: string | null;
+            /** @description Whether it is announced, which means it is meant to be public, with its sets */
+            announced: boolean;
+            announcedUpdatedBy: string | null;
+            announcedUpdatedAt: string | null;
         };
         SessionFields: {
             /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
@@ -5523,6 +5544,83 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_session_announced: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    announced: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        session: components["schemas"]["Session"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

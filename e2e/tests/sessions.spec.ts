@@ -42,6 +42,8 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await search.fill('sable mouvant')
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^annulées/ }).click()
   await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annulée')
+  // Which stays announced.
+  await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annoncée')
 
   // Those of the other types, among which a synth meetup, which has no sets.
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
@@ -469,10 +471,23 @@ test("a collective's takeover is added from its page, until the next day, with i
   await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/1234567')
   await expect(sets.getByRole('row').nth(1)).toContainText('23 h – 0 h')
 
-  // Listed in the section, found by its name, and on the artist's page.
+  // Announced, which says who announced it.
+  const announcement = page.getByRole('group', { name: 'Annonce' })
+  await announcement.getByRole('button', { name: 'annoncée', exact: true }).click()
+  await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText(/^Changée par /)).toBeVisible()
+
+  // Listed in the section, found by its name, among the announced sessions, and on the artist's page.
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(unique)
-  await expect(page.getByRole('row').filter({ has: page.locator(`a[href="${sessionPage}"]`) })).toContainText(mine.artist.name)
+  const row = page.getByRole('row').filter({ has: page.locator(`a[href="${sessionPage}"]`) })
+  await expect(row).toContainText(mine.artist.name)
+  await expect(row).toContainText('annoncée')
+  const announced = page.getByRole('group', { name: 'Annonce' })
+  await announced.getByRole('button', { name: /^non annoncées/ }).click()
+  await expect(row).toHaveCount(0)
+  await announced.getByRole('button', { name: /^annoncées/ }).click()
+  await expect(row).toHaveCount(1)
   await page.goto(`/admin/artistes/${mine.artist.id}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 
@@ -487,6 +502,10 @@ test("a collective's takeover is added from its page, until the next day, with i
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
   await expect(sets.getByRole('button', { name: 'annulé', pressed: true })).toHaveCount(1)
+  // It stays announced, until it's un-announced.
+  await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await announcement.getByRole('button', { name: 'non annoncée' }).click()
+  await expect(announcement.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
   // Its set can't be un-cancelled, and sets can't be added to it, which their buttons say, greyed out.
   const planned = sets.getByRole('button', { name: 'planifié' })
   await expect(planned).toHaveAttribute('aria-disabled', 'true')

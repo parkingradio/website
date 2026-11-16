@@ -85,6 +85,9 @@ const SessionBody = z
     hasFlyer: z.boolean(),
     sets: z.array(SetBody).meta({ description: 'By offset, then by when they were added, those without an offset last' }),
     ...Tracked,
+    announced: z.boolean().meta({ description: 'Whether it is announced, which means it is meant to be public, with its sets' }),
+    announcedUpdatedBy: z.string().nullable(),
+    announcedUpdatedAt: Timestamp.nullable(),
   })
   .meta({ id: 'Session' })
 export type SessionBody = z.infer<typeof SessionBody>
@@ -274,6 +277,9 @@ function sessionBody(row: StoredSession): SessionBody {
     hasFlyer: row.flyerKey !== null,
     sets: row.sets.map((set) => setBody(set, row)),
     ...tracked(row),
+    announced: row.announced,
+    announcedUpdatedBy: row.announcedUpdatedBy,
+    announcedUpdatedAt: row.announcedUpdatedAt?.toISOString() ?? null,
   }
 }
 
@@ -413,6 +419,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
   }
 
   const StatusBody = z.strictObject({ status: Status }, { error: objectError(BAD_STATUS) })
+  const BAD_ANNOUNCED = 'announced must be true or false'
+  const AnnouncedBody = z.strictObject({ announced: z.boolean({ error: BAD_ANNOUNCED }) }, { error: objectError(BAD_ANNOUNCED) })
 
   api.get(
     '/api/admin/sessions',
@@ -560,7 +568,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     {
       config: { admin: true, tool: null },
       schema: {
-        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status or its sets, which move with its start",
+        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
         tags: ['Sessions'],
         params: ById,
         multipart: SessionForm,
@@ -581,7 +589,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Modifier une session' } },
       schema: {
         operationId: 'update_session',
-        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status or its sets, which move with its start",
+        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which move with its start",
         tags: ['Sessions'],
         params: ById,
         body: SessionChangesBody,
@@ -610,6 +618,25 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     async (request, reply) => {
       const change = statusChange(request.body.status, request.user!.email)
       return saving(reply, NO_SUCH_SESSION, () => store.setStatus(request.params.id, change))
+    },
+  )
+
+  api.put(
+    '/api/admin/sessions/:id/announced',
+    {
+      config: { admin: true, tool: { title: 'Annoncer une session, ou retirer son annonce' } },
+      schema: {
+        operationId: 'update_session_announced',
+        summary: 'Announces a session, which means it is meant to be public, with its sets, or un-announces it',
+        tags: ['Sessions'],
+        params: ById,
+        body: AnnouncedBody,
+        response: { 200: SessionResponse, 400: ApiError, 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const change = { announced: request.body.announced, announcedUpdatedBy: request.user!.email, announcedUpdatedAt: new Date() }
+      return saving(reply, NO_SUCH_SESSION, () => store.setAnnounced(request.params.id, change))
     },
   )
 
