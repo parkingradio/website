@@ -10,7 +10,7 @@ import {
   EMPTY_SESSION_FORM,
   STATUSES,
   applicationLink,
-  applicationToApply,
+  findApplication,
   listedSetFromApplication,
   newSetFormValues,
   sessionFormValues,
@@ -810,7 +810,7 @@ function OpenSet({
 // collective's (see "From an application" in docs/design/client/admin/sessions.md).
 function setFromApplication(id: string, session: Session): InitialSet {
   return ({ artists, applications }) => {
-    const found = applicationToApply(id, applications, artists)
+    const found = findApplication(id, applications, artists)
     if (found === undefined) return newSetFormValues(session)
     return found?.artist ? { ...newSetFormValues(session), ...setValuesFromApplication(found.application, found.artist) } : null
   }
@@ -847,7 +847,7 @@ function SessionFormWithChoices({
   if (collectives.kind === 'loading' || applications.kind === 'loading') return null
   const applicationList = applications.kind === 'loaded' ? applications.value.applications : null
   const artists = fromApplication?.artists
-  const found = fromApplication && applicationToApply(fromApplication.id, applicationList, artists?.kind === 'loaded' ? artists.value.artists : null)
+  const found = fromApplication && findApplication(fromApplication.id, applicationList, artists?.kind === 'loaded' ? artists.value.artists : null)
   // The artists are only waited for when the application is an artist's.
   if (found === undefined && artists?.kind === 'loading') return null
 

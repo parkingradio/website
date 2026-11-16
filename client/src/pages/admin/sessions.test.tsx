@@ -2306,6 +2306,32 @@ describe('From an application', () => {
       })
     })
 
+    it('changes the set it lists, or takes it out of the list, like any other', async () => {
+      mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+      renderAt('/admin/sessions/nouvelle?application=application-3')
+
+      await fillIn()
+      fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore, horaire à déterminer' }))
+      await screen.findByRole('heading', { name: 'Set de Aurore' })
+      const form = within(screen.getByRole('region', { name: 'Set de Aurore' }))
+      expect(form.getByLabelText('horaire à déterminer')).toBeChecked()
+      expect(form.getByLabelText('Durée')).toBeInTheDocument()
+      expect(form.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aurore, reçue le 15 août 2026')
+      fireEvent.change(form.getByLabelText('YouTube'), { target: { value: 'dQw4w9WgXcQ' } })
+      fireEvent.click(form.getByRole('button', { name: 'enregistrer' }))
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Aurore' })).not.toBeInTheDocument())
+      const table = screen.getByRole('table', { name: 'Sets' })
+      expect(rows(table)).toHaveLength(1)
+      expect(within(table).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+
+      fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Aurore, horaire à déterminer' }))
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sets' })).toHaveFocus()
+      fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+      expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0]).sets).toEqual([])
+    })
+
     it("starts as the takeover of a collective's application, in place of the takeover of the address, linked to it", async () => {
       const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
       mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] }, 'POST /api/admin/sessions': { ok: true, session: SESSION } })

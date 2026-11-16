@@ -180,14 +180,8 @@ test('a takeover and its set are given the applications they come from in their 
   const { unique, day } = own(testInfo)
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
-  const apply = async (owner: object) => {
-    const fields = { dates: [day], timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '' }
-    const created = await page.request.post('/api/admin/applications', { data: { ...fields, ...owner } })
-    expect(created.ok()).toBe(true)
-    return (await created.json()).application.id as string
-  }
-  const collectives = await apply({ collectiveId: mine.collective.id })
-  const artists = await apply({ artistId: mine.artist.id })
+  const collectives = await addOwnApplication(page, { collectiveId: mine.collective.id, dates: [day] })
+  const artists = await addOwnApplication(page, { artistId: mine.artist.id, dates: [day] })
   const fields = { start: `${day}T21:00-04:00`, durationMinutes: 120, type: 'takeover', takeover: mine.collective.id, application: null, name: `E2E ${unique}`, raEvent: null, description: '' }
   const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
   expect(created.ok()).toBe(true)
@@ -236,14 +230,9 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const { unique, day, otherDay } = own(testInfo)
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
-  const apply = async (owner: object) => {
-    const fields = { dates: [day], timeSlots: [{ start: '20:00', end: '23:00' }], performanceTypes: ['dj'], otherPerformanceType: 'Synthé', details: '' }
-    const created = await page.request.post('/api/admin/applications', { data: { ...fields, ...owner } })
-    expect(created.ok()).toBe(true)
-    return (await created.json()).application.id as string
-  }
-  const artists = await apply({ artistId: mine.artist.id })
-  const collectives = await apply({ collectiveId: mine.collective.id })
+  const fields = { dates: [day], timeSlots: [{ start: '20:00', end: '23:00' }], otherPerformanceType: 'Synthé' }
+  const artists = await addOwnApplication(page, { artistId: mine.artist.id, ...fields })
+  const collectives = await addOwnApplication(page, { collectiveId: mine.collective.id, ...fields })
   await mockEvents(page)
   const name = `E2E ${unique}`
   const sets = page.getByRole('table', { name: 'Sets' })
@@ -336,6 +325,15 @@ async function addOwnCollective(page: Page, unique: string) {
   expect(created.ok()).toBe(true)
   const { id, members } = (await created.json()).collective
   return { collective: { name, id: id as string }, artist: { name: artist, id: members[0].id as string } }
+}
+
+// Adds an application, as a DJ, for an artist or a collective of the test's own, through the API, with `fields` (its
+// owner's id, its days, and those that change), and returns its id. It's deleted with its owner.
+async function addOwnApplication(page: Page, fields: ({ artistId: string } | { collectiveId: string }) & { dates: string[] } & Record<string, unknown>) {
+  const application = { timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '', ...fields }
+  const created = await page.request.post('/api/admin/applications', { data: application })
+  expect(created.ok()).toBe(true)
+  return (await created.json()).application.id as string
 }
 
 async function deleteOwn(page: Page, { collective, artist }: Awaited<ReturnType<typeof addOwnCollective>>) {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useId, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useApi } from '../../api/use-api'
 import type { Application } from '../../application-fields'
@@ -153,7 +153,8 @@ export function SetFormWithChoices({
   const choices = { artists: artists.kind === 'loaded' ? artists.value.artists : null, applications: applications.kind === 'loaded' ? applications.value.applications : null }
   const values = !loaded ? null : typeof initial === 'function' ? initial(choices) : initial
   const shown = reveal && values !== null
-  useEffect(() => {
+  // Before the form is painted, so that it's never seen elsewhere.
+  useLayoutEffect(() => {
     if (!shown) return
     const heading = document.getElementById(headingId)
     heading?.focus({ preventScroll: true })

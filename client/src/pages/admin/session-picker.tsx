@@ -20,7 +20,7 @@ const NEW_SESSION: ComboboxOption = { key: '', label: 'nouvelle session' }
 
 // The address that adds a set to `session`, or to a new one when it's null, from `application`.
 function fromApplicationPath(session: Session | null, application: Pick<Application, 'id'>): string {
-  return session ? `${sessionPath(session)}?application=${application.id}` : newSessionPath({ application: application.id })
+  return session ? `${sessionPath(session)}?${new URLSearchParams({ application: application.id })}` : newSessionPath({ application: application.id })
 }
 
 // "nouvelle session", then the planned sessions, those on one of the days the artist would like to play first, by date,

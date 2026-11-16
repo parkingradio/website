@@ -491,7 +491,7 @@ export const applicationLink = ({ id, receivedAt }: Pick<ApplicationLink, 'id' |
 // The application whose id is `id`, among `applications`, and its artist, among `artists`, for an artist's, or null for a
 // collective's. Null when there's no such application, or undefined when it can't be told, since the applications, or
 // the artists for an artist's, couldn't be loaded (null).
-export function applicationToApply(
+export function findApplication(
   id: string,
   applications: Schema<'Application'>[] | null,
   artists: Reference[] | null,

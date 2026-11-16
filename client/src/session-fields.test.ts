@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Application } from './application-fields'
 import {
   EMPTY_SESSION_FORM,
-  applicationToApply,
+  findApplication,
   checkSession,
   checkSet,
   durationOf,
@@ -500,17 +500,17 @@ describe('the application a form starts from', () => {
   const ARTISTS = [{ id: 'artist-1', name: 'Aurore' }]
 
   it("is an artist's, with the artist, or a collective's", () => {
-    expect(applicationToApply('application-1', APPLICATIONS, ARTISTS)).toEqual({ application: APPLICATIONS[0], artist: { id: 'artist-1', name: 'Aurore' } })
-    expect(applicationToApply('application-2', APPLICATIONS, null)).toEqual({ application: APPLICATIONS[1], artist: null })
+    expect(findApplication('application-1', APPLICATIONS, ARTISTS)).toEqual({ application: APPLICATIONS[0], artist: { id: 'artist-1', name: 'Aurore' } })
+    expect(findApplication('application-2', APPLICATIONS, null)).toEqual({ application: APPLICATIONS[1], artist: null })
   })
 
   it("is none when there's no such application, or artist", () => {
-    expect(applicationToApply('unknown', APPLICATIONS, ARTISTS)).toBeNull()
-    expect(applicationToApply('application-1', APPLICATIONS, [])).toBeNull()
+    expect(findApplication('unknown', APPLICATIONS, ARTISTS)).toBeNull()
+    expect(findApplication('application-1', APPLICATIONS, [])).toBeNull()
   })
 
   it("can't be told without the applications, or the artists for an artist's", () => {
-    expect(applicationToApply('application-1', null, ARTISTS)).toBeUndefined()
-    expect(applicationToApply('application-1', APPLICATIONS, null)).toBeUndefined()
+    expect(findApplication('application-1', null, ARTISTS)).toBeUndefined()
+    expect(findApplication('application-1', APPLICATIONS, null)).toBeUndefined()
   })
 })

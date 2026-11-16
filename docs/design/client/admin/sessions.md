@@ -118,8 +118,9 @@ Only one form is open at a time on a session's page, the session's, the panel of
 saved.
 
 What the page's address opens, `?raEvent` (see [Creating its event on RA](#creating-its-event-on-ra)) or `?application`
-(see [From an application](#from-an-application)), is removed from it, in place, as soon as a form opens or closes, so
-that reloading the page, or coming back to it, doesn't open it again.
+(see [From an application](#from-an-application)), stays in it until the admin opens a form or closes one, the one it
+opened included, whether it's saved or cancelled. It's then removed from the address, in place, so that reloading the
+page, or coming back to it, doesn't open it again.
 
 ## Creating its event on RA
 
@@ -299,11 +300,13 @@ An application's page leads to a session's page, or to "nouvelle session", with 
 - On "nouvelle session", an artist's application lists a set, filled in the same way, whose place isn't known yet
   (« horaire à déterminer », without a duration). A collective's application makes the session its collective's
   takeover, in place of `?takeover`, with the application picked. Above the form, the application's days and time slots
-  are shown as its page shows them, with a link to it, for reference only: they don't fill in the session's times.
+  are shown as its page shows them, with a link to it, which opens in a new tab: they don't fill in the session's
+  times.
 
 An application that doesn't exist, or a collective's on a session's page, is ignored, like a `?takeover` that isn't a
 known collective. The application and its artist are looked for among those loaded for the form (see
-[Endpoints](#endpoints)): when they can't be loaded, the form says so, and starts as it would without the application.
+[Endpoints](#endpoints)): when they can't be loaded, the page says so, and opens a new set's form, or "nouvelle session",
+as it would without the application.
 
 ## Errors
 
