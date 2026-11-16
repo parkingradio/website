@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import type { ListedSet } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
 import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, setTitle } from './describe'
+import { arrowAfterMove } from './list'
 import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { SetSession } from './set-form'
@@ -66,10 +67,7 @@ export function ListedSets({
   const move = (index: number, by: -1 | 1) => {
     const moved = [...sets]
     ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
-    // The same arrow, unless the set is now at the end where it can't be used.
-    const end = by < 0 ? 0 : sets.length - 1
-    const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
-    focusNext.current = { key: keyOf(sets[index]), action: index + by === end ? other : arrow }
+    focusNext.current = { key: keyOf(sets[index]), action: arrowAfterMove(by, index + by, sets.length) }
     onChange(moved)
     if (open?.index === index) onOpen({ ...open, index: index + by })
     else if (open?.index === index + by) onOpen({ ...open, index })

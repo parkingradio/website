@@ -167,7 +167,10 @@ const SetDuration = mostly<number | null>(
 )
 
 // Where a set is moved to: mostly a place among a few sets, sometimes past the last, or else not a place.
-const Position = mostly<number>(fc.oneof({ arbitrary: fc.nat({ max: 4 }), weight: 9 }, { arbitrary: fc.constant(1e20), weight: 1 }), fc.constantFrom(-1, 1.5))
+const Position = mostly<number>(
+  fc.oneof({ arbitrary: fc.nat({ max: 4 }), weight: 9 }, { arbitrary: fc.constant(Number.MAX_SAFE_INTEGER), weight: 1 }),
+  fc.constantFrom(-1, 1.5, 1e20),
+)
 
 const SetFields = fc
   .record({

@@ -60,8 +60,8 @@ class Refused extends Error {
 export class NoSuchReference extends Refused {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
-// it doesn't change as they are (see `brokenSessionRule` in sessions/fields.ts, and `checkAnnounced`), or its application (see `checkSessionApplication` and `checkSetApplication`). The message says
-// which.
+// it doesn't change as they are (see `brokenSessionRule` in sessions/fields.ts, and `checkAnnounced`), or its application
+// (see `checkSessionApplication` and `checkSetApplication`). The message says which.
 export class BrokenFields extends Refused {}
 
 // `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
@@ -259,8 +259,9 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 //   cancelled sets), whether the session, the set, the takeover's collective, the performers and the application exist,
 //   and so whether the foreign keys hold, rather than failing unexpectedly once they're checked, without locking their
 //   rows, which would keep their profiles from being changed in the meantime, whether a collective that's deleted has
-//   takeovers, and who an application belongs to, which its rules are about (see "Applications" in
-//   docs/design/server/sessions.md).
+//   takeovers, who an application belongs to, which its rules are about (see "Applications" in
+//   docs/design/server/sessions.md), and a session's sets' positions and how many there are, which adding, moving and
+//   deleting a set work from, so that the positions stay 0 to n - 1 (see "sets" in db/schema.ts).
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock. Nor can saving a set or a session, which takes a lock on its application's row to check its foreign key
 //   once its own row is written, and deleting that application, which writes the set's or the session's row once it has
@@ -598,8 +599,8 @@ export function sessionsStore(db: Queryable): SessionsStore {
         await lockSessions(tx)
         const [set] = await tx.select({ sessionId: sets.sessionId, position: sets.position }).from(sets).where(eq(sets.id, id))
         if (!set) return null
-        // Past the last, it goes last, before anything reaches the database, whose integers are smaller than some numbers
-        // that are sent.
+        // Past the last, it goes last, before anything reaches the database, whose integers are smaller than some that are
+        // sent.
         const to = Math.min(position, (await setCount(tx, set.sessionId)) - 1)
         const from = set.position
         if (to !== from) {

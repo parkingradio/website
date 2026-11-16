@@ -2943,8 +2943,9 @@
         "type": "object",
         "properties": {
           "position": {
-            "type": "number",
+            "type": "integer",
             "minimum": 0,
+            "maximum": 9007199254740991,
             "description": "The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last"
           }
         },

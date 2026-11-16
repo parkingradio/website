@@ -124,7 +124,7 @@ describe("a session's sets", () => {
     response = await move(a, 2)
     expect(ids(response.json().session.sets)).toEqual([d, b, a, c])
     // Past the last, even past what the database's integers hold.
-    for (const position of [4, Number.MAX_SAFE_INTEGER, 1e20]) {
+    for (const position of [4, 2 ** 31, Number.MAX_SAFE_INTEGER]) {
       response = await move(d, position)
       expect(response.statusCode, String(position)).toBe(200)
       expect(ids(response.json().session.sets)).toEqual([b, a, c, d])
@@ -138,7 +138,7 @@ describe("a session's sets", () => {
     const { session, sets } = await sessionWithSets([60, 60])
     expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
     expect((await move(sets[1], 0)).statusCode).toBe(200)
-    for (const position of [-1, 1.5, '1', null, undefined]) expect((await move(sets[0], position)).statusCode, String(position)).toBe(400)
+    for (const position of [-1, 1.5, 1e20, '1', null, undefined]) expect((await move(sets[0], position)).statusCode, String(position)).toBe(400)
     expect((await request('PUT', `/api/admin/sets/${sets[0]}/position`, { position: 0, id: sets[0] })).statusCode).toBe(400)
     expect((await app.inject({ method: 'PUT', url: `/api/admin/sets/${sets[0]}/position`, cookies: await sessionCookies() })).statusCode).toBe(400)
     for (const id of ['not-a-uuid', '00000000-0000-4000-8000-000000000000']) {

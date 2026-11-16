@@ -422,10 +422,10 @@ json PUT "${SETS}/${second}/position" '{"position":1}'
 expect_status 200
 [ "$(set_ids)" = "${opening} ${second} ${whenever} ${unplaced} " ] || { _show_body; fail "expected the set moved second"; }
 # Past the last, even past what the database's integers hold, it goes last.
-json PUT "${SETS}/${whenever}/position" '{"position":100000000000000000000}'
+json PUT "${SETS}/${whenever}/position" '{"position":9007199254740991}'
 expect_status 200
 [ "$(set_ids)" = "${opening} ${second} ${unplaced} ${whenever} " ] || { _show_body; fail "expected the set moved last"; }
-for body in '{"position":-1}' '{"position":1.5}' '{"position":"1"}' '{"position":null}' '{}' '{"position":0,"id":"x"}'; do
+for body in '{"position":-1}' '{"position":1.5}' '{"position":100000000000000000000}' '{"position":"1"}' '{"position":null}' '{}' '{"position":0,"id":"x"}'; do
     json PUT "${SETS}/${whenever}/position" "$body"
     expect_status 400
 done

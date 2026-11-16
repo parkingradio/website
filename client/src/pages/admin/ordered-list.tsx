@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { arrowAfterMove } from './list'
 
 // Picks in order, e.g. a collective's artists or a set's performers, one per line, each of which can be moved up or down
 // or removed.
@@ -32,13 +33,10 @@ export function OrderedList<T>({ items, keyOf, label, name = label, onChange, ne
     }
   }, [items, nextFocus])
 
-  const move = (index: number, by: number) => {
+  const move = (index: number, by: -1 | 1) => {
     const moved = [...items]
     ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
-    // The same arrow, unless the item is now at the end where it's disabled.
-    const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
-    const end = by < 0 ? 0 : items.length - 1
-    focusNext.current = { key: keyOf(items[index]), action: index + by === end ? other : arrow }
+    focusNext.current = { key: keyOf(items[index]), action: arrowAfterMove(by, index + by, items.length) }
     onChange(moved)
   }
   const remove = (index: number) => {

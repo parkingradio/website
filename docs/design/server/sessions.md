@@ -52,8 +52,8 @@ A session, as the endpoints below return it, also has:
 Every set belongs to a session: the one it's added to, or added with, which doesn't change. Sets aren't listed on their
 own: they're in their sessions, and the `total` of a list of sessions counts sessions, not sets. A session can be added
 with its sets, all of them or nothing, in a single request, whose errors about one of the sets say which it is, by its
-place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), and
-which keep the order they're sent in. A set has:
+place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A
+set has:
 
 | Field | Type | |
 |---|---|---|
@@ -73,7 +73,7 @@ A set, as the endpoints below return it, also has:
 | `id` | string | |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. its start changing, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
 
@@ -399,12 +399,12 @@ Only an error about one of the sets has `setIndex`: that set's place in `sets`, 
 ## `PUT /api/admin/sessions/:id` (admin)
 
 Replaces a session's fields, but not its status, whether it's announced, or its sets, which stay as they are, even when
-they add up to more than the session (see [Sets' order](#sets-order)). It
-takes the same request as `POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which
-is deleted. Without one, the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which
-removes it, and deletes it. Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it,
-but without the errors about its sets, and with 400 when there's both a flyer and `removeFlyer`, or when it would remove
-an announced session's start, and with 404 when there's no such session.
+they add up to more than the session (see [Sets' order](#sets-order)). It takes the same request as
+`POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which is deleted. Without one,
+the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it.
+Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors
+about its sets, and with 400 when there's both a flyer and `removeFlyer`, or when it would remove an announced session's
+start, and with 404 when there's no such session.
 
 ## `PATCH /api/admin/sessions/:id` (admin)
 
@@ -465,11 +465,10 @@ When it fails, nothing is saved.
 
 ## `PUT /api/admin/sets/:id` (admin)
 
-Replaces a set's fields, even when its session is cancelled, but not its session, its place among its session's sets,
-or its status. It takes the same
-request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it is then, and fails like it, but
-with 404 when there's no such set, which is checked before the track is resolved, and without the 409 for a cancelled
-session.
+Replaces a set's fields, even when its session is cancelled, but not its session, its place among its session's sets, or
+its status. It takes the same request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it
+is then, and fails like it, but with 404 when there's no such set, which is checked before the track is resolved, and
+without the 409 for a cancelled session.
 
 ## `PATCH /api/admin/sets/:id` (admin)
 
@@ -497,8 +496,8 @@ with that session in `session`.
 
 Moves a set to another place among its session's sets, even when its session is cancelled, and leaves the others in
 their order (see [Sets' order](#sets-order)). It doesn't change the set's fields or its status, or who last changed it.
-Responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `position` isn't a whole number from 0, and 404 when
-there's no such set.
+Responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `position` isn't a whole number from 0 to 2^53 − 1,
+and 404 when there's no such set.
 
 ## `DELETE /api/admin/sets/:id` (admin)
 

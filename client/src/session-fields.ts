@@ -145,8 +145,8 @@ export function after(start: Date, minutes: number): Date {
 const SKIPPED = "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été."
 
 // What's wrong with a start and an end time ("HH:MM"), if they're missing or aren't times.
-function checkStartEnd<T extends { start: string; end: string }>({ start, end }: T): FieldErrors<T> {
-  const errors: FieldErrors<T> = {}
+function checkStartEnd({ start, end }: SessionFormValues): FieldErrors<SessionFormValues> {
+  const errors: FieldErrors<SessionFormValues> = {}
   if (!start) errors.start = "Indiquez l'heure de début."
   else if (!isTime(start)) errors.start = "L'heure de début est invalide."
   if (!end) errors.end = "Indiquez l'heure de fin."

@@ -675,8 +675,7 @@ dl.admin-record {
   gap: 0.4rem;
 }
 
-/* A session's day and the times it starts and ends, a set's times, or the hours and minutes of a duration, side by
-   side. */
+/* A session's day and the times it starts and ends, or the hours and minutes of a duration, side by side. */
 .admin-form .admin-times {
   flex-wrap: wrap;
   align-items: flex-start;

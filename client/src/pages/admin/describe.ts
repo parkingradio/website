@@ -324,15 +324,10 @@ export function sessionHours({ start, end, durationMinutes }: SessionTimes): str
   return start === null || end === null ? formatDuration(durationMinutes) : `${formatQuebecTime(start)} – ${formatQuebecTime(end)}`
 }
 
-// E.g. "de 21 h à 1 h le lendemain", or "qui dure 4 h" for a session without a date.
-function sessionWithin({ start, end, durationMinutes }: SessionTimes): string {
-  if (start === null || end === null) return `qui dure ${formatDuration(durationMinutes)}`
-  return `de ${formatQuebecTime(start)} à ${formatQuebecTime(end)}${laterDay(start, end) ? ' le lendemain' : ''}`
-}
-
 // E.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
-export function sessionWhen(session: SessionTimes): string {
-  return session.start === null ? UNDATED : `${sessionLongDay(session)}, ${sessionWithin(session)}`
+export function sessionWhen({ start, end }: SessionTimes): string {
+  if (start === null || end === null) return UNDATED
+  return `${sessionLongDay({ start })}, de ${formatQuebecTime(start)} à ${formatQuebecTime(end)}${laterDay(start, end) ? ' le lendemain' : ''}`
 }
 
 // Sessions without a date are later than any other, then by when they were added.

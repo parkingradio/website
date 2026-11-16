@@ -1014,16 +1014,16 @@ describe('sessions routes', () => {
       expect(await ids(response)).toEqual(['set-4', 'set-2', 'set-3'])
       expect(store.moveSet).toHaveBeenLastCalledWith('set-4', 0)
       // Past the last, which the store takes care of.
-      response = await send(app, 'PUT', '/api/admin/sets/set-4/position', { position: 1e20 })
+      response = await send(app, 'PUT', '/api/admin/sets/set-4/position', { position: Number.MAX_SAFE_INTEGER })
       expect(response.statusCode).toBe(200)
-      expect(store.moveSet).toHaveBeenLastCalledWith('set-4', 1e20)
+      expect(store.moveSet).toHaveBeenLastCalledWith('set-4', Number.MAX_SAFE_INTEGER)
       expect(await ids(response)).toEqual(['set-2', 'set-3', 'set-4'])
     })
 
     it('refuses a position that is not a whole number from 0, or other fields', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
-      for (const body of [{ position: -1 }, { position: 1.5 }, { position: '1' }, { position: null }, {}, { position: 0, id: 'set-2' }]) {
+      for (const body of [{ position: -1 }, { position: 1.5 }, { position: 1e20 }, { position: '1' }, { position: null }, {}, { position: 0, id: 'set-2' }]) {
         const response = await send(app, 'PUT', '/api/admin/sets/set-2/position', body)
         expect(response.statusCode, JSON.stringify(body)).toBe(400)
       }

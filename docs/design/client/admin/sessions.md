@@ -242,11 +242,10 @@ top to bottom, the form has:
   candidature" (see [Applications](#applications)).
 - "Durée": how long the set lasts, in hours and minutes, at most 24 h, which the form checks (see
   [Times](../../server/sessions.md#times)), or empty while it isn't known, which the form says, along with how long the
-  session lasts. It
-  doesn't check that the sets still add up to no more than the session: the list of sets says so (see [A session's
-  page](#a-sessions-page)). A new set, which goes after the session's other sets, lasts an hour by default, or what's
-  left of the session after its sets, cancelled ones included, if that's less. When the session's sets fill it, "Durée"
-  starts empty.
+  session lasts. It doesn't check that the sets still add up to no more than the session: the list of sets says so (see
+  [A session's page](#a-sessions-page)). A new set, which goes after the session's other sets, lasts an hour by default,
+  or what's left of the session after its sets, cancelled ones included, if that's less. When the session's sets fill
+  it, "Durée" starts empty.
 - "Prestation": what the performers do, picked from the same list as the application form's (see
   [Candidatures](candidatures.md)), and "Autre", in a few words.
 - "Genres": tags to click, like an artist's (see [Adding an artist](artistes.md#adding-an-artist)). While it has none,
@@ -297,10 +296,10 @@ An application's page leads to a session's page, or to "nouvelle session", with 
 - On a session's page, unless the session is cancelled, a new set's form opens, filled in from the application: its
   artist as the only performer, its performance types and "autre", and the application itself. The page scrolls to the
   form, whose heading gets the focus.
-- On "nouvelle session", an artist's application lists a set, filled in the same way, whose duration isn't known yet. A collective's application makes the session its collective's
-  takeover, in place of `?takeover`, with the application picked. Above the form, the application's days and time slots
-  are shown as its page shows them, with a link to it, which opens in a new tab: they don't fill in the session's
-  times.
+- On "nouvelle session", an artist's application lists a set, filled in the same way, whose duration isn't known yet. A
+  collective's application makes the session its collective's takeover, in place of `?takeover`, with the application
+  picked. Above the form, the application's days and time slots are shown as its page shows them, with a link to it,
+  which opens in a new tab: they don't fill in the session's times.
 
 An application that doesn't exist, or a collective's on a session's page, is ignored, like a `?takeover` that isn't a
 known collective. The application and its artist are looked for among those loaded for the form (see
@@ -314,7 +313,8 @@ check sessions and sets as the server does, for immediate feedback, but not the 
 sets, e.g. sessions that overlap (see [Rules](../../server/sessions.md#rules)). The server's check is the one that
 counts: if it refuses what the form accepted, the form shows the server's message. When the server names what's in the
 way, the message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set
-of the session whose page this is is named as on its page, without a link, and the session itself isn't named. Changing a status, or whether the session is announced, shows these the same way.
+of the session whose page this is is named as on its page, without a link, and the session itself isn't named. Changing
+a status, or whether the session is announced, shows these the same way.
 
 An error about one of a new session's sets names it, e.g. « Le set de Aurore n'a pas pu être ajouté : … », and another of
 its sets in the way is named without a link.

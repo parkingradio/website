@@ -117,7 +117,7 @@ expect_body_contains '\"soundcloudTrack\":null'
 echo "  sessions are listed by when they start, with bounds in Québec time, and other offsets are refused, with their type and title"
 call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
 expect_body_contains "\\\"total\\\":1,\\\"sessions\\\":[{\\\"id\\\":\\\"${session}\\\""
-expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"application\":null,\"status\":\"planned\",\"announced\":false,\"sets\"'
+expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"durationMinutes\":120,\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"application\":null,\"status\":\"planned\",\"announced\":false,\"sets\"'
 call list_sessions '{"from":"2026-11-14T21:01-05:00","to":"2026-11-14T23:00-05:00"}'
 expect_body_contains '\"total\":0,'
 call list_sessions '{"from":"2026-11-15T03:00+01:00"}'

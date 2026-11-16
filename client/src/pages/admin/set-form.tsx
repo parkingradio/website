@@ -101,7 +101,7 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
           {session.durationMinutes === null
             ? "La durée de la session n'est pas encore indiquée."
             : `La session dure ${formatDuration(session.durationMinutes)}.`}{' '}
-          Vide tant qu'elle n'est pas connue.
+          Laissez vide tant que la durée du set n'est pas connue.
         </p>
       </div>
 

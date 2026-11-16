@@ -57,7 +57,7 @@ export function SetsTooLong({ sets, durationMinutes }: { sets: Pick<StudioSet, '
   const minutes = setsMinutes(sets)
   if (durationMinutes === null || minutes <= durationMinutes) return null
   return (
-    <p className="admin-notice">
+    <p className="admin-notice" role="status">
       Les sets durent {formatDuration(minutes)}, plus que la session ({formatDuration(durationMinutes)}).
     </p>
   )

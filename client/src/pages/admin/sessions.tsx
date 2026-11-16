@@ -49,7 +49,7 @@ import {
   setTitle,
 } from './describe'
 import type { Announced } from './describe'
-import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
+import { arrowAfterMove, compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
@@ -537,10 +537,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: index + by } })
     setBusy(false)
     if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
-    // The focus stays on the same arrow, unless the set is now at the end where it can't be used.
     const now = result.session.sets.findIndex((other) => other.id === set.id)
-    const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
-    focusNext.current = { id: set.id, action: now === (by < 0 ? 0 : result.session.sets.length - 1) ? other : arrow }
+    focusNext.current = { id: set.id, action: arrowAfterMove(by, now, result.session.sets.length) }
     setSession(result.session)
   }
 

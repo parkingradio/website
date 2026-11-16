@@ -341,12 +341,13 @@ describe('the rules that involve several fields', () => {
 })
 
 describe('SetPosition', () => {
-  it('takes a whole number from 0, however large, which the store brings back to the last place', () => {
-    for (const position of [0, 3, 1e20]) expect(SetPosition.parse({ position })).toEqual({ position })
+  it('takes a whole number from 0, even past the last place, which the store brings back to it', () => {
+    for (const position of [0, 3, Number.MAX_SAFE_INTEGER]) expect(SetPosition.parse({ position })).toEqual({ position })
   })
 
   it('refuses anything else, and other fields', () => {
-    for (const position of [-1, 1.5, '1', null, undefined, Infinity, NaN]) {
+    // Past the whole numbers that numbers hold exactly, too.
+    for (const position of [-1, 1.5, '1', null, undefined, Infinity, NaN, 1e20]) {
       expect(SetPosition.safeParse({ position }).error?.issues[0].message, String(position)).toBe('The position must be a whole number, from 0')
     }
     for (const sent of [null, [], 'first']) expect(SetPosition.safeParse(sent).error?.issues[0].message).toBe('The position must be a whole number, from 0')

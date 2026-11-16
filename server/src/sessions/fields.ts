@@ -251,9 +251,8 @@ export const SetPosition = z
     {
       position: z
         .number({ error: BAD_POSITION })
+        .int(BAD_POSITION)
         .min(0, BAD_POSITION)
-        // Any whole number, even past the integers zod's `int` takes, since past the last is last.
-        .refine(Number.isInteger, BAD_POSITION)
         .meta({ description: "The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last" }),
     },
     { error: objectError(BAD_POSITION) },
