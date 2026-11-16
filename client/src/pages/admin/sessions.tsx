@@ -572,10 +572,9 @@ function LoadedSession({ loaded }: { loaded: Session }) {
 
       <h2>Statut</h2>
       <StatusButtons statuses={STATUSES} labels={SESSION_STATUS_LABELS} status={session.status} disabled={busy} onChange={changeStatus} />
-      {session.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', session.statusUpdatedBy, session.statusUpdatedAt)}</p>}
+      {session.statusUpdatedBy && <p className="admin-meta">{byWhom('Statut changé', session.statusUpdatedBy, session.statusUpdatedAt)}</p>}
       <ErrorMessage error={error} />
-
-      <h2>Annonce</h2>
+      {/* Whether it's announced, under its status. */}
       <StatusButtons
         label="Annonce"
         statuses={ANNOUNCED_CHOICES}
@@ -585,7 +584,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         unavailable={(announced) => (announced === 'true' && session.start === null ? "La session n'a pas de date." : null)}
         onChange={changeAnnounced}
       />
-      {session.announcedUpdatedBy && <p className="admin-meta">{byWhom('Changée', session.announcedUpdatedBy, session.announcedUpdatedAt)}</p>}
+      {session.announcedUpdatedBy && <p className="admin-meta">{byWhom('Annonce changée', session.announcedUpdatedBy, session.announcedUpdatedAt)}</p>}
       <ErrorMessage error={announcedError} />
 
       <h2>Session</h2>

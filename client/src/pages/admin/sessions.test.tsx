@@ -629,7 +629,7 @@ describe("A session's page", () => {
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
     await waitFor(() => expect(statuses.getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
-    expect(screen.getByText(/^Changé par admin@example.com le/)).toBeInTheDocument()
+    expect(screen.getByText(/^Statut changé par admin@example.com le/)).toBeInTheDocument()
 
     // Its sets can't be added to, or un-cancelled, which the buttons say, greyed out, rather than the page.
     expect(visibleText(document.body)).not.toMatch(/La session est annulée/)
@@ -656,14 +656,19 @@ describe("A session's page", () => {
 
     const group = within(await screen.findByRole('group', { name: 'Annonce' }))
     expect(group.getAllByRole('button').map((button) => button.textContent)).toEqual(['non annoncée', 'annoncée'])
+    // Under "Statut", after the status, rather than under a heading of its own.
+    const follows = (before: HTMLElement, after: HTMLElement) => Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(screen.queryByRole('heading', { name: 'Annonce' })).not.toBeInTheDocument()
+    expect(follows(screen.getByRole('group', { name: 'Statut' }), screen.getByRole('group', { name: 'Annonce' }))).toBe(true)
+    expect(follows(screen.getByRole('group', { name: 'Annonce' }), screen.getByRole('heading', { level: 2, name: 'Session' }))).toBe(true)
     expect(group.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByText(/^Changée par/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Annonce changée par/)).not.toBeInTheDocument()
     fireEvent.click(group.getByRole('button', { name: 'annoncée' }))
     await waitFor(() => expect(group.getByRole('button', { name: 'annoncée' })).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
-    expect(screen.getByText(/^Changée par admin@example.com le/)).toBeInTheDocument()
+    expect(screen.getByText(/^Annonce changée par admin@example.com le/)).toBeInTheDocument()
     // Neither the status, nor who changed it.
-    expect(screen.queryByText(/^Changé par/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Statut changé par/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
   })
 

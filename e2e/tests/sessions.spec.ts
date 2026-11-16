@@ -475,7 +475,7 @@ test("a collective's takeover is added from its page, until the next day, with i
   const announcement = page.getByRole('group', { name: 'Annonce' })
   await announcement.getByRole('button', { name: 'annoncée', exact: true }).click()
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText(/^Changée par /)).toBeVisible()
+  await expect(page.getByText(/^Annonce changée par /)).toBeVisible()
 
   // Listed in the section, found by its name, among the announced sessions, and on the artist's page.
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()
@@ -504,7 +504,9 @@ test("a collective's takeover is added from its page, until the next day, with i
   await expect(sets.getByRole('button', { name: 'annulé', pressed: true })).toHaveCount(1)
   // It stays announced, until it's un-announced.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await announcement.getByRole('button', { name: 'non annoncée' }).click()
+  // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.
+  const unannounce = announcement.getByRole('button', { name: 'non annoncée' })
+  await (isMobile ? unannounce.tap() : unannounce.click())
   await expect(announcement.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
   // Its set can't be un-cancelled, and sets can't be added to it, which their buttons say, greyed out.
   const planned = sets.getByRole('button', { name: 'planifié' })
