@@ -63,10 +63,9 @@ function changeSet(id: string, changes: Partial<StoredSet>) {
 const NEW = { updatedBy: null, updatedAt: null, status: 'planned' as const, statusUpdatedBy: null, statusUpdatedAt: null }
 const UNANNOUNCED = { announced: false, announcedUpdatedBy: null, announcedUpdatedAt: null }
 
-// A set, as the database would add it to the session `sessionId`, at `position`, always at CREATED_AT, so that responses
-// don't depend on when the test runs.
+// A set, as the database would add it to the session `sessionId`, at `position`.
 function newSet(sessionId: string, { performers: sent, ...set }: NewSet, position: number): StoredSet {
-  return { id: `set-${++nextId}`, ...NEW, ...set, createdAt: CREATED_AT, sessionId, position, ...performers(sent), application: null, ...application(set.applicationId) }
+  return { id: `set-${++nextId}`, createdAt: CREATED_AT, ...NEW, ...set, sessionId, position, ...performers(sent), application: null, ...application(set.applicationId) }
 }
 
 const store: SessionsStore = {
@@ -1252,8 +1251,6 @@ describe('sessions routes', () => {
       const response = await sessionWithSet(app)
 
       expect(response.statusCode).toBe(200)
-      // As the admin, when they add it, which its session's status gets if it's planned again.
-      expect(store.addSet).toHaveBeenLastCalledWith('session-1', expect.objectContaining({ createdBy: 'admin@example.com', createdAt: expect.any(Date) }))
       expect(response.json().session).toMatchObject({ id: 'session-1', start: '2026-11-14T21:00:00-05:00' })
       expect(response.json().session.sets).toEqual([
         {

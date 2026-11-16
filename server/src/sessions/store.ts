@@ -49,8 +49,7 @@ export type SetChanges = Pick<
 export type StatusChangedBy = { statusUpdatedBy: string; statusUpdatedAt: Date }
 export type StatusChange = StatusChangedBy & { status: Status }
 export type AnnouncedChange = Pick<SessionRow, 'announced'> & { announcedUpdatedBy: string; announcedUpdatedAt: Date }
-// Who adds a set, and when, which the database gives otherwise.
-export type NewSet = SetChanges & { createdBy: string; createdAt?: Date }
+export type NewSet = SetChanges & { createdBy: string }
 
 // Thrown when a session or a set can't be saved. When it's about one of the sets added with a session, `setIndex` is that
 // set's place among them, from 0.
@@ -156,10 +155,10 @@ export type SessionsStore = {
   delete(id: string): Promise<SessionRow | null>
   // The set as the database keeps it, without its performers.
   getSet(id: string): Promise<SetRow | null>
-  // Adds a set to the session `sessionId`, as "planned", after its other sets. Throws a NoSuchReference, a BrokenFields or
-  // a Conflict.
-  // Plans its session again if it's done, as whoever adds the set, when they do (see `followSets`).
-  addSet(sessionId: string, set: NewSet & { createdAt: Date }): Promise<StoredSession | null>
+  // Adds a set to the session `sessionId`, as "planned", after its other sets, which plans the session again if it's
+  // done, as whoever adds the set, when they do (see `followSets`). Throws a NoSuchReference, a BrokenFields or a
+  // Conflict.
+  addSet(sessionId: string, set: NewSet): Promise<StoredSession | null>
   // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
   // but not its session, its position or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
@@ -439,7 +438,7 @@ function checkAnnounced(session: Pick<SessionRow, 'announced' | 'startAt'>) {
 // at least one set that's done, and none that's planned. In a transaction that holds the sessions' lock, so that its sets
 // can't change in the meantime: two of its sets marked done at the same time can't each see the other still planned.
 // Called whenever one of its sets is added, its status is set, or it's deleted.
-async function followSets(tx: Queryable, sessionId: string, by: StatusChangedBy) {
+async function followSets(tx: Queryable, sessionId: string, by: { statusUpdatedBy: string; statusUpdatedAt: Date | SQL }) {
   const hasSet = (status: Status) => exists(tx.select().from(sets).where(and(eq(sets.sessionId, sessionId), eq(sets.status, status))))
   // In one statement, which only ever matches one of the two.
   await tx
@@ -591,8 +590,9 @@ export function sessionsStore(db: Queryable): SessionsStore {
         if (!session) return null
         if (session.status === 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, sessionId))
         await insertSet(tx, sessionId, set)
-        // Its session, if it's done, is planned again, as whoever added the set, when they did.
-        await followSets(tx, sessionId, { statusUpdatedBy: set.createdBy, statusUpdatedAt: set.createdAt })
+        // Its session, if it's done, is planned again, as whoever added the set, when they did: now() is when the
+        // transaction started, which the set's created_at is too.
+        await followSets(tx, sessionId, { statusUpdatedBy: set.createdBy, statusUpdatedAt: sql`now()` })
         return sessionWithId(tx, sessionId)
       })
     },

@@ -117,8 +117,8 @@ isn't among them, even when it's still going on then.
   deleted.
 
 Requests that would break a rule fail with 409, even when they're sent at the same time: when two requests would break a
-rule together, one of them fails. The exception is that a done session has no planned set, which the server keeps by
-changing statuses instead (see [Status](#status)). The others fail for:
+rule together, one of them fails, except for the rule that a done session has no planned set, which the server keeps by
+changing statuses instead (see [Status](#status)). Requests fail with 409 for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
 - adding a set to a cancelled session, or un-cancelling a set of a cancelled session,

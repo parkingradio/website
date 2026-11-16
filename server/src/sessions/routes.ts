@@ -661,8 +661,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       if (session.status === 'cancelled') return fail(reply, { status: 409, error: SESSION_CANCELLED, session })
       const saved = await setChanges(request.body, null)
       if ('error' in saved) return fail(reply, saved)
-      // When it's added, which its session's status gets when it's planned again.
-      const set = { ...saved, createdBy: request.user!.email, createdAt: new Date() }
+      const set = { ...saved, createdBy: request.user!.email }
       return saving(reply, NO_SUCH_SESSION, () => store.addSet(session.id, set))
     },
   )

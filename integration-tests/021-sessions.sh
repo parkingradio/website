@@ -721,8 +721,9 @@ wait_for_background
 expect_status 200
 expect_body_contains '"durationMinutes":150'
 [[ "$(set_ids)" == *" $(last_set) " ]] || { _show_body; fail "expected the set added last"; }
-echo "  which plans the session, which was done, again, until that set is deleted"
-[ "$(sql "select status from sessions where id = '${first}'")" = planned ] || fail "expected the session to be planned again"
+echo "  which makes the session, which was done, planned again, and done again once that set is deleted"
+[ "$(sql "select status || ' ' || status_updated_by from sessions where id = '${first}'")" = "planned ${ADMIN_EMAIL}" ] \
+    || fail "expected the session to be planned again, as the admin who added the set"
 [ "$(sql "select status_updated_at = (select created_at from sets where id = '$(last_set)') from sessions where id = '${first}'")" = t ] \
     || fail "expected the session to be planned again when the set was added"
 json DELETE "${SETS}/$(last_set)"

@@ -27,8 +27,8 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // database: random sequences of requests, through the routes, after each of which every rule must still hold (see
 // test-invariants.ts), the server must not have failed, a 409 must be about a rule, with what's really in the way, and
 // the statuses of sessions and sets must have changed as the request says they do, and no other way (see "Status" in
-// docs/design/server/sessions.md, and `expectStatuses`), which isn't an invariant: e.g. a session that's planned again
-// can have sets that are all done.
+// docs/design/server/sessions.md, and `expectStatuses`), which isn't an invariant: e.g. a session marked planned by
+// hand can have sets that are all done.
 //
 // Each operation is plain data, which fast-check generates and shrinks, and that `run` sends. What it acts on, e.g. the
 // session a set is added to, is an index into the ids of what exists, in the order it was added, or an id of nothing
@@ -115,7 +115,8 @@ function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequ
 
 // Checks that statuses changed from `before` to `after` as `request`, if it's sent and succeeded, says, and that nothing
 // else changed them: what's added is planned, and what's changed is changed by the admin, at the same time, since the
-// step started, `since`.
+// step started, `since`, give or take a second when a set is added, whose session's status then has the time of the
+// database's clock, as the set's addition does.
 function expectStatuses(before: Statuses, after: Statuses, request: StatusRequest | null, since: number, where: string) {
   const expected = request ? expectedStatuses(before, after, request) : null
   const at = new Set<number | null>()
@@ -131,7 +132,7 @@ function expectStatuses(before: Statuses, after: Statuses, request: StatusReques
       continue
     }
     expect(row, `${where}: ${id}, changed`).toMatchObject({ status, by: TEST_ADMIN.email })
-    expect(row.at, `${where}: when ${id} changed`).toBeGreaterThanOrEqual(since)
+    expect(row.at, `${where}: when ${id} changed`).toBeGreaterThanOrEqual(request && 'addedTo' in request ? since - 1000 : since)
     at.add(row.at)
   }
   expect(at.size, `${where}: when the statuses changed`).toBeLessThanOrEqual(1)
