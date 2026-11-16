@@ -656,7 +656,7 @@ export type SeedSession = {
   when?: { day: number; start: string }
   durationMinutes: number
   status: Status
-  // Whether it's announced, which it's only once it's added, and which it needs a date for.
+  // Whether it's announced, once it's added, which it needs a date for.
   announced?: true
   // In order. Each set is given its status once it's added. Cancelling the session cancels them all, and marking it as
   // done marks none of them.

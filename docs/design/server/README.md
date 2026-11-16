@@ -80,10 +80,8 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   `links`, rather than being merged into it, and null, or a blank string, where `PUT` takes it, removes it the same way.
   The rules that involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are
   checked on the item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field
-  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes. A status, or whether a
-  session is announced, is changed with an endpoint of its own, which keeps who changed it and when apart from
-  `updatedBy` and `updatedAt`, e.g. in `statusUpdatedBy` and `statusUpdatedAt`, and sets them even when it doesn't
-  change.
+  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes. Likewise, the endpoints that
+  change a status, or whether a session is announced, say who changed it and when even when it doesn't change.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.

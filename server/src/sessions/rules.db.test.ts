@@ -49,7 +49,6 @@ type Session = {
   type: string
   takeover: { id: string } | null
   status: string
-  announced: boolean
   sets: StudioSet[]
 }
 

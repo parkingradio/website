@@ -313,10 +313,11 @@ Responses give each one as an object, or null when there's none, with an `id` an
 
 ## Events on RA
 
-Parking Radio announces its sessions on Resident Advisor, under its promoter page (see [Events](events.md)). A session's
-event there is its `raEvent` (see [Links](#links)), which an admin creates on RA from the content the server gives for
-the session, whatever its status (see [`GET /api/admin/sessions/:id/ra-event`](#get-apiadminsessionsidra-event-admin)),
-then sets as its `raEvent`. The server never creates events on RA itself. The content is:
+Parking Radio lists its sessions as events on Resident Advisor, under its promoter page (see [Events](events.md)). A
+session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA from the content the server
+gives for the session, whatever its status, and whether it's announced or not (see
+[`GET /api/admin/sessions/:id/ra-event`](#get-apiadminsessionsidra-event-admin)), then sets as its `raEvent`. The server
+never creates events on RA itself. The content is:
 
 | Field | Type | |
 |---|---|---|

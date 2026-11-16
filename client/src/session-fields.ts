@@ -256,7 +256,8 @@ export function endTimeAfter(day: string, start: string, minutes: number): strin
 
 // Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the
 // `applications` it can come from belong to, and whether it's `announced`, which it has to have a date for, and returns
-// what the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from UTC, and the event on RA by its id.
+// what the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from
+// UTC, and the event on RA by its id.
 export function checkSession(
   form: SessionFormValues,
   times = sessionTimes(form),

@@ -169,7 +169,7 @@ export function useSort<K extends string, T>(columns: Record<K, SortColumn<T>>, 
   }
 }
 
-// What else than its status a list is filtered by, in the URL's `name` parameter: one of `values`, or null for every
+// What a list is filtered by besides its status, in the URL's `name` parameter: one of `values`, or null for every
 // entry, which the URL leaves out, as it does a value it doesn't know.
 export function useQueryFilter<V extends string>(name: string, values: readonly V[]): [V | null, (value: V | null) => void] {
   const [params, change] = useQueryParams()
