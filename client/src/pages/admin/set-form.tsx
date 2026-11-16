@@ -188,7 +188,7 @@ function PerformersField({ performers, artists, onChange, error, onLeave }: Grou
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Artistes</legend>
-      <p className="admin-hint">Dans leur ordre de présentation. Un artiste qui n'est pas encore connu s'ajoute d'abord dans la section «&nbsp;artistes&nbsp;».</p>
+      <p className="admin-hint">Dans leur ordre de présentation.</p>
       <OrderedList items={performers} keyOf={(performer) => performer.id} label={(performer) => performer.name} onChange={onChange} nextFocus={pickerId} />
       <div className="admin-field">
         <label htmlFor={pickerId}>Ajouter un artiste</label>
