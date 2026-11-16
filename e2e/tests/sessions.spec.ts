@@ -232,6 +232,89 @@ test('a takeover and its set are given the applications they come from in their 
   await deleteOwn(page, mine)
 })
 
+test("an artist's sets, and a collective's takeover, are added from the pages of the applications they come from", async ({ page }, testInfo) => {
+  const { unique, day, otherDay } = own(testInfo)
+  await logIn(page)
+  const mine = await addOwnCollective(page, unique)
+  const apply = async (owner: object) => {
+    const fields = { dates: [day], timeSlots: [{ start: '20:00', end: '23:00' }], performanceTypes: ['dj'], otherPerformanceType: 'Synthé', details: '' }
+    const created = await page.request.post('/api/admin/applications', { data: { ...fields, ...owner } })
+    expect(created.ok()).toBe(true)
+    return (await created.json()).application.id as string
+  }
+  const artists = await apply({ artistId: mine.artist.id })
+  const collectives = await apply({ collectiveId: mine.collective.id })
+  await mockEvents(page)
+  const name = `E2E ${unique}`
+  const sets = page.getByRole('table', { name: 'Sets' })
+  const sessionPicker = page.getByRole('combobox', { name: 'Session' })
+
+  // A new session, with the artist's set, whose place isn't known yet, under when they'd like to play.
+  await page.goto(`/admin/candidatures/${artists}`)
+  await page.getByRole('button', { name: 'créer un set' }).click()
+  await sessionPicker.click()
+  await page.getByRole('option', { name: 'nouvelle session' }).click()
+  await page.getByRole('button', { name: 'créer le set' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Nouvelle session' })).toBeVisible()
+  const reminder = page.getByRole('region', { name: 'Candidature' })
+  await expect(reminder.getByRole('listitem')).toHaveText([longDay(day)])
+  await expect(reminder).toContainText('20:00 à 23:00')
+  await expect(rowsOf(sets, mine.artist.name)).toContainText('horaire à déterminer')
+  await expect(rowsOf(sets, mine.artist.name)).toContainText('DJ, autre : Synthé')
+  await page.getByLabel('Date', { exact: true }).fill(day)
+  await page.getByLabel('Début').fill('20:00')
+  await page.getByLabel('Fin').fill('23:00')
+  await page.getByRole('radio', { name: 'Autre' }).check()
+  await page.getByLabel('Nom').fill(name)
+  await page.getByRole('button', { name: 'ajouter la session' }).click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+  const sessionPage = new URL(page.url()).pathname
+  await expect(rowsOf(sets, mine.artist.name)).toContainText('horaire à déterminer')
+  await expect(sets.getByRole('link', { name: /^Candidature reçue le / })).toHaveAttribute('href', `/admin/candidatures/${artists}`)
+
+  // Another one, in that session, which is on the day the artist would like to play.
+  await page.goto(`/admin/candidatures/${artists}`)
+  await page.getByRole('button', { name: 'créer un set' }).click()
+  await sessionPicker.fill(unique)
+  const option = page.getByRole('option', { name: new RegExp(`^${name},`) })
+  await expect(option).toContainText('20 h – 23 h · date souhaitée')
+  await option.click()
+  await page.getByRole('button', { name: 'créer le set' }).click()
+  await expect(page).toHaveURL(`${sessionPage}?application=${artists}`)
+  const newSet = page.getByRole('region', { name: 'Nouveau set' })
+  await expect(newSet.getByRole('heading', { name: 'Nouveau set' })).toBeFocused()
+  await expect(newSet.getByRole('heading', { name: 'Nouveau set' })).toBeInViewport()
+  await expect(newSet.getByRole('combobox', { name: 'Candidature' })).toHaveValue(new RegExp(`^${mine.artist.name}, reçue le `))
+  await expect(newSet.getByLabel('Début')).toHaveValue('20:00')
+  await expect(newSet.getByLabel('Fin')).toHaveValue('21:00')
+  await newSet.getByRole('button', { name: 'ajouter le set' }).click()
+  await expect(page).toHaveURL(sessionPage)
+  await expect(sets.getByRole('row')).toHaveCount(3)
+  // Which the page doesn't open again.
+  await page.reload()
+  await expect(sets.getByRole('row')).toHaveCount(3)
+  await expect(page.getByRole('heading', { name: 'Nouveau set' })).toHaveCount(0)
+  await page.goto(`/admin/candidatures/${artists}`)
+  await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
+
+  // The collective's takeover, from its application.
+  await page.goto(`/admin/candidatures/${collectives}`)
+  await page.getByRole('link', { name: 'créer une session' }).click()
+  await expect(page.getByRole('combobox', { name: 'Collectif' })).toHaveValue(mine.collective.name)
+  await expect(page.getByRole('combobox', { name: 'Candidature' })).toHaveValue(/^Reçue le /)
+  await page.getByLabel('Date', { exact: true }).fill(otherDay)
+  await page.getByLabel('Début').fill('20:00')
+  await page.getByLabel('Fin').fill('23:00')
+  await page.getByLabel('Nom').fill(`${name} TAKEOVER`)
+  await page.getByRole('button', { name: 'ajouter la session' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: `${name} TAKEOVER` })).toBeVisible()
+  await expect(value(page, 'Candidature').getByRole('link')).toHaveAttribute('href', `/admin/candidatures/${collectives}`)
+  const takeoverPage = new URL(page.url()).pathname
+
+  for (const path of [sessionPage, takeoverPage]) expect((await page.request.delete(`/api${path}`)).ok()).toBe(true)
+  await deleteOwn(page, mine)
+})
+
 // What a test's own entities are named after, two days for its sessions, from 2100 to 2899, in July, when clocks don't
 // change, and a YouTube video id of 11 characters. They're derived from its unique name, so that other tests' sessions,
 // even those left from a run that failed, are very unlikely to have them.

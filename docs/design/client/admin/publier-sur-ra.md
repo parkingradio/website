@@ -72,9 +72,9 @@ The link back to the session is `<site>/admin/sessions/<session>?raEvent=<id>`. 
 since anyone could write one: on the session's page, while the session has no event on RA, `raEvent` opens the panel
 that creates it, with that event's link in its field, under a notice that says it was just created on RA, and only
 « enregistrer » saves it (see [Creating its event on RA](sessions.md#creating-its-event-on-ra)). A `raEvent` that isn't
-an event on RA, as a session's `raEvent` takes it, is ignored. « enregistrer » and « annuler » remove it from the page's
-address. Once the event is created, the bookmarklet also removes the event from RA's page's address, so that clicking it
-again there doesn't offer to create it again.
+an event on RA, as a session's `raEvent` takes it, is ignored. It's removed from the page's address as
+[A session's page](sessions.md#a-sessions-page) says. Once the event is created, the bookmarklet also removes the event
+from RA's page's address, so that clicking it again there doesn't offer to create it again.
 
 ## Later
 

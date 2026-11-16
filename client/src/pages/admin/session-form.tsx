@@ -56,12 +56,13 @@ export type SessionFormProps = {
   applications: Application[] | null
   // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
-  // For a new session: the sets listed to be added with it, which can be changed in the form, and are sent with it.
-  sets?: { listed: ListedSet[]; onChange: (sets: ListedSet[]) => void }
+  // For a new session: the sets listed to be added with it at first, which can be changed in the form, and are sent
+  // with it.
+  sets?: ListedSet[]
   submitLabel: string
   // Sends the form, as `PUT /api/admin/sessions/:id` takes it, which `POST /api/admin/sessions` takes too, without
-  // `removeFlyer`, but with the listed sets, and returns the error, if it failed.
-  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'> & { session: { sets?: SetFields[] } }) => Promise<ReactNode | null>
+  // `removeFlyer`, but with the listed sets, which are given as they're listed too, and returns the error, if it failed.
+  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'> & { session: { sets?: SetFields[] } }, sets: ListedSet[]) => Promise<ReactNode | null>
   onCancel?: () => void
 }
 
@@ -72,13 +73,14 @@ export function SessionForm({
   collectives,
   applications,
   events,
-  sets,
+  sets: initialSets,
   submitLabel,
   onSubmit,
   onCancel,
 }: SessionFormProps) {
   const formId = useId()
   const [form, setForm] = useState(initial)
+  const [sets, setSets] = useState(initialSets)
   const update = (changes: Partial<SessionFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const [flyer, setFlyer] = useState<File | null>(null)
   // Whether to remove the session's flyer, which only happens once the form is sent.
@@ -92,8 +94,8 @@ export function SessionForm({
   const [openSet, setOpenSet] = useState<OpenListedSet | null>(null)
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => {
     // There are fields, since there are no errors by then.
-    const session = sets ? { ...checked.fields!, sets: sets.listed.map(listedSetFields) } : checked.fields!
-    return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined })
+    const session = sets ? { ...checked.fields!, sets: sets.map(listedSetFields) } : checked.fields!
+    return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }, sets ?? [])
   })
   // The session's times, which listed sets are placed in, or none while they aren't valid.
   const listedIn: SetSession =
@@ -107,7 +109,7 @@ export function SessionForm({
         <TimesField
           form={form}
           times={times}
-          hasSets={hasSets || (sets?.listed.length ?? 0) > 0}
+          hasSets={hasSets || (sets?.length ?? 0) > 0}
           onChange={update}
           errors={{ day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
           onLeave={leave('day', 'start', 'end', 'duration')}
@@ -164,7 +166,7 @@ export function SessionForm({
       </form>
       {sets && (
         <>
-          <ListedSets sets={sets.listed} session={listedIn} open={openSet} busy={busy} onChange={sets.onChange} onOpen={setOpenSet} />
+          <ListedSets sets={sets} session={listedIn} open={openSet} busy={busy} onChange={setSets} onOpen={setOpenSet} />
           {/* After the sets, whose forms can't be within the session's. */}
           <div className="admin-form admin-form-wide">
             <FormActions

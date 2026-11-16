@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { Application } from './application-fields'
 import {
   EMPTY_SESSION_FORM,
+  applicationToApply,
   checkSession,
   checkSet,
   durationOf,
@@ -488,5 +490,27 @@ describe("a new session's listed sets", () => {
       youtubeVideo: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       application: { id: 'application-1' },
     })
+  })
+})
+
+describe('the application a form starts from', () => {
+  const owned = (id: string, owner: { artistId: string } | { collectiveId: string }) =>
+    ({ id, artistId: null, collectiveId: null, ...owner }) as unknown as Application
+  const APPLICATIONS = [owned('application-1', { artistId: 'artist-1' }), owned('application-2', { collectiveId: 'collective-1' })]
+  const ARTISTS = [{ id: 'artist-1', name: 'Aurore' }]
+
+  it("is an artist's, with the artist, or a collective's", () => {
+    expect(applicationToApply('application-1', APPLICATIONS, ARTISTS)).toEqual({ application: APPLICATIONS[0], artist: { id: 'artist-1', name: 'Aurore' } })
+    expect(applicationToApply('application-2', APPLICATIONS, null)).toEqual({ application: APPLICATIONS[1], artist: null })
+  })
+
+  it("is none when there's no such application, or artist", () => {
+    expect(applicationToApply('unknown', APPLICATIONS, ARTISTS)).toBeNull()
+    expect(applicationToApply('application-1', APPLICATIONS, [])).toBeNull()
+  })
+
+  it("can't be told without the applications, or the artists for an artist's", () => {
+    expect(applicationToApply('application-1', null, ARTISTS)).toBeUndefined()
+    expect(applicationToApply('application-1', APPLICATIONS, null)).toBeUndefined()
   })
 })

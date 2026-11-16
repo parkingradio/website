@@ -6,8 +6,21 @@ import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import { raEventId } from '../../session-links'
-import { EMPTY_SESSION_FORM, STATUSES, newSetFormValues, sessionFormValues, setFormValues, shownSet } from '../../session-fields'
+import {
+  EMPTY_SESSION_FORM,
+  STATUSES,
+  applicationLink,
+  applicationToApply,
+  listedSetFromApplication,
+  newSetFormValues,
+  sessionFormValues,
+  setFormValues,
+  setValuesFromApplication,
+  shownSet,
+} from '../../session-fields'
 import type { ListedSet, Session, SessionPlace, SessionStatus, StudioSet } from '../../session-fields'
+import type { Artist } from '../../artist-profile'
+import { ApplicationWishes } from './application-wishes'
 import { Button } from './button'
 import {
   MISSING,
@@ -18,6 +31,7 @@ import {
   applicationPath,
   byWhom,
   capitalized,
+  compareStarts,
   describePerformanceTypes,
   entryPath,
   flyerUrl,
@@ -26,7 +40,7 @@ import {
   receivedOn,
   sessionDay,
   sessionHours,
-  sessionLongDay,
+  sessionSearchFields,
   sessionWhen,
   setHours,
   setInSentence,
@@ -36,13 +50,15 @@ import {
 import { compareText, search, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
-import { ApplicationsFailure, CollectivesFailure } from './profile-details'
+import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
 import { RaEventPanel } from './ra-event'
-import { failure, sessionPath } from './session-errors'
+import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
+import { CreateSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
 import { Performers, SetLinks } from './set-cells'
 import { SetFormWithChoices } from './set-form'
+import type { InitialSet } from './set-form'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
 // are its sets, and adding one.
@@ -61,12 +77,6 @@ const DEFAULT_STATUS: SessionStatus = 'planned'
 // The columns the list of sessions can be sorted by, where statuses are in the order sessions go through them.
 type SessionColumn = 'date' | 'name' | 'status'
 
-// Sessions without a date are later than any other, then by when they were added.
-function compareStarts(a: Session, b: Session): number {
-  const start = (session: Session) => (session.start === null ? Infinity : Date.parse(session.start))
-  return start(a) - start(b) || Date.parse(a.createdAt) - Date.parse(b.createdAt)
-}
-
 // The soonest come first in the default view, and the latest otherwise.
 function sessionColumns(status: SessionStatus | null): Record<SessionColumn, SortColumn<Session>> {
   return {
@@ -74,14 +84,6 @@ function sessionColumns(status: SessionStatus | null): Record<SessionColumn, Sor
     name: { compare: (a, b) => compareText(a.title, b.title) },
     status: { compare: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) },
   }
-}
-
-function SessionsFailure({ message }: { message: string }) {
-  return (
-    <p className="admin-error" role="alert">
-      Les sessions n'ont pas pu être chargées&nbsp;: {message}
-    </p>
-  )
 }
 
 // The performers of a session's sets, set by set.
@@ -239,11 +241,14 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
 
 // The sets that come from an artist's application, on its page, with their sessions, linking to them, where they're only
 // shown, like the artist's sets on their page (see `OwnSets`).
-export function ApplicationSets({ sets }: { sets: Application['sets'] }) {
+// "créer un set" adds another one.
+export function ApplicationSets({ application }: { application: Application }) {
   const headingId = useId()
+  const { sets } = application
   return (
     <>
       <h2 id={headingId}>Sets</h2>
+      <CreateSet application={application} />
       {sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un set de l'artiste.</p>
       ) : (
@@ -276,11 +281,18 @@ export function ApplicationSets({ sets }: { sets: Application['sets'] }) {
 
 // The sessions that come from a collective's application, on its page, linking to them, where they're only shown, like
 // the collective's sessions on its page (see `OwnSessions`).
-export function ApplicationSessions({ sessions }: { sessions: Application['sessions'] }) {
+// "créer une session" adds another one, as the collective's takeover.
+export function ApplicationSessions({ application }: { application: Application }) {
   const headingId = useId()
+  const { sessions } = application
   return (
     <>
       <h2 id={headingId}>Sessions</h2>
+      <div className="admin-toolbar">
+        <Link to={newSessionPath({ application: application.id })} className="admin-button">
+          créer une session
+        </Link>
+      </div>
       {sessions.length === 0 ? (
         <p className="admin-placeholder">
           Aucune session ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un takeover du collectif.
@@ -320,7 +332,7 @@ export function SessionsPage() {
     <>
       <h1>Sessions</h1>
       <div className="admin-toolbar">
-        <Link to="/admin/sessions/nouvelle" className="admin-button">
+        <Link to={newSessionPath()} className="admin-button">
           nouvelle session
         </Link>
         <SearchField query={query} onChange={setQuery} />
@@ -328,18 +340,6 @@ export function SessionsPage() {
       <SessionsList query={query} />
     </>
   )
-}
-
-// What a session is searched by: its title, its type, its takeover's collective, its sets' performers, and its day,
-// written out, e.g. "samedi 14 novembre 2026", so that "novembre" or "samedi" finds it, or "date à déterminer".
-function sessionSearchFields(session: Session): string[] {
-  return [
-    session.title,
-    SESSION_TYPE_LABELS[session.type],
-    session.takeover?.name ?? '',
-    ...session.sets.flatMap((set) => set.performers.map((performer) => performer.name)),
-    sessionLongDay(session),
-  ].filter(Boolean)
 }
 
 // The sessions with the status in the `status` query parameter, the default view without one, or every session, or those
@@ -408,18 +408,27 @@ function SessionById({ id }: { id: string }) {
 }
 
 // The one form open on a session's page, if any: the session's, its event on RA's, or a set's, by its id, or a new one's
-// (null).
-type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null } | null
+// (null), which can be filled in from an application, by its id (see "From an application" in
+// docs/design/client/admin/sessions.md).
+type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null; application?: string } | null
+
+// What the address of a session's page opens, until a form opens or closes.
+const OPENING_PARAMS = ['raEvent', 'application']
 
 function LoadedSession({ loaded }: { loaded: Session }) {
   // The session as the last change left it, which replaces the one loaded.
   const [session, setSession] = useState(loaded)
   // The event on RA that the bookmarklet just created for the session, from the address it led back to (see
   // docs/design/client/admin/publier-sur-ra.md), while it has none. It opens the panel of its event on RA with it, until
-  // a form opens or closes: only saving it saves it.
+  // a form opens or closes: only saving it saves it. Or else the application a new set is filled in from, unless the
+  // session is cancelled.
   const [searchParams, setSearchParams] = useSearchParams()
   const created = session.raEvent ? null : raEventId(searchParams.get('raEvent') ?? '')
-  const [open, setOpen] = useState<OpenForm>(created ? { kind: 'raEvent' } : null)
+  const [open, setOpen] = useState<OpenForm>(() => {
+    const application = searchParams.get('application')
+    if (created) return { kind: 'raEvent' }
+    return application && session.status !== 'cancelled' ? { kind: 'set', id: null, application } : null
+  })
   const [busy, setBusy] = useState(false)
   // Why the session's status couldn't be changed, or why it couldn't be deleted.
   const [error, setError] = useState<ReactNode>(null)
@@ -439,15 +448,21 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }, [session, setsHeadingId])
   const navigate = useNavigate()
   const params = { path: { id: session.id } }
-  const openForm = (form: OpenForm) => {
+  // Opens `form`, or closes the one that's open, after which the address doesn't open anything anymore.
+  const showForm = (form: OpenForm) => {
     setOpen(form)
-    setError(null)
-    setSetsError(null)
-    if (!searchParams.has('raEvent')) return
+    if (!OPENING_PARAMS.some((name) => searchParams.has(name))) return
     const params = new URLSearchParams(searchParams)
-    params.delete('raEvent')
+    for (const name of OPENING_PARAMS) params.delete(name)
     setSearchParams(params, { replace: true })
   }
+  // Opening a form, or closing one once it's saved, also clears what the page said went wrong.
+  const openForm = (form: OpenForm) => {
+    showForm(form)
+    setError(null)
+    setSetsError(null)
+  }
+  const close = () => showForm(null)
   // A change that the server answered with the session as it is now, which closes the form.
   const changed = (session: Session) => {
     setSession(session)
@@ -467,7 +482,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     if (!result.ok) return setError(failure("Le statut n'a pas pu être changé", result, session.id))
     setSession(result.session)
     // Sets can't be added to a cancelled session.
-    if (status === 'cancelled' && open?.kind === 'set' && open.id === null) setOpen(null)
+    if (status === 'cancelled' && open?.kind === 'set' && open.id === null) close()
   }
 
   const changeSetStatus = async (set: StudioSet, status: SessionStatus) => {
@@ -531,7 +546,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           hasSets={session.sets.length > 0}
           flyer={session.hasFlyer ? flyerUrl(session) : null}
           submitLabel="enregistrer"
-          onCancel={() => setOpen(null)}
+          onCancel={close}
           onSubmit={async (body) => {
             const result = await api.PUT('/api/admin/sessions/{id}', { params, body, bodySerializer: formData })
             if (!result.ok) return failure("La session n'a pas pu être enregistrée", result, session.id)
@@ -614,11 +629,12 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       )}
       {open?.kind === 'set' && (
         <OpenSet
-          // Afresh for each set.
-          key={open.id ?? 'new'}
+          // Afresh for each set, and for a new one filled in from an application or not.
+          key={open.id ?? (open.application ? 'application' : 'new')}
           session={session}
           set={session.sets.find((set) => set.id === open.id) ?? null}
-          onClose={() => setOpen(null)}
+          application={open.application}
+          onClose={close}
           onChanged={changed}
         />
       )}
@@ -746,14 +762,27 @@ function SetsTable({
   )
 }
 
-// The form of a set of `session`, or of a new one when `set` is null, under its sets. A set's form also says who added
-// it and changed it.
-function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: StudioSet | null; onClose: () => void; onChanged: (session: Session) => void }) {
+// The form of a set of `session`, or of a new one when `set` is null, under its sets, which can be filled in from the
+// application whose id is `application`. A set's form also says who added it and changed it.
+function OpenSet({
+  session,
+  set,
+  application,
+  onClose,
+  onChanged,
+}: {
+  session: Session
+  set: StudioSet | null
+  application?: string
+  onClose: () => void
+  onChanged: (session: Session) => void
+}) {
   return (
     <SetFormWithChoices
       title={set ? setTitle(set) : 'Nouveau set'}
       session={session}
-      initial={set ? setFormValues(set, session) : newSetFormValues(session)}
+      initial={set ? setFormValues(set, session) : application ? setFromApplication(application, session) : newSetFormValues(session)}
+      reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}
       onCancel={onClose}
       onSubmit={async (fields) => {
@@ -776,34 +805,78 @@ function OpenSet({ session, set, onClose, onChanged }: { session: Session; set: 
   )
 }
 
+// What a new set of `session` starts with, filled in from the application whose id is `id`, once it's found, with its
+// artist, or as a new set when they couldn't be loaded, or nothing when there's no such application, or it's a
+// collective's (see "From an application" in docs/design/client/admin/sessions.md).
+function setFromApplication(id: string, session: Session): InitialSet {
+  return ({ artists, applications }) => {
+    const found = applicationToApply(id, applications, artists)
+    if (found === undefined) return newSetFormValues(session)
+    return found?.artist ? { ...newSetFormValues(session), ...setValuesFromApplication(found.application, found.artist) } : null
+  }
+}
+
 // Events from the year 2000 on, the earliest the server takes, which are every one of Parking Radio's events (see "Time
 // ranges" in docs/design/server/events.md).
 const EVERY_EVENT_FROM = '2000-01-01T00:00-05:00'
 
-// The session form, with every collective to pick a takeover's from, loaded each time it opens, so that they're
-// current, and nothing until then, and every event read from RA, which it doesn't wait for. When the collectives can't
-// be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's one of them.
+// A new session's form starts from the application whose id is `id`, if it's found among the applications, and, for an
+// artist's, its artist among `artists` (see "From an application" in docs/design/client/admin/sessions.md).
+type FromApplication = { id: string; artists: Loaded<{ artists: Artist[] }> }
+
+type SessionFormWithChoicesProps = Omit<SessionFormProps, 'collectives' | 'applications' | 'events'> & {
+  takeoverId?: string | null
+  fromApplication?: FromApplication
+}
+
+// The session form, with every collective to pick a takeover's from, and every application, loaded each time it opens,
+// so that they're current, and nothing until then, and every event read from RA, which it doesn't wait for. When the
+// collectives can't be loaded, it says so. A new session can start as a collective's takeover (`takeoverId`), if it's one
+// of them, or from an application, under when its artist would like to play.
 function SessionFormWithChoices({
   takeoverId,
+  fromApplication,
   initial,
+  sets,
   ...props
-}: Omit<SessionFormProps, 'collectives' | 'applications' | 'events'> & { takeoverId?: string | null }) {
+}: SessionFormWithChoicesProps) {
   const collectives = useApi('/api/admin/collectives')
   const applications = useApi('/api/admin/applications')
   // Asked for along with them, but not waited for.
   const events = useApi('/api/events', { params: { query: { from: EVERY_EVENT_FROM } } })
   if (collectives.kind === 'loading' || applications.kind === 'loading') return null
+  const applicationList = applications.kind === 'loaded' ? applications.value.applications : null
+  const artists = fromApplication?.artists
+  const found = fromApplication && applicationToApply(fromApplication.id, applicationList, artists?.kind === 'loaded' ? artists.value.artists : null)
+  // The artists are only waited for when the application is an artist's.
+  if (found === undefined && artists?.kind === 'loading') return null
+
   const collectiveList = collectives.kind === 'loaded' ? collectives.value.collectives : null
-  const takeover = collectiveList?.find((collective) => collective.id === takeoverId)
+  // A collective's application makes the session its takeover.
+  const fromCollective = found?.artist === null ? found.application : null
+  const takeover = collectiveList?.find((collective) => collective.id === (fromCollective?.collectiveId ?? takeoverId))
   return (
     <>
+      {found && <ApplicationReminder application={found.application} />}
+      {/* The applications' failure is said below. */}
+      {found === undefined && artists?.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
       <SessionForm
         {...props}
-        initial={takeover ? { ...initial, type: 'takeover', takeover: { id: takeover.id, name: takeover.name } } : initial}
+        initial={
+          takeover
+            ? {
+                ...initial,
+                type: 'takeover',
+                takeover: { id: takeover.id, name: takeover.name },
+                application: fromCollective ? applicationLink(fromCollective) : initial.application,
+              }
+            : initial
+        }
+        sets={found?.artist ? [listedSetFromApplication(found.application, found.artist)] : sets}
         collectives={collectiveList}
-        applications={applications.kind === 'loaded' ? applications.value.applications : null}
+        applications={applicationList}
         events={events}
       />
     </>
@@ -824,28 +897,55 @@ function newSessionFailure(
   return failure(`${capitalized(setInSentence(shown(setIndex)))} n'a pas pu être ajouté`, result, undefined, other)
 }
 
-// Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known, with
-// the sets listed in its form.
+// Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known, or from
+// the application in the `application` query parameter, with the sets listed in its form.
 export function NewSessionPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [sets, setSets] = useState<ListedSet[]>([])
+  const applicationId = searchParams.get('application')
+  const props: SessionFormWithChoicesProps = {
+    takeoverId: searchParams.get('takeover'),
+    initial: EMPTY_SESSION_FORM,
+    sets: [],
+    submitLabel: 'ajouter la session',
+    onSubmit: async (body, sets) => {
+      const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
+      if (!result.ok) return newSessionFailure(result, body.session, sets)
+      navigate(sessionPath(result.session))
+      return null
+    },
+  }
   return (
     <>
       <BackToSessions />
       <h1>Nouvelle session</h1>
-      <SessionFormWithChoices
-        takeoverId={searchParams.get('takeover')}
-        initial={EMPTY_SESSION_FORM}
-        sets={{ listed: sets, onChange: setSets }}
-        submitLabel="ajouter la session"
-        onSubmit={async (body) => {
-          const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
-          if (!result.ok) return newSessionFailure(result, body.session, sets)
-          navigate(sessionPath(result.session))
-          return null
-        }}
-      />
+      {applicationId ? <NewSessionFromApplication key={applicationId} id={applicationId} {...props} /> : <SessionFormWithChoices {...props} />}
     </>
+  )
+}
+
+// A new session from the application whose id is `id`, with the artists loaded along with what the form loads, to name
+// an artist's.
+function NewSessionFromApplication({ id, ...props }: SessionFormWithChoicesProps & { id: string }) {
+  const artists = useApi('/api/admin/artists')
+  return <SessionFormWithChoices {...props} fromApplication={{ id, artists }} />
+}
+
+// When the artist of the application a new session comes from would like to play, which doesn't fill in its times, and
+// a link to the application, which opens in a new tab, so that the form isn't left.
+function ApplicationReminder({ application }: { application: Application }) {
+  const headingId = useId()
+  return (
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId}>Candidature</h2>
+      <p className="admin-meta">
+        <Link to={applicationPath(application)} target="_blank" rel="noreferrer">
+          {capitalized(receivedOn(application))}
+        </Link>
+      </p>
+      <dl className="admin-record">
+        <ApplicationWishes application={application} />
+      </dl>
+    </section>
   )
 }

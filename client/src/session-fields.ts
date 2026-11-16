@@ -483,6 +483,51 @@ export function listedSetFields({ performers, application, ...fields }: ListedSe
   return { ...fields, performers: performers.map(({ id }) => ({ id })), application: application?.id ?? null }
 }
 
+// From an application (see "From an application" in docs/design/client/admin/sessions.md).
+
+// An application, as a set or a session that comes from it gives it.
+export const applicationLink = ({ id, receivedAt }: Pick<ApplicationLink, 'id' | 'receivedAt'>): ApplicationLink => ({ id, receivedAt })
+
+// The application whose id is `id`, among `applications`, and its artist, among `artists`, for an artist's, or null for a
+// collective's. Null when there's no such application, or undefined when it can't be told, since the applications, or
+// the artists for an artist's, couldn't be loaded (null).
+export function applicationToApply(
+  id: string,
+  applications: Schema<'Application'>[] | null,
+  artists: Reference[] | null,
+): { application: Schema<'Application'>; artist: Reference | null } | null | undefined {
+  if (applications === null) return undefined
+  const application = applications.find((application) => application.id === id)
+  if (!application) return null
+  if (application.artistId === null) return { application, artist: null }
+  if (artists === null) return undefined
+  // It's there, unless it was deleted, with the application, since the applications were loaded.
+  const artist = artists.find((artist) => artist.id === application.artistId)
+  return artist ? { application, artist: { id: artist.id, name: artist.name } } : null
+}
+
+// What a set filled in from an artist's application has: its artist, as its only performer, its performance types and
+// "autre", and the application itself.
+export function setValuesFromApplication(
+  application: Pick<Schema<'Application'>, 'id' | 'receivedAt' | 'performanceTypes' | 'otherPerformanceType'>,
+  artist: Reference,
+): Pick<SetFormValues, 'performers' | 'performanceTypes' | 'otherPerformanceType' | 'application'> {
+  const { performanceTypes, otherPerformanceType } = application
+  return { performers: [artist], performanceTypes, otherPerformanceType, application: applicationLink(application) }
+}
+
+// A set listed in a new session's form, filled in from an artist's application, whose place isn't known yet.
+export function listedSetFromApplication(application: Parameters<typeof setValuesFromApplication>[0], artist: Reference): ListedSet {
+  return {
+    ...setValuesFromApplication(application, artist),
+    offsetMinutes: null,
+    durationMinutes: null,
+    genres: [],
+    soundcloudTrack: null,
+    youtubeVideo: null,
+  }
+}
+
 // A listed set as a set of `session` is shown and changed, with its times once the session has a start, and planned.
 // Its links are as they were typed, which its form checked, but a video's is shown as YouTube's, since it can be its id.
 export function shownSet(set: ListedSet, session: SessionPlace): SetValues & Pick<StudioSet, 'start' | 'end' | 'status'> {

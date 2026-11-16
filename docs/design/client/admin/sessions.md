@@ -117,6 +117,10 @@ Only one form is open at a time on a session's page, the session's, the panel of
 [Creating its event on RA](#creating-its-event-on-ra)), or a set's: opening one closes the other, losing what wasn't
 saved.
 
+What the page's address opens, `?raEvent` (see [Creating its event on RA](#creating-its-event-on-ra)) or `?application`
+(see [From an application](#from-an-application)), is removed from it, in place, as soon as a form opens or closes, so
+that reloading the page, or coming back to it, doesn't open it again.
+
 ## Creating its event on RA
 
 While a session has no event on Resident Advisor, "créer", after its "Événement RA", opens a panel under it, to create
@@ -284,6 +288,23 @@ loaded, the form says so above it, and only "Aucune candidature" and the set's o
 by when it was received, can be picked. The form then can't tell whose an application is, so the server's check is the
 one that counts (see [Errors](#errors)).
 
+## From an application
+
+An application's page leads to a session's page, or to "nouvelle session", with the application, `?application=<id>`
+(see [Candidatures](candidatures.md)), whose forms then start from it:
+
+- On a session's page, unless the session is cancelled, a new set's form opens, filled in from the application: its
+  artist as the only performer, its performance types and "autre", and the application itself. The page scrolls to the
+  form, whose heading gets the focus.
+- On "nouvelle session", an artist's application lists a set, filled in the same way, whose place isn't known yet
+  (« horaire à déterminer », without a duration). A collective's application makes the session its collective's
+  takeover, in place of `?takeover`, with the application picked. Above the form, the application's days and time slots
+  are shown as its page shows them, with a link to it, for reference only: they don't fill in the session's times.
+
+An application that doesn't exist, or a collective's on a session's page, is ignored, like a `?takeover` that isn't a
+known collective. The application and its artist are looked for among those loaded for the form (see
+[Endpoints](#endpoints)): when they can't be loaded, the form says so, and starts as it would without the application.
+
 ## Errors
 
 The forms say what's wrong with each field once it's left, like the artist form (see [Artistes](artistes.md)): they
@@ -310,6 +331,8 @@ and another of its sets in the way is named without a link.
   `DELETE /api/admin/sets/:id`, for its sets.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
   set's form, to pick the performers and suggest their genres, each time the form opens.
-- `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens.
+- `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens, and
+  on "nouvelle session", along with `GET /api/admin/artists`, to find the application of `?application`, and its
+  artist.
 - `GET /api/events`, in the session form, to pick the event on RA, each time it opens, from the year 2000 on, to get
   every one (see [Time ranges](../../server/events.md#time-ranges)).

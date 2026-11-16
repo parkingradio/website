@@ -334,6 +334,24 @@ export function sessionWhen(session: SessionTimes): string {
   return session.start === null ? UNDATED : `${sessionLongDay(session)}, ${sessionWithin(session)}`
 }
 
+// Sessions without a date are later than any other, then by when they were added.
+export function compareStarts(a: Pick<Session, 'start' | 'createdAt'>, b: Pick<Session, 'start' | 'createdAt'>): number {
+  const start = (session: Pick<Session, 'start'>) => (session.start === null ? Infinity : Date.parse(session.start))
+  return start(a) - start(b) || Date.parse(a.createdAt) - Date.parse(b.createdAt)
+}
+
+// What a session is searched by: its title, its type, its takeover's collective, its sets' performers, and its day,
+// written out, e.g. "samedi 14 novembre 2026", so that "novembre" or "samedi" finds it, or "date à déterminer".
+export function sessionSearchFields(session: Session): string[] {
+  return [
+    session.title,
+    SESSION_TYPE_LABELS[session.type],
+    session.takeover?.name ?? '',
+    ...session.sets.flatMap((set) => set.performers.map((performer) => performer.name)),
+    sessionLongDay(session),
+  ].filter(Boolean)
+}
+
 // A session as it's named along with others: its title, which the server gives, then its day, e.g. "HAUTE RIVE TAKEOVER,
 // sam. 14 nov. 2026", or "GUEST MIXES, date à déterminer". Where it's named alone, e.g. as its page's title, it's its
 // title only.

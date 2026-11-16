@@ -2174,3 +2174,177 @@ describe("A new session's sets", () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^La session n'a pas pu être ajoutée : Another session overlaps this one \(SOIRÉE/))
   })
 })
+
+describe('From an application', () => {
+  // Aurore's, with something else she'd do.
+  const AURORES = { ...APPLICATIONS_LIST[3], performanceTypes: ['dj', 'vinyl'], otherPerformanceType: 'Synthé', timeSlots: [{ start: '18:00', end: '22:00' }] } satisfies Application
+  const LIST = APPLICATIONS_LIST.map((application) => (application.id === AURORES.id ? AURORES : application))
+  const WITH_AURORES = { ...ARTISTS, '/api/admin/applications': { ok: true, total: LIST.length, applications: LIST } }
+  const path = () => screen.getByTestId('path')
+  const newSet = () => within(screen.getByRole('region', { name: 'Nouveau set' }))
+
+  describe("on a session's page", () => {
+    const SET_PAGE = { ...PAGE, ...WITH_AURORES }
+
+    it('opens a new set filled in from it, where a new set starts, focused, and removes it from the address once saved', async () => {
+      const added = { ...SESSION, sets: [...SESSION.sets, studioSet('set-9', { performers: [{ id: 'artist-1', name: 'Aurore' }], offsetMinutes: 150, durationMinutes: 60 })] }
+      mockFetch({ ...SET_PAGE, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: added } })
+      renderAt('/admin/sessions/session-1?application=application-3')
+
+      expect(await screen.findByRole('heading', { name: 'Nouveau set' })).toHaveFocus()
+      expect(newSet().getByRole('button', { name: 'retirer Aurore' })).toBeInTheDocument()
+      expect(newSet().getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aurore, reçue le 15 août 2026')
+      expect(newSet().getByLabelText('DJ')).toBeChecked()
+      expect(newSet().getByLabelText('Vinyl')).toBeChecked()
+      expect(newSet().getByLabelText('Début')).toHaveValue('23:30')
+      expect(newSet().getByLabelText('Fin')).toHaveValue('00:30')
+      fireEvent.click(newSet().getByRole('button', { name: 'ajouter le set' }))
+
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-1/sets')).toHaveLength(1))
+      expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toEqual({
+        performers: [{ id: 'artist-1' }],
+        offsetMinutes: 150,
+        durationMinutes: 60,
+        performanceTypes: ['dj', 'vinyl'],
+        otherPerformanceType: 'Synthé',
+        genres: [],
+        soundcloudTrack: null,
+        youtubeVideo: null,
+        application: 'application-3',
+      })
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
+      expect(path()).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
+    })
+
+    it('removes it from the address once the form is cancelled, or another one opens, which starts empty', async () => {
+      mockFetch(SET_PAGE)
+      const first = renderAt('/admin/sessions/session-1?application=application-3&raEvent=x')
+      await screen.findByRole('heading', { name: 'Nouveau set' })
+      fireEvent.click(newSet().getByRole('button', { name: 'annuler' }))
+      expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
+      expect(path()).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
+      first.unmount()
+
+      renderAt('/admin/sessions/session-1?application=application-3')
+      await screen.findByRole('heading', { name: 'Nouveau set' })
+      fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+      expect(path()).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
+      await waitFor(() => expect(newSet().getByRole('combobox', { name: 'Candidature' })).toHaveValue(''))
+      expect(newSet().queryByRole('button', { name: 'retirer Aurore' })).not.toBeInTheDocument()
+    })
+
+    it("opens nothing for an application that doesn't exist, or a collective's, or in a cancelled session", async () => {
+      mockFetch(SET_PAGE)
+      for (const application of ['unknown', 'application-1']) {
+        const page = renderAt(`/admin/sessions/session-1?application=${application}`)
+        await waitFor(() => expect(requestsTo('GET', '/api/admin/applications').length).toBeGreaterThan(0))
+        await screen.findByRole('heading', { name: 'Sets' })
+        expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
+        page.unmount()
+        vi.mocked(fetch).mockClear()
+      }
+
+      mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, status: 'cancelled' } } })
+      renderAt('/admin/sessions/session-1?application=application-3')
+      await screen.findByRole('heading', { name: 'Sets' })
+      expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
+      expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(0)
+    })
+
+    it('opens a new set without it when the applications could not be loaded, which it says', async () => {
+      mockFetch({ ...SET_PAGE, '/api/admin/applications': { ok: false, error: 'Boom' } })
+      renderAt('/admin/sessions/session-1?application=application-3')
+
+      expect(await screen.findByRole('heading', { name: 'Nouveau set' })).toHaveFocus()
+      expect(screen.getByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom")
+      expect(newSet().queryByRole('button', { name: 'retirer Aurore' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('on "nouvelle session"', () => {
+    const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, ...WITH_AURORES }
+    const reminder = () => within(screen.getByRole('region', { name: 'Candidature' }))
+
+    it("lists a set filled in from an artist's application, whose place isn't known, under when the artist would like to play", async () => {
+      mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+      renderAt('/admin/sessions/nouvelle?application=application-3')
+
+      expect(await screen.findByRole('link', { name: 'Reçue le 15 août 2026' })).toHaveAttribute('href', '/admin/candidatures/application-3')
+      expect(reminder().getByRole('link')).toHaveAttribute('target', '_blank')
+      expect(reminder().getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'samedi 14 novembre 2026',
+        'samedi 21 novembre 2026',
+        'samedi 28 novembre 2026',
+        'samedi 5 décembre 2026',
+      ])
+      expect(reminder().getByText('18:00 à 22:00')).toBeInTheDocument()
+      // Which doesn't fill in the session's times.
+      expect(screen.getByLabelText('Date')).toHaveValue('')
+      expect(screen.getByLabelText('Début')).toHaveValue('')
+      expect(rows(screen.getByRole('table', { name: 'Sets' })).map((row) => row.slice(0, 3))).toEqual([['horaire à déterminer', 'Aurore', 'DJ, Vinyl, autre : Synthé']])
+      expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
+
+      await fillIn()
+      fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+      expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({
+        type: 'guest-mixes',
+        application: null,
+        sets: [
+          {
+            performers: [{ id: 'artist-1' }],
+            offsetMinutes: null,
+            durationMinutes: null,
+            performanceTypes: ['dj', 'vinyl'],
+            otherPerformanceType: 'Synthé',
+            genres: [],
+            soundcloudTrack: null,
+            youtubeVideo: null,
+            application: 'application-3',
+          },
+        ],
+      })
+    })
+
+    it("starts as the takeover of a collective's application, in place of the takeover of the address, linked to it", async () => {
+      const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
+      mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] }, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+      renderAt('/admin/sessions/nouvelle?takeover=collective-2&application=application-1')
+
+      expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
+      expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
+      expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 1 septembre 2026')
+      expect(reminder().getAllByRole('listitem').map((item) => item.textContent)).toEqual(['samedi 14 novembre 2026', 'samedi 21 novembre 2026'])
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+
+      await fillIn({ type: null })
+      fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+      expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-1', application: 'application-1', sets: [] })
+    })
+
+    it("ignores an application that doesn't exist, keeping the takeover of the address", async () => {
+      mockFetch(NEW)
+      renderAt('/admin/sessions/nouvelle?takeover=collective-1&application=unknown')
+
+      expect(await screen.findByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
+      expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Aucune candidature')
+      expect(screen.queryByRole('region', { name: 'Candidature' })).not.toBeInTheDocument()
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+    })
+
+    it('starts without it when the applications, or the artists, could not be loaded, which it says', async () => {
+      mockFetch({ ...NEW, '/api/admin/applications': { ok: false, error: 'Boom' } })
+      const first = renderAt('/admin/sessions/nouvelle?application=application-3')
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les candidatures n'ont pas pu être chargées : Boom"))
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+      first.unmount()
+
+      mockFetch({ ...NEW, '/api/admin/artists': { ok: false, error: 'Boom' } })
+      renderAt('/admin/sessions/nouvelle?application=application-3')
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom"))
+      expect(screen.getByText('Aucun set.')).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Candidature' })).not.toBeInTheDocument()
+    })
+  })
+})
