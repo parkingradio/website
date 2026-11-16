@@ -78,7 +78,10 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
   sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
-  [Status](../../server/sessions.md#status)). Under it, likewise, whether the session is announced, as "non annoncée"
+  [Status](../../server/sessions.md#status)). Marking it "jouée" while it has "planifié" sets first asks to confirm too,
+  saying that they'll be marked "joué", « Les sets planifiés seront aussi marqués comme joués : », or « Le set planifié
+  sera aussi marqué comme joué : » for one, then naming each one on a line of its own, e.g. « • Set de Aurore », then
+  asking « Marquer la session comme jouée ? ». Under it, likewise, whether the session is announced, as "non annoncée"
   and "annoncée". Each says why it couldn't be changed under its own buttons. While the session has no date,
   "annoncée" can't be used, and says « La session n'a pas de date. » (see
   [Controls that can't be used](layout.md#controls-that-cant-be-used)).
@@ -111,6 +114,10 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
     can't be used.
   - "modifier", which opens its form (see [A set's form](#a-sets-form)).
   - "×", which deletes it for good, after confirming. Its artists stay.
+
+  Changing a set's status, or deleting a set, can make the session "jouée" (see
+  [Status](../../server/sessions.md#status)), which its status then shows, since the page shows the session as the
+  server responds with it.
 
   When a status can't be changed, or a set can't be moved or deleted, the section says why above the sets, naming the
   set.

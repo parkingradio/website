@@ -196,15 +196,15 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer, and its sets |
 | [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Replacing a session's fields, and replacing or removing its flyer |
 | [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent, or removing its flyer |
-| [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled |
+| [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled, which can mark its sets too |
 | [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
 | [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session |
 | [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Replacing a set's fields |
 | [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
-| [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled |
+| [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled, which can make its session done |
 | [`PUT /api/admin/sets/:id/position`](sessions.md#put-apiadminsetsidposition-admin) | admin | Moving a set to another place among its session's sets |
-| [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set |
+| [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

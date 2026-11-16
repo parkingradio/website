@@ -658,8 +658,10 @@ export type SeedSession = {
   status: Status
   // Whether it's announced, once it's added, which it needs a date for.
   announced?: true
-  // In order. Each set is given its status once it's added. Cancelling the session cancels them all, and marking it as
-  // done marks none of them.
+  // In order. Each set is given its status once it's added, then the session its own. Cancelling the session cancels them
+  // all, and marking it as done marks those that are planned done. A planned session becomes done once none of its sets
+  // is planned and one is done (see "Status" in docs/design/server/sessions.md), as soon as that's true while they're
+  // added: e.g. a planned session whose sets are done then planned would be done once its first set is.
   sets: SeedSet[]
 }
 

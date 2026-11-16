@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, gt, gte, inArray, lt, ne, notExists, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -45,7 +45,9 @@ export type SetChanges = Pick<
   | 'youtubeVideoId'
   | 'applicationId'
 > & { performers: SentPerformer[] }
-export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpdatedAt: Date }
+// Who changes a status, and when, and to what.
+export type StatusChangedBy = { statusUpdatedBy: string; statusUpdatedAt: Date }
+export type StatusChange = StatusChangedBy & { status: Status }
 export type AnnouncedChange = Pick<SessionRow, 'announced'> & { announcedUpdatedBy: string; announcedUpdatedAt: Date }
 export type NewSet = SetChanges & { createdBy: string }
 
@@ -143,7 +145,8 @@ export type SessionsStore = {
     id: string,
     changes: Partial<SessionChanges> & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
   ): Promise<{ before: SessionRow; after: StoredSession } | null>
-  // Cancelling a session cancels its sets that aren't, as the same admin, at the same time. Throws a Conflict.
+  // Cancelling a session cancels its sets that aren't, and marking it done marks its planned sets done, as the same
+  // admin, at the same time. Throws a Conflict.
   setStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Announces the session, or un-announces it. Throws a BrokenFields when it's announced without a start.
   setAnnounced(id: string, change: AnnouncedChange): Promise<StoredSession | null>
@@ -158,13 +161,16 @@ export type SessionsStore = {
   // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
   // but not its session, its position or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
-  // Throws a Conflict.
+  // Marks the set's session done, as the same admin, at the same time, when its sets are then played (see
+  // `markDoneIfPlayed`). Throws a Conflict.
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Moves the set to `position` among its session's sets, or last when that's past the last, the others keeping their
   // order. Doesn't count as changing it.
   moveSet(id: string, position: number): Promise<StoredSession | null>
-  // Returns false if the set didn't exist. Its performers stay, and the session's other sets keep their order.
-  deleteSet(id: string): Promise<boolean>
+  // Returns the set's session as it is then, or null if the set didn't exist. Its performers stay, and the session's
+  // other sets keep their order. Marks the session done, as `by` says, when its sets are then played (see
+  // `markDoneIfPlayed`).
+  deleteSet(id: string, by: StatusChangedBy): Promise<StoredSession | null>
   // The sessions that come from one of the applications `applicationIds`, or that have a set that does, in the order of
   // `list`, with all their sets.
   ofApplications(applicationIds: string[]): Promise<StoredSession[]>
@@ -259,9 +265,10 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 //   cancelled sets), whether the session, the set, the takeover's collective, the performers and the application exist,
 //   and so whether the foreign keys hold, rather than failing unexpectedly once they're checked, without locking their
 //   rows, which would keep their profiles from being changed in the meantime, whether a collective that's deleted has
-//   takeovers, who an application belongs to, which its rules are about (see "Applications" in
-//   docs/design/server/sessions.md), and a session's sets' positions and how many there are, which adding, moving and
-//   deleting a set work from, so that the positions stay 0 to n - 1 (see "sets" in db/schema.ts).
+//   takeovers, whether a session's sets are all played (see `markDoneIfPlayed`), who an application belongs to, which its
+//   rules are about (see "Applications" in docs/design/server/sessions.md), and a session's sets' positions and how many
+//   there are, which adding, moving and deleting a set work from, so that the positions stay 0 to n - 1 (see "sets" in
+//   db/schema.ts).
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock. Nor can saving a set or a session, which takes a lock on its application's row to check its foreign key
 //   once its own row is written, and deleting that application, which writes the set's or the session's row once it has
@@ -427,6 +434,18 @@ function checkAnnounced(session: Pick<SessionRow, 'announced' | 'startAt'>) {
   if (session.announced && session.startAt === null) throw new BrokenFields(ANNOUNCED_HAS_START)
 }
 
+// Marks the session `sessionId` done, as `by` says, if it's planned, with at least one set that's done, and none that's
+// planned (see "Status" in docs/design/server/sessions.md), in a transaction that holds the sessions' lock, so that its
+// sets can't change in the meantime: two of its sets marked done at the same time can't each see the other still
+// planned. Called whenever one of its sets' status is changed, or one of them is deleted.
+async function markDoneIfPlayed(tx: Queryable, sessionId: string, by: StatusChangedBy) {
+  const setOf = (status: Status) => tx.select().from(sets).where(and(eq(sets.sessionId, sessionId), eq(sets.status, status)))
+  await tx
+    .update(sessions)
+    .set({ ...by, status: 'done' })
+    .where(and(eq(sessions.id, sessionId), eq(sessions.status, 'planned'), exists(setOf('done')), notExists(setOf('planned'))))
+}
+
 // The session `id`, or null when there's no such session.
 async function sessionRow(tx: Queryable, id: string): Promise<SessionRow | null> {
   const [session] = await tx.select().from(sessions).where(eq(sessions.id, id))
@@ -518,11 +537,13 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const before = await sessionRow(tx, id)
         if (!before) return null
         await checkingSessionRules(tx, id, before, (savepoint) => savepoint.update(sessions).set(change).where(eq(sessions.id, id)))
-        if (change.status === 'cancelled') {
+        // Cancelling it cancels its sets that aren't, and marking it done marks those that are planned.
+        if (change.status !== 'planned') {
+          const marked = change.status === 'cancelled' ? ne(sets.status, 'cancelled') : eq(sets.status, 'planned')
           await tx
             .update(sets)
             .set(change)
-            .where(and(eq(sets.sessionId, id), ne(sets.status, 'cancelled')))
+            .where(and(eq(sets.sessionId, id), marked))
         }
         return sessionWithId(tx, id)
       })
@@ -598,6 +619,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
           throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, session.id))
         }
         await tx.update(sets).set(change).where(eq(sets.id, id))
+        await markDoneIfPlayed(tx, session.id, change)
         return sessionWithId(tx, session.id)
       })
     },
@@ -625,18 +647,19 @@ export function sessionsStore(db: Queryable): SessionsStore {
       })
     },
 
-    async deleteSet(id) {
-      if (!isUuid(id)) return false
+    async deleteSet(id, by) {
+      if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         const [deleted] = await tx.delete(sets).where(eq(sets.id, id)).returning({ sessionId: sets.sessionId, position: sets.position })
-        if (!deleted) return false
+        if (!deleted) return null
         // The sets after it move up, so that the positions are still 0 to n - 1.
         await tx
           .update(sets)
           .set({ position: sql`${sets.position} - 1` })
           .where(and(eq(sets.sessionId, deleted.sessionId), gt(sets.position, deleted.position)))
-        return true
+        await markDoneIfPlayed(tx, deleted.sessionId, by)
+        return sessionWithId(tx, deleted.sessionId)
       })
     },
 

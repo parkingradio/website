@@ -43,7 +43,7 @@ A session, as the endpoints below return it, also has:
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when, which for a status that changed along with another one, or with a set's deletion, is that change's (see [Status](#status)) |
 | `announced` | boolean | Whether the session is announced: see [Announced](#announced) |
 | `announcedUpdatedBy`, `announcedUpdatedAt` | string or null | Who last announced or un-announced it (an admin's email), and when |
 
@@ -75,7 +75,7 @@ A set, as the endpoints below return it, also has:
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. its start changing, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when, which for a status that changed along with its session's is that change's (see [Status](#status)) |
 
 ## Times
 
@@ -155,14 +155,27 @@ deleting it, stops it counting.
 ## Status
 
 A new session or set is `"planned"`, then `"done"` once it's been played, or `"cancelled"`, e.g. a set whose artist
-didn't show up. Only admins change statuses: nothing changes them on its own. Any status can be changed to any other,
-except as below.
+didn't show up. Any status can be changed to any other, except as below. Statuses only change when an admin changes one,
+or deletes a set, never as time passes, e.g. once a session's end has passed. Changing one, or deleting a set, can
+change others, as below, as the same admin, at the same time, and the endpoints that do so respond with the session as
+it then is, with its sets:
 
-A session's status and its sets' are independent, e.g. a session that's done can have a cancelled set, with one
-exception: a cancelled session only has cancelled sets. Cancelling a session cancels every one of its sets that isn't
-already cancelled, done ones included, as the same admin, at the same time. Un-cancelling a session leaves its sets
-cancelled: each one is un-cancelled on its own, once the session isn't cancelled anymore. The sets of a cancelled session
-can still be changed, but not un-cancelled while it is.
+- **Cancelling a session cancels its sets**: every one that isn't already cancelled, done ones included. Un-cancelling
+  a session leaves its sets cancelled: each one is un-cancelled on its own, once the session isn't cancelled anymore.
+  A cancelled session only has cancelled sets (see [Rules](#rules)): its sets can still be changed, but not un-cancelled
+  while it is.
+- **Marking a session done marks its planned sets done**. Its cancelled sets stay cancelled. Marking it planned again
+  leaves its sets as they are.
+- **A planned session becomes done once its sets are played**: whenever one of its sets' status is changed (see
+  [Changes, in Conventions](README.md#conventions)), or one of its sets is deleted, a session that's then planned, with
+  at least one set that's done and none that's planned, becomes done. Cancelled sets count as finished, e.g. two sets
+  done and one cancelled make the session done, whichever comes last, but a session whose sets are all cancelled stays
+  planned. It never goes the other way: a set that's planned again leaves its session done, to be corrected by hand. A
+  session that's planned again while none of its sets is planned stays so until one of its sets' status is changed, or
+  one of them is deleted. This holds even for requests sent at the same time, e.g. two sets marked done together.
+
+Otherwise, a session's status and its sets' are independent, e.g. a session that's done can have a cancelled set, and
+one that's planned can have sets that are done.
 
 ## Announced
 
@@ -427,7 +440,7 @@ it's checked against the other sessions, as the session would then be. Responds 
 |---|---|---|
 | `status` | `"planned"`, `"done"` or `"cancelled"` | |
 
-Changes a session's status, and its sets' when it's cancelled (see [Status](#status)), and responds like
+Changes a session's status, and its sets' when it's cancelled or marked done (see [Status](#status)), and responds like
 `POST /api/admin/sessions`, with its sets as they are then. Fails with 400 if `status` isn't one of these values, 404 when
 there's no such session, or 409 when the session would then overlap another one, with that session in `session`.
 
@@ -490,7 +503,8 @@ there's no field.
 |---|---|---|
 | `status` | `"planned"`, `"done"` or `"cancelled"` | |
 
-Changes a set's status, and responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `status` isn't one of
+Changes a set's status, and its session's when that makes it done (see [Status](#status)), and responds like
+`POST /api/admin/sessions/:id/sets`, with the session as it is then. Fails with 400 if `status` isn't one of
 these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
 with that session in `session`.
 
@@ -507,5 +521,6 @@ and 404 when there's no such set.
 
 ## `DELETE /api/admin/sets/:id` (admin)
 
-Deletes a set, and responds `{"ok": true}`. The session's other sets keep their order. Its performers stay, and so does
-its application. Fails with 404 when there's no such set.
+Deletes a set, which can make its session done (see [Status](#status)), and responds like
+`POST /api/admin/sessions/:id/sets`, with the session as it is then, without the set. The session's other sets keep their
+order. Its performers stay, and so does its application. Fails with 404 when there's no such set.

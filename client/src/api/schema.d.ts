@@ -2122,7 +2122,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled */
+        /** Marks a session as planned, done or cancelled: cancelling it cancels its sets, and marking it done marks its planned sets done */
         put: operations["update_session_status"];
         post?: never;
         delete?: never;
@@ -2268,7 +2268,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Deletes a set, but not its performers */
+        /** Deletes a set, but not its performers, and returns its session, which becomes done once none of its sets is planned and one is done (see Status) */
         delete: operations["delete_set"];
         options?: never;
         head?: never;
@@ -2284,7 +2284,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Marks a set as planned, done or cancelled, and returns its session */
+        /** Marks a set as planned, done or cancelled, and returns its session, which becomes done once none of its sets is planned and one is done (see Status) */
         put: operations["update_set_status"];
         post?: never;
         delete?: never;
@@ -5754,7 +5754,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Ok"];
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        session: components["schemas"]["Session"];
+                    };
                 };
             };
             /** @description Default Response */

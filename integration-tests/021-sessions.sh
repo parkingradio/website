@@ -697,12 +697,19 @@ wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
 expect_conflict 'This session is cancelled' "$first"
-json PUT "${SESSIONS}/${first}/status" '{"status":"done"}'
+
+echo "  marking a session done marks its planned sets done, as the same admin, at the same time, but not its cancelled ones"
+json PUT "${SESSIONS}/${first}/status" '{"status":"planned"}'
 expect_status 200
 for set in "$opening" "$second"; do
-    json PUT "${SETS}/${set}/status" '{"status":"done"}'
+    json PUT "${SETS}/${set}/status" '{"status":"planned"}'
     expect_status 200
 done
+json PUT "${SESSIONS}/${first}/status" '{"status":"done"}'
+expect_status 200
+[ "$(sql "select string_agg(sets.status || ' ' || (sets.status_updated_by = '${ADMIN_EMAIL}' and sets.status_updated_at = sessions.status_updated_at)::text, ', ' order by sets.position)
+    from sets join sessions on sessions.id = sets.session_id where sessions.id = '${first}'")" = "done true, done true, cancelled false, cancelled false" ] \
+    || fail "expected the planned sets to be marked done with the session, and the cancelled ones to stay cancelled"
 
 echo "  a set added while another transaction shortens its session waits for it, and comes after its other sets"
 # Only because of the sessions' lock too.
@@ -940,9 +947,12 @@ expect_status 400
 expect_body_contains '"error":"Unknown field: `offsetMinutes`"'
 json PUT "${SESSIONS}/${next}/status" '{"status":"planned"}'
 expect_status 200
+echo "  and a planned session becomes done once none of its sets is planned, and one is done"
 json PUT "${SETS}/${later}/status" '{"status":"done"}'
 expect_status 200
 expect_body_contains "{\"id\":\"${later}\",\"performers\":[]"
+[ "$(sql "select status || ' ' || status_updated_by from sessions where id = '${next}'")" = "done ${ADMIN_EMAIL}" ] \
+    || fail "expected the session to be done, as the admin who marked its last set done"
 
 echo "  a session or a set that doesn't exist can't be viewed, changed or deleted"
 for id in "$NOBODY" not-a-uuid; do
