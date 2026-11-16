@@ -114,7 +114,10 @@ test('a seeded session says when its sets add up to more than it', async ({ page
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('soirée à revoir')
   await rowsOf(page, 'SOIRÉE À REVOIR').getByRole('link').first().click()
   await expect(page.getByRole('heading', { level: 1, name: 'SOIRÉE À REVOIR' })).toBeVisible()
-  await expect(page.getByText(/^Les sets durent /)).toHaveText('Les sets durent 2 h 15, plus que la session (2 h).')
+  // As a warning.
+  const warning = page.getByText(/Les sets durent /)
+  await expect(warning).toHaveText('\u26a0\ufe0e Les sets durent 2 h 15, plus que la session (2 h).')
+  await expect(warning).toHaveClass(/admin-warning/)
 })
 
 test("a control that can't be used says why in a tooltip, right under it, while hovered, focused or tapped", async ({ page, isMobile }) => {

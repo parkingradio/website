@@ -472,7 +472,7 @@ const RA_EVENTS = {
 const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
-const tooLong = () => screen.queryByText(/^Les sets durent /)?.textContent ?? null
+const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
 // What the session's record, or the content of its event on RA, says for `label`.
 // Its own terms only, since the content of the event on RA is within the session's record.
 const recordValue = (record: string, label: string) =>
@@ -983,7 +983,8 @@ describe("A session's page", () => {
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
-    expect(tooLong()).toBe('Les sets durent 2 h 15, plus que la session (2 h).')
+    expect(tooLong()).toBe('\u26a0\ufe0e Les sets durent 2 h 15, plus que la session (2 h).')
+    expect(screen.getByRole('status')).toHaveClass('admin-warning')
     expect(rows(setsTable()).map((row) => row[0])).toEqual(['1 h', '45 min', '30 min', 'à déterminer'])
 
     // Without Dune's set, which the server doesn't answer with the session.
@@ -1323,7 +1324,6 @@ describe("A set's form", () => {
     await openNew()
     // Its sets last 3 h 30, the cancelled one included, which keeps its place: half an hour is left.
     expect(durationValues()).toEqual(['0', '30'])
-    expect(screen.getByText(/^La session dure 4 h\./)).toBeInTheDocument()
 
     pick('Cyan')
     pick('Aurore')
@@ -1390,7 +1390,6 @@ describe("A set's form", () => {
     await openNew()
     // An hour of the 3 hours is left.
     expect(durationValues()).toEqual(['1', '0'])
-    expect(screen.getByText(/^La session dure 3 h\./)).toBeInTheDocument()
     pick('Brume')
     fireEvent.change(duration().getByLabelText('heures'), { target: { value: '24' } })
     fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '1' } })
@@ -1931,7 +1930,6 @@ describe("A new session's sets", () => {
     fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
     await screen.findByRole('heading', { name: 'Nouveau set' })
     expect(durationIn(setForm('Nouveau set'))).toEqual(['1', '0'])
-    expect(setForm('Nouveau set').getByText(/^La session dure 4 h\./)).toBeInTheDocument()
     fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
     await addSet('Cyan')
     await addSet('Aurore', (form) => {
@@ -1983,7 +1981,7 @@ describe("A new session's sets", () => {
     await addSet('Aurore', lasting('3', '30'))
     expect(tooLong()).toBeNull()
     await addSet('Brume', lasting('1', '0'))
-    expect(tooLong()).toBe('Les sets durent 4 h 30, plus que la session (4 h).')
+    expect(tooLong()).toBe('\u26a0\ufe0e Les sets durent 4 h 30, plus que la session (4 h).')
     // Longer, until 2:00.
     fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '02:00' } })
     expect(tooLong()).toBeNull()
@@ -1994,23 +1992,21 @@ describe("A new session's sets", () => {
     expect(tooLong()).toBeNull()
   })
 
-  it("lists sets before the session's times are known, for an hour by default, keeping its duration as it was when their form opened", async () => {
+  it("lists sets before the session's times are known, for an hour by default, then for what's left of the session", async () => {
     mockFetch(NEW)
     renderAt('/admin/sessions/nouvelle')
 
     fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
     await screen.findByRole('heading', { name: 'Nouveau set' })
-    expect(setForm('Nouveau set').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
     expect(durationIn(setForm('Nouveau set'))).toEqual(['1', '0'])
-    // Still so once the session's times are, while the form is open.
+    // The form keeps what it opened with once the session's times are known.
     await fillIn()
-    expect(setForm('Nouveau set').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
+    expect(durationIn(setForm('Nouveau set'))).toEqual(['1', '0'])
     fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
 
     await addSet('Aurore', lasting('3', '30'))
     fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
     await screen.findByRole('heading', { name: 'Nouveau set' })
-    expect(setForm('Nouveau set').getByText(/^La session dure 4 h\./)).toBeInTheDocument()
     expect(durationIn(setForm('Nouveau set'))).toEqual(['0', '30'])
     fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
 
@@ -2018,8 +2014,9 @@ describe("A new session's sets", () => {
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore' }))
     await screen.findByRole('heading', { name: 'Set de Aurore' })
-    expect(setForm('Set de Aurore').getByText(/^La durée de la session n'est pas encore indiquée\./)).toBeInTheDocument()
     expect(durationIn(setForm('Set de Aurore'))).toEqual(['3', '30'])
+    // Without a hint under its duration.
+    expect(setForm('Set de Aurore').queryByText(/La session dure|La durée de la session|Laissez vide/)).not.toBeInTheDocument()
   })
 
   it("can't be sent with a set's form open, which it says", async () => {

@@ -199,6 +199,13 @@
   border-left: 2px solid #000;
 }
 
+/* A warning, about something that doesn't prevent anything, after a ⚠ (see "Warnings" in
+   docs/design/client/admin/layout.md): in brown, between the black of notices and the red of errors. */
+.admin-notice.admin-warning {
+  border-left-color: #9a4a00;
+  color: #9a4a00;
+}
+
 .admin-error,
 .radio-track-left-out {
   color: #b3261e;

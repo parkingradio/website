@@ -828,7 +828,6 @@ function OpenSet({
   return (
     <SetFormWithChoices
       title={set ? setTitle(set) : 'Nouveau set'}
-      session={session}
       initial={set ? setFormValues(set) : application ? setFromApplication(application, session) : newSetFormValues(session)}
       reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}

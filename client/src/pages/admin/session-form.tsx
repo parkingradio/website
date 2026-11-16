@@ -32,7 +32,6 @@ import { ListedSets } from './listed-sets'
 import type { OpenListedSet } from './listed-sets'
 import { compareText, search } from './list'
 import { PhotoField } from './profile-fields'
-import type { SetSession } from './set-form'
 import type { GroupProps } from './profile-fields'
 
 // A form for a session and its flyer, to add a session, with the sets listed to be added with it, or change one, but not
@@ -96,8 +95,6 @@ export function SessionForm({
     const session = sets ? { ...checked.fields!, sets: sets.map(listedSetFields) } : checked.fields!
     return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }, sets ?? [])
   })
-  // How long the session lasts, for its listed sets, or null while its times aren't valid.
-  const listedIn: SetSession = { durationMinutes: 'errors' in times ? null : times.durationMinutes }
 
   return (
     <>
@@ -165,7 +162,7 @@ export function SessionForm({
       </form>
       {sets && (
         <>
-          <ListedSets sets={sets} session={listedIn} open={openSet} busy={busy} onChange={setSets} onOpen={setOpenSet} />
+          <ListedSets sets={sets} durationMinutes={'errors' in times ? null : times.durationMinutes} open={openSet} busy={busy} onChange={setSets} onOpen={setOpenSet} />
           {/* After the sets, whose forms can't be within the session's. */}
           <div className="admin-form admin-form-wide">
             <FormActions

@@ -5,15 +5,13 @@ import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, se
 import { arrowAfterMove } from './list'
 import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
-import type { SetSession } from './set-form'
 
 // The sets listed in a new session's form, to be added with it, all at once (see "A new session's sets" in
 // docs/design/client/admin/sessions.md): each one is changed in its form, or taken out of the list, without sending
 // anything.
 
-// The set whose form is open: a listed one, by its place in the list, or a new one, with the session's duration as it
-// was when it opened, which it works from.
-export type OpenListedSet = { index: number | null; session: SetSession }
+// The set whose form is open: a listed one, by its place in the list, or a new one.
+export type OpenListedSet = { index: number | null }
 
 // A key for each listed set, which stays the same while it's listed, whatever its place in the list, e.g. once a set
 // before it is taken out of the list. A set that's changed is another one, with another key.
@@ -26,15 +24,15 @@ function keyOf(set: ListedSet): number {
 
 export function ListedSets({
   sets,
-  session,
+  durationMinutes,
   open,
   busy,
   onChange,
   onOpen,
 }: {
   sets: ListedSet[]
-  // The session's duration, as its form has it.
-  session: SetSession
+  // How long the session lasts, as its form has it, or null while its times aren't valid.
+  durationMinutes: number | null
   open: OpenListedSet | null
   // Whether the session is being sent, with its sets, which then can't be changed.
   busy: boolean
@@ -79,11 +77,11 @@ export function ListedSets({
         Sets
       </h2>
       <div className="admin-toolbar">
-        <button type="button" disabled={busy} onClick={() => onOpen({ index: null, session })}>
+        <button type="button" disabled={busy} onClick={() => onOpen({ index: null })}>
           ajouter un set
         </button>
       </div>
-      <SetsTooLong sets={sets} durationMinutes={session.durationMinutes} />
+      <SetsTooLong sets={sets} durationMinutes={durationMinutes} />
       {rows.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (
@@ -118,7 +116,7 @@ export function ListedSets({
                     data={{ 'data-set': key }}
                     onMove={(by) => move(index, by)}
                   />{' '}
-                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index, session })}>
+                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index })}>
                     modifier
                   </button>{' '}
                   <button
@@ -142,8 +140,7 @@ export function ListedSets({
           // Afresh for each set, but not when another one is taken out of the list.
           key={open.index === null ? 'new' : keyOf(sets[open.index])}
           title={open.index === null ? 'Nouveau set' : setTitle(sets[open.index])}
-          session={open.session}
-          initial={open.index === null ? newSetFormValues({ ...open.session, sets }) : setFormValues(shownSet(sets[open.index]))}
+          initial={open.index === null ? newSetFormValues({ durationMinutes, sets }) : setFormValues(shownSet(sets[open.index]))}
           submitLabel={open.index === null ? 'ajouter le set' : 'enregistrer'}
           onCancel={() => onOpen(null)}
           onSubmit={async (fields, form) => {

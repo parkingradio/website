@@ -8,7 +8,7 @@ import { checkSet, isPerformersApplication } from '../../session-fields'
 import type { Reference, SetFields, SetFormValues } from '../../session-fields'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
-import { artistOption, formatDuration, genreNames, membersGenres } from './describe'
+import { artistOption, genreNames, membersGenres } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
 import { ApplicationsFailure, ArtistsFailure } from './profile-details'
@@ -22,13 +22,7 @@ import type { GroupProps } from './profile-fields'
 // How many of its performers' genres a set's form suggests.
 const SUGGESTED_GENRES = 3
 
-// The session a set is in, as far as its form goes: how long it lasts, which is null for a new session while its times
-// aren't valid.
-export type SetSession = { durationMinutes: number | null }
-
 type SetFormProps = {
-  // The session the set is in, whose duration the form says.
-  session: SetSession
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
   // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
@@ -42,7 +36,7 @@ type SetFormProps = {
   onCancel: () => void
 }
 
-export function SetForm({ session, initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const checked = checkSet(form, applications)
@@ -97,12 +91,6 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
 
       <div onBlur={leaving(leave('duration'))}>
         <DurationField label="Durée" value={form.duration} onChange={(duration) => update({ duration })} error={shown('duration')} />
-        <p className="admin-hint">
-          {session.durationMinutes === null
-            ? "La durée de la session n'est pas encore indiquée."
-            : `La session dure ${formatDuration(session.durationMinutes)}.`}{' '}
-          Laissez vide tant que la durée du set n'est pas connue.
-        </p>
       </div>
 
       <PerformanceTypesField

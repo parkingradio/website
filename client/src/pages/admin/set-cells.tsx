@@ -51,14 +51,16 @@ export function SetLinks({ set, newTab = false }: { set: Pick<SetValues, 'applic
   ))
 }
 
-// What the sets of a session that lasts `durationMinutes` say when they add up to more than it, e.g. « Les sets durent
-// 4 h 58, plus que la session (1 h). », or nothing, which is also the case while the session's duration isn't known.
+// What the sets of a session that lasts `durationMinutes` say when they add up to more than it, as a warning, e.g. « ⚠
+// Les sets durent 4 h 58, plus que la session (1 h). », or nothing, which is also the case while the session's duration
+// isn't known.
 export function SetsTooLong({ sets, durationMinutes }: { sets: Pick<StudioSet, 'durationMinutes'>[]; durationMinutes: number | null }) {
   const minutes = setsMinutes(sets)
   if (durationMinutes === null || minutes <= durationMinutes) return null
   return (
-    <p className="admin-notice" role="status">
-      Les sets durent {formatDuration(minutes)}, plus que la session ({formatDuration(durationMinutes)}).
+    <p className="admin-notice admin-warning" role="status">
+      {/* With U+FE0E, so that phones don't draw it as a colored emoji. */}
+      {'\u26a0\ufe0e'} Les sets durent {formatDuration(minutes)}, plus que la session ({formatDuration(durationMinutes)}).
     </p>
   )
 }
