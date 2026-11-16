@@ -14,11 +14,10 @@ import {
   sessionFormValues,
   sessionTimes,
   setFormValues,
-  fitsInSession,
   newSetDuration,
   shownSet,
   typeName,
-  whyNotFitting,
+  setsMinutes,
 } from './session-fields'
 import type { Session, SessionFormValues, SetFormValues, StudioSet } from './session-fields'
 
@@ -43,7 +42,6 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
     id: 'set-1',
     performers: [{ id: 'artist-1', name: 'Aurore' }],
     durationMinutes: null,
-    fitsInSession: true,
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -281,26 +279,11 @@ describe("a new set's duration", () => {
   })
 })
 
-describe('whether a set fits in its session', () => {
-  const sets = (...durations: (number | null)[]) => durations.map((durationMinutes, i) => studioSet({ id: `set-${i}`, durationMinutes }))
-
-  it('is whether its duration and those before it add up to no more than the session, an unknown one counting as none', () => {
-    const listed = sets(null, 60, null, 60, 30, null)
-    expect(listed.map((_, i) => fitsInSession(listed, i, 120))).toEqual([true, true, true, true, false, false])
-    // Exactly filled: the last one fits, and the one without a duration after it starts when the session ends.
-    expect(listed.map((_, i) => fitsInSession(listed, i, 150))).toEqual([true, true, true, true, true, false])
-    expect(listed.map((_, i) => fitsInSession(listed, i, 151))).toEqual([true, true, true, true, true, true])
-  })
-
-  it('says why it does not: the sets before it fill the session, or it ends after it', () => {
-    const fitted = (durationMinutes: number, ...durations: (number | null)[]) => {
-      const found = session(null, durationMinutes, sets(...durations))
-      found.sets = found.sets.map((set, i) => ({ ...set, fitsInSession: fitsInSession(found.sets, i, durationMinutes) }))
-      return found.sets.map((_, i) => whyNotFitting(found, i))
-    }
-    expect(fitted(120, 60, 60, null, 30)).toEqual([null, null, 'Commence après la session.', 'Commence après la session.'])
-    expect(fitted(120, 60, 90, 30)).toEqual([null, 'Finit après la session.', 'Commence après la session.'])
-    expect(fitted(120, null, 121)).toEqual([null, 'Finit après la session.'])
+describe("how long a session's sets last together", () => {
+  it('is the sum of their durations, cancelled ones included, an unknown one counting for nothing', () => {
+    expect(setsMinutes([])).toBe(0)
+    const sets = [null, 60, 45].map((durationMinutes, i) => studioSet({ id: `set-${i}`, durationMinutes }))
+    expect(setsMinutes([...sets, studioSet({ durationMinutes: 30, status: 'cancelled' })])).toBe(135)
   })
 })
 

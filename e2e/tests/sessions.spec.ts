@@ -109,60 +109,54 @@ test("a seeded session's page shows the content of its event on RA, its performe
   await expect(page.getByRole('button', { name: 'copier le line-up' })).toBeVisible()
 })
 
-test('a seeded session marks its sets that end after it, saying why in a tooltip', async ({ page, isMobile }) => {
+test('a seeded session says when its sets add up to more than it', async ({ page }) => {
   await logIn(page, { at: '/admin/sessions' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('soirée à revoir')
   await rowsOf(page, 'SOIRÉE À REVOIR').getByRole('link').first().click()
-  // By their performers' links.
-  const sets = page.getByRole('table', { name: 'Sets' })
-  const mark = (artist: string) =>
-    sets
-      .getByRole('row')
-      .filter({ has: page.getByRole('link', { name: artist, exact: true }) })
-      .getByRole('button', { name: 'avertissement' })
-  await expect(mark('Fréquence Boréale')).toHaveCount(0)
-  await expect(mark('Ondine')).toHaveCount(0)
-  await expect(mark('Jah Pierre')).toHaveAccessibleDescription('Finit après la session.')
+  await expect(page.getByRole('heading', { level: 1, name: 'SOIRÉE À REVOIR' })).toBeVisible()
+  await expect(page.getByText(/^Les sets durent /)).toHaveText('Les sets durent 2 h 15, plus que la session (2 h).')
+})
+
+test("a control that can't be used says why in a tooltip, right under it, while hovered, focused or tapped", async ({ page, isMobile }) => {
+  // Les Nuits Basses' takeover, which is cancelled, so sets can't be added to it.
+  await logIn(page, { at: '/admin/sessions?status=cancelled' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('les nuits basses')
+  await rowsOf(page, 'LES NUITS BASSES TAKEOVER').getByRole('link').first().click()
+  const add = page.getByRole('button', { name: 'ajouter un set' })
+  const why = 'La session est annulée\u00a0: on ne peut pas lui ajouter de set.'
+  await expect(add).toHaveAccessibleDescription(why)
   const tooltip = page.getByRole('tooltip').filter({ visible: true })
   await expect(tooltip).toHaveCount(0)
-  // The mark doesn't make its row taller.
-  const heights = await mark('Jah Pierre').evaluate((mark) => {
-    const row = mark.closest('tr')!
-    const marked = row.getBoundingClientRect().height
-    mark.style.display = 'none'
-    const unmarked = row.getBoundingClientRect().height
-    mark.style.display = ''
-    return { marked, unmarked }
-  })
-  expect(heights.marked).toBe(heights.unmarked)
 
   if (isMobile) {
-    // Tapping the mark shows its tooltip, and tapping something else hides it.
-    await mark('Jah Pierre').tap()
-    await expect(tooltip).toHaveText('Finit après la session.')
+    // Tapping it shows its tooltip, by force, since Playwright waits for an aria-disabled button to be enabled, and
+    // tapping something else hides it.
+    await add.tap({ force: true })
+    await expect(tooltip).toHaveText(why)
     await page.getByRole('heading', { level: 1 }).tap()
     await expect(tooltip).toHaveCount(0)
     return
   }
 
-  // Hovering the mark shows its tooltip, right under it, and so does the keyboard's focus, until Escape.
-  await mark('Jah Pierre').hover()
-  await expect(tooltip).toHaveText('Finit après la session.')
-  const [markBox, tipBox] = [await mark('Jah Pierre').boundingBox(), await tooltip.boundingBox()]
-  expect(Math.abs(tipBox!.y - (markBox!.y + markBox!.height))).toBeLessThan(1)
+  // Hovering it shows its tooltip, right under it, and so does the keyboard's focus, until Escape.
+  await add.hover({ force: true })
+  await expect(tooltip).toHaveText(why)
+  const [addBox, tipBox] = [await add.boundingBox(), await tooltip.boundingBox()]
+  expect(Math.abs(tipBox!.y - (addBox!.y + addBox!.height))).toBeLessThan(1)
   await page.mouse.move(0, 0)
   await expect(tooltip).toHaveCount(0)
   // Clicking it with the mouse doesn't keep it once the mouse is gone.
-  await mark('Jah Pierre').click()
+  await add.click({ force: true })
   await page.mouse.move(0, 0)
   await expect(tooltip).toHaveCount(0)
-  await sets.getByRole('button', { name: /^supprimer : Set de Ondine/ }).focus()
+  // With the keyboard, from the heading of the sets, just before it.
+  await page.getByRole('heading', { name: 'Sets', exact: true }).focus()
   await page.keyboard.press('Tab')
-  await expect(mark('Jah Pierre')).toBeFocused()
-  await expect(tooltip).toHaveText('Finit après la session.')
+  await expect(add).toBeFocused()
+  await expect(tooltip).toHaveText(why)
   await page.keyboard.press('Escape')
   await expect(tooltip).toHaveCount(0)
-  await expect(mark('Jah Pierre')).toBeFocused()
+  await expect(add).toBeFocused()
 })
 
 // With Collectif Béton's takeover, BÉTON 140, which comes from its application (see seed-data.ts).

@@ -13,8 +13,8 @@ import { isSoundcloudTrackLink, youtubeVideoId, youtubeVideoUrl } from './sessio
 // The forms check sessions and sets as the server does, to say what's wrong right away, with a copy of the server's rules
 // (see server/src/sessions/fields.ts), which must be changed together with these. Their messages are in French, unlike
 // the server's. The server's are the ones that count: when they disagree, the server's message shows. The rules that
-// involve other sessions or sets, e.g. that sessions don't overlap, are only the server's. Whether a set fits in its
-// session isn't checked: the server allows it, and its session's page marks it.
+// involve other sessions or sets, e.g. that sessions don't overlap, are only the server's. Whether a session's sets add up
+// to more than it isn't checked: the server allows it, and the lists of its sets say so.
 
 export type Session = Schema<'Session'>
 // A set, as the endpoints return it. Not `Set`, which is JavaScript's.
@@ -345,7 +345,7 @@ export function setFormValues(set: SetValues): SetFormValues {
 // session whose duration is null, since its times aren't known yet, is never filled.
 export function newSetDuration({ durationMinutes, sets }: { durationMinutes: number | null; sets: Pick<StudioSet, 'durationMinutes'>[] }): number | null {
   if (durationMinutes === null) return 60
-  const left = durationMinutes - minutesBefore(sets, sets.length)
+  const left = durationMinutes - setsMinutes(sets)
   return left > 0 ? Math.min(60, left) : null
 }
 
@@ -393,28 +393,11 @@ export function checkSet(
   }
 }
 
-// Sets' order (see "Sets' order" in docs/design/server/sessions.md): a session's sets take place one after the other,
-// whatever their statuses, and an unknown duration counts as none.
-
-// How long the first `count` of `sets` last, an unknown duration counting as none.
-function minutesBefore(sets: Pick<StudioSet, 'durationMinutes'>[], count: number): number {
-  return sets.slice(0, count).reduce((sum, set) => sum + (set.durationMinutes ?? 0), 0)
-}
-
-// Whether the set at `index` among `sets` fits in a session of `durationMinutes`, as the server says it does, e.g. once
-// another set is deleted, which the server doesn't answer with the session: it ends no later than the session, or,
-// without a duration, it starts before the session ends.
-export function fitsInSession(sets: Pick<StudioSet, 'durationMinutes'>[], index: number, durationMinutes: number): boolean {
-  const before = minutesBefore(sets, index)
-  const own = sets[index].durationMinutes
-  return own === null ? before < durationMinutes : before + own <= durationMinutes
-}
-
-// Why the set at `index` of `session` doesn't fit in it, when it doesn't: it starts after the session, since the sets
-// before it fill it, or else it ends after it.
-export function whyNotFitting(session: Pick<Session, 'durationMinutes' | 'sets'>, index: number): string | null {
-  if (session.sets[index].fitsInSession) return null
-  return minutesBefore(session.sets, index) >= session.durationMinutes ? 'Commence après la session.' : 'Finit après la session.'
+// How long `sets` last together, which a session's sets are meant to do no longer than it: an unknown duration counts
+// for nothing, and cancelled sets count too, since they keep their place (see "Sets' order" in
+// docs/design/server/sessions.md).
+export function setsMinutes(sets: Pick<StudioSet, 'durationMinutes'>[]): number {
+  return sets.reduce((sum, set) => sum + (set.durationMinutes ?? 0), 0)
 }
 
 // A set listed in a new session's form, to be added with it (see "A new session's sets" in

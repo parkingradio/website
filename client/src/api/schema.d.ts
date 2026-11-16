@@ -2969,6 +2969,7 @@ export interface components {
         };
         ApplicationSet: {
             id: string;
+            /** @description Null while it isn't known */
             durationMinutes: number | null;
             status: components["schemas"]["SessionStatus"];
             /** @description The set's session */
@@ -3298,9 +3299,8 @@ export interface components {
             id: string;
             /** @description The artists who played, in order */
             performers: components["schemas"]["Reference"][];
+            /** @description Null while it isn't known */
             durationMinutes: number | null;
-            /** @description Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends */
-            fitsInSession: boolean;
             performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
             otherPerformanceType: string;
             genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
@@ -3320,7 +3320,7 @@ export interface components {
         SetFields: {
             /** @description Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped */
             performers: components["schemas"]["SentPerformer"][];
-            /** @description Null while it isn't known, which counts as none for the sets after it: see "Sets' order" in the rules */
+            /** @description Null while it isn't known, which counts for nothing: see "Sets' order" in the rules */
             durationMinutes: number | null;
             /** @description In any order, even more than once: saved in the order of the list, without duplicates */
             performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
@@ -5815,7 +5815,7 @@ export interface operations {
                 "application/json": {
                     /** @description Artists, in order, at least one, once those that are there twice, whatever the case of their ids, are dropped */
                     performers?: components["schemas"]["SentPerformer"][];
-                    /** @description Null while it isn't known, which counts as none for the sets after it: see "Sets' order" in the rules */
+                    /** @description Null while it isn't known, which counts for nothing: see "Sets' order" in the rules */
                     durationMinutes?: number | null;
                     /** @description In any order, even more than once: saved in the order of the list, without duplicates */
                     performanceTypes?: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];

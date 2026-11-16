@@ -221,7 +221,7 @@ export const SET_FIELDS = {
   performers: Performers,
   durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}, or null`, 1, MAX_MINUTES)
     .nullable()
-    .meta({ description: 'Null while it isn\'t known, which counts as none for the sets after it: see "Sets\' order" in the rules' }),
+    .meta({ description: "Null while it isn't known, which counts for nothing: see \"Sets' order\" in the rules" }),
   performanceTypes: z
     .array(PerformanceType, { error: BAD_PERFORMANCE_TYPE })
     .overwrite((ids) => PERFORMANCE_TYPES.filter((id) => ids.includes(id)))

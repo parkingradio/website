@@ -85,7 +85,6 @@ const STUB_SET: StudioSet = {
   id: 'set-1',
   performers: [{ id: 'artist-1', name: 'Aurore' }],
   durationMinutes: 60,
-  fitsInSession: true,
   performanceTypes: ['dj'],
   otherPerformanceType: '',
   genres: [],

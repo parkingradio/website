@@ -734,8 +734,8 @@ export const SEED_SESSIONS: SeedSession[] = [
     status: 'done',
     sets: [{ performers: ['Grillage', 'Pied-de-Biche'], durationMinutes: 120, performanceTypes: ['dj'], status: 'done' }],
   },
-  // An evening of guest mixes, which two sets fill, then a cancelled set they replaced, moved after them, which doesn't
-  // fit anymore, but isn't marked since it's cancelled.
+  // An evening of guest mixes, which two sets fill, then a cancelled set they replaced, moved after them, whose duration
+  // was removed, so that it doesn't count.
   {
     type: 'guest-mixes',
     when: { day: 30, start: '21:00' },
@@ -744,7 +744,7 @@ export const SEED_SESSIONS: SeedSession[] = [
     sets: [
       { performers: ['clementine@example.com', 'clement.brule@example.com'], durationMinutes: 90, performanceTypes: ['dj'], status: 'planned' },
       { performers: ['kwame@example.com'], durationMinutes: 60, performanceTypes: ['dj'], genres: ['deep-house'], status: 'planned' },
-      { performers: ['Marée Basse'], durationMinutes: 60, performanceTypes: ['live-performance'], application: [30, 60], status: 'cancelled' },
+      { performers: ['Marée Basse'], durationMinutes: null, performanceTypes: ['live-performance'], application: [30, 60], status: 'cancelled' },
     ],
   },
   // A takeover put together before its date is known, whose last set's duration isn't known either.
@@ -759,7 +759,7 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Écume'], durationMinutes: null, status: 'planned' },
     ],
   },
-  // An evening whose sets are being changed: the last one ends after it, which its page marks (see "Sets' order" in
+  // An evening whose sets are being changed: they add up to more than it, which its page says (see "Sets' order" in
   // docs/design/server/sessions.md). It has no description, which its type doesn't give.
   {
     type: 'other',

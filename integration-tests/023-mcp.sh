@@ -110,7 +110,7 @@ call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"ty
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-14T23:00:00-05:00\"'
 session="$(sql "select id from sessions where name = 'MCP'")"
 call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[]}"
-expect_body_contains '\"durationMinutes\":null,\"fitsInSession\":true'
+expect_body_contains '\"durationMinutes\":null,\"performanceTypes\"'
 expect_body_lacks 'offsetMinutes'
 expect_body_contains '\"soundcloudTrack\":null'
 

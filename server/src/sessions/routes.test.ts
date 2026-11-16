@@ -10,7 +10,6 @@ import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { BrokenFields, Conflict, NoSuchReference } from './store.js'
 import type { NewSet, SessionsStore, StoredSession, StoredSet } from './store.js'
-import type { Status } from './fields.js'
 import { sessionsRoutes } from './routes.js'
 
 // A fake database: the sessions, with their sets, and the artists and collectives that exist, by id. It doesn't check the
@@ -1003,92 +1002,6 @@ describe('sessions routes', () => {
     })
   })
 
-  describe("sets' order", () => {
-    // The sets of `session`, as the database would give them, by id, in order: their duration and status.
-    function withSets(session: StoredSession, sets: [id: string, duration: number | null, status: Status][]) {
-      session.sets = sets.map(([id, durationMinutes, status], position) => ({
-        id,
-        sessionId: session.id,
-        position,
-        createdAt: CREATED_AT,
-        createdBy: 'admin@example.com',
-        ...NEW,
-        status,
-        durationMinutes,
-        performers: [],
-        application: null,
-        applicationId: null,
-        performanceTypes: [],
-        otherPerformanceType: '',
-        genres: [],
-        soundcloudTrackId: null,
-        soundcloudTrackUrl: null,
-        youtubeVideoId: null,
-      }))
-    }
-
-    const fitting = async (app: App, path = '/api/admin/sessions/session-1') =>
-      (await send(app, 'GET', path)).json().session.sets.map(({ id, fitsInSession }: { id: string; fitsInSession: boolean }) => [id, fitsInSession])
-
-    it('says whether each set ends no later than its session, from its duration and those before it, whatever their statuses', async () => {
-      const app = await buildApp()
-      // 4 hours.
-      await createSession(app)
-      withSets(rows[0], [
-        // Without a duration in first place, it fits.
-        ['unknown', null, 'planned'],
-        ['first', 60, 'done'],
-        // A cancelled set keeps its place, and its duration counts.
-        ['cancelled', 60, 'cancelled'],
-        // Until the session ends, which fits: 60 + 60 + 120 = 240.
-        ['filling', 120, 'planned'],
-        // Right after sets that fill the session, without a duration: it starts when it ends.
-        ['after', null, 'planned'],
-        ['later', 30, 'planned'],
-      ])
-      expect(await fitting(app)).toEqual([
-        ['unknown', true],
-        ['first', true],
-        ['cancelled', true],
-        ['filling', true],
-        ['after', false],
-        ['later', false],
-      ])
-      // An unknown duration counts as none, and a set that's longer than the session never fits.
-      withSets(rows[0], [
-        ['unknown', null, 'planned'],
-        ['middle', 230, 'planned'],
-        ['last', null, 'planned'],
-        ['too-long', 241, 'planned'],
-      ])
-      expect(await fitting(app)).toEqual([
-        ['unknown', true],
-        ['middle', true],
-        ['last', true],
-        ['too-long', false],
-      ])
-    })
-
-    it("changes with the session's duration, and the sets' order", async () => {
-      const app = await buildApp()
-      await createSession(app)
-      withSets(rows[0], [
-        ['first', 120, 'planned'],
-        ['second', 60, 'planned'],
-        ['third', 60, 'cancelled'],
-      ])
-      let response = await send(app, 'PATCH', '/api/admin/sessions/session-1', { durationMinutes: 180 })
-      expect(response.json().session.sets.map(({ fitsInSession }: { fitsInSession: boolean }) => fitsInSession)).toEqual([true, true, false])
-      response = await send(app, 'PUT', '/api/admin/sets/third/position', { position: 0 })
-      expect(response.statusCode).toBe(200)
-      expect(response.json().session.sets.map(({ id, fitsInSession }: { id: string; fitsInSession: boolean }) => [id, fitsInSession])).toEqual([
-        ['third', true],
-        ['first', true],
-        ['second', false],
-      ])
-    })
-  })
-
   describe('PUT /api/admin/sets/:id/position', () => {
     it('moves the set to its place among its session\'s sets, from 0, and returns the session', async () => {
       const app = await buildApp()
@@ -1152,14 +1065,12 @@ describe('sessions routes', () => {
       expect(store.update).toHaveBeenCalledWith('session-1', expect.objectContaining({ startAt: new Date('2026-11-22T01:00:00Z'), durationMinutes: 240 }))
     })
 
-    it("can shorten the session so that its sets don't fit in it anymore, which they say", async () => {
+    it('can shorten the session so that its sets add up to more than it, which they stay as they are', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
+      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 59 }))
       expect(response.statusCode).toBe(200)
-      expect(response.json().session.sets).toEqual([expect.objectContaining({ id: 'set-2', durationMinutes: 60, fitsInSession: true })])
-      const shorter = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 59 }))
-      expect(shorter.json().session.sets).toEqual([expect.objectContaining({ id: 'set-2', durationMinutes: 60, fitsInSession: false })])
+      expect(response.json().session).toMatchObject({ durationMinutes: 59, sets: [{ id: 'set-2', durationMinutes: 60 }] })
     })
 
     it('responds 404 for a session that does not exist', async () => {
@@ -1348,7 +1259,6 @@ describe('sessions routes', () => {
             { id: 'artist-2', name: 'Brume' },
           ],
           durationMinutes: 60,
-          fitsInSession: true,
           performanceTypes: ['dj', 'live-performance'],
           otherPerformanceType: 'Synthé modulaire',
           genres: ['ambient'],
@@ -1373,7 +1283,7 @@ describe('sessions routes', () => {
       await sessionWithSet(app, { soundcloudTrack: null, youtubeVideo: null })
       const response = await addSet(app, 'session-1', { durationMinutes: null, soundcloudTrack: '', youtubeVideo: ' ' })
       expect(response.json().session.sets.map(({ id }: { id: string }) => id)).toEqual(['set-2', 'set-3'])
-      expect(response.json().session.sets[1]).toEqual(expect.objectContaining({ durationMinutes: null, fitsInSession: true, soundcloudTrack: null, youtubeVideo: null }))
+      expect(response.json().session.sets[1]).toEqual(expect.objectContaining({ durationMinutes: null, soundcloudTrack: null, youtubeVideo: null }))
       expect(response.json().session.sets[1]).not.toHaveProperty('start')
       expect(response.json().session.sets[1]).not.toHaveProperty('end')
       expect(resolveTrack).not.toHaveBeenCalled()
@@ -1458,12 +1368,11 @@ describe('sessions routes', () => {
       const { session: other } = (await sessionWithSet(app)).json()
       await createSession(app, { start: null })
 
-      // Another set, with its session, which says whether it fits in it.
+      // Another set, with its session.
       vi.mocked(store.addSet).mockRejectedValueOnce(new Conflict("This YouTube video is another set's", rows[0], rows[0].sets[0]))
       let response = await addSet(app, 'session-3')
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: "This YouTube video is another set's", session: other, set: other.sets[0] })
-      expect(response.json().set.fitsInSession).toBe(true)
 
       // The set's own session.
       vi.mocked(store.addSet).mockRejectedValueOnce(new Conflict('This session is cancelled', rows[1]))
@@ -1546,7 +1455,7 @@ describe('sessions routes', () => {
         ok: false,
         error: "This YouTube video is another set's",
         session: expect.objectContaining({ id: 'session-1' }),
-        set: expect.objectContaining({ id: 'set-2', fitsInSession: true }),
+        set: expect.objectContaining({ id: 'set-2', durationMinutes: 60 }),
       })
     })
   })

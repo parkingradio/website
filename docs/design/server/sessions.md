@@ -71,7 +71,6 @@ A set, as the endpoints below return it, also has:
 | Field | Type | |
 |---|---|---|
 | `id` | string | |
-| `fitsInSession` | boolean | Whether the set fits in its session, whatever its status: see [Sets' order](#sets-order) |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. moving it, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
@@ -141,16 +140,12 @@ Giving a set another place, e.g. one that was added last, takes moving it afterw
 for the first, cancelled ones included: the other sets keep their order. Deleting a set leaves the others in their
 order.
 
-**A set fits in its session** (`fitsInSession`) when it ends no later than the session does: when its duration and those
-of the sets before it add up to no more than the session's duration. A duration that isn't known counts as none, so it
-doesn't push the sets after it, and a set without a duration fits when the durations of the sets before it add up to
-less than the session's duration, i.e. when it starts before the session ends. This is about the order and the
-durations only, whatever the sets' statuses. The server doesn't require sets to fit, so that a session and its sets can
-be changed one at a time, in any order, e.g. a session shortened before its last set is shortened too. But since a set that doesn't
-fit is usually a mistake, or a change that isn't finished, apps that change a session's duration, or its sets'
-durations or order, should tell the admin about the sets that aren't cancelled and that they leave not fitting. E.g. a
-cancelled set and the set that replaces it both count: removing the cancelled set's duration, or deleting it, keeps it
-from pushing the sets after it.
+A session's sets are meant to last no longer than the session: their durations are meant to add up to no more than its
+duration, those of cancelled sets included, since they keep their place, while a duration that isn't known counts for
+nothing. The server doesn't require it, since a session's duration and its sets' are changed one at a time. Apps that add
+sets, or change a session's duration or its sets' durations, should tell the admin when its sets add up to more than
+the session. E.g. a cancelled set and the set that replaces it both count: removing the cancelled set's duration, or
+deleting it, stops it counting.
 
 ## Status
 
@@ -403,8 +398,8 @@ Only an error about one of the sets has `setIndex`: that set's place in `sets`, 
 
 ## `PUT /api/admin/sessions/:id` (admin)
 
-Replaces a session's fields, but not its status, whether it's announced, or its sets, which keep their order, even
-when they don't fit in it anymore (see [Sets' order](#sets-order)). It
+Replaces a session's fields, but not its status, whether it's announced, or its sets, which stay as they are, even when
+they add up to more than the session (see [Sets' order](#sets-order)). It
 takes the same request as `POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which
 is deleted. Without one, the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which
 removes it, and deletes it. Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it,

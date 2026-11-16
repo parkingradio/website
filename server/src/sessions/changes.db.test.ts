@@ -141,7 +141,7 @@ describe('PATCH /api/admin/sessions/:id', () => {
 })
 
 describe('PATCH /api/admin/sets/:id', () => {
-  it("changes a set's duration, which says whether it and the sets after it fit, without moving it", async () => {
+  it("changes a set's duration, or makes it unknown, without moving it", async () => {
     const artist = await createArtist('Aurore')
     const session = await createSession({})
     const first = await createSet(session, { performers: [{ id: artist }], durationMinutes: 60 })
@@ -150,14 +150,11 @@ describe('PATCH /api/admin/sets/:id', () => {
     const longer = await request('PATCH', `/api/admin/sets/${first}`, { durationMinutes: 90 })
     expect(longer.statusCode).toBe(200)
     expect(longer.json().session.sets).toMatchObject([
-      { id: first, durationMinutes: 90, fitsInSession: true },
-      { id: second, durationMinutes: 60, fitsInSession: false },
+      { id: first, durationMinutes: 90 },
+      { id: second, durationMinutes: 60 },
     ])
     const unknown = await request('PATCH', `/api/admin/sets/${first}`, { durationMinutes: null })
-    expect(unknown.json().session.sets).toMatchObject([
-      { id: first, durationMinutes: null, fitsInSession: true },
-      { id: second, fitsInSession: true },
-    ])
+    expect(unknown.json().session.sets).toMatchObject([{ id: first, durationMinutes: null }, { id: second }])
   })
 
   it('keeps its performers, its track and its video when they are not sent, without resolving the track again', async () => {

@@ -83,7 +83,7 @@
 
 /* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
    below), the headers of the columns that sort a list, and the one that shows a long bio or description whole,
-   underlined like a link since nothing else says it can be clicked (see also .admin-warning). */
+   underlined like a link since nothing else says it can be clicked. */
 .admin .radio-track-left-out button,
 .admin .radio-track-left-out button:hover,
 .admin .admin-sort,
@@ -470,24 +470,6 @@
 .admin-status-rejected a,
 .admin-status-cancelled a {
   color: inherit;
-}
-
-/* The mark of a set whose place is wrong, e.g. that overlaps another, which doesn't prevent anything: a button that looks
-   like text, bold, and bigger than the times it follows, though not taller than their line, so that its row isn't
-   taller, and in that line, rather than over the cell's padding like the rows' other buttons (see
-   `.admin-table-controls`). */
-.admin .admin-warning,
-.admin .admin-warning:hover {
-  margin-block: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #9a4a00;
-  font-weight: 700;
-  font-size: 1.2em;
-  line-height: 1;
-  vertical-align: top;
-  cursor: help;
 }
 
 /* A tooltip (see button.tsx), placed by its button, over the rest of the page, though not over the navigation bar or

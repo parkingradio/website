@@ -2,7 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import type { ListedSet } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
 import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, setTitle } from './describe'
-import { MoveButtons, Performers, SetLinks } from './set-cells'
+import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { SetSession } from './set-form'
 
@@ -85,6 +85,7 @@ export function ListedSets({
           ajouter un set
         </button>
       </div>
+      <SetsTooLong sets={sets} durationMinutes={session.durationMinutes} />
       {rows.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (

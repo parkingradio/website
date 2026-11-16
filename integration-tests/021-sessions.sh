@@ -8,7 +8,7 @@
 # order, even while they're moved, added and deleted at the same time, sessions listed those without a start first, then the most recent first, by artist, by takeover and by when they
 # start, the rules of sessions (sessions don't overlap, a video or a track in at most one set, a cancelled session only
 # has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
-# including while other transactions change sessions, sets that don't fit in their session, which they say, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
+# including while other transactions change sessions, sets that add up to more than their session, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
 # collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, the applications
 # sets and sessions come from, which applications list, their rules, and deleting them, even while a set is given one,
 # the content of a session's event on RA, from its sets' performers, and announcing a session.
@@ -86,10 +86,10 @@ set_ids() {
     printf '%s' "$BODY" | grep -o '{"id":"[^"]*","performers"' | cut -d'"' -f4 | tr '\n' ' '
 }
 
-# expect_fits <set id> <fits> -- expect the body of the last request to have that set, saying whether it fits in its
-# session (true or false).
-expect_fits() {
-    expect_body "\\{\"id\":\"$1\",\"performers\":\\[[^]]*\\],\"durationMinutes\":[^,]*,\"fitsInSession\":$2,"
+# expect_duration <set id> <duration> -- expect the body of the last request to have that set, with that duration, in
+# minutes, or null.
+expect_duration() {
+    expect_body "\\{\"id\":\"$1\",\"performers\":\\[[^]]*\\],\"durationMinutes\":$2,"
 }
 
 # last_set -- the id of the set that was added last.
@@ -377,7 +377,7 @@ expect_status 200
 opening="$(last_set)"
 expect_body_contains "\"id\":\"${first}\",\"start\":\"2026-11-14T21:00:00-05:00\""
 expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
-expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,\"fitsInSession\":true,\"performanceTypes\""
+expect_body_contains "{\"id\":\"${opening}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,\"performanceTypes\""
 expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerformanceType":"Synthé modulaire","genres":["ambient","techno"],"soundcloudTrack":null'
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
@@ -401,24 +401,17 @@ done
 json GET "${SESSIONS}/${first}"
 [ "$(set_ids)" = "${opening} " ] || { _show_body; fail "expected only the opening set"; }
 
-echo "  a set doesn't have to fit in its session, which it says, from its duration and those before it, an unknown one counting as none"
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 181)"
-expect_status 200
-expect_fits "$(last_set)" false
-json DELETE "${SETS}/$(last_set)"
-expect_status 200
-# Until the session ends, which fits.
-json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 180)"
+echo "  a session's sets don't have to add up to no more than the session, and a set's duration can be unknown"
+json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 240)"
 expect_status 200
 whenever="$(last_set)"
-expect_fits "$whenever" true
-# Without a duration, right after the sets that fill the session: it starts when it ends.
+expect_duration "$whenever" 240
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" null)"
 expect_status 200
 unplaced="$(last_set)"
-expect_body_contains "{\"id\":\"${unplaced}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":null,\"fitsInSession\":false,"
+expect_body_contains "{\"id\":\"${unplaced}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":null,"
 # Nothing gives a set's times.
-if printf '%s' "$BODY" | grep -q -E '"offsetMinutes"|"overlappingSets"|"durationMinutes":[^,]*,"start"'; then _show_body; fail "expected sets without times"; fi
+if printf '%s' "$BODY" | grep -q -E '"offsetMinutes"|"overlappingSets"|"fitsInSession"|"durationMinutes":[^,]*,"start"'; then _show_body; fail "expected sets without times"; fi
 
 echo "  a session's sets are in the order they're added, which moving one changes, the others keeping their order"
 json POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60)"
@@ -428,13 +421,10 @@ second="$(last_set)"
 json PUT "${SETS}/${second}/position" '{"position":1}'
 expect_status 200
 [ "$(set_ids)" = "${opening} ${second} ${whenever} ${unplaced} " ] || { _show_body; fail "expected the set moved second"; }
-expect_fits "$second" true
-expect_fits "$whenever" false
 # Past the last, even past what the database's integers hold, it goes last.
 json PUT "${SETS}/${whenever}/position" '{"position":100000000000000000000}'
 expect_status 200
 [ "$(set_ids)" = "${opening} ${second} ${unplaced} ${whenever} " ] || { _show_body; fail "expected the set moved last"; }
-expect_fits "$unplaced" true
 for body in '{"position":-1}' '{"position":1.5}' '{"position":"1"}' '{"position":null}' '{}' '{"position":0,"id":"x"}'; do
     json PUT "${SETS}/${whenever}/position" "$body"
     expect_status 400
@@ -456,17 +446,13 @@ later="$(last_set)"
 json PUT "${SETS}/${opening}/status" '{"status":"done"}'
 expect_status 200
 
-echo "  a session can be shortened so that its sets don't fit in it anymore, which they say, a cancelled set keeping its place"
+echo "  a session can be shortened so that its sets add up to more than it, a cancelled set keeping its place"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
 session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 expect_body_contains '"durationMinutes":119'
-expect_fits "$opening" true
-expect_fits "$second" false
-# After the cancelled set, whose duration still counts.
-expect_fits "$unplaced" false
-expect_fits "$whenever" false
+[ "$(set_ids)" = "${opening} ${second} ${unplaced} ${whenever} " ] || { _show_body; fail "expected the sets in their order"; }
 json PUT "${SETS}/${second}/status" '{"status":"planned"}'
 expect_status 200
 json DELETE "${SETS}/${whenever}"
@@ -476,7 +462,7 @@ echo "  moving a session leaves its sets as they are, which doesn't count as cha
 session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
-expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,\"fitsInSession\":true,"
+expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,"
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
 session_form PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
@@ -707,7 +693,7 @@ for set in "$opening" "$second"; do
     expect_status 200
 done
 
-echo "  a set added while another transaction shortens its session waits for it, and says if it doesn't fit anymore"
+echo "  a set added while another transaction shortens its session waits for it, and comes after its other sets"
 # Only because of the sessions' lock too.
 hold_sessions_lock "update sessions set duration_minutes = 150 where id = '${first}';"
 send_in_background POST "${SESSIONS}/${first}/sets" "$(set_json "$(performers "$ana")" 60)"
@@ -716,7 +702,7 @@ release_sessions_lock
 wait_for_background
 expect_status 200
 expect_body_contains '"durationMinutes":150'
-expect_fits "$(last_set)" false
+[[ "$(set_ids)" == *" $(last_set) " ]] || { _show_body; fail "expected the set added last"; }
 json DELETE "${SETS}/$(last_set)"
 expect_status 200
 

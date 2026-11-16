@@ -1,9 +1,11 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router'
+import { setsMinutes } from '../../session-fields'
 import type { SetValues, StudioSet } from '../../session-fields'
-import { applicationPath, entryPath, receivedOn } from './describe'
+import { applicationPath, entryPath, formatDuration, receivedOn } from './describe'
 
-// What the rows of sets show, on a session's page and in a new session's form.
+// What the lists of sets show, their rows and what they say of the sets together, on a session's page and in a new
+// session's form.
 
 // What a link opens, with `newTab`: the page it links to, in a new tab, e.g. so that a form that isn't saved isn't left.
 const inNewTab = (newTab: boolean) => (newTab ? { target: '_blank', rel: 'noreferrer' } : {})
@@ -47,6 +49,18 @@ export function SetLinks({ set, newTab = false }: { set: Pick<SetValues, 'applic
       {link}
     </Fragment>
   ))
+}
+
+// What the sets of a session that lasts `durationMinutes` say when they add up to more than it, e.g. « Les sets durent
+// 4 h 58, plus que la session (1 h). », or nothing, which is also the case while the session's duration isn't known.
+export function SetsTooLong({ sets, durationMinutes }: { sets: Pick<StudioSet, 'durationMinutes'>[]; durationMinutes: number | null }) {
+  const minutes = setsMinutes(sets)
+  if (durationMinutes === null || minutes <= durationMinutes) return null
+  return (
+    <p className="admin-notice">
+      Les sets durent {formatDuration(minutes)}, plus que la session ({formatDuration(durationMinutes)}).
+    </p>
+  )
 }
 
 // "↑" and "↓", which move a set one place up or down among its session's sets, like a set's artists (see

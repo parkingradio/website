@@ -281,7 +281,7 @@ export const sessions = pgTable(
 // can't declare, since it's deferrable, enforces: it's only in the migration that adds it (0014_ordered_sets.sql),
 //   CONSTRAINT sets_session_id_position_key UNIQUE (session_id, position) DEFERRABLE INITIALLY IMMEDIATE
 // so that a single statement can shift several sets, e.g. to move one. Its index also finds a session's sets. A session's
-// sets are meant to fit in it, but they don't have to, so nothing checks it (see "Sets' order" in
+// sets are meant to add up to no more than it, but they don't have to, so nothing checks it (see "Sets' order" in
 // docs/design/server/sessions.md). That a cancelled session only has cancelled sets is checked by the server, since it
 // spans both tables (see sessions/store.ts).
 export const sets = pgTable(

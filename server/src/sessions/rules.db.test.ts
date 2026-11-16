@@ -40,7 +40,7 @@ import { checkSessionsInvariants } from './test-invariants.js'
 type Ids = { sessions: string[]; sets: string[]; artists: string[]; collectives: string[]; applications: { id: string; owner: string }[] }
 type Context = { app: FastifyInstance; database: TestDatabase; cookies: Record<string, string>; ids: Ids }
 type Body = { error: string; session: Session | null; set: StudioSet | null; setIndex?: number; otherSetIndex?: number }
-type StudioSet = { id: string; durationMinutes: number | null; fitsInSession: boolean; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
+type StudioSet = { id: string; soundcloudTrack: { id: string } | null; youtubeVideo: { id: string } | null }
 type Session = {
   id: string
   start: string | null
@@ -243,17 +243,6 @@ function setConflicts<Args extends { fields: SetArgs }>(id: (args: Args, context
       expectSetWith(body, id(args, context), (set) => set.soundcloudTrack?.id === TRACKS[args.fields.soundcloudTrack!]),
     [VIDEO_TAKEN]: (body: Body, args: Args, context: Context) =>
       expectSetWith(body, id(args, context), (set) => set.youtubeVideo?.id === args.fields.youtubeVideo),
-  }
-}
-
-// Checks that each set of `session` says whether it fits in it as "Sets' order" in docs/design/server/sessions.md says:
-// from its duration and those of the sets before it, an unknown one counting as none.
-function expectFits(session: Session) {
-  let before = 0
-  for (const set of session.sets) {
-    const fits = set.durationMinutes === null ? before < session.durationMinutes : before + set.durationMinutes <= session.durationMinutes
-    expect(set.fitsInSession, `whether ${set.id} fits`).toBe(fits)
-    before += set.durationMinutes ?? 0
   }
 }
 
@@ -603,8 +592,6 @@ describe('the rules of sessions and sets', () => {
             expect(check, `${where}: a 409 that isn't about one of the rules`).toBeDefined()
             await check!(body, args, context)
           }
-          const session = response.statusCode === 200 ? (response.json() as { session?: Session }).session : undefined
-          if (session) expectFits(session)
           await checkSessionsInvariants(database.db)
         }
       }),

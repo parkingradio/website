@@ -930,6 +930,7 @@
             "type": "string"
           },
           "durationMinutes": {
+            "description": "Null while it isn't known",
             "type": [
               "number",
               "null"
@@ -2638,14 +2639,11 @@
             "description": "The artists who played, in order"
           },
           "durationMinutes": {
+            "description": "Null while it isn't known",
             "type": [
               "number",
               "null"
             ]
-          },
-          "fitsInSession": {
-            "type": "boolean",
-            "description": "Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends"
           },
           "performanceTypes": {
             "type": "array",
@@ -2795,7 +2793,6 @@
           "id",
           "performers",
           "durationMinutes",
-          "fitsInSession",
           "performanceTypes",
           "otherPerformanceType",
           "genres",
@@ -2834,7 +2831,7 @@
                 "type": "null"
               }
             ],
-            "description": "Null while it isn't known, which counts as none for the sets after it: see \"Sets' order\" in the rules"
+            "description": "Null while it isn't known, which counts for nothing: see \"Sets' order\" in the rules"
           },
           "performanceTypes": {
             "type": "array",
@@ -8830,7 +8827,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Null while it isn't known, which counts as none for the sets after it: see \"Sets' order\" in the rules"
+                    "description": "Null while it isn't known, which counts for nothing: see \"Sets' order\" in the rules"
                   },
                   "performanceTypes": {
                     "type": "array",

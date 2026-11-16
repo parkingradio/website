@@ -56,11 +56,7 @@ const SetBody = z
   .object({
     id: z.string(),
     performers: z.array(Reference).meta({ description: 'The artists who played, in order' }),
-    durationMinutes: z.number().nullable(),
-    fitsInSession: z.boolean().meta({
-      description:
-        "Whether it ends no later than its session, whatever its status: whether its duration and those of the sets before it add up to no more than the session's, an unknown one counting as none. A set without a duration fits when it starts before the session ends",
-    }),
+    durationMinutes: z.number().nullable().meta({ description: "Null while it isn't known" }),
     performanceTypes: z.array(PerformanceType),
     otherPerformanceType: z.string(),
     genres: z.array(Genre),
@@ -231,25 +227,12 @@ function tracked(row: StoredSession | StoredSet) {
   }
 }
 
-// Whether the set `row` fits in `session`, whatever the statuses: it ends no later than the session, with an unknown
-// duration counting as none, or, without a duration, it starts before the session ends (see "Sets' order" in
-// docs/design/server/sessions.md).
-function fits(row: StoredSet, session: StoredSession): boolean {
-  let before = 0
-  for (const set of session.sets) {
-    if (set.id === row.id) break
-    before += set.durationMinutes ?? 0
-  }
-  return row.durationMinutes === null ? before < session.durationMinutes : before + row.durationMinutes <= session.durationMinutes
-}
-
-// The set `row` of `session`.
-function setBody(row: StoredSet, session: StoredSession): SetBody {
+// The set `row`.
+function setBody(row: StoredSet): SetBody {
   return {
     id: row.id,
     performers: row.performers,
     durationMinutes: row.durationMinutes,
-    fitsInSession: fits(row, session),
     performanceTypes: row.performanceTypes,
     otherPerformanceType: row.otherPerformanceType,
     genres: row.genres,
@@ -275,7 +258,7 @@ function sessionBody(row: StoredSession): SessionBody {
     description: row.description,
     effectiveDescription: effectiveDescription(row),
     hasFlyer: row.flyerKey !== null,
-    sets: row.sets.map((set) => setBody(set, row)),
+    sets: row.sets.map(setBody),
     ...tracked(row),
     announced: row.announced,
     announcedUpdatedBy: row.announcedUpdatedBy,
@@ -290,7 +273,7 @@ export function conflictBody({ error, session, set }: { error: string; session?:
     error,
     session: session ? sessionBody(session) : null,
     // A set in the way always comes with its session.
-    set: set && session ? setBody(set, session) : null,
+    set: set && session ? setBody(set) : null,
   }
 }
 

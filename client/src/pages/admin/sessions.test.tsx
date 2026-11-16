@@ -124,7 +124,6 @@ function studioSet(id: string, fields: Partial<StudioSet>): StudioSet {
     id,
     performers: [],
     durationMinutes: null,
-    fitsInSession: true,
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -472,13 +471,8 @@ const RA_EVENTS = {
 }
 const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
-// What the mark of each set says, if it has one, in its tooltip (see button.test.tsx).
-const marks = () =>
-  within(setsTable())
-    .getAllByRole('row')
-    .slice(1)
-    .map((row) => within(row).queryByRole('button', { name: 'avertissement' })?.getAttribute('aria-describedby') ?? null)
-    .map((id) => id && document.getElementById(id)!.textContent)
+// What the sets say when they add up to more than their session, if they do.
+const tooLong = () => screen.queryByText(/^Les sets durent /)?.textContent ?? null
 // What the session's record, or the content of its event on RA, says for `label`.
 // Its own terms only, since the content of the event on RA is within the session's record.
 const recordValue = (record: string, label: string) =>
@@ -971,9 +965,8 @@ describe("A session's page", () => {
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
   })
 
-  it('marks the sets that are not cancelled and do not fit in the session, saying why, and works it out again once one is deleted', async () => {
-    // Until 23:00: two sets, then one that ends after it, one without a duration that starts after it, and a cancelled one
-    // that doesn't fit either.
+  it('says when its sets add up to more than the session, cancelled ones included, and no longer once one is deleted', async () => {
+    // Until 23:00, with sets of 2 h 15, a cancelled one included, and one whose duration isn't known.
     const [first, , cancelled] = SESSION.sets
     const crowded: Session = {
       ...SESSION,
@@ -982,46 +975,39 @@ describe("A session's page", () => {
       sets: [
         first,
         studioSet('set-4', { performers: [{ id: 'artist-4', name: 'Dune' }], durationMinutes: 45 }),
-        studioSet('set-5', { performers: [{ id: 'artist-5', name: 'Écume' }], durationMinutes: 30, fitsInSession: false }),
-        studioSet('set-6', { performers: [{ id: 'artist-6', name: 'Flore' }], fitsInSession: false }),
-        { ...cancelled, fitsInSession: false },
+        { ...cancelled, durationMinutes: 30 },
+        studioSet('set-5', { performers: [{ id: 'artist-5', name: 'Écume' }] }),
       ],
     }
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: crowded }, 'DELETE /api/admin/sets/set-4': { ok: true } })
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
-    expect(marks()).toEqual([null, null, 'Finit après la session.', 'Commence après la session.', null])
-    // After the duration, as text rather than as an emoji.
-    expect(rows(setsTable())[2][0]).toBe('30 min \u26a0\ufe0e')
-    expect(rows(setsTable())[3][0]).toBe('à déterminer \u26a0\ufe0e')
-    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    expect(tooLong()).toBe('Les sets durent 2 h 15, plus que la session (2 h).')
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['1 h', '45 min', '30 min', 'à déterminer'])
 
-    // Without the set before them, which the server doesn't answer with the session, they fit, and the cancelled one
-    // still doesn't, which isn't marked.
+    // Without Dune's set, which the server doesn't answer with the session.
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Dune' }))
-    await waitFor(() => expect(marks()).toHaveLength(4))
-    expect(marks()).toEqual([null, null, null, null])
-    expect(rows(setsTable())[1][0]).toBe('30 min')
+    await waitFor(() => expect(rows(setsTable())).toHaveLength(3))
+    expect(tooLong()).toBeNull()
   })
 
-  it('marks no set when every set fits in the session', async () => {
+  it('says nothing of its sets when they add up to no more than the session', async () => {
     mockFetch(PAGE)
     renderAt('/admin/sessions/session-1')
     await screen.findByRole('table', { name: 'Sets' })
-    expect(marks()).toEqual([null, null, null])
+    expect(tooLong()).toBeNull()
   })
 
   it('moves a set up or down among the sets, showing them as the server then has them, the focus staying on its arrow', async () => {
-    // 2 h 30, which its sets fill, the cancelled one included once it's moved before Cyan's.
     const [first, cyan, cancelled] = SESSION.sets
-    const session = (...sets: StudioSet[]): Session => ({ ...SESSION, end: '2026-11-15T04:30:00.000Z', durationMinutes: 150, sets })
+    const session = (...sets: StudioSet[]): Session => ({ ...SESSION, sets })
     mockFetch({
       ...LOGGED_IN,
       '/api/admin/sessions/session-1': { ok: true, session: session(first, cyan, cancelled) },
-      'PUT /api/admin/sets/set-3/position': { ok: true, session: session(first, cancelled, { ...cyan, fitsInSession: false }) },
-      'PUT /api/admin/sets/set-2/position': { ok: true, session: session(first, cyan, { ...cancelled, fitsInSession: false }) },
+      'PUT /api/admin/sets/set-3/position': { ok: true, session: session(first, cancelled, cyan) },
+      'PUT /api/admin/sets/set-2/position': { ok: true, session: session(first, cyan, cancelled) },
       'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' },
     })
     renderAt('/admin/sessions/session-1')
@@ -1029,21 +1015,17 @@ describe("A session's page", () => {
     await screen.findByRole('table', { name: 'Sets' })
     expect(screen.getByRole('button', { name: 'monter : Set de Aurore et Brume' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'descendre : Set' })).toBeDisabled()
-    expect(marks()).toEqual([null, null, null])
 
-    // The cancelled set keeps its place, so Cyan's no longer fits.
     fireEvent.click(screen.getByRole('button', { name: 'monter : Set' }))
     await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', '-', 'Cyan']))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-3/position')[0])).toEqual({ position: 1 })
     expect(screen.getByRole('button', { name: 'monter : Set' })).toHaveFocus()
-    expect(marks()).toEqual([null, null, 'Finit après la session.'])
 
-    // Moved back up, it fits again, and the focus goes to the other arrow, since it's the only one it can use there.
+    // Moved back up, the focus staying on its arrow.
     fireEvent.click(screen.getByRole('button', { name: 'monter : Set de Cyan' }))
     await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-']))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2/position')[0])).toEqual({ position: 1 })
     expect(screen.getByRole('button', { name: 'monter : Set de Cyan' })).toHaveFocus()
-    expect(marks()).toEqual([null, null, null])
 
     fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Aurore et Brume' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/^Le set « Set de Aurore et Brume » n'a pas pu être déplacé : Boom$/)
@@ -1372,7 +1354,7 @@ describe("A set's form", () => {
     })
   })
 
-  it("changes a set, its duration included, which doesn't have to fit in the session", async () => {
+  it('changes a set, its duration included, even when the sets then add up to more than the session', async () => {
     mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
@@ -1991,6 +1973,25 @@ describe("A new session's sets", () => {
       { ...empty, performers: [{ id: 'artist-1' }], durationMinutes: null, youtubeVideo: 'dQw4w9WgXcQ' },
       { ...empty, performers: [{ id: 'artist-2' }], durationMinutes: 60, youtubeVideo: null },
     ])
+  })
+
+  it('says when its sets add up to more than the session, once its times are known', async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn()
+    await addSet('Aurore', lasting('3', '30'))
+    expect(tooLong()).toBeNull()
+    await addSet('Brume', lasting('1', '0'))
+    expect(tooLong()).toBe('Les sets durent 4 h 30, plus que la session (4 h).')
+    // Longer, until 2:00.
+    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '02:00' } })
+    expect(tooLong()).toBeNull()
+    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '01:00' } })
+    expect(tooLong()).not.toBeNull()
+    // Nothing while they aren't.
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
+    expect(tooLong()).toBeNull()
   })
 
   it("lists sets before the session's times are known, for an hour by default, keeping its duration as it was when their form opened", async () => {

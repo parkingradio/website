@@ -11,13 +11,11 @@ import {
   STATUSES,
   applicationLink,
   findApplication,
-  fitsInSession,
   listedSetFromApplication,
   newSetFormValues,
   sessionFormValues,
   setFormValues,
   setValuesFromApplication,
-  whyNotFitting,
 } from '../../session-fields'
 import type { ListedSet, Session, SessionStatus, StudioSet } from '../../session-fields'
 import type { Artist } from '../../artist-profile'
@@ -60,7 +58,7 @@ import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import { CreateSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
-import { MoveButtons, Performers, SetLinks } from './set-cells'
+import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet } from './set-form'
 
@@ -557,11 +555,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     const index = session.sets.findIndex((other) => other.id === set.id)
     const next = session.sets[index + 1] ?? session.sets[index - 1]
     focusNext.current = next ? { id: next.id, action: 'delete' } : 'heading'
-    // The sets after it move up, so whether they fit is worked out again, as the server would.
-    setSession((session) => {
-      const sets = session.sets.filter((other) => other.id !== set.id)
-      return { ...session, sets: sets.map((other, i) => ({ ...other, fitsInSession: fitsInSession(sets, i, session.durationMinutes) })) }
-    })
+    setSession((session) => ({ ...session, sets: session.sets.filter((other) => other.id !== set.id) }))
     setOpen((open) => (open?.kind === 'set' && open.id === set.id ? null : open))
   }
 
@@ -681,6 +675,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         </Button>
       </div>
       <ErrorMessage error={setsError} />
+      <SetsTooLong sets={session.sets} durationMinutes={session.durationMinutes} />
       {session.sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (
@@ -736,25 +731,8 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// The mark after a set's duration, when it doesn't fit in its session and isn't cancelled, saying why in its tooltip (see
-// "Sets' order" in docs/design/server/sessions.md).
-function ProblemsMark({ problem }: { problem: string | null }) {
-  return (
-    problem !== null && (
-      <>
-        {' '}
-        {/* With U+FE0E, so that phones don't draw it as a colored emoji. */}
-        <Button className="admin-warning" aria-label="avertissement" tip={[problem]}>
-          {'\u26a0\ufe0e'}
-        </Button>
-      </>
-    )
-  )
-}
-
 // A session's sets, in their order, each with its status as buttons that change it, arrows that move it, a button that
-// opens its form, and one that deletes it. The sets of a cancelled session can't be un-cancelled. Those that don't fit in
-// the session are marked, saying why.
+// opens its form, and one that deletes it. The sets of a cancelled session can't be un-cancelled.
 function SetsTable({
   session,
   busy,
@@ -786,10 +764,7 @@ function SetsTable({
       <tbody>
         {session.sets.map((set, index) => (
           <tr key={set.id} className={`admin-status-${set.status}`}>
-            <td className="admin-day">
-              {setDuration(set)}
-              <ProblemsMark problem={set.status === 'cancelled' ? null : whyNotFitting(session, index)} />
-            </td>
+            <td className="admin-day">{setDuration(set)}</td>
             <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
             <td>{describePerformanceTypes(set)}</td>
             <td>{genreNames(set.genres)}</td>

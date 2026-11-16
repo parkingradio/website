@@ -16,8 +16,8 @@ import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
 
 // The order of a session's sets, against a real database: new sets go last, moving one leaves the others in their
-// order, and so does deleting one, even with requests sent at the same time, and whether each set fits in its session
-// follows (see "Sets' order" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts move sets
+// order, and so does deleting one, even with requests sent at the same time (see "Sets' order" in
+// docs/design/server/sessions.md). The property-based tests of rules.db.test.ts move sets
 // too.
 
 // Photos and flyers aren't sent, so there are none to read or delete.
@@ -33,7 +33,7 @@ let database: TestDatabase
 let app: FastifyInstance
 let artist: string
 
-type Sets = { id: string; durationMinutes: number | null; fitsInSession: boolean; updatedBy: string | null }[]
+type Sets = { id: string; durationMinutes: number | null; updatedBy: string | null }[]
 
 async function request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
@@ -171,24 +171,5 @@ describe("a session's sets", () => {
     expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 200, 200, 200, 200, 200, 200])
     expect(await setsOf(session)).toHaveLength(6)
     await checkSessionsInvariants(database.db)
-  })
-
-  it('fit in their session from their order and their durations, whatever their statuses', async () => {
-    // 2 hours, which the first three fill exactly: the last one, without a duration, starts when the session ends.
-    const { session, sets } = await sessionWithSets([60, 30, 30, null])
-    const fits = async () => (await setsOf(session)).map(({ fitsInSession }) => fitsInSession)
-    expect(await fits()).toEqual([true, true, true, false])
-    // A cancelled set keeps its place, and its duration counts.
-    expect((await request('PUT', `/api/admin/sets/${sets[1]}/status`, { status: 'cancelled' })).statusCode).toBe(200)
-    expect(await fits()).toEqual([true, true, true, false])
-    // Moved last, it no longer pushes the others.
-    const moved = await move(sets[1], 3)
-    expect((moved.json().session.sets as Sets).map(({ fitsInSession }) => fitsInSession)).toEqual([true, true, true, true])
-    // Without a duration, a set counts as none.
-    expect((await request('PATCH', `/api/admin/sets/${sets[0]}`, { durationMinutes: null })).statusCode).toBe(200)
-    expect(await fits()).toEqual([true, true, true, true])
-    // Shortening the session leaves the last ones out, while the one that fills it exactly still fits.
-    const shorter = await request('PATCH', `/api/admin/sessions/${session}`, { durationMinutes: 30 })
-    expect((shorter.json().session.sets as Sets).map(({ fitsInSession }) => fitsInSession)).toEqual([true, true, false, false])
   })
 })

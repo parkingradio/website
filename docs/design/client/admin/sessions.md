@@ -101,20 +101,17 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "×", which deletes it for good, after confirming. Its artists stay.
 
   When a status can't be changed, or a set can't be moved or deleted, the section says why above the sets, naming the
-  set. Once a set is deleted, the page works out again whether the sets after it fit in the session, as the server does
-  (see [Sets' order](../../server/sessions.md#sets-order)), rather than loading the session again.
+  set.
   "ajouter un set" opens the form of a new set.
 
   While the session is cancelled, "ajouter un set" can't be used, and says « La session est annulée : on ne peut pas lui
   ajouter de set. ». Its sets' "planifié" and "joué" can't be used either, and say « La session est annulée : on ne peut
   pas rétablir ses sets. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 
-  A set that isn't cancelled has a "⚠" after its duration when it doesn't fit in the session (see
-  [Sets' order](../../server/sessions.md#sets-order)). Its tooltip (see [Tooltips](layout.md#tooltips)) says why:
-  « Commence après la session. » when the durations of the sets before it already fill the session, or else « Finit
-  après la session. ».
-
-  The "⚠" doesn't prevent anything, since a session and its sets are changed one at a time.
+  When the sets' durations add up to more than the session's, cancelled sets included and unknown durations counting
+  for nothing (see [Sets' order](../../server/sessions.md#sets-order)), the section says so above the sets, e.g. « Les
+  sets durent 4 h 58, plus que la session (1 h). ». It doesn't prevent anything, since a session and its sets are
+  changed one at a time.
 - "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
   takeover's collective, stay, which the page says of those it has.
 
@@ -174,8 +171,8 @@ bottom, the form has:
 - "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
   times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
-  after. The form doesn't check that the session's sets still fit in the session once it's shorter: the session's page
-  then marks those that don't (see [A session's page](#a-sessions-page)). While the session is announced, checking
+  after. The form doesn't check that the session's sets still add up to no more than the session once it's shorter:
+  the session's page then says so (see [A session's page](#a-sessions-page)). While the session is announced, checking
   "date à déterminer" shows an error right away, which screen readers announce, « Une session annoncée a une date :
   retirez d'abord son annonce. », and the form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
@@ -222,9 +219,9 @@ When the collectives can't be loaded, the form says so: the session's collective
 After its fields, a new session's form has its sets, which are only sent with it. They're added, changed and listed as
 on a session's page (see [A set's form](#a-sets-form)), except that:
 
-- Their rows have no status, and no "⚠", which the session's page shows once the session is added. Their links open
-  in a new tab. "↑" and "↓" move a set in the list, which is the order they're added in, and "×" takes it out of the
-  list, without confirming.
+- Their rows have no status. Their links open in a new tab. Once the session's times are valid, the list says when the
+  sets add up to more than the session, as a session's page does. "↑" and "↓" move a set in the list, which is the
+  order they're added in, and "×" takes it out of the list, without confirming.
 - While the session's times aren't valid, its duration isn't known: a new set then lasts an hour by default, and its
   form says « La durée de la session n'est pas encore indiquée. » in place of how long the session lasts. A set's form
   keeps the session's duration as it was when it opened.
@@ -246,7 +243,7 @@ top to bottom, the form has:
 - "Durée": how long the set lasts, in hours and minutes, at most 24 h, which the form checks (see
   [Times](../../server/sessions.md#times)), or empty while it isn't known, which the form says, along with how long the
   session lasts. It
-  doesn't check that the set fits in the session: the session's page marks those that don't (see [A session's
+  doesn't check that the sets still add up to no more than the session: the list of sets says so (see [A session's
   page](#a-sessions-page)). A new set, which goes after the session's other sets, lasts an hour by default, or what's
   left of the session after its sets, cancelled ones included, if that's less. When the session's sets fill it, "Durée"
   starts empty.
