@@ -496,8 +496,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }
 
   const changeStatus = async (status: SessionStatus) => {
-    // Cancelling it cancels its sets that aren't, which turns played ones into cancelled ones, so they're named, saying
-    // which were played.
+    // Cancelling it cancels its sets that aren't cancelled, played ones included, so they're named, saying which were
+    // played.
     const uncancelled = session.sets.filter((set) => set.status !== 'cancelled')
     if (status === 'cancelled' && uncancelled.length > 0) {
       const cancelled = uncancelled.length === 1 ? 'Ce set sera aussi annulé' : 'Ces sets seront aussi annulés'
