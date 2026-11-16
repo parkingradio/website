@@ -7,7 +7,7 @@ import type { Collective } from '../../collective-profile'
 import { OwnApplications } from './applications'
 import { Button } from './button'
 import { CollectiveForm } from './collective-form'
-import { failure } from './session-errors'
+import { failure, newSessionPath } from './session-errors'
 import { OwnSessions } from './sessions'
 import type { CollectiveFormProps } from './collective-form'
 import { ArtistsFailure, BackToArtists, CollectiveDetails, LoadFailure } from './profile-details'
@@ -96,7 +96,7 @@ function CollectiveById({ id }: { id: string }) {
 
       <OwnApplications applications={applications} newPath={`/admin/candidatures/nouvelle?collective=${collective.id}`} />
 
-      <OwnSessions sessions={sessions} newPath={`/admin/sessions/nouvelle?takeover=${collective.id}`} />
+      <OwnSessions sessions={sessions} newPath={newSessionPath({ takeover: collective.id })} />
 
       <h2>Supprimer</h2>
       <p>

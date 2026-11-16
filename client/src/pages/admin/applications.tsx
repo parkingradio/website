@@ -9,6 +9,7 @@ import type { Application, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ApplicationForm } from './application-form'
+import { ApplicationWishes } from './application-wishes'
 import { Button } from './button'
 import {
   KIND_LABELS,
@@ -621,27 +622,14 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
         </button>
       </div>
       <dl className="admin-record">
-        <dt>Dates souhaitées</dt>
-        <dd>
-          <ul>
-            {application.dates.map((date) => (
-              <li key={date}>{formatDay(date)}</li>
-            ))}
-          </ul>
-        </dd>
-        <dt>Plages horaires</dt>
-        <dd>
-          {application.timeSlots.length === 0
-            ? 'à toute heure'
-            : application.timeSlots.map(({ start, end }) => `${start} à ${end}`).join(', ')}
-        </dd>
+        <ApplicationWishes application={application} />
         <dt>Type de prestation</dt>
         <dd>{describePerformanceTypes(application) || '—'}</dd>
         <dt>Questions ou détails</dt>
         <dd className="admin-text">{application.details || '—'}</dd>
       </dl>
 
-      {application.collectiveId === null ? <ApplicationSets sets={application.sets} /> : <ApplicationSessions sessions={application.sessions} />}
+      {application.collectiveId === null ? <ApplicationSets application={application} /> : <ApplicationSessions application={application} />}
 
       <h2>Supprimer</h2>
       <p>

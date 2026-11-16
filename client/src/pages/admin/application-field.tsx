@@ -2,6 +2,7 @@ import { useId } from 'react'
 import type { Application } from '../../application-fields'
 import { Combobox } from '../../combobox'
 import type { ComboboxOption } from '../../combobox'
+import { applicationLink } from '../../session-fields'
 import type { ApplicationLink } from '../../session-fields'
 import { STATUS_LABELS, capitalized, listedDates, receivedOn } from './describe'
 import { FieldError } from './fields'
@@ -63,7 +64,7 @@ export function ApplicationField({ candidates, applications, own, selected, owne
         selected={selected?.id ?? ''}
         onSelect={(key) => {
           const link = [...kept, ...candidates].find((link) => link.id === key)
-          onChange(link ? { id: link.id, receivedAt: link.receivedAt } : null)
+          onChange(link ? applicationLink(link) : null)
         }}
         onBlur={onLeave}
         invalid={!!error}

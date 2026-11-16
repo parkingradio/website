@@ -43,9 +43,18 @@ and who last changed it and when, if anyone did. From top to bottom, it then sho
   [Applications, in Sessions](../../server/sessions.md#applications)), in the server's order. Each row shows the day
   ("Date"), the times ("Heure", written as on a session's page, see [Times](sessions.md#times)) and the status
   ("Statut"). A set also shows its session's title ("Session"), which links to the session's page. A session shows its
-  own title ("Nom"), and its day links to its page. When there are none, the section says so, and that they're linked
-  from the form of one of the artist's sets, or of one of the collective's takeovers (see
-  [Applications](sessions.md#applications)). They can't be changed from here.
+  own title ("Nom"), and its day links to its page. When there are none, the section says so. They can't be changed
+  from here. An artist's application's "Sets" has
+  "créer un set", which opens a field that picks the session to add a set to: "nouvelle session", then the planned
+  sessions, past ones and those without a date included, first those on one of the days the artist would like to play,
+  by date, marked "date souhaitée", then the others, in the order of the default view of
+  [the list of sessions](sessions.md#the-list). Each one is named as sessions are among others (see
+  [Names](sessions.md#names)), with its times as that list's "Heure" shows them, and the field searches them as that
+  list does. "créer le set" then leads to the session's page, or to "nouvelle session", with the application (see
+  [From an application](sessions.md#from-an-application)): it can't be used until a session is picked, saying « Choisissez
+  d'abord une session. ». "annuler" closes the field. When the sessions can't be loaded, the field says so, and only
+  offers "nouvelle session". A collective's application's "Sessions" has "créer une session", which leads to "nouvelle
+  session" with the application.
 - "Supprimer": deletes the application for good, after confirming, then shows the list as "← candidatures" does. The
   artist or the collective stays, and so do the sets or sessions that come from it. When there are some, the page says
   « Les sets associés restent. » or « Les sessions associées restent. ».
@@ -83,6 +92,8 @@ are skipped: after accepting the 5th of 12 new applications, « suivante » show
   `PUT /api/admin/applications/:id/status`, to change a status from the list.
 - `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/status` and
   `DELETE /api/admin/applications/:id`, for an application's page.
+- `GET /api/admin/sessions`, on an artist's application's page, to pick the session to add a set to, each time
+  "créer un set" opens the field.
 - `POST /api/admin/applications`, for "nouvelle candidature".
 - `GET /api/admin/artists` and `GET /api/admin/collectives`, for the names, cities and genres of artists and collectives
   in the list, to search the applications by them, also for « précédente » and « suivante » on an application's page,

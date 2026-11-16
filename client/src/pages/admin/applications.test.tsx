@@ -5,6 +5,7 @@ import type { Application } from '../../application-fields'
 import App from '../../app'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
+import type { Session } from '../../session-fields'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
@@ -742,9 +743,7 @@ describe('An application’s page', () => {
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')
     expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. L'artiste reste\.$/)
     expect(screen.getByRole('heading', { level: 2, name: 'Sets' })).toBeInTheDocument()
-    expect(screen.getByText(/^Aucun set ne vient de cette candidature/)).toHaveTextContent(
-      "Aucun set ne vient de cette candidature : on la choisit dans le formulaire d'un set de l'artiste.",
-    )
+    expect(screen.getByText('Aucun set.')).toBeInTheDocument()
     expect(screen.getByText('jeudi 10 décembre 2026')).toBeInTheDocument()
     expect(screen.getByText('jeudi 14 janvier 2027')).toBeInTheDocument()
     expect(screen.getByText('18:00 à 22:00')).toBeInTheDocument()
@@ -1069,9 +1068,7 @@ describe('An application’s page', () => {
       expect(described('Description')).toHaveTextContent(/^-$/)
       expect(screen.queryByText(/ajouté par/)).not.toBeInTheDocument()
       expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. Le collectif reste\.$/)
-      expect(screen.getByText(/^Aucune session ne vient de cette candidature/)).toHaveTextContent(
-        "Aucune session ne vient de cette candidature : on la choisit dans le formulaire d'un takeover du collectif.",
-      )
+      expect(screen.getByText('Aucune session.')).toBeInTheDocument()
       expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
     })
 
@@ -1501,5 +1498,129 @@ describe('Creating an application', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom"))
     expect(screen.queryByRole('button', { name: 'créer la candidature' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Adding a set or a session from an application’s page', () => {
+  const PAGE = {
+    ...LOGGED_IN,
+    '/api/admin/applications/application-1': { ok: true, application: APPLICATION },
+    '/api/admin/artists/artist-1': { ok: true, artist: AURORE },
+  }
+
+  function session(id: string, title: string, start: string | null, status: Session['status'] = 'planned'): Session {
+    const end = start && new Date(Date.parse(start) + 60 * 60 * 1000).toISOString()
+    return {
+      id,
+      start,
+      end,
+      durationMinutes: 60,
+      type: 'other',
+      takeover: null,
+      application: null,
+      name: title,
+      title,
+      raEvent: null,
+      description: '',
+      effectiveDescription: '',
+      hasFlyer: false,
+      sets: [],
+      createdAt: '2026-10-01T16:00:00.000Z',
+      createdBy: 'admin@example.com',
+      updatedBy: null,
+      updatedAt: null,
+      status,
+      statusUpdatedBy: null,
+      statusUpdatedAt: null,
+    }
+  }
+
+  // As the server lists them. The artist would like to play on December 10th and 17th, among other days.
+  const SESSIONS = [
+    session('session-undated', 'SANS DATE', null),
+    // On December 17th and 10th, in Québec, which are wished.
+    session('session-17', 'LE 17', '2026-12-18T01:00:00.000Z'),
+    session('session-10', 'LE 10', '2026-12-11T01:30:00.000Z'),
+    // On December 10th in UTC, but still the 9th in Québec.
+    session('session-9', 'LE 9', '2026-12-10T03:00:00.000Z'),
+    session('session-past', 'PASSÉE', '2026-09-01T00:00:00.000Z'),
+    // Neither offered, though on a wished day.
+    session('session-done', 'JOUÉE', '2026-12-17T01:00:00.000Z', 'done'),
+    session('session-cancelled', 'ANNULÉE', '2026-12-10T23:00:00.000Z', 'cancelled'),
+  ]
+  const WITH_SESSIONS = { ...PAGE, '/api/admin/sessions': { ok: true, total: SESSIONS.length, sessions: SESSIONS } }
+
+  const picker = () => screen.getByRole('combobox', { name: 'Session' })
+  const go = () => screen.getByRole('button', { name: 'créer le set' })
+  const options = () => screen.queryAllByRole('option').map((option) => option.textContent)
+
+  it('picks the session among the planned ones, those on the days the artist would like to play first, then leads to it with the application', async () => {
+    mockFetch(WITH_SESSIONS)
+    renderAt('/admin/candidatures/application-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'créer un set' }))
+    await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir une session…'))
+    expect(picker()).toHaveFocus()
+    // Nothing is picked until a session is.
+    expect(go()).toHaveAttribute('aria-disabled', 'true')
+    expect(go()).toHaveAccessibleDescription("Choisissez d'abord une session.")
+    fireEvent.click(go())
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures\/application-1$/)
+
+    fireEvent.click(picker())
+    expect(options()).toEqual([
+      'nouvelle session',
+      'LE 10, jeu. 10 déc. 202620 h 30 – 21 h 30 · date souhaitée',
+      'LE 17, jeu. 17 déc. 202620 h – 21 h · date souhaitée',
+      'PASSÉE, lun. 31 août 202620 h – 21 h',
+      'LE 9, mer. 9 déc. 202622 h – 23 h',
+      'SANS DATE, date à déterminer1 h',
+    ])
+    // Searched as the list of sessions is.
+    fireEvent.change(picker(), { target: { value: 'mercredi' } })
+    expect(options()).toEqual(['LE 9, mer. 9 déc. 202622 h – 23 h'])
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^LE 9/ }))
+    expect(go()).not.toHaveAttribute('aria-disabled')
+    fireEvent.click(go())
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-9\?application=application-1$/)
+  })
+
+  it('leads to a new session, even from a rejected application, or closes', async () => {
+    mockFetch({ ...WITH_SESSIONS, '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, status: 'rejected' } } })
+    renderAt('/admin/candidatures/application-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'créer un set' }))
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    expect(screen.queryByRole('combobox', { name: 'Session' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'créer un set' })).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'créer un set' }))
+    fireEvent.click(picker())
+    fireEvent.mouseDown(await screen.findByRole('option', { name: 'nouvelle session' }))
+    fireEvent.click(go())
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/nouvelle\?application=application-1$/)
+  })
+
+  it('offers only a new session when the sessions could not be loaded, which it says', async () => {
+    mockFetch({ ...PAGE, '/api/admin/sessions': { ok: false, error: 'Boom' } })
+    renderAt('/admin/candidatures/application-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'créer un set' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les sessions n'ont pas pu être chargées : Boom"))
+    fireEvent.click(picker())
+    expect(options()).toEqual(['nouvelle session'])
+  })
+
+  it("leads to a new session as a collective's takeover, from its application", async () => {
+    mockFetch({
+      ...LOGGED_IN,
+      '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, artistId: null, collectiveId: 'collective-1' } },
+      '/api/admin/collectives/collective-1': { ok: true, collective: ONDES },
+      '/api/admin/artists?collective=collective-1': { ok: true, artists: [AURORE] },
+    })
+    renderAt('/admin/candidatures/application-1')
+
+    expect(await screen.findByRole('link', { name: 'créer une session' })).toHaveAttribute('href', '/admin/sessions/nouvelle?application=application-1')
+    expect(screen.queryByRole('button', { name: 'créer un set' })).not.toBeInTheDocument()
   })
 })

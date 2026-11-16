@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useApi } from '../../api/use-api'
 import type { Application } from '../../application-fields'
@@ -132,26 +132,45 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
   )
 }
 
+// What a set's form starts with, given the artists and the applications it loaded, or null when they couldn't be: null
+// shows nothing.
+export type InitialSet = SetFormValues | ((loaded: { artists: Artist[] | null; applications: Application[] | null }) => SetFormValues | null)
+
 // A set's form, under the heading `title`, and what `children` say of the set, with every artist and application to pick
 // from, loaded each time it opens, so that they're current, and nothing until then. When they can't be loaded, it says
-// so.
-export function SetFormWithChoices({ title, children, ...props }: Omit<SetFormProps, 'artists' | 'applications'> & { title: string; children?: ReactNode }) {
+// so. With `reveal`, it's brought into view once it shows, its heading focused.
+export function SetFormWithChoices({
+  title,
+  children,
+  initial,
+  reveal = false,
+  ...props
+}: Omit<SetFormProps, 'artists' | 'applications' | 'initial'> & { title: string; children?: ReactNode; initial: InitialSet; reveal?: boolean }) {
   const artists = useApi('/api/admin/artists')
   const applications = useApi('/api/admin/applications')
   const headingId = useId()
-  if (artists.kind === 'loading' || applications.kind === 'loading') return null
+  const loaded = artists.kind !== 'loading' && applications.kind !== 'loading'
+  const choices = { artists: artists.kind === 'loaded' ? artists.value.artists : null, applications: applications.kind === 'loaded' ? applications.value.applications : null }
+  const values = !loaded ? null : typeof initial === 'function' ? initial(choices) : initial
+  const shown = reveal && values !== null
+  // Before the form is painted, so that it's never seen elsewhere.
+  useLayoutEffect(() => {
+    if (!shown) return
+    const heading = document.getElementById(headingId)
+    heading?.focus({ preventScroll: true })
+    heading?.scrollIntoView?.({ block: 'start' })
+  }, [shown, headingId])
+  if (values === null) return null
 
   return (
     <section aria-labelledby={headingId}>
-      <h3 id={headingId}>{title}</h3>
+      <h3 id={headingId} tabIndex={reveal ? -1 : undefined}>
+        {title}
+      </h3>
       {children}
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
-      <SetForm
-        {...props}
-        artists={artists.kind === 'loaded' ? artists.value.artists : null}
-        applications={applications.kind === 'loaded' ? applications.value.applications : null}
-      />
+      <SetForm {...props} initial={values} {...choices} />
     </section>
   )
 }
