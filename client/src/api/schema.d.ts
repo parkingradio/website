@@ -3138,6 +3138,7 @@ export interface components {
         NewSessionFields: {
             /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
             start: string | null;
+            /** @description Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC */
             durationMinutes: number;
             type: components["schemas"]["SessionType"];
             /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
@@ -3268,6 +3269,7 @@ export interface components {
         SessionFields: {
             /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
             start: string | null;
+            /** @description Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC */
             durationMinutes: number;
             type: components["schemas"]["SessionType"];
             /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
@@ -5329,6 +5331,7 @@ export interface operations {
                 "application/json": {
                     /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
                     start?: string | null;
+                    /** @description Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC */
                     durationMinutes?: number;
                     type?: components["schemas"]["SessionType"];
                     /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */

@@ -6,13 +6,13 @@ import {
   checkSession,
   checkSet,
   durationOf,
-  endTimeAfter,
   listedSet,
   listedSetFields,
   minutesOf,
   newSetFormValues,
   sessionFormValues,
   sessionTimes,
+  startChanges,
   setFormValues,
   newSetDuration,
   shownSet,
@@ -91,74 +91,128 @@ describe('durations', () => {
 })
 
 describe('sessionTimes', () => {
-  const times = (day: string, start: string, end: string) => {
-    const result = sessionTimes({ ...EMPTY_SESSION_FORM, day, start, end })
+  const times = (day: string, start: string, endDay: string, end: string) => {
+    const result = sessionTimes({ ...EMPTY_SESSION_FORM, day, start, endDay, end })
     return 'errors' in result ? result.errors : { start: result.start?.toISOString(), durationMinutes: result.durationMinutes }
   }
 
-  it('starts on the day, in Québec time', () => {
-    expect(times('2026-11-14', '21:00', '22:30')).toEqual({ start: '2026-11-15T02:00:00.000Z', durationMinutes: 90 })
+  it('starts and ends on their days, in Québec time', () => {
+    expect(times('2026-11-14', '21:00', '2026-11-14', '22:30')).toEqual({ start: '2026-11-15T02:00:00.000Z', durationMinutes: 90 })
+    expect(times('2026-11-14', '23:00', '2026-11-15', '01:00')).toEqual({ start: '2026-11-15T04:00:00.000Z', durationMinutes: 120 })
   })
 
-  it("ends the next day when the end time isn't after the start time", () => {
-    expect(times('2026-11-14', '23:00', '01:00')).toEqual({ start: '2026-11-15T04:00:00.000Z', durationMinutes: 120 })
-    // As long as a session can be.
-    expect(times('2026-11-14', '21:00', '21:00')).toEqual({ start: '2026-11-15T02:00:00.000Z', durationMinutes: 1440 })
+  it('lasts several days, if need be', () => {
+    // A weekend.
+    expect(times('2026-11-13', '18:00', '2026-11-15', '02:00')).toEqual({ start: '2026-11-13T23:00:00.000Z', durationMinutes: 32 * 60 })
+    expect(times('2026-11-14', '21:00', '2027-11-14', '21:00')).toEqual({ start: '2026-11-15T02:00:00.000Z', durationMinutes: 365 * 24 * 60 })
+  })
+
+  it('refuses an end that is not after the start, rather than moving it to the next day', () => {
+    const notAfter = { end: 'La fin doit être après le début.' }
+    expect(times('2026-11-14', '23:00', '2026-11-14', '01:00')).toEqual(notAfter)
+    expect(times('2026-11-14', '21:00', '2026-11-14', '21:00')).toEqual(notAfter)
+    expect(times('2026-11-14', '21:00', '2026-11-13', '23:00')).toEqual(notAfter)
   })
 
   it('lasts as long as the clocks say, across a change of the clocks', () => {
     // Clocks fall back at 2:00 on November 1st, 2026: from midnight to 3:00 is 4 hours.
-    expect(times('2026-11-01', '00:00', '03:00')).toEqual({ start: '2026-11-01T04:00:00.000Z', durationMinutes: 240 })
-  })
-
-  it('refuses a session that would last more than 24 hours across a change of the clocks', () => {
-    expect(times('2026-10-31', '21:00', '21:00')).toEqual({ end: 'Une session dure au plus 24 heures.' })
+    expect(times('2026-11-01', '00:00', '2026-11-01', '03:00')).toEqual({ start: '2026-11-01T04:00:00.000Z', durationMinutes: 240 })
+    expect(times('2026-10-31', '21:00', '2026-11-01', '21:00')).toEqual({ start: '2026-11-01T01:00:00.000Z', durationMinutes: 1500 })
     // When they spring forward, the same is 23 hours.
-    expect(times('2026-03-07', '21:00', '21:00')).toEqual({ start: '2026-03-08T02:00:00.000Z', durationMinutes: 1380 })
+    expect(times('2026-03-07', '21:00', '2026-03-08', '21:00')).toEqual({ start: '2026-03-08T02:00:00.000Z', durationMinutes: 1380 })
   })
 
   it("refuses a time that clocks skip as they spring forward, at 2:00 on March 8th, 2026", () => {
     const skipped = "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été."
-    expect(times('2026-03-08', '02:30', '04:00')).toEqual({ start: skipped })
-    expect(times('2026-03-07', '23:00', '02:30')).toEqual({ end: skipped })
+    expect(times('2026-03-08', '02:30', '2026-03-08', '04:00')).toEqual({ start: skipped })
+    expect(times('2026-03-07', '23:00', '2026-03-08', '02:30')).toEqual({ end: skipped })
+    expect(times('2026-03-08', '02:30', '2026-03-08', '02:45')).toEqual({ start: skipped, end: skipped })
   })
 
-  it('takes the first of the two times that happen twice as the start, and ends at the first time after it', () => {
-    expect(times('2026-11-01', '01:30', '02:30')).toEqual({ start: '2026-11-01T05:30:00.000Z', durationMinutes: 120 })
+  it('takes the first of the two times that happen twice as the start, and the first of the two after the start as the end', () => {
+    expect(times('2026-11-01', '01:30', '2026-11-01', '02:30')).toEqual({ start: '2026-11-01T05:30:00.000Z', durationMinutes: 120 })
     // The second 1:15, after the first 1:30.
-    expect(times('2026-11-01', '01:30', '01:15')).toEqual({ start: '2026-11-01T05:30:00.000Z', durationMinutes: 45 })
+    expect(times('2026-11-01', '01:30', '2026-11-01', '01:15')).toEqual({ start: '2026-11-01T05:30:00.000Z', durationMinutes: 45 })
+    // The first 1:45, which is after the first 1:30.
+    expect(times('2026-11-01', '01:30', '2026-11-01', '01:45')).toEqual({ start: '2026-11-01T05:30:00.000Z', durationMinutes: 15 })
+    expect(times('2026-11-01', '00:30', '2026-11-01', '01:30')).toEqual({ start: '2026-11-01T04:30:00.000Z', durationMinutes: 60 })
   })
 
   it('says what is missing or invalid', () => {
-    expect(times('', '', '')).toEqual({ day: 'Choisissez le jour de la session.', start: "Indiquez l'heure de début.", end: "Indiquez l'heure de fin." })
-    expect(times('20261-01-01', '25:00', '21:00')).toEqual({ day: 'La date est invalide.', start: "L'heure de début est invalide." })
+    expect(times('', '', '', '')).toEqual({
+      day: 'Choisissez la date de début.',
+      start: "Indiquez l'heure de début.",
+      endDay: 'Choisissez la date de fin.',
+      end: "Indiquez l'heure de fin.",
+    })
+    expect(times('20261-01-01', '25:00', '2026-02-30', '21:00')).toEqual({
+      day: 'La date de début est invalide.',
+      start: "L'heure de début est invalide.",
+      endDay: 'La date de fin est invalide.',
+    })
   })
 
-  it('checks that the start is from 2000 to 2999, in UTC', () => {
+  it('checks that the session takes place within the years 2000 to 2999, in UTC', () => {
+    const years = 'Une session a lieu entre les années 2000 et 2999.'
     // 19:00 in Québec is midnight in UTC, which is already 2000.
-    expect(times('1999-12-31', '19:00', '20:00')).toEqual({ start: '2000-01-01T00:00:00.000Z', durationMinutes: 60 })
-    expect(times('1999-12-31', '18:00', '20:00')).toEqual({ day: 'Une session a lieu entre les années 2000 et 2999.' })
-    expect(times('2999-12-31', '19:00', '20:00')).toEqual({ day: 'Une session a lieu entre les années 2000 et 2999.' })
+    expect(times('1999-12-31', '19:00', '1999-12-31', '20:00')).toEqual({ start: '2000-01-01T00:00:00.000Z', durationMinutes: 60 })
+    expect(times('1999-12-31', '18:00', '1999-12-31', '20:00')).toEqual({ day: years })
+    expect(times('2999-12-31', '19:00', '2999-12-31', '20:00')).toEqual({ day: years })
+    // It ends by the start of 3000, which isn't part of it.
+    expect(times('2999-12-31', '18:00', '2999-12-31', '19:00')).toEqual({ start: '2999-12-31T23:00:00.000Z', durationMinutes: 60 })
+    expect(times('2999-12-31', '18:00', '2999-12-31', '19:01')).toEqual({ endDay: years })
   })
 
-  it("takes only the duration of a session whose date isn't known yet, from a minute to 24 hours", () => {
+  it("takes only the duration of a session whose date isn't known yet, however long", () => {
     const undated = (hours: string, minutes: string) => {
       const result = sessionTimes({ ...EMPTY_SESSION_FORM, undated: true, day: 'x', duration: { hours, minutes } })
       return 'errors' in result ? result.errors : result
     }
     expect(undated('4', '')).toEqual({ start: null, durationMinutes: 240 })
+    expect(undated('100', '1')).toEqual({ start: null, durationMinutes: 6001 })
     expect(undated('', '')).toEqual({ duration: 'Indiquez la durée de la session.' })
     expect(undated('0', '0')).toEqual({ duration: 'La durée est invalide.' })
-    expect(undated('24', '1')).toEqual({ duration: 'Une session dure au plus 24 heures.' })
+    // Longer than the time from the start of 2000 to the start of 3000.
+    expect(undated('8765832', '0')).toEqual({ start: null, durationMinutes: 525949920 })
+    expect(undated('8765832', '1')).toEqual({ duration: 'La durée est invalide.' })
   })
 })
 
-describe('endTimeAfter', () => {
-  it('is how long after the start the clocks show, or would if they did not change, while the day is not known', () => {
-    expect(endTimeAfter('2026-11-14', '23:00', 150)).toBe('01:30')
-    // Clocks fall back an hour on the night of October 31st, 2026.
-    expect(endTimeAfter('2026-10-31', '23:00', 240)).toBe('02:00')
-    expect(endTimeAfter('', '23:00', 240)).toBe('03:00')
+describe('startChanges', () => {
+  const form = (changes: Partial<SessionFormValues>): SessionFormValues => ({ ...EMPTY_SESSION_FORM, ...changes })
+
+  it("gives the end the start's day while it has none, then keeps its distance in days from the start's", () => {
+    expect(startChanges(form({}), { day: '2026-11-14' })).toEqual({ day: '2026-11-14', lastDay: '2026-11-14', endDay: '2026-11-14' })
+    const overnight = form({ day: '2026-11-14', lastDay: '2026-11-14', endDay: '2026-11-15' })
+    expect(startChanges(overnight, { day: '2026-11-21' })).toEqual({ day: '2026-11-21', lastDay: '2026-11-21', endDay: '2026-11-22' })
+    expect(startChanges(overnight, { day: '2026-12-31' })).toMatchObject({ endDay: '2027-01-01' })
+    // An end's day that the admin chose first stays.
+    expect(startChanges(form({ endDay: '2026-11-15' }), { day: '2026-11-14' })).toEqual({ day: '2026-11-14', lastDay: '2026-11-14' })
+  })
+
+  it("keeps the distance from the last day the start had, while the start's day isn't one", () => {
+    const overnight = form({ day: '2026-11-14', lastDay: '2026-11-14', endDay: '2026-11-15' })
+    const cleared = { ...overnight, ...startChanges(overnight, { day: '' }) }
+    expect(cleared).toMatchObject({ day: '', lastDay: '2026-11-14', endDay: '2026-11-15' })
+    const typed = { ...cleared, ...startChanges(cleared, { day: '2026-11-02' }) }
+    expect(typed).toMatchObject({ day: '2026-11-02', endDay: '2026-11-03' })
+    expect({ ...typed, ...startChanges(typed, { day: '2026-11-21' }) }).toMatchObject({ day: '2026-11-21', endDay: '2026-11-22' })
+  })
+
+  it('fills an empty end in, as long after the start as the duration, once the start is a day and a time the clocks show', () => {
+    const undated = form({ duration: { hours: '2', minutes: '30' } })
+    // The start's time first, then its day, or the other way around.
+    expect(startChanges(undated, { start: '23:00' })).toEqual({ start: '23:00' })
+    expect(startChanges({ ...undated, start: '23:00' }, { day: '2026-11-14' })).toEqual({ day: '2026-11-14', lastDay: '2026-11-14', endDay: '2026-11-15', end: '01:30' })
+    const withDay = { ...undated, ...startChanges(undated, { day: '2026-11-14' }) }
+    expect(withDay).toMatchObject({ endDay: '2026-11-14', end: '' })
+    expect(startChanges(withDay, { start: '23:00' })).toEqual({ start: '23:00', endDay: '2026-11-15', end: '01:30' })
+    // Across a change of the clocks, as they show it: 4 hours after 23:00 on October 31st, 2026, is 2:00.
+    expect(startChanges({ ...undated, day: '2026-10-31', duration: { hours: '4', minutes: '' } }, { start: '23:00' })).toMatchObject({ endDay: '2026-11-01', end: '02:00' })
+    // Not at a time the clocks skip, nor once there's an end, nor without a duration.
+    expect(startChanges({ ...undated, day: '2026-03-08' }, { start: '02:30' })).toEqual({ start: '02:30' })
+    expect(startChanges({ ...withDay, end: '22:00' }, { start: '21:00' })).toEqual({ start: '21:00' })
+    expect(startChanges({ ...withDay, duration: { hours: '', minutes: '' } }, { start: '21:00' })).toEqual({ start: '21:00' })
   })
 })
 
@@ -167,6 +221,7 @@ describe('checkSession', () => {
     ...EMPTY_SESSION_FORM,
     day: '2026-11-14',
     start: '21:00',
+    endDay: '2026-11-15',
     end: '01:00',
     type: 'takeover',
     takeover: { id: 'collective-1', name: 'Ondes' },
@@ -239,14 +294,29 @@ describe('checkSession', () => {
 
   // Clocks fall back from 2:00 to 1:00 on November 1st, 2026, so that night's times from 1:00 to 2:00 happen twice:
   // first at 5:00 UTC, then at 6:00 UTC.
-  it('keeps a session that starts at the second 1:30 where it is while its times are unchanged', () => {
+  it('keeps a session that starts at the second 1:30 where it is while its start is unchanged', () => {
     const form = sessionFormValues(session('2026-11-01T06:30:00.000Z', 60))
-    expect(form).toMatchObject({ day: '2026-11-01', start: '01:30', end: '02:30' })
+    expect(form).toMatchObject({ day: '2026-11-01', start: '01:30', endDay: '2026-11-01', end: '02:30' })
     expect(checkSession({ ...form, name: 'AUTRE' }).fields).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 60 })
-    // Each time stays what it was while it's left as it was: changing the end keeps the start.
+    // Its start and its end each stay what they were while they're left as they were: changing the end keeps the start.
     expect(checkSession({ ...form, end: '02:00' }).fields).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 30 })
-    // A start that's typed is the first of the two again, and the end is the first time after it.
+    // A start that's typed is the first of the two again.
     expect(checkSession({ ...form, start: '01:15' }).fields).toMatchObject({ start: '2026-11-01T01:15-04:00', durationMinutes: 135 })
+  })
+
+  it('keeps a session that ends at the second 1:30 where it ends while its end is unchanged', () => {
+    const form = sessionFormValues(session('2026-11-01T04:00:00.000Z', 150))
+    expect(form).toMatchObject({ day: '2026-11-01', start: '00:00', endDay: '2026-11-01', end: '01:30' })
+    // Changing the start keeps the end at the second 1:30, rather than the first.
+    expect(checkSession({ ...form, start: '00:30' }).fields).toMatchObject({ start: '2026-11-01T00:30-04:00', durationMinutes: 120 })
+    // An end that's typed is the first of the two after the start.
+    expect(checkSession({ ...form, end: '01:45' }).fields).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 105 })
+  })
+
+  it('reads the days and times of a session that lasts several days', () => {
+    const form = sessionFormValues(session('2026-11-13T23:00:00.000Z', 32 * 60))
+    expect(form).toMatchObject({ day: '2026-11-13', lastDay: '2026-11-13', start: '18:00', endDay: '2026-11-15', end: '02:00' })
+    expect(checkSession({ ...form, name: 'X' }).fields).toMatchObject({ start: '2026-11-13T18:00-05:00', durationMinutes: 32 * 60 })
   })
 
   it('names a session as its type does, with its collective in upper case for a takeover', () => {
@@ -317,13 +387,12 @@ describe('checkSet', () => {
     })
   })
 
-  it('takes a duration from a minute to 24 hours, or none while it is not known', () => {
+  it('takes a duration from a minute, or none while it is not known', () => {
     const duration = (hours: string, minutes: string) => checkSet({ ...FORM, duration: { hours, minutes } })
     expect(duration('', '').fields).toMatchObject({ durationMinutes: null })
     expect(duration('', '1').fields).toMatchObject({ durationMinutes: 1 })
-    expect(duration('24', '').fields).toMatchObject({ durationMinutes: 1440 })
-    expect(duration('24', '1').errors).toEqual({ duration: 'Un set dure au plus 24 heures.' })
-    for (const [hours, minutes] of [['0', '0'], ['1', '60'], ['x', ''], ['-1', '']]) {
+    expect(duration('25', '').fields).toMatchObject({ durationMinutes: 1500 })
+    for (const [hours, minutes] of [['0', '0'], ['1', '60'], ['x', ''], ['-1', ''], ['8765832', '1']]) {
       expect(duration(hours, minutes).errors, `${hours} h ${minutes}`).toEqual({ duration: 'La durée est invalide.' })
     }
   })

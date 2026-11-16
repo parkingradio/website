@@ -22,6 +22,7 @@ import {
   SetFields,
   SetPosition,
   Status,
+  after,
   sessionTitle,
 } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
@@ -205,13 +206,6 @@ function link(id: string | null, url: (id: string) => string): z.infer<typeof Li
 
 function applicationLink(row: StoredSession | StoredSet): z.infer<typeof ApplicationLink> | null {
   return row.application && { id: row.application.id, receivedAt: row.application.receivedAt.toISOString() }
-}
-
-const MINUTE_MS = 60 * 1000
-
-// `minutes` after `date`, in minutes that actually pass.
-function after(date: Date, minutes: number): Date {
-  return new Date(date.getTime() + minutes * MINUTE_MS)
 }
 
 // The fields are listed one by one, so that a column added to a table doesn't end up in the API unless it's added here.

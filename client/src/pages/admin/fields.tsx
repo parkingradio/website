@@ -44,7 +44,7 @@ export function DurationField({
   error: string | undefined
 }) {
   const id = useId()
-  const input = (part: keyof Duration, max: number) => (
+  const input = (part: keyof Duration, max?: number) => (
     <input
       type="number"
       inputMode="numeric"
@@ -61,7 +61,7 @@ export function DurationField({
       <div className="admin-row admin-times admin-duration" role="group" aria-labelledby={id}>
         <label>
           heures
-          {input('hours', 99)}
+          {input('hours')}
         </label>
         <label>
           minutes

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DATE_TIME_DESCRIPTION, QUEBEC_TIME_RULE, instantWith } from '../api/formats.js'
+import { DATE_TIME_DESCRIPTION, EARLIEST_INSTANT, LATEST_INSTANT, QUEBEC_TIME_RULE, instantWith } from '../api/formats.js'
 import { objectError } from '../api/schemas.js'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES } from '../applications/fields.js'
 import { GENRES } from '../artists/profile.js'
@@ -54,8 +54,17 @@ export const NO_SUCH_APPLICATION = 'No such application'
 export const NOT_THE_SETS_APPLICATION = "A set's application is one of its performers'"
 export const NOT_THE_SESSIONS_APPLICATION = "A session's application is that of the collective whose takeover it is"
 
-// The longest a session or a set lasts, in minutes: 24 hours, so that a typo can't make a session overlap days of others.
-const MAX_MINUTES = 24 * 60
+// A session takes place within the years 2000 to 2999, in UTC: it starts in them, and ends by the start of 3000 (see
+// "Times" in docs/design/server/sessions.md). So a duration, a session's or a set's, is at most the time from the start of
+// 2000 to the start of 3000, in minutes, which also keeps it within the database's integers.
+const MINUTE_MS = 60 * 1000
+export const MAX_MINUTES = (LATEST_INSTANT - EARLIEST_INSTANT) / MINUTE_MS
+
+// `minutes` after `date`, in minutes that actually pass, e.g. a session's end.
+export function after(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * MINUTE_MS)
+}
+const ENDS_BY_3000 = 'A session ends by the start of the year 3000, in UTC'
 
 // A value, or null, or a blank string, for none, that's sent as a string, which `parse` turns into what's kept, or null
 // when it isn't one, which fails with `message`. It's trimmed first.
@@ -125,20 +134,25 @@ const description = z
 // with the fields it doesn't send as they are (see "Changes" in docs/design/server/README.md).
 export type BrokenRule = { message: string; field: string }
 
-// The rules of a session's type, its takeover's collective and its application, by their ids, and its name (see "Types
-// and names" and "Applications" in docs/design/server/sessions.md). The store checks the rest of its application's rule,
-// which needs the application (see `checkSessionApplication` in sessions/store.ts).
+// The rules of a session's start and duration, of its type, its takeover's collective and its application, by their ids,
+// and its name (see "Times", "Types and names" and "Applications" in docs/design/server/sessions.md). The store checks the
+// rest of its application's rule, which needs the application (see `checkSessionApplication` in sessions/store.ts).
 export function brokenSessionRule({
+  start,
+  durationMinutes,
   type,
   takeover,
   application,
   name,
 }: {
+  start: Date | null
+  durationMinutes: number
   type: SessionType
   takeover: string | null
   application: string | null
   name: string
 }): BrokenRule | null {
+  if (start && after(start, durationMinutes).getTime() > LATEST_INSTANT) return { message: ENDS_BY_3000, field: 'durationMinutes' }
   if (type === 'takeover' && takeover === null) return { message: 'A takeover has a collective', field: 'takeover' }
   if (type !== 'takeover' && takeover !== null) return { message: 'Only a takeover has a collective', field: 'takeover' }
   if (type === 'other' && name === '') return { message: 'A session of type other has a name', field: 'name' }
@@ -166,7 +180,9 @@ export const SESSION_FIELDS = {
     START,
     `${DATE_TIME_DESCRIPTION}, from 2000 to 2999 in UTC`,
   ),
-  durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES),
+  durationMinutes: minutes(`The duration must be a whole number of minutes, from 1 to ${MAX_MINUTES}`, 1, MAX_MINUTES).meta({
+    description: `Minutes that actually pass, whatever the clocks say. ${ENDS_BY_3000}`,
+  }),
   type: SessionType,
   takeover: orNone(
     lowerCase,

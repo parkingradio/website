@@ -33,6 +33,8 @@ const INVARIANTS: Record<string, SQL> = {
     select session_id::text from sets group by session_id having min(position) <> 0 or max(position) <> count(*) - 1 or count(distinct position) <> count(*)`,
   'A session starts from the year 2000 to the year 2999, in UTC': sql`
     select id::text from sessions where start_at < '2000-01-01T00:00:00Z' or start_at >= '3000-01-01T00:00:00Z'`,
+  'A session ends by the start of the year 3000, in UTC': sql`
+    select id::text from sessions where start_at + duration_minutes * interval '1 minute' > '3000-01-01T00:00:00Z'`,
 }
 
 // Throws an error that lists every rule that doesn't hold, with what breaks it.

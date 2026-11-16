@@ -1958,7 +1958,8 @@
           "durationMinutes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1440
+            "maximum": 525949920,
+            "description": "Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC"
           },
           "type": {
             "$ref": "#/components/schemas/SessionType"
@@ -2540,7 +2541,8 @@
           "durationMinutes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 1440
+            "maximum": 525949920,
+            "description": "Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC"
           },
           "type": {
             "$ref": "#/components/schemas/SessionType"
@@ -2825,7 +2827,7 @@
               {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 1440
+                "maximum": 525949920
               },
               {
                 "type": "null"
@@ -7903,7 +7905,8 @@
                   "durationMinutes": {
                     "type": "integer",
                     "minimum": 1,
-                    "maximum": 1440
+                    "maximum": 525949920,
+                    "description": "Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC"
                   },
                   "type": {
                     "$ref": "#/components/schemas/SessionType"
@@ -8822,7 +8825,7 @@
                       {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 1440
+                        "maximum": 525949920
                       },
                       {
                         "type": "null"

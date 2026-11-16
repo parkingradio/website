@@ -69,6 +69,30 @@ describe("sessions' days and times", () => {
     expect(sessionHours(session)).toBe('23 h – 1 h 30')
     expect(sessionWhen(session)).toBe('samedi 14 novembre 2026, de 23 h à 1 h 30 le lendemain')
   })
+
+  it("say the day a session ends, when its times alone don't say it", () => {
+    // Times in Québec, from November 13th, 2026, a Friday.
+    const at = (day: number, time: string) => new Date(`2026-11-${day}T${time}:00-05:00`).toISOString()
+    const times = (start: string, end: string) => {
+      const session = { start, end, durationMinutes: (Date.parse(end) - Date.parse(start)) / 60000 }
+      return [sessionHours(session), sessionWhen(session)]
+    }
+    expect(times(at(14, '21:00'), at(14, '23:00'))).toEqual(['21 h – 23 h', 'samedi 14 novembre 2026, de 21 h à 23 h'])
+    expect(times(at(14, '21:00'), at(15, '01:00'))).toEqual(['21 h – 1 h', 'samedi 14 novembre 2026, de 21 h à 1 h le lendemain'])
+    // The next day, at the same time or later.
+    expect(times(at(14, '21:00'), at(15, '21:00'))).toEqual(['21 h – dim. 15 nov., 21 h', 'samedi 14 novembre 2026, de 21 h à 21 h le lendemain'])
+    expect(times(at(14, '18:00'), at(15, '20:00'))).toEqual(['18 h – dim. 15 nov., 20 h', 'samedi 14 novembre 2026, de 18 h à 20 h le lendemain'])
+    // Later.
+    expect(times(at(13, '18:00'), at(15, '02:00'))).toEqual([
+      '18 h – dim. 15 nov., 2 h',
+      'du vendredi 13 novembre 2026 à 18 h au dimanche 15 novembre 2026 à 2 h',
+    ])
+    // Across a new year, without its year.
+    expect(times('2027-12-30T23:00:00.000Z', '2028-01-02T01:00:00.000Z')).toEqual([
+      '18 h – sam. 1 janv., 20 h',
+      'du jeudi 30 décembre 2027 à 18 h au samedi 1 janvier 2028 à 20 h',
+    ])
+  })
 })
 
 describe('dates and times', () => {

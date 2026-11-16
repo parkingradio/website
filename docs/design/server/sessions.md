@@ -86,20 +86,25 @@ Québec time, with or without seconds, with the offset from UTC in effect then, 
 `"2026-11-14T21:00-04:00"`, and so is a time the clocks skip, e.g. 2:30 on March 14, 2027. A time they show twice, e.g.
 1:30 on November 1, 2026, takes the offset of the one it is: -04:00 for the first, -05:00 for the second. Responses give
 it, and the `end` the server works out, in Québec time, to the second, with the offset in effect then, e.g.
-`"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start is from the year 2000 to the
-year 2999, in UTC, and can be in the past or in the future.
+`"2026-11-14T21:00:00-05:00"` (see [Times, in Conventions](README.md#conventions)). A start can be in the past or in the
+future.
 
 A set has a duration, which can be null while it isn't known yet, but no start: its place in its session is its place
 among the session's sets (see [Sets' order](#sets-order)).
 
 Durations are whole numbers of minutes, of time that actually passes, whatever the clocks say: a session from 21:00 to
-2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A duration is from 1 minute to 24 hours (1440
-minutes).
+2:00 on the night the clocks go back an hour lasts 360 minutes, not 300. A session can last several days, e.g. a weekend,
+which is one session. It takes place within the years 2000 to 2999, in UTC: it starts in them, and ends at the latest at
+the start of 3000, which is checked on the session as it would then be, e.g. when a session without a start is given
+one. Requests that would make it end later fail with 400 (`"A session ends by the start of the year 3000, in UTC"`). A
+duration, a session's or a set's, is at least 1 minute, and at most the time from the start of 2000 to the start of
+3000.
 
 To find the sessions of a period, e.g. next week, list them with `from` and `to`, instants like `start`, each with the
 offset in effect at that time: that gives the sessions that start at or after `from` and before `to`, and leaves out
 those without a start. `from` alone gives those from then on. E.g. for the week of Monday, October 26, 2026, when the
-clocks go back: `from` `"2026-10-26T00:00-04:00"`, `to` `"2026-11-02T00:00-05:00"`.
+clocks go back: `from` `"2026-10-26T00:00-04:00"`, `to` `"2026-11-02T00:00-05:00"`. A session that starts before `from`
+isn't among them, even when it's still going on then.
 
 ## Rules
 
@@ -389,7 +394,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | The request is malformed, a field isn't valid, the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 |
+| 400 | The request is malformed, a field isn't valid, the session would end after the start of the year 3000 (see [Times](#times)), the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)), or one of the sets would fail with 409, with what's in the way, or, when that's another set of the list, its place in `sets`, `otherSetIndex` |
 | 413 | The flyer is larger than 10 MB |
 | 502 | One of the sets' tracks has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
@@ -410,10 +415,11 @@ start, and with 404 when there's no such session.
 
 Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, and leaves the others as they are (see
 [Changes, in Conventions](README.md#conventions)). It takes JSON, with any of its `start`, `durationMinutes`, `type`,
-`takeover`, `application`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the session's flyer, and
-deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its `type`, `takeover`,
-`application` and `name` are checked together, and it's checked against the other sessions, as the session would then be. Responds like
-`PUT`, and fails like it, but with 400 when there's no field.
+`takeover`, `application`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the
+session's flyer, and deletes it, and `false` keeps it, like leaving it out. A flyer is only replaced with `PUT`. Its
+`start` and `durationMinutes` are checked together, and so are its `type`, `takeover`, `application` and `name`, and
+it's checked against the other sessions, as the session would then be. Responds like `PUT`, and fails like it, but with
+400 when there's no field.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 

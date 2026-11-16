@@ -18,7 +18,7 @@ import { applicationsStore } from '../applications/store.js'
 import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
-import { SESSION_FIELDS, SET_FIELDS } from './fields.js'
+import { MAX_MINUTES, SESSION_FIELDS, SET_FIELDS } from './fields.js'
 import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
@@ -119,13 +119,14 @@ const Kind = mostly<Kind>(
   ),
 )
 
-// Sessions over a couple of evenings.
+// Sessions over a couple of evenings, some of which last several days, and one just before the year 3000, in UTC, by
+// which sessions end.
 const SessionFields = fc.record({
   start: mostly<string | null>(
-    fc.option(fc.constantFrom('2026-11-14T18:00-05:00', '2026-11-14T21:00-05:00', '2026-11-14T23:30-05:00', '2026-11-15T21:00-05:00')),
+    fc.option(fc.constantFrom('2026-11-14T18:00-05:00', '2026-11-14T21:00-05:00', '2026-11-14T23:30-05:00', '2026-11-15T21:00-05:00', '2999-12-31T18:00-05:00')),
     fc.constant('1999-12-31T21:00-05:00'),
   ),
-  durationMinutes: mostly<number>(fc.constantFrom(1, 60, 120, 240, 1440), fc.constantFrom(0, 1441)),
+  durationMinutes: mostly<number>(fc.constantFrom(1, 60, 120, 240, 1440, 2880, 4320, MAX_MINUTES), fc.constantFrom(0, MAX_MINUTES + 1)),
   kind: Kind,
   application: Application,
 })
@@ -158,12 +159,12 @@ const TRACKS: Record<string, string | null> = {
 }
 const VIDEOS = ['a', 'b', 'c', 'd', 'e'].map((letter) => letter.repeat(11))
 
-const DURATION = fc.constantFrom(1, 30, 60, 120, 240, 1440)
+const DURATION = fc.constantFrom(1, 30, 60, 120, 240, 1440, 2880, MAX_MINUTES)
 
 // A set's duration: mostly one, sometimes none, which isn't known yet.
 const SetDuration = mostly<number | null>(
   fc.oneof({ arbitrary: DURATION, weight: 3 }, { arbitrary: fc.constant(null), weight: 1 }),
-  fc.constantFrom(0, 1441),
+  fc.constantFrom(0, MAX_MINUTES + 1),
 )
 
 // Where a set is moved to: mostly a place among a few sets, sometimes past the last, or else not a place.

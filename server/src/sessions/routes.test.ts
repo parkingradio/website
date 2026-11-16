@@ -435,7 +435,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       let response = await createSession(app, { durationMinutes: 0 })
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 1440' })
+      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 525949920' })
       response = await createSession(app, { takeover: 'artist-1' })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'No such collective' })
@@ -510,7 +510,7 @@ describe('sessions routes', () => {
     it('refuses an invalid set, saying which, before asking SoundCloud or storing the flyer, and without a set for the session itself', async () => {
       const app = await buildApp()
       const invalid = [
-        [set({ durationMinutes: 0 }), 'The duration must be a whole number of minutes, from 1 to 1440, or null'],
+        [set({ durationMinutes: 0 }), 'The duration must be a whole number of minutes, from 1 to 525949920, or null'],
         [set({ offsetMinutes: 0 }), 'Unknown field: `offsetMinutes`'],
         [set({ performers: [] }), 'A set has at least one performer'],
         [{ ...set(), title: 'X' }, 'Unknown field: `title`'],
@@ -523,7 +523,7 @@ describe('sessions routes', () => {
         expect(response.json()).toEqual({ ok: false, error, setIndex: 1 })
       }
       const response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set()], { durationMinutes: 0 }))
-      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 1440' })
+      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 525949920' })
       expect(resolveTrack).not.toHaveBeenCalled()
       expect(photos.store).not.toHaveBeenCalled()
       expect(store.create).not.toHaveBeenCalled()
@@ -1132,7 +1132,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await createSession(app)
       const invalid = [
-        [{ durationMinutes: 0 }, 'The duration must be a whole number of minutes, from 1 to 1440'],
+        [{ durationMinutes: 0 }, 'The duration must be a whole number of minutes, from 1 to 525949920'],
         [{ title: 'X' }, 'Unknown field: `title`'],
         [{ removeFlyer: 'true' }, 'removeFlyer must be true or false'],
         [{}, 'There must be at least one field to change'],
@@ -1316,9 +1316,9 @@ describe('sessions routes', () => {
     it('refuses an invalid set, saying what is wrong, before asking SoundCloud, or performers who do not exist', async () => {
       const app = await buildApp()
       await createSession(app)
-      let response = await addSet(app, 'session-1', { durationMinutes: 1441 })
+      let response = await addSet(app, 'session-1', { durationMinutes: 525949921 })
       expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 1440, or null' })
+      expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 525949920, or null' })
       expect(resolveTrack).not.toHaveBeenCalled()
       for (const performer of ['artist-9', 'collective-1']) {
         response = await addSet(app, 'session-1', { performers: [{ id: performer }] })

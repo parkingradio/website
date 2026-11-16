@@ -178,13 +178,24 @@ ondes="$(first_id)"
 echo "  an invalid session is explained, including one with the NUL character"
 session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 0)"
 expect_status 400
-expect_body_contains '"error":"The duration must be a whole number of minutes, from 1 to 1440"'
+expect_body_contains '"error":"The duration must be a whole number of minutes, from 1 to 525949920"'
 # Postgres can't keep it.
 session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"name":"HAUTE\u0000RIVE"')"
 expect_status 400
 expect_body_contains '"error":"Text can'"'"'t contain the NUL character"'
 session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"raEvent":"https://ra.co/events/6683745\u0000"')"
 expect_status 400
+
+echo "  a session can last several days, but ends by the start of the year 3000, in UTC"
+session_form POST "$SESSIONS" "$(session_json '"2027-06-11T18:00-04:00"' 3360)"
+expect_status 200
+weekend="$(first_id)"
+expect_body_contains '"start":"2027-06-11T18:00:00-04:00","end":"2027-06-14T02:00:00-04:00","durationMinutes":3360'
+json DELETE "${SESSIONS}/${weekend}"
+expect_status 200
+session_form POST "$SESSIONS" "$(session_json '"2999-12-31T18:00-05:00"' 61)"
+expect_status 400
+expect_body_contains '"error":"A session ends by the start of the year 3000, in UTC"'
 
 echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in Québec time and its RA event reduced"
 session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
