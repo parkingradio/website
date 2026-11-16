@@ -2023,6 +2023,39 @@ describe("A new session's sets", () => {
     expect(setForm('Set de Aurore').getByText('La session dure 4 h.')).toBeInTheDocument()
   })
 
+  it("places a set as the session's times were when its form opened, even when they change while it's open", async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    // Opened before the session's times: an hour after its start, whatever they become.
+    fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    let form = setForm('Nouveau set')
+    fireEvent.change(within(form.getByRole('group', { name: 'Début, après celui de la session' })).getByLabelText('heures'), { target: { value: '1' } })
+    await fillIn()
+    fireEvent.click(form.getByRole('combobox', { name: 'Ajouter un artiste' }))
+    fireEvent.mouseDown(form.getByRole('option', { name: /^Aurore/ }))
+    fireEvent.click(form.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
+    expect(rows(setsTable())[0][0]).toBe('22 h – 23 h')
+
+    // Opened while the session starts at 21:00: from 23:00, two hours after its start, even once it starts at 20:00.
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    form = setForm('Nouveau set')
+    fireEvent.change(form.getByLabelText('Début'), { target: { value: '23:00' } })
+    fireEvent.change(form.getByLabelText('Fin'), { target: { value: '00:00' } })
+    fireEvent.change(screen.getAllByLabelText('Début')[0], { target: { value: '20:00' } })
+    fireEvent.click(form.getByRole('combobox', { name: 'Ajouter un artiste' }))
+    fireEvent.mouseDown(form.getByRole('option', { name: /^Brume/ }))
+    fireEvent.click(form.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
+    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
+      ['21 h – 22 h', 'Aurore'],
+      ['22 h – 23 h', 'Brume'],
+    ])
+  })
+
   it("can't be sent with a set's form open, which it says", async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')

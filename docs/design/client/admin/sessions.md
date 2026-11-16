@@ -210,10 +210,12 @@ When the collectives can't be loaded, the form says so: the session's collective
 After its fields, a new session's form has its sets, which are only sent with it. They're added, changed and listed as
 on a session's page (see [A set's form](#a-sets-form)), except that:
 
-- Their rows have no status, and their links open in a new tab. "×" takes a set out of the list, without confirming.
+- Their rows have no status, and no "⚠", which the session's page shows once the session is added. Their links open
+  in a new tab. "×" takes a set out of the list, without confirming.
 - Their places are relative to the session's start, so they move with it. While its times aren't valid, they're placed
-  as in a session without a date whose duration isn't known, so a new one lasts an hour, and their form says so. A set's
-  form keeps the session's times as they were when it opened.
+  as in a session without a date whose duration isn't known, so a new one lasts an hour, and their form says « Quand a
+  lieu la session n'est pas encore indiqué. » in place of when the session is. A set's form keeps the session's times as
+  they were when it opened.
 - "ajouter la session" can't be used while a set's form is open, saying « Ajoutez d'abord le set, ou annulez-le. »,
   or « Enregistrez d'abord le set, ou annulez-le. » for a listed set's, and the sets can't be changed while it's sent.
 

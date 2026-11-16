@@ -38,7 +38,7 @@ A session, as the endpoints below return it, also has:
 | `end` | string or null | When the session ends: its `start` plus its `durationMinutes`, or null when it has no `start` |
 | `effectiveDescription` | string | The session's description: its `description`, or else the one its type gives it, or `""` when neither has one: see [Descriptions](#descriptions) |
 | `hasFlyer` | boolean | Whether the session has a flyer: see [Flyers](#flyers) |
-| `sets` | list of sets | Its sets, by `offsetMinutes`, the sets without an offset last, then in the order they were added, or sent with their session, cancelled ones included |
+| `sets` | list of sets | Its sets, by `offsetMinutes`, the sets without an offset last, then in the order they were added, those added with their session in the order they were sent, cancelled ones included |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Status changes don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
@@ -49,8 +49,9 @@ A session, as the endpoints below return it, also has:
 
 Every set belongs to a session: the one it's added to, or added with, which doesn't change. Sets aren't listed on their
 own: they're in their sessions, and the `total` of a list of sessions counts sessions, not sets. A session can be added
-with its sets, all of them or nothing, in a single request (see
-[`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A set has:
+with its sets, all of them or nothing, in a single request, whose errors about one of the sets say which it is, by its
+place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A
+set has:
 
 | Field | Type | |
 |---|---|---|
@@ -127,7 +128,8 @@ linked to without another request. `set` is the set in the way, if it's a set, o
 in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
 the way, and a collective that has takeovers has one of them. When several things are in the way, it's one of them. Both
 are null for the 409s that aren't about a session or a set, and when the set in the way is another one of the same
-request, which `otherSetIndex` gives instead (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
+request, which `otherSetIndex` gives instead, by its place in the list of sets sent, from 0 (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
 ## Sets' places
 
@@ -368,7 +370,8 @@ JSON, in a field rather than a file, which are its `start`, `durationMinutes`, `
 flyer, which can be left out. A few other fields or files are ignored, but a second flyer isn't: the request fails.
 
 `sets` is a list of sets, each as [`POST /api/admin/sessions/:id/sets`](#post-apiadminsessionsidsets-admin) takes it,
-which are added in order, as that endpoint would add each one right after the session and the sets before it. Their
+refusing the fields it doesn't take, which are added in order, as that endpoint would add each one right after the
+session and the sets before it. Their
 tracks are resolved once every field is valid, before anything is checked against what's saved, e.g. that the session
 doesn't overlap another: an error about resolving a track comes first.
 
