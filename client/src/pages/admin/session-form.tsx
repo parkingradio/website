@@ -44,8 +44,6 @@ import type { GroupProps } from './profile-fields'
 export type SessionFormProps = {
   // What the form starts with: a session's, to change it, or what a new one starts with.
   initial: SessionFormValues
-  // Whether the session has sets, which move with it.
-  hasSets?: boolean
   // Whether the session is announced, which it has to have a date for.
   announced?: boolean
   // The address of the session's flyer, if it has one.
@@ -70,7 +68,6 @@ export type SessionFormProps = {
 
 export function SessionForm({
   initial,
-  hasSets = false,
   announced = false,
   flyer: current = null,
   collectives,
@@ -112,7 +109,6 @@ export function SessionForm({
         <TimesField
           form={form}
           times={times}
-          hasSets={hasSets || (sets?.length ?? 0) > 0}
           onChange={(changes) => {
             update(changes)
             // So that it says right away when an announced session is left without a date.
@@ -196,14 +192,12 @@ export function SessionForm({
 function TimesField({
   form,
   times,
-  hasSets,
   onChange,
   errors,
   onLeave,
 }: {
   form: SessionFormValues
   times: ReturnType<typeof sessionTimes>
-  hasSets: boolean
   onChange: (changes: Partial<SessionFormValues>) => void
   errors: Partial<Record<'undated' | 'day' | 'start' | 'end' | 'duration', string>>
   onLeave: () => void
@@ -270,7 +264,6 @@ function TimesField({
           <FieldError message={error} />
         </>
       )}
-      {hasSets && <p className="admin-hint">Ses sets se déplacent avec elle.</p>}
     </fieldset>
   )
 }
