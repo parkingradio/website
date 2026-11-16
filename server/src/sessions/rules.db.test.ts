@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
-import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
+import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
 import type { Photos } from '../artists/store.js'
@@ -25,7 +25,10 @@ import { checkSessionsInvariants } from './test-invariants.js'
 
 // Property-based tests of the rules of sessions and sets (see "Rules" and "Applications" in docs/design/server/sessions.md), against a real
 // database: random sequences of requests, through the routes, after each of which every rule must still hold (see
-// test-invariants.ts), the server must not have failed, and a 409 must be about a rule, with what's really in the way.
+// test-invariants.ts), the server must not have failed, a 409 must be about a rule, with what's really in the way, and
+// the statuses of sessions and sets must have changed as the request says they do, and no other way (see "Status" in
+// docs/design/server/sessions.md, and `expectStatuses`), which isn't an invariant: e.g. a session marked planned by
+// hand can have sets that are all done.
 //
 // Each operation is plain data, which fast-check generates and shrinks, and that `run` sends. What it acts on, e.g. the
 // session a set is added to, is an index into the ids of what exists, in the order it was added, or an id of nothing
@@ -52,13 +55,87 @@ type Session = {
   sets: StudioSet[]
 }
 
-// An operation: how to generate it, and how often, relative to the others, how to send it, and how to check the 409s it
-// can get, which are about the rules, each by its message.
+// An operation: how to generate it, and how often, relative to the others, how to send it, how to check the 409s it
+// can get, which are about the rules, each by its message, and, for those that change a status, add a set to a session or
+// delete one, which ones, found before it's sent, since deleting a set leaves it out of the ids (see `expectStatuses`).
 type Operation<Args> = {
   args: fc.Arbitrary<Args>
   weight: number
   run(context: Context, args: Args): Promise<LightMyRequestResponse>
   conflicts?: Record<string, (body: Body, args: Args, context: Context) => Promise<void> | void>
+  statusRequest?: (context: Context, args: Args) => StatusRequest
+}
+
+// What an operation asks that can change statuses: a session's or a set's, or adding a set to a session, or deleting one.
+type StatusRequest = { session: string; status: string } | { set: string; status: string } | { addedTo: string } | { deletedSet: string }
+
+// The status of every session and set, by id, who last changed it and when, in milliseconds, and, for a set, its session.
+type StatusRow = { status: string; by: string | null; at: number | null; session: string | null }
+type Statuses = Map<string, StatusRow>
+
+async function statuses(database: TestDatabase): Promise<Statuses> {
+  const { rows } = await database.db.execute<StatusRow & { id: string }>(sql`
+    select id::text, status::text, status_updated_by as by, (extract(epoch from status_updated_at) * 1000)::float8 as at, null as session
+    from sessions
+    union all
+    select id::text, status::text, status_updated_by, (extract(epoch from status_updated_at) * 1000)::float8, session_id::text from sets`)
+  return new Map(rows.map(({ id, ...row }) => [id, row]))
+}
+
+// The statuses that the sessions and the sets of `before` should have once `request` succeeded, by id, and whether it
+// changed them, as the admin who sent it, all at the same time, with the sets of each session as they are `after` it:
+// - a session's status changes, and cancelling it cancels its sets that aren't, while marking it done marks its planned
+//   sets done;
+// - a set's status changes, or it's added, as planned, or deleted, after which its session, if it's done, with a set
+//   that's planned, is planned again, or, if it's planned, with at least one set that's done and none that's planned,
+//   becomes done.
+function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequest): Map<string, { status: string; changed: boolean }> {
+  const expected = new Map([...before].map(([id, { status }]) => [id, { status, changed: false }]))
+  const mark = (id: string, status: string) => expected.set(id, { status, changed: true })
+  const setsOf = (session: string) => [...after].filter(([, row]) => row.session === session).map(([id]) => id)
+  const followSets = (session: string) => {
+    // A set that's just added is planned.
+    const statuses = setsOf(session).map((id) => expected.get(id)?.status ?? 'planned')
+    const { status } = expected.get(session)!
+    if (status === 'done' && statuses.includes('planned')) mark(session, 'planned')
+    if (status === 'planned' && statuses.includes('done') && !statuses.includes('planned')) mark(session, 'done')
+  }
+  if ('session' in request) {
+    mark(request.session, request.status)
+    for (const set of setsOf(request.session)) {
+      const { status } = expected.get(set)!
+      if (request.status === 'cancelled' ? status !== 'cancelled' : request.status === 'done' && status === 'planned') mark(set, request.status)
+    }
+  } else {
+    if ('set' in request) mark(request.set, request.status)
+    followSets('addedTo' in request ? request.addedTo : before.get('set' in request ? request.set : request.deletedSet)!.session!)
+  }
+  return expected
+}
+
+// Checks that statuses changed from `before` to `after` as `request`, if it's sent and succeeded, says, and that nothing
+// else changed them: what's added is planned, and what's changed is changed by the admin, at the same time, since the
+// step started, `since`, give or take a second when a set is added, whose session's status then has the time of the
+// database's clock, as the set's addition does.
+function expectStatuses(before: Statuses, after: Statuses, request: StatusRequest | null, since: number, where: string) {
+  const expected = request ? expectedStatuses(before, after, request) : null
+  const at = new Set<number | null>()
+  for (const [id, row] of after) {
+    const was = before.get(id)
+    if (!was) {
+      expect(row, `${where}: ${id}, added`).toMatchObject({ status: 'planned', by: null, at: null })
+      continue
+    }
+    const { status, changed } = expected?.get(id) ?? { status: was.status, changed: false }
+    if (!changed) {
+      expect(row, `${where}: ${id}, unchanged`).toEqual(was)
+      continue
+    }
+    expect(row, `${where}: ${id}, changed`).toMatchObject({ status, by: TEST_ADMIN.email })
+    expect(row.at, `${where}: when ${id} changed`).toBeGreaterThanOrEqual(request && 'addedTo' in request ? since - 1000 : since)
+    at.add(row.at)
+  }
+  expect(at.size, `${where}: when the statuses changed`).toBeLessThanOrEqual(1)
 }
 
 const SESSION_OVERLAPS = 'Another session overlaps this one'
@@ -353,6 +430,7 @@ const OPERATIONS = {
     weight: 2,
     args: fc.record({ session: fc.nat(), status: STATUS }),
     run: (context, { session, status }) => send(context, 'PUT', `/api/admin/sessions/${pick(context.ids.sessions, session)}/status`, { status }),
+    statusRequest: (context, { session, status }) => ({ session: pick(context.ids.sessions, session), status }),
     conflicts: {
       // The session is as it was, since the request failed.
       [SESSION_OVERLAPS]: async (body, { session }, context) => {
@@ -388,6 +466,7 @@ const OPERATIONS = {
       }
       return response
     },
+    statusRequest: (context, { session }) => ({ addedTo: pick(context.ids.sessions, session) }),
     conflicts: {
       [SESSION_CANCELLED]: (body, { session }, context) => {
         expect(body.session?.id).toBe(pick(context.ids.sessions, session))
@@ -418,6 +497,7 @@ const OPERATIONS = {
     weight: 3,
     args: fc.record({ set: fc.nat(), status: STATUS }),
     run: (context, { set, status }) => send(context, 'PUT', `/api/admin/sets/${pick(context.ids.sets, set)}/status`, { status }),
+    statusRequest: (context, { set, status }) => ({ set: pick(context.ids.sets, set), status }),
     conflicts: {
       [SESSION_CANCELLED]: (body, { set }, context) => {
         expect(body.session?.status).toBe('cancelled')
@@ -450,6 +530,7 @@ const OPERATIONS = {
     weight: 1,
     args: fc.nat(),
     run: (context, set) => remove(context, `/api/admin/sets/${pick(context.ids.sets, set)}`),
+    statusRequest: (context, set) => ({ deletedSet: pick(context.ids.sets, set) }),
   } satisfies Operation<number>,
 
   // Takes the application from its sets and sessions.
@@ -580,12 +661,16 @@ describe('the rules of sessions and sets', () => {
     await database?.drop()
   })
 
-  it('hold after any sequence of requests, which never fail unexpectedly, and whose 409s say what is really in the way', async () => {
+  it('hold after any sequence of requests, which never fail unexpectedly, whose 409s say what is really in the way, and which change statuses as they say', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(STEP, { maxLength: 40, size: 'max' }), async (steps) => {
         const context: Context = { app, database, cookies: await sessionCookies(), ids: await reset(database) }
+        // The statuses as they are before each step, which are those the step before left.
+        let before = await statuses(database)
         for (const [i, { name, args }] of steps.entries()) {
           const operation: Operation<unknown> = OPERATIONS[name] as Operation<unknown>
+          const request = operation.statusRequest?.(context, args) ?? null
+          const since = Date.now()
           const response = await operation.run(context, args)
           const where = `step ${i}, ${name}: ${response.statusCode} ${response.body}`
           expect(response.statusCode, where).toBeLessThan(500)
@@ -597,6 +682,9 @@ describe('the rules of sessions and sets', () => {
             await check!(body, args, context)
           }
           await checkSessionsInvariants(database.db)
+          const after = await statuses(database)
+          expectStatuses(before, after, response.statusCode === 200 ? request : null, since, where)
+          before = after
         }
       }),
       { numRuns: numberFromEnv('FC_NUM_RUNS') ?? 200, seed: numberFromEnv('FC_SEED'), path: process.env.FC_PATH },

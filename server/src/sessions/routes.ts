@@ -28,7 +28,7 @@ import {
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
 import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
-import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
+import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StatusChangedBy, StoredFlyer, StoredSession, StoredSet } from './store.js'
 
 // Admin routes for sessions and their sets: add, view, change, mark as planned, done or cancelled, and delete them (see
 // docs/design/server/sessions.md).
@@ -390,8 +390,12 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     return { ...changes, soundcloudTrackId: track, soundcloudTrackUrl: soundcloudTrack }
   }
 
+  function statusChangedBy(by: string): StatusChangedBy {
+    return { statusUpdatedBy: by, statusUpdatedAt: new Date() }
+  }
+
   function statusChange(status: z.infer<typeof Status>, by: string) {
-    return { status, statusUpdatedBy: by, statusUpdatedAt: new Date() }
+    return { status, ...statusChangedBy(by) }
   }
 
   const StatusBody = z.strictObject({ status: Status }, { error: objectError(BAD_STATUS) })
@@ -584,7 +588,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: "Changer le statut d'une session" } },
       schema: {
         operationId: 'update_session_status',
-        summary: "Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled",
+        summary: "Marks a session as planned, done or cancelled: cancelling it cancels its sets, and marking it done marks its planned sets done",
         tags: ['Sessions'],
         params: ById,
         body: StatusBody,
@@ -643,7 +647,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Ajouter un set' } },
       schema: {
         operationId: 'create_set',
-        summary: "Adds a set to a session, as planned, after its other sets, and returns the session",
+        summary: 'Adds a set to a session, as planned, after its other sets, and returns the session, which this can make planned again',
         tags: ['Sessions'],
         params: ById,
         body: SetFields,
@@ -712,7 +716,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: "Changer le statut d'un set" } },
       schema: {
         operationId: 'update_set_status',
-        summary: 'Marks a set as planned, done or cancelled, and returns its session',
+        summary: 'Marks a set as planned, done or cancelled, and returns its session, which this can make done, or planned again',
         tags: ['Sessions'],
         params: ById,
         body: StatusBody,
@@ -747,15 +751,16 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Supprimer un set' } },
       schema: {
         operationId: 'delete_set',
-        summary: 'Deletes a set, but not its performers',
+        summary: 'Deletes a set, but not its performers, and returns its session, which this can make done',
         tags: ['Sessions'],
         params: ById,
-        response: { 200: Ok, 404: ApiError },
+        response: { 200: SessionResponse, 404: ApiError },
       },
     },
     async (request, reply) => {
-      if (!(await store.deleteSet(request.params.id))) return reply.status(404).send(NO_SUCH_SET)
-      return { ok: true as const }
+      // Who deleted it, and when, which its session's status gets when that makes it done.
+      const by = statusChangedBy(request.user!.email)
+      return saving(reply, NO_SUCH_SET, () => store.deleteSet(request.params.id, by))
     },
   )
 }

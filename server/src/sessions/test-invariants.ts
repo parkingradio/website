@@ -22,6 +22,9 @@ const INVARIANTS: Record<string, SQL> = {
   'A cancelled session only has cancelled sets': sql`
     select sets.id::text from sets join sessions on sessions.id = sets.session_id
     where sessions.status = 'cancelled' and sets.status <> 'cancelled'`,
+  'A done session has no planned set': sql`
+    select sets.id::text from sets join sessions on sessions.id = sets.session_id
+    where sessions.status = 'done' and sets.status = 'planned'`,
   "A set's application is one of its performers'": sql`
     select sets.id::text from sets join applications on applications.id = sets.application_id
     where not exists (select from set_performers where set_id = sets.id and artist_id = applications.artist_id)`,

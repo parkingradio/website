@@ -127,12 +127,12 @@ const store: SessionsStore = {
     session.sets = others.map((set, i) => ({ ...set, position: i }))
     return session
   }),
-  deleteSet: async (id) => {
+  deleteSet: vi.fn<SessionsStore['deleteSet']>(async (id) => {
     const session = sessionOf(id)
-    if (!session) return false
+    if (!session) return null
     session.sets = session.sets.filter((set) => set.id !== id)
-    return true
-  },
+    return session
+  }),
   ofApplications: async () => [],
 }
 
@@ -1559,10 +1559,13 @@ describe('sessions routes', () => {
   })
 
   describe('DELETE /api/admin/sets/:id', () => {
-    it('deletes the set, or responds 404', async () => {
+    it('deletes the set as the admin, and returns its session, or responds 404', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
-      expect((await send(app, 'DELETE', '/api/admin/sets/set-2')).json()).toEqual({ ok: true })
+      const deleted = await send(app, 'DELETE', '/api/admin/sets/set-2')
+      expect(deleted.statusCode).toBe(200)
+      expect(deleted.json()).toMatchObject({ ok: true, session: { id: 'session-1', sets: [] } })
+      expect(store.deleteSet).toHaveBeenLastCalledWith('set-2', { statusUpdatedBy: 'admin@example.com', statusUpdatedAt: expect.any(Date) })
       expect(rows[0].sets).toEqual([])
       const response = await send(app, 'DELETE', '/api/admin/sets/set-2')
       expect(response.statusCode).toBe(404)

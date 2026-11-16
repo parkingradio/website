@@ -8308,7 +8308,7 @@
     "/api/admin/sessions/{id}/status": {
       "put": {
         "operationId": "update_session_status",
-        "summary": "Marks a session as planned, done or cancelled, and its sets as cancelled when it's cancelled",
+        "summary": "Marks a session as planned, done or cancelled: cancelling it cancels its sets, and marking it done marks its planned sets done",
         "tags": [
           "Sessions"
         ],
@@ -8550,7 +8550,7 @@
     "/api/admin/sessions/{id}/sets": {
       "post": {
         "operationId": "create_set",
-        "summary": "Adds a set to a session, as planned, after its other sets, and returns the session",
+        "summary": "Adds a set to a session, as planned, after its other sets, and returns the session, which this can make planned again",
         "tags": [
           "Sessions"
         ],
@@ -9044,7 +9044,7 @@
       },
       "delete": {
         "operationId": "delete_set",
-        "summary": "Deletes a set, but not its performers",
+        "summary": "Deletes a set, but not its performers, and returns its session, which this can make done",
         "tags": [
           "Sessions"
         ],
@@ -9064,7 +9064,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -9125,7 +9141,7 @@
     "/api/admin/sets/{id}/status": {
       "put": {
         "operationId": "update_set_status",
-        "summary": "Marks a set as planned, done or cancelled, and returns its session",
+        "summary": "Marks a set as planned, done or cancelled, and returns its session, which this can make done, or planned again",
         "tags": [
           "Sessions"
         ],

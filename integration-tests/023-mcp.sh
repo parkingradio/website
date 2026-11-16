@@ -144,6 +144,12 @@ other="$(sql "select id from sets where session_id = '${session}' and id <> '${s
 call update_set_position "{\"id\":\"${other}\",\"position\":0}"
 expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${other}\\\""
 [ "$(sql "select position from sets where id = '${set}'")" = 1 ] || fail "expected the first set to be moved second"
+echo "  a set's status is changed as the admin, which makes its session done once none of its sets is planned, and deleting one gives its session"
+call update_set_status "{\"id\":\"${other}\",\"status\":\"done\"}"
+call delete_set "{\"id\":\"${set}\"}"
+expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${other}\\\""
+[ "$(sql "select status || ' ' || status_updated_by from sessions where id = '${session}'")" = "done ${ADMIN_EMAIL}" ] \
+    || fail "expected the session to be done, as the admin who connected the app"
 call delete_set "{\"id\":\"${other}\"}"
 
 echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, unless it's removed"

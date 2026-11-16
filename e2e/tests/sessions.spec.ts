@@ -510,11 +510,13 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await page.goto(`/admin/artistes/${mine.artist.id}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 
-  // The second set deleted with the × of its row, once confirmed.
+  // The second set deleted with the × of its row, once confirmed, which makes the session jouée, since its other set is
+  // joué.
   await page.goto(sessionPage)
   page.once('dialog', (dialog) => dialog.accept())
   await sets.getByRole('row').nth(2).getByRole('button', { name: /^supprimer : / }).click()
   await expect(sets.getByRole('row')).toHaveCount(2)
+  await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
 
   // Cancelled, with its set, once confirmed.
   page.once('dialog', (dialog) => dialog.accept())

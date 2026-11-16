@@ -646,6 +646,50 @@ describe("A session's page", () => {
     expect(setStatuses.getByRole('button', { name: 'annulé' })).not.toHaveAttribute('aria-disabled')
   })
 
+  it('asks first when marking it jouée marks planned sets, naming them, and not when none is', async () => {
+    const statusButton = async (name: string) => within(await screen.findByRole('group', { name: 'Statut' })).getByRole('button', { name })
+    const done = (session: Session): Session => ({
+      ...session,
+      status: 'done',
+      statusUpdatedBy: 'admin@example.com',
+      statusUpdatedAt: '2026-11-15T04:00:00.000Z',
+      sets: session.sets.map((set) => (set.status === 'planned' ? { ...set, status: 'done' } : set)),
+    })
+    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: done(SESSION) } })
+    const page = renderAt('/admin/sessions/session-1')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    fireEvent.click(await statusButton('jouée'))
+    expect(confirm).toHaveBeenLastCalledWith('Le set planifié sera aussi marqué comme joué\u00a0:\n• Set de Aurore et Brume\nMarquer la session comme jouée ?')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+    fireEvent.click(await statusButton('jouée'))
+    await waitFor(async () => expect(await statusButton('jouée')).toHaveAttribute('aria-pressed', 'true'))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'done' })
+    expect(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'joué' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    page.unmount()
+
+    // Several, each on a line of its own.
+    mockFetch({ ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    const undated = renderAt('/admin/sessions/session-2')
+    confirm.mockReturnValueOnce(false)
+    fireEvent.click(await statusButton('jouée'))
+    expect(confirm).toHaveBeenLastCalledWith('Les sets planifiés seront aussi marqués comme joués\u00a0:\n• Set de Brume\n• Set de Cyan\nMarquer la session comme jouée ?')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-2/status')).toHaveLength(0)
+    undated.unmount()
+
+    // Without planned sets, nothing to ask.
+    confirm.mockClear()
+    const played = { ...SESSION, sets: SESSION.sets.slice(1) }
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: played }, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: done(played) } })
+    renderAt('/admin/sessions/session-1')
+    fireEvent.click(await statusButton('jouée'))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(1))
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
   it('announces the session, and un-announces it, saying who did it', async () => {
     const announced = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
     mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: announced } })
@@ -709,10 +753,16 @@ describe("A session's page", () => {
 
   it("says why the status couldn't be changed, linking to the session it would overlap", async () => {
     const other = SESSIONS[2]
-    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/status': { ok: false, error: 'Another session overlaps this one', session: other, set: null } })
+    // Un-cancelling it, since a cancelled session doesn't count.
+    const cancelled = { ...SESSION, status: 'cancelled' as const, sets: SESSION.sets.map((set) => ({ ...set, status: 'cancelled' as const })) }
+    mockFetch({
+      ...PAGE,
+      '/api/admin/sessions/session-1': { ok: true, session: cancelled },
+      'PUT /api/admin/sessions/session-1/status': { ok: false, error: 'Another session overlaps this one', session: other, set: null },
+    })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut' })).getByRole('button', { name: 'jouée' }))
+    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut' })).getByRole('button', { name: 'planifiée' }))
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent("Le statut n'a pas pu être changé : Another session overlaps this one (SOIRÉE, ven. 2 oct. 2026)")
     expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-3')
@@ -1056,7 +1106,8 @@ describe("A session's page", () => {
         studioSet('set-5', { performers: [{ id: 'artist-5', name: 'Écume' }] }),
       ],
     }
-    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: crowded }, 'DELETE /api/admin/sets/set-4': { ok: true } })
+    const withoutDune = { ...crowded, sets: crowded.sets.filter((set) => set.id !== 'set-4') }
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: crowded }, 'DELETE /api/admin/sets/set-4': { ok: true, session: withoutDune } })
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
@@ -1064,7 +1115,7 @@ describe("A session's page", () => {
     expect(screen.getByRole('status')).toHaveClass('admin-warning')
     expect(rows(setsTable()).map((row) => row[0])).toEqual(['1 h', '45 min', '30 min', 'à déterminer'])
 
-    // Without Dune's set, which the server doesn't answer with the session.
+    // Without Dune's set, as the server then has the session.
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Dune' }))
     await waitFor(() => expect(rows(setsTable())).toHaveLength(3))
@@ -1435,6 +1486,25 @@ describe("A set's form", () => {
     })
   })
 
+  it('shows the session as the server has it once a set is added, which can make it planifiée again', async () => {
+    const played: Session = { ...SESSION, status: 'done', sets: [CYAN_SET, SESSION.sets[2]] }
+    const reopened: Session = {
+      ...played,
+      status: 'planned',
+      statusUpdatedBy: 'admin@example.com',
+      statusUpdatedAt: '2026-11-15T04:00:00.000Z',
+      sets: [...played.sets, studioSet('set-9', { performers: [{ id: 'artist-1', name: 'Aurore' }], durationMinutes: 30 })],
+    }
+    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: played }, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: reopened } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(rows(setsTable())).toHaveLength(3))
+    expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'planifiée' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('changes a set, its duration included, even when the sets then add up to more than the session', async () => {
     mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
@@ -1551,7 +1621,7 @@ describe("A set's form", () => {
   })
 
   it("deletes a set with the × of its row once confirmed, closing its form if it's open, or says why it couldn't", async () => {
-    mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-2': { ok: true } })
+    mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-2': { ok: true, session: { ...SESSION, sets: [SET, SESSION.sets[2]] } } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
@@ -1583,7 +1653,12 @@ describe("A set's form", () => {
 
   it("moves the focus to the previous set's × once the last one is deleted, or to the heading once there are none", async () => {
     const two = { ...SESSION, sets: [SET, CYAN_SET] }
-    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: two }, 'DELETE /api/admin/sets/set-2': { ok: true }, 'DELETE /api/admin/sets/set-1': { ok: true } })
+    mockFetch({
+      ...SET_PAGE,
+      '/api/admin/sessions/session-1': { ok: true, session: two },
+      'DELETE /api/admin/sets/set-2': { ok: true, session: { ...two, sets: [SET] } },
+      'DELETE /api/admin/sets/set-1': { ok: true, session: { ...two, sets: [] } },
+    })
     renderAt('/admin/sessions/session-1')
 
     vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -1603,8 +1678,21 @@ describe("A set's form", () => {
     expect(focused).toBe(screen.getByRole('heading', { level: 2, name: 'Sets' }))
   })
 
+  it('shows the session as the server has it once a set is deleted, which can make it jouée', async () => {
+    const [, cyan, cancelled] = SESSION.sets
+    const played = { ...SESSION, status: 'done' as const, statusUpdatedBy: 'admin@example.com', statusUpdatedAt: '2026-11-15T04:00:00.000Z', sets: [cyan, cancelled] }
+    mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-1': { ok: true, session: played } })
+    renderAt('/admin/sessions/session-1')
+
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    fireEvent.click(await screen.findByRole('button', { name: 'supprimer : Set de Aurore et Brume' }))
+    await waitFor(() => expect(rows(setsTable())).toHaveLength(2))
+    expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(/^Statut changé par admin@example.com le/)).toBeInTheDocument()
+  })
+
   it("closes the form of a set opened while it's being deleted, rather than showing a new set's", async () => {
-    mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-2': { ok: true } })
+    mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-2': { ok: true, session: { ...SESSION, sets: [SET, SESSION.sets[2]] } } })
     renderAt('/admin/sessions/session-1')
 
     vi.spyOn(window, 'confirm').mockReturnValue(true)

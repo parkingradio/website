@@ -501,6 +501,13 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       const sets = uncancelled === 1 ? "son set qui ne l'est pas" : `ses ${uncancelled} sets qui ne le sont pas`
       if (!window.confirm(`Annuler la session annule aussi ${sets}. Annuler la session ?`)) return
     }
+    // Marking it done marks its planned sets done, which could be a set that didn't happen, so they're named.
+    const planned = session.sets.filter((set) => set.status === 'planned')
+    if (status === 'done' && planned.length > 0) {
+      const marked = planned.length === 1 ? 'Le set planifié sera aussi marqué comme joué' : 'Les sets planifiés seront aussi marqués comme joués'
+      const names = planned.map((set) => `• ${setTitle(set)}`).join('\n')
+      if (!window.confirm(`${marked}\u00a0:\n${names}\nMarquer la session comme jouée ?`)) return
+    }
     setBusy(true)
     setError(null)
     const result = await api.PUT('/api/admin/sessions/{id}/status', { params, body: { status } })
@@ -553,7 +560,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     const index = session.sets.findIndex((other) => other.id === set.id)
     const next = session.sets[index + 1] ?? session.sets[index - 1]
     focusNext.current = next ? { id: next.id, action: 'delete' } : 'heading'
-    setSession((session) => ({ ...session, sets: session.sets.filter((other) => other.id !== set.id) }))
+    // As the server has it then, which can be done now that the set is gone.
+    setSession(result.session)
     setOpen((open) => (open?.kind === 'set' && open.id === set.id ? null : open))
   }
 
