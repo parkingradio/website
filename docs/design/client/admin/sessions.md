@@ -177,10 +177,10 @@ bottom, the form has:
 - "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
   times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
-  after. The form doesn't check that the session's sets still fit in it once it's shorter: the session's page then marks
-  those that don't (see [A session's page](#a-sessions-page)). While the session is announced, checking "date à
-  déterminer" shows an error right away, which screen readers announce, « Une session annoncée a une date : retirez
-  d'abord son annonce. », and the form can't be sent until it's un-checked.
+  after. The form doesn't check that the session's sets still fit in the session once it's shorter: the session's page
+  then marks those that don't (see [A session's page](#a-sessions-page)). While the session is announced, checking
+  "date à déterminer" shows an error right away, which screen readers announce, « Une session annoncée a une date :
+  retirez d'abord son annonce. », and the form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
   buttons, in this order.
 - "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the
