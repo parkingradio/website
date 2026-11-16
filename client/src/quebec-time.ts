@@ -18,11 +18,12 @@ const partsFormat = new Intl.DateTimeFormat('en-CA', {
   hourCycle: 'h23',
 })
 
-// The day and time it is in Québec at `instant`, as "YYYY-MM-DD" and "HH:MM".
+// The day and time it is in Québec at `instant`, as "YYYY-MM-DD" and "HH:MM". Years before 1000, which forms' date fields
+// go through as a year is typed, e.g. 0002, are padded too, since Intl doesn't.
 export function quebecDayAndTime(instant: Date): { day: string; time: string } {
   const parts: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
   for (const { type, value } of partsFormat.formatToParts(instant)) parts[type] = value
-  return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+  return { day: `${parts.year!.padStart(4, '0')}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
 }
 
 // The admin lists' search relies on the weekday, the day, the month and the year being next to each other, in that

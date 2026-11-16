@@ -787,13 +787,13 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Marée Basse'], durationMinutes: 60, application: [30, 60], status: 'planned' },
     ],
   },
-  // A weekend, which one session is, coming up, from 18:00 for 55 hours, e.g. to 1:00 two days later, with a few of its
-  // sets planned.
+  // A marathon, which one session is, coming up, over three days: from 18:00 to 1:00 two days later, 31 hours, unless the
+  // clocks change in between, with a few of its sets planned.
   {
     type: 'other',
-    name: 'WEEK-END MODULAIRE',
+    name: 'MARATHON MODULAIRE',
     when: { day: 75, start: '18:00' },
-    durationMinutes: 55 * 60,
+    durationMinutes: 31 * 60,
     status: 'planned',
     sets: [
       { performers: ['Ondine'], durationMinutes: 180, performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire', status: 'planned' },

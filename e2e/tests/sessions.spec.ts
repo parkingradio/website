@@ -41,13 +41,13 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(rowsOf(sets, 'Écume').getByRole('cell').first()).toHaveText('à déterminer')
   await page.goBack()
 
-  // The weekend, which says the day it ends on, in the list and on its page.
-  await search.fill('week-end modulaire')
-  const weekend = rowsOf(page, 'WEEK-END MODULAIRE')
-  await expect(weekend).toContainText(/18 h – \S+\. \d+ \S+, \d+ h/)
-  await weekend.getByRole('link').first().click()
+  // The one over three days, which says the day it ends on, in the list and on its page.
+  await search.fill('marathon modulaire')
+  const marathon = rowsOf(page, 'MARATHON MODULAIRE')
+  await expect(marathon).toContainText(/18 h – \S+\. \d+ \S+, \d+ h/)
+  await marathon.getByRole('link').first().click()
   await expect(value(page, 'Quand')).toHaveText(/^du .+ à 18 h au .+ à \d+ h$/)
-  await expect(value(page, 'Durée')).toHaveText('55 h')
+  await expect(value(page, 'Durée')).toHaveText('31 h')
   await page.goBack()
 
   // The cancelled one.

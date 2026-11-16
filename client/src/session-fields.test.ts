@@ -161,6 +161,9 @@ describe('sessionTimes', () => {
     // It ends by the start of 3000, which isn't part of it.
     expect(times('2999-12-31', '18:00', '2999-12-31', '19:00')).toEqual({ start: '2999-12-31T23:00:00.000Z', durationMinutes: 60 })
     expect(times('2999-12-31', '18:00', '2999-12-31', '19:01')).toEqual({ endDay: years })
+    // As a year is typed in a date field.
+    expect(times('0002-11-14', '21:00', '2026-11-15', '01:00')).toEqual({ day: years })
+    expect(times('2026-11-14', '21:00', '0002-11-15', '01:00')).toEqual({ end: 'La fin doit être après le début.' })
   })
 
   it("takes only the duration of a session whose date isn't known yet, however long", () => {
@@ -199,6 +202,14 @@ describe('startChanges', () => {
     expect({ ...typed, ...startChanges(typed, { day: '2026-11-21' }) }).toMatchObject({ day: '2026-11-21', endDay: '2026-11-22' })
   })
 
+  it('keeps the distance through every year a date field goes through as a year is typed', () => {
+    let typing = form({ day: '2026-11-14', lastDay: '2026-11-14', endDay: '2026-11-15', start: '21:00', end: '01:00' })
+    for (const day of ['0002-11-21', '0020-11-21', '0202-11-21', '2027-11-21']) {
+      typing = { ...typing, ...startChanges(typing, { day }) }
+      expect(typing.endDay, day).toBe(`${day.slice(0, 4)}-11-22`)
+    }
+  })
+
   it('fills an empty end in, as long after the start as the duration, once the start is a day and a time the clocks show', () => {
     const undated = form({ duration: { hours: '2', minutes: '30' } })
     // The start's time first, then its day, or the other way around.
@@ -213,6 +224,10 @@ describe('startChanges', () => {
     expect(startChanges({ ...undated, day: '2026-03-08' }, { start: '02:30' })).toEqual({ start: '02:30' })
     expect(startChanges({ ...withDay, end: '22:00' }, { start: '21:00' })).toEqual({ start: '21:00' })
     expect(startChanges({ ...withDay, duration: { hours: '', minutes: '' } }, { start: '21:00' })).toEqual({ start: '21:00' })
+
+    // A session that's changed keeps lasting as long as it did when its form opened.
+    const opened = { ...sessionFormValues(session('2026-11-15T02:00:00.000Z', 240)), end: '' }
+    expect(startChanges(opened, { start: '22:00' })).toEqual({ start: '22:00', endDay: '2026-11-15', end: '02:00' })
   })
 })
 

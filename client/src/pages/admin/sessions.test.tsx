@@ -1009,6 +1009,22 @@ describe("A session's page", () => {
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 150 })
   })
 
+  it('goes through the years a date field gives as a year is typed, saying what is wrong', async () => {
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('group', { name: 'Début' })
+    fireEvent.change(timeInput('Fin', 'date'), { target: { value: '0002-11-15' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    expect(await screen.findByText('La fin doit être après le début.')).toBeInTheDocument()
+    fireEvent.change(timeInput('Fin', 'date'), { target: { value: '2026-11-15' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '0002-11-14' } })
+    expect(await screen.findByText('Une session a lieu entre les années 2000 et 2999.')).toBeInTheDocument()
+    expect(timeInput('Fin', 'date')).toHaveValue('0002-11-15')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+  })
+
   it('moves an overnight session to another day, its end with it, and back', async () => {
     mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')

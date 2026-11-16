@@ -22,6 +22,12 @@ describe('Québec time', () => {
     expect(quebecInstant('2026-11-01', '02:00')?.toISOString()).toBe('2026-11-01T07:00:00.000Z')
   })
 
+  it('takes years before 1000, which date fields go through as a year is typed', () => {
+    expect(quebecDayAndTime(new Date('0002-11-14T12:00:00Z')).day).toBe('0002-11-14')
+    expect(quebecInstant('0002-11-14', '21:00')).not.toBeNull()
+    expect(quebecInstants('0202-11-14', '21:00')).toHaveLength(1)
+  })
+
   it('writes an instant with the day, the time and the offset of Québec then', () => {
     expect(quebecDateTime(new Date('2026-11-15T02:00:00Z'))).toBe('2026-11-14T21:00-05:00')
     expect(quebecDateTime(new Date('2026-11-01T05:30:00Z'))).toBe('2026-11-01T01:30-04:00')

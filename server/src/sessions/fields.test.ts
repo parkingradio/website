@@ -140,10 +140,12 @@ describe('SessionFields', () => {
     // A weekend.
     expect(parse({ start: '2026-11-13T18:00-05:00', durationMinutes: 3360 }).durationMinutes).toBe(3360)
     expect(parse({ start: null, durationMinutes: MAX_MINUTES }).durationMinutes).toBe(MAX_MINUTES)
-    for (const durationMinutes of [0, MAX_MINUTES + 1, 60.5, -60, '60', null, undefined]) {
-      expect(sessionError(sessionFields({ start: null, durationMinutes })), String(durationMinutes)).toBe(
-        'The duration must be a whole number of minutes, from 1 to 525949920',
-      )
+    for (const start of [null, '2026-11-14T21:00-05:00']) {
+      for (const durationMinutes of [0, MAX_MINUTES + 1, 60.5, -60, '60', null, undefined]) {
+        expect(sessionError(sessionFields({ start, durationMinutes })), `${start} ${durationMinutes}`).toBe(
+          'The duration must be a whole number of minutes, from 1 to 525949920',
+        )
+      }
     }
   })
 

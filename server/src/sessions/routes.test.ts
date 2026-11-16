@@ -8,6 +8,7 @@ import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { PhotoFolder, SentPhoto } from '../artists/store.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
+import { MAX_MINUTES } from './fields.js'
 import { BrokenFields, Conflict, NoSuchReference } from './store.js'
 import type { NewSet, SessionsStore, StoredSession, StoredSet } from './store.js'
 import { sessionsRoutes } from './routes.js'
@@ -1316,7 +1317,7 @@ describe('sessions routes', () => {
     it('refuses an invalid set, saying what is wrong, before asking SoundCloud, or performers who do not exist', async () => {
       const app = await buildApp()
       await createSession(app)
-      let response = await addSet(app, 'session-1', { durationMinutes: 525949921 })
+      let response = await addSet(app, 'session-1', { durationMinutes: MAX_MINUTES + 1 })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 525949920, or null' })
       expect(resolveTrack).not.toHaveBeenCalled()
