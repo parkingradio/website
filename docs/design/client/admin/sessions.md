@@ -77,11 +77,11 @@ Clicking a session opens it at `/admin/sessions/<id>`, titled as it's called (se
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
-  sets that aren't cancelled first asks to confirm, saying that they'll be cancelled too (see
-  [Status](../../server/sessions.md#status)). Marking it "jouée" while it has "planifié" sets first asks to confirm
-  too, naming them and saying that they'll be marked "joué". Under it, likewise, whether the session is announced,
-  as "non annoncée" and "annoncée". Each says why it couldn't be changed under its own buttons. While the session has no
-  date, "annoncée" can't be used, and says « La session n'a pas de date. » (see
+  sets that aren't cancelled first asks to confirm, naming them, marking those that are "joué", and saying that they'll
+  be cancelled too (see [Status](../../server/sessions.md#status)). Marking it "jouée" while it has "planifié" sets
+  first asks to confirm too, naming them and saying that they'll be marked "joué". Under it, likewise, whether the
+  session is announced, as "non annoncée" and "annoncée". Each says why it couldn't be changed under its own buttons.
+  While the session has no date, "annoncée" can't be used, and says « La session n'a pas de date. » (see
   [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 - "Session": the session's details, which "modifier" changes in a form in their place (see
   [The session form](#the-session-form)):

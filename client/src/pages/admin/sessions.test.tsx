@@ -618,9 +618,8 @@ describe("A session's page", () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const statuses = within(await screen.findByRole('group', { name: 'Statut' }))
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
-    expect(confirm).toHaveBeenLastCalledWith(
-      "Annuler la session annule aussi ses 2 sets qui ne le sont pas. Annuler la session ?",
-    )
+    // Those that aren't cancelled, saying which were played.
+    expect(confirm).toHaveBeenLastCalledWith('Ces sets seront aussi annulés\u00a0:\n• Set de Aurore et Brume\n• Set de Cyan (joué)\nAnnuler la session ?')
     expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
 
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
@@ -644,6 +643,17 @@ describe("A session's page", () => {
     fireEvent.click(setStatuses.getByRole('button', { name: 'joué' }))
     expect(requestsTo('PUT', '/api/admin/sets/set-2/status')).toHaveLength(0)
     expect(setStatuses.getByRole('button', { name: 'annulé' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('names the one set that cancelling a played session cancels, saying that it was played', async () => {
+    const played: Session = { ...SESSION, status: 'done', sets: [CYAN_SET, SESSION.sets[2]] }
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: played } })
+    renderAt('/admin/sessions/session-1')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false)
+    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut' })).getByRole('button', { name: 'annulée' }))
+    expect(confirm).toHaveBeenLastCalledWith('Ce set sera aussi annulé\u00a0:\n• Set de Cyan (joué)\nAnnuler la session ?')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
   })
 
   it('asks first when marking it jouée marks planned sets, naming them, and not when none is', async () => {
