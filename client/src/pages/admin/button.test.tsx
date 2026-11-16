@@ -37,9 +37,9 @@ describe('Button', () => {
   })
 
   it('describes the button with its tooltip, a sentence per line, kept apart', () => {
-    render(<Button tip={['Finit après la session.', 'Chevauche le set de Cyan, 22 h – 23 h 30.']}>⚠</Button>)
+    render(<Button tip={['La session est annulée.', 'Elle n\'a pas de date.']}>⚠</Button>)
     const button = screen.getByRole('button')
-    expect(button).toHaveAccessibleDescription('Finit après la session. Chevauche le set de Cyan, 22 h – 23 h 30.')
+    expect(button).toHaveAccessibleDescription("La session est annulée. Elle n'a pas de date.")
     expect(tooltip()).not.toBeVisible()
   })
 

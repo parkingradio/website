@@ -4,12 +4,11 @@ import { useApi } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import type { Artist, GenreId } from '../../artist-profile'
 import { Combobox } from '../../combobox'
-import { quebecDayAndTime } from '../../quebec-time'
-import { after, checkSet, durationOf, isPerformersApplication, setPlace } from '../../session-fields'
-import type { Reference, Session, SetFields, SetFormValues, SetPlace } from '../../session-fields'
+import { checkSet, isPerformersApplication } from '../../session-fields'
+import type { Reference, SetFields, SetFormValues } from '../../session-fields'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
-import { artistOption, formatDuration, genreNames, membersGenres, nextDay, sessionWithin } from './describe'
+import { artistOption, genreNames, membersGenres } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
 import { ApplicationsFailure, ArtistsFailure } from './profile-details'
@@ -23,13 +22,7 @@ import type { GroupProps } from './profile-fields'
 // How many of its performers' genres a set's form suggests.
 const SUGGESTED_GENRES = 3
 
-// The session a set is in, as far as its form goes: one that's saved, or a new one, with its times as its form has them,
-// which are all null while they aren't valid, when the set is placed as in a session without a date.
-export type SetSession = Pick<Session, 'start' | 'end' | 'durationMinutes'> | { start: null; end: null; durationMinutes: null }
-
 type SetFormProps = {
-  // The session the set is in, which its times are relative to.
-  session: SetSession
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
   // The artists the performers are picked from, or null when they couldn't be loaded, which leaves those of the set as
@@ -43,11 +36,10 @@ type SetFormProps = {
   onCancel: () => void
 }
 
-export function SetForm({ session, initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
-  const place = setPlace(form, session)
-  const checked = checkSet(form, session, place, applications)
+  const checked = checkSet(form, applications)
   const errors = checked.errors ?? {}
   // There are fields, since there are no errors by then.
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => onSubmit(checked.fields!, form))
@@ -97,14 +89,9 @@ export function SetForm({ session, initial, artists, applications, submitLabel, 
         onLeave={leave('application')}
       />
 
-      <PlaceField
-        form={form}
-        session={session}
-        place={'errors' in place ? null : place}
-        onChange={update}
-        errors={{ start: shown('start'), end: shown('end'), offset: shown('offset'), duration: shown('duration') }}
-        onLeave={leave('start', 'end', 'offset', 'duration')}
-      />
+      <div onBlur={leaving(leave('duration'))}>
+        <DurationField label="Durée" value={form.duration} onChange={(duration) => update({ duration })} error={shown('duration')} />
+      </div>
 
       <PerformanceTypesField
         performanceTypes={form.performanceTypes}
@@ -216,93 +203,6 @@ function PerformersField({ performers, artists, onChange, error, onLeave }: Grou
         />
       </div>
       <FieldError message={error} />
-    </fieldset>
-  )
-}
-
-// When a set that starts `offsetMinutes` after `sessionStart` and lasts `durationMinutes` is on a later day than the
-// session's start, since a start time before the session's is the next day's: e.g. ", commence le lendemain, dimanche
-// 15 novembre 2026", or else ", finit le lendemain, ...", or "" when it's all on the session's day.
-function laterDay(sessionStart: string, offsetMinutes: number, durationMinutes: number): string {
-  const start = new Date(sessionStart)
-  const day = quebecDayAndTime(start).day
-  const setStart = after(start, offsetMinutes)
-  return nextDay('commence', setStart, day) || nextDay('finit', after(setStart, durationMinutes), day)
-}
-
-// Where the set is in its session: in a session with a date, the times it starts and ends, in Québec time; in a session
-// without one, its start, after the session's, and its duration; or only its duration, while its place isn't known.
-function PlaceField({
-  form,
-  session,
-  place,
-  onChange,
-  errors,
-  onLeave,
-}: {
-  form: SetFormValues
-  session: SetSession
-  // Its offset and duration, once its times are valid.
-  place: SetPlace | null
-  onChange: (changes: Partial<SetFormValues>) => void
-  errors: Partial<Record<'start' | 'end' | 'offset' | 'duration', string>>
-  onLeave: () => void
-}) {
-  const dated = session.start !== null
-  const durationMinutes = place?.durationMinutes ?? null
-  return (
-    <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
-      <legend>Horaire</legend>
-      <p className="admin-hint">
-        {session.start !== null
-          ? `La session a lieu ${sessionWithin(session)}.`
-          : session.durationMinutes === null
-            ? "Quand a lieu la session n'est pas encore indiqué."
-            : `La session dure ${formatDuration(session.durationMinutes)}.`}
-        {dated && !form.unplaced && ' Heure du Québec.'}
-      </p>
-      <div className="admin-choices">
-        <label>
-          <input
-            type="checkbox"
-            checked={form.unplaced}
-            onChange={(event) => {
-              // Keeps how long the set lasts, when its times say it.
-              const unplaced = event.target.checked
-              onChange(unplaced && durationMinutes !== null ? { unplaced, duration: durationOf(durationMinutes) } : { unplaced })
-            }}
-          />
-          horaire à déterminer
-        </label>
-      </div>
-      {form.unplaced ? (
-        <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
-      ) : dated ? (
-        <>
-          <div className="admin-row admin-times">
-            <label>
-              Début
-              <input type="time" value={form.start} aria-invalid={errors.start ? true : undefined} onChange={(event) => onChange({ start: event.target.value })} />
-            </label>
-            <label>
-              Fin
-              <input type="time" value={form.end} aria-invalid={errors.end ? true : undefined} onChange={(event) => onChange({ end: event.target.value })} />
-            </label>
-          </div>
-          {place !== null && place.offsetMinutes !== null && (
-            <p className="admin-hint" role="status">
-              Dure {formatDuration(place.durationMinutes!)}
-              {laterDay(session.start!, place.offsetMinutes, place.durationMinutes!)}.
-            </p>
-          )}
-          <FieldError message={errors.start ?? errors.end} />
-        </>
-      ) : (
-        <>
-          <DurationField label="Début, après celui de la session" value={form.offset} onChange={(offset) => onChange({ offset })} error={errors.offset} />
-          <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
-        </>
-      )}
     </fieldset>
   )
 }

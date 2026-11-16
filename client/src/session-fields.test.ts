@@ -14,9 +14,10 @@ import {
   sessionFormValues,
   sessionTimes,
   setFormValues,
+  newSetDuration,
   shownSet,
   typeName,
-  setPlace,
+  setsMinutes,
 } from './session-fields'
 import type { Session, SessionFormValues, SetFormValues, StudioSet } from './session-fields'
 
@@ -40,12 +41,7 @@ function studioSet(fields: Partial<StudioSet>): StudioSet {
   return {
     id: 'set-1',
     performers: [{ id: 'artist-1', name: 'Aurore' }],
-    offsetMinutes: null,
     durationMinutes: null,
-    start: null,
-    end: null,
-    fitsInSession: true,
-    overlappingSets: [],
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -267,125 +263,33 @@ describe('checkSession', () => {
   })
 })
 
-describe('setPlace', () => {
-  // Saturday, November 14th, 2026, from 21:00 to 1:00 in Québec.
-  const SESSION = session('2026-11-15T02:00:00.000Z', 240)
-  const FORM = newSetFormValues({ ...SESSION, sets: [] })
-  const place = (form: Partial<SetFormValues>, of: Session = SESSION) => {
-    const result = setPlace({ ...FORM, opened: undefined, ...form }, of)
-    return 'errors' in result ? result.errors : result
-  }
-  const late = 'Un set commence au plus 23 h 59 après le début de la session.'
-  const longest = 'Un set dure au plus 24 heures.'
+describe("a new set's duration", () => {
+  const sets = (...durations: (number | null)[]) => durations.map((durationMinutes, i) => studioSet({ id: `set-${i}`, durationMinutes }))
 
-  it("is worked out from the times of day, from the session's start, a start before its start time being the next day", () => {
-    expect(place({ start: '21:00', end: '22:00' })).toEqual({ offsetMinutes: 0, durationMinutes: 60 })
-    expect(place({ start: '23:30', end: '00:15' })).toEqual({ offsetMinutes: 150, durationMinutes: 45 })
-    expect(place({ start: '00:30', end: '01:00' })).toEqual({ offsetMinutes: 210, durationMinutes: 30 })
-  })
-
-  it("doesn't have to take place within the session, but starts at most 23 h 59 after its start, and lasts at most 24 hours", () => {
-    // The next day at 20:00, which is after the session, and until after it ends.
-    expect(place({ start: '20:00', end: '21:00' })).toEqual({ offsetMinutes: 1380, durationMinutes: 60 })
-    expect(place({ start: '00:30', end: '01:30' })).toEqual({ offsetMinutes: 210, durationMinutes: 60 })
-    expect(place({ start: '20:59', end: '21:00' })).toEqual({ offsetMinutes: 1439, durationMinutes: 1 })
-    // The night clocks fall back, times of day are an hour further apart: from 23:00 in summer time, 22:59 the next day is
-    // 24 h 59 later, and from 23:00 to 22:30 is 24 h 30.
-    const night = session('2026-11-01T03:00:00.000Z', 240)
-    expect(place({ start: '22:59', end: '23:30' }, night)).toEqual({ start: late })
-    expect(place({ start: '23:00', end: '22:30' }, night)).toEqual({ end: longest })
-    expect(place({ start: '23:00', end: '22:00' }, night)).toEqual({ offsetMinutes: 0, durationMinutes: 1440 })
-  })
-
-  it('says what is missing or invalid', () => {
-    expect(place({ start: '', end: '25:00' })).toEqual({ start: "Indiquez l'heure de début.", end: "L'heure de fin est invalide." })
-  })
-
-  it('refuses a start that clocks skip after the session starts, as they spring forward', () => {
-    // From 23:00 in winter time, on the night of March 7th, 2026, for 4 hours: 2:30 is skipped, and 3:00 is 3 hours later.
-    const night = session('2026-03-08T04:00:00.000Z', 240)
-    expect(place({ start: '02:30', end: '03:30' }, night)).toEqual({ start: "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été." })
-    expect(place({ start: '01:30', end: '02:30' }, night)).toEqual({ end: "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été." })
-    expect(place({ start: '03:00', end: '04:00' }, night)).toEqual({ offsetMinutes: 180, durationMinutes: 60 })
-  })
-
-  it('lasts as long as the clocks say on the night they fall back', () => {
-    // From 23:00 in summer time to 2:00 in winter time: from the first 1:00 to 2:00 is 2 hours.
-    const night = session('2026-11-01T03:00:00.000Z', 240)
-    expect(place({ start: '01:00', end: '02:00' }, night)).toEqual({ offsetMinutes: 120, durationMinutes: 120 })
-    // From midnight, the first time clocks show 1:00 is the first 1:00.
-    expect(place({ start: '00:00', end: '01:00' }, night)).toEqual({ offsetMinutes: 60, durationMinutes: 60 })
-  })
-
-  it("is the set's offset and duration in a session without a date, a duration being needed once there's a start", () => {
-    const undated = session(null, 180)
-    expect(place({ offset: { hours: '1', minutes: '30' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offsetMinutes: 90, durationMinutes: 60 })
-    expect(place({ offset: { hours: '0', minutes: '' }, duration: { hours: '', minutes: '' } }, undated)).toEqual({ duration: 'Indiquez la durée du set.' })
-    expect(place({ offset: { hours: '', minutes: '' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offset: 'Indiquez quand le set commence.' })
-    // After the session, or until after it.
-    expect(place({ offset: { hours: '2', minutes: '30' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offsetMinutes: 150, durationMinutes: 60 })
-    expect(place({ offset: { hours: '23', minutes: '59' }, duration: { hours: '24', minutes: '' } }, undated)).toEqual({ offsetMinutes: 1439, durationMinutes: 1440 })
-    expect(place({ offset: { hours: '24', minutes: '' }, duration: { hours: '1', minutes: '' } }, undated)).toEqual({ offset: late })
-    expect(place({ offset: { hours: '1', minutes: '' }, duration: { hours: '24', minutes: '1' } }, undated)).toEqual({ duration: longest })
-  })
-
-  it("is only a duration, which can be left out, and can be longer than the session, while the set's place isn't known", () => {
-    expect(place({ unplaced: true, duration: { hours: '', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: null })
-    expect(place({ unplaced: true, duration: { hours: '1', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: 60 })
-    expect(place({ unplaced: true, duration: { hours: '5', minutes: '' } })).toEqual({ offsetMinutes: null, durationMinutes: 300 })
-    expect(place({ unplaced: true, duration: { hours: '25', minutes: '' } })).toEqual({ duration: longest })
+  it("is an hour, or what's left of the session after its sets, cancelled ones included, or none when they fill it", () => {
+    expect(newSetDuration({ durationMinutes: 240, sets: [] })).toBe(60)
+    expect(newSetDuration({ durationMinutes: 240, sets: sets(60, null, 150) })).toBe(30)
+    expect(newSetDuration({ durationMinutes: 240, sets: [...sets(60, 150), studioSet({ durationMinutes: 30, status: 'cancelled' })] })).toBeNull()
+    expect(newSetDuration({ durationMinutes: 240, sets: sets(300) })).toBeNull()
+    expect(newSetDuration({ durationMinutes: 45, sets: [] })).toBe(45)
+    // While the session's times aren't valid.
+    expect(newSetDuration({ durationMinutes: null, sets: sets(600) })).toBe(60)
+    expect(newSetFormValues({ durationMinutes: 240, sets: sets(150) }).duration).toEqual({ hours: '1', minutes: '0' })
+    expect(newSetFormValues({ durationMinutes: 240, sets: sets(240) }).duration).toEqual({ hours: '', minutes: '' })
   })
 })
 
-describe('the place a set form opens with', () => {
-  const sent = (form: SetFormValues, of: Session) => {
-    const { fields, errors } = checkSet(form, of)
-    return errors ?? { offsetMinutes: fields.offsetMinutes, durationMinutes: fields.durationMinutes }
-  }
-
-  it("is a set's, by its times of day, or by its offset and duration in a session without a date", () => {
-    const set = studioSet({ offsetMinutes: 150, durationMinutes: 60 })
-    expect(setFormValues(set, session('2026-11-15T02:00:00.000Z', 240))).toMatchObject({ unplaced: false, start: '23:30', end: '00:30' })
-    expect(setFormValues(set, session(null, 240))).toMatchObject({ offset: { hours: '2', minutes: '30' }, duration: { hours: '1', minutes: '0' } })
-    expect(setFormValues(studioSet({ durationMinutes: 45 }), session(null, 240))).toMatchObject({ unplaced: true, duration: { hours: '0', minutes: '45' } })
-  })
-
-  it('is, for a new set, when the last set that is not cancelled and whose place is known ends, for an hour, or until the session ends', () => {
-    const sets = [
-      studioSet({ offsetMinutes: 0, durationMinutes: 60 }),
-      studioSet({ offsetMinutes: 150, durationMinutes: 30, status: 'cancelled' }),
-      studioSet({ offsetMinutes: 60, durationMinutes: 60, status: 'done' }),
-      studioSet({ durationMinutes: 60 }),
-    ]
-    const dated = session('2026-11-15T02:00:00.000Z', 150, sets)
-    expect(newSetFormValues(dated)).toMatchObject({ unplaced: false, start: '23:00', end: '23:30' })
-    expect(newSetFormValues(session(null, 240, sets))).toMatchObject({ offset: { hours: '2', minutes: '0' }, duration: { hours: '1', minutes: '0' } })
-    expect(newSetFormValues(session('2026-11-15T02:00:00.000Z', 240))).toMatchObject({ start: '21:00', end: '22:00' })
-    // Without times when the sets fill the session.
-    expect(newSetFormValues(session('2026-11-15T02:00:00.000Z', 120, sets))).toMatchObject({ unplaced: false, start: '', end: '', offset: { hours: '', minutes: '' } })
-  })
-
-  // Clocks fall back from 2:00 to 1:00 on November 1st, 2026, so that night's times from 1:00 to 2:00 happen twice.
-  it('stays where it was while its times are unchanged, even at the second 1:00 of the night clocks fall back', () => {
-    // From 23:00 in summer time, for 4 hours, with a set until the second 1:00.
-    const night = session('2026-11-01T03:00:00.000Z', 240, [studioSet({ offsetMinutes: 0, durationMinutes: 180 })])
-    const form = { ...newSetFormValues(night), performers: [{ id: 'artist-1', name: 'Aurore' }] }
-    expect(form).toMatchObject({ start: '01:00', end: '02:00' })
-    expect(sent(form, night)).toEqual({ offsetMinutes: 180, durationMinutes: 60 })
-    // Changing the end keeps the start at the second 1:00.
-    expect(sent({ ...form, end: '01:30' }, night)).toEqual({ offsetMinutes: 180, durationMinutes: 30 })
-    // A start that's typed is the first time after the session's start when clocks show it.
-    expect(sent({ ...form, start: '00:30' }, night)).toEqual({ offsetMinutes: 90, durationMinutes: 150 })
-
-    const set = studioSet({ offsetMinutes: 150, durationMinutes: 60 })
-    expect(sent({ ...setFormValues(set, night), youtubeVideo: 'dQw4w9WgXcQ' }, night)).toEqual({ offsetMinutes: 150, durationMinutes: 60 })
+describe("how long a session's sets last together", () => {
+  it('is the sum of their durations, cancelled ones included, an unknown one counting for nothing', () => {
+    expect(setsMinutes([])).toBe(0)
+    const sets = [null, 60, 45].map((durationMinutes, i) => studioSet({ id: `set-${i}`, durationMinutes }))
+    expect(setsMinutes([...sets, studioSet({ durationMinutes: 30, status: 'cancelled' })])).toBe(135)
   })
 })
 
 describe('checkSet', () => {
-  const SESSION = session('2026-11-15T02:00:00.000Z', 240)
   const FORM: SetFormValues = {
-    ...newSetFormValues(SESSION),
+    ...newSetFormValues({ durationMinutes: 240, sets: [] }),
     performers: [
       { id: 'artist-1', name: 'Aurore' },
       { id: 'artist-2', name: 'Brume' },
@@ -398,11 +302,10 @@ describe('checkSet', () => {
     application: link('application-1'),
   }
 
-  it('returns what the server is sent: the ids, the offset and duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
-    expect(checkSet(FORM, SESSION)).toEqual({
+  it('returns what the server is sent: the ids, the duration, the performance types in order, the other one cleaned up, and the links trimmed', () => {
+    expect(checkSet(FORM)).toEqual({
       fields: {
         performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
-        offsetMinutes: 0,
         durationMinutes: 60,
         performanceTypes: ['dj', 'live-performance'],
         otherPerformanceType: 'Synthé modulaire',
@@ -414,40 +317,47 @@ describe('checkSet', () => {
     })
   })
 
+  it('takes a duration from a minute to 24 hours, or none while it is not known', () => {
+    const duration = (hours: string, minutes: string) => checkSet({ ...FORM, duration: { hours, minutes } })
+    expect(duration('', '').fields).toMatchObject({ durationMinutes: null })
+    expect(duration('', '1').fields).toMatchObject({ durationMinutes: 1 })
+    expect(duration('24', '').fields).toMatchObject({ durationMinutes: 1440 })
+    expect(duration('24', '1').errors).toEqual({ duration: 'Un set dure au plus 24 heures.' })
+    for (const [hours, minutes] of [['0', '0'], ['1', '60'], ['x', ''], ['-1', '']]) {
+      expect(duration(hours, minutes).errors, `${hours} h ${minutes}`).toEqual({ duration: 'La durée est invalide.' })
+    }
+  })
+
   it("needs its application to be one of its performers', once the applications are known", () => {
     const applications = [
       { id: 'application-1', artistId: 'artist-1', collectiveId: null },
       { id: 'application-2', artistId: 'artist-3', collectiveId: null },
       { id: 'application-3', artistId: null, collectiveId: 'collective-1' },
     ]
-    expect(checkSet(FORM, SESSION, undefined, applications).fields).toMatchObject({ application: 'application-1' })
+    expect(checkSet(FORM, applications).fields).toMatchObject({ application: 'application-1' })
     const error = "La candidature doit être celle d'un des artistes du set\u00a0: choisissez-en une autre, ou «\u00a0Aucune candidature\u00a0»."
     for (const application of ['application-2', 'application-3']) {
-      expect(checkSet({ ...FORM, application: link(application) }, SESSION, undefined, applications).errors).toEqual({ application: error })
+      expect(checkSet({ ...FORM, application: link(application) }, applications).errors).toEqual({ application: error })
     }
-    expect(checkSet({ ...FORM, performers: [{ id: 'artist-2', name: 'Brume' }] }, SESSION, undefined, applications).errors).toEqual({ application: error })
-    expect(checkSet({ ...FORM, application: null }, SESSION, undefined, applications).fields).toMatchObject({ application: null })
+    expect(checkSet({ ...FORM, performers: [{ id: 'artist-2', name: 'Brume' }] }, applications).errors).toEqual({ application: error })
+    expect(checkSet({ ...FORM, application: null }, applications).fields).toMatchObject({ application: null })
     // Left to the server when they aren't known.
-    expect(checkSet({ ...FORM, application: link('application-2') }, SESSION).fields).toMatchObject({ application: 'application-2' })
+    expect(checkSet({ ...FORM, application: link('application-2') }).fields).toMatchObject({ application: 'application-2' })
   })
 
   it('says what is wrong with each field', () => {
     expect(
-      checkSet(
-        {
-          ...FORM,
-          performers: [],
-          opened: undefined,
-          start: '',
-          otherPerformanceType: 'x'.repeat(61),
-          soundcloudTrack: 'https://on.soundcloud.com/AbCdE',
-          youtubeVideo: 'https://www.youtube.com/@parkingradio',
-        },
-        SESSION,
-      ).errors,
+      checkSet({
+        ...FORM,
+        performers: [],
+        duration: { hours: '', minutes: '75' },
+        otherPerformanceType: 'x'.repeat(61),
+        soundcloudTrack: 'https://on.soundcloud.com/AbCdE',
+        youtubeVideo: 'https://www.youtube.com/@parkingradio',
+      }).errors,
     ).toEqual({
       performers: 'Choisissez au moins un artiste.',
-      start: "Indiquez l'heure de début.",
+      duration: 'La durée est invalide.',
       otherPerformanceType: 'La prestation « Autre » dépasse 60 caractères.',
       soundcloudTrack: 'Le lien SoundCloud doit mener à la piste sur soundcloud.com, p. ex. « https://soundcloud.com/parkingdotradio/3tons ».',
       youtubeVideo: 'Le lien YouTube est invalide : collez le lien de la vidéo, ou son identifiant.',
@@ -458,8 +368,7 @@ describe('checkSet', () => {
 describe("a new session's listed sets", () => {
   const fields = {
     performers: [{ id: 'artist-1' }],
-    offsetMinutes: 90,
-    durationMinutes: 60,
+    durationMinutes: 90,
     performanceTypes: [],
     otherPerformanceType: '',
     genres: [],
@@ -473,25 +382,22 @@ describe("a new session's listed sets", () => {
     expect(listedSetFields(listed)).toEqual(fields)
   })
 
-  it("are placed relative to the session's start, so that they move with it, and counted from it without one", () => {
-    expect(shownSet(listed, { start: '2026-11-14T21:00:00-05:00' })).toMatchObject({
-      start: '2026-11-14T22:30-05:00',
-      end: '2026-11-14T23:30-05:00',
-      performers: [{ id: 'artist-1', name: 'Aurore' }],
-      status: 'planned',
-    })
-    expect(shownSet(listed, { start: '2026-11-15T20:00:00-05:00' })).toMatchObject({ start: '2026-11-15T21:30-05:00' })
-    expect(shownSet(listed, { start: null })).toMatchObject({ start: null, end: null, offsetMinutes: 90 })
+  it('are shown as planned, without times', () => {
+    const shown = shownSet(listed)
+    expect(shown).toMatchObject({ durationMinutes: 90, performers: [{ id: 'artist-1', name: 'Aurore' }], status: 'planned' })
+    expect(shown).not.toHaveProperty('start')
   })
 
   it('open their form as they were added, with the link to their video on YouTube', () => {
-    const session = { start: '2026-11-14T21:00:00-05:00', durationMinutes: 240 }
-    expect(setFormValues(shownSet(listed, session), session)).toMatchObject({
-      start: '22:30',
-      end: '23:30',
+    expect(setFormValues(shownSet(listed))).toEqual({
+      performers: [{ id: 'artist-1', name: 'Aurore' }],
+      duration: { hours: '1', minutes: '30' },
+      performanceTypes: [],
+      otherPerformanceType: '',
+      genres: [],
       soundcloudTrack: 'https://soundcloud.com/parkingdotradio/3tons',
       youtubeVideo: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      application: { id: 'application-1' },
+      application: { id: 'application-1', receivedAt: '2026-10-01T12:00:00-04:00' },
     })
   })
 })

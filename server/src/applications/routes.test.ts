@@ -153,7 +153,7 @@ function storedSet(changes: Partial<StoredSet>): StoredSet {
     sessionId: 'session',
     ...TRACKED,
     ...UNTRACKED_STATUS,
-    offsetMinutes: null,
+    position: 0,
     durationMinutes: 60,
     performers: [],
     performanceTypes: [],
@@ -493,7 +493,7 @@ describe('applications routes', () => {
       const link = (id: string) => ({ applicationId: id, application: { id, receivedAt: new Date() } })
       linked = [
         // A takeover without a date, which comes from the collective's application, with a set that comes from another one.
-        storedSession({ id: 'session-1', ...link('application-2'), sets: [storedSet({ id: 'set-1', offsetMinutes: 0, ...link('application-3') })] }),
+        storedSession({ id: 'session-1', ...link('application-2'), sets: [storedSet({ id: 'set-1', ...link('application-3') })] }),
         // An evening where the artist's set was cancelled, then the one that replaced it, which comes from the same
         // application.
         storedSession({
@@ -503,22 +503,20 @@ describe('applications routes', () => {
           takeover: null,
           startAt: new Date('2026-11-15T02:00:00Z'),
           sets: [
-            storedSet({ id: 'set-2', offsetMinutes: 0 }),
-            storedSet({ id: 'set-3', offsetMinutes: 60, status: 'cancelled', ...link('application-1') }),
-            storedSet({ id: 'set-4', offsetMinutes: null, ...link('application-1') }),
+            storedSet({ id: 'set-2' }),
+            storedSet({ id: 'set-3', position: 1, status: 'cancelled', ...link('application-1') }),
+            storedSet({ id: 'set-4', position: 2, durationMinutes: null, ...link('application-1') }),
           ],
         }),
       ]
       const artists = await send(app, 'GET', '/api/admin/applications/application-1')
       const session = { id: 'session-2', title: 'GUEST MIXES', start: '2026-11-14T21:00:00-05:00' }
-      expect(artists.json().application).toMatchObject({
-        sets: [
-          { id: 'set-3', start: '2026-11-14T22:00:00-05:00', end: '2026-11-14T23:00:00-05:00', offsetMinutes: 60, durationMinutes: 60, status: 'cancelled', session },
-          // Without a place in its session.
-          { id: 'set-4', start: null, end: null, offsetMinutes: null, durationMinutes: 60, status: 'planned', session },
-        ],
-        sessions: [],
-      })
+      // Without times, which sets don't have.
+      expect(artists.json().application).toMatchObject({ sessions: [] })
+      expect(artists.json().application.sets).toEqual([
+        { id: 'set-3', durationMinutes: 60, status: 'cancelled', session },
+        { id: 'set-4', durationMinutes: null, status: 'planned', session },
+      ])
       expect(sessions.ofApplications).toHaveBeenCalledWith(['application-1'])
       const collectives = await send(app, 'GET', '/api/admin/applications/application-2')
       expect(collectives.json().application).toMatchObject({

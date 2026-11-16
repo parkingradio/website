@@ -16,9 +16,8 @@ import {
   sessionFormValues,
   setFormValues,
   setValuesFromApplication,
-  shownSet,
 } from '../../session-fields'
-import type { ListedSet, Session, SessionPlace, SessionStatus, StudioSet } from '../../session-fields'
+import type { ListedSet, Session, SessionStatus, StudioSet } from '../../session-fields'
 import type { Artist } from '../../artist-profile'
 import { ApplicationWishes } from './application-wishes'
 import { Button } from './button'
@@ -44,13 +43,13 @@ import {
   sessionHours,
   sessionSearchFields,
   sessionWhen,
-  setHours,
+  setDuration,
   setInSentence,
   setName,
   setTitle,
 } from './describe'
 import type { Announced } from './describe'
-import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
+import { arrowAfterMove, compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
@@ -59,7 +58,7 @@ import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
 import { CreateSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
-import { Performers, SetLinks } from './set-cells'
+import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet } from './set-form'
 
@@ -214,7 +213,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Heure</th>
+                <th>Durée</th>
                 <th>Session</th>
                 <th>Artistes</th>
                 <th>Prestation</th>
@@ -227,7 +226,7 @@ export function OwnSets({ sessions, artistId }: { sessions: Loaded<{ sessions: S
               {sets.map(({ set, session }) => (
                 <tr key={set.id} className={`admin-status-${set.status}`}>
                   <td className="admin-day">{sessionDay(session)}</td>
-                  <td className="admin-day">{setHours(set)}</td>
+                  <td className="admin-day">{setDuration(set)}</td>
                   <td>
                     <Link to={sessionPath(session)}>{session.title}</Link>
                   </td>
@@ -266,7 +265,7 @@ export function ApplicationSets({ application }: { application: Application }) {
           <thead>
             <tr>
               <th>Date</th>
-              <th>Heure</th>
+              <th>Durée</th>
               <th>Session</th>
               <th>Statut</th>
             </tr>
@@ -275,7 +274,7 @@ export function ApplicationSets({ application }: { application: Application }) {
             {sets.map((set) => (
               <tr key={set.id} className={`admin-status-${set.status}`}>
                 <td className="admin-day">{sessionDay(set.session)}</td>
-                <td className="admin-day">{setHours(set)}</td>
+                <td className="admin-day">{setDuration(set)}</td>
                 <td>
                   <Link to={sessionPath(set.session)}>{set.session.title}</Link>
                 </td>
@@ -461,16 +460,16 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   // Why a set's status couldn't be changed, or why it couldn't be deleted.
   const [setsError, setSetsError] = useState<ReactNode>(null)
   const setsHeadingId = useId()
-  // What gets the focus once a set is deleted, since its × is gone: another set's ×, by the set's id, or the heading of
-  // the sets.
-  const focusAfterDelete = useRef<string | null>(null)
+  // What gets the focus once a set is deleted, since its × is gone, or moved, since its arrow was disabled while the
+  // request was under way: a set's button, by the set's id and what the button does, or the heading of the sets.
+  const focusNext = useRef<{ id: string; action: 'up' | 'down' | 'delete' } | 'heading' | null>(null)
   // A layout effect, which React runs in the commit that removes the ×, rather than a passive one, which it runs in a later
   // task when the update follows a request: the focus never falls back to the page in between.
   useLayoutEffect(() => {
-    const next = focusAfterDelete.current
-    focusAfterDelete.current = null
+    const next = focusNext.current
+    focusNext.current = null
     if (next === 'heading') document.getElementById(setsHeadingId)?.focus()
-    else if (next) document.querySelector<HTMLElement>(`[data-delete="${next}"]`)?.focus()
+    else if (next) document.querySelector<HTMLElement>(`[data-set="${next.id}"][data-action="${next.action}"]`)?.focus()
   }, [session, setsHeadingId])
   const navigate = useNavigate()
   const params = { path: { id: session.id } }
@@ -530,6 +529,19 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     else setSetsError(failure(`Le statut de «\u00a0${setName(set)}\u00a0» n'a pas pu être changé`, result, session.id))
   }
 
+  // Moves the set one place up or down among the session's sets, as the server then has them.
+  const moveSet = async (set: StudioSet, by: -1 | 1) => {
+    const index = session.sets.findIndex((other) => other.id === set.id)
+    setBusy(true)
+    setSetsError(null)
+    const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: index + by } })
+    setBusy(false)
+    if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
+    const now = result.session.sets.findIndex((other) => other.id === set.id)
+    focusNext.current = { id: set.id, action: arrowAfterMove(by, now, result.session.sets.length) }
+    setSession(result.session)
+  }
+
   const removeSet = async (set: StudioSet) => {
     if (!window.confirm(`Supprimer définitivement ce set (${setName(set)}) ?${set.performers.length > 0 ? ' Ses artistes restent.' : ''}`)) return
     setBusy(true)
@@ -539,12 +551,9 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être supprimé`, result, session.id))
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
     const index = session.sets.findIndex((other) => other.id === set.id)
-    focusAfterDelete.current = (session.sets[index + 1] ?? session.sets[index - 1])?.id ?? 'heading'
-    // The other sets don't overlap it anymore.
-    setSession((session) => ({
-      ...session,
-      sets: session.sets.filter((other) => other.id !== set.id).map((other) => ({ ...other, overlappingSets: other.overlappingSets.filter((id) => id !== set.id) })),
-    }))
+    const next = session.sets[index + 1] ?? session.sets[index - 1]
+    focusNext.current = next ? { id: next.id, action: 'delete' } : 'heading'
+    setSession((session) => ({ ...session, sets: session.sets.filter((other) => other.id !== set.id) }))
     setOpen((open) => (open?.kind === 'set' && open.id === set.id ? null : open))
   }
 
@@ -664,6 +673,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         </Button>
       </div>
       <ErrorMessage error={setsError} />
+      <SetsTooLong sets={session.sets} durationMinutes={session.durationMinutes} />
       {session.sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (
@@ -671,6 +681,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           session={session}
           busy={busy}
           onStatus={changeSetStatus}
+          onMove={moveSet}
           onEdit={(set) => openForm({ kind: 'set', id: set.id })}
           onDelete={removeSet}
         />
@@ -718,43 +729,20 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// What's wrong with where a set is, a sentence each, when it isn't cancelled: that it doesn't fit in its session, then
-// each set that it overlaps, in the order of the session's sets (see "Sets' places" in docs/design/server/sessions.md).
-function setProblems(set: StudioSet, session: Session): string[] {
-  if (set.status === 'cancelled') return []
-  const overlapping = session.sets.filter((other) => set.overlappingSets.includes(other.id)).map((other) => `Chevauche ${setInSentence(other)}.`)
-  if (set.fitsInSession) return overlapping
-  const where = set.offsetMinutes === null ? 'Dure plus longtemps que' : set.offsetMinutes >= session.durationMinutes ? 'Commence après' : 'Finit après'
-  return [`${where} la session.`, ...overlapping]
-}
-
-// The mark after a set's times, when its place is wrong, saying why in its tooltip.
-function ProblemsMark({ problems }: { problems: string[] }) {
-  return (
-    problems.length > 0 && (
-      <>
-        {' '}
-        {/* With U+FE0E, so that phones don't draw it as a colored emoji. */}
-        <Button className="admin-warning" aria-label="avertissement" tip={problems}>
-          {'\u26a0\ufe0e'}
-        </Button>
-      </>
-    )
-  )
-}
-
-// A session's sets, each with its status as buttons that change it, a button that opens its form, and one that deletes it.
-// The sets of a cancelled session can't be un-cancelled. Those whose place is wrong are marked, saying why.
+// A session's sets, in their order, each with its status as buttons that change it, arrows that move it, a button that
+// opens its form, and one that deletes it. The sets of a cancelled session can't be un-cancelled.
 function SetsTable({
   session,
   busy,
   onStatus,
+  onMove,
   onEdit,
   onDelete,
 }: {
   session: Session
   busy: boolean
   onStatus: (set: StudioSet, status: SessionStatus) => void
+  onMove: (set: StudioSet, by: -1 | 1) => void
   onEdit: (set: StudioSet) => void
   onDelete: (set: StudioSet) => void
 }) {
@@ -762,7 +750,7 @@ function SetsTable({
     <table className="admin-table admin-table-controls" aria-label="Sets">
       <thead>
         <tr>
-          <th>Heure</th>
+          <th>Durée</th>
           <th>Artistes</th>
           <th>Prestation</th>
           <th>Genres</th>
@@ -772,12 +760,9 @@ function SetsTable({
         </tr>
       </thead>
       <tbody>
-        {session.sets.map((set) => (
+        {session.sets.map((set, index) => (
           <tr key={set.id} className={`admin-status-${set.status}`}>
-            <td className="admin-day">
-              {setHours(set)}
-              <ProblemsMark problems={setProblems(set, session)} />
-            </td>
+            <td className="admin-day">{setDuration(set)}</td>
             <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
             <td>{describePerformanceTypes(set)}</td>
             <td>{genreNames(set.genres)}</td>
@@ -796,10 +781,25 @@ function SetsTable({
               />
             </td>
             <td>
+              <MoveButtons
+                name={setName(set)}
+                first={index === 0}
+                last={index === session.sets.length - 1}
+                disabled={busy}
+                data={{ 'data-set': set.id }}
+                onMove={(by) => onMove(set, by)}
+              />{' '}
               <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={() => onEdit(set)}>
                 modifier
               </button>{' '}
-              <button type="button" data-delete={set.id} aria-label={`supprimer : ${setName(set)}`} disabled={busy} onClick={() => onDelete(set)}>
+              <button
+                type="button"
+                data-set={set.id}
+                data-action="delete"
+                aria-label={`supprimer : ${setName(set)}`}
+                disabled={busy}
+                onClick={() => onDelete(set)}
+              >
                 ×
               </button>
             </td>
@@ -828,8 +828,7 @@ function OpenSet({
   return (
     <SetFormWithChoices
       title={set ? setTitle(set) : 'Nouveau set'}
-      session={session}
-      initial={set ? setFormValues(set, session) : application ? setFromApplication(application, session) : newSetFormValues(session)}
+      initial={set ? setFormValues(set) : application ? setFromApplication(application, session) : newSetFormValues(session)}
       reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}
       onCancel={onClose}
@@ -931,18 +930,16 @@ function SessionFormWithChoices({
   )
 }
 
-// Why a new session couldn't be added, with the sets listed in its form, `sets`, which were placed in `session`: the
-// server's message, and when it's about one of the sets, which one, and what's in the way, which can be another of them.
+// Why a new session couldn't be added, with the sets listed in its form, `sets`: the server's message, and when it's
+// about one of the sets, which one, and what's in the way, which can be another of them.
 function newSessionFailure(
   result: { error: string; session?: Session | null; set?: StudioSet | null; setIndex?: number; otherSetIndex?: number },
-  session: SessionPlace,
   sets: ListedSet[],
 ): ReactNode {
   const { setIndex, otherSetIndex } = result
   if (setIndex === undefined) return failure("La session n'a pas pu être ajoutée", result)
-  const shown = (index: number) => shownSet(sets[index], session)
-  const other = otherSetIndex === undefined ? null : setName(shown(otherSetIndex))
-  return failure(`${capitalized(setInSentence(shown(setIndex)))} n'a pas pu être ajouté`, result, undefined, other)
+  const other = otherSetIndex === undefined ? null : setName(sets[otherSetIndex])
+  return failure(`${capitalized(setInSentence(sets[setIndex]))} n'a pas pu être ajouté`, result, undefined, other)
 }
 
 // Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known, or from
@@ -958,7 +955,7 @@ export function NewSessionPage() {
     submitLabel: 'ajouter la session',
     onSubmit: async (body, sets) => {
       const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
-      if (!result.ok) return newSessionFailure(result, body.session, sets)
+      if (!result.ok) return newSessionFailure(result, sets)
       navigate(sessionPath(result.session))
       return null
     },

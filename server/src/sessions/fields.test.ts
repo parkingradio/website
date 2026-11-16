@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SESSION_TYPES, SessionFields, SetFields, brokenSessionRule, brokenSetRule, sessionTitle } from './fields.js'
+import { SESSION_TYPES, SessionFields, SetFields, SetPosition, brokenSessionRule, sessionTitle } from './fields.js'
 
 // The rules in sessions/fields.ts, which every session and set has to follow. The server answers with the first error.
 
@@ -20,7 +20,6 @@ function sessionFields(changes: Record<string, unknown> = {}) {
 function setFields(changes: Record<string, unknown> = {}) {
   return {
     performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
-    offsetMinutes: 60,
     durationMinutes: 60,
     performanceTypes: ['dj'],
     otherPerformanceType: '',
@@ -243,7 +242,6 @@ describe('SetFields', () => {
       }),
     ).toEqual({
       performers: [{ id: 'artist-1' }, { id: 'artist-2' }],
-      offsetMinutes: 60,
       durationMinutes: 60,
       // In the order of the list, without duplicates.
       performanceTypes: ['dj', 'live-performance'],
@@ -277,21 +275,14 @@ describe('SetFields', () => {
     }
   })
 
-  it('takes a set without an offset, or without an offset or a duration', () => {
-    expect(parse({ offsetMinutes: null })).toMatchObject({ offsetMinutes: null, durationMinutes: 60 })
-    expect(parse({ offsetMinutes: null, durationMinutes: null })).toMatchObject({ offsetMinutes: null, durationMinutes: null })
+  it('takes a set without a duration, but not with an offset, which sets no longer have', () => {
+    expect(parse({ durationMinutes: null })).toMatchObject({ durationMinutes: null })
+    expect(setError(setFields({ offsetMinutes: 0 }))).toBe('Unknown field: `offsetMinutes`')
   })
 
-  it('refuses an offset without a duration', () => {
-    expect(setError(setFields({ durationMinutes: null }))).toBe('A set with an offset also has a duration')
-  })
-
-  it('takes offsets and durations of whole minutes, within 24 hours', () => {
-    expect(parse({ offsetMinutes: 0, durationMinutes: 1440 })).toMatchObject({ offsetMinutes: 0, durationMinutes: 1440 })
-    expect(parse({ offsetMinutes: 1439, durationMinutes: 1 })).toMatchObject({ offsetMinutes: 1439, durationMinutes: 1 })
-    for (const offsetMinutes of [-1, 1440, 0.5, '0', undefined]) {
-      expect(setError(setFields({ offsetMinutes })), String(offsetMinutes)).toBe('The offset must be a whole number of minutes, from 0 to 1439, or null')
-    }
+  it('takes durations of whole minutes, within 24 hours', () => {
+    expect(parse({ durationMinutes: 1440 })).toMatchObject({ durationMinutes: 1440 })
+    expect(parse({ durationMinutes: 1 })).toMatchObject({ durationMinutes: 1 })
     for (const durationMinutes of [0, 1441, 0.5, '60', undefined]) {
       expect(setError(setFields({ durationMinutes })), String(durationMinutes)).toBe('The duration must be a whole number of minutes, from 1 to 1440, or null')
     }
@@ -339,22 +330,27 @@ describe('the rules that involve several fields', () => {
     expect(brokenSessionRule({ type: 'other', ...none, application: 'a', name: '' })).toEqual({ message: 'A session of type other has a name', field: 'name' })
   })
 
-  it("are those of a set's place", () => {
-    expect(brokenSetRule({ offsetMinutes: null, durationMinutes: null })).toBeNull()
-    expect(brokenSetRule({ offsetMinutes: 0, durationMinutes: 60 })).toBeNull()
-    expect(brokenSetRule({ offsetMinutes: 0, durationMinutes: null })).toEqual({ message: 'A set with an offset also has a duration', field: 'durationMinutes' })
-  })
-
   it('are checked by the schemas too, after the fields', () => {
     expect(SessionFields.safeParse(sessionFields({ type: 'takeover' })).error?.issues[0]).toMatchObject({ message: 'A takeover has a collective', path: ['takeover'] })
-    expect(SetFields.safeParse(setFields({ offsetMinutes: 0, durationMinutes: null })).error?.issues[0]).toMatchObject({
-      message: 'A set with an offset also has a duration',
-      path: ['durationMinutes'],
-    })
   })
 
   it("refuse the fields they don't take, naming them", () => {
     expect(SessionFields.safeParse({ ...sessionFields(), title: 'X' }).error?.issues[0].message).toBe('Unknown field: `title`')
     expect(SetFields.safeParse({ ...setFields(), id: 'set-1' }).error?.issues[0].message).toBe('Unknown field: `id`')
+  })
+})
+
+describe('SetPosition', () => {
+  it('takes a whole number from 0, even past the last place, which the store brings back to it', () => {
+    for (const position of [0, 3, Number.MAX_SAFE_INTEGER]) expect(SetPosition.parse({ position })).toEqual({ position })
+  })
+
+  it('refuses anything else, and other fields', () => {
+    // Past the whole numbers that numbers hold exactly, too.
+    for (const position of [-1, 1.5, '1', null, undefined, Infinity, NaN, 1e20]) {
+      expect(SetPosition.safeParse({ position }).error?.issues[0].message, String(position)).toBe('The position must be a whole number, from 0')
+    }
+    for (const sent of [null, [], 'first']) expect(SetPosition.safeParse(sent).error?.issues[0].message).toBe('The position must be a whole number, from 0')
+    expect(SetPosition.safeParse({ position: 0, id: 'set-1' }).error?.issues[0].message).toBe('Unknown field: `id`')
   })
 })

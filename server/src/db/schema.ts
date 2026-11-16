@@ -276,9 +276,14 @@ export const sessions = pgTable(
 // Sets: the performances of a session, each streamed as its own YouTube live and uploaded as its own SoundCloud track.
 // See `SetFields` in sessions/fields.ts for what each field can contain. Deleting a session deletes its sets.
 //
-// A set's place in its session is relative to its start. A session's sets are meant to fit in it without overlapping each
-// other, but they don't have to, so nothing checks it (see "Sets' places" in docs/design/server/sessions.md). That a
-// cancelled session only has cancelled sets is checked by the server, since it spans both tables (see sessions/store.ts).
+// A session's sets are in an order, their positions, which are 0 to n - 1 for its n sets: the server keeps them so, under
+// the sessions' lock (see sessions/store.ts). Each one is once in its session, which a unique constraint that drizzle
+// can't declare, since it's deferrable, enforces: it's only in the migration that adds it (0014_ordered_sets.sql),
+//   CONSTRAINT sets_session_id_position_key UNIQUE (session_id, position) DEFERRABLE INITIALLY IMMEDIATE
+// so that a single statement can shift several sets, e.g. to move one. Its index also finds a session's sets. A session's
+// sets are meant to add up to no more than it, but they don't have to, so nothing checks it (see "Sets' order" in
+// docs/design/server/sessions.md). That a cancelled session only has cancelled sets is checked by the server, since it
+// spans both tables (see sessions/store.ts).
 export const sets = pgTable(
   'sets',
   {
@@ -288,9 +293,9 @@ export const sets = pgTable(
     sessionId: uuid('session_id')
       .notNull()
       .references(() => sessions.id, { onDelete: 'cascade' }),
-    // In minutes after its session's start, and how long it lasts, in minutes that actually pass. Each one is null until
-    // it's known, but a set with an offset has a duration.
-    offsetMinutes: integer('offset_minutes'),
+    // Its place among its session's sets, from 0 (see above).
+    position: integer('position').notNull(),
+    // How long it lasts, in minutes that actually pass, or null until it's known.
     durationMinutes: integer('duration_minutes'),
     performanceTypes: text('performance_types').array().$type<PerformanceTypeId[]>().notNull(), // ids, in the order of PERFORMANCE_TYPES
     otherPerformanceType: text('other_performance_type').notNull(), // free text, "" for none
@@ -311,13 +316,11 @@ export const sets = pgTable(
     statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
   },
   (table) => [
-    index('sets_session_id_idx').on(table.sessionId),
     index('sets_application_id_idx').on(table.applicationId),
     // A track, or a video, belongs to at most one set.
     uniqueIndex('sets_soundcloud_track_id_idx').on(table.soundcloudTrackId),
     uniqueIndex('sets_youtube_video_id_idx').on(table.youtubeVideoId),
-    check('sets_place', sql`${table.offsetMinutes} is null or ${table.durationMinutes} is not null`),
-    check('sets_offset', sql`${table.offsetMinutes} between 0 and 1439`),
+    check('sets_position', sql`${table.position} >= 0`),
     check('sets_duration', sql`${table.durationMinutes} between 1 and 1440`),
     check('sets_soundcloud_track', sql`(${table.soundcloudTrackId} is null) = (${table.soundcloudTrackUrl} is null)`),
     check('sets_status', oneOf(table.status, STATUSES)),

@@ -83,7 +83,7 @@
 
 /* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
    below), the headers of the columns that sort a list, and the one that shows a long bio or description whole,
-   underlined like a link since nothing else says it can be clicked (see also .admin-warning). */
+   underlined like a link since nothing else says it can be clicked. */
 .admin .radio-track-left-out button,
 .admin .radio-track-left-out button:hover,
 .admin .admin-sort,
@@ -197,6 +197,13 @@
 .admin-notice {
   padding-left: 0.75rem;
   border-left: 2px solid #000;
+}
+
+/* A warning, about something that doesn't prevent anything, after a ⚠ (see "Warnings" in
+   docs/design/client/admin/layout.md): in brown, between the black of notices and the red of errors. */
+.admin-notice.admin-warning {
+  border-left-color: #9a4a00;
+  color: #9a4a00;
 }
 
 .admin-error,
@@ -472,24 +479,6 @@
   color: inherit;
 }
 
-/* The mark of a set whose place is wrong, e.g. that overlaps another, which doesn't prevent anything: a button that looks
-   like text, bold, and bigger than the times it follows, though not taller than their line, so that its row isn't
-   taller, and in that line, rather than over the cell's padding like the rows' other buttons (see
-   `.admin-table-controls`). */
-.admin .admin-warning,
-.admin .admin-warning:hover {
-  margin-block: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #9a4a00;
-  font-weight: 700;
-  font-size: 1.2em;
-  line-height: 1;
-  vertical-align: top;
-  cursor: help;
-}
-
 /* A tooltip (see button.tsx), placed by its button, over the rest of the page, though not over the navigation bar or
    the player's bar (see .page). */
 .admin-tooltip {
@@ -693,8 +682,7 @@ dl.admin-record {
   gap: 0.4rem;
 }
 
-/* A session's day and the times it starts and ends, a set's times, or the hours and minutes of a duration, side by
-   side. */
+/* A session's day and the times it starts and ends, or the hours and minutes of a duration, side by side. */
 .admin-form .admin-times {
   flex-wrap: wrap;
   align-items: flex-start;

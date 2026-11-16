@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionWhen, setHours, setInSentence, setName, setTitle } from './describe'
+import { collectiveOption, deletedWith, membersGenres, sessionDay, sessionHours, sessionName, sessionWhen, setDuration, setInSentence, setName, setTitle } from './describe'
 
 describe('membersGenres', () => {
   const artists = new Map(
@@ -54,7 +54,7 @@ describe('deletedWith', () => {
   })
 })
 
-describe("sessions' and sets' days and times", () => {
+describe("sessions' days and times", () => {
   afterEach(() => {
     vi.unstubAllEnvs()
   })
@@ -63,12 +63,11 @@ describe("sessions' and sets' days and times", () => {
     // Loaded again in Tokyo's time zone, since formatters keep the one they're created in.
     vi.stubEnv('TZ', 'Asia/Tokyo')
     vi.resetModules()
-    const { sessionDay, sessionHours, sessionWhen, setHours } = await import('./describe')
+    const { sessionDay, sessionHours, sessionWhen } = await import('./describe')
     const session = { start: '2026-11-15T04:00:00.000Z', end: '2026-11-15T06:30:00.000Z', durationMinutes: 150 }
     expect(sessionDay(session)).toBe('sam. 14 nov. 2026')
     expect(sessionHours(session)).toBe('23 h – 1 h 30')
     expect(sessionWhen(session)).toBe('samedi 14 novembre 2026, de 23 h à 1 h 30 le lendemain')
-    expect(setHours({ ...session, offsetMinutes: 0 })).toBe('23 h – 1 h 30')
   })
 })
 
@@ -89,14 +88,13 @@ describe('dates and times', () => {
 describe('names and times of sessions and sets', () => {
   const session = { start: null, end: null, durationMinutes: 150, title: 'GUEST MIXES' }
 
-  it("are counted from a session's start while its date isn't known", () => {
+  it("are a session's duration while its date isn't known, and a set's duration, which sets have rather than times", () => {
     expect(sessionDay(session)).toBe('date à déterminer')
     expect(sessionHours(session)).toBe('2 h 30')
     expect(sessionWhen(session)).toBe('date à déterminer')
-    expect(setHours({ start: null, end: null, offsetMinutes: 0, durationMinutes: 45 })).toBe('+0 h – +0 h 45')
-    expect(setHours({ start: null, end: null, offsetMinutes: 90, durationMinutes: 60 })).toBe('+1 h 30 – +2 h 30')
-    expect(setHours({ start: null, end: null, offsetMinutes: null, durationMinutes: 45 })).toBe('horaire à déterminer (45 min)')
-    expect(setHours({ start: null, end: null, offsetMinutes: null, durationMinutes: null })).toBe('horaire à déterminer')
+    expect(setDuration({ durationMinutes: 45 })).toBe('45 min')
+    expect(setDuration({ durationMinutes: 90 })).toBe('1 h 30')
+    expect(setDuration({ durationMinutes: null })).toBe('à déterminer')
   })
 
   it('name a session by its title, with its day, where it is named along with others', () => {
@@ -105,12 +103,12 @@ describe('names and times of sessions and sets', () => {
   })
 
   it('name a set by its performers, with its session where it is named outside of it', () => {
-    const set = { performers: [{ id: 'a', name: 'Aurore' }, { id: 'b', name: 'Brume' }], start: null, end: null, offsetMinutes: 60, durationMinutes: 60 }
+    const set = { performers: [{ id: 'a', name: 'Aurore' }, { id: 'b', name: 'Brume' }] }
     expect(setTitle(set)).toBe('Set de Aurore et Brume')
     expect(setTitle({ performers: [] })).toBe('Set')
-    expect(setName(set as never)).toBe('Set de Aurore et Brume, +1 h – +2 h')
-    expect(setName(set as never, { ...session, title: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, date à déterminer, +1 h – +2 h')
-    expect(setInSentence(set)).toBe('le set de Aurore et Brume, +1 h – +2 h')
-    expect(setInSentence({ ...set, performers: [] })).toBe('le set, +1 h – +2 h')
+    expect(setName(set)).toBe('Set de Aurore et Brume')
+    expect(setName(set, { start: '2026-11-15T02:00:00.000Z', title: 'HAUTE RIVE' })).toBe('Set de Aurore et Brume, HAUTE RIVE, sam. 14 nov. 2026')
+    expect(setInSentence(set)).toBe('le set de Aurore et Brume')
+    expect(setInSentence({ performers: [] })).toBe('le set')
   })
 })

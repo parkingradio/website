@@ -110,14 +110,14 @@ call create_session '{"start":"2026-11-14T21:00-05:00","durationMinutes":120,"ty
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\",\"end\":\"2026-11-14T23:00:00-05:00\"'
 session="$(sql "select id from sessions where name = 'MCP'")"
 call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[]}"
-expect_body_contains '\"offsetMinutes\":null'
-expect_body_contains '\"durationMinutes\":null'
+expect_body_contains '\"durationMinutes\":null,\"performanceTypes\"'
+expect_body_lacks 'offsetMinutes'
 expect_body_contains '\"soundcloudTrack\":null'
 
 echo "  sessions are listed by when they start, with bounds in Québec time, and other offsets are refused, with their type and title"
 call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
 expect_body_contains "\\\"total\\\":1,\\\"sessions\\\":[{\\\"id\\\":\\\"${session}\\\""
-expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"application\":null,\"status\":\"planned\",\"announced\":false,\"sets\"'
+expect_body_contains '\"end\":\"2026-11-14T23:00:00-05:00\",\"durationMinutes\":120,\"type\":\"other\",\"title\":\"MCP\",\"takeover\":null,\"application\":null,\"status\":\"planned\",\"announced\":false,\"sets\"'
 call list_sessions '{"from":"2026-11-14T21:01-05:00","to":"2026-11-14T23:00-05:00"}'
 expect_body_contains '\"total\":0,'
 call list_sessions '{"from":"2026-11-15T03:00+01:00"}'
@@ -131,11 +131,20 @@ set="$(sql "select id from sets where session_id = '${session}'")"
 call update_set "{\"id\":\"${set}\",\"application\":\"${application}\"}"
 expect_body_contains "\\\"application\\\":{\\\"id\\\":\\\"${application}\\\""
 call list_sessions '{"from":"2026-11-14T21:00-05:00","to":"2026-11-14T21:01-05:00"}'
-# After the set's performers.
+# With its duration rather than its times, and after its performers, its application.
+expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${set}\\\",\\\"durationMinutes\\\":null,\\\"status\\\":\\\"planned\\\",\\\"performers\\\""
 expect_body_contains "}],\\\"application\\\":{\\\"id\\\":\\\"${application}\\\""
 call list_applications "{\"artist\":\"${artist}\"}"
 expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${set}\\\""
 expect_body_contains '\"sessions\":[]'
+
+echo "  a set is moved among its session's sets"
+call create_set "{\"id\":\"${session}\",\"performers\":[{\"id\":\"${artist}\"}],\"durationMinutes\":60,\"performanceTypes\":[],\"otherPerformanceType\":\"\",\"genres\":[]}"
+other="$(sql "select id from sets where session_id = '${session}' and id <> '${set}'")"
+call update_set_position "{\"id\":\"${other}\",\"position\":0}"
+expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${other}\\\""
+[ "$(sql "select position from sets where id = '${set}'")" = 1 ] || fail "expected the first set to be moved second"
+call delete_set "{\"id\":\"${other}\"}"
 
 echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, unless it's removed"
 sql "update sessions set flyer_key = 'sessions/mcp.png', flyer_type = 'image/png' where id = '${session}'" >/dev/null

@@ -71,6 +71,12 @@ and background, and those of rejected applications and of cancelled sessions and
 color of their own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't
 told by color alone.
 
+## Warnings
+
+A warning, about something that's probably a mistake but that doesn't prevent anything, e.g. a session's sets that add up
+to more than it (see [Sessions](sessions.md#a-sessions-page)), is a sentence that starts with a "⚠", in brown, set apart
+like the pages' other notices, so that it isn't told by color alone either.
+
 ## Tooltips
 
 Some controls have a tooltip, under them, or above them when there's no room below, e.g. to say why they can't be used

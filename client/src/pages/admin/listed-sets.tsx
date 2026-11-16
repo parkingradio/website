@@ -1,18 +1,17 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import type { ListedSet } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
-import { MISSING, describePerformanceTypes, genreNames, setHours, setName, setTitle } from './describe'
-import { Performers, SetLinks } from './set-cells'
+import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, setTitle } from './describe'
+import { arrowAfterMove } from './list'
+import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
-import type { SetSession } from './set-form'
 
 // The sets listed in a new session's form, to be added with it, all at once (see "A new session's sets" in
 // docs/design/client/admin/sessions.md): each one is changed in its form, or taken out of the list, without sending
 // anything.
 
-// The set whose form is open: a listed one, by its place in the list, or a new one, with the session's times as they were
-// when it opened, which it works from.
-export type OpenListedSet = { index: number | null; session: SetSession }
+// The set whose form is open: a listed one, by its place in the list, or a new one.
+export type OpenListedSet = { index: number | null }
 
 // A key for each listed set, which stays the same while it's listed, whatever its place in the list, e.g. once a set
 // before it is taken out of the list. A set that's changed is another one, with another key.
@@ -25,15 +24,15 @@ function keyOf(set: ListedSet): number {
 
 export function ListedSets({
   sets,
-  session,
+  durationMinutes,
   open,
   busy,
   onChange,
   onOpen,
 }: {
   sets: ListedSet[]
-  // The session's times, as its form has them.
-  session: SetSession
+  // How long the session lasts, as its form has it, or null while its times aren't valid.
+  durationMinutes: number | null
   open: OpenListedSet | null
   // Whether the session is being sent, with its sets, which then can't be changed.
   busy: boolean
@@ -41,29 +40,35 @@ export function ListedSets({
   onOpen: (open: OpenListedSet | null) => void
 }) {
   const headingId = useId()
-  // What gets the focus once a set is taken out of the list, since its × is gone: another set's ×, by its key, or the
-  // heading of the sets, as on a session's page.
-  const focusAfterRemove = useRef<number | 'heading' | null>(null)
+  // What gets the focus once the sets change, since the button that changed them can be gone, disabled or moved, which
+  // loses it: a set's button, by its key and what it does, or the heading of the sets, as on a session's page.
+  const focusNext = useRef<{ key: number; action: 'up' | 'down' | 'remove' } | 'heading' | null>(null)
   useLayoutEffect(() => {
-    const next = focusAfterRemove.current
-    focusAfterRemove.current = null
+    const next = focusNext.current
+    focusNext.current = null
     if (next === 'heading') document.getElementById(headingId)?.focus()
-    else if (next !== null) document.querySelector<HTMLElement>(`[data-remove="${next}"]`)?.focus()
+    else if (next !== null) document.querySelector<HTMLElement>(`[data-set="${next.key}"][data-action="${next.action}"]`)?.focus()
   }, [sets, headingId])
 
-  // As a session's page lists them: by their start, those whose place isn't known last, then in the order they were
-  // added, which is their order in the list, and the server's.
-  const rows = sets
-    .map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set, session) }))
-    .sort((a, b) => (a.shown.offsetMinutes ?? Infinity) - (b.shown.offsetMinutes ?? Infinity) || a.index - b.index)
+  // In their order, which is the one they're added in.
+  const rows = sets.map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set) }))
   const remove = (index: number) => {
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
-    const row = rows.findIndex((row) => row.index === index)
-    focusAfterRemove.current = (rows[row + 1] ?? rows[row - 1])?.key ?? 'heading'
+    const next = rows[index + 1] ?? rows[index - 1]
+    focusNext.current = next ? { key: next.key, action: 'remove' } : 'heading'
     onChange(sets.filter((_, i) => i !== index))
     if (open?.index === index) onOpen(null)
     // The open form's set moves up in the list.
     else if (open?.index != null && open.index > index) onOpen({ ...open, index: open.index - 1 })
+  }
+  // Swaps the set at `index` with the one `by` places from it, the open form's set included.
+  const move = (index: number, by: -1 | 1) => {
+    const moved = [...sets]
+    ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
+    focusNext.current = { key: keyOf(sets[index]), action: arrowAfterMove(by, index + by, sets.length) }
+    onChange(moved)
+    if (open?.index === index) onOpen({ ...open, index: index + by })
+    else if (open?.index === index + by) onOpen({ ...open, index })
   }
 
   return (
@@ -72,17 +77,18 @@ export function ListedSets({
         Sets
       </h2>
       <div className="admin-toolbar">
-        <button type="button" disabled={busy} onClick={() => onOpen({ index: null, session })}>
+        <button type="button" disabled={busy} onClick={() => onOpen({ index: null })}>
           ajouter un set
         </button>
       </div>
+      <SetsTooLong sets={sets} durationMinutes={durationMinutes} />
       {rows.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (
         <table className="admin-table admin-table-controls" aria-label="Sets">
           <thead>
             <tr>
-              <th>Heure</th>
+              <th>Durée</th>
               <th>Artistes</th>
               <th>Prestation</th>
               <th>Genres</th>
@@ -93,7 +99,7 @@ export function ListedSets({
           <tbody>
             {rows.map(({ index, key, shown }) => (
               <tr key={key}>
-                <td className="admin-day">{setHours(shown)}</td>
+                <td className="admin-day">{setDuration(shown)}</td>
                 {/* Its links open in a new tab, so that the form isn't left. */}
                 <td>{shown.performers.length > 0 ? <Performers performers={shown.performers} newTab /> : MISSING}</td>
                 <td>{describePerformanceTypes(shown)}</td>
@@ -102,10 +108,25 @@ export function ListedSets({
                   <SetLinks set={shown} newTab />
                 </td>
                 <td>
-                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index, session })}>
+                  <MoveButtons
+                    name={setName(shown)}
+                    first={index === 0}
+                    last={index === rows.length - 1}
+                    disabled={busy}
+                    data={{ 'data-set': key }}
+                    onMove={(by) => move(index, by)}
+                  />{' '}
+                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index })}>
                     modifier
                   </button>{' '}
-                  <button type="button" data-remove={key} aria-label={`retirer : ${setName(shown)}`} disabled={busy} onClick={() => remove(index)}>
+                  <button
+                    type="button"
+                    data-set={key}
+                    data-action="remove"
+                    aria-label={`retirer : ${setName(shown)}`}
+                    disabled={busy}
+                    onClick={() => remove(index)}
+                  >
                     ×
                   </button>
                 </td>
@@ -119,12 +140,7 @@ export function ListedSets({
           // Afresh for each set, but not when another one is taken out of the list.
           key={open.index === null ? 'new' : keyOf(sets[open.index])}
           title={open.index === null ? 'Nouveau set' : setTitle(sets[open.index])}
-          session={open.session}
-          initial={
-            open.index === null
-              ? newSetFormValues({ ...open.session, sets: sets.map((set) => shownSet(set, open.session)) })
-              : setFormValues(shownSet(sets[open.index], open.session), open.session)
-          }
+          initial={open.index === null ? newSetFormValues({ durationMinutes, sets }) : setFormValues(shownSet(sets[open.index]))}
           submitLabel={open.index === null ? 'ajouter le set' : 'enregistrer'}
           onCancel={() => onOpen(null)}
           onSubmit={async (fields, form) => {

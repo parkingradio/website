@@ -225,8 +225,8 @@ const SUMMARIES: Record<string, (body: JsonObject, send: Send) => Promise<JsonOb
   list_sessions: async ({ sessions, ...rest }) => ({
     ...rest,
     sessions: (sessions as JsonObject[]).map((session) => ({
-      ...pickOne(session, ['id', 'start', 'end', 'type', 'title', 'takeover', 'application', 'status', 'announced']),
-      sets: pick(session.sets, ['id', 'start', 'end', 'status', 'performers', 'application']),
+      ...pickOne(session, ['id', 'start', 'end', 'durationMinutes', 'type', 'title', 'takeover', 'application', 'status', 'announced']),
+      sets: pick(session.sets, ['id', 'durationMinutes', 'status', 'performers', 'application']),
     })),
   }),
 }
