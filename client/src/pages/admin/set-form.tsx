@@ -23,8 +23,9 @@ import type { GroupProps } from './profile-fields'
 // How many of its performers' genres a set's form suggests.
 const SUGGESTED_GENRES = 3
 
-// The session a set is in, as far as its form goes: one that's saved, or a new one, with its times as its form has them.
-export type SetSession = Pick<Session, 'start' | 'end' | 'durationMinutes'>
+// The session a set is in, as far as its form goes: one that's saved, or a new one, with its times as its form has them,
+// which are all null while they aren't valid, when the set is placed as in a session without a date.
+export type SetSession = Pick<Session, 'start' | 'end' | 'durationMinutes'> | { start: null; end: null; durationMinutes: null }
 
 type SetFormProps = {
   // The session the set is in, which its times are relative to.
@@ -234,7 +235,11 @@ function PlaceField({
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Horaire</legend>
       <p className="admin-hint">
-        {dated ? `La session a lieu ${sessionWithin(session)}.` : `La session dure ${formatDuration(session.durationMinutes)}.`}
+        {session.start !== null
+          ? `La session a lieu ${sessionWithin(session)}.`
+          : session.durationMinutes === null
+            ? "Quand a lieu la session n'est pas encore indiqué."
+            : `La session dure ${formatDuration(session.durationMinutes)}.`}
         {dated && !form.unplaced && ' Heure du Québec.'}
       </p>
       <div className="admin-choices">

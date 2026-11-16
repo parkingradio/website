@@ -95,8 +95,11 @@ export function SessionForm({
     const session = sets ? { ...checked.fields!, sets: sets.listed.map(listedSetFields) } : checked.fields!
     return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined })
   })
-  // The session's times, which listed sets are placed in, once they're valid.
-  const listedIn: SetSession | null = 'errors' in times ? null : { ...startAndEnd(times.start, times.durationMinutes), durationMinutes: times.durationMinutes }
+  // The session's times, which listed sets are placed in, or none while they aren't valid.
+  const listedIn: SetSession =
+    'errors' in times
+      ? { start: null, end: null, durationMinutes: null }
+      : { ...startAndEnd(times.start, times.durationMinutes), durationMinutes: times.durationMinutes }
 
   return (
     <>

@@ -469,14 +469,14 @@ describe("a new session's listed sets", () => {
   })
 
   it("are placed relative to the session's start, so that they move with it, and counted from it without one", () => {
-    expect(shownSet(listed, { start: '2026-11-14T21:00:00-05:00', durationMinutes: 240 })).toMatchObject({
+    expect(shownSet(listed, { start: '2026-11-14T21:00:00-05:00' })).toMatchObject({
       start: '2026-11-14T22:30-05:00',
       end: '2026-11-14T23:30-05:00',
       performers: [{ id: 'artist-1', name: 'Aurore' }],
       status: 'planned',
     })
-    expect(shownSet(listed, { start: '2026-11-15T20:00:00-05:00', durationMinutes: 240 })).toMatchObject({ start: '2026-11-15T21:30-05:00' })
-    expect(shownSet(listed, { start: null, durationMinutes: 240 })).toMatchObject({ start: null, end: null, offsetMinutes: 90 })
+    expect(shownSet(listed, { start: '2026-11-15T20:00:00-05:00' })).toMatchObject({ start: '2026-11-15T21:30-05:00' })
+    expect(shownSet(listed, { start: null })).toMatchObject({ start: null, end: null, offsetMinutes: 90 })
   })
 
   it('open their form as they were added, with the link to their video on YouTube', () => {

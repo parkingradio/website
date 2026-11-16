@@ -314,8 +314,8 @@ export type SetFormValues = {
   application: ApplicationLink | null
 }
 
-// The session a set is in, as far as its place goes.
-export type SessionPlace = Pick<Session, 'start' | 'durationMinutes'>
+// The session a set is in, as far as its place goes, which is relative to its start.
+export type SessionPlace = Pick<Session, 'start'>
 
 // When something that starts at `start`, or whose start isn't known when it's null, and lasts `durationMinutes` starts and
 // ends, as the endpoints give them.
@@ -373,11 +373,13 @@ export function setFormValues(set: SetValues, session: SessionPlace): SetFormVal
 
 // What a new set of `session` starts with: when the last of its sets that isn't cancelled and whose place is known ends,
 // or at its start when there's none, for an hour, or until the session ends if that's sooner, or without times when
-// its sets fill it.
-export function newSetFormValues(session: SessionPlace & { sets: Pick<StudioSet, 'status' | 'offsetMinutes' | 'durationMinutes'>[] }): SetFormValues {
+// its sets fill it. A session whose duration is null, since its times aren't known yet, is never filled.
+export function newSetFormValues(
+  session: Pick<Session, 'start'> & { durationMinutes: number | null; sets: Pick<StudioSet, 'status' | 'offsetMinutes' | 'durationMinutes'>[] },
+): SetFormValues {
   const ends = session.sets.filter((set) => set.status !== 'cancelled' && set.offsetMinutes !== null).map((set) => set.offsetMinutes! + set.durationMinutes!)
   const offsetMinutes = Math.max(0, ...ends)
-  const durationMinutes = Math.min(60, session.durationMinutes - offsetMinutes)
+  const durationMinutes = session.durationMinutes === null ? 60 : Math.min(60, session.durationMinutes - offsetMinutes)
   if (durationMinutes <= 0) return EMPTY_SET_FORM
   return { ...EMPTY_SET_FORM, ...placeValues(session, offsetMinutes, durationMinutes) }
 }

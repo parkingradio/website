@@ -1983,25 +1983,37 @@ describe("A new session's sets", () => {
     ])
   })
 
-  it("moves the sets with the session, which can't be added or changed while its times aren't valid, when they're counted from its start", async () => {
+  it("lists sets before the session's times are known, counted from its start, then moves them with it", async () => {
     mockFetch(NEW)
     renderAt('/admin/sessions/nouvelle')
 
-    await fillIn()
+    // Before the session's times: as in a session without a date, whose duration isn't known, so for an hour.
+    fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    const form = setForm('Nouveau set')
+    expect(form.getByText("Quand a lieu la session n'est pas encore indiqué.")).toBeInTheDocument()
+    const durations = form.getAllByRole('group').filter((group) => group.classList.contains('admin-duration'))
+    expect(durations.map((group) => within(group).getAllByRole('spinbutton').map((input) => (input as HTMLInputElement).value))).toEqual([
+      ['0', '0'],
+      ['1', '0'],
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
     await addSet('Aurore')
-    expect(rows(setsTable())[0][0]).toBe('21 h – 22 h')
+    await addSet('Brume')
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['+0 h – +1 h', '+1 h – +2 h'])
+
+    await fillIn()
+    expect(rows(setsTable()).map((row) => row[0])).toEqual(['21 h – 22 h', '22 h – 23 h'])
     fireEvent.change(screen.getByLabelText('Début'), { target: { value: '20:00' } })
     expect(rows(setsTable())[0][0]).toBe('20 h – 21 h')
 
+    // Not valid anymore: they can still be changed.
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
     expect(rows(setsTable())[0][0]).toBe('+0 h – +1 h')
-    for (const name of ['ajouter un set', 'modifier : Set de Aurore, +0 h – +1 h']) {
-      const button = screen.getByRole('button', { name })
-      expect(button).toHaveAttribute('aria-disabled', 'true')
-      expect(button).toHaveAccessibleDescription("Indiquez d'abord quand a lieu la session.")
-      fireEvent.click(button)
-    }
-    expect(screen.queryByRole('region', { name: /^(Nouveau set|Set de)/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore, +0 h – +1 h' }))
+    await screen.findByRole('heading', { name: 'Set de Aurore' })
+    expect(setForm('Set de Aurore').getByText("Quand a lieu la session n'est pas encore indiqué.")).toBeInTheDocument()
+    fireEvent.click(setForm('Set de Aurore').getByRole('button', { name: 'annuler' }))
 
     // Without a date, from its start.
     fireEvent.click(screen.getByLabelText('date à déterminer'))

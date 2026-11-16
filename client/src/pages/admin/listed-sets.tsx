@@ -1,7 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import type { ListedSet } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
-import { Button } from './button'
 import { MISSING, describePerformanceTypes, genreNames, setHours, setName, setTitle } from './describe'
 import { Performers, SetLinks } from './set-cells'
 import { SetFormWithChoices } from './set-form'
@@ -14,8 +13,6 @@ import type { SetSession } from './set-form'
 // The set whose form is open: a listed one, by its place in the list, or a new one, with the session's times as they were
 // when it opened, which it works from.
 export type OpenListedSet = { index: number | null; session: SetSession }
-
-const NO_TIMES = "Indiquez d'abord quand a lieu la session."
 
 // A key for each listed set, which stays the same while it's listed, whatever its place in the list, e.g. once a set
 // before it is taken out of the list. A set that's changed is another one, with another key.
@@ -35,8 +32,8 @@ export function ListedSets({
   onOpen,
 }: {
   sets: ListedSet[]
-  // The session's times, or null while they aren't valid, when the sets' times are counted from its start.
-  session: SetSession | null
+  // The session's times, as its form has them.
+  session: SetSession
   open: OpenListedSet | null
   // Whether the session is being sent, with its sets, which then can't be changed.
   busy: boolean
@@ -54,11 +51,10 @@ export function ListedSets({
     else if (next !== null) document.querySelector<HTMLElement>(`[data-remove="${next}"]`)?.focus()
   }, [sets, headingId])
 
-  const shownIn = session ?? { start: null, durationMinutes: 0 }
   // As a session's page lists them: by their start, those whose place isn't known last, then in the order they were
   // added, which is their order in the list, and the server's.
   const rows = sets
-    .map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set, shownIn) }))
+    .map((set, index) => ({ index, key: keyOf(set), shown: shownSet(set, session) }))
     .sort((a, b) => (a.shown.offsetMinutes ?? Infinity) - (b.shown.offsetMinutes ?? Infinity) || a.index - b.index)
   const remove = (index: number) => {
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
@@ -76,9 +72,9 @@ export function ListedSets({
         Sets
       </h2>
       <div className="admin-toolbar">
-        <Button unavailable={session ? null : NO_TIMES} disabled={busy} onClick={() => onOpen({ index: null, session: session! })}>
+        <button type="button" disabled={busy} onClick={() => onOpen({ index: null, session })}>
           ajouter un set
-        </Button>
+        </button>
       </div>
       {rows.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
@@ -106,14 +102,9 @@ export function ListedSets({
                   <SetLinks set={shown} newTab />
                 </td>
                 <td>
-                  <Button
-                    aria-label={`modifier : ${setName(shown)}`}
-                    unavailable={session ? null : NO_TIMES}
-                    disabled={busy}
-                    onClick={() => onOpen({ index, session: session! })}
-                  >
+                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index, session })}>
                     modifier
-                  </Button>{' '}
+                  </button>{' '}
                   <button type="button" data-remove={key} aria-label={`retirer : ${setName(shown)}`} disabled={busy} onClick={() => remove(index)}>
                     ×
                   </button>
