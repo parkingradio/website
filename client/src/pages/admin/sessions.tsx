@@ -591,7 +591,6 @@ function LoadedSession({ loaded }: { loaded: Session }) {
       {open?.kind === 'session' ? (
         <SessionFormWithChoices
           initial={sessionFormValues(session)}
-          hasSets={session.sets.length > 0}
           announced={session.announced}
           flyer={session.hasFlyer ? flyerUrl(session) : null}
           submitLabel="enregistrer"

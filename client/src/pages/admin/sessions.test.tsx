@@ -758,7 +758,6 @@ describe("A session's page", () => {
     expect(screen.getByLabelText('Début')).toHaveValue('21:00')
     expect(screen.getByLabelText('Fin')).toHaveValue('01:00')
     expect(screen.getByRole('status')).toHaveTextContent('Dure 4 h, finit le lendemain, dimanche 15 novembre 2026.')
-    expect(screen.getByText('Ses sets se déplacent avec elle.')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
     expect(screen.getByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
     // The name its type gives it shows while it has none of its own.
@@ -2051,7 +2050,6 @@ describe("A new session's sets", () => {
       ['horaire à déterminer (1 h)', 'Aurore'],
     ])
     expect(within(setsTable()).getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
-    expect(screen.getByText('Ses sets se déplacent avec elle.')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Brume, 22 h – 23 h' }))
     await screen.findByRole('heading', { name: 'Set de Brume' })

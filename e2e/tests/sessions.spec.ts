@@ -462,7 +462,6 @@ test("a collective's takeover is added from its page, until the next day, with i
 
   // Moved to another day, with its sets.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
-  await expect(page.getByText('Ses sets se déplacent avec elle.')).toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('GUEST MIXES, sam. 10 oct. 2026')
   await page.getByLabel('Date', { exact: true }).fill(otherDay)
   await page.getByRole('button', { name: 'enregistrer' }).click()
