@@ -155,10 +155,11 @@ the panel, while the session has no event on RA, with the event's link in its fi
 
 ## The session form
 
-"nouvelle session" adds a session, as planned, at `/admin/sessions/nouvelle`, then goes to its page, where its sets are
-added. A new session starts without a type, which has to be picked. A collective's page leads to it as its takeover,
-with "Takeover" and the collective picked (`?takeover=<id>`), unless it isn't one of the collectives loaded, e.g. when
-they can't be loaded, in which case nothing is picked. From top to bottom, the form has:
+"nouvelle session" adds a session, as planned, with its sets (see [A new session's sets](#a-new-sessions-sets)), at
+`/admin/sessions/nouvelle`, then goes to its page. A new session starts without a type, which has to be picked. A
+collective's page leads to it as its takeover, with "Takeover" and the collective picked (`?takeover=<id>`), unless it
+isn't one of the collectives loaded, e.g. when they can't be loaded, in which case nothing is picked. From top to
+bottom, the form has:
 
 - "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when
   it ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
@@ -203,6 +204,20 @@ they can't be loaded, in which case nothing is picked. From top to bottom, the f
   couldn't be.
 
 When the collectives can't be loaded, the form says so: the session's collective stays, but another one can't be picked.
+
+### A new session's sets
+
+After its fields, a new session's form has its sets, which are only sent with it. They're added, changed and listed as
+on a session's page (see [A set's form](#a-sets-form)), except that:
+
+- Their rows have no status, and no "⚠", which the session's page shows once the session is added. Their links open
+  in a new tab. "×" takes a set out of the list, without confirming.
+- Their places are relative to the session's start, so they move with it. While its times aren't valid, they're placed
+  as in a session without a date whose duration isn't known, so a new one lasts an hour, and their form says « Quand a
+  lieu la session n'est pas encore indiqué. » in place of when the session is. A set's form keeps the session's times as
+  they were when it opened.
+- "ajouter la session" can't be used while a set's form is open, saying « Ajoutez d'abord le set, ou annulez-le. »,
+  or « Enregistrez d'abord le set, ou annulez-le. » for a listed set's, and the sets can't be changed while it's sent.
 
 ## A set's form
 
@@ -278,6 +293,9 @@ counts: if it refuses what the form accepted, the form shows the server's messag
 way, the message names it (see [Names](#names)) and links to its session's page, unless that's the page it's on: a set
 of the session whose page this is is named by its performers and times, without a link, and the session itself isn't
 named. Changing a status shows these the same way.
+
+An error about one of a new session's sets names it, e.g. « Le set de Aurore, 21 h – 22 h n'a pas pu être ajouté : … »,
+and another of its sets in the way is named without a link.
 
 ## Endpoints
 

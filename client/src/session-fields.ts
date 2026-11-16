@@ -5,7 +5,7 @@ import type { GenreId } from './artist-profile'
 import { checkLine, checkText, everyOne } from './checks'
 import type { FieldErrors } from './checks'
 import { quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstantFrom } from './quebec-time'
-import { isSoundcloudTrackLink, youtubeVideoId } from './session-links'
+import { isSoundcloudTrackLink, youtubeVideoId, youtubeVideoUrl } from './session-links'
 
 // How sessions and sets are checked in the browser, by the admin pages, and how their forms' times of day become what the
 // server takes (see docs/design/client/admin/sessions.md).
@@ -314,8 +314,21 @@ export type SetFormValues = {
   application: ApplicationLink | null
 }
 
-// The session a set is in, as far as its place goes.
-type SessionPlace = Pick<Session, 'start' | 'durationMinutes'>
+// The session a set is in, as far as its place goes, which is relative to its start.
+export type SessionPlace = Pick<Session, 'start'>
+
+// When something that starts at `start`, or whose start isn't known when it's null, and lasts `durationMinutes` starts and
+// ends, as the endpoints give them.
+export function startAndEnd(start: Date | null, durationMinutes: number): Pick<Session, 'start' | 'end'> {
+  return { start: start && quebecDateTime(start), end: start && quebecDateTime(after(start, durationMinutes)) }
+}
+
+// A set as far as its form goes, which a set that's saved is, and so is one that's listed in a new session's form (see
+// `ListedSet`).
+export type SetValues = Pick<StudioSet, 'performers' | 'performanceTypes' | 'otherPerformanceType' | 'genres' | 'application' | 'offsetMinutes' | 'durationMinutes'> & {
+  soundcloudTrack: { url: string } | null
+  youtubeVideo: { url: string } | null
+}
 
 const EMPTY_SET_FORM: SetFormValues = {
   performers: [],
@@ -342,7 +355,7 @@ function placeValues(session: SessionPlace, offsetMinutes: number, durationMinut
 }
 
 // A set of `session` as the form shows it, to change it.
-export function setFormValues(set: StudioSet, session: SessionPlace): SetFormValues {
+export function setFormValues(set: SetValues, session: SessionPlace): SetFormValues {
   const values: SetFormValues = {
     ...EMPTY_SET_FORM,
     performers: set.performers,
@@ -360,11 +373,13 @@ export function setFormValues(set: StudioSet, session: SessionPlace): SetFormVal
 
 // What a new set of `session` starts with: when the last of its sets that isn't cancelled and whose place is known ends,
 // or at its start when there's none, for an hour, or until the session ends if that's sooner, or without times when
-// its sets fill it.
-export function newSetFormValues(session: SessionPlace & Pick<Session, 'sets'>): SetFormValues {
+// its sets fill it. A session whose duration is null, since its times aren't known yet, is never filled.
+export function newSetFormValues(
+  session: Pick<Session, 'start'> & { durationMinutes: number | null; sets: Pick<StudioSet, 'status' | 'offsetMinutes' | 'durationMinutes'>[] },
+): SetFormValues {
   const ends = session.sets.filter((set) => set.status !== 'cancelled' && set.offsetMinutes !== null).map((set) => set.offsetMinutes! + set.durationMinutes!)
   const offsetMinutes = Math.max(0, ...ends)
-  const durationMinutes = Math.min(60, session.durationMinutes - offsetMinutes)
+  const durationMinutes = session.durationMinutes === null ? 60 : Math.min(60, session.durationMinutes - offsetMinutes)
   if (durationMinutes <= 0) return EMPTY_SET_FORM
   return { ...EMPTY_SET_FORM, ...placeValues(session, offsetMinutes, durationMinutes) }
 }
@@ -450,5 +465,35 @@ export function checkSet(
       youtubeVideo: youtubeVideo || null,
       application: form.application?.id ?? null,
     },
+  }
+}
+
+// A set listed in a new session's form, to be added with it (see "A new session's sets" in
+// docs/design/client/admin/sessions.md): what the server will be sent of it, with its performers and its application as
+// they're shown. Its place is relative to the session's start, so it moves with the session.
+export type ListedSet = Omit<SetFields, 'performers' | 'application'> & { performers: Reference[]; application: ApplicationLink | null }
+
+// The set that a set's form, `form`, sends as `fields`, as it's listed.
+export function listedSet(fields: SetFields, form: Pick<SetFormValues, 'performers' | 'application'>): ListedSet {
+  return { ...fields, performers: form.performers, application: form.application }
+}
+
+// What the server is sent of a listed set.
+export function listedSetFields({ performers, application, ...fields }: ListedSet): SetFields {
+  return { ...fields, performers: performers.map(({ id }) => ({ id })), application: application?.id ?? null }
+}
+
+// A listed set as a set of `session` is shown and changed, with its times once the session has a start, and planned.
+// Its links are as they were typed, which its form checked, but a video's is shown as YouTube's, since it can be its id.
+export function shownSet(set: ListedSet, session: SessionPlace): SetValues & Pick<StudioSet, 'start' | 'end' | 'status'> {
+  const start = session.start !== null && set.offsetMinutes !== null ? after(new Date(session.start), set.offsetMinutes) : null
+  const videoId = set.youtubeVideo && youtubeVideoId(set.youtubeVideo)
+  return {
+    ...set,
+    soundcloudTrack: set.soundcloudTrack === null ? null : { url: set.soundcloudTrack },
+    youtubeVideo: videoId ? { url: youtubeVideoUrl(videoId) } : null,
+    // A set with an offset has a duration.
+    ...startAndEnd(start, set.durationMinutes!),
+    status: 'planned',
   }
 }

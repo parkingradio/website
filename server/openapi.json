@@ -1901,6 +1901,151 @@
         ],
         "additionalProperties": false
       },
+      "NewSessionConflictError": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "string"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Session"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session in the way, or the set's in the way"
+          },
+          "set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Set"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set in the way, if it is one"
+          },
+          "setIndex": {
+            "description": "The place in `sets` of the set the error is about, from 0, only when it is about one of them",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "otherSetIndex": {
+            "description": "The place in `sets` of the set in the way, from 0, when it is another of them, which is not saved: `session` and `set` are then null",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "error",
+          "session",
+          "set"
+        ],
+        "additionalProperties": false
+      },
+      "NewSessionError": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "string"
+          },
+          "setIndex": {
+            "description": "The place in `sets` of the set the error is about, from 0, only when it is about one of them",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "NewSessionFields": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "description": "A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionType"
+          },
+          "takeover": {
+            "description": "The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "application": {
+            "description": "The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none"
+          },
+          "raEvent": {
+            "description": "The event's id on RA, or a link to it. Null, or blank, for none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to 5000 characters. Empty for none"
+          },
+          "sets": {
+            "description": "The sets to add with the session, in order, each with the fields a new set takes. If one of them can't be added, nothing is saved, and the error's `setIndex` is its place in the list, from 0. Left out, none",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetFields"
+            }
+          }
+        },
+        "required": [
+          "start",
+          "durationMinutes",
+          "type",
+          "takeover",
+          "application",
+          "name",
+          "raEvent",
+          "description"
+        ],
+        "additionalProperties": false
+      },
       "Ok": {
         "type": "object",
         "properties": {
@@ -7423,7 +7568,7 @@
       },
       "post": {
         "operationId": "create_session",
-        "summary": "Adds a session, as planned, without sets, with or without a flyer",
+        "summary": "Adds a session, as planned, with or without a flyer, and the sets it's given, if any, all of them or nothing",
         "tags": [
           "Sessions"
         ],
@@ -7435,7 +7580,7 @@
                 "type": "object",
                 "properties": {
                   "session": {
-                    "$ref": "#/components/schemas/SessionFields"
+                    "$ref": "#/components/schemas/NewSessionFields"
                   },
                   "flyer": {
                     "type": "string",
@@ -7487,7 +7632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiError"
+                  "$ref": "#/components/schemas/NewSessionError"
                 }
               }
             }
@@ -7517,7 +7662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConflictError"
+                  "$ref": "#/components/schemas/NewSessionConflictError"
                 }
               }
             }
@@ -7538,6 +7683,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewSessionError"
                 }
               }
             }

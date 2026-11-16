@@ -17,23 +17,29 @@ import {
   durationOf,
   endTimeAfter,
   isCollectivesApplication,
+  listedSetFields,
   minutesOf,
   sessionTimes,
+  startAndEnd,
   typeName,
 } from '../../session-fields'
-import type { RaEvent, Reference, SessionFormValues, SessionType } from '../../session-fields'
+import type { ListedSet, RaEvent, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay, nextDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
+import { ListedSets } from './listed-sets'
+import type { OpenListedSet } from './listed-sets'
 import { compareText, search } from './list'
 import { PhotoField } from './profile-fields'
+import type { SetSession } from './set-form'
 import type { GroupProps } from './profile-fields'
 
-// A form for a session and its flyer, to add a session or change one, but not its sets. Like the artist form (see
-// artist-form.tsx), each field is checked as the server checks it (see `checkSession`), and says what's wrong once it's
-// been left, or once the form is sent, and the server's error is shown if it refuses the session anyway.
+// A form for a session and its flyer, to add a session, with the sets listed to be added with it, or change one, but not
+// its sets. Like the artist form (see artist-form.tsx), each field is checked as the server checks it (see
+// `checkSession`), and says what's wrong once it's been left, or once the form is sent, and the server's error is shown
+// if it refuses the session anyway.
 
 export type SessionFormProps = {
   // What the form starts with: a session's, to change it, or what a new one starts with.
@@ -50,10 +56,12 @@ export type SessionFormProps = {
   applications: Application[] | null
   // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
   events: Loaded<Schema<'Events'>>
+  // For a new session: the sets listed to be added with it, which can be changed in the form, and are sent with it.
+  sets?: { listed: ListedSet[]; onChange: (sets: ListedSet[]) => void }
   submitLabel: string
   // Sends the form, as `PUT /api/admin/sessions/:id` takes it, which `POST /api/admin/sessions` takes too, without
-  // `removeFlyer`, and returns the error, if it failed.
-  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'>) => Promise<ReactNode | null>
+  // `removeFlyer`, but with the listed sets, and returns the error, if it failed.
+  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'> & { session: { sets?: SetFields[] } }) => Promise<ReactNode | null>
   onCancel?: () => void
 }
 
@@ -64,10 +72,12 @@ export function SessionForm({
   collectives,
   applications,
   events,
+  sets,
   submitLabel,
   onSubmit,
   onCancel,
 }: SessionFormProps) {
+  const formId = useId()
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SessionFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const [flyer, setFlyer] = useState<File | null>(null)
@@ -78,71 +88,97 @@ export function SessionForm({
   const errors: Partial<Record<keyof SessionFormValues | 'flyer', string>> = { ...checked.errors }
   const flyerProblem = pickedPhotoError(flyer, 'flyer')
   if (flyerProblem) errors.flyer = flyerProblem
-  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () =>
+  // The listed set whose form is open, if any.
+  const [openSet, setOpenSet] = useState<OpenListedSet | null>(null)
+  const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => {
     // There are fields, since there are no errors by then.
-    onSubmit({ session: checked.fields!, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }),
-  )
+    const session = sets ? { ...checked.fields!, sets: sets.listed.map(listedSetFields) } : checked.fields!
+    return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined })
+  })
+  // The session's times, which listed sets are placed in, or none while they aren't valid.
+  const listedIn: SetSession =
+    'errors' in times
+      ? { start: null, end: null, durationMinutes: null }
+      : { ...startAndEnd(times.start, times.durationMinutes), durationMinutes: times.durationMinutes }
 
   return (
-    <form ref={formRef} className="admin-form admin-form-wide" onSubmit={submit} noValidate>
-      <TimesField
-        form={form}
-        times={times}
-        hasSets={hasSets}
-        onChange={update}
-        errors={{ day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
-        onLeave={leave('day', 'start', 'end', 'duration')}
-      />
+    <>
+      <form id={formId} ref={formRef} className="admin-form admin-form-wide" onSubmit={submit} noValidate>
+        <TimesField
+          form={form}
+          times={times}
+          hasSets={hasSets || (sets?.listed.length ?? 0) > 0}
+          onChange={update}
+          errors={{ day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
+          onLeave={leave('day', 'start', 'end', 'duration')}
+        />
 
-      <TypeField type={form.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
+        <TypeField type={form.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
 
-      {form.type === 'takeover' && (
+        {form.type === 'takeover' && (
+          <>
+            <TakeoverField
+              takeover={form.takeover}
+              collectives={collectives}
+              onChange={(takeover) => {
+                update({ takeover })
+                // So that it says right away when its application isn't the collective's.
+                leave('application')()
+              }}
+              error={shown('takeover')}
+              onLeave={leave('takeover')}
+            />
+            <ApplicationField
+              candidates={applications?.filter((application) => isCollectivesApplication(application, form.takeover)) ?? []}
+              applications={applications}
+              own={initial.application}
+              selected={form.application}
+              empty={form.takeover ? 'Aucune candidature de ce collectif.' : "Choisissez d'abord le collectif."}
+              onChange={(application) => update({ application })}
+              error={shown('application')}
+              onLeave={leave('application')}
+            />
+          </>
+        )}
+
+        <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
+
+        <DescriptionField form={form} onChange={(description) => update({ description })} error={shown('description')} onLeave={leave('description')} />
+
+        <PhotoField
+          image="flyer"
+          current={current}
+          removed={removeFlyer}
+          onRemove={() => setRemoveFlyer(true)}
+          photo={flyer}
+          onChange={(flyer) => {
+            setFlyer(flyer)
+            leave('flyer')()
+          }}
+          error={shown('flyer')}
+        />
+
+        <RaEventField event={form.raEvent} own={initial.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} />
+
+        {!sets && <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />}
+      </form>
+      {sets && (
         <>
-          <TakeoverField
-            takeover={form.takeover}
-            collectives={collectives}
-            onChange={(takeover) => {
-              update({ takeover })
-              // So that it says right away when its application isn't the collective's.
-              leave('application')()
-            }}
-            error={shown('takeover')}
-            onLeave={leave('takeover')}
-          />
-          <ApplicationField
-            candidates={applications?.filter((application) => isCollectivesApplication(application, form.takeover)) ?? []}
-            applications={applications}
-            own={initial.application}
-            selected={form.application}
-            empty={form.takeover ? 'Aucune candidature de ce collectif.' : "Choisissez d'abord le collectif."}
-            onChange={(application) => update({ application })}
-            error={shown('application')}
-            onLeave={leave('application')}
-          />
+          <ListedSets sets={sets.listed} session={listedIn} open={openSet} busy={busy} onChange={sets.onChange} onOpen={setOpenSet} />
+          {/* After the sets, whose forms can't be within the session's. */}
+          <div className="admin-form admin-form-wide">
+            <FormActions
+              form={formId}
+              error={error}
+              busy={busy}
+              submitLabel={submitLabel}
+              onCancel={onCancel}
+              unavailable={openSet ? `${openSet.index === null ? 'Ajoutez' : 'Enregistrez'} d'abord le set, ou annulez-le.` : null}
+            />
+          </div>
         </>
       )}
-
-      <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
-
-      <DescriptionField form={form} onChange={(description) => update({ description })} error={shown('description')} onLeave={leave('description')} />
-
-      <PhotoField
-        image="flyer"
-        current={current}
-        removed={removeFlyer}
-        onRemove={() => setRemoveFlyer(true)}
-        photo={flyer}
-        onChange={(flyer) => {
-          setFlyer(flyer)
-          leave('flyer')()
-        }}
-        error={shown('flyer')}
-      />
-
-      <RaEventField event={form.raEvent} own={initial.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} />
-
-      <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
-    </form>
+    </>
   )
 }
 

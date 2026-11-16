@@ -656,8 +656,8 @@ export type SeedSession = {
   when?: { day: number; start: string }
   durationMinutes: number
   status: Status
-  // In order. A set is given its status as soon as it's added, so that a cancelled set can be overlapped by the sets
-  // after it. Cancelling the session cancels them all, and marking it as done marks none of them.
+  // In order. Each set is given its status once it's added. Cancelling the session cancels them all, and marking it as
+  // done marks none of them.
   sets: SeedSet[]
 }
 

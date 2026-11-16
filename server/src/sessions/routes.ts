@@ -10,11 +10,11 @@ import { forgetPhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
-import { BAD_STATUS, Genre, PerformanceType, SESSION_FIELDS, SET_FIELDS, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
+import { BAD_STATUS, Genre, NewSessionFields, PerformanceType, SESSION_FIELDS, SET_FIELDS, SessionFields, SessionType, SetFields, Status, sessionTitle } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
 import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
-import type { SessionChanges, SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
+import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StoredFlyer, StoredSession, StoredSet } from './store.js'
 
 // Admin routes for sessions and their sets: add, view, change, mark as planned, done or cancelled, and delete them (see
 // docs/design/server/sessions.md).
@@ -117,10 +117,13 @@ const FlyerFile = z.file().meta({
   description: `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents. An empty file is no flyer`,
 })
 
-// What adding a session sends, as multipart/form-data, and changing one with `removeFlyer`. The route reads it itself
-// (see `readSessionForm`): only the session's fields are checked against their schema here.
-const NewSessionForm = z.object({ session: SessionFields, flyer: FlyerFile.optional() })
-const SessionForm = NewSessionForm.extend({
+// What adding a session sends, as multipart/form-data, with its sets, and changing one, without them, with
+// `removeFlyer`. The route reads it itself (see `readSessionForm`): only the session's fields are checked against their
+// schema here.
+const NewSessionForm = z.object({ session: NewSessionFields, flyer: FlyerFile.optional() })
+const SessionForm = z.object({
+  session: SessionFields,
+  flyer: FlyerFile.optional(),
   removeFlyer: z
     .string()
     .optional()
@@ -143,14 +146,17 @@ function sessionChanges({ start, durationMinutes, type, takeover, application, n
 }
 
 // Reads the session's fields, as JSON from the "session" part, and the flyer from a request that adds or changes a
-// session, and checks them, like an artist's profile and photo (see `readProfileForm`), along with the "removeFlyer"
-// field, which only changing one reads. Returns them, or the error to reply with when the request is malformed or
-// invalid.
-async function readSessionForm(
+// session, and checks them against `schema`, like an artist's profile and photo (see `readProfileForm`), along with the
+// "removeFlyer" field, which only changing one reads. Returns them, or the error to reply with when the request is
+// malformed or invalid, with the `setIndex` of the set it's about, if it's about one of those added with the session.
+async function readSessionForm<Schema extends z.ZodType>(
   request: FastifyRequest,
-): Promise<{ fields: SessionFields; flyer: SentPhoto | null; removeFlyer: boolean } | { status: 400 | 413; error: string }> {
-  const sent = await readProfileForm(request, 'session', SessionFields, { photoPart: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
-  return 'error' in sent ? sent : { fields: sent.profile, flyer: sent.photo, removeFlyer: sent.removePhoto }
+  schema: Schema,
+): Promise<{ fields: z.output<Schema>; flyer: SentPhoto | null; removeFlyer: boolean } | Failure> {
+  const sent = await readProfileForm(request, 'session', schema, { photoPart: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
+  if (!('error' in sent)) return { fields: sent.profile, flyer: sent.photo, removeFlyer: sent.removePhoto }
+  const [field, setIndex] = sent.path ?? []
+  return { status: sent.status, error: sent.error, ...(field === 'sets' && typeof setIndex === 'number' && { setIndex }) }
 }
 
 // What the 409s respond: when a session or a set would break one of the rules of sessions, what's in the way (see
@@ -161,11 +167,31 @@ export const ConflictError = ApiError.extend({
   set: SetBody.nullable().meta({ description: 'The set in the way, if it is one' }),
 }).meta({ id: 'ConflictError' })
 
+// The errors of adding a session, which say which of the sets added with it they're about, if they're about one.
+const SetIndex = z.number().int().nonnegative()
+const NewSessionError = ApiError.extend({
+  setIndex: SetIndex.optional().meta({ description: 'The place in `sets` of the set the error is about, from 0, only when it is about one of them' }),
+}).meta({ id: 'NewSessionError' })
+const NewSessionConflictError = ConflictError.extend({
+  ...NewSessionError.pick({ setIndex: true }).shape,
+  otherSetIndex: SetIndex.optional().meta({
+    description: 'The place in `sets` of the set in the way, from 0, when it is another of them, which is not saved: `session` and `set` are then null',
+  }),
+}).meta({ id: 'NewSessionConflictError' })
+
 const NO_SUCH_SESSION: ApiError = { ok: false, error: 'No such session' }
 const NO_SUCH_SET: ApiError = { ok: false, error: 'No such set' }
 
-// Why a request failed, and what's in the way, when it's about a session or a set.
-type Failure = { status: 400 | 409 | 502; error: string; session?: StoredSession | null; set?: StoredSet | null }
+// Why a request failed, and what's in the way, when it's about a session or a set, and which of the sets added with a
+// session it's about, if it's about one of them, and the one in the way, if that's another one of them.
+type Failure = {
+  status: 400 | 409 | 413 | 502
+  error: string
+  session?: StoredSession | null
+  set?: StoredSet | null
+  setIndex?: number
+  otherSetIndex?: number
+}
 
 function link(id: string | null, url: (id: string) => string): z.infer<typeof Link> | null {
   return id === null ? null : { id, url: url(id) }
@@ -320,10 +346,11 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
   // The messages of these routes' schemas are whole sentences, which are sent as they are.
   app.setSchemaErrorFormatter(firstIssue)
 
-  // Responds that a request failed: a 409 always has `session` and `set` (see `ConflictError`).
-  function fail(reply: FastifyReply, { status, ...failure }: Failure) {
-    if (status !== 409) return reply.status(status).send({ ok: false as const, error: failure.error })
-    return reply.status(409).send(conflictBody(failure))
+  // Responds that a request failed: a 409 always has `session` and `set` (see `ConflictError`), and an error about one of
+  // the sets added with a session has its `setIndex`, and the `otherSetIndex` of the one in the way, if there's one.
+  function fail(reply: FastifyReply, { status, setIndex, otherSetIndex, ...failure }: Failure) {
+    if (status !== 409) return reply.status(status).send({ ok: false as const, error: failure.error, setIndex })
+    return reply.status(409).send({ ...conflictBody(failure), setIndex, otherSetIndex })
   }
 
   // Runs `save`, which saves a session or a set, and responds with the session it returns, or 404 with `notFound` when
@@ -335,8 +362,11 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       saved = await save()
     } catch (error) {
       await forgetPhoto(photos, reply.log, newFlyer)
-      if (error instanceof NoSuchReference || error instanceof BrokenFields) return fail(reply, { status: 400, error: error.message })
-      if (error instanceof Conflict) return fail(reply, { status: 409, error: error.message, session: error.session, set: error.set })
+      if (error instanceof NoSuchReference || error instanceof BrokenFields) return fail(reply, { status: 400, error: error.message, setIndex: error.setIndex })
+      if (error instanceof Conflict) {
+        const { message, session, set, setIndex, otherSetIndex } = error
+        return fail(reply, { status: 409, error: message, session, set, setIndex, otherSetIndex })
+      }
       throw error
     }
     if (!saved) {
@@ -478,19 +508,28 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Ajouter une session' } },
       schema: {
         operationId: 'create_session',
-        summary: 'Adds a session, as planned, without sets, with or without a flyer',
+        summary: "Adds a session, as planned, with or without a flyer, and the sets it's given, if any, all of them or nothing",
         tags: ['Sessions'],
         multipart: NewSessionForm,
-        response: { 200: SessionResponse, 400: ApiError, 409: ConflictError, 413: ApiError },
+        response: { 200: SessionResponse, 400: NewSessionError, 409: NewSessionConflictError, 413: ApiError, 502: NewSessionError },
       },
     },
     async (request, reply) => {
-      const sent = await readSessionForm(request)
-      if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
+      const sent = await readSessionForm(request, NewSessionFields)
+      if ('error' in sent) return fail(reply, sent)
+      const { sets: sentSets = [], ...fields } = sent.fields
+      const createdBy = request.user!.email
+      // Their tracks are resolved once everything that was sent is valid, before anything is stored.
+      const sets: NewSet[] = []
+      for (const [setIndex, set] of sentSets.entries()) {
+        const saved = await setChanges(set, null)
+        if ('error' in saved) return fail(reply, { ...saved, setIndex })
+        sets.push({ ...saved, createdBy })
+      }
       const flyer = await storeFlyer(sent.flyer)
-      const session = { ...sessionChanges(sent.fields), ...flyer, createdBy: request.user!.email }
+      const session = { ...sessionChanges(fields), ...flyer, createdBy }
       // It can't be missing once it's added.
-      return saving(reply, NO_SUCH_SESSION, () => store.create(session), flyer.flyerKey)
+      return saving(reply, NO_SUCH_SESSION, () => store.create(session, sets), flyer.flyerKey)
     },
   )
 
@@ -529,8 +568,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       },
     },
     async (request, reply) => {
-      const sent = await readSessionForm(request)
-      if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
+      const sent = await readSessionForm(request, SessionFields)
+      if ('error' in sent) return fail(reply, sent)
       if (sent.flyer && sent.removeFlyer) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
       return updateSession(request, reply, sent.fields, sent.flyer, sent.removeFlyer)
     },

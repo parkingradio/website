@@ -236,6 +236,9 @@ export function receivedOn({ receivedAt }: { receivedAt: string }): string {
   return `reçue le ${dateFormat.format(new Date(receivedAt))}`
 }
 
+// `text` with its first letter in upper case, e.g. "Reçue le 28 mars 2026" for "reçue le 28 mars 2026".
+export const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
 // E.g. "Aurore, sa photo et ses candidatures".
 function enumerate(items: string[]): string {
   return items.length > 1 ? `${items.slice(0, -1).join(', ')} et ${items.at(-1)}` : (items[0] ?? '')
@@ -354,7 +357,7 @@ export function setTitle(set: Pick<StudioSet, 'performers'>): string {
 
 // A set as it's named on its session's page, e.g. "Set de Aurore, 21 h – 22 h", or outside it, with its session, e.g.
 // "Set de Aurore, HAUTE RIVE TAKEOVER, sam. 14 nov. 2026, 21 h – 22 h".
-export function setName(set: StudioSet, session?: Pick<Session, 'title' | 'start'>): string {
+export function setName(set: Pick<StudioSet, 'performers' | 'start' | 'end' | 'offsetMinutes' | 'durationMinutes'>, session?: Pick<Session, 'title' | 'start'>): string {
   return [setTitle(set), ...(session ? [sessionName(session)] : []), setHours(set)].join(', ')
 }
 

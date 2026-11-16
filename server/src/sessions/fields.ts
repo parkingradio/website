@@ -187,8 +187,10 @@ export const SESSION_FIELDS = {
   description,
 }
 
+const NOT_A_SESSION = objectError('A session must be an object with its fields')
+
 export const SessionFields = z
-  .strictObject(SESSION_FIELDS, { error: objectError('A session must be an object with its fields') })
+  .strictObject(SESSION_FIELDS, { error: NOT_A_SESSION })
   .superRefine(checking(brokenSessionRule))
   .meta({ id: 'SessionFields' })
 export type SessionFields = z.output<typeof SessionFields>
@@ -251,3 +253,24 @@ export const SetFields = z
   .superRefine(checking(brokenSetRule))
   .meta({ id: 'SetFields' })
 export type SetFields = z.output<typeof SetFields>
+
+// What adding a session sends: its fields, with the same rules as `SessionFields`, which can't be extended once it's
+// refined, and the sets to add with it, in order, each with the fields that adding a set takes. Leaving them out adds
+// none.
+export const NewSessionFields = z
+  .strictObject(
+    {
+      ...SESSION_FIELDS,
+      sets: z
+        .array(SetFields, { error: 'The sets must be a list of sets' })
+        .optional()
+        .meta({
+          description:
+            "The sets to add with the session, in order, each with the fields a new set takes. If one of them can't be added, nothing is saved, and the error's `setIndex` is its place in the list, from 0. Left out, none",
+        }),
+    },
+    { error: NOT_A_SESSION },
+  )
+  .superRefine(checking(brokenSessionRule))
+  .meta({ id: 'NewSessionFields' })
+export type NewSessionFields = z.output<typeof NewSessionFields>

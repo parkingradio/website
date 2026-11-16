@@ -3,16 +3,13 @@ import type { Application } from '../../application-fields'
 import { Combobox } from '../../combobox'
 import type { ComboboxOption } from '../../combobox'
 import type { ApplicationLink } from '../../session-fields'
-import { STATUS_LABELS, listedDates, receivedOn } from './describe'
+import { STATUS_LABELS, capitalized, listedDates, receivedOn } from './describe'
 import { FieldError } from './fields'
 
 // The application a set or a session comes from, in their forms (see "Applications" in
 // docs/design/client/admin/sessions.md).
 
 const NO_APPLICATION: ComboboxOption = { key: '', label: 'Aucune candidature' }
-
-// `text` with its first letter in upper case, e.g. "Reçue le 28 mars 2026" for "reçue le 28 mars 2026".
-const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 type ApplicationFieldProps = {
   // The applications that can be picked, in order: those of the set's performers, or of the takeover's collective.

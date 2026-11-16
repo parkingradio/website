@@ -42,6 +42,10 @@ export function youtubeVideoId(sent: string): string | null {
   return id && YOUTUBE_VIDEO_ID.test(id) ? id : null
 }
 
+export function youtubeVideoUrl(id: string): string {
+  return `https://www.youtube.com/watch?v=${id}`
+}
+
 // A link to a track on soundcloud.com, or a private track's private link, which ends with its secret. Whether it's a
 // track is up to SoundCloud, which the server asks: this only checks that it can be one.
 const SOUNDCLOUD_TRACK_LINK = /^https?:\/\/(?:www\.|m\.)?soundcloud\.com(\/[^/?#\s]+\/[^/?#\s]+(?:\/s-[^/?#\s]+)?)\/?(?:[?#]\S*)?$/

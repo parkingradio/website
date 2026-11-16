@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, performanceTypeName } from '../../application-fields'
 import type { PerformanceTypeId } from '../../application-fields'
 import type { Duration } from '../../session-fields'
+import { Button } from './button'
 
 // What the forms of the admin sections are made of.
 
@@ -74,7 +75,23 @@ export function DurationField({
 
 // The error of the server, if it refused what was sent, then the button that sends the form, and the one that cancels
 // it, if it can be.
-export function FormActions({ error, busy, submitLabel, onCancel }: { error: ReactNode; busy: boolean; submitLabel: string; onCancel?: () => void }) {
+export function FormActions({
+  error,
+  busy,
+  submitLabel,
+  onCancel,
+  form,
+  unavailable,
+}: {
+  error: ReactNode
+  busy: boolean
+  submitLabel: string
+  onCancel?: () => void
+  // The id of the form it sends, when it isn't within it.
+  form?: string
+  // Why the form can't be sent, when a rule keeps it from being sent.
+  unavailable?: string | null
+}) {
   return (
     <>
       {error && (
@@ -83,9 +100,9 @@ export function FormActions({ error, busy, submitLabel, onCancel }: { error: Rea
         </p>
       )}
       <div className="admin-actions">
-        <button type="submit" disabled={busy}>
+        <Button type="submit" form={form} disabled={busy} unavailable={unavailable}>
           {submitLabel}
-        </button>
+        </Button>
         {onCancel && (
           <button type="button" onClick={onCancel} disabled={busy}>
             annuler

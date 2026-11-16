@@ -46,15 +46,22 @@ export type SetChanges = Pick<
   | 'applicationId'
 > & { performers: SentPerformer[] }
 export type StatusChange = { status: Status; statusUpdatedBy: string; statusUpdatedAt: Date }
+export type NewSet = SetChanges & { createdBy: string }
+
+// Thrown when a session or a set can't be saved. When it's about one of the sets added with a session, `setIndex` is that
+// set's place among them, from 0.
+class Refused extends Error {
+  setIndex?: number
+}
 
 // Thrown when a session or a set can't be saved because the takeover's collective, one of its performers, or its
 // application, doesn't exist. The message says which.
-export class NoSuchReference extends Error {}
+export class NoSuchReference extends Refused {}
 
 // Thrown when a change would make a session or a set break a rule that involves several of its fields, with the fields
 // it doesn't change as they are (see `brokenSessionRule` and `brokenSetRule` in sessions/fields.ts), or its application
 // (see `checkSessionApplication` and `checkSetApplication`). The message says which.
-export class BrokenFields extends Error {}
+export class BrokenFields extends Refused {}
 
 // `row` as `changes` would leave it: a field they don't have, or have as undefined, stays as it is, as Drizzle leaves a
 // column when it's given undefined.
@@ -69,16 +76,19 @@ function check(broken: BrokenRule | null) {
 
 // Thrown when saving a session or a set, or deleting a collective that has takeovers, would break one of the rules of
 // sessions. The message says which, and `session` and `set` are what's in the way: `set` is a set, if it's one, and
-// `session` is the session in the way, or that set's. Both are null only if it can't be found anymore, which only
-// something outside the server could cause (see `checkingRules`).
-export class Conflict extends Error {
+// `session` is the session in the way, or that set's. Both are null when what's in the way is another of the sets added
+// with a session, which isn't saved, whose place among them is then `otherSetIndex`, and otherwise only if it can't be
+// found anymore, which only something outside the server could cause (see `checkingRules`).
+export class Conflict extends Refused {
   session: StoredSession | null
   set: StoredSet | null
+  otherSetIndex?: number
 
-  constructor(message: string, session: StoredSession | null, set: StoredSet | null = null) {
+  constructor(message: string, session: StoredSession | null, set: StoredSet | null = null, otherSetIndex?: number) {
     super(message)
     this.session = session
     this.set = set
+    this.otherSetIndex = otherSetIndex
   }
 }
 
@@ -120,8 +130,9 @@ export type SessionsStore = {
   // start at or after `from` and before `to`, which leaves out those without a start.
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
   get(id: string): Promise<StoredSession | null>
-  // Adds a session, as "planned". Throws a NoSuchReference or a Conflict.
-  create(session: SessionChanges & StoredFlyer & { createdBy: string }): Promise<StoredSession>
+  // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none. Throws
+  // a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about one.
+  create(session: SessionChanges & StoredFlyer & { createdBy: string }, sets: NewSet[]): Promise<StoredSession>
   // Changes the session's fields that `changes` has, all of them when they're replaced, and its flyer when there's a new
   // one, or nulls to remove it, but not its status or its sets. Returns the session as it was, so that a flyer that was
   // replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a NoSuchReference or a Conflict.
@@ -136,8 +147,8 @@ export type SessionsStore = {
   delete(id: string): Promise<SessionRow | null>
   // The set as the database keeps it, without its performers.
   getSet(id: string): Promise<SetRow | null>
-  // Adds a set to the session `sessionId`, as "planned". Throws a NoSuchReference or a Conflict.
-  addSet(sessionId: string, set: SetChanges & { createdBy: string }): Promise<StoredSession | null>
+  // Adds a set to the session `sessionId`, as "planned". Throws a NoSuchReference, a BrokenFields or a Conflict.
+  addSet(sessionId: string, set: NewSet): Promise<StoredSession | null>
   // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
   // but not its session or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
@@ -323,7 +334,7 @@ async function addPerformers(tx: Queryable, setId: string, performers: SentPerfo
 async function checkingRules<T, Saved>(
   tx: Queryable,
   rules: Record<string, Rule<Saved>>,
-  inTheWay: (rule: Rule<Saved>) => Promise<Pick<Conflict, 'session' | 'set'>>,
+  inTheWay: (rule: Rule<Saved>) => Promise<Pick<Conflict, 'session' | 'set' | 'otherSetIndex'>>,
   write: (savepoint: Queryable) => Promise<T>,
 ): Promise<T> {
   try {
@@ -331,8 +342,8 @@ async function checkingRules<T, Saved>(
   } catch (error) {
     const constraint = Object.keys(rules).find((name) => violatesConstraint(error, name))
     if (!constraint) throw error
-    const { session, set } = await inTheWay(rules[constraint])
-    throw new Conflict(rules[constraint].message, session, set)
+    const { session, set, otherSetIndex } = await inTheWay(rules[constraint])
+    throw new Conflict(rules[constraint].message, session, set, otherSetIndex)
   }
 }
 
@@ -351,8 +362,15 @@ function checkingSessionRules<T>(tx: Queryable, id: string | null, session: Sess
 }
 
 // Runs `write`, which saves the set `id`, or a new one when it's null, as `set` says it then is, and throws a Conflict
-// with the other set, and its session, when it breaks a rule (see `checkingRules`).
-function checkingSetRules<T>(tx: Queryable, id: string | null, set: SetLinks, write: (savepoint: Queryable) => Promise<T>) {
+// with the other set, and its session, when it breaks a rule (see `checkingRules`), or with the other set's place among
+// `added`, the sets added with the same session, by id, when it's one of them.
+function checkingSetRules<T>(
+  tx: Queryable,
+  id: string | null,
+  set: SetLinks,
+  write: (savepoint: Queryable) => Promise<T>,
+  added: Map<string, number> = new Map(),
+) {
   return checkingRules(
     tx,
     SET_RULES,
@@ -362,10 +380,28 @@ function checkingSetRules<T>(tx: Queryable, id: string | null, set: SetLinks, wr
         .from(sets)
         .where(and(rule.other(set), id === null ? undefined : ne(sets.id, id)))
         .limit(1)
+      if (other && added.has(other.id)) return { session: null, set: null, otherSetIndex: added.get(other.id) }
       return (other && (await setWithId(tx, other.id))) ?? { session: null, set: null }
     },
     write,
   )
+}
+
+// Adds `set` to the session `sessionId`, in the transaction `tx`, which holds the sessions' lock, with `added` and
+// `createdAt` as `create` gives them when the set is added with its session, and returns its id. Throws a
+// NoSuchReference, a BrokenFields or a Conflict.
+async function insertSet(
+  tx: Queryable,
+  sessionId: string,
+  { performers, ...set }: NewSet,
+  { added, createdAt }: { added?: Map<string, number>; createdAt?: SQL } = {},
+): Promise<string> {
+  await checkPerformers(tx, performers)
+  if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
+  const row = { ...set, sessionId, ...(createdAt && { createdAt }) }
+  const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }), added)
+  await addPerformers(tx, id, performers)
+  return id
 }
 
 // The session `id`, or null when there's no such session.
@@ -404,12 +440,25 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return isUuid(id) ? sessionWithId(db, id) : null
     },
 
-    create(session) {
+    create(session, newSets) {
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         await checkTakeover(tx, session.takeoverId)
         await checkSessionApplication(tx, session)
         const [row] = await checkingSessionRules(tx, null, session, (savepoint) => savepoint.insert(sessions).values(session).returning({ id: sessions.id }))
+        // The sets added so far, by id, with their place among them.
+        const added = new Map<string, number>()
+        for (const [setIndex, set] of newSets.entries()) {
+          try {
+            // A microsecond apart, in order, so that the sets that are otherwise in the same place are in the order they
+            // were sent (see `setsOf`), rather than all added at the time the transaction started.
+            const createdAt = sql`now() + ${setIndex} * interval '1 microsecond'`
+            added.set(await insertSet(tx, row.id, set, { added, createdAt }), setIndex)
+          } catch (error) {
+            if (error instanceof Refused) error.setIndex = setIndex
+            throw error
+          }
+        }
         return (await sessionWithId(tx, row.id))!
       })
     },
@@ -463,18 +512,14 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return row ?? null
     },
 
-    async addSet(sessionId, { performers, ...set }) {
+    async addSet(sessionId, set) {
       if (!isUuid(sessionId)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         const session = await sessionRow(tx, sessionId)
         if (!session) return null
         if (session.status === 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, sessionId))
-        await checkPerformers(tx, performers)
-        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
-        const row = { ...set, sessionId }
-        const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }))
-        await addPerformers(tx, id, performers)
+        await insertSet(tx, sessionId, set)
         return sessionWithId(tx, sessionId)
       })
     },

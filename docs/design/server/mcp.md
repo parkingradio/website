@@ -103,11 +103,11 @@ are `multipart/form-data` (see [`POST /api/admin/artists`](artists.md#post-apiad
 of the profile or the session. Tools can't send photos or flyers: what's added with a tool has none.
 
 In the tools of `POST` endpoints, a field of the body that can be null can be left out, which sends it as null, e.g. a
-new set's `soundcloudTrack`, or a new session's `start`, which makes a session whose date isn't known yet. The tools of
-`PATCH` endpoints take every field as optional, as their endpoints do, and their descriptions say that only what they're
-given changes, and that a list or an object they're given replaces the whole one (see
-[Changes, in Conventions](README.md#conventions)). So what's changed with a tool keeps its photo or its flyer, unless
-`removePhoto` or `removeFlyer` is `true`.
+new set's `soundcloudTrack`, or a new session's `start`, which makes a session whose date isn't known yet, and so can
+those of the objects in a list in it, e.g. the sets of a new session. The tools of `PATCH` endpoints take every field as
+optional, as their endpoints do, and their descriptions say that only what they're given changes, and that a list or an
+object they're given replaces the whole one (see [Changes, in Conventions](README.md#conventions)). So what's changed
+with a tool keeps its photo or its flyer, unless `removePhoto` or `removeFlyer` is `true`.
 
 ### Results
 

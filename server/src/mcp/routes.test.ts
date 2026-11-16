@@ -133,6 +133,17 @@ async function buildApp(logs?: string[], environment = 'test') {
         return times
       },
     )
+    // Like a session added with its sets: a list of objects, whose fields that can be null can be left out too, which
+    // the route gives back as it gets them.
+    const Thing = z.object({ name: z.string(), note: z.string().nullable() })
+    api.post(
+      '/api/admin/things',
+      {
+        config: { admin: true, tool: { title: 'Ajouter des choses' } },
+        schema: { operationId: 'create_things', summary: 'Things', body: z.object({ things: z.array(Thing), names: z.array(z.string()).optional() }) },
+      },
+      async (request) => request.body,
+    )
     api.get(
       '/api/admin/artists',
       { config: { admin: true, tool: { title: 'Lister les artistes' } }, schema: { operationId: 'list_artists', summary: 'Every artist' } },
@@ -372,7 +383,7 @@ describe('the MCP server', () => {
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
       expect(tools.map(({ name }) => name)).toEqual([
-        ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'list_artists'],
+        ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'create_things', 'list_artists'],
         'read_documentation',
       ])
       const get = tools.find(({ name }) => name === 'get_thing')!
@@ -494,6 +505,18 @@ describe('the MCP server', () => {
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const create = response.json().result.tools.find(({ name }: { name: string }) => name === 'create_times')
       expect(create.inputSchema.required).toEqual(['name'])
+    })
+
+    it('send the fields that can be null of the objects in the lists of a POST as null when they are left out, but nothing else', async () => {
+      const app = await buildApp()
+      const things = [{ name: 'a' }, { name: 'b', note: 'c' }]
+      expect((await call(app, 'create_things', { things, names: ['d'] })).body).toEqual({ things: [{ name: 'a', note: null }, { name: 'b', note: 'c' }], names: ['d'] })
+      // What isn't an object stays as it is, which the route refuses.
+      expect(await call(app, 'create_things', { things: ['a', null] })).toMatchObject({ isError: true, body: { status: 400 } })
+      const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      const create = response.json().result.tools.find(({ name }: { name: string }) => name === 'create_things')
+      expect(create.inputSchema.required).toEqual(['things'])
+      expect(create.inputSchema.properties.things.items.required).toEqual(['name'])
     })
 
     it('list a summary of each one, with the rest of the response as it is', async () => {

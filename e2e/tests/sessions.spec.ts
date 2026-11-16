@@ -308,33 +308,58 @@ test("a collective's takeover is added from its page, until the next day, with i
   await expect(page.getByRole('option')).toHaveCount(1)
   await page.getByRole('option', { name: /^GUEST MIXES, sam\. 10 oct\. 2026/ }).click()
   await expect(page.getByRole('link', { name: 'https://ra.co/events/1234567' })).toBeVisible()
+
+  // Its sets, listed in its form until it's added: one at the session's start, for an hour, unless it's changed, then
+  // one when it ends, with the same video.
+  const listed = page.getByRole('table', { name: 'Sets' })
+  const newSet = page.getByRole('region', { name: 'Nouveau set' })
+  await page.getByRole('button', { name: 'ajouter un set' }).click()
+  await expect(newSet.getByLabel('Début')).toHaveValue('23:00')
+  await expect(newSet.getByLabel('Fin')).toHaveValue('00:00')
+  await newSet.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
+  await newSet.getByRole('option', { name: mine.artist.name }).click()
+  await newSet.getByLabel('DJ').check()
+  await newSet.getByLabel('YouTube').fill(`https://youtu.be/${youtubeVideo}`)
+  // SoundCloud can't be asked, since the SoundCloud app's credentials aren't entered in the tests' server.
+  await newSet.getByLabel('SoundCloud').fill('https://soundcloud.com/parkingdotradio/e2e')
+  await newSet.getByRole('button', { name: 'ajouter le set' }).click()
+  await expect(listed.getByRole('row')).toHaveCount(2)
+  await page.getByRole('button', { name: 'ajouter un set' }).click()
+  await expect(newSet.getByLabel('Début')).toHaveValue('00:00')
+  await expect(newSet.getByLabel('Fin')).toHaveValue('01:00')
+  await newSet.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
+  await newSet.getByRole('option', { name: mine.artist.name }).click()
+  await newSet.getByLabel('YouTube').fill(youtubeVideo)
+  await newSet.getByRole('button', { name: 'ajouter le set' }).click()
+  await expect(listed.getByRole('row')).toHaveCount(3)
+
+  // The server refuses the set it can't add, which the error names, and nothing is saved until it can add them all.
+  await page.getByRole('button', { name: 'ajouter la session' }).click()
+  await expect(page.getByRole('alert')).toHaveText(
+    `Le set de ${mine.artist.name}, 23 h – 0 h n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet`,
+  )
+  await page.getByRole('button', { name: `modifier : Set de ${mine.artist.name}, 23 h – 0 h` }).click()
+  const listedSet = page.getByRole('region', { name: `Set de ${mine.artist.name}` })
+  await listedSet.getByLabel('SoundCloud').fill('')
+  await listedSet.getByRole('button', { name: 'enregistrer' }).click()
+  await page.getByRole('button', { name: 'ajouter la session' }).click()
+  await expect(page.getByRole('alert')).toHaveText(
+    `Le set de ${mine.artist.name}, 0 h – 1 h n'a pas pu être ajouté : This YouTube video is another set's (Set de ${mine.artist.name}, 23 h – 0 h)`,
+  )
+  await page.getByRole('button', { name: `retirer : Set de ${mine.artist.name}, 0 h – 1 h` }).click()
+  await expect(listed.getByRole('row')).toHaveCount(2)
   await page.getByRole('button', { name: 'ajouter la session' }).click()
 
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
   await expect(value(page, 'Quand')).toHaveText(`${longDay(day)}, de 23 h à 1 h 30 le lendemain`)
   await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/1234567')
   const sessionPage = new URL(page.url()).pathname
-
-  // A set at the session's start, for an hour, unless it's changed.
-  await page.getByRole('button', { name: 'ajouter un set' }).click()
-  await expect(page.getByLabel('Début')).toHaveValue('23:00')
-  await expect(page.getByLabel('Fin')).toHaveValue('00:00')
-  await page.getByRole('combobox', { name: 'Ajouter un artiste' }).fill(mine.artist.name)
-  await page.getByRole('option', { name: mine.artist.name }).click()
-  await page.getByLabel('DJ').check()
-  await page.getByLabel('YouTube').fill(`https://youtu.be/${youtubeVideo}`)
-  // SoundCloud can't be asked, since the SoundCloud app's credentials aren't entered in the tests' server.
-  await page.getByLabel('SoundCloud').fill('https://soundcloud.com/parkingdotradio/e2e')
-  await page.getByRole('button', { name: 'ajouter le set' }).click()
-  await expect(page.getByRole('alert')).toContainText("Le set n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet")
-  await page.getByLabel('SoundCloud').fill('')
-  await page.getByRole('button', { name: 'ajouter le set' }).click()
   const sets = page.getByRole('table', { name: 'Sets' })
   await expect(sets.getByRole('row')).toHaveCount(2)
   await expect(sets.getByRole('row').nth(1)).toContainText('23 h – 0 h')
   await expect(sets.getByRole('row').nth(1)).toContainText('DJ')
 
-  // The next one starts when it ends, and the server refuses another set's video, naming that set.
+  // The next one, added from its page, starts when it ends, and the server refuses another set's video, naming that set.
   await page.getByRole('button', { name: 'ajouter un set' }).click()
   await expect(page.getByLabel('Début')).toHaveValue('00:00')
   await expect(page.getByLabel('Fin')).toHaveValue('01:00')
