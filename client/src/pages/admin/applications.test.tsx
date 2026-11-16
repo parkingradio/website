@@ -743,9 +743,7 @@ describe('An application’s page', () => {
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')
     expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. L'artiste reste\.$/)
     expect(screen.getByRole('heading', { level: 2, name: 'Sets' })).toBeInTheDocument()
-    expect(screen.getByText(/^Aucun set ne vient de cette candidature/)).toHaveTextContent(
-      "Aucun set ne vient de cette candidature : on la choisit dans le formulaire d'un set de l'artiste.",
-    )
+    expect(screen.getByText('Aucun set.')).toBeInTheDocument()
     expect(screen.getByText('jeudi 10 décembre 2026')).toBeInTheDocument()
     expect(screen.getByText('jeudi 14 janvier 2027')).toBeInTheDocument()
     expect(screen.getByText('18:00 à 22:00')).toBeInTheDocument()
@@ -1070,9 +1068,7 @@ describe('An application’s page', () => {
       expect(described('Description')).toHaveTextContent(/^-$/)
       expect(screen.queryByText(/ajouté par/)).not.toBeInTheDocument()
       expect(screen.getByText(/^La candidature sera supprimée/)).toHaveTextContent(/^La candidature sera supprimée pour de bon\. Le collectif reste\.$/)
-      expect(screen.getByText(/^Aucune session ne vient de cette candidature/)).toHaveTextContent(
-        "Aucune session ne vient de cette candidature : on la choisit dans le formulaire d'un takeover du collectif.",
-      )
+      expect(screen.getByText('Aucune session.')).toBeInTheDocument()
       expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(0)
     })
 

@@ -250,7 +250,7 @@ export function ApplicationSets({ application }: { application: Application }) {
       <h2 id={headingId}>Sets</h2>
       <CreateSet application={application} />
       {sets.length === 0 ? (
-        <p className="admin-placeholder">Aucun set ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un set de l'artiste.</p>
+        <p className="admin-placeholder">Aucun set.</p>
       ) : (
         <table className="admin-table" aria-labelledby={headingId}>
           <thead>
@@ -294,9 +294,7 @@ export function ApplicationSessions({ application }: { application: Application 
         </Link>
       </div>
       {sessions.length === 0 ? (
-        <p className="admin-placeholder">
-          Aucune session ne vient de cette candidature&nbsp;: on la choisit dans le formulaire d'un takeover du collectif.
-        </p>
+        <p className="admin-placeholder">Aucune session.</p>
       ) : (
         <table className="admin-table" aria-labelledby={headingId}>
           <thead>
