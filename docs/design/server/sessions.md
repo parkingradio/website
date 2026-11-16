@@ -43,7 +43,7 @@ A session, as the endpoints below return it, also has:
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when, which for a status that changed along with another one, or with a set's deletion, is that change's (see [Status](#status)) |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
 | `announced` | boolean | Whether the session is announced: see [Announced](#announced) |
 | `announcedUpdatedBy`, `announcedUpdatedAt` | string or null | Who last announced or un-announced it (an admin's email), and when |
 
@@ -75,7 +75,7 @@ A set, as the endpoints below return it, also has:
 | `createdBy` | string | The email of the admin who added it |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. its start changing, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when, which for a status that changed along with its session's is that change's (see [Status](#status)) |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
 
 ## Times
 
@@ -166,13 +166,13 @@ it then is, with its sets:
   while it is.
 - **Marking a session done marks its planned sets done**. Its cancelled sets stay cancelled. Marking it planned again
   leaves its sets as they are.
-- **A planned session becomes done once its sets are played**: whenever one of its sets' status is changed (see
-  [Changes, in Conventions](README.md#conventions)), or one of its sets is deleted, a session that's then planned, with
-  at least one set that's done and none that's planned, becomes done. Cancelled sets count as finished, e.g. two sets
-  done and one cancelled make the session done, whichever comes last, but a session whose sets are all cancelled stays
-  planned. It never goes the other way: a set that's planned again leaves its session done, to be corrected by hand. A
-  session that's planned again while none of its sets is planned stays so until one of its sets' status is changed, or
-  one of them is deleted. This holds even for requests sent at the same time, e.g. two sets marked done together.
+- **A planned session becomes done once its sets are played**: whenever one of its sets' status is set, even to the
+  one it already has, or one of its sets is deleted, a session that's then planned, with at least one set that's done
+  and none that's planned, becomes done, e.g. two sets done and one cancelled make it done, whichever comes last, but
+  not three cancelled. It never goes the other way: a set that's planned again leaves its session done, to be corrected
+  by hand. A session that's planned again while none of its sets is planned isn't made done until one of its sets'
+  status is set, or one of them is deleted. This holds even for requests sent at the same time, e.g. two sets marked
+  done together.
 
 Otherwise, a session's status and its sets' are independent, e.g. a session that's done can have a cancelled set, and
 one that's planned can have sets that are done.

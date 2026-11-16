@@ -716,7 +716,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: "Changer le statut d'un set" } },
       schema: {
         operationId: 'update_set_status',
-        summary: 'Marks a set as planned, done or cancelled, and returns its session, which becomes done once none of its sets is planned and one is done (see Status)',
+        summary: 'Marks a set as planned, done or cancelled, and returns its session, which this can make done',
         tags: ['Sessions'],
         params: ById,
         body: StatusBody,
@@ -751,7 +751,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Supprimer un set' } },
       schema: {
         operationId: 'delete_set',
-        summary: 'Deletes a set, but not its performers, and returns its session, which becomes done once none of its sets is planned and one is done (see Status)',
+        summary: 'Deletes a set, but not its performers, and returns its session, which this can make done',
         tags: ['Sessions'],
         params: ById,
         response: { 200: SessionResponse, 404: ApiError },

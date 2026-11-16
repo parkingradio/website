@@ -115,9 +115,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "modifier", which opens its form (see [A set's form](#a-sets-form)).
   - "×", which deletes it for good, after confirming. Its artists stay.
 
-  Changing a set's status, or deleting a set, can make the session "jouée" (see
-  [Status](../../server/sessions.md#status)), which its status then shows, since the page shows the session as the
-  server responds with it.
+  Changing a set's status, or deleting one, can make the session "jouée" (see
+  [Status](../../server/sessions.md#status)).
 
   When a status can't be changed, or a set can't be moved or deleted, the section says why above the sets, naming the
   set.

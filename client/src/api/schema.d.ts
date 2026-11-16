@@ -2268,7 +2268,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Deletes a set, but not its performers, and returns its session, which becomes done once none of its sets is planned and one is done (see Status) */
+        /** Deletes a set, but not its performers, and returns its session, which this can make done */
         delete: operations["delete_set"];
         options?: never;
         head?: never;
@@ -2284,7 +2284,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Marks a set as planned, done or cancelled, and returns its session, which becomes done once none of its sets is planned and one is done (see Status) */
+        /** Marks a set as planned, done or cancelled, and returns its session, which this can make done */
         put: operations["update_set_status"];
         post?: never;
         delete?: never;

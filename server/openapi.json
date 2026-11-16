@@ -9044,7 +9044,7 @@
       },
       "delete": {
         "operationId": "delete_set",
-        "summary": "Deletes a set, but not its performers, and returns its session, which becomes done once none of its sets is planned and one is done (see Status)",
+        "summary": "Deletes a set, but not its performers, and returns its session, which this can make done",
         "tags": [
           "Sessions"
         ],
@@ -9141,7 +9141,7 @@
     "/api/admin/sets/{id}/status": {
       "put": {
         "operationId": "update_set_status",
-        "summary": "Marks a set as planned, done or cancelled, and returns its session, which becomes done once none of its sets is planned and one is done (see Status)",
+        "summary": "Marks a set as planned, done or cancelled, and returns its session, which this can make done",
         "tags": [
           "Sessions"
         ],

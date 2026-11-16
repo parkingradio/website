@@ -15,10 +15,10 @@ import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
 
-// How a session's status and its sets' change each other, against a real database: cancelling a session cancels its
-// sets, marking it done marks its planned sets done, and a planned session becomes done once its sets are played, even
-// with requests sent at the same time (see "Status" in docs/design/server/sessions.md). The property-based tests of
-// rules.db.test.ts check these after random requests too.
+// How a session's status and its sets' change each other, against a real database: marking a session done marks its
+// planned sets done, and a planned session becomes done once its sets are played, even with requests sent at the same
+// time (see "Status" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts check these after
+// random requests too.
 
 // Photos and flyers aren't sent, so there are none to read or delete.
 const NO_PHOTOS: Photos = {
