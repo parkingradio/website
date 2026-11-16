@@ -112,11 +112,13 @@ isn't among them, even when it's still going on then.
   its start, included, to its end, excluded, so a session can start when the one before it ends.
 - **A SoundCloud track, or a YouTube video, belongs to at most one set**, cancelled ones included.
 - **A cancelled session only has cancelled sets** (see [Status](#status)).
+- **A done session has no planned set** (see [Status](#status)).
 - **A takeover has a collective** (see [Types and names](#types-and-names)), so a collective with takeovers can't be
   deleted.
 
 Requests that would break a rule fail with 409, even when they're sent at the same time: when two requests would break a
-rule together, one of them fails. That's the case for:
+rule together, one of them fails. The exception is that a done session has no planned set, which the server keeps by
+changing statuses instead (see [Status](#status)). The others fail for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
 - adding a set to a cancelled session, or un-cancelling a set of a cancelled session,
@@ -156,23 +158,24 @@ deleting it, stops it counting.
 
 A new session or set is `"planned"`, then `"done"` once it's been played, or `"cancelled"`, e.g. a set whose artist
 didn't show up. Any status can be changed to any other, except as below. Statuses only change when an admin changes one,
-or deletes a set, never as time passes, e.g. once a session's end has passed. Changing one, or deleting a set, can
-change others, as below, as the same admin, at the same time, and the endpoints that do so respond with the session as
-it then is, with its sets:
+adds a set, or deletes one, never as time passes, e.g. once a session's end has passed. Each of these can change other
+statuses, as below, as the same admin, at the same time, and the endpoints that do so respond with the session as it
+then is, with its sets:
 
 - **Cancelling a session cancels its sets**: every one that isn't already cancelled, done ones included. Un-cancelling
   a session leaves its sets cancelled: each one is un-cancelled on its own, once the session isn't cancelled anymore.
   A cancelled session only has cancelled sets (see [Rules](#rules)): its sets can still be changed, but not un-cancelled
   while it is.
-- **Marking a session done marks its planned sets done**. Its cancelled sets stay cancelled. Marking it planned again
-  leaves its sets as they are.
+- **A done session has no planned set** (see [Rules](#rules)): marking a session done marks its planned sets done, while
+  its cancelled sets stay cancelled, and a done session that gets a planned set, one whose status is set to planned, or
+  a new one, is planned again. Marking a session planned leaves its sets as they are.
 - **A planned session becomes done once its sets are played**: whenever one of its sets' status is set, even to the
   one it already has, or one of its sets is deleted, a session that's then planned, with at least one set that's done
   and none that's planned, becomes done, e.g. two sets done and one cancelled make it done, whichever comes last, but
-  not three cancelled. It never goes the other way: a set that's planned again leaves its session done, to be corrected
-  by hand. A session that's planned again while none of its sets is planned isn't made done until one of its sets'
-  status is set, or one of them is deleted. This holds even for requests sent at the same time, e.g. two sets marked
-  done together.
+  not three cancelled. A session that's marked planned while none of its sets is planned isn't made done until one of
+  its sets' status is set, or one of them is deleted.
+
+These hold even for requests sent at the same time, e.g. two sets marked done together.
 
 Otherwise, a session's status and its sets' are independent, e.g. a session that's done can have a cancelled set, and
 one that's planned can have sets that are done.
@@ -462,9 +465,10 @@ their applications. Fails with
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
-Adds a set to a session, as `"planned"`, after its other sets (see [Sets' order](#sets-order)). The request has the
-set's `performers`, `durationMinutes`, `performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack`,
-`youtubeVideo` and `application`, as above, none of them left out.
+Adds a set to a session, as `"planned"`, after its other sets (see [Sets' order](#sets-order)), which makes the session
+planned again if it's done (see [Status](#status)). The request has the set's `performers`, `durationMinutes`,
+`performanceTypes`, `otherPerformanceType`, `genres`, `soundcloudTrack`, `youtubeVideo` and `application`, as above,
+none of them left out.
 
 | Response field | Type | |
 |---|---|---|
@@ -503,9 +507,9 @@ there's no field.
 |---|---|---|
 | `status` | `"planned"`, `"done"` or `"cancelled"` | |
 
-Changes a set's status, and its session's when that makes it done (see [Status](#status)), and responds like
-`POST /api/admin/sessions/:id/sets`, with the session as it is then. Fails with 400 if `status` isn't one of
-these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
+Changes a set's status, and its session's when that makes it done, or planned again (see [Status](#status)), and
+responds like `POST /api/admin/sessions/:id/sets`, with the session as it is then. Fails with 400 if `status` isn't one
+of these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
 with that session in `session`.
 
 ## `PUT /api/admin/sets/:id/position` (admin)

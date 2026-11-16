@@ -56,8 +56,8 @@ type Session = {
 }
 
 // An operation: how to generate it, and how often, relative to the others, how to send it, how to check the 409s it
-// can get, which are about the rules, each by its message, and, for those that change a status or delete a set, which
-// ones, found before it's sent, since deleting a set leaves it out of the ids (see `expectStatuses`).
+// can get, which are about the rules, each by its message, and, for those that change a status, add a set to a session or
+// delete one, which ones, found before it's sent, since deleting a set leaves it out of the ids (see `expectStatuses`).
 type Operation<Args> = {
   args: fc.Arbitrary<Args>
   weight: number
@@ -66,8 +66,8 @@ type Operation<Args> = {
   statusRequest?: (context: Context, args: Args) => StatusRequest
 }
 
-// What an operation asks of statuses: a session's or a set's, or deleting a set.
-type StatusRequest = { session: string; status: string } | { set: string; status: string } | { deletedSet: string }
+// What an operation asks that can change statuses: a session's or a set's, or adding a set to a session, or deleting one.
+type StatusRequest = { session: string; status: string } | { set: string; status: string } | { addedTo: string } | { deletedSet: string }
 
 // The status of every session and set, by id, who last changed it and when, in milliseconds, and, for a set, its session.
 type StatusRow = { status: string; by: string | null; at: number | null; session: string | null }
@@ -86,15 +86,19 @@ async function statuses(database: TestDatabase): Promise<Statuses> {
 // changed them, as the admin who sent it, all at the same time, with the sets of each session as they are `after` it:
 // - a session's status changes, and cancelling it cancels its sets that aren't, while marking it done marks its planned
 //   sets done;
-// - a set's status changes, or it's deleted, after which its session, if it's planned, with at least one set that's done
-//   and none that's planned, becomes done.
+// - a set's status changes, or it's added, as planned, or deleted, after which its session, if it's done, with a set
+//   that's planned, is planned again, or, if it's planned, with at least one set that's done and none that's planned,
+//   becomes done.
 function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequest): Map<string, { status: string; changed: boolean }> {
   const expected = new Map([...before].map(([id, { status }]) => [id, { status, changed: false }]))
   const mark = (id: string, status: string) => expected.set(id, { status, changed: true })
   const setsOf = (session: string) => [...after].filter(([, row]) => row.session === session).map(([id]) => id)
-  const markDoneIfPlayed = (session: string) => {
-    const statuses = setsOf(session).map((id) => expected.get(id)!.status)
-    if (expected.get(session)!.status === 'planned' && statuses.includes('done') && !statuses.includes('planned')) mark(session, 'done')
+  const followSets = (session: string) => {
+    // A set that's just added is planned.
+    const statuses = setsOf(session).map((id) => expected.get(id)?.status ?? 'planned')
+    const { status } = expected.get(session)!
+    if (status === 'done' && statuses.includes('planned')) mark(session, 'planned')
+    if (status === 'planned' && statuses.includes('done') && !statuses.includes('planned')) mark(session, 'done')
   }
   if ('session' in request) {
     mark(request.session, request.status)
@@ -102,11 +106,9 @@ function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequ
       const { status } = expected.get(set)!
       if (request.status === 'cancelled' ? status !== 'cancelled' : request.status === 'done' && status === 'planned') mark(set, request.status)
     }
-  } else if ('set' in request) {
-    mark(request.set, request.status)
-    markDoneIfPlayed(before.get(request.set)!.session!)
   } else {
-    markDoneIfPlayed(before.get(request.deletedSet)!.session!)
+    if ('set' in request) mark(request.set, request.status)
+    followSets('addedTo' in request ? request.addedTo : before.get('set' in request ? request.set : request.deletedSet)!.session!)
   }
   return expected
 }
@@ -463,6 +465,7 @@ const OPERATIONS = {
       }
       return response
     },
+    statusRequest: (context, { session }) => ({ addedTo: pick(context.ids.sessions, session) }),
     conflicts: {
       [SESSION_CANCELLED]: (body, { session }, context) => {
         expect(body.session?.id).toBe(pick(context.ids.sessions, session))

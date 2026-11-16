@@ -721,8 +721,13 @@ wait_for_background
 expect_status 200
 expect_body_contains '"durationMinutes":150'
 [[ "$(set_ids)" == *" $(last_set) " ]] || { _show_body; fail "expected the set added last"; }
+echo "  which plans the session, which was done, again, until that set is deleted"
+[ "$(sql "select status from sessions where id = '${first}'")" = planned ] || fail "expected the session to be planned again"
+[ "$(sql "select status_updated_at = (select created_at from sets where id = '$(last_set)') from sessions where id = '${first}'")" = t ] \
+    || fail "expected the session to be planned again when the set was added"
 json DELETE "${SETS}/$(last_set)"
 expect_status 200
+[ "$(sql "select status from sessions where id = '${first}'")" = done ] || fail "expected the session to be done again"
 
 echo "  sets moved, added and deleted at the same time wait for each other, and stay in an order"
 session_form POST "$SESSIONS" "$(session_json null 120 "\"sets\":[$(set_json "$(performers "$ana")" 30),$(set_json "$(performers "$brume")" 30),$(set_json "$(performers "$ana")" 30)]")"

@@ -647,7 +647,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Ajouter un set' } },
       schema: {
         operationId: 'create_set',
-        summary: "Adds a set to a session, as planned, after its other sets, and returns the session",
+        summary: 'Adds a set to a session, as planned, after its other sets, and returns the session, which this can make planned again',
         tags: ['Sessions'],
         params: ById,
         body: SetFields,
@@ -661,7 +661,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       if (session.status === 'cancelled') return fail(reply, { status: 409, error: SESSION_CANCELLED, session })
       const saved = await setChanges(request.body, null)
       if ('error' in saved) return fail(reply, saved)
-      const set = { ...saved, createdBy: request.user!.email }
+      // When it's added, which its session's status gets when it's planned again.
+      const set = { ...saved, createdBy: request.user!.email, createdAt: new Date() }
       return saving(reply, NO_SUCH_SESSION, () => store.addSet(session.id, set))
     },
   )
@@ -716,7 +717,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: "Changer le statut d'un set" } },
       schema: {
         operationId: 'update_set_status',
-        summary: 'Marks a set as planned, done or cancelled, and returns its session, which this can make done',
+        summary: 'Marks a set as planned, done or cancelled, and returns its session, which this can make done, or planned again',
         tags: ['Sessions'],
         params: ById,
         body: StatusBody,

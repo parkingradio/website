@@ -8550,7 +8550,7 @@
     "/api/admin/sessions/{id}/sets": {
       "post": {
         "operationId": "create_set",
-        "summary": "Adds a set to a session, as planned, after its other sets, and returns the session",
+        "summary": "Adds a set to a session, as planned, after its other sets, and returns the session, which this can make planned again",
         "tags": [
           "Sessions"
         ],
@@ -9141,7 +9141,7 @@
     "/api/admin/sets/{id}/status": {
       "put": {
         "operationId": "update_set_status",
-        "summary": "Marks a set as planned, done or cancelled, and returns its session, which this can make done",
+        "summary": "Marks a set as planned, done or cancelled, and returns its session, which this can make done, or planned again",
         "tags": [
           "Sessions"
         ],

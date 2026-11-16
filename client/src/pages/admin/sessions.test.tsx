@@ -1486,6 +1486,25 @@ describe("A set's form", () => {
     })
   })
 
+  it('shows the session as the server has it once a set is added, which can make it planifiée again', async () => {
+    const played: Session = { ...SESSION, status: 'done', sets: [CYAN_SET, SESSION.sets[2]] }
+    const reopened: Session = {
+      ...played,
+      status: 'planned',
+      statusUpdatedBy: 'admin@example.com',
+      statusUpdatedAt: '2026-11-15T04:00:00.000Z',
+      sets: [...played.sets, studioSet('set-9', { performers: [{ id: 'artist-1', name: 'Aurore' }], durationMinutes: 30 })],
+    }
+    mockFetch({ ...SET_PAGE, '/api/admin/sessions/session-1': { ok: true, session: played }, 'POST /api/admin/sessions/session-1/sets': { ok: true, session: reopened } })
+    renderAt('/admin/sessions/session-1')
+
+    await openNew()
+    pick('Aurore')
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(rows(setsTable())).toHaveLength(3))
+    expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'planifiée' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('changes a set, its duration included, even when the sets then add up to more than the session', async () => {
     mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')

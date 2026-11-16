@@ -16,8 +16,8 @@ import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
 
 // How a session's status and its sets' change each other, against a real database: marking a session done marks its
-// planned sets done, and a planned session becomes done once its sets are played, even with requests sent at the same
-// time (see "Status" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts check these after
+// planned sets done, a done session that gets a planned set is planned again, and a planned session becomes done once its
+// sets are played, even with requests sent at the same time (see "Status" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts check these after
 // random requests too.
 
 // Photos and flyers aren't sent, so there are none to read or delete.
@@ -32,7 +32,7 @@ const NO_PHOTOS: Photos = {
 // Another admin than the one who adds the sessions, to tell who changed a status.
 const OTHER_ADMIN = { ...TEST_ADMIN, id: 'other-admin-id', email: 'other@example.com' }
 
-type Tracked = { id: string; status: string; statusUpdatedBy: string | null; statusUpdatedAt: string | null }
+type Tracked = { id: string; createdAt: string; status: string; statusUpdatedBy: string | null; statusUpdatedAt: string | null }
 type Session = Tracked & { sets: Tracked[] }
 
 let database: TestDatabase
@@ -43,15 +43,26 @@ async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, p
   return app.inject({ method, url, payload, cookies: await sessionCookies(admin) })
 }
 
+// A set of Aurore's, as adding one sends it.
+const newSet = () => ({
+  performers: [{ id: artist }],
+  durationMinutes: 60,
+  performanceTypes: [],
+  otherPerformanceType: '',
+  genres: [],
+  soundcloudTrack: null,
+  youtubeVideo: null,
+  application: null,
+})
+
 // Adds a session with as many sets as `statuses`, then gives each set its status, in order, and returns the session's id
 // and its sets', in order.
 async function sessionWithSets(statuses: string[]): Promise<{ session: string; sets: string[] }> {
   const session = { start: null, durationMinutes: 240, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '' }
-  const set = { performers: [{ id: artist }], durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
   const response = await app.inject({
     method: 'POST',
     url: '/api/admin/sessions',
-    ...multipartBody({ session: JSON.stringify({ ...session, sets: statuses.map(() => set) }) }),
+    ...multipartBody({ session: JSON.stringify({ ...session, sets: statuses.map(newSet) }) }),
     cookies: await sessionCookies(),
   })
   expect(response.statusCode).toBe(200)
@@ -144,11 +155,24 @@ describe('a planned session', () => {
 })
 
 describe('a session that is done', () => {
-  it('stays done when one of its sets is planned again', async () => {
-    const { session, sets } = await sessionWithSets(['done', 'planned'])
-    expect((await setStatus(sets[1], 'done')).json().session.status).toBe('done')
-    const response = await setStatus(sets[0], 'planned')
-    expect(response.json().session).toMatchObject({ id: session, status: 'done' })
+  it('is planned again when one of its sets is, from done or from cancelled, as the admin who did it, at the same time', async () => {
+    const { session, sets } = await sessionWithSets(['done', 'cancelled'])
+    expect((await sessionOf(session)).status).toBe('done')
+    const changed: Session = (await setStatus(sets[0], 'planned', OTHER_ADMIN)).json().session
+    expect(changed).toMatchObject({ status: 'planned', statusUpdatedBy: OTHER_ADMIN.email, statusUpdatedAt: changed.sets[0].statusUpdatedAt })
+    // Undoing that makes it done again.
+    expect((await setStatus(sets[0], 'done')).json().session.status).toBe('done')
+    expect((await setStatus(sets[1], 'planned')).json().session.status).toBe('planned')
+    await checkSessionsInvariants(database.db)
+  })
+
+  it('is planned again when a set is added to it, as the admin who added it, when they did, and done again once that set is', async () => {
+    const { session } = await sessionWithSets(['done'])
+    const changed: Session = (await request('POST', `/api/admin/sessions/${session}/sets`, newSet(), OTHER_ADMIN)).json().session
+    const added = changed.sets[1]
+    expect(changed).toMatchObject({ status: 'planned', statusUpdatedBy: OTHER_ADMIN.email, statusUpdatedAt: added.createdAt })
+    await checkSessionsInvariants(database.db)
+    expect((await setStatus(added.id, 'done')).json().session.status).toBe('done')
   })
 })
 

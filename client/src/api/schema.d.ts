@@ -2157,7 +2157,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Adds a set to a session, as planned, after its other sets, and returns the session */
+        /** Adds a set to a session, as planned, after its other sets, and returns the session, which this can make planned again */
         post: operations["create_set"];
         delete?: never;
         options?: never;
@@ -2284,7 +2284,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Marks a set as planned, done or cancelled, and returns its session, which this can make done */
+        /** Marks a set as planned, done or cancelled, and returns its session, which this can make done, or planned again */
         put: operations["update_set_status"];
         post?: never;
         delete?: never;
