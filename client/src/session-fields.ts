@@ -4,7 +4,7 @@ import type { PerformanceTypeId } from './application-fields'
 import type { GenreId } from './artist-profile'
 import { checkLine, checkText, everyOne } from './checks'
 import type { FieldErrors } from './checks'
-import { quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstantFrom } from './quebec-time'
+import { addDays, daysBetween, quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstants } from './quebec-time'
 import { isSoundcloudTrackLink, youtubeVideoId, youtubeVideoUrl } from './session-links'
 
 // How sessions and sets are checked in the browser, by the admin pages, and how their forms' times of day become what the
@@ -106,12 +106,12 @@ En gros, l'artiste se pointe au parking avec son laptop et shoot ses visuels dir
 
 const NAME_MAX_LENGTH = 100
 export const DESCRIPTION_MAX_LENGTH = 5000
-// The longest a session or a set lasts, in minutes.
-const MAX_MINUTES = 24 * 60
-// Sessions start from 2000 to 2999, in UTC.
+// Sessions take place within the years 2000 to 2999, in UTC: they start in them, and end by the start of 3000. So a
+// duration, a session's or a set's, is at most the time from the start of 2000 to the start of 3000.
 const EARLIEST = Date.parse('2000-01-01T00:00:00Z')
 const LATEST = Date.parse('3000-01-01T00:00:00Z')
 const MINUTE_MS = 60 * 1000
+const MAX_MINUTES = (LATEST - EARLIEST) / MINUTE_MS
 
 // A number of hours and minutes as a form has it: two numbers as they're typed, which are empty while they're not filled.
 export type Duration = { hours: string; minutes: string }
@@ -122,14 +122,14 @@ export function durationOf(minutes: number | null): Duration {
   return minutes === null ? EMPTY_DURATION : { hours: String(Math.floor(minutes / 60)), minutes: String(minutes % 60) }
 }
 
-// The minutes of a duration, or null when it's left empty, or undefined when it isn't whole hours and minutes. Either
-// number can be left empty, for none.
+// The minutes of a duration, or null when it's left empty, or undefined when it isn't whole hours and minutes, or is
+// longer than any can be. Either number can be left empty, for none.
 export function minutesOf({ hours, minutes }: Duration): number | null | undefined {
   if (!hours.trim() && !minutes.trim()) return null
   const parse = (value: string, max: number) => (!value.trim() ? 0 : /^\d+$/.test(value.trim()) && Number(value) <= max ? Number(value) : undefined)
-  const h = parse(hours, 99)
+  const h = parse(hours, Infinity)
   const m = parse(minutes, 59)
-  return h === undefined || m === undefined ? undefined : h * 60 + m
+  return h === undefined || m === undefined || h * 60 + m > MAX_MINUTES ? undefined : h * 60 + m
 }
 
 // The minutes between two instants, which are whole minutes since the forms' times are.
@@ -138,17 +138,24 @@ function minutesBetween(start: Date, end: Date): number {
 }
 
 // `minutes` after `start`, in minutes that actually pass.
-export function after(start: Date, minutes: number): Date {
+function after(start: Date, minutes: number): Date {
   return new Date(start.getTime() + minutes * MINUTE_MS)
 }
 
 const SKIPPED = "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été."
 
-// What's wrong with a start and an end time ("HH:MM"), if they're missing or aren't times.
-function checkStartEnd({ start, end }: SessionFormValues): FieldErrors<SessionFormValues> {
+const YEARS = 'Une session a lieu entre les années 2000 et 2999.'
+
+// What's wrong with the days ("YYYY-MM-DD") and the times ("HH:MM") a session starts and ends at, if they're missing or
+// aren't days and times. Browsers let years have more than 4 digits, which aren't days.
+function checkDaysAndTimes({ day, start, endDay, end }: SessionFormValues): FieldErrors<SessionFormValues> {
   const errors: FieldErrors<SessionFormValues> = {}
+  if (!day) errors.day = 'Choisissez la date de début.'
+  else if (!isDay(day)) errors.day = 'La date de début est invalide.'
   if (!start) errors.start = "Indiquez l'heure de début."
   else if (!isTime(start)) errors.start = "L'heure de début est invalide."
+  if (!endDay) errors.endDay = 'Choisissez la date de fin.'
+  else if (!isDay(endDay)) errors.endDay = 'La date de fin est invalide.'
   if (!end) errors.end = "Indiquez l'heure de fin."
   else if (!isTime(end)) errors.end = "L'heure de fin est invalide."
   return errors
@@ -156,19 +163,23 @@ function checkStartEnd({ start, end }: SessionFormValues): FieldErrors<SessionFo
 
 // Sessions.
 
-// A session as the form has it: its day and times in Québec time, as "YYYY-MM-DD" and "HH:MM", or its duration when its
-// date isn't known yet (`undated`), its type, or null until it's picked, its takeover's collective as it's shown, which
-// it keeps while another type is picked, but only a takeover sends, the application it comes from, likewise, and the rest
-// as it's typed.
+// A session as the form has it: the days and times it starts and ends at in Québec time, as "YYYY-MM-DD" and "HH:MM", or
+// its duration when its date isn't known yet (`undated`), its type, or null until it's picked, its takeover's collective
+// as it's shown, which it keeps while another type is picked, but only a takeover sends, the application it comes from,
+// likewise, and the rest as it's typed.
 export type SessionFormValues = {
   undated: boolean
+  // The day it starts, and the last one it had that was a day, which the day it ends keeps its distance from, even when
+  // the day it starts is cleared in between (see `startChanges`).
   day: string
+  lastDay: string
   start: string
+  endDay: string
   end: string
   duration: Duration
-  // The day and times the form opened with, e.g. a session's, and what they stood for: each one left as it was stands for
-  // what it stood for, even when a time happens twice and the one meant is the second (see `sessionTimes`).
-  opened?: { day: string; start: string; end: string; startAt: Date; durationMinutes: number }
+  // The days and times the form opened with, e.g. a session's, and what they stood for: its start or its end left as it
+  // was stands for what it stood for, even when a time happens twice and the one meant is the second (see `sessionTimes`).
+  opened?: { day: string; start: string; endDay: string; end: string; startAt: Date; endAt: Date }
   type: SessionType | null
   takeover: Reference | null
   application: ApplicationLink | null
@@ -180,7 +191,9 @@ export type SessionFormValues = {
 export const EMPTY_SESSION_FORM: SessionFormValues = {
   undated: false,
   day: '',
+  lastDay: '',
   start: '',
+  endDay: '',
   end: '',
   duration: EMPTY_DURATION,
   type: null,
@@ -205,52 +218,63 @@ export function sessionFormValues(session: Session): SessionFormValues {
   }
   if (session.start === null) return { ...values, undated: true }
   const startAt = new Date(session.start)
+  const endAt = after(startAt, session.durationMinutes)
   const start = quebecDayAndTime(startAt)
-  const shown = { day: start.day, start: start.time, end: quebecDayAndTime(after(startAt, session.durationMinutes)).time }
-  return { ...values, ...shown, opened: { ...shown, startAt, durationMinutes: session.durationMinutes } }
+  const end = quebecDayAndTime(endAt)
+  const shown = { day: start.day, start: start.time, endDay: end.day, end: end.time }
+  return { ...values, ...shown, lastDay: start.day, opened: { ...shown, startAt, endAt } }
 }
 
 type SessionTimes = { start: Date | null; durationMinutes: number }
 
-// When a session starts, or null when its date isn't known yet, and how long it lasts, from its day and times, in Québec
-// time, or its duration (see "Times" in docs/design/client/admin/sessions.md), or what's wrong with them instead.
+// When a session starts, or null when its date isn't known yet, and how long it lasts, from the days and times it starts
+// and ends at, in Québec time, or its duration (see "Times" in docs/design/client/admin/sessions.md), or what's wrong
+// with them instead.
 export function sessionTimes(form: SessionFormValues): SessionTimes | { errors: FieldErrors<SessionFormValues> } {
   if (form.undated) {
     const durationMinutes = minutesOf(form.duration)
     if (durationMinutes === null) return { errors: { duration: 'Indiquez la durée de la session.' } }
     if (durationMinutes === undefined || durationMinutes < 1) return { errors: { duration: 'La durée est invalide.' } }
-    if (durationMinutes > MAX_MINUTES) return { errors: { duration: 'Une session dure au plus 24 heures.' } }
     return { start: null, durationMinutes }
   }
-  const { day, start, end, opened } = form
-  const keptStart = opened && opened.day === day && opened.start === start
-  if (keptStart && opened.end === end) return { start: opened.startAt, durationMinutes: opened.durationMinutes }
-  const errors: FieldErrors<SessionFormValues> = {}
-  // Browsers let years have more than 4 digits, which aren't days.
-  if (!day) errors.day = 'Choisissez le jour de la session.'
-  else if (!isDay(day)) errors.day = 'La date est invalide.'
-  Object.assign(errors, checkStartEnd(form))
+  const { day, start, endDay, end, opened } = form
+  const errors = checkDaysAndTimes(form)
   if (Object.keys(errors).length > 0) return { errors }
 
-  const startAt = keptStart ? opened.startAt : quebecInstant(day, start)
-  if (!startAt) return { errors: { start: SKIPPED } }
-  const endAt = quebecInstantFrom(startAt, end)
-  if (!endAt) return { errors: { end: SKIPPED } }
-  if (startAt.getTime() < EARLIEST || startAt.getTime() >= LATEST) return { errors: { day: 'Une session a lieu entre les années 2000 et 2999.' } }
-  const durationMinutes = minutesBetween(startAt, endAt)
-  // More than a day across a change of the clocks, from a time to the same time the next day.
-  if (durationMinutes > MAX_MINUTES) return { errors: { end: 'Une session dure au plus 24 heures.' } }
-  return { start: startAt, durationMinutes }
+  const startAt = opened && opened.day === day && opened.start === start ? opened.startAt : quebecInstant(day, start)
+  if (!startAt) errors.start = SKIPPED
+  else if (startAt.getTime() < EARLIEST || startAt.getTime() >= LATEST) errors.day = YEARS
+  const ends = opened && opened.endDay === endDay && opened.end === end ? [opened.endAt] : quebecInstants(endDay, end)
+  if (ends.length === 0) errors.end = SKIPPED
+  if (!startAt || Object.keys(errors).length > 0) return { errors }
+  // When the clocks show it twice, the first of the two that's after the start.
+  const endAt = ends.find((instant) => instant > startAt)
+  if (!endAt) return { errors: { end: 'La fin doit être après le début.' } }
+  if (endAt.getTime() > LATEST) return { errors: { endDay: YEARS } }
+  return { start: startAt, durationMinutes: minutesBetween(startAt, endAt) }
 }
 
-// The end time of a session that starts at `start` ("HH:MM") on `day` and lasts `minutes`, as Québec's clocks show it, or
-// as they would if they didn't change, while the day isn't known.
-export function endTimeAfter(day: string, start: string, minutes: number): string {
-  const startAt = isDay(day) ? quebecInstant(day, start) : null
-  if (startAt) return quebecDayAndTime(after(startAt, minutes)).time
-  const [hours, mins] = start.split(':').map(Number)
-  const total = (hours * 60 + mins + minutes) % (24 * 60)
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+// What changing the day (`day`) or the time (`start`) a session starts at changes in the form `form`. Once the start's
+// day is a day, the end's day keeps its distance in days from the last day the start had, or takes the start's day
+// while it's empty. Once the start is a day and a time the clocks show, an empty end time is filled in, with its day, as
+// long after it as the duration, e.g. that of a session whose date wasn't known (see "The session form" in
+// docs/design/client/admin/sessions.md).
+export function startChanges(form: SessionFormValues, changes: Partial<Pick<SessionFormValues, 'day' | 'start'>>): Partial<SessionFormValues> {
+  const result: Partial<SessionFormValues> = { ...changes }
+  const day = changes.day ?? form.day
+  if (changes.day !== undefined && isDay(day)) {
+    result.lastDay = day
+    if (!form.endDay) result.endDay = day
+    else if (isDay(form.endDay) && isDay(form.lastDay)) result.endDay = addDays(form.endDay, daysBetween(form.lastDay, day))
+  }
+  const start = changes.start ?? form.start
+  const lasts = minutesOf(form.duration)
+  const startAt = !form.end && lasts && isDay(day) && isTime(start) ? quebecInstant(day, start) : null
+  if (startAt) {
+    const end = quebecDayAndTime(after(startAt, lasts!))
+    Object.assign(result, { endDay: end.day, end: end.time })
+  }
+  return result
 }
 
 // Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the
@@ -367,7 +391,6 @@ export function checkSet(
   if (owner && !isPerformersApplication(owner, form.performers)) errors.application = NOT_THE_SETS_APPLICATION
   const durationMinutes = minutesOf(form.duration)
   if (durationMinutes === undefined || durationMinutes === 0) errors.duration = 'La durée est invalide.'
-  else if (durationMinutes !== null && durationMinutes > MAX_MINUTES) errors.duration = 'Un set dure au plus 24 heures.'
   const otherPerformanceType = checkLine(form.otherPerformanceType, 'La prestation « Autre »', OTHER_PERFORMANCE_TYPE_MAX_LENGTH, null)
   if (otherPerformanceType.error) errors.otherPerformanceType = otherPerformanceType.error
   const soundcloudTrack = form.soundcloudTrack.trim()

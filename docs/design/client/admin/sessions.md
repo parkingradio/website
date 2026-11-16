@@ -22,30 +22,41 @@ deleted.
 ## Times
 
 Times are shown and entered in Québec time ("heure du Québec"), whatever the browser's time zone, since that's where
-the studio is, e.g. "sam. 14 nov. 2026, 21 h – 1 h". A session whose date isn't known yet (see
-[Times](../../server/sessions.md#times)) shows "date à déterminer" in place of its day, and its duration in place of its
-times, e.g. "4 h". Sets have no times, only their order and their durations (see
-[Sets' order](../../server/sessions.md#sets-order)): a set's duration is shown e.g. "1 h 30", or "à déterminer" when it
-isn't known.
+the studio is. A session whose date isn't known yet (see [Times](../../server/sessions.md#times)) shows "date à
+déterminer" in place of its day, and its duration in place of its times, e.g. "4 h". Sets have no times, only their
+order and their durations (see [Sets' order](../../server/sessions.md#sets-order)): a set's duration is shown e.g.
+"1 h 30", or "à déterminer" when it isn't known. Durations are in hours and minutes, even those longer than a day, e.g.
+"56 h".
 
-The forms take a session's day and times of day, in the 24-hour format (see [Architecture](../architecture.md)), and
-turn them into what the server takes (see [Times](../../server/sessions.md#times)):
+A session's times are written:
 
-- A session's start is its day and its start time. A time that doesn't happen that day, as clocks spring forward, is
-  refused, and one that happens twice, as they fall back, is the first of the two.
-- Its end is the first time after its start when Québec's clocks show it, unless they skip it before showing it, in
-  which case it's refused. So an end time that isn't after the start time is the next day.
-- A time left as the form opened with it stands for what it stood for, e.g. the start of a session at the second 1 h 30
-  of the night clocks fall back, so that changing something else, even its end, never moves it.
+- in full, e.g. on its page: "samedi 14 novembre 2026, de 21 h à 23 h", or "samedi 14 novembre 2026, de 21 h à 1 h le
+  lendemain" when it ends the next day, at any time, or else "du vendredi 13 novembre 2026 à 18 h au dimanche 15
+  novembre 2026 à 2 h";
+- in short, e.g. in lists, after its day: "21 h – 1 h", when it ends the day it starts, or the next day at an earlier
+  time than it starts, or else with the day it ends, without its year, e.g. "18 h – dim. 15 nov., 2 h", or
+  "21 h – dim. 15 nov., 21 h" for a session of 24 hours.
+
+The forms take a session's start and its end each as a day and a time of day, in the 24-hour format (see
+[Architecture](../architecture.md)), and turn them into what the server takes (see
+[Times](../../server/sessions.md#times)):
+
+- A session's start is refused when the clocks skip it, as they spring forward, and is the first of the two when they
+  show it twice, as they fall back.
+- Its end likewise is refused when the clocks skip it, and is the first of the two that's after the start when they
+  show it twice. An end that isn't after the start is refused, « La fin doit être après le début. »: it's never moved
+  to another day.
+- A start, or an end, left as the form opened with it stands for what it stood for, e.g. the start of a session at the
+  second 1 h 30 of the night clocks fall back, so that changing something else never moves it.
 
 Durations are entered in hours and minutes, as two numbers.
 
 ## The list
 
-The section lists the sessions, each with its day ("Date"), linking to its page, its start and end ("Heure"), its title
-("Nom"), its type ("Type"), which for a takeover links to its collective, its sets' performers ("Artistes"), set by set
-in their order, the sets separated by "·", each artist linking to their page, its status, and "annoncée" for an
-announced session ("Annonce").
+The section lists the sessions, each with its day ("Date"), linking to its page, its times, in short ("Heure", see
+[Times](#times)), its title ("Nom"), its type ("Type"), which for a takeover links to its collective, its sets'
+performers ("Artistes"), set by set in their order, the sets separated by "·", each artist linking to their page, its
+status, and "annoncée" for an announced session ("Annonce").
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
 first, past ones included, then those without a date, the first added first. With another status or "toutes", those
@@ -73,7 +84,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 - "Session": the session's details, which "modifier" changes in a form in their place (see
   [The session form](#the-session-form)):
-  - "Quand": when it is, e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
+  - "Quand": when it is, in full (see [Times](#times)), e.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or
+    "date à déterminer".
   - "Durée": how long it lasts.
   - "Type": its type.
   - "Takeover de", for a takeover: its collective, linking to it.
@@ -168,13 +180,19 @@ collective's page leads to it as its takeover, with "Takeover" and the collectiv
 isn't one of the collectives loaded, e.g. when they can't be loaded, in which case nothing is picked. From top to
 bottom, the form has:
 
-- "Quand": "Date", "Début" and "Fin", in Québec time (see [Times](#times)), then how long the session lasts, and when it
-  ends the next day. Or, with "date à déterminer" checked, only "Durée". Checking it fills the duration in from the
-  times, when they're valid. Once a start time is entered after un-checking it, an empty end time is filled in that long
-  after. The form doesn't check that the session's sets still add up to no more than the session once it's shorter: the
-  session's page then warns of it (see [A session's page](#a-sessions-page)). While the session is announced, checking
-  "date à déterminer" shows an error right away, which screen readers announce, « Une session annoncée a une date :
-  retirez d'abord son annonce. », and the form can't be sent until it's un-checked.
+- "Quand": "Début" and "Fin", each a "date" and an "heure", in Québec time (see [Times](#times)), then how long the
+  session lasts, e.g. « Dure 4 h. », once they're valid. The end's date keeps its distance in days from the start's:
+  when the start's date changes to another day, the end's moves by as many days, from the last day the start had, even
+  if its date was cleared in between, e.g. while it's typed. When the start's date changes while the end has none, the
+  end takes it. Changing the end's date only changes that distance. Or, with "date à déterminer" checked, only
+  "Durée". Checking it fills the duration in from the times, when they're valid. Once the start has both its date and
+  its time, whichever is entered last, and the clocks show that time, an empty end time is filled in, with its date, as
+  long after the start as the duration the form has, if it has one: the one "Durée" had, e.g. after un-checking "date à
+  déterminer", or else the session's as the form opened. The form doesn't check that the session's sets still add up
+  to no more than the session once it's shorter: the session's page then warns of it (see
+  [A session's page](#a-sessions-page)). While the session is announced, checking "date à déterminer" shows an error
+  right away, which screen readers announce, « Une session annoncée a une date : retirez d'abord son annonce. », and the
+  form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
   buttons, in this order.
 - "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the
@@ -239,11 +257,11 @@ top to bottom, the form has:
   picked. Performers can't be created by typing a name: they're added in Artistes first.
 - "Candidature": the application the set comes from, picked from its performers' applications, or "Aucune
   candidature" (see [Applications](#applications)).
-- "Durée": how long the set lasts, in hours and minutes, at most 24 h, which the form checks (see
-  [Times](../../server/sessions.md#times)), or empty while it isn't known. It doesn't check that the sets still add up
-  to no more than the session: the list of sets warns of it (see [A session's page](#a-sessions-page)). A new set, which
-  goes after the session's other sets, lasts an hour by default, or what's left of the session after its sets, cancelled
-  ones included, if that's less. When the session's sets fill it, "Durée" starts empty.
+- "Durée": how long the set lasts, in hours and minutes (see [Times](../../server/sessions.md#times)), or empty while it
+  isn't known. It doesn't check that the sets still add up to no more than the session: the list of sets warns of it
+  (see [A session's page](#a-sessions-page)). A new set, which goes after the session's other sets, lasts an hour by
+  default, or what's left of the session after its sets, cancelled ones included, if that's less. When the session's
+  sets fill it, "Durée" starts empty.
 - "Prestation": what the performers do, picked from the same list as the application form's (see
   [Candidatures](candidatures.md)), and "Autre", in a few words.
 - "Genres": tags to click, like an artist's (see [Adding an artist](artistes.md#adding-an-artist)). While it has none,

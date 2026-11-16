@@ -492,7 +492,16 @@ export function sessionsStore(db: Queryable): SessionsStore {
         if (!before) return null
         // The rules are about the session as it will be, with the fields that aren't changed as they are.
         const session = changed(before, changes)
-        check(brokenSessionRule({ type: session.type, takeover: session.takeoverId, application: session.applicationId, name: session.name }))
+        check(
+          brokenSessionRule({
+            start: session.startAt,
+            durationMinutes: session.durationMinutes,
+            type: session.type,
+            takeover: session.takeoverId,
+            application: session.applicationId,
+            name: session.name,
+          }),
+        )
         checkAnnounced(session)
         await checkTakeover(tx, session.takeoverId)
         await checkSessionApplication(tx, session)

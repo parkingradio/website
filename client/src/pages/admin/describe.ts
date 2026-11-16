@@ -4,7 +4,7 @@ import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
 import type { Artist, ArtistLinks, GenreId } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { QUEBEC_TIME_ZONE, formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
+import { QUEBEC_TIME_ZONE, daysBetween, formatLongQuebecDay, quebecDayAndTime } from '../../quebec-time'
 import type { Session, SessionStatus, SessionType, StudioSet } from '../../session-fields'
 import type { ComboboxOption } from '../../combobox'
 import { compareText } from './list'
@@ -271,6 +271,7 @@ export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: str
 // Sessions' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
 // and their names (see docs/design/client/admin/sessions.md).
 const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
+const quebecDayInYearFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: QUEBEC_TIME_ZONE })
 
 // What's shown in place of the day of a session whose date isn't known yet.
 const UNDATED = 'date à déterminer'
@@ -285,26 +286,15 @@ function hoursAndMinutes(minutes: number): string {
   return `${Math.floor(minutes / 60)} h${minutes % 60 === 0 ? '' : ` ${String(minutes % 60).padStart(2, '0')}`}`
 }
 
-// E.g. "21 h", or "21 h 30", the time of `instant` in Québec.
-function formatQuebecTime(instant: string): string {
-  const [hours, minutes] = quebecDayAndTime(new Date(instant)).time.split(':').map(Number)
+// E.g. "21 h", or "21 h 30", for a time of day, "HH:MM".
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':').map(Number)
   return hoursAndMinutes(hours * 60 + minutes)
 }
 
 // E.g. "1 h", "1 h 30" or "45 min".
 export function formatDuration(minutes: number): string {
   return minutes < 60 ? `${minutes} min` : hoursAndMinutes(minutes)
-}
-
-// Whether an instant is on a later day than another, in Québec.
-function laterDay(start: string, end: string): boolean {
-  return quebecDayAndTime(new Date(start)).day !== quebecDayAndTime(new Date(end)).day
-}
-
-// When `instant` is on a later day than `day` ("YYYY-MM-DD"), in Québec, what the forms say of it, e.g. ", finit le
-// lendemain, dimanche 15 novembre 2026" for "finit", or else "".
-export function nextDay(what: string, instant: Date, day: string): string {
-  return quebecDayAndTime(instant).day === day ? '' : `, ${what} le lendemain, ${formatLongQuebecDay(instant.toISOString())}`
 }
 
 type SessionTimes = Pick<Session, 'start' | 'end' | 'durationMinutes'>
@@ -319,15 +309,30 @@ export function sessionLongDay({ start }: Pick<Session, 'start'>): string {
   return start === null ? UNDATED : formatLongQuebecDay(start)
 }
 
-// E.g. "21 h – 1 h", or how long a session without a date lasts, e.g. "4 h".
-export function sessionHours({ start, end, durationMinutes }: SessionTimes): string {
-  return start === null || end === null ? formatDuration(durationMinutes) : `${formatQuebecTime(start)} – ${formatQuebecTime(end)}`
+// When a session starts and ends, in Québec, as days and times, and how many days after the day it starts on it ends on.
+function startAndEnd(start: string, end: string) {
+  const from = quebecDayAndTime(new Date(start))
+  const to = quebecDayAndTime(new Date(end))
+  return { from, to, days: daysBetween(from.day, to.day) }
 }
 
-// E.g. "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "date à déterminer".
+// E.g. "21 h – 1 h", when the times alone say when it ends: the day it starts, or the next one at an earlier time. Or else
+// with the day it ends, without its year, e.g. "18 h – dim. 15 nov., 2 h", or "21 h – dim. 15 nov., 21 h". Or how long a
+// session without a date lasts, e.g. "4 h".
+export function sessionHours({ start, end, durationMinutes }: SessionTimes): string {
+  if (start === null || end === null) return formatDuration(durationMinutes)
+  const { from, to, days } = startAndEnd(start, end)
+  const endDay = days === 0 || (days === 1 && to.time < from.time) ? '' : `${quebecDayInYearFormat.format(new Date(end))}, `
+  return `${formatTime(from.time)} – ${endDay}${formatTime(to.time)}`
+}
+
+// E.g. "samedi 14 novembre 2026, de 21 h à 23 h", "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "du vendredi
+// 13 novembre 2026 à 18 h au dimanche 15 novembre 2026 à 2 h", or "date à déterminer".
 export function sessionWhen({ start, end }: SessionTimes): string {
   if (start === null || end === null) return UNDATED
-  return `${sessionLongDay({ start })}, de ${formatQuebecTime(start)} à ${formatQuebecTime(end)}${laterDay(start, end) ? ' le lendemain' : ''}`
+  const { from, to, days } = startAndEnd(start, end)
+  if (days > 1) return `du ${formatLongQuebecDay(start)} à ${formatTime(from.time)} au ${formatLongQuebecDay(end)} à ${formatTime(to.time)}`
+  return `${formatLongQuebecDay(start)}, de ${formatTime(from.time)} à ${formatTime(to.time)}${days === 1 ? ' le lendemain' : ''}`
 }
 
 // Sessions without a date are later than any other, then by when they were added.

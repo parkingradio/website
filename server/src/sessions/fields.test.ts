@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SESSION_TYPES, SessionFields, SetFields, SetPosition, brokenSessionRule, sessionTitle } from './fields.js'
+import { MAX_MINUTES, SESSION_TYPES, SessionFields, SetFields, SetPosition, brokenSessionRule, sessionTitle } from './fields.js'
 
 // The rules in sessions/fields.ts, which every session and set has to follow. The server answers with the first error.
 
@@ -135,12 +135,25 @@ describe('SessionFields', () => {
     expect(sessionError(sessionFields({ start: '2026-11-14T21:00-05:00\0' }))).toBe(START)
   })
 
-  it('takes a duration of whole minutes, from 1 minute to 24 hours, even without a start', () => {
+  it('takes a duration of whole minutes, from 1 minute to the time from the start of 2000 to the start of 3000, even without a start', () => {
     expect(parse({ durationMinutes: 1 }).durationMinutes).toBe(1)
-    expect(parse({ start: null, durationMinutes: 1440 }).durationMinutes).toBe(1440)
-    for (const durationMinutes of [0, 1441, 60.5, -60, '60', null, undefined]) {
-      expect(sessionError(sessionFields({ durationMinutes })), String(durationMinutes)).toBe('The duration must be a whole number of minutes, from 1 to 1440')
+    // A weekend.
+    expect(parse({ start: '2026-11-13T18:00-05:00', durationMinutes: 3360 }).durationMinutes).toBe(3360)
+    expect(parse({ start: null, durationMinutes: MAX_MINUTES }).durationMinutes).toBe(MAX_MINUTES)
+    for (const start of [null, '2026-11-14T21:00-05:00']) {
+      for (const durationMinutes of [0, MAX_MINUTES + 1, 60.5, -60, '60', null, undefined]) {
+        expect(sessionError(sessionFields({ start, durationMinutes })), `${start} ${durationMinutes}`).toBe(
+          'The duration must be a whole number of minutes, from 1 to 525949920',
+        )
+      }
     }
+  })
+
+  it('takes a session that ends by the start of the year 3000, in UTC', () => {
+    // 18:00 in Québec on December 31st, 2999, is 23:00 in UTC.
+    expect(parse({ start: '2999-12-31T18:00-05:00', durationMinutes: 60 }).durationMinutes).toBe(60)
+    expect(sessionError(sessionFields({ start: '2999-12-31T18:00-05:00', durationMinutes: 61 }))).toBe('A session ends by the start of the year 3000, in UTC')
+    expect(parse({ start: '2000-01-01T00:00-05:00', durationMinutes: MAX_MINUTES - 300 }).durationMinutes).toBe(MAX_MINUTES - 300)
   })
 
   it('takes one of the types, and refuses any other value, or none', () => {
@@ -280,11 +293,12 @@ describe('SetFields', () => {
     expect(setError(setFields({ offsetMinutes: 0 }))).toBe('Unknown field: `offsetMinutes`')
   })
 
-  it('takes durations of whole minutes, within 24 hours', () => {
-    expect(parse({ durationMinutes: 1440 })).toMatchObject({ durationMinutes: 1440 })
+  it('takes durations of whole minutes, up to the time from the start of 2000 to the start of 3000', () => {
+    expect(parse({ durationMinutes: 1500 })).toMatchObject({ durationMinutes: 1500 })
+    expect(parse({ durationMinutes: MAX_MINUTES })).toMatchObject({ durationMinutes: MAX_MINUTES })
     expect(parse({ durationMinutes: 1 })).toMatchObject({ durationMinutes: 1 })
-    for (const durationMinutes of [0, 1441, 0.5, '60', undefined]) {
-      expect(setError(setFields({ durationMinutes })), String(durationMinutes)).toBe('The duration must be a whole number of minutes, from 1 to 1440, or null')
+    for (const durationMinutes of [0, MAX_MINUTES + 1, 0.5, '60', undefined]) {
+      expect(setError(setFields({ durationMinutes })), String(durationMinutes)).toBe('The duration must be a whole number of minutes, from 1 to 525949920, or null')
     }
   })
 
@@ -315,9 +329,16 @@ describe('SetFields', () => {
 })
 
 describe('the rules that involve several fields', () => {
-  it("are those of a session's type, its takeover, its application and its name, which a change checks on the session it would make", () => {
-    const none = { takeover: null, application: null }
-    expect(brokenSessionRule({ type: 'takeover', takeover: 'c', application: 'a', name: '' })).toBeNull()
+  it("are those of a session's start and duration, its type, its takeover, its application and its name, which a change checks on the session it would make", () => {
+    const none = { start: null, durationMinutes: 60, takeover: null, application: null }
+    const late = { start: new Date('2999-12-31T23:00:00Z'), durationMinutes: 60 }
+    expect(brokenSessionRule({ type: 'guest-mixes', ...none, ...late, name: '' })).toBeNull()
+    expect(brokenSessionRule({ type: 'guest-mixes', ...none, ...late, durationMinutes: 61, name: '' })).toEqual({
+      message: 'A session ends by the start of the year 3000, in UTC',
+      field: 'durationMinutes',
+    })
+    expect(brokenSessionRule({ type: 'guest-mixes', ...none, durationMinutes: MAX_MINUTES, name: '' })).toBeNull()
+    expect(brokenSessionRule({ ...none, type: 'takeover', takeover: 'c', application: 'a', name: '' })).toBeNull()
     expect(brokenSessionRule({ type: 'other', ...none, name: 'ATELIER' })).toBeNull()
     expect(brokenSessionRule({ type: 'takeover', ...none, name: 'X' })).toEqual({ message: 'A takeover has a collective', field: 'takeover' })
     expect(brokenSessionRule({ type: 'guest-mixes', ...none, takeover: 'c', name: '' })).toEqual({ message: 'Only a takeover has a collective', field: 'takeover' })

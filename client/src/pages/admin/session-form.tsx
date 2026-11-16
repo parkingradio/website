@@ -12,21 +12,19 @@ import {
   DESCRIPTION_MAX_LENGTH,
   SESSION_TYPES,
   TYPE_DESCRIPTIONS,
-  after,
   checkSession,
   durationOf,
-  endTimeAfter,
   isCollectivesApplication,
   listedSetFields,
-  minutesOf,
   sessionTimes,
+  startChanges,
   typeName,
 } from '../../session-fields'
 import type { ListedSet, RaEvent, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
-import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay, nextDay } from './describe'
+import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled } from './fields'
 import { ListedSets } from './listed-sets'
 import type { OpenListedSet } from './listed-sets'
@@ -107,8 +105,15 @@ export function SessionForm({
             // So that it says right away when an announced session is left without a date.
             if ('undated' in changes) leave('undated')()
           }}
-          errors={{ undated: shown('undated'), day: shown('day'), start: shown('start'), end: shown('end'), duration: shown('duration') }}
-          onLeave={leave('day', 'start', 'end', 'duration')}
+          errors={{
+            undated: shown('undated'),
+            day: shown('day'),
+            start: shown('start'),
+            endDay: shown('endDay'),
+            end: shown('end'),
+            duration: shown('duration'),
+          }}
+          onLeave={leave('day', 'start', 'endDay', 'end', 'duration')}
         />
 
         <TypeField type={form.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
@@ -180,8 +185,8 @@ export function SessionForm({
   )
 }
 
-// The day the session starts, and the times it starts and ends, in Québec time, then how long it lasts, and when it ends
-// the next day, once they're valid. Or only its duration, while its date isn't known.
+// The days and times the session starts and ends at, in Québec time, then how long it lasts, once they're valid. Or only
+// its duration, while its date isn't known.
 function TimesField({
   form,
   times,
@@ -192,13 +197,11 @@ function TimesField({
   form: SessionFormValues
   times: ReturnType<typeof sessionTimes>
   onChange: (changes: Partial<SessionFormValues>) => void
-  errors: Partial<Record<'undated' | 'day' | 'start' | 'end' | 'duration', string>>
+  errors: Partial<Record<'undated' | 'day' | 'start' | 'endDay' | 'end' | 'duration', string>>
   onLeave: () => void
 }) {
-  // When the session starts and how long it lasts, once its day and times are valid.
-  const dated = 'start' in times && times.start ? { start: times.start, durationMinutes: times.durationMinutes } : null
-  const end = dated && after(dated.start, dated.durationMinutes)
-  const error = errors.day ?? errors.start ?? errors.end
+  // How long the session lasts, once its days and times are valid.
+  const lasts = 'start' in times && times.start ? times.durationMinutes : null
   // Checking "date à déterminer" keeps how long the session lasts, when its times say it.
   const setUndated = (undated: boolean) => {
     const dated = sessionTimes({ ...form, undated: false })
@@ -223,41 +226,69 @@ function TimesField({
         <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
       ) : (
         <>
-          <p className="admin-hint">Heure du Québec. Une fin qui n'est pas après le début est le lendemain.</p>
-          <div className="admin-row admin-times">
-            <label>
-              Date
-              <input type="date" value={form.day} aria-invalid={errors.day ? true : undefined} onChange={(event) => onChange({ day: event.target.value })} />
-            </label>
-            <label>
-              Début
-              <input
-                type="time"
-                value={form.start}
-                aria-invalid={errors.start ? true : undefined}
-                onChange={(event) => {
-                  const start = event.target.value
-                  // A session whose date wasn't known keeps lasting as long once it has one.
-                  const lasts = minutesOf(form.duration)
-                  onChange(form.end || !start || !lasts ? { start } : { start, end: endTimeAfter(form.day, start, lasts) })
-                }}
-              />
-            </label>
-            <label>
-              Fin
-              <input type="time" value={form.end} aria-invalid={errors.end ? true : undefined} onChange={(event) => onChange({ end: event.target.value })} />
-            </label>
-          </div>
-          {dated && end && (
+          <DayAndTime
+            label="Début"
+            day={form.day}
+            time={form.start}
+            onDay={(day) => onChange(startChanges(form, { day }))}
+            onTime={(start) => onChange(startChanges(form, { start }))}
+            dayError={errors.day}
+            timeError={errors.start}
+          />
+          <DayAndTime
+            label="Fin"
+            day={form.endDay}
+            time={form.end}
+            onDay={(endDay) => onChange({ endDay })}
+            onTime={(end) => onChange({ end })}
+            dayError={errors.endDay}
+            timeError={errors.end}
+          />
+          {lasts !== null && (
             <p className="admin-hint" role="status">
-              Dure {formatDuration(dated.durationMinutes)}
-              {nextDay('finit', end, form.day)}.
+              Dure {formatDuration(lasts)}.
             </p>
           )}
-          <FieldError message={error} />
         </>
       )}
     </fieldset>
+  )
+}
+
+// A day and a time, in Québec time, under `label`, with what's wrong with either.
+function DayAndTime({
+  label,
+  day,
+  time,
+  onDay,
+  onTime,
+  dayError,
+  timeError,
+}: {
+  label: string
+  day: string
+  time: string
+  onDay: (day: string) => void
+  onTime: (time: string) => void
+  dayError: string | undefined
+  timeError: string | undefined
+}) {
+  const id = useId()
+  return (
+    <div className="admin-field">
+      <span id={id}>{label}</span>
+      <div className="admin-row admin-times" role="group" aria-labelledby={id}>
+        <label>
+          date
+          <input type="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
+        </label>
+        <label>
+          heure
+          <input type="time" value={time} aria-invalid={timeError ? true : undefined} onChange={(event) => onTime(event.target.value)} />
+        </label>
+      </div>
+      <FieldError message={dayError ?? timeError} />
+    </div>
   )
 }
 

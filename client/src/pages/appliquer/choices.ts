@@ -2,6 +2,7 @@ import type { PerformanceTypeId } from '../../application-fields'
 import type { ApplicantKind } from '../../applicant'
 import { countryOptions } from '../../artist-profile'
 import type { GenreId, LinkSiteId } from '../../artist-profile'
+import { quebecDayAndTime } from '../../quebec-time'
 
 // What the "Appliquer" form offers, and the limits it sets, on top of the rules that every profile and application has to
 // follow (see artist-profile.ts and application-fields.ts). The server doesn't know about these: admins can
@@ -59,13 +60,10 @@ export const MIN_MONTHS_AHEAD = 2
 export const MAX_MONTHS_AHEAD = 12
 export const MAX_DATES = 14
 
-// "Today" is the day in Québec, whatever the time zone of the visitor.
-const TIME_ZONE = 'America/Toronto'
-
-// The day `date` falls on in Québec, as "YYYY-MM-DD".
+// The day `date` falls on in Québec, as "YYYY-MM-DD": "today" is the day in Québec, whatever the time zone of the
+// visitor.
 export function dayInQuebec(date: Date): string {
-  // The en-CA locale formats dates as YYYY-MM-DD.
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+  return quebecDayAndTime(date).day
 }
 
 // The same day of the month, `months` months later. When that month is shorter, the last day of that month instead

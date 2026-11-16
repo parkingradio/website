@@ -663,8 +663,8 @@ export type SeedSession = {
   sets: SeedSet[]
 }
 
-// The sessions are clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or happen
-// twice.
+// The sessions start and end clear of 2:00 to 3:00, when clocks change: on those nights, their times could be skipped or
+// happen twice.
 export const SEED_SESSIONS: SeedSession[] = [
   // Onde Commune's takeover, announced: its three artists, one after the other, the first of whom applied for it on her
   // own.
@@ -785,6 +785,19 @@ export const SEED_SESSIONS: SeedSession[] = [
     sets: [
       { performers: ['Sable Mouvant'], durationMinutes: 60, status: 'planned' },
       { performers: ['Marée Basse'], durationMinutes: 60, application: [30, 60], status: 'planned' },
+    ],
+  },
+  // A marathon, which one session is, coming up, over three days: from 18:00 to 1:00 two days later, 31 hours, unless the
+  // clocks change in between, with a few of its sets planned.
+  {
+    type: 'other',
+    name: 'MARATHON MODULAIRE',
+    when: { day: 75, start: '18:00' },
+    durationMinutes: 31 * 60,
+    status: 'planned',
+    sets: [
+      { performers: ['Ondine'], durationMinutes: 180, performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire', status: 'planned' },
+      { performers: ['Marée'], durationMinutes: 180, performanceTypes: ['live-performance'], genres: ['ambient'], status: 'planned' },
     ],
   },
   // A live performance, coming up and announced, with its own description, but no flyer yet.

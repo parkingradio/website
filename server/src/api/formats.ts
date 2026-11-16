@@ -9,8 +9,8 @@ import { z } from 'zod'
 const QUEBEC_TIME_ZONE = 'America/Toronto'
 
 // The instants that requests can send, e.g. a session's start: from the year 2000, in UTC, when Québec's offsets are
-// whole minutes, as `inQuebecTime` needs, to 2999, which is plenty, and keeps years at 4 digits, even a day later, at a
-// session's end.
+// whole minutes, as `inQuebecTime` needs, to 2999, which is plenty, and keeps years at 4 digits, even at a session's end,
+// which is by the start of 3000 (see "Times" in docs/design/server/sessions.md).
 export const EARLIEST_INSTANT = Date.parse('2000-01-01T00:00:00Z')
 export const LATEST_INSTANT = Date.parse('3000-01-01T00:00:00Z')
 

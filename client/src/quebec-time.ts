@@ -18,11 +18,12 @@ const partsFormat = new Intl.DateTimeFormat('en-CA', {
   hourCycle: 'h23',
 })
 
-// The day and time it is in Québec at `instant`, as "YYYY-MM-DD" and "HH:MM".
+// The day and time it is in Québec at `instant`, as "YYYY-MM-DD" and "HH:MM". Years before 1000, which forms' date fields
+// go through as a year is typed, e.g. 0002, are padded too, since Intl doesn't.
 export function quebecDayAndTime(instant: Date): { day: string; time: string } {
   const parts: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {}
   for (const { type, value } of partsFormat.formatToParts(instant)) parts[type] = value
-  return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+  return { day: `${parts.year!.padStart(4, '0')}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
 }
 
 // The admin lists' search relies on the weekday, the day, the month and the year being next to each other, in that
@@ -57,31 +58,15 @@ export function quebecInstant(day: string, time: string): Date | null {
   return found.length > 0 ? new Date(Math.min(...found)) : null
 }
 
-// Every instant it's `time` ("HH:MM") on `day` ("YYYY-MM-DD") in Québec: none when clocks skip it, two when they show it
-// twice, as they fall back.
-function occurrences(day: string, time: string): Date[] {
+// Every instant it's `time` ("HH:MM") on `day` ("YYYY-MM-DD") in Québec, in order: none when clocks skip it, or when it
+// isn't a day and a time, and two when they show it twice, as they fall back.
+export function quebecInstants(day: string, time: string): Date[] {
   const first = quebecInstant(day, time)
   if (!first) return []
   // When clocks fall back, they show a time again an hour after they first did.
   const again = new Date(first.getTime() + 60 * MINUTE_MS)
   const parts = quebecDayAndTime(again)
   return parts.day === day && parts.time === time ? [first, again] : [first]
-}
-
-// The first instant after `after` (or at it, when it's `inclusive`) when Québec's clocks show `time` ("HH:MM"), within
-// the day `after` is on and the next. Null when they skip it before showing it, as they spring forward, or when it isn't
-// a time.
-export function quebecInstantFrom(after: Date, time: string, { inclusive = false } = {}): Date | null {
-  const start = quebecDayAndTime(after)
-  for (const day of [start.day, addDays(start.day, 1)]) {
-    const all = occurrences(day, time)
-    const found = all.filter((instant) => (inclusive ? instant >= after : instant > after))
-    if (found.length > 0) return found[0]
-    // Skipped on a day where it would come after `after`.
-    const comesAfter = day !== start.day || (inclusive ? time >= start.time : time > start.time)
-    if (comesAfter && all.length === 0) return null
-  }
-  return null
 }
 
 // `instant` as the day and time in Québec, with Québec's offset from UTC then, e.g. "2026-11-14T21:00-05:00", to the minute.
@@ -95,4 +80,9 @@ export function quebecDateTime(instant: Date): string {
 // The day that's `days` days after `day` ("YYYY-MM-DD"), or before if it's negative, as "YYYY-MM-DD".
 export function addDays(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10)
+}
+
+// How many days `day` is after `from` (both "YYYY-MM-DD"), or before if it's negative.
+export function daysBetween(from: string, day: string): number {
+  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
 }

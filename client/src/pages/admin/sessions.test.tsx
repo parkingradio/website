@@ -255,12 +255,28 @@ async function expectSearch(query: string, found: string[]) {
 }
 
 // What was sent as the session's fields in a request to save one, as JSON in the "session" part.
+// The date or the time of the session's start or end, in its form.
+const timeInput = (when: 'Début' | 'Fin', part: 'date' | 'heure') => within(screen.getByRole('group', { name: when })).getByLabelText(part)
+
 function sentSession(request: RequestInit) {
   return JSON.parse((request.body as FormData).get('session') as string)
 }
 
 describe('The list of sessions', () => {
   const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
+
+  it('says which day a session ends on, when it lasts several days, and on its page too', async () => {
+    // From 18:00 on Friday to 2:00 on Sunday.
+    const weekend = { ...SESSION, start: '2026-11-13T23:00:00.000Z', end: '2026-11-15T07:00:00.000Z', durationMinutes: 1920 }
+    mockFetch({ ...PAGE, '/api/admin/sessions': { ok: true, sessions: [weekend] }, '/api/admin/sessions/session-1': { ok: true, session: weekend } })
+    renderAt('/admin/sessions?status=all')
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
+    expect(rows()[0].slice(0, 2)).toEqual(['ven. 13 nov. 2026', '18 h – dim. 15 nov., 2 h'])
+    fireEvent.click(screen.getByRole('link', { name: 'ven. 13 nov. 2026' }))
+    expect(await screen.findByText('du vendredi 13 novembre 2026 à 18 h au dimanche 15 novembre 2026 à 2 h')).toBeInTheDocument()
+    expect(value('Durée')).toHaveTextContent(/^32 h$/)
+  })
 
   it('lists every session, those without a date first, then the latest first, in Québec time', async () => {
     mockFetch(LIST)
@@ -735,10 +751,12 @@ describe("A session's page", () => {
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
-    expect(await screen.findByLabelText('Date')).toHaveValue('2026-11-14')
-    expect(screen.getByLabelText('Début')).toHaveValue('21:00')
-    expect(screen.getByLabelText('Fin')).toHaveValue('01:00')
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 4 h, finit le lendemain, dimanche 15 novembre 2026.')
+    await screen.findByRole('group', { name: 'Début' })
+    expect(timeInput('Début', 'date')).toHaveValue('2026-11-14')
+    expect(timeInput('Début', 'heure')).toHaveValue('21:00')
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
+    expect(timeInput('Fin', 'heure')).toHaveValue('01:00')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
     expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
     expect(screen.getByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
     // The name its type gives it shows while it has none of its own.
@@ -958,11 +976,70 @@ describe("A session's page", () => {
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
-    expect(await screen.findByLabelText('Début')).toHaveValue('01:30')
+    await screen.findByRole('group', { name: 'Début' })
+    expect(timeInput('Début', 'heure')).toHaveValue('01:30')
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
+  })
+
+  it('keeps a session that ends at the second 1:30 of the night clocks fall back where it ends while its end is unchanged', async () => {
+    // From midnight, in summer time, to 1:30 in winter time.
+    const second = { ...SESSION, start: '2026-11-01T04:00:00.000Z', end: '2026-11-01T06:30:00.000Z', durationMinutes: 150, sets: [] }
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('group', { name: 'Début' })
+    expect(timeInput('Fin', 'heure')).toHaveValue('01:30')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
+    // Changing only the start's time doesn't move the end.
+    fireEvent.change(timeInput('Début', 'heure'), { target: { value: '00:30' } })
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h\.$/)
+    fireEvent.change(timeInput('Début', 'heure'), { target: { value: '00:00' } })
+    // Moving the start's day moves the end's, and moving it back finds the end as it opened.
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-08' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-08')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 1 h 30\.$/)
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-01' } })
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 150 })
+  })
+
+  it('goes through the years a date field gives as a year is typed, saying what is wrong', async () => {
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('group', { name: 'Début' })
+    fireEvent.change(timeInput('Fin', 'date'), { target: { value: '0002-11-15' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    expect(await screen.findByText('La fin doit être après le début.')).toBeInTheDocument()
+    fireEvent.change(timeInput('Fin', 'date'), { target: { value: '2026-11-15' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '0002-11-14' } })
+    expect(await screen.findByText('Une session a lieu entre les années 2000 et 2999.')).toBeInTheDocument()
+    expect(timeInput('Fin', 'date')).toHaveValue('0002-11-15')
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+  })
+
+  it('moves an overnight session to another day, its end with it, and back', async () => {
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    await screen.findByRole('group', { name: 'Début' })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-21' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-22')
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-21' } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-21T21:00-05:00', durationMinutes: 240 })
   })
 
   it('says when its sets add up to more than the session, cancelled ones included, and no longer once one is deleted', async () => {
@@ -1070,10 +1147,14 @@ describe("A session's page", () => {
     expect(await screen.findByLabelText('date à déterminer')).toBeChecked()
     expect(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures')).toHaveValue(3)
     fireEvent.click(screen.getByLabelText('date à déterminer'))
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-14' } })
-    fireEvent.change(screen.getByLabelText('Début'), { target: { value: '21:00' } })
-    expect(screen.getByLabelText('Fin')).toHaveValue('00:00')
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 3 h, finit le lendemain, dimanche 15 novembre 2026.')
+    // Once the start has its day and its time, the end is filled in, both its day and its time.
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-14')
+    expect(timeInput('Fin', 'heure')).toHaveValue('')
+    fireEvent.change(timeInput('Début', 'heure'), { target: { value: '21:00' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
+    expect(timeInput('Fin', 'heure')).toHaveValue('00:00')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 3 h\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-2')).toHaveLength(1))
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
@@ -1383,7 +1464,7 @@ describe("A set's form", () => {
     })
   })
 
-  it('adds a set without a duration, or with one of at most a day, in a session without a date too', async () => {
+  it('adds a set without a duration, or with one of more than a day, in a session without a date too', async () => {
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'POST /api/admin/sessions/session-2/sets': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
@@ -1391,19 +1472,23 @@ describe("A set's form", () => {
     // An hour of the 3 hours is left.
     expect(durationValues()).toEqual(['1', '0'])
     pick('Brume')
-    fireEvent.change(duration().getByLabelText('heures'), { target: { value: '24' } })
-    fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    expect(await screen.findByText('Un set dure au plus 24 heures.')).toBeInTheDocument()
+    fireEvent.change(duration().getByLabelText('heures'), { target: { value: '25' } })
     fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '75' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     expect(await screen.findByText('La durée est invalide.')).toBeInTheDocument()
     expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(0)
+    fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(1))
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-2/sets')[0])).toMatchObject({ durationMinutes: 1501 })
+    await openNew()
+    pick('Brume')
 
     fireEvent.change(duration().getByLabelText('heures'), { target: { value: '' } })
     fireEvent.change(duration().getByLabelText('minutes'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
-    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(1))
-    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-2/sets')[0])).toMatchObject({ durationMinutes: null })
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions/session-2/sets')).toHaveLength(2))
+    expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-2/sets')[1])).toMatchObject({ durationMinutes: null })
   })
 
   it("starts without a duration when the session's sets fill it", async () => {
@@ -1620,24 +1705,26 @@ describe("A set's form", () => {
   })
 })
 
-// Fills a new session's form in, on Saturday, November 14, 2026, from 21:00 to 1:00, as guest mixes, unless it's told
-// otherwise.
-async function fillIn({ day = '2026-11-14', start = '21:00', end = '01:00', type = 'Guest mixes' as string | null } = {}) {
-  fireEvent.change(await screen.findByLabelText('Date'), { target: { value: day } })
-  fireEvent.change(screen.getByLabelText('Début'), { target: { value: start } })
-  fireEvent.change(screen.getByLabelText('Fin'), { target: { value: end } })
+// Fills a new session's form in, from 21:00 on Saturday, November 14, 2026, to 1:00 the next day, as guest mixes, unless
+// it's told otherwise.
+async function fillIn({ day = '2026-11-14', start = '21:00', endDay = '2026-11-15', end = '01:00', type = 'Guest mixes' as string | null } = {}) {
+  await screen.findByRole('group', { name: 'Début' })
+  fireEvent.change(timeInput('Début', 'date'), { target: { value: day } })
+  fireEvent.change(timeInput('Début', 'heure'), { target: { value: start } })
+  fireEvent.change(timeInput('Fin', 'date'), { target: { value: endDay } })
+  fireEvent.change(timeInput('Fin', 'heure'), { target: { value: end } })
   if (type) fireEvent.click(screen.getByRole('radio', { name: type }))
 }
 
 describe('Adding a session', () => {
   const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS }
 
-  it('adds a session, ending the next day when the end time is not after the start time, and goes to its page', async () => {
+  it('adds a session, from its start to its end, each a day and a time, and goes to its page', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
 
     await fillIn()
-    expect(screen.getByRole('status')).toHaveTextContent('Dure 4 h, finit le lendemain, dimanche 15 novembre 2026.')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: '  HAUTE   RIVE ' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
 
@@ -1717,41 +1804,103 @@ describe('Adding a session', () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/nouvelle')
 
-    await fillIn({ start: '20:00', end: '23:30' })
+    await fillIn({ start: '20:00', endDay: '2026-11-14', end: '23:30' })
     fireEvent.click(screen.getByLabelText('date à déterminer'))
     const duration = within(screen.getByRole('group', { name: 'Durée' }))
     expect(duration.getByLabelText('heures')).toHaveValue(3)
     expect(duration.getByLabelText('minutes')).toHaveValue(30)
-    expect(screen.queryByLabelText('Date')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Début' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
 
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
     expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: null, durationMinutes: 210 })
   })
 
-  it('needs the duration of a session without a date, of at most 24 hours', async () => {
+  it('needs the duration of a session without a date, which can be more than a day', async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: UNDATED } })
+    renderAt('/admin/sessions/nouvelle')
+
+    fireEvent.click(await screen.findByLabelText('date à déterminer'))
+    fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    expect(await screen.findByText('Indiquez la durée de la session.')).toBeInTheDocument()
+    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures'), { target: { value: '150' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: null, durationMinutes: 9000 })
+  })
+
+  it("fills the end in from the duration once the start's time, then its day, are entered after un-checking « date à déterminer »", async () => {
     mockFetch(NEW)
     renderAt('/admin/sessions/nouvelle')
 
     fireEvent.click(await screen.findByLabelText('date à déterminer'))
-    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
-    expect(await screen.findByText('Indiquez la durée de la session.')).toBeInTheDocument()
-    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures'), { target: { value: '25' } })
-    expect(await screen.findByText('Une session dure au plus 24 heures.')).toBeInTheDocument()
-    expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('heures'), { target: { value: '2' } })
+    fireEvent.change(within(screen.getByRole('group', { name: 'Durée' })).getByLabelText('minutes'), { target: { value: '30' } })
+    fireEvent.click(screen.getByLabelText('date à déterminer'))
+    fireEvent.change(timeInput('Début', 'heure'), { target: { value: '23:00' } })
+    expect(timeInput('Fin', 'heure')).toHaveValue('')
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
+    expect(timeInput('Fin', 'heure')).toHaveValue('01:30')
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
   })
 
-  it("refuses a start that doesn't happen that day, and a session longer than 24 hours across a change of the clocks", async () => {
+  it('adds a session that lasts several days', async () => {
+    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn({ day: '2026-11-13', start: '18:00', endDay: '2026-11-15', end: '02:00' })
+    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 32 h\.$/)
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
+    expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: '2026-11-13T18:00-05:00', durationMinutes: 1920 })
+  })
+
+  it("refuses an end that isn't after the start, rather than moving it to the next day", async () => {
     mockFetch(NEW)
     renderAt('/admin/sessions/nouvelle')
 
-    await fillIn({ day: '2026-03-08', start: '02:30', end: '04:00' })
+    await fillIn({ endDay: '2026-11-14' })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
-    expect(await screen.findByText("Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été.")).toBeInTheDocument()
-    expect(screen.getByLabelText('Début')).toHaveAttribute('aria-invalid', 'true')
+    expect(await screen.findByText('La fin doit être après le début.')).toBeInTheDocument()
+    expect(timeInput('Fin', 'heure')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+  })
 
-    await fillIn({ day: '2026-10-31', start: '21:00', end: '21:00' })
-    expect(await screen.findByText('Une session dure au plus 24 heures.')).toBeInTheDocument()
+  it("gives the end the start's day, then keeps its distance in days from it, even when the start's day is cleared on the way", async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    await screen.findByRole('group', { name: 'Début' })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-14')
+    // Changed by hand, it keeps that distance.
+    fireEvent.change(timeInput('Fin', 'date'), { target: { value: '2026-11-16' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-20' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-22')
+    // As browsers do while a day is typed.
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-22')
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-02' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-27' } })
+    expect(timeInput('Fin', 'date')).toHaveValue('2026-11-29')
+  })
+
+  it("refuses a time that the clocks skip, at the start or at the end", async () => {
+    mockFetch(NEW)
+    renderAt('/admin/sessions/nouvelle')
+
+    const skipped = "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été."
+    await fillIn({ day: '2026-03-08', start: '02:30', endDay: '2026-03-08', end: '04:00' })
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
+    expect(await screen.findByText(skipped)).toBeInTheDocument()
+    expect(timeInput('Début', 'heure')).toHaveAttribute('aria-invalid', 'true')
+
+    await fillIn({ day: '2026-03-07', start: '23:00', endDay: '2026-03-08', end: '02:30' })
+    expect(await screen.findByText(skipped)).toBeInTheDocument()
+    expect(timeInput('Fin', 'heure')).toHaveAttribute('aria-invalid', 'true')
     expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
   })
 
@@ -1983,12 +2132,12 @@ describe("A new session's sets", () => {
     await addSet('Brume', lasting('1', '0'))
     expect(tooLong()).toBe('\u26a0\ufe0e Les sets durent 4 h 30, plus que la session (4 h).')
     // Longer, until 2:00.
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '02:00' } })
+    fireEvent.change(timeInput('Fin', 'heure'), { target: { value: '02:00' } })
     expect(tooLong()).toBeNull()
-    fireEvent.change(screen.getByLabelText('Fin'), { target: { value: '01:00' } })
+    fireEvent.change(timeInput('Fin', 'heure'), { target: { value: '01:00' } })
     expect(tooLong()).not.toBeNull()
     // Nothing while they aren't.
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '' } })
     expect(tooLong()).toBeNull()
   })
 
@@ -2011,7 +2160,7 @@ describe("A new session's sets", () => {
     fireEvent.click(setForm('Nouveau set').getByRole('button', { name: 'annuler' }))
 
     // Not valid anymore: they can still be changed.
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } })
+    fireEvent.change(timeInput('Début', 'date'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Aurore' }))
     await screen.findByRole('heading', { name: 'Set de Aurore' })
     expect(durationIn(setForm('Set de Aurore'))).toEqual(['3', '30'])
@@ -2243,8 +2392,8 @@ describe('From an application', () => {
       ])
       expect(reminder().getByText('18:00 à 22:00')).toBeInTheDocument()
       // Which doesn't fill in the session's times.
-      expect(screen.getByLabelText('Date')).toHaveValue('')
-      expect(screen.getByLabelText('Début')).toHaveValue('')
+      expect(timeInput('Début', 'date')).toHaveValue('')
+      expect(timeInput('Début', 'heure')).toHaveValue('')
       expect(rows(screen.getByRole('table', { name: 'Sets' })).map((row) => row.slice(0, 3))).toEqual([['à déterminer', 'Aurore', 'DJ, Vinyl, autre : Synthé']])
       expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
 

@@ -16,6 +16,7 @@ import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
+import { checkSessionsInvariants } from './test-invariants.js'
 
 // Changing some of the fields of sessions, sets and collectives with PATCH, against a real database: the stores apply the
 // changes to what's saved, in the transaction that saves them, and check the rules on the result (see "Changes" in
@@ -125,9 +126,55 @@ describe('PATCH /api/admin/sessions/:id', () => {
     expect(response.statusCode).toBe(409)
     expect(response.json()).toMatchObject({ error: 'Another session overlaps this one', session: { id: second }, set: null })
 
-    // Without a start, it overlaps nothing.
+    // Without a start, it overlaps nothing, however long it lasts.
     const undated = await createSession({ start: null })
-    expect((await request('PATCH', `/api/admin/sessions/${undated}`, { durationMinutes: 1440 })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sessions/${undated}`, { durationMinutes: 4320 })).statusCode).toBe(200)
+  })
+
+  it('lets a session last several days, which then overlaps the sessions of those days', async () => {
+    const weekend = await createSession({ start: '2026-11-20T18:00-05:00', durationMinutes: 60 })
+    const sunday = await createSession({ start: '2026-11-22T20:00-05:00', durationMinutes: 60 })
+    const response = await request('PATCH', `/api/admin/sessions/${weekend}`, { durationMinutes: 56 * 60 })
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toMatchObject({ error: 'Another session overlaps this one', session: { id: sunday } })
+    const changed = await request('PATCH', `/api/admin/sessions/${weekend}`, { durationMinutes: 50 * 60 })
+    expect(changed.json().session).toMatchObject({ start: '2026-11-20T18:00:00-05:00', end: '2026-11-22T20:00:00-05:00', durationMinutes: 3000 })
+  })
+
+  const ENDS_BY_3000 = { ok: false, error: 'A session ends by the start of the year 3000, in UTC' }
+
+  it('checks that a session ends by the start of the year 3000, in UTC, on the session as it would be', async () => {
+    // A session without a start can last longer, until it's given one.
+    const undated = await createSession({ start: null, durationMinutes: 120 })
+    expect((await request('PATCH', `/api/admin/sessions/${undated}`, { start: '2999-12-31T18:00-05:00' })).json()).toEqual(ENDS_BY_3000)
+    // Midnight in UTC, which it ends at, isn't part of it.
+    expect((await request('PATCH', `/api/admin/sessions/${undated}`, { start: '2999-12-31T17:00-05:00' })).statusCode).toBe(200)
+    await request('DELETE', `/api/admin/sessions/${undated}`)
+
+    // 23:00 in UTC on December 31st, 2999.
+    const late = await createSession({ start: '2999-12-31T18:00-05:00', durationMinutes: 60 })
+    expect((await request('PATCH', `/api/admin/sessions/${late}`, { durationMinutes: 61 })).json()).toEqual(ENDS_BY_3000)
+    expect((await request('PATCH', `/api/admin/sessions/${late}`, { durationMinutes: 30 })).statusCode).toBe(200)
+
+    const fields = { start: '2999-12-31T18:00-05:00', durationMinutes: 61, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '' }
+    const put = await sendForm('PUT', `/api/admin/sessions/${late}`, 'session', fields)
+    expect(put.statusCode).toBe(400)
+    expect(put.json()).toEqual(ENDS_BY_3000)
+    const post = await sendForm('POST', '/api/admin/sessions', 'session', fields)
+    expect(post.statusCode).toBe(400)
+    expect(post.json()).toEqual(ENDS_BY_3000)
+  })
+
+  it('keeps a session ending by the start of the year 3000 when its start and its duration are changed at the same time', async () => {
+    // 21:00 in UTC on December 31st, 2999, for an hour. Either change alone ends it by midnight in UTC, but not both.
+    const id = await createSession({ start: '2999-12-31T16:00-05:00', durationMinutes: 60 })
+    const responses = await Promise.all([
+      request('PATCH', `/api/admin/sessions/${id}`, { start: '2999-12-31T18:00-05:00' }),
+      request('PATCH', `/api/admin/sessions/${id}`, { durationMinutes: 180 }),
+    ])
+    expect(responses.map(({ statusCode }) => statusCode).sort()).toEqual([200, 400])
+    expect(responses.find(({ statusCode }) => statusCode === 400)!.json()).toEqual(ENDS_BY_3000)
+    await checkSessionsInvariants(database.db)
   })
 
   it("checks that an announced session keeps its start on the session as it would be, keeping the start it isn't sent", async () => {

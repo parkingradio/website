@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { addDays, quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstantFrom } from './quebec-time'
+import { addDays, daysBetween, quebecDateTime, quebecDayAndTime, quebecInstant, quebecInstants } from './quebec-time'
 
 describe('Québec time', () => {
   afterEach(() => {
@@ -22,6 +22,12 @@ describe('Québec time', () => {
     expect(quebecInstant('2026-11-01', '02:00')?.toISOString()).toBe('2026-11-01T07:00:00.000Z')
   })
 
+  it('takes years before 1000, which date fields go through as a year is typed', () => {
+    expect(quebecDayAndTime(new Date('0002-11-14T12:00:00Z')).day).toBe('0002-11-14')
+    expect(quebecInstant('0002-11-14', '21:00')).not.toBeNull()
+    expect(quebecInstants('0202-11-14', '21:00')).toHaveLength(1)
+  })
+
   it('writes an instant with the day, the time and the offset of Québec then', () => {
     expect(quebecDateTime(new Date('2026-11-15T02:00:00Z'))).toBe('2026-11-14T21:00-05:00')
     expect(quebecDateTime(new Date('2026-11-01T05:30:00Z'))).toBe('2026-11-01T01:30-04:00')
@@ -29,35 +35,14 @@ describe('Québec time', () => {
     expect(quebecDayAndTime(new Date('2026-07-01T04:00:00Z'))).toEqual({ day: '2026-07-01', time: '00:00' })
   })
 
-  it('gives the first instant after another one when the clocks show a time, that day or the next', () => {
-    const from = (after: string, time: string, inclusive = false) => quebecInstantFrom(new Date(after), time, { inclusive })?.toISOString() ?? null
-    // 21:00 on November 14th, 2026.
-    expect(from('2026-11-15T02:00:00Z', '22:30')).toBe('2026-11-15T03:30:00.000Z')
-    expect(from('2026-11-15T02:00:00Z', '01:00')).toBe('2026-11-15T06:00:00.000Z')
-    expect(from('2026-11-15T02:00:00Z', '21:00')).toBe('2026-11-16T02:00:00.000Z')
-    expect(from('2026-11-15T02:00:00Z', '21:00', true)).toBe('2026-11-15T02:00:00.000Z')
-    expect(from('2026-11-15T02:00:00Z', '20:00')).toBe('2026-11-16T01:00:00.000Z')
-  })
-
-  it('counts both times that happen twice as clocks fall back', () => {
-    const from = (after: string, time: string) => quebecInstantFrom(new Date(after), time)?.toISOString() ?? null
-    // From the first 1:30, the second 1:15, then the second 1:30.
-    expect(from('2026-11-01T05:30:00Z', '01:15')).toBe('2026-11-01T06:15:00.000Z')
-    expect(from('2026-11-01T05:30:00Z', '01:30')).toBe('2026-11-01T06:30:00.000Z')
-    // From the second 1:30, 1:15 is the next day.
-    expect(from('2026-11-01T06:30:00Z', '01:15')).toBe('2026-11-02T06:15:00.000Z')
-  })
-
-  it('refuses a time that clocks skip before they show it, as they spring forward', () => {
-    const from = (after: string, time: string) => quebecInstantFrom(new Date(after), time)?.toISOString() ?? null
-    // From 23:00 on March 7th, 2026, 2:30 is skipped the next night, rather than shown the night after.
-    expect(from('2026-03-08T04:00:00Z', '02:30')).toBeNull()
-    expect(from('2026-03-08T04:00:00Z', '03:00')).toBe('2026-03-08T07:00:00.000Z')
-    // From 1:00 on March 8th, too.
-    expect(from('2026-03-08T06:00:00Z', '02:30')).toBeNull()
-    // From 4:00 on March 8th, 2:30 comes the next day, which has it.
-    expect(from('2026-03-08T08:00:00Z', '02:30')).toBe('2026-03-09T06:30:00.000Z')
-    expect(from('2026-03-08T04:00:00Z', '25:00')).toBeNull()
+  it('gives every instant of a day and time in Québec: none when clocks skip it, and both when they show it twice', () => {
+    const instants = (day: string, time: string) => quebecInstants(day, time).map((instant) => instant.toISOString())
+    expect(instants('2026-11-14', '21:00')).toEqual(['2026-11-15T02:00:00.000Z'])
+    expect(instants('2026-11-01', '01:30')).toEqual(['2026-11-01T05:30:00.000Z', '2026-11-01T06:30:00.000Z'])
+    expect(instants('2026-11-01', '02:00')).toEqual(['2026-11-01T07:00:00.000Z'])
+    expect(instants('2026-03-08', '02:30')).toEqual([])
+    expect(instants('2026-03-08', '25:00')).toEqual([])
+    expect(instants('2026-02-30', '21:00')).toEqual([])
   })
 
   it("doesn't depend on the browser's time zone", async () => {
@@ -75,5 +60,12 @@ describe('Québec time', () => {
     expect(addDays('2026-02-28', 1)).toBe('2026-03-01')
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
     expect(addDays('2026-01-01', -1)).toBe('2025-12-31')
+  })
+
+  it('counts the days between two days, across months, years and changes of the clocks', () => {
+    expect(daysBetween('2026-11-14', '2026-11-15')).toBe(1)
+    expect(daysBetween('2026-10-31', '2026-11-02')).toBe(2)
+    expect(daysBetween('2026-12-31', '2027-01-01')).toBe(1)
+    expect(daysBetween('2026-11-21', '2026-11-14')).toBe(-7)
   })
 })

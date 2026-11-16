@@ -263,7 +263,7 @@ export const sessions = pgTable(
   (table) => [
     index('sessions_takeover_id_idx').on(table.takeoverId),
     index('sessions_application_id_idx').on(table.applicationId),
-    check('sessions_duration', sql`${table.durationMinutes} between 1 and 1440`),
+    check('sessions_duration', sql`${table.durationMinutes} >= 1`),
     check('sessions_status', oneOf(table.status, STATUSES)),
     check('sessions_type', oneOf(table.type, SESSION_TYPES)),
     check('sessions_takeover', sql`(${table.type} = 'takeover') = (${table.takeoverId} is not null)`),
@@ -321,7 +321,7 @@ export const sets = pgTable(
     uniqueIndex('sets_soundcloud_track_id_idx').on(table.soundcloudTrackId),
     uniqueIndex('sets_youtube_video_id_idx').on(table.youtubeVideoId),
     check('sets_position', sql`${table.position} >= 0`),
-    check('sets_duration', sql`${table.durationMinutes} between 1 and 1440`),
+    check('sets_duration', sql`${table.durationMinutes} >= 1`),
     check('sets_soundcloud_track', sql`(${table.soundcloudTrackId} is null) = (${table.soundcloudTrackUrl} is null)`),
     check('sets_status', oneOf(table.status, STATUSES)),
   ],
