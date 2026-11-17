@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import App from '../../app'
 import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../../test-utils'
@@ -33,11 +33,6 @@ describe('Autoriser une application', () => {
 
   beforeEach(() => {
     go = vi.spyOn(browser, 'go').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
   it('shows the login form while logged out, without the admin menu, then what the app asks for', async () => {

@@ -74,7 +74,6 @@ beforeEach(() => {
 afterEach(() => {
   document.body.replaceChildren()
   document.cookie = 'next_id_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-  vi.unstubAllGlobals()
 })
 
 describe('The bookmarklet', () => {

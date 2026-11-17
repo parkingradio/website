@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../../api/client'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { Admins } from './admins'
@@ -37,10 +37,6 @@ async function row(email: string) {
 }
 
 describe('Admins', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('shows a confirmation after inviting a new admin, and reloads the list', async () => {
     mockFetch({ ...LOADED, 'POST /api/admin/invite': { ok: true } })
     render(<Admins />)
@@ -177,10 +173,6 @@ describe('Admins', () => {
 })
 
 describe('Connecting Claude', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   const connection = (fields: Partial<Schema<'Connection'>> = {}): Schema<'Connection'> => ({
     id: 'connection-id',
     client: 'Claude',
@@ -249,6 +241,8 @@ describe('Connecting Claude', () => {
     render(<Admins />)
     fireEvent.click((await appRow('Claude')).getByRole('button', { name: 'déconnecter' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("L'application n'a pas pu être déconnectée : No such connection")
+    // In case the list is out of date, e.g. the app was disconnected already.
+    await waitFor(() => expect(requestsTo('GET', '/api/admin/connections')).toHaveLength(2))
   })
 
   it("says when the apps can't be loaded", async () => {
