@@ -66,8 +66,14 @@ type Operation<Args> = {
   statusRequest?: (context: Context, args: Args) => StatusRequest
 }
 
-// What an operation asks that can change statuses: a session's or a set's, or adding a set to a session, or deleting one.
-type StatusRequest = { session: string; status: string } | { set: string; status: string } | { addedTo: string } | { deletedSet: string }
+// What an operation asks that can change statuses: a session's or a set's, or adding a set to a session, deleting one, or
+// moving one to a session.
+type StatusRequest =
+  | { session: string; status: string }
+  | { set: string; status: string }
+  | { addedTo: string }
+  | { deletedSet: string }
+  | { movedSet: string; to: string }
 
 // The status of every session and set, by id, who last changed it and when, in milliseconds, and, for a set, its session.
 type StatusRow = { status: string; by: string | null; at: number | null; session: string | null }
@@ -88,7 +94,9 @@ async function statuses(database: TestDatabase): Promise<Statuses> {
 //   sets done;
 // - a set's status changes, or it's added, as planned, or deleted, after which its session, if it's done, with a set
 //   that's planned, is planned again, or, if it's planned, with at least one set that's done and none that's planned,
-//   becomes done.
+//   becomes done;
+// - a set is moved to another session, keeping its status, after which both sessions follow their sets that way, while
+//   moving it to the session it's in changes none.
 function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequest): Map<string, { status: string; changed: boolean }> {
   const expected = new Map([...before].map(([id, { status }]) => [id, { status, changed: false }]))
   const mark = (id: string, status: string) => expected.set(id, { status, changed: true })
@@ -106,6 +114,12 @@ function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequ
       const { status } = expected.get(set)!
       if (request.status === 'cancelled' ? status !== 'cancelled' : request.status === 'done' && status === 'planned') mark(set, request.status)
     }
+  } else if ('movedSet' in request) {
+    const from = before.get(request.movedSet)!.session!
+    if (from !== request.to) {
+      followSets(from)
+      followSets(request.to)
+    }
   } else {
     if ('set' in request) mark(request.set, request.status)
     followSets('addedTo' in request ? request.addedTo : before.get('set' in request ? request.set : request.deletedSet)!.session!)
@@ -116,7 +130,7 @@ function expectedStatuses(before: Statuses, after: Statuses, request: StatusRequ
 // Checks that statuses changed from `before` to `after` as `request`, if it's sent and succeeded, says, and that nothing
 // else changed them: what's added is planned, and what's changed is changed by the admin, at the same time, since the
 // step started, `since`, give or take a second when a set is added, whose session's status then has the time of the
-// database's clock, as the set's addition does.
+// database's clock, as the set's addition does. A set that's moved changes its session, and nothing else.
 function expectStatuses(before: Statuses, after: Statuses, request: StatusRequest | null, since: number, where: string) {
   const expected = request ? expectedStatuses(before, after, request) : null
   const at = new Set<number | null>()
@@ -128,7 +142,8 @@ function expectStatuses(before: Statuses, after: Statuses, request: StatusReques
     }
     const { status, changed } = expected?.get(id) ?? { status: was.status, changed: false }
     if (!changed) {
-      expect(row, `${where}: ${id}, unchanged`).toEqual(was)
+      const session = request && 'movedSet' in request && request.movedSet === id ? request.to : was.session
+      expect(row, `${where}: ${id}, unchanged`).toEqual({ ...was, session })
       continue
     }
     expect(row, `${where}: ${id}, changed`).toMatchObject({ status, by: TEST_ADMIN.email })
@@ -525,6 +540,38 @@ const OPERATIONS = {
       return response
     },
   } satisfies Operation<{ set: number; position: number }>,
+
+  // Moves the set to the session, after its sets, those of the session it leaves keeping their order, or leaves it where
+  // it is when that's its own.
+  moveSetToSession: {
+    weight: 3,
+    args: fc.record({ set: fc.nat(), session: fc.nat() }),
+    run: async (context, { set, session }) => {
+      const id = pick(context.ids.sets, set)
+      const to = pick(context.ids.sessions, session)
+      const before = (await send(context, 'GET', '/api/admin/sessions')).json().sessions as Session[]
+      const setsOf = (sessionId: string) => before.find((other) => other.id === sessionId)?.sets.map((other) => other.id) ?? []
+      const from = before.find((other) => other.sets.some((found) => found.id === id))?.id
+      const response = await send(context, 'PUT', `/api/admin/sets/${id}/session`, { session: to })
+      if (response.statusCode === 200) {
+        const { session: joined, previousSession: left } = response.json() as { session: Session; previousSession: Session }
+        expect([joined.id, left.id]).toEqual([to, from])
+        if (from === to) expect(joined.sets.map((other) => other.id)).toEqual(setsOf(to))
+        else {
+          expect(joined.sets.map((other) => other.id)).toEqual([...setsOf(to), id])
+          expect(left.sets.map((other) => other.id)).toEqual(setsOf(from!).filter((other) => other !== id))
+        }
+      }
+      return response
+    },
+    statusRequest: (context, { set, session }) => ({ movedSet: pick(context.ids.sets, set), to: pick(context.ids.sessions, session) }),
+    conflicts: {
+      [SESSION_CANCELLED]: (body, { session }, context) => {
+        expect(body.session).toMatchObject({ id: pick(context.ids.sessions, session), status: 'cancelled' })
+        expect(body.set).toBeNull()
+      },
+    },
+  } satisfies Operation<{ set: number; session: number }>,
 
   deleteSet: {
     weight: 1,

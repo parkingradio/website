@@ -110,14 +110,16 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "↑" and "↓", which move it one place up or down among the session's sets, like a set's artists (see
     [A set's form](#a-sets-form)), even while the session is cancelled. The first set's "↑" and the last one's "↓"
     can't be used.
+  - "déplacer", which opens the panel that moves it to another session (see
+    [Moving a set to another session](#moving-a-set-to-another-session)).
   - "modifier", which opens its form (see [A set's form](#a-sets-form)).
   - "×", which deletes it for good, after confirming.
 
-  Changing a set's status, adding one or deleting one can change the session's status (see
-  [Status](../../server/sessions.md#status)).
+  Changing a set's status, adding one, moving one to another session or deleting one can change the session's status
+  (see [Status](../../server/sessions.md#status)).
 
-  When a status can't be changed, or a set can't be moved or deleted, the section says why above the sets, naming the
-  set.
+  When a status can't be changed, or a set can't be moved up or down or deleted, the section says why above the sets,
+  naming the set.
   "ajouter un set" opens the form of a new set.
 
   While the session is cancelled, "ajouter un set" can't be used, and says « La session est annulée : on ne peut pas lui
@@ -132,8 +134,9 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   takeover's collective, stay, which the page says of those it has.
 
 Only one form is open at a time on a session's page, the session's, the panel of its event on RA (see
-[Creating its event on RA](#creating-its-event-on-ra)), or a set's: opening one closes the other, losing what wasn't
-saved.
+[Creating its event on RA](#creating-its-event-on-ra)), a set's, or the panel that moves a set to another session (see
+[Moving a set to another session](#moving-a-set-to-another-session)): opening one closes the other, losing what wasn't
+saved. Deleting a set closes its form, or its panel, if it's open.
 
 What the page's address opens, `?raEvent` (see [Creating its event on RA](#creating-its-event-on-ra)) or `?application`
 (see [From an application](#from-an-application)), stays in it until the admin opens a form or closes one, the one it
@@ -275,6 +278,29 @@ top to bottom, the form has:
 
 When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked.
 
+## Moving a set to another session
+
+A set's "déplacer" opens a panel under the sets, titled after the set, that moves it to another session (see
+[Sets' order](../../server/sessions.md#sets-order)). Its field, "Session", which gets the focus, offers every other
+session, loaded when the panel opens: first the planned ones, in the order of the list's default view, then the others,
+done or cancelled, in the order of its "toutes" view (see [The list](#the-list)). Each one is named as sessions are among
+others (see [Names](#names)), with its times in short, and its status unless it's planned. The field searches them as the
+list does, and the panel says when they can't be loaded.
+
+"déplacer" moves the set there, after its sets. It can't be used until a session is picked, nor while the session picked
+is cancelled and the set isn't, saying why (see [Controls that can't be used](layout.md#controls-that-cant-be-used)):
+only cancelled sets can be moved into a cancelled session, and moving a set never changes its status (see
+[Status](../../server/sessions.md#status)). "annuler" closes the panel, and gives the focus back to the set's
+"déplacer".
+
+Once the set is moved, the page stays on the session it left, as the server then has it, without the set, and its status
+can have changed. The focus goes to the next set's "déplacer", or else the previous one's, or else the heading of the
+sets. Above the sets, a notice says where the set went, linking to that session, until a form opens, or another set is
+changed. That session's page says when its sets then add up to more than it.
+
+When the set can't be moved, the panel stays open and says why, naming what's in the way as the other errors do (see
+[Errors](#errors)).
+
 ## Applications
 
 A set or a session can come from an application (see [Applications](../../server/sessions.md#applications)). Its form
@@ -349,7 +375,8 @@ its sets in the way is named without a link.
   `PATCH /api/admin/sessions/:id`, to save the event as the session's.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
-  `PUT /api/admin/sets/:id/position` and `DELETE /api/admin/sets/:id`, for its sets.
+  `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,
+  and `GET /api/admin/sessions`, in the panel that moves a set to another session, each time it opens.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
   set's form, to pick the performers and suggest their genres, each time the form opens.
 - `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens, and

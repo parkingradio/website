@@ -38,7 +38,7 @@ let app: FastifyInstance
 // How many times SoundCloud was asked to resolve a track.
 let resolved = 0
 
-async function request(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?: object) {
+async function request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
@@ -235,6 +235,36 @@ describe('PATCH /api/admin/sets/:id', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json().session.sets[0]).toMatchObject({ performers: [], otherPerformanceType: 'Synthé modulaire' })
     expect((await request('PATCH', `/api/admin/sets/${id}`, { performers: [] })).json()).toEqual({ ok: false, error: 'A set has at least one performer' })
+  })
+})
+
+describe('PUT /api/admin/sets/:id/session', () => {
+  it('counts as changing the set, even to the session it is in, but changes nothing else of it, nor either session', async () => {
+    const artist = await createArtist('Aurore')
+    const from = await createSession({})
+    const to = await createSession({ start: '2026-11-21T21:00-05:00' })
+    const id = await createSet(from, { performers: [{ id: artist }], durationMinutes: 45, genres: ['ambient'], soundcloudTrack: TRACK, youtubeVideo: 'dQw4w9WgXcQ' })
+    const before = (await request('GET', `/api/admin/sessions/${from}`)).json().session
+    expect(before.sets[0].updatedBy).toBeNull()
+
+    const response = await request('PUT', `/api/admin/sets/${id}/session`, { session: to })
+    expect(response.statusCode).toBe(200)
+    const { session, previousSession } = response.json()
+    const moved = session.sets[0]
+    const { updatedBy, updatedAt, ...rest } = moved
+    expect(updatedBy).toBe('admin@example.com')
+    expect(updatedAt).not.toBeNull()
+    expect({ ...before.sets[0], updatedBy: null, updatedAt: null }).toEqual({ ...rest, updatedBy: null, updatedAt: null })
+    // Neither session counts as changed.
+    expect(session.updatedBy).toBeNull()
+    expect(previousSession.updatedBy).toBeNull()
+    expect(resolved).toBe(1)
+
+    // Moved to the session it's in, it's still changed, by whoever did it.
+    const other = { id: 'other-admin-id', email: 'other@example.com', sessionVersion: 0 }
+    const again = await app.inject({ method: 'PUT', url: `/api/admin/sets/${id}/session`, payload: { session: to }, cookies: await sessionCookies(other) })
+    expect(again.statusCode).toBe(200)
+    expect(again.json().session.sets[0]).toMatchObject({ id, updatedBy: other.email })
   })
 })
 

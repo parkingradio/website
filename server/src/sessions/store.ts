@@ -11,6 +11,7 @@ import {
   NO_SUCH_APPLICATION,
   NO_SUCH_ARTIST,
   NO_SUCH_COLLECTIVE,
+  NO_SUCH_SESSION,
   brokenSessionRule,
 } from './fields.js'
 import type { BrokenRule, SentPerformer, Status } from './fields.js'
@@ -160,13 +161,24 @@ export type SessionsStore = {
   // Conflict.
   addSet(sessionId: string, set: NewSet): Promise<StoredSession | null>
   // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
-  // but not its session, its position or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
+  // but not its session (see `moveSetToSession`), its position or its status. Throws a BrokenFields, a NoSuchReference or
+  // a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
   // Makes the set's session follow its sets, as the same admin, at the same time (see `followSets`). Throws a Conflict.
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Moves the set to `position` among its session's sets, or last when that's past the last, the others keeping their
   // order. Doesn't count as changing it.
   moveSet(id: string, position: number): Promise<StoredSession | null>
+  // Moves the set to the session `sessionId`, after its sets, as a change to the set, `by`, the sets of the session it
+  // leaves keeping their order. Then both sessions follow their sets, as the same admin, at the same time (see
+  // `followSets`). Moved to the session it's in, it stays where it is, but still counts as changed. Returns the set's
+  // session, and the one it was in, as they are then: the same one when it didn't move. Throws a NoSuchReference when
+  // there's no such session, or a Conflict when the set isn't cancelled and that session is.
+  moveSetToSession(
+    id: string,
+    sessionId: string,
+    by: { updatedBy: string; updatedAt: Date },
+  ): Promise<{ session: StoredSession; previousSession: StoredSession } | null>
   // Returns the set's session as it is then, or null if the set didn't exist. Its performers stay, and the session's
   // other sets keep their order. Makes the session follow its sets, as `by` says (see `followSets`).
   deleteSet(id: string, by: StatusChangedBy): Promise<StoredSession | null>
@@ -409,6 +421,15 @@ async function setCount(tx: Queryable, sessionId: string): Promise<number> {
   return found
 }
 
+// Moves the sets of the session `sessionId` after `position` up by one, once its set there is gone, so that its positions
+// are still 0 to n - 1.
+async function closeGap(tx: Queryable, sessionId: string, position: number) {
+  await tx
+    .update(sets)
+    .set({ position: sql`${sets.position} - 1` })
+    .where(and(eq(sets.sessionId, sessionId), gt(sets.position, position)))
+}
+
 // Adds `set` to the session `sessionId`, after its other sets, in the transaction `tx`, which holds the sessions' lock,
 // with `added` and its `position` as `create` gives them when the set is added with its session, and returns its id.
 // Throws a NoSuchReference, a BrokenFields or a Conflict.
@@ -437,7 +458,7 @@ function checkAnnounced(session: Pick<SessionRow, 'announced' | 'startAt'>) {
 // docs/design/server/sessions.md): planned again if it's done, with a set that's planned, or done if it's planned, with
 // at least one set that's done, and none that's planned. In a transaction that holds the sessions' lock, so that its sets
 // can't change in the meantime: two of its sets marked done at the same time can't each see the other still planned.
-// Called whenever one of its sets is added, its status is set, or it's deleted.
+// Called whenever one of its sets is added, its status is set, or it's deleted, or a set is moved into it or out of it.
 async function followSets(tx: Queryable, sessionId: string, by: { statusUpdatedBy: string; statusUpdatedAt: Date | SQL }) {
   const hasSet = (status: Status) => exists(tx.select().from(sets).where(and(eq(sets.sessionId, sessionId), eq(sets.status, status))))
   // In one statement, which only ever matches one of the two.
@@ -656,17 +677,44 @@ export function sessionsStore(db: Queryable): SessionsStore {
       })
     },
 
+    async moveSetToSession(id, sessionId, by) {
+      if (!isUuid(id)) return null
+      return db.transaction(async (tx) => {
+        await lockSessions(tx)
+        const [set] = await tx.select({ sessionId: sets.sessionId, position: sets.position, status: sets.status }).from(sets).where(eq(sets.id, id))
+        if (!set) return null
+        const from = set.sessionId
+        if (sessionId === from) {
+          await tx.update(sets).set(by).where(eq(sets.id, id))
+          const session = (await sessionWithId(tx, from))!
+          return { session, previousSession: session }
+        }
+        const to = isUuid(sessionId) ? await sessionRow(tx, sessionId) : null
+        if (!to) throw new NoSuchReference(NO_SUCH_SESSION)
+        if (to.status === 'cancelled' && set.status !== 'cancelled') throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, to.id))
+        // After the sets of the session it joins.
+        await tx
+          .update(sets)
+          .set({ ...by, sessionId: to.id, position: await setCount(tx, to.id) })
+          .where(eq(sets.id, id))
+        await closeGap(tx, from, set.position)
+        // Both as the same admin, at the same time, when the set was moved.
+        const statusBy = { statusUpdatedBy: by.updatedBy, statusUpdatedAt: by.updatedAt }
+        await followSets(tx, from, statusBy)
+        await followSets(tx, to.id, statusBy)
+        const both = await sessionsWhere(tx, inArray(sessions.id, [to.id, from]))
+        const found = (sessionId: string) => both.find((session) => session.id === sessionId)!
+        return { session: found(to.id), previousSession: found(from) }
+      })
+    },
+
     async deleteSet(id, by) {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         const [deleted] = await tx.delete(sets).where(eq(sets.id, id)).returning({ sessionId: sets.sessionId, position: sets.position })
         if (!deleted) return null
-        // The sets after it move up, so that the positions are still 0 to n - 1.
-        await tx
-          .update(sets)
-          .set({ position: sql`${sets.position} - 1` })
-          .where(and(eq(sets.sessionId, deleted.sessionId), gt(sets.position, deleted.position)))
+        await closeGap(tx, deleted.sessionId, deleted.position)
         await followSets(tx, deleted.sessionId, by)
         return sessionWithId(tx, deleted.sessionId)
       })

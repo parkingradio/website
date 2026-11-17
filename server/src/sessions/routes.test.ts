@@ -127,6 +127,20 @@ const store: SessionsStore = {
     session.sets = others.map((set, i) => ({ ...set, position: i }))
     return session
   }),
+  moveSetToSession: vi.fn<SessionsStore['moveSetToSession']>(async (id, sessionId, by) => {
+    const previousSession = sessionOf(id)
+    if (!previousSession) return null
+    const session = rows.find((row) => row.id === sessionId)
+    if (!session) throw new NoSuchReference('No such session')
+    const moved = { ...previousSession.sets.find((set) => set.id === id)!, ...by }
+    if (session === previousSession) {
+      session.sets = session.sets.map((set) => (set.id === id ? moved : set))
+      return { session, previousSession }
+    }
+    previousSession.sets = previousSession.sets.filter((set) => set.id !== id).map((set, position) => ({ ...set, position }))
+    session.sets.push({ ...moved, sessionId, position: session.sets.length })
+    return { session, previousSession }
+  }),
   deleteSet: vi.fn<SessionsStore['deleteSet']>(async (id) => {
     const session = sessionOf(id)
     if (!session) return null
@@ -1040,6 +1054,69 @@ describe('sessions routes', () => {
         expect(response.statusCode).toBe(404)
         expect(response.json()).toEqual({ ok: false, error: 'No such set' })
       }
+    })
+  })
+
+  describe('PUT /api/admin/sets/:id/session', () => {
+    it('moves the set to another session, after its sets, as a change to the set, and returns both sessions', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      await addSet(app, 'session-1', { soundcloudTrack: null, youtubeVideo: null })
+      await createSession(app, { start: '2026-11-21T21:00-05:00' })
+      await addSet(app, 'session-4', { soundcloudTrack: null, youtubeVideo: null })
+      const response = await send(app, 'PUT', '/api/admin/sets/set-2/session', { session: 'session-4' })
+      expect(response.statusCode).toBe(200)
+      const { session, previousSession } = response.json()
+      expect(session.id).toBe('session-4')
+      expect(session.sets.map(({ id }: { id: string }) => id)).toEqual(['set-5', 'set-2'])
+      expect(session.sets[1]).toMatchObject({ updatedBy: 'admin@example.com', status: 'planned' })
+      expect(previousSession.id).toBe('session-1')
+      expect(previousSession.sets.map(({ id }: { id: string }) => id)).toEqual(['set-3'])
+      expect(store.moveSetToSession).toHaveBeenLastCalledWith('set-2', 'session-4', { updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+    })
+
+    it("takes the session's id in any case", async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      await send(app, 'PUT', '/api/admin/sets/set-2/session', { session: 'SESSION-1' })
+      expect(store.moveSetToSession).toHaveBeenLastCalledWith('set-2', 'session-1', expect.anything())
+    })
+
+    it('refuses a session that is not a string, or other fields', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      for (const body of [{ session: 1 }, { session: null }, {}, { session: 'session-1', position: 0 }, []]) {
+        const response = await send(app, 'PUT', '/api/admin/sets/set-2/session', body)
+        expect(response.statusCode, JSON.stringify(body)).toBe(400)
+      }
+      const response = await app.inject({ method: 'PUT', url: '/api/admin/sets/set-2/session', cookies: await sessionCookies() })
+      expect(response.statusCode).toBe(400)
+      expect(store.moveSetToSession).not.toHaveBeenCalled()
+    })
+
+    it('responds 400 when there is no such session, and 404 when there is no such set', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      let response = await send(app, 'PUT', '/api/admin/sets/set-2/session', { session: 'session-9' })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: 'No such session' })
+      response = await send(app, 'PUT', '/api/admin/sets/set-9/session', { session: 'session-1' })
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such set' })
+      // The set is checked before the session.
+      response = await send(app, 'PUT', '/api/admin/sets/set-9/session', { session: 'session-9' })
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such set' })
+    })
+
+    it('responds 409 with the cancelled session in the way', async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      await createSession(app, { start: '2026-11-21T21:00-05:00' })
+      vi.mocked(store.moveSetToSession).mockRejectedValueOnce(new Conflict('This session is cancelled', rows[1]))
+      const response = await send(app, 'PUT', '/api/admin/sets/set-2/session', { session: 'session-3' })
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toMatchObject({ ok: false, error: 'This session is cancelled', session: { id: 'session-3' }, set: null })
     })
   })
 

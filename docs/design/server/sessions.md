@@ -41,7 +41,7 @@ A session, as the endpoints below return it, also has:
 | `sets` | list of sets | Its sets, in their order, cancelled ones included: see [Sets' order](#sets-order) |
 | `createdAt` | string | When the session was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, and neither do changes to its sets, renaming the takeover's collective, or its application being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the session (an admin's email), and when, its flyer included. Changes to its status or to whether it's announced don't count, nor do changes to its sets (e.g. a set moved into it or out of it), renaming the takeover's collective, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
 | `announced` | boolean | Whether the session is announced: see [Announced](#announced) |
@@ -49,11 +49,11 @@ A session, as the endpoints below return it, also has:
 
 ## Sets
 
-Every set belongs to a session: the one it's added to, or added with, which doesn't change. Sets aren't listed on their
-own: they're in their sessions, and the `total` of a list of sessions counts sessions, not sets. A session can be added
-with its sets, all of them or nothing, in a single request, whose errors about one of the sets say which it is, by its
-place in the list of sets sent, from 0, `setIndex` (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A
-set has:
+Every set belongs to a session: the one it's added to, or added with, or the one it was last moved to (see
+[Sets' order](#sets-order)). Sets aren't listed on their own: they're in their sessions, and the `total` of a list of
+sessions counts sessions, not sets. A session can be added with its sets, all of them or nothing, in a single request,
+whose errors about one of the sets say which it is, by its place in the list of sets sent, from 0, `setIndex` (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)). A set has:
 
 | Field | Type | |
 |---|---|---|
@@ -73,7 +73,7 @@ A set, as the endpoints below return it, also has:
 | `id` | string | |
 | `createdAt` | string | When the set was added |
 | `createdBy` | string | The email of the admin who added it |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Status changes don't count, and neither do changes to its session, e.g. its start changing, moving the set or another one among the session's sets, a performer being deleted, or its application being deleted |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the set (an admin's email), and when. Moving it to another session counts. Status changes don't, nor do changes to its session (e.g. its start changing, or moving the set or another one among the session's sets), a performer being deleted, or its application being deleted |
 | `status` | `"planned"`, `"done"` or `"cancelled"` | See [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when (see [Status](#status)) |
 
@@ -121,17 +121,20 @@ rule together, one of them fails, except for the rule that a done session has no
 changing statuses instead (see [Status](#status)). Requests fail with 409 for:
 
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
-- adding a set to a cancelled session, or un-cancelling a set of a cancelled session,
+- adding a set to a cancelled session, moving a set that isn't cancelled into one, or un-cancelling one of its sets,
 - giving a set a track or a video that's another set's, including another set added in the same request,
 - deleting a collective that has takeovers.
 
 These 409s also have `session` and `set`, what's in the way, as the endpoints return them, so that it can be named and
 linked to without another request. `set` is the set in the way, if it's a set, or else null, and `session` is the session
-in the way, or that set's session. A set that's added to or un-cancelled in a cancelled session has its own session in
-the way, and a collective that has takeovers has one of them. When several things are in the way, it's one of them. Both
-are null for the 409s that aren't about a session or a set, and when the set in the way is another one of the same
-request, which `otherSetIndex` gives instead, by its place in the list of sets sent, from 0 (see
-[`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
+in the way, or that set's session. In particular:
+
+- A set that's added to, moved into, or un-cancelled in a cancelled session has that session in the way.
+- Deleting a collective that has takeovers has one of them in the way.
+- When several things are in the way, it's one of them.
+- Both are null for the 409s that aren't about a session or a set, and when the set in the way is another one of the
+  same request, which `otherSetIndex` gives instead, by its place in the list of sets sent, from 0 (see
+  [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
 ## Sets' order
 
@@ -147,6 +150,9 @@ Giving a set another place, e.g. one that was added last, takes moving it afterw
 for the first, cancelled ones included: the other sets keep their order. Deleting a set leaves the others in their
 order.
 
+A set can also be moved to another session, with [`PUT /api/admin/sets/:id/session`](#put-apiadminsetsidsession-admin).
+It then goes after that session's sets, and the sets of the session it leaves keep their order, as when it's deleted.
+
 A session's sets are meant to last no longer than the session: their durations are meant to add up to no more than its
 duration, those of cancelled sets included, since they keep their place, while a duration that isn't known counts for
 nothing. The server doesn't require it, since a session's duration and its sets' are changed one at a time. Apps that add
@@ -157,23 +163,42 @@ deleting it, stops it counting.
 ## Status
 
 A new session or set is `"planned"`, then `"done"` once it's been played, or `"cancelled"`, e.g. a set whose artist
-didn't show up. Any status can be changed to any other, except as below. Statuses only change when an admin changes one,
-adds a set, or deletes one, never as time passes, e.g. once a session's end has passed. Each of these can change other
-statuses, as below, as the same admin, at the same time, and the endpoints that do so respond with the session as it
-then is, with its sets:
+didn't show up. Any status can be changed to any other, except as below. Statuses only change when an admin:
 
-- **Cancelling a session cancels its sets**: every one that isn't already cancelled, done ones included. Un-cancelling
-  a session leaves its sets cancelled: each one is un-cancelled on its own, once the session isn't cancelled anymore.
-  A cancelled session only has cancelled sets (see [Rules](#rules)): its sets can still be changed, but not un-cancelled
-  while it is.
+- changes a session's or a set's status,
+- adds a set,
+- moves a set to another session,
+- deletes a set,
+
+never as time passes, e.g. once a session's end has passed. Each of these can change other statuses, as below, as the
+same admin, at the same time, and the endpoints that do so respond with the session as it then is, with its sets, or,
+for moving a set, with both sessions. Moving a set never changes its own status, only those of the sessions it leaves
+and joins.
+
+- **Cancelling a session cancels its sets**: every one that isn't already cancelled, done ones included. A cancelled
+  session only has cancelled sets (see [Rules](#rules)), so while it's cancelled:
+  - its sets can still be changed, and moved to another session, where they stay cancelled,
+  - none of its sets can be un-cancelled,
+  - no set can be added to it, and only cancelled sets can be moved into it.
+
+  Un-cancelling a session leaves its sets cancelled: each one is un-cancelled on its own, once the session isn't
+  cancelled anymore.
 - **A done session has no planned set** (see [Rules](#rules)): marking a session done marks its planned sets done, while
-  its cancelled sets stay cancelled, and a done session that gets a planned set, one whose status is set to planned, or
-  a new one, is planned again. Marking a session planned leaves its sets as they are.
-- **A planned session becomes done once its sets are played**: whenever one of its sets' status is set, even to the
-  one it already has, or one of its sets is deleted, a session that's then planned, with at least one set that's done
-  and none that's planned, becomes done, e.g. two sets done and one cancelled make it done, whichever comes last, but
-  not three cancelled. A session that's marked planned while none of its sets is planned isn't made done until one of
-  its sets' status is set, or one of them is deleted.
+  its cancelled sets stay cancelled. A done session is planned again once it gets a planned set:
+  - one of its sets' status is set to planned,
+  - a set is added to it, as a new set is planned,
+  - a planned set is moved into it.
+
+  Marking a session planned leaves its sets as they are.
+- **A planned session becomes done once its sets are played**: whenever one of these happens, a session that's then
+  planned, with at least one set that's done and none that's planned, becomes done:
+  - one of its sets' status is set, even to the one it already has,
+  - one of its sets is deleted, or moved to another session,
+  - a set is moved into it.
+
+  E.g. two sets done and one cancelled make it done, whichever comes last, but not three cancelled, and so does a done
+  set moved into a planned session without sets. A session that's marked planned while none of its sets is planned
+  isn't made done until one of these happens.
 
 These hold even for requests sent at the same time, e.g. two sets marked done together.
 
@@ -488,8 +513,9 @@ When it fails, nothing is saved.
 
 ## `PUT /api/admin/sets/:id` (admin)
 
-Replaces a set's fields, even when its session is cancelled, but not its session, its place among its session's sets, or
-its status. It takes the same request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it
+Replaces a set's fields, even when its session is cancelled, but not its session (see
+[`PUT /api/admin/sets/:id/session`](#put-apiadminsetsidsession-admin)), its place among its session's sets, or its
+status. It takes the same request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it
 is then, and fails like it, but with 404 when there's no such set, which is checked before the track is resolved, and
 without the 409 for a cancelled session.
 
@@ -522,6 +548,27 @@ Moves a set to another place among its session's sets, even when its session is 
 their order (see [Sets' order](#sets-order)). It doesn't change the set's fields or its status, or who last changed it.
 Responds like `POST /api/admin/sessions/:id/sets`. Fails with 400 if `position` isn't a whole number from 0 to 2^53 − 1,
 and 404 when there's no such set.
+
+## `PUT /api/admin/sets/:id/session` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `session` | string | The id of the session to move the set to |
+
+Moves a set to another session, after its sets, which counts as changing the set (`updatedBy` and `updatedAt`), and
+leaves the sets of the session it leaves in their order (see [Sets' order](#sets-order)). Nothing else about the set
+changes, its status included. Then both sessions follow their sets (see [Status](#status)). A set moved to the session
+it's in stays where it is, and no status changes, but it still counts as changed.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `session` | session | The set's session, which it was moved to, with its sets, as it is then |
+| `previousSession` | session | The session the set was in, with its other sets, as it is then: the same one as `session` when the set was moved to the session it was in |
+
+Fails with 400 if `session` isn't a string, or when there's no such session (`"No such session"`), 404 when there's no
+such set, which is checked before the session, or 409 when the set isn't cancelled and the session is, with that
+session in `session` (see [Rules](#rules)).
 
 ## `DELETE /api/admin/sets/:id` (admin)
 

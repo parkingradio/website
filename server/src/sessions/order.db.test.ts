@@ -16,9 +16,9 @@ import { sessionsStore } from './store.js'
 import { checkSessionsInvariants } from './test-invariants.js'
 
 // The order of a session's sets, against a real database: new sets go last, moving one leaves the others in their
-// order, and so does deleting one, even with requests sent at the same time (see "Sets' order" in
-// docs/design/server/sessions.md). The property-based tests of rules.db.test.ts move sets
-// too.
+// order, and so does deleting one, or moving one to another session, after whose sets it goes, even with requests sent
+// at the same time (see "Sets' order" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts
+// move sets too.
 
 // Photos and flyers aren't sent, so there are none to read or delete.
 const NO_PHOTOS: Photos = {
@@ -73,6 +73,7 @@ async function setsOf(session: string): Promise<Sets> {
 
 const ids = (sets: Sets) => sets.map(({ id }) => id)
 const move = (id: string, position: unknown) => request('PUT', `/api/admin/sets/${id}/position`, { position })
+const moveTo = (id: string, session: unknown) => request('PUT', `/api/admin/sets/${id}/session`, { session })
 
 beforeAll(async () => {
   process.env.JWT_SECRET = 'test-secret'
@@ -170,6 +171,60 @@ describe("a session's sets", () => {
     ])
     expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 200, 200, 200, 200, 200, 200])
     expect(await setsOf(session)).toHaveLength(6)
+    await checkSessionsInvariants(database.db)
+  })
+
+  it('are moved to another session one at a time, after its sets, those of the session they leave keeping their order', async () => {
+    const first = await sessionWithSets([10, 20, 30])
+    const second = await sessionWithSets([40])
+    const [a, b, c] = first.sets
+    const [d] = second.sets
+    let response = await moveTo(b, second.session)
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.id).toBe(second.session)
+    expect(ids(response.json().session.sets)).toEqual([d, b])
+    expect(response.json().previousSession.id).toBe(first.session)
+    expect(ids(response.json().previousSession.sets)).toEqual([a, c])
+    await checkSessionsInvariants(database.db)
+    response = await moveTo(a, second.session)
+    expect(ids(response.json().session.sets)).toEqual([d, b, a])
+    expect(ids(response.json().previousSession.sets)).toEqual([c])
+    // Back to the one it came from, after its sets, and then out of a session it was the only set of.
+    response = await moveTo(b, first.session)
+    expect(ids(response.json().session.sets)).toEqual([c, b])
+    response = await moveTo(d, first.session)
+    expect(ids(response.json().previousSession.sets)).toEqual([a])
+    expect(ids(response.json().session.sets)).toEqual([c, b, d])
+    await checkSessionsInvariants(database.db)
+  })
+
+  it('stay where they are when moved to the session they are in, whatever the case of its id', async () => {
+    const { session, sets } = await sessionWithSets([10, 20, 30])
+    for (const id of [session, session.toUpperCase()]) {
+      const response = await moveTo(sets[0], id)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session.id).toBe(session)
+      expect(ids(response.json().session.sets)).toEqual(sets)
+      expect(response.json().previousSession).toEqual(response.json().session)
+    }
+    await checkSessionsInvariants(database.db)
+  })
+
+  it('stay in an order when they are moved between sessions, moved, added and deleted at the same time', async () => {
+    const first = await sessionWithSets([10, 20, 30, 40])
+    const second = await sessionWithSets([50, 60, 70])
+    const responses = await Promise.all([
+      moveTo(first.sets[0], second.session),
+      moveTo(second.sets[2], first.session),
+      move(first.sets[3], 0),
+      moveTo(second.sets[0], first.session),
+      request('POST', `/api/admin/sessions/${second.session}/sets`, set(15)),
+      request('DELETE', `/api/admin/sets/${first.sets[2]}`),
+      moveTo(first.sets[1], second.session),
+      move(second.sets[1], 5),
+    ])
+    expect(responses.map(({ statusCode }) => statusCode)).toEqual([200, 200, 200, 200, 200, 200, 200, 200])
+    expect((await setsOf(first.session)).length + (await setsOf(second.session)).length).toBe(7)
     await checkSessionsInvariants(database.db)
   })
 })
