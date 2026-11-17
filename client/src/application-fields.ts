@@ -31,8 +31,14 @@ export function performanceTypeName(id: PerformanceTypeId): string {
 }
 
 // In the order applications usually go through them (see describe.ts for their names). The server works out "planned"
-// and "done" from the application's sets and sessions, and only takes the others (see `ApplicationDecision`).
+// and "done" from the application's sets and sessions, and only takes the others, what admins decide.
 export const APPLICATION_STATUSES = everyOne<ApplicationStatus>()(['new', 'accepted', 'planned', 'done', 'rejected'])
+export const APPLICATION_DECISIONS = everyOne<ApplicationDecision>()(['new', 'accepted', 'rejected'])
+
+// Whether an application with `status` can be given another one, which its sets and sessions don't decide.
+export function isDecision(status: ApplicationStatus): status is ApplicationDecision {
+  return (APPLICATION_DECISIONS as readonly ApplicationStatus[]).includes(status)
+}
 
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 export const DETAILS_MAX_LENGTH = 2000

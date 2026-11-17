@@ -11,7 +11,8 @@ few words.
 The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
 by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status,
-as a dropdown that changes it, without confirming.
+as a dropdown that changes it to "nouvelle", "retenue" or "refusée", without confirming, or only its name for a
+"planifiée" or "jouée" application, which its sets or sessions make so.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
 "retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first. When
@@ -33,7 +34,10 @@ search and order in its address (see [Going through the list](#going-through-the
 it was received (unless that's the day it was created), who created it and when, or that it was sent through the form,
 and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
-- "Statut": the status, as buttons that change it, and which admin last changed it, and when.
+- "Statut": "nouvelle", "retenue" and "refusée", as buttons that change the status (see
+  [Status colors](layout.md#status-colors)), and which admin last changed it, and when. While its sets or sessions make
+  it "planifiée" or "jouée", what admins decided doesn't show, and can't be changed: the section only says so, and why,
+  e.g. « Planifiée : un de ses sets est planifié. » or « Jouée : une de ses sessions a été jouée. ».
 - "Artiste" or "Collectif": the artist's or the collective's photo and profile, as their page shows them (see
   [An artist's page](artistes.md#an-artists-page) and [A collective's page](artistes.md#a-collectives-page)), starting
   with their name, which links to their page. It leaves out who added them and who last changed them, and what their

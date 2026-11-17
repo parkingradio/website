@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
-import { APPLICATION_STATUSES } from '../../application-fields'
+import { APPLICATION_DECISIONS, APPLICATION_STATUSES, isDecision } from '../../application-fields'
 import type { Application, ApplicationDecision, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
@@ -80,10 +80,11 @@ const DEFAULT_STATUS: ApplicationStatus = 'new'
 // Those still to go through, where the oldest come first, rather than the most recently received.
 const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
 
-// The status picked, which is sent as it is for now: the server refuses "planned" and "done", which it works out from the
-// application's sets and sessions, and the page shows its error.
-function asDecision(status: ApplicationStatus): ApplicationDecision {
-  return status as ApplicationDecision
+// The status of an application that its sets, or its sessions for a collective's, give it, and why.
+function linkedStatus(application: Application): string {
+  const played = application.status === 'done'
+  if (applicationOwner(application).kind === 'collective') return played ? 'Jouée : une de ses sessions a été jouée.' : 'Planifiée : une de ses sessions est planifiée.'
+  return played ? 'Jouée : un de ses sets a été joué.' : 'Planifiée : un de ses sets est planifié.'
 }
 
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
@@ -106,8 +107,9 @@ function applicationColumns(owners: Owners, status: ApplicationStatus | null): R
 
 // Applications, as listed in this section, or on an artist's or a collective's page, under the heading whose id is
 // `labelledBy`, where `owners` is left out since they're all theirs, and so are the columns about them. The columns sort
-// the list when there's `sorting`, and the statuses are dropdowns that change them when there's `changeStatus`. The links
-// to the applications' pages keep `linkQuery`, the list they go through, if any.
+// the list when there's `sorting`, and the statuses that admins decide are dropdowns that change them when there's
+// `changeStatus`, while those that sets and sessions give are only shown. The links to the applications' pages keep
+// `linkQuery`, the list they go through, if any.
 export function ApplicationsTable({
   applications,
   owners,
@@ -119,7 +121,7 @@ export function ApplicationsTable({
   applications: Application[]
   owners?: Owners
   sorting?: Sorting<ApplicationColumn>
-  changeStatus?: (application: Application, status: ApplicationStatus) => Promise<void>
+  changeStatus?: (application: Application, status: ApplicationDecision) => Promise<void>
   linkQuery?: string
   labelledBy?: string
 }) {
@@ -179,10 +181,10 @@ export function ApplicationsTable({
               </td>
               <td>{describePerformanceTypes(application)}</td>
               <td className="admin-status">
-                {changeStatus ? (
+                {changeStatus && isDecision(application.status) ? (
                   <StatusSelect
                     label={`Statut : ${applicationName(application, owner)}`}
-                    statuses={APPLICATION_STATUSES}
+                    statuses={APPLICATION_DECISIONS}
                     labels={STATUS_LABELS}
                     status={application.status}
                     onChange={(status) => changeStatus(application, status)}
@@ -327,9 +329,9 @@ function ApplicationsList() {
   const all = applications.value.applications.map((application) => changed[application.id] ?? application)
   const { found, listed } = list(all)
 
-  const changeStatus = async (application: Application, status: ApplicationStatus) => {
+  const changeStatus = async (application: Application, status: ApplicationDecision) => {
     setStatusError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status: asDecision(status) } })
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status } })
     if (result.ok) setChanged((changed) => ({ ...changed, [application.id]: result.application }))
     else setStatusError(`Le statut de «\u00a0${applicationName(application, ownerOf(application, byKey))}\u00a0» n'a pas pu être changé : ${result.error}`)
   }
@@ -553,10 +555,10 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
     )
   }
 
-  const changeStatus = async (status: ApplicationStatus) => {
+  const changeStatus = async (status: ApplicationDecision) => {
     setBusy(true)
     setError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status: asDecision(status) } })
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status } })
     setBusy(false)
     if (result.ok) setApplication(result.application)
     else setError(`Le statut n'a pas pu être changé : ${result.error}`)
@@ -589,8 +591,14 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
       {application.updatedBy && <p className="admin-meta">{byWhom('Modifiée', application.updatedBy, application.updatedAt)}</p>}
 
       <h2>Statut</h2>
-      <StatusButtons statuses={APPLICATION_STATUSES} labels={STATUS_LABELS} status={application.status} disabled={busy} onChange={changeStatus} />
-      {application.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>}
+      {isDecision(application.status) ? (
+        <>
+          <StatusButtons statuses={APPLICATION_DECISIONS} labels={STATUS_LABELS} status={application.status} disabled={busy} onChange={changeStatus} />
+          {application.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>}
+        </>
+      ) : (
+        <p>{linkedStatus(application)}</p>
+      )}
       {error && (
         <p className="admin-error" role="alert">
           {error}
