@@ -106,7 +106,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "Liens": "SoundCloud" and "YouTube", each linking to the recording, then "Candidature", linking to the page of the
     application the set comes from. Screen readers name that last link by when the application was received, e.g.
     "Candidature reçue le 1 septembre 2026".
-  - Its status, as buttons that change it.
+  - "Statut": its status, as a dropdown that changes it once another status is picked, without confirming, as in the
+    list of [Candidatures](candidatures.md).
   - "↑" and "↓", which move it one place up or down among the session's sets, like a set's artists (see
     [A set's form](#a-sets-form)), even while the session is cancelled. The first set's "↑" and the last one's "↓"
     can't be used.
@@ -119,12 +120,13 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   (see [Status](../../server/sessions.md#status)).
 
   When a status can't be changed, or a set can't be moved up or down or deleted, the section says why above the sets,
-  naming the set.
+  naming the set, and the set's dropdown shows its status again.
   "ajouter un set" opens the form of a new set.
 
   While the session is cancelled, "ajouter un set" can't be used, and says « La session est annulée : on ne peut pas lui
-  ajouter de set. ». Its sets' "planifié" and "joué" can't be used either, and say « La session est annulée : on ne peut
-  pas rétablir ses sets. » (see [Controls that can't be used](layout.md#controls-that-cant-be-used)).
+  ajouter de set. ». Its sets' statuses are written out rather than dropdowns, and, when it has sets, the section says
+  why above them: « La session est annulée : on ne peut pas rétablir ses sets. » (see
+  [Controls that can't be used](layout.md#controls-that-cant-be-used)).
 
   When the sets' durations add up to more than the session's, cancelled sets included and unknown durations counting
   for nothing (see [Sets' order](../../server/sessions.md#sets-order)), the section warns of it above the sets (see

@@ -52,7 +52,7 @@ import {
 import type { Announced } from './describe'
 import { arrowAfterMove, compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
-import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
+import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
 import { RaEventPanel } from './ra-event'
 import { failure, newSessionPath, sessionPath } from './session-errors'
@@ -791,9 +791,9 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// A session's sets, in their order, each with its status as buttons that change it, arrows that move it, a button that
-// opens the panel that moves it to another session, one that opens its form, and one that deletes it. The sets of a
-// cancelled session can't be un-cancelled.
+// A session's sets, in their order, each with its status as a dropdown that changes it, arrows that move it, a button
+// that opens the panel that moves it to another session, one that opens its form, and one that deletes it. The sets of a
+// cancelled session can't be un-cancelled: their statuses are written out instead, and it says why above them, once.
 function SetsTable({
   session,
   busy,
@@ -805,76 +805,83 @@ function SetsTable({
 }: {
   session: Session
   busy: boolean
-  onStatus: (set: StudioSet, status: SessionStatus) => void
+  onStatus: (set: StudioSet, status: SessionStatus) => Promise<void>
   onMove: (set: StudioSet, by: -1 | 1) => void
   onMoveTo: (set: StudioSet) => void
   onEdit: (set: StudioSet) => void
   onDelete: (set: StudioSet) => void
 }) {
+  const cancelled = session.status === 'cancelled'
   return (
-    <table className="admin-table admin-table-controls" aria-label="Sets">
-      <thead>
-        <tr>
-          <th>Durée</th>
-          <th>Artistes</th>
-          <th>Prestation</th>
-          <th>Genres</th>
-          <th>Liens</th>
-          <th>Statut</th>
-          <th aria-label="Actions" />
-        </tr>
-      </thead>
-      <tbody>
-        {session.sets.map((set, index) => (
-          <tr key={set.id} className={`admin-status-${set.status}`}>
-            <td className="admin-day">{setDuration(set)}</td>
-            <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
-            <td>{describePerformanceTypes(set)}</td>
-            <td>{genreNames(set.genres)}</td>
-            <td>
-              <SetLinks set={set} />
-            </td>
-            <td>
-              <StatusButtons
-                label={`Statut : ${setName(set)}`}
-                statuses={STATUSES}
-                labels={SET_STATUS_LABELS}
-                status={set.status}
-                disabled={busy}
-                unavailable={(status) => (session.status === 'cancelled' && status !== 'cancelled' ? 'La session est annulée\u00a0: on ne peut pas rétablir ses sets.' : null)}
-                onChange={(status) => onStatus(set, status)}
-              />
-            </td>
-            <td>
-              <MoveButtons
-                name={setName(set)}
-                first={index === 0}
-                last={index === session.sets.length - 1}
-                disabled={busy}
-                data={{ 'data-set': set.id }}
-                onMove={(by) => onMove(set, by)}
-              />{' '}
-              <button type="button" data-set={set.id} data-action="move" aria-label={`déplacer : ${setName(set)}`} onClick={() => onMoveTo(set)}>
-                déplacer
-              </button>{' '}
-              <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={() => onEdit(set)}>
-                modifier
-              </button>{' '}
-              <button
-                type="button"
-                data-set={set.id}
-                data-action="delete"
-                aria-label={`supprimer : ${setName(set)}`}
-                disabled={busy}
-                onClick={() => onDelete(set)}
-              >
-                ×
-              </button>
-            </td>
+    <>
+      {cancelled && <p className="admin-notice">La session est annulée&nbsp;: on ne peut pas rétablir ses sets.</p>}
+      <table className="admin-table admin-table-controls" aria-label="Sets">
+        <thead>
+          <tr>
+            <th>Durée</th>
+            <th>Artistes</th>
+            <th>Prestation</th>
+            <th>Genres</th>
+            <th>Liens</th>
+            <th>Statut</th>
+            <th aria-label="Actions" />
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {session.sets.map((set, index) => (
+            <tr key={set.id} className={`admin-status-${set.status}`}>
+              <td className="admin-day">{setDuration(set)}</td>
+              <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
+              <td>{describePerformanceTypes(set)}</td>
+              <td>{genreNames(set.genres)}</td>
+              <td>
+                <SetLinks set={set} />
+              </td>
+              <td>
+                {cancelled ? (
+                  SET_STATUS_LABELS[set.status]
+                ) : (
+                  <StatusSelect
+                    label={`Statut : ${setName(set)}`}
+                    statuses={STATUSES}
+                    labels={SET_STATUS_LABELS}
+                    status={set.status}
+                    disabled={busy}
+                    onChange={(status) => onStatus(set, status)}
+                  />
+                )}
+              </td>
+              <td>
+                <MoveButtons
+                  name={setName(set)}
+                  first={index === 0}
+                  last={index === session.sets.length - 1}
+                  disabled={busy}
+                  data={{ 'data-set': set.id }}
+                  onMove={(by) => onMove(set, by)}
+                />{' '}
+                <button type="button" data-set={set.id} data-action="move" aria-label={`déplacer : ${setName(set)}`} onClick={() => onMoveTo(set)}>
+                  déplacer
+                </button>{' '}
+                <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={() => onEdit(set)}>
+                  modifier
+                </button>{' '}
+                <button
+                  type="button"
+                  data-set={set.id}
+                  data-action="delete"
+                  aria-label={`supprimer : ${setName(set)}`}
+                  disabled={busy}
+                  onClick={() => onDelete(set)}
+                >
+                  ×
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   )
 }
 

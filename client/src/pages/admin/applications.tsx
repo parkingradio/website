@@ -36,7 +36,7 @@ import { ApplicationsFailure, ArtistDetails, ArtistsFailure, CollectiveDetails, 
 import { ApplicationSessions, ApplicationSets } from './sessions'
 import { compareText, listQuery, search, useQueryParams, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
-import { SearchField, SortHeader, StatusButtons, StatusFilters } from './list-controls'
+import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
 
 // The applications section: every application, each one's page, where its status is changed and it's changed or
 // deleted, and creating one by hand, e.g. to bring in one that came through the original Google Form.
@@ -175,6 +175,8 @@ export function ApplicationsTable({
                 {changeStatus ? (
                   <StatusSelect
                     label={`Statut : ${applicationName(application, owner)}`}
+                    statuses={APPLICATION_STATUSES}
+                    labels={STATUS_LABELS}
                     status={application.status}
                     onChange={(status) => changeStatus(application, status)}
                   />
@@ -187,31 +189,6 @@ export function ApplicationsTable({
         })}
       </tbody>
     </table>
-  )
-}
-
-// An application's status, as a dropdown that changes it, which shows the one picked and can't be used while it's saved.
-function StatusSelect({ label, status, onChange }: { label: string; status: ApplicationStatus; onChange: (status: ApplicationStatus) => Promise<void> }) {
-  const [saving, setSaving] = useState<ApplicationStatus | null>(null)
-  return (
-    <select
-      className="admin-status-select"
-      aria-label={label}
-      value={saving ?? status}
-      disabled={saving !== null}
-      onChange={async (event) => {
-        const picked = event.target.value as ApplicationStatus
-        setSaving(picked)
-        await onChange(picked)
-        setSaving(null)
-      }}
-    >
-      {APPLICATION_STATUSES.map((each) => (
-        <option key={each} value={each}>
-          {STATUS_LABELS[each]}
-        </option>
-      ))}
-    </select>
   )
 }
 

@@ -94,6 +94,9 @@ sentence. It keeps the keyboard's focus, so that its tooltip can be read, and sc
 Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
 without a tooltip.
 
+A dropdown that a rule keeps from being used in every row of a list, e.g. the statuses of a cancelled session's sets, is
+replaced by its value, written out, and the list says why once, above it, rather than in a tooltip.
+
 ## Endpoints
 
 - `GET /api/admin/me`, to know whether there's a session, and the admin's email.

@@ -1,9 +1,10 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from './button'
 import type { Sorting } from './list'
 
 // The field that searches a list of the admin sections, the headers of the columns that sort it, and the buttons that
-// filter it by status (see list.ts), or change an entry's status.
+// filter it by status (see list.ts), or the buttons, or the dropdown, that change an entry's status.
 
 export function SearchField({ query, onChange }: { query: string; onChange: (query: string) => void }) {
   return (
@@ -91,5 +92,58 @@ export function StatusButtons<S extends string>({
         </Button>
       ))}
     </div>
+  )
+}
+
+// A status, as a dropdown named `label` that changes it to another of the `statuses`, each named by `labels`, e.g. in a
+// row of a list. It shows the one picked, and can't be used while it's saved, nor while `disabled`.
+export function StatusSelect<S extends string>({
+  label,
+  statuses,
+  labels,
+  status,
+  disabled = false,
+  onChange,
+}: {
+  label: string
+  statuses: readonly S[]
+  labels: Record<S, string>
+  status: S
+  disabled?: boolean
+  onChange: (status: S) => Promise<void>
+}) {
+  const [saving, setSaving] = useState<S | null>(null)
+  const locked = disabled || saving !== null
+  const select = useRef<HTMLSelectElement>(null)
+  // Browsers take the focus away from a control once it's disabled, as it is while its status is saved, which would leave
+  // the keyboard at the top of the page: it gets the focus back once it can be used again, if it had it when the status
+  // was picked, and the focus hasn't gone anywhere else since.
+  const refocus = useRef(false)
+  useLayoutEffect(() => {
+    if (locked || !refocus.current) return
+    refocus.current = false
+    if (document.activeElement === null || document.activeElement === document.body) select.current?.focus()
+  }, [locked])
+  return (
+    <select
+      ref={select}
+      className="admin-status-select"
+      aria-label={label}
+      value={saving ?? status}
+      disabled={locked}
+      onChange={async (event) => {
+        const picked = event.target.value as S
+        refocus.current = document.activeElement === event.target
+        setSaving(picked)
+        await onChange(picked)
+        setSaving(null)
+      }}
+    >
+      {statuses.map((each) => (
+        <option key={each} value={each}>
+          {labels[each]}
+        </option>
+      ))}
+    </select>
   )
 }

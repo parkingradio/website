@@ -475,9 +475,25 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(sets.getByRole('row')).toHaveCount(3)
   await expect(sets.getByRole('row').nth(2).getByRole('cell').first()).toHaveText('1 h')
 
-  const first = sets.getByRole('row').nth(1).getByRole('group', { name: /^Statut : / })
-  await first.getByRole('button', { name: 'joué' }).click()
-  await expect(first.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true')
+  // The first one marked joué from its dropdown, which gets the focus back once it's saved, after the browser took it away
+  // while it was disabled: the server's answer is held back until it has.
+  const first = sets.getByRole('row').nth(1).getByRole('combobox', { name: /^Statut : / })
+  const status = '**/api/admin/sets/*/status'
+  let answer!: () => void
+  const answered = new Promise<void>((resolve) => (answer = resolve))
+  await page.route(status, async (route) => {
+    await answered
+    await route.continue()
+  })
+  await first.focus()
+  await first.selectOption({ label: 'joué' })
+  await expect(first).toBeDisabled()
+  await expect(first).not.toBeFocused()
+  answer()
+  await expect(first).toBeEnabled()
+  await page.unroute(status)
+  await expect(first).toHaveValue('done')
+  await expect(first).toBeFocused()
 
   // Moved to another day, its end with it, its sets in their order.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
@@ -488,7 +504,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(value(page, 'Quand')).toHaveText(`${longDay(otherDay)}, de 23 h à 1 h 30 le lendemain`)
   // Its event on RA kept.
   await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/1234567')
-  await expect(first.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(first).toHaveValue('done')
 
   // Announced, which says who announced it.
   const announcement = page.getByRole('group', { name: 'Annonce' })
@@ -522,17 +538,17 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(sets.getByRole('button', { name: 'annulé', pressed: true })).toHaveCount(1)
+  await expect(sets.getByRole('row').nth(1).getByRole('cell').nth(5)).toHaveText('annulé')
   // It stays announced, until it's un-announced.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
   // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.
   const unannounce = announcement.getByRole('button', { name: 'non annoncée' })
   await (isMobile ? unannounce.tap() : unannounce.click())
   await expect(announcement.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
-  // Its set can't be un-cancelled, and sets can't be added to it, which their buttons say, greyed out.
-  const planned = sets.getByRole('button', { name: 'planifié' })
-  await expect(planned).toHaveAttribute('aria-disabled', 'true')
-  await expect(planned).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')
+  // Its set can't be un-cancelled, which the page says above the sets, its status written out, and sets can't be added
+  // to it, which the button says, greyed out.
+  await expect(page.getByText('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')).toBeVisible()
+  await expect(sets.getByRole('combobox')).toHaveCount(0)
   const add = page.getByRole('button', { name: 'ajouter un set' })
   await expect(add).toHaveAttribute('aria-disabled', 'true')
   // By force, since Playwright waits for an aria-disabled button to be enabled before clicking or tapping it. Tapping it
