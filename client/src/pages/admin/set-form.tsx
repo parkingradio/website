@@ -213,9 +213,9 @@ function PerformersField({
   const options = [...members, ...(artists ?? []).filter((artist) => !memberIds.has(artist.id))].map((artist) => {
     const option = artistOption(artist)
     // What marks the collective's artists.
-    const collective = memberIds.has(artist.id) ? takeover?.name : undefined
+    const collective = takeover && memberIds.has(artist.id) ? takeover.name : null
     if (performers.some((performer) => performer.id === artist.id)) {
-      return { ...option, detail: [collective, 'déjà dans le set'].filter(Boolean).join(' · '), disabled: true }
+      return { ...option, detail: collective ? `${collective} · déjà dans le set` : 'déjà dans le set', disabled: true }
     }
     return collective ? { ...option, detail: collective } : option
   })

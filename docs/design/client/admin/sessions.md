@@ -250,8 +250,8 @@ on a session's page (see [A set's form](#a-sets-form)), except that:
   which is the order they're added in, and "×" takes it out of the list, without confirming.
 - While the session's times aren't valid, its duration isn't known: a new set then lasts an hour by default. A new
   set's form keeps the duration it opened with, even once the session's times change.
-- In a takeover's set, its collective is the one the session's form has picked: an open set's form follows it right
-  away as the collective or the type changes.
+- A takeover's collective, whose artists its sets' forms list first, is the one the session's form has picked: an open
+  set's form follows it as the collective or the type changes.
 - "ajouter la session" can't be used while a set's form is open, saying « Ajoutez d'abord le set, ou annulez-le. »,
   or « Enregistrez d'abord le set, ou annulez-le. » for a listed set's, and the sets can't be changed while it's sent.
 
@@ -386,9 +386,9 @@ its sets in the way is named without a link.
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
   `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,
   and `GET /api/admin/sessions`, in the panel that moves a set to another session, each time it opens.
-- `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and to list its artists first in a
-  new session's sets, and `GET /api/admin/artists`, in a set's form, to pick the performers and suggest their genres,
-  each time the form opens.
+- `GET /api/admin/collectives`, in the session form, to pick a takeover's collective and list its artists first in a new
+  session's sets, and `GET /api/admin/artists`, in a set's form, to pick the performers and suggest their genres, each
+  time the form opens.
 - `GET /api/admin/collectives/:id`, in a set's form on a takeover's page, to list its collective's artists first, each
   time the form opens.
 - `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens, and

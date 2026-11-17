@@ -205,6 +205,7 @@ test("a takeover's set form offers its collective's artists first, in its order,
     .poll(firstOptions(set, 4))
     .toEqual(['MathisCollectif Béton · déjà dans le set', 'RosalieCollectif Béton · déjà dans le set', 'KofiCollectif Béton', 'YasmineCollectif Béton'])
   // The guest of its first set is offered as in other sets.
+  await expect(set.getByRole('option', { name: /^DJ Poutine/ })).toHaveCount(1)
   await expect(set.getByRole('option', { name: /^DJ Poutine/ })).not.toContainText('Collectif Béton')
   // Its artists whose names have an « o » come first, ahead of those whose names start with one, e.g. Ondine.
   await picker.fill('o')
