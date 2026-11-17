@@ -77,13 +77,14 @@ function applicationName(application: Application, owner: Entry | undefined): st
 // What the list of applications opens on.
 const DEFAULT_STATUS: ApplicationStatus = 'new'
 
+// Those still to go through, where the oldest come first, rather than the most recently received.
+const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
+
 // The status picked, which is sent as it is for now: the server refuses "planned" and "done", which it works out from the
 // application's sets and sessions, and the page shows its error.
 function asDecision(status: ApplicationStatus): ApplicationDecision {
   return status as ApplicationDecision
 }
-// Those still to go through, where the oldest come first, rather than the most recently received.
-const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
 
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
 // them.

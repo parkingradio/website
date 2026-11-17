@@ -42,7 +42,7 @@ The endpoints below also return these fields:
 | `receivedAt` | string | When the artist sent the application, which isn't always when it was created: one that came by email, or through the original Google Form, can be brought in long after. For one sent through `POST /api/applications`, that's when it was created. For one an admin created, it's what the admin said, or else when it was created. Admins can change it either way |
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count, and neither do changes to its sets and sessions |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Changes to what admins decided don't count, and neither do changes to its sets and sessions |
 | `status` | `"new"`, `"accepted"`, `"planned"`, `"done"` or `"rejected"` | Worked out from what admins decided and from its sets or sessions: see [Status](#status) |
 | `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed what admins decided (an admin's email), and when, but not when its sets or sessions change its status (see [Status](#status)) |
 | `sets` | list of objects | The sets that come from the application, which only an artist's has: see below |
@@ -83,19 +83,17 @@ An application only keeps what admins decided about it: every application starts
   new, accepted ───── reject ─────▶ rejected
 ```
 
-So an application is planned by being a planned set's or session's `application` (see
-[Applications, in Sessions](sessions.md#applications)), whatever admins decided, and done once it's played: never
-through `PUT /api/admin/applications/:id/status`, which only takes what admins decide. A set or a session that's planned
-wins over one that's done, e.g. for an application played once, then booked again. One whose sets and sessions are all
-cancelled is accepted, to be booked again, rather than new. What admins decided can still be changed to `"new"` or
-`"accepted"` while its sets or sessions make it planned or done: it's kept, and shows once they don't anymore.
+So an application, whether it's new or accepted, is planned by being a planned set's or session's `application` (see
+[Applications, in Sessions](sessions.md#applications)), and done once it's played: never through
+`PUT /api/admin/applications/:id/status`, which only takes what admins decide. Once its sets and sessions are all
+cancelled, it's accepted, to be booked again. What admins decided can still be changed to `"new"` or `"accepted"` while
+its sets or sessions make it planned or done: it's kept, and shows once they don't anymore.
 
 **A rejected application has no set or session that's planned or done** (see
 [Applications, in Sessions](sessions.md#applications)), even for requests sent at the same time. Rejecting an
 application fails with 409 while it has one, but one whose sets and sessions are all cancelled can be rejected, and they
-keep it.
-Then, until it's accepted or made new again, giving it to a set or a session that's planned or done fails with 400, and
-un-cancelling one of its sets or sessions, i.e. marking it planned or done, with 409.
+keep it. Then, until it's accepted or made new again, giving it to a set or a session that's planned or done fails with
+400, and un-cancelling one of its sets or sessions, i.e. marking it planned or done, with 409.
 
 ## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
 

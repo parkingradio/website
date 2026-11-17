@@ -82,9 +82,10 @@ function check(broken: BrokenRule | null) {
 
 // Thrown when saving a session or a set, or deleting a collective that has takeovers, would break one of the rules of
 // sessions. The message says which, and `session` and `set` are what's in the way: `set` is a set, if it's one, and
-// `session` is the session in the way, or that set's. Both are null when what's in the way is another of the sets added
-// with a session, which isn't saved, whose place among them is then `otherSetIndex`, and otherwise only if it can't be
-// found anymore, which only something outside the server could cause (see `checkingRules`).
+// `session` is the session in the way, or that set's. Both are null when what's in the way isn't another session or set,
+// e.g. a rejected application (see `checkUncancelled`), when it's another of the sets added with a session, which isn't
+// saved, whose place among them is then `otherSetIndex`, and otherwise only if it can't be found anymore, which only
+// something outside the server could cause (see `checkingRules`).
 export class Conflict extends Refused {
   session: StoredSession | null
   set: StoredSet | null
@@ -281,9 +282,9 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 //   rows, which would keep their profiles from being changed in the meantime, whether a collective that's deleted has
 //   takeovers, the statuses of a session's sets, which its own follows (see `followSets`), who an application belongs
 //   to and whether it's rejected, which its rules are about (see "Applications" in docs/design/server/sessions.md), and
-//   whether an application that's rejected has sets or sessions that are planned or done, and a session's sets'
-//   positions and how many there are, which adding, moving and deleting a set work from, so that the positions stay 0 to
-//   n - 1 (see "sets" in db/schema.ts).
+//   whether an application has sets or sessions that are planned or done, which rejecting it is about, and a session's
+//   sets' positions and how many there are, which adding, moving and deleting a set work from, so that the positions stay
+//   0 to n - 1 (see "sets" in db/schema.ts).
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock. Nor can saving a set or a session, which takes a lock on its application's row to check its foreign key
 //   once its own row is written, and deleting that application, which writes the set's or the session's row once it has
@@ -334,7 +335,7 @@ async function savedApplication(tx: Queryable, id: string): Promise<Pick<typeof 
   return found
 }
 
-// Whether a set or a session with the application `decided`, which would have `status`, would break the rule that a
+// Whether a set or a session whose application has `decision`, which would have `status`, would break the rule that a
 // rejected application has no set or session that's planned or done (see "Applications" in
 // docs/design/server/sessions.md).
 function breaksRejection({ decision }: { decision: ApplicationDecision }, status: Status): boolean {
@@ -360,8 +361,8 @@ async function checkSetApplication(tx: Queryable, applicationId: string, perform
   if (breaksRejection(application, status)) throw new BrokenFields(REJECTED_APPLICATION)
 }
 
-// Whether the application `id` has a set or a session that's planned or done, which it keeps until the transaction `tx`,
-// which holds the sessions' lock, ends, e.g. while it's rejected.
+// Whether the application `id` has a set or a session that's planned or done, which can't change until the transaction
+// `tx`, which holds the sessions' lock, ends.
 export async function isBooked(tx: Queryable, id: string): Promise<boolean> {
   const booked = (table: typeof sets | typeof sessions) => exists(tx.select().from(table).where(and(eq(table.applicationId, id), ne(table.status, 'cancelled'))))
   const { rows } = await tx.execute<{ found: boolean }>(sql`select ${or(booked(sets), booked(sessions))} as found`)
