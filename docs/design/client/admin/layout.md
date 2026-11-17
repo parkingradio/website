@@ -99,16 +99,17 @@ replaced by its value, written out, and the list says why once, above it, rather
 
 ## Reordering
 
-Lists whose order counts, e.g. a set's performers, are reordered by dragging their items by a handle, a block of dots at
-the start of each item: with a mouse, or on a touch screen once it's held for a moment. Only the handle starts a drag, so
-that elsewhere the items' links and buttons work as usual, and swiping scrolls the page. The item moves to where it's
-dropped, and the others make room for it, but the list's order only changes once it's dropped. Escape puts it back.
+Some lists whose order counts, e.g. a set's performers, are reordered by dragging their items by a handle, a block of
+dots at the start of each item: with a mouse, or on a touch screen once it's held for a moment. Only the handle starts a
+drag, so that elsewhere the items' links and buttons work as usual, and swiping scrolls the page. The item moves to
+where it's dropped, and the others make room for it, but the list's order only changes once it's dropped. Escape puts
+it back.
 
 The handle also works with the keyboard: Space or Enter picks the item up, the up and down arrows move it one place, and
-Space, Enter or Tab drops it. The focus stays on the handle. Screen readers name the handle after its item, e.g.
-"réordonner Aurore", describe how to use it with the keyboard, and announce, in French, when the item is picked up, each
-place it's moved to, and where it's dropped, or that it's put back, with its place, e.g. « Aurore est maintenant en
-position 2 sur 3. ».
+Space, Enter or Tab drops it, while clicking elsewhere puts it back. The focus stays on the handle. Screen readers name
+the handle after its item, e.g. "réordonner Aurore", describe how to use it with the keyboard, and announce, in French,
+when the item is picked up, each place it's moved to, and where it's dropped, or that it's put back, with its place,
+e.g. « Aurore est maintenant en position 2 sur 3. ».
 
 While a list can't be changed for a moment, e.g. while it's sent, its handles are greyed out (see
 [Controls that can't be used](#controls-that-cant-be-used)).

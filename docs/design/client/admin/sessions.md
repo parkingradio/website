@@ -244,7 +244,7 @@ When the collectives can't be loaded, the form says so: the session's collective
 After its fields, a new session's form has its sets, which are only sent with it. They're added, changed and listed as
 on a session's page (see [A set's form](#a-sets-form)), except that:
 
-- Their rows have no status, nor "↑", "↓" and "déplacer": the sets, in the order they're added in, are reordered by
+- Their rows have no status, nor "↑", "↓" or "déplacer": the sets, in the order they're added in, are reordered by
   dragging them by a handle at the start of their rows (see [Reordering](layout.md#reordering)). "×" takes a set out of
   the list, without confirming. Their links open in a new tab. Once the session's times are valid, the list says when
   the sets add up to more than the session, with the same warning as a session's page.
