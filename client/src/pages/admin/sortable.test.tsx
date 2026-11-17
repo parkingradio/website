@@ -7,14 +7,16 @@ import { DragHandle, SortableList } from './sortable'
 import { closestVertically } from './sortable-places'
 import { arrayMove, useSortableItem } from './use-sortable'
 
-// A list of A, B, C and D, reordered by their handles, and a button outside it. `onMove` is told of each move.
-function Letters({ onMove }: { onMove: (from: number, to: number) => void }) {
+// A list of A, B, C and D, reordered by their handles, unless it's `disabled`, and a button outside it. `onMove` is told
+// of each move.
+function Letters({ onMove, disabled }: { onMove: (from: number, to: number) => void; disabled?: boolean }) {
   const [letters, setLetters] = useState(['A', 'B', 'C', 'D'])
   return (
     <>
       <SortableList
         ids={letters}
         nameOf={(index) => letters[index]}
+        disabled={disabled}
         onMove={(from, to) => {
           onMove(from, to)
           setLetters(arrayMove(letters, from, to))
@@ -136,6 +138,38 @@ describe('A list reordered by dragging', () => {
     await act(() => new Promise((resolve) => setTimeout(resolve)))
     expect(onMove).not.toHaveBeenCalled()
     expect(letters()).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it("can't be reordered while it's disabled, with the mouse, a finger or the keyboard, but its handles keep the focus", async () => {
+    const onMove = vi.fn()
+    const { rerender } = render(<Letters onMove={onMove} disabled />)
+    mockListLayout()
+    // A finger held on the handle for longer than it takes to pick its item up, then lifted.
+    const touch = async (letter: string) => {
+      fireEvent.touchStart(handle(letter), { touches: [{ clientX: 10, clientY: 20 }] })
+      await act(() => new Promise((resolve) => setTimeout(resolve, 250)))
+      const pickedUp = handle(letter).getAttribute('aria-pressed') === 'true'
+      fireEvent.touchEnd(handle(letter), { touches: [] })
+      return pickedUp
+    }
+
+    expect(handle('A')).toHaveAttribute('aria-disabled', 'true')
+    handle('A').focus()
+    expect(handle('A')).toHaveFocus()
+    await moveWithKeyboard(handle('A'), 2)
+    expect(handle('A')).toHaveFocus()
+    fireEvent.mouseDown(handle('B'), { button: 0, clientX: 10, clientY: 60 })
+    fireEvent.mouseMove(document, { clientX: 10, clientY: 100 })
+    expect(handle('B')).not.toHaveAttribute('aria-pressed', 'true')
+    fireEvent.mouseUp(document, { clientX: 10, clientY: 100 })
+    expect(await touch('C')).toBe(false)
+    expect(onMove).not.toHaveBeenCalled()
+    expect(letters()).toEqual(['A', 'B', 'C', 'D'])
+
+    // Unlike once it's enabled again.
+    rerender(<Letters onMove={onMove} />)
+    expect(handle('A')).not.toHaveAttribute('aria-disabled')
+    expect(await touch('C')).toBe(true)
   })
 
   it('keeps dragging an item with the mouse when its handle loses the focus, e.g. to another window', () => {

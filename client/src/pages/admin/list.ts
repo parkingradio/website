@@ -196,10 +196,3 @@ export function listQuery(params: URLSearchParams, status: string | null): strin
   }
   return `?${query}`
 }
-
-// Which of its arrows keeps the focus once a set is moved one place up (`by` -1) or down (1) among its session's sets, to
-// `index` among `count` sets: the same one, unless the set is now at the end where that arrow can't be used.
-export function arrowAfterMove(by: -1 | 1, index: number, count: number): 'up' | 'down' {
-  const [arrow, other] = by < 0 ? (['up', 'down'] as const) : (['down', 'up'] as const)
-  return index === (by < 0 ? 0 : count - 1) ? other : arrow
-}

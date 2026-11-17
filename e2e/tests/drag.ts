@@ -46,15 +46,22 @@ export async function drag(page: Page, handle: Locator, target: Locator, { touch
   })
 }
 
-// Picks up the item whose handle is `handle` with the keyboard, moves it `by` places down, or up if it's negative, and
-// drops it there. The page only listens for the arrows a moment after the item is picked up, which is waited for, and
-// each move is waited for, until the page announces the item's new place, after the handle's list.
-export async function moveWithKeyboard(page: Page, handle: Locator, by: number) {
+// Picks up the item whose handle is `handle` with the keyboard, and returns what the page announces, after the handle's
+// list. The page only listens for the other keys, e.g. the arrows or Escape, a moment after the item is picked up, which
+// is waited for.
+export async function pickUp(page: Page, handle: Locator): Promise<Locator> {
   const announced = handle.locator('xpath=(ancestor::ol | ancestor::table)[last()]/following-sibling::*[@role="status"][1]')
   await handle.focus()
   await page.keyboard.press('Space')
   await expect(announced).toContainText('Vous déplacez')
   await nextFrames(page)
+  return announced
+}
+
+// Picks up the item whose handle is `handle` with the keyboard, moves it `by` places down, or up if it's negative, and
+// drops it there. Each move is waited for, until the page announces the item's new place.
+export async function moveWithKeyboard(page: Page, handle: Locator, by: number) {
+  const announced = await pickUp(page, handle)
   for (let i = 0; i < Math.abs(by); i++) {
     const before = await announced.textContent()
     await page.keyboard.press(by > 0 ? 'ArrowDown' : 'ArrowUp')

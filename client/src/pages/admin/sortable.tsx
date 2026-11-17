@@ -40,24 +40,28 @@ export function SortableList({
 
   // dnd-kit says the item is over its own place as soon as it's picked up, which would cut what's announced then.
   const pickedUp = useRef(false)
+  // An item can leave the list while it's dragged, e.g. once the server answers for another change: nothing is said of
+  // it, and it isn't moved.
+  const listed = (...items: (string | number)[]) => items.every((id) => ids.includes(String(id)))
   const name = (id: string | number) => nameOf(ids.indexOf(String(id)))
   const place = (id: string | number) => `position ${ids.indexOf(String(id)) + 1} sur ${ids.length}`
   const announcements: Announcements = {
     onDragStart({ active }) {
       pickedUp.current = true
-      return `Vous déplacez ${name(active.id)} en ${place(active.id)}.`
+      if (listed(active.id)) return `Vous déplacez ${name(active.id)} en ${place(active.id)}.`
     },
     onDragOver({ active, over }) {
-      if (!over || (pickedUp.current && over.id === active.id)) return
+      if (!over || (pickedUp.current && over.id === active.id) || !listed(active.id, over.id)) return
       pickedUp.current = false
       return `${name(active.id)}\u00a0: ${place(over.id)}.`
     },
     onDragEnd({ active, over }) {
-      if (over && over.id !== active.id) return `${name(active.id)} est maintenant en ${place(over.id)}.`
+      if (!listed(active.id)) return
+      if (over && over.id !== active.id && listed(over.id)) return `${name(active.id)} est maintenant en ${place(over.id)}.`
       return `${name(active.id)} reste en ${place(active.id)}.`
     },
     onDragCancel({ active }) {
-      return `Déplacement annulé\u00a0: ${name(active.id)} reste en ${place(active.id)}.`
+      if (listed(active.id)) return `Déplacement annulé\u00a0: ${name(active.id)} reste en ${place(active.id)}.`
     },
   }
 
@@ -73,7 +77,7 @@ export function SortableList({
       onDragEnd={({ active, over }) => {
         const from = ids.indexOf(String(active.id))
         const to = over ? ids.indexOf(String(over.id)) : from
-        if (from !== to) onMove(from, to)
+        if (from >= 0 && to >= 0 && from !== to) onMove(from, to)
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
@@ -83,10 +87,12 @@ export function SortableList({
   )
 }
 
-// The handle that drags its item, at its start, named by `label`, e.g. "réordonner Aurore".
+// The handle that drags its item, at its start, named by `label`, e.g. "réordonner Aurore". While its list can't be
+// reordered, it's only aria-disabled, so that it keeps the focus, e.g. once its item is dropped and the move is saved
+// (see "A session's page" in docs/design/client/admin/sessions.md): dnd-kit then drops its listeners.
 export function DragHandle({ handle: { ref, props, disabled }, label }: { handle: SortableHandle; label: string }) {
   return (
-    <button type="button" ref={ref} className="admin-handle" aria-label={label} disabled={disabled} {...props}>
+    <button type="button" ref={ref} className="admin-handle" aria-label={label} aria-disabled={disabled || undefined} {...props}>
       {/* Six dots, in two columns. */}
       <svg aria-hidden="true" viewBox="0 0 10 16" width="10" height="16" fill="currentColor">
         {[3, 8, 13].flatMap((y) => [2.5, 7.5].map((x) => <circle key={`${x},${y}`} cx={x} cy={y} r="1.5" />))}

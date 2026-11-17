@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import type { Locator, Page, TestInfo } from '@playwright/test'
+import type { Locator, Page, Request, TestInfo } from '@playwright/test'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
-import { moveWithKeyboard } from './drag.ts'
+import { drag, moveWithKeyboard, pickUp } from './drag.ts'
 import { test, expect, adminMenu, logIn } from './fixtures.ts'
 
 // The sessions and their sets: the seeded ones (see seed-data.ts), searched and listed on their artists' and collectives'
@@ -9,6 +9,9 @@ import { test, expect, adminMenu, logIn } from './fixtures.ts'
 
 // The rows of a page or a table that have `text`, and what a page says of `label`.
 const rowsOf = (within: Page | Locator, text: string) => within.getByRole('row').filter({ hasText: text })
+// A set's duration and its status, in its row, whose first cell has the handle that reorders the sets.
+const durationOf = (row: Locator) => row.getByRole('cell').nth(1)
+const statusOf = (row: Locator) => row.getByRole('cell').nth(6)
 // What the session's record, or the content of its event on RA, which is within it, says for `label`.
 const recordValue = (page: Page, record: string, label: string) =>
   page.getByLabel(record, { exact: true }).locator(':scope > dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
@@ -16,6 +19,20 @@ const value = (page: Page, label: string) => recordValue(page, 'Session', label)
 // The date or the time a session starts or ends at, in its form.
 const timeInput = (page: Page, when: 'Début' | 'Fin', part: 'date' | 'heure') => page.getByRole('group', { name: when, exact: true }).getByLabel(part, { exact: true })
 const raValue = (page: Page, label: string) => recordValue(page, "Contenu de l'événement RA", label)
+// Holds back the server's answers to the requests to `url`, until what this returns is called, and lets the requests go
+// through as usual afterwards.
+async function holdBack(page: Page, url: string): Promise<() => Promise<void>> {
+  let answer!: () => void
+  const answered = new Promise<void>((resolve) => (answer = resolve))
+  await page.route(url, async (route) => {
+    await answered
+    await route.continue()
+  })
+  return async () => {
+    answer()
+    await page.unroute(url)
+  }
+}
 
 test('the seeded sessions are listed, searched and filtered, and on the pages of their artists and collectives', async ({ page }) => {
   await logIn(page, { at: '/admin/sessions?status=all' })
@@ -38,8 +55,8 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   const sets = page.getByRole('table', { name: 'Sets' })
   // In their order, by their durations.
   await expect(sets.getByRole('row').nth(1)).toContainText('Ondine')
-  await expect(rowsOf(sets, 'Ondine').getByRole('cell').first()).toHaveText('1 h')
-  await expect(rowsOf(sets, 'Écume').getByRole('cell').first()).toHaveText('à déterminer')
+  await expect(durationOf(rowsOf(sets, 'Ondine'))).toHaveText('1 h')
+  await expect(durationOf(rowsOf(sets, 'Écume'))).toHaveText('à déterminer')
   await page.goBack()
 
   // The one over three days, which says the day it ends on, in the list and on its page.
@@ -87,7 +104,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(value(page, 'Description')).toContainText('Trois artistes, trois heures')
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de ONDE COMMUNE TAKEOVER' })).toHaveJSProperty('naturalWidth', 64)
   const sessionPage = new URL(page.url()).pathname
-  await expect(rowsOf(sets, 'Kwame Asante').getByRole('cell').first()).toHaveText('1 h')
+  await expect(durationOf(rowsOf(sets, 'Kwame Asante'))).toHaveText('1 h')
 
   // His page lists his set, but not the session's other sets.
   await sets.getByRole('link', { name: 'Kwame Asante', exact: true }).click()
@@ -275,7 +292,7 @@ test('a takeover and its set are given the applications they come from in their 
   await deleteOwn(page, mine)
 })
 
-test("an artist's sets, and a collective's takeover, are added from the pages of the applications they come from", async ({ page }, testInfo) => {
+test("an artist's sets, and a collective's takeover, are added from the pages of the applications they come from", async ({ page, hasTouch }, testInfo) => {
   const { unique, day, otherDay } = own(testInfo)
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
@@ -297,8 +314,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const reminder = page.getByRole('region', { name: 'Candidature' })
   await expect(reminder.getByRole('listitem')).toHaveText([longDay(day)])
   await expect(reminder).toContainText('20:00 à 23:00')
-  // After the cell with its handle.
-  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').nth(1)).toHaveText('à déterminer')
+  await expect(durationOf(rowsOf(sets, mine.artist.name))).toHaveText('à déterminer')
   await expect(rowsOf(sets, mine.artist.name)).toContainText('DJ, autre : Synthé')
   await timeInput(page, 'Début', 'date').fill(day)
   await timeInput(page, 'Début', 'heure').fill('20:00')
@@ -308,7 +324,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
   const sessionPage = new URL(page.url()).pathname
-  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').first()).toHaveText('à déterminer')
+  await expect(durationOf(rowsOf(sets, mine.artist.name))).toHaveText('à déterminer')
   await expect(sets.getByRole('link', { name: /^Candidature reçue le / })).toHaveAttribute('href', `/admin/candidatures/${artists}`)
 
   // Another one, in that session, which is on the day the artist would like to play.
@@ -329,18 +345,36 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(page).toHaveURL(sessionPage)
   await expect(sets.getByRole('row')).toHaveCount(3)
-  const durations = sets.getByRole('row').locator('td:first-child')
+  const durations = sets.getByRole('row').locator('td:nth-child(2)')
   await expect(durations).toHaveText(['à déterminer', '1 h'])
-  // Moved up, which the session keeps, and which the page doesn't open again.
-  const second = sets.getByRole('row').nth(2)
-  await second.getByRole('button', { name: /^monter : / }).click()
+  // The first one moved down with the keyboard, where it shows as soon as it's dropped, while that's saved: the server's
+  // answer is held back meanwhile. Its handle, greyed out until then, keeps the focus throughout, though the row is put
+  // back in the page.
+  const handleOf = (row: number) => sets.getByRole('row').nth(row).getByRole('button', { name: /^réordonner : / })
+  const answerMove = await holdBack(page, '**/api/admin/sets/*/position')
+  await moveWithKeyboard(page, handleOf(1), 1)
   await expect(durations).toHaveText(['1 h', 'à déterminer'])
-  // The focus goes to its other arrow, since it's first.
-  await expect(sets.getByRole('row').nth(1).getByRole('button', { name: /^descendre : / })).toBeFocused()
+  await expect(handleOf(2)).toHaveAttribute('aria-disabled', 'true')
+  await expect(handleOf(2)).toBeFocused()
+  await answerMove()
+  await expect(handleOf(2)).not.toHaveAttribute('aria-disabled')
+  await expect(handleOf(2)).toBeFocused()
+  // Which the session keeps, and which the page doesn't open again.
   await page.reload()
   await expect(sets.getByRole('row')).toHaveCount(3)
   await expect(durations).toHaveText(['1 h', 'à déterminer'])
   await expect(page.getByRole('heading', { name: 'Nouveau set' })).toHaveCount(0)
+  // Moved back up by dragging it, with the mouse, or with a finger on touch screens, with a single request.
+  const moves: unknown[] = []
+  const recordMove = (request: Request) => {
+    if (request.method() === 'PUT' && request.url().endsWith('/position')) moves.push(request.postDataJSON())
+  }
+  page.on('request', recordMove)
+  await drag(page, handleOf(2), sets.getByRole('row').nth(1), { touch: hasTouch })
+  await expect(durations).toHaveText(['à déterminer', '1 h'])
+  await expect(handleOf(1)).not.toHaveAttribute('aria-disabled')
+  page.off('request', recordMove)
+  expect(moves).toEqual([{ position: 0 }])
   await page.goto(`/admin/candidatures/${artists}`)
   await expect(page.getByRole('table', { name: 'Sets' }).getByRole('row')).toHaveCount(3)
 
@@ -525,7 +559,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   const sessionPage = new URL(page.url()).pathname
   const sets = page.getByRole('table', { name: 'Sets' })
   await expect(sets.getByRole('row')).toHaveCount(2)
-  await expect(sets.getByRole('row').nth(1).getByRole('cell').first()).toHaveText('1 h')
+  await expect(durationOf(sets.getByRole('row').nth(1))).toHaveText('1 h')
   await expect(sets.getByRole('row').nth(1)).toContainText('DJ')
 
   // The next one, added from its page, for an hour, after it, and the server refuses another set's video, naming that set.
@@ -539,27 +573,27 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await page.getByLabel('YouTube').fill('')
   await page.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(sets.getByRole('row')).toHaveCount(3)
-  await expect(sets.getByRole('row').nth(2).getByRole('cell').first()).toHaveText('1 h')
+  await expect(durationOf(sets.getByRole('row').nth(2))).toHaveText('1 h')
 
   // The first one marked joué from its dropdown, which gets the focus back once it's saved: the server's answer is held
   // back until the browser has taken the focus away, while the dropdown is disabled.
   const first = sets.getByRole('row').nth(1).getByRole('combobox', { name: /^Statut : / })
-  const status = '**/api/admin/sets/*/status'
-  let answer!: () => void
-  const answered = new Promise<void>((resolve) => (answer = resolve))
-  await page.route(status, async (route) => {
-    await answered
-    await route.continue()
-  })
+  const answerStatus = await holdBack(page, '**/api/admin/sets/*/status')
   await first.focus()
   await first.selectOption({ label: 'joué' })
   await expect(first).toBeDisabled()
   await expect(first).not.toBeFocused()
-  answer()
+  await answerStatus()
   await expect(first).toBeEnabled()
-  await page.unroute(status)
   await expect(first).toHaveValue('done')
   await expect(first).toBeFocused()
+  // Picked up, its row keeps the color of its status, and is put back.
+  const pickedUp = sets.getByRole('row').nth(1)
+  await pickUp(page, pickedUp.getByRole('button', { name: /^réordonner : / }))
+  await expect(pickedUp).toHaveAttribute('data-dragging')
+  await expect(pickedUp).toHaveCSS('background-color', 'rgb(245, 245, 245)')
+  await page.keyboard.press('Escape')
+  await expect(pickedUp).not.toHaveAttribute('data-dragging')
 
   // Moved to another day, its end with it, its sets in their order.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
@@ -604,7 +638,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(sets.getByRole('row').nth(1).getByRole('cell').nth(5)).toHaveText('annulé')
+  await expect(statusOf(sets.getByRole('row').nth(1))).toHaveText('annulé')
   // It stays announced, until it's un-announced.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
   // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.

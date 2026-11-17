@@ -111,8 +111,8 @@ handle. Screen readers name the handle after its item, e.g. "réordonner Aurore"
 keyboard, and announce, in French, when the item is picked up, each place it's moved to, and where it's dropped, or that
 it's put back, with its place, e.g. « Aurore est maintenant en position 2 sur 3. ».
 
-While a list can't be changed for a moment, e.g. while it's sent, its handles are greyed out (see
-[Controls that can't be used](#controls-that-cant-be-used)).
+While a list can't be changed for a moment, e.g. while it's sent, or while a move is saved, its handles are greyed out
+(see [Controls that can't be used](#controls-that-cant-be-used)), but keep the focus.
 
 ## Endpoints
 
