@@ -818,7 +818,7 @@ dl.admin-record {
 }
 
 /* Big enough for a finger. In a table's row, whose cells are aligned at their top, it's centered on the first line of
-   the others, overflowing into its cell's padding. */
+   the others as far as its cell's padding allows, rather than overlapping the next row's handle. */
 @media (pointer: coarse) {
   .admin button.admin-handle {
     min-width: 40px;
@@ -826,7 +826,7 @@ dl.admin-record {
   }
 
   .admin-table-controls td button.admin-handle {
-    margin-block: calc((1lh - 40px) / 2);
+    margin-block: max(calc((1lh - 40px) / 2), -0.5rem);
   }
 }
 

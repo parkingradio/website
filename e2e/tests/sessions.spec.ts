@@ -423,7 +423,7 @@ function longDay(day: string): string {
   return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 }
 
-test("a collective's takeover is added from its page, overnight, with its sets, then moved, one of its sets deleted, cancelled and deleted", async ({ page, isMobile }, testInfo) => {
+test("a collective's takeover is added from its page, overnight, with its sets, then moved, one of its sets deleted, cancelled and deleted", async ({ page, isMobile, hasTouch }, testInfo) => {
   const { unique, day, otherDay, youtubeVideo } = own(testInfo)
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
@@ -479,6 +479,25 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   // performer does, in the cell after the handle's, the duration's and the performers'.
   const performance = (row: number) => listed.getByRole('row').nth(row).getByRole('cell').nth(3)
   await expect(performance(1)).toHaveText('DJ')
+  // On touch screens, the handles, big enough for a finger, stay within their rows, so that they never overlap, and are
+  // about as high as the rows' first lines.
+  if (hasTouch) {
+    const handles = await listed.locator('tbody tr').evaluateAll((rows) =>
+      rows.map((row) => {
+        const handle = row.querySelector('.admin-handle')!.getBoundingClientRect()
+        const { top, bottom } = row.getBoundingClientRect()
+        const text = document.createRange()
+        text.selectNodeContents(row.querySelectorAll('td')[1])
+        const line = text.getClientRects()[0]
+        const offset = Math.abs((handle.top + handle.bottom) / 2 - (line.top + line.bottom) / 2)
+        return { within: handle.top >= top - 0.5 && handle.bottom <= bottom + 0.5, offset }
+      }),
+    )
+    for (const { within, offset } of handles) {
+      expect(within).toBe(true)
+      expect(offset).toBeLessThan(6)
+    }
+  }
   await moveWithKeyboard(page, listed.getByRole('row').nth(1).getByRole('button', { name: /^réordonner : / }), 1)
   await expect(performance(2)).toHaveText('DJ')
   await expect(listed.getByRole('row').nth(2).getByRole('button', { name: /^réordonner : / })).toBeFocused()
