@@ -268,6 +268,8 @@ async function expectSearch(query: string, found: string[]) {
 // What was sent as the session's fields in a request to save one, as JSON in the "session" part.
 // The date or the time of the session's start or end, in its form.
 const timeInput = (when: 'Début' | 'Fin', part: 'date' | 'heure') => within(screen.getByRole('group', { name: when })).getByLabelText(part)
+// How long the session form says the session lasts, rather than what's said of the sets' handles after their table.
+const lasts = () => within(screen.getByRole('group', { name: 'Quand' })).queryByRole('status')
 
 function sentSession(request: RequestInit) {
   return JSON.parse((request.body as FormData).get('session') as string)
@@ -528,9 +530,9 @@ describe("A session's page", () => {
     expect(within(value('Événement RA')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/6683745')
 
     expect(rows(setsTable())).toEqual([
-      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifié', '↑ ↓ déplacer modifier ×'],
-      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'joué', '↑ ↓ déplacer modifier ×'],
-      ['1 h', '-', '', '-', '', 'annulé', '↑ ↓ déplacer modifier ×'],
+      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifié', 'déplacer modifier ×'],
+      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'joué', 'déplacer modifier ×'],
+      ['1 h', '-', '', '-', '', 'annulé', 'déplacer modifier ×'],
     ])
     const first = within(setsTable()).getAllByRole('row')[1]
     expect(within(first).getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
@@ -624,7 +626,8 @@ describe("A session's page", () => {
   it('changes the status, asking first when cancelling it cancels sets', async () => {
     const cancelled = { ...SESSION, status: 'cancelled', statusUpdatedBy: 'admin@example.com', statusUpdatedAt: '2026-11-15T04:00:00.000Z' }
     cancelled.sets = SESSION.sets.map((set) => ({ ...set, status: 'cancelled' }))
-    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: cancelled } })
+    const reordered = { ...cancelled, sets: [cancelled.sets[1], cancelled.sets[0], cancelled.sets[2]] }
+    mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: cancelled }, 'PUT /api/admin/sets/set-1/position': { ok: true, session: reordered } })
     renderAt('/admin/sessions/session-1')
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
@@ -652,6 +655,11 @@ describe("A session's page", () => {
     expect(why.textContent).toBe('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')
     expect(why.compareDocumentPosition(setsTable()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(visibleText(document.body).match(/La session est annulée/g)).toHaveLength(1)
+
+    // Its sets can still be reordered.
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner : Set de Aurore et Brume' }), 1)
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-1/position').map(jsonBody)).toEqual([{ position: 1 }]))
+    await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', 'Aurore, Brume', '-']))
   })
 
   it("brings its sets' dropdowns back once it's un-cancelled, and says nothing of sets it doesn't have", async () => {
@@ -881,7 +889,7 @@ describe("A session's page", () => {
     expect(timeInput('Début', 'heure')).toHaveValue('21:00')
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
     expect(timeInput('Fin', 'heure')).toHaveValue('01:00')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 4 h\.$/)
     expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
     expect(screen.getByRole('combobox', { name: 'Collectif' })).toHaveValue('Ondes')
     // The name its type gives it shows while it has none of its own.
@@ -1118,17 +1126,17 @@ describe("A session's page", () => {
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
     await screen.findByRole('group', { name: 'Début' })
     expect(timeInput('Fin', 'heure')).toHaveValue('01:30')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 2 h 30\.$/)
     // Changing only the start's time doesn't move the end.
     fireEvent.change(timeInput('Début', 'heure'), { target: { value: '00:30' } })
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 2 h\.$/)
     fireEvent.change(timeInput('Début', 'heure'), { target: { value: '00:00' } })
     // Moving the start's day moves the end's, and moving it back finds the end as it opened.
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-08' } })
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-08')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 1 h 30\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 1 h 30\.$/)
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-01' } })
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 2 h 30\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 150 })
@@ -1160,7 +1168,7 @@ describe("A session's page", () => {
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-22')
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 4 h\.$/)
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-21' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
@@ -1187,7 +1195,9 @@ describe("A session's page", () => {
 
     await screen.findByRole('table', { name: 'Sets' })
     expect(tooLong()).toBe('\u26a0\ufe0e Les sets durent 2 h 15, plus que la session (2 h).')
-    expect(screen.getByRole('status')).toHaveClass('admin-warning')
+    const warning = screen.getByText(/Les sets durent /)
+    expect(warning).toHaveAttribute('role', 'status')
+    expect(warning).toHaveClass('admin-warning')
     expect(rows(setsTable()).map((row) => row[0])).toEqual(['1 h', '45 min', '30 min', 'à déterminer'])
 
     // Without Dune's set, as the server then has the session.
@@ -1204,36 +1214,99 @@ describe("A session's page", () => {
     expect(tooLong()).toBeNull()
   })
 
-  it('moves a set up or down among the sets, showing them as the server then has them, the focus staying on its arrow', async () => {
+  // Holds back the answers to the requests that save a set's place, which are still made, until what this returns is
+  // called.
+  function holdMoves() {
+    const answered = vi.mocked(fetch).getMockImplementation()!
+    let release = () => {}
+    const released = new Promise<void>((resolve) => (release = resolve))
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      const response = answered(input, options)
+      if ((input instanceof Request ? input.url : String(input)).endsWith('/position')) await released
+      return response
+    })
+    return release
+  }
+
+  it("moves a set where it's dropped, showing it there while it's saved, with a request per drop, its handle keeping the focus", async () => {
     const [first, cyan, cancelled] = SESSION.sets
     const session = (...sets: StudioSet[]): Session => ({ ...SESSION, sets })
     mockFetch({
       ...LOGGED_IN,
       '/api/admin/sessions/session-1': { ok: true, session: session(first, cyan, cancelled) },
-      'PUT /api/admin/sets/set-3/position': { ok: true, session: session(first, cancelled, cyan) },
-      'PUT /api/admin/sets/set-2/position': { ok: true, session: session(first, cyan, cancelled) },
-      'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' },
+      // As the server then has the session, the status of the set of Cyan changed by another admin meanwhile.
+      'PUT /api/admin/sets/set-1/position': { ok: true, session: session({ ...cyan, status: 'cancelled' }, cancelled, first) },
     })
+    const answer = holdMoves()
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
-    expect(screen.getByRole('button', { name: 'monter : Set de Aurore et Brume' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'descendre : Set' })).toBeDisabled()
-
-    fireEvent.click(screen.getByRole('button', { name: 'monter : Set' }))
-    await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', '-', 'Cyan']))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-3/position')[0])).toEqual({ position: 1 })
-    expect(screen.getByRole('button', { name: 'monter : Set' })).toHaveFocus()
-
-    // Moved back up, the focus staying on its arrow.
-    fireEvent.click(screen.getByRole('button', { name: 'monter : Set de Cyan' }))
-    await waitFor(() => expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-']))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2/position')[0])).toEqual({ position: 1 })
-    expect(screen.getByRole('button', { name: 'monter : Set de Cyan' })).toHaveFocus()
-
-    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Aurore et Brume' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^Le set « Set de Aurore et Brume » n'a pas pu être déplacé : Boom$/)
+    const handle = screen.getByRole('button', { name: 'réordonner : Set de Aurore et Brume' })
+    expect(handle).not.toHaveAttribute('aria-disabled')
+    // Put back with Escape, which sends nothing.
+    await moveWithKeyboard(handle, 1, { cancel: true })
     expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-'])
+
+    // Moved down two places, to the end, where it shows while that's saved, with a single request. Its handle keeps the
+    // focus, greyed out, like the others, and the sets' other controls can't be used, until it's saved.
+    await moveWithKeyboard(handle, 2)
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', '-', 'Aurore, Brume'])
+    expect(requestsTo('PUT', '/api/admin/sets/set-1/position').map(jsonBody)).toEqual([{ position: 2 }])
+    expect(requestsTo('PUT', '/api/admin/sets/set-2/position')).toHaveLength(0)
+    expect(handle).toHaveFocus()
+    for (const each of screen.getAllByRole('button', { name: /^réordonner : / })) expect(each).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('combobox', { name: 'Statut : Set de Cyan' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'supprimer : Set de Cyan' })).toBeDisabled()
+    // Picking it up again does nothing.
+    await moveWithKeyboard(handle, -1)
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', '-', 'Aurore, Brume'])
+    expect(requestsTo('PUT', '/api/admin/sets/set-1/position')).toHaveLength(1)
+
+    answer()
+    await waitFor(() => expect(handle).not.toHaveAttribute('aria-disabled'))
+    expect(rows(setsTable()).map((row) => [row[1], row[5]])).toEqual([
+      ['Cyan', 'annulé'],
+      ['-', 'annulé'],
+      ['Aurore, Brume', 'planifié'],
+    ])
+    expect(handle).toHaveFocus()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it("puts a set back where it was when its place can't be saved, saying why", async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/session-1')
+
+    await screen.findByRole('table', { name: 'Sets' })
+    const handle = screen.getByRole('button', { name: 'réordonner : Set de Aurore et Brume' })
+    await moveWithKeyboard(handle, 1)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/^Le set « Set de Aurore et Brume » n'a pas pu être déplacé : Boom$/)
+    expect(alert.compareDocumentPosition(setsTable()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-'])
+    expect(requestsTo('PUT', '/api/admin/sets/set-1/position').map(jsonBody)).toEqual([{ position: 1 }])
+    expect(handle).not.toHaveAttribute('aria-disabled')
+    expect(handle).toHaveFocus()
+  })
+
+  it("doesn't put a set back over what the server answered for another change while its place was saved", async () => {
+    const [first, cyan, cancelled] = SESSION.sets
+    const changed = { ...SESSION, sets: [first, { ...cyan, durationMinutes: 45 }, cancelled] }
+    mockFetch({ ...PAGE, ...ARTISTS, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' }, 'PUT /api/admin/sets/set-2': { ok: true, session: changed } })
+    const answer = holdMoves()
+    renderAt('/admin/sessions/session-1')
+
+    await screen.findByRole('table', { name: 'Sets' })
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner : Set de Aurore et Brume' }), 1)
+    // The set of Cyan saved from its form meanwhile.
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan' }))
+    await screen.findByRole('heading', { name: 'Set de Cyan' })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([['1 h', 'Aurore, Brume'], ['45 min', 'Cyan'], ['1 h', '-']]))
+
+    answer()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/n'a pas pu être déplacé : Boom$/)
+    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([['1 h', 'Aurore, Brume'], ['45 min', 'Cyan'], ['1 h', '-']])
   })
 
   it("has one form open at a time, the session's or a set's", async () => {
@@ -1280,7 +1353,7 @@ describe("A session's page", () => {
     fireEvent.change(timeInput('Début', 'heure'), { target: { value: '21:00' } })
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
     expect(timeInput('Fin', 'heure')).toHaveValue('00:00')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 3 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 3 h\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-2')).toHaveLength(1))
     expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
@@ -2137,7 +2210,7 @@ describe('Adding a session', () => {
     renderAt('/admin/sessions/nouvelle')
 
     await fillIn()
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 4 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 4 h\.$/)
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: '  HAUTE   RIVE ' } })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
 
@@ -2256,7 +2329,7 @@ describe('Adding a session', () => {
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-14' } })
     expect(timeInput('Fin', 'date')).toHaveValue('2026-11-15')
     expect(timeInput('Fin', 'heure')).toHaveValue('01:30')
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 2 h 30\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 2 h 30\.$/)
   })
 
   it('adds a session that lasts several days', async () => {
@@ -2264,7 +2337,7 @@ describe('Adding a session', () => {
     renderAt('/admin/sessions/nouvelle')
 
     await fillIn({ day: '2026-11-13', start: '18:00', endDay: '2026-11-15', end: '02:00' })
-    expect(screen.getByRole('status')).toHaveTextContent(/^Dure 32 h\.$/)
+    expect(lasts()).toHaveTextContent(/^Dure 32 h\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
     expect(sentSession(requestsTo('POST', '/api/admin/sessions')[0])).toMatchObject({ start: '2026-11-13T18:00-05:00', durationMinutes: 1920 })
@@ -2278,7 +2351,7 @@ describe('Adding a session', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     expect(await screen.findByText('La fin doit être après le début.')).toBeInTheDocument()
     expect(timeInput('Fin', 'heure')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(lasts()).not.toBeInTheDocument()
     expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
   })
 
@@ -2671,7 +2744,8 @@ describe("A new session's sets", () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'modifier : Set de Aurore' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'retirer : Set de Aurore' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'réordonner : Set de Aurore' })).toBeDisabled()
+    // Only greyed out, so that it would keep the focus (see sortable.tsx).
+    expect(screen.getByRole('button', { name: 'réordonner : Set de Aurore' })).toHaveAttribute('aria-disabled', 'true')
     answer(Response.json({ ok: false, error: 'Boom' }, { status: 500 }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeEnabled())
   })

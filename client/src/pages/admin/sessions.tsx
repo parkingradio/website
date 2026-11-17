@@ -50,7 +50,7 @@ import {
   setTitle,
 } from './describe'
 import type { Announced } from './describe'
-import { arrowAfterMove, compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
+import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
@@ -60,9 +60,11 @@ import { SessionForm } from './session-form'
 import { CreateSet, MoveSet } from './session-picker'
 import type { MovedSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
-import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
+import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet, TakeoverCollective } from './set-form'
+import { DragHandle, SortableList } from './sortable'
+import { arrayMove, useSortableItem } from './use-sortable'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
 // are its sets, and adding one.
@@ -464,10 +466,9 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   // The set that was just moved to another session, and that session, as the server answered, which the page says.
   const [moved, setMoved] = useState<{ set: StudioSet; to: Session } | null>(null)
   const setsHeadingId = useId()
-  // What gets the focus once a set is deleted, or moved to another session, since its row is gone, or moved, since its
-  // arrow was disabled while the request was under way, or once the panel that moves it is closed: a set's button, by the
-  // set's id and what the button does, or the heading of the sets.
-  const focusNext = useRef<{ id: string; action: 'up' | 'down' | 'move' | 'delete' } | 'heading' | null>(null)
+  // What gets the focus once a set is deleted, or moved to another session, since its row is gone, or once the panel
+  // that moves it is closed: a set's button, by the set's id and what the button does, or the heading of the sets.
+  const focusNext = useRef<{ id: string; action: 'move' | 'delete' } | 'heading' | null>(null)
   // A layout effect, which React runs in the commit that removes the ×, rather than a passive one, which it runs in a later
   // task when the update follows a request: the focus never falls back to the page in between. After every commit, since
   // it only does something once `focusNext` is set.
@@ -550,17 +551,24 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     else setSetsError(failure(`Le statut de «\u00a0${setName(set)}\u00a0» n'a pas pu être changé`, result, session.id))
   }
 
-  // Moves the set one place up or down among the session's sets, as the server then has them.
-  const moveSet = async (set: StudioSet, by: -1 | 1) => {
-    const index = session.sets.findIndex((other) => other.id === set.id)
+  // Moves the set at `from` to `to` among the session's sets, once it's dropped there: it shows there right away, while
+  // that's saved, then the sets show as the server has them, or the set goes back to where it was.
+  const moveSet = async (from: number, to: number) => {
+    const before = session
+    const set = before.sets[from]
+    const moved = { ...before, sets: arrayMove(before.sets, from, to) }
+    // Before the request, in the commit that drops the set, so that it never shows back in its place in between. Its
+    // handle, which is only aria-disabled while the move is saved, keeps the focus.
+    setSession(moved)
     setBusy(true)
     clearSetsMessages()
-    const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: index + by } })
+    const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: to } })
     setBusy(false)
-    if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
-    const now = result.session.sets.findIndex((other) => other.id === set.id)
-    focusNext.current = { id: set.id, action: arrowAfterMove(by, now, result.session.sets.length) }
-    setSession(result.session)
+    if (result.ok) return setSession(result.session)
+    // Unless another of the server's answers replaced it meanwhile, e.g. a set's form saved, which has the sets in their
+    // order.
+    setSession((current) => (current === moved ? before : current))
+    setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
   }
 
   // The focus goes to the next set's button that does `action`, or the previous one's, or else to the heading of the sets,
@@ -791,10 +799,10 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
   )
 }
 
-// A session's sets, in their order, each with its status as a dropdown that changes it, arrows that move it, a button
-// that opens the panel that moves it to another session, one that opens its form, and one that deletes it. The sets of a
-// cancelled session can't be un-cancelled: their statuses are written out instead, and the table says why above them,
-// once.
+// A session's sets, in their order, each with a handle that drags it to another place among them (see sortable.tsx), its
+// status as a dropdown that changes it, a button that opens the panel that moves it to another session, one that opens
+// its form, and one that deletes it. The sets of a cancelled session can't be un-cancelled: their statuses are written
+// out instead, and the table says why above them, once.
 function SetsTable({
   session,
   busy,
@@ -807,7 +815,7 @@ function SetsTable({
   session: Session
   busy: boolean
   onStatus: (set: StudioSet, status: SessionStatus) => Promise<void>
-  onMove: (set: StudioSet, by: -1 | 1) => void
+  onMove: (from: number, to: number) => void
   onMoveTo: (set: StudioSet) => void
   onEdit: (set: StudioSet) => void
   onDelete: (set: StudioSet) => void
@@ -816,73 +824,92 @@ function SetsTable({
   return (
     <>
       {cancelled && <p className="admin-notice">La session est annulée&nbsp;: on ne peut pas rétablir ses sets.</p>}
-      <table className="admin-table admin-table-controls" aria-label="Sets">
-        <thead>
-          <tr>
-            <th>Durée</th>
-            <th>Artistes</th>
-            <th>Prestation</th>
-            <th>Genres</th>
-            <th>Liens</th>
-            <th>Statut</th>
-            <th aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {session.sets.map((set, index) => (
-            <tr key={set.id} className={`admin-status-${set.status}`}>
-              <td className="admin-day">{setDuration(set)}</td>
-              <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
-              <td>{describePerformanceTypes(set)}</td>
-              <td>{genreNames(set.genres)}</td>
-              <td>
-                <SetLinks set={set} />
-              </td>
-              <td>
-                {cancelled ? (
-                  SET_STATUS_LABELS[set.status]
-                ) : (
-                  <StatusSelect
-                    label={`Statut : ${setName(set)}`}
-                    statuses={STATUSES}
-                    labels={SET_STATUS_LABELS}
-                    status={set.status}
-                    disabled={busy}
-                    onChange={(status) => onStatus(set, status)}
-                  />
-                )}
-              </td>
-              <td>
-                <MoveButtons
-                  name={setName(set)}
-                  first={index === 0}
-                  last={index === session.sets.length - 1}
-                  disabled={busy}
-                  data={{ 'data-set': set.id }}
-                  onMove={(by) => onMove(set, by)}
-                />{' '}
-                <button type="button" data-set={set.id} data-action="move" aria-label={`déplacer : ${setName(set)}`} onClick={() => onMoveTo(set)}>
-                  déplacer
-                </button>{' '}
-                <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={() => onEdit(set)}>
-                  modifier
-                </button>{' '}
-                <button
-                  type="button"
-                  data-set={set.id}
-                  data-action="delete"
-                  aria-label={`supprimer : ${setName(set)}`}
-                  disabled={busy}
-                  onClick={() => onDelete(set)}
-                >
-                  ×
-                </button>
-              </td>
+      {/* Even while the session is cancelled. */}
+      <SortableList ids={session.sets.map((set) => set.id)} nameOf={(index) => `«\u00a0${setName(session.sets[index])}\u00a0»`} disabled={busy} onMove={onMove}>
+        <table className="admin-table admin-table-controls" aria-label="Sets">
+          <thead>
+            <tr>
+              <th aria-label="Ordre" />
+              <th>Durée</th>
+              <th>Artistes</th>
+              <th>Prestation</th>
+              <th>Genres</th>
+              <th>Liens</th>
+              <th>Statut</th>
+              <th aria-label="Actions" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {session.sets.map((set) => (
+              <SetRow
+                key={set.id}
+                set={set}
+                cancelled={cancelled}
+                busy={busy}
+                onStatus={(status) => onStatus(set, status)}
+                onMoveTo={() => onMoveTo(set)}
+                onEdit={() => onEdit(set)}
+                onDelete={() => onDelete(set)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </SortableList>
     </>
+  )
+}
+
+// A set's row, colored by its status, which is dragged by its handle to reorder the sets.
+function SetRow({
+  set,
+  cancelled,
+  busy,
+  onStatus,
+  onMoveTo,
+  onEdit,
+  onDelete,
+}: {
+  set: StudioSet
+  // Whether its session is cancelled, which writes its status out.
+  cancelled: boolean
+  busy: boolean
+  onStatus: (status: SessionStatus) => Promise<void>
+  onMoveTo: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { ref, style, dragging, handle } = useSortableItem(set.id)
+  return (
+    <tr ref={ref} style={style} className={`admin-status-${set.status}`} data-dragging={dragging || undefined}>
+      <td>
+        <DragHandle handle={handle} label={`réordonner : ${setName(set)}`} />
+      </td>
+      <td className="admin-day">{setDuration(set)}</td>
+      <td>{set.performers.length > 0 ? <Performers performers={set.performers} /> : MISSING}</td>
+      <td>{describePerformanceTypes(set)}</td>
+      <td>{genreNames(set.genres)}</td>
+      <td>
+        <SetLinks set={set} />
+      </td>
+      <td>
+        {cancelled ? (
+          SET_STATUS_LABELS[set.status]
+        ) : (
+          <StatusSelect label={`Statut : ${setName(set)}`} statuses={STATUSES} labels={SET_STATUS_LABELS} status={set.status} disabled={busy} onChange={onStatus} />
+        )}
+      </td>
+      <td>
+        <button type="button" data-set={set.id} data-action="move" aria-label={`déplacer : ${setName(set)}`} onClick={onMoveTo}>
+          déplacer
+        </button>{' '}
+        <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={onEdit}>
+          modifier
+        </button>{' '}
+        <button type="button" data-set={set.id} data-action="delete" aria-label={`supprimer : ${setName(set)}`} disabled={busy} onClick={onDelete}>
+          ×
+        </button>
+      </td>
+    </tr>
   )
 }
 

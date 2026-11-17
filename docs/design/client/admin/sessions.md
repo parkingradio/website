@@ -99,6 +99,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "Événement RA": its event on RA, linking to it, or "-" when it has none. "créer" opens a panel under it that creates
     the event (see [Creating its event on RA](#creating-its-event-on-ra)).
 - "Sets": its sets, in their order (see [Sets' order](../../server/sessions.md#sets-order)). Each set is a row with:
+  - A handle, by which it's dragged to another place among the session's sets (see [Reordering](layout.md#reordering)),
+    even while the session is cancelled. It shows there as soon as it's dropped, while that's saved.
   - "Durée": its duration.
   - "Artistes": its performers, each linking to their page, or "-" once they've all been deleted.
   - "Prestation": its performance types.
@@ -107,8 +109,6 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
     application the set comes from. Screen readers name that last link by when the application was received, e.g.
     "Candidature reçue le 1 septembre 2026".
   - "Statut": its status, as a dropdown that changes it as soon as another status is picked, without confirming.
-  - "↑" and "↓", which move it one place up or down among the session's sets, even while the session is cancelled.
-    The first set's "↑" and the last one's "↓" can't be used.
   - "déplacer", which opens the panel that moves it to another session (see
     [Moving a set to another session](#moving-a-set-to-another-session)).
   - "modifier", which opens its form (see [A set's form](#a-sets-form)).
@@ -117,8 +117,9 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   Changing a set's status, adding one, moving one to another session or deleting one can change the session's status
   (see [Status](../../server/sessions.md#status)).
 
-  When a status can't be changed, or a set can't be moved up or down or deleted, the section says why above the sets,
-  naming the set. A set whose status couldn't be changed keeps it.
+  When a status can't be changed, a set's new place can't be saved, or a set can't be deleted, the section says why
+  above the sets, naming the set. A set whose status couldn't be changed keeps it, and one whose place couldn't be saved
+  goes back to where it was.
   "ajouter un set" opens the form of a new set.
 
   While the session is cancelled, "ajouter un set" can't be used, and says « La session est annulée : on ne peut pas lui
@@ -244,10 +245,9 @@ When the collectives can't be loaded, the form says so: the session's collective
 After its fields, a new session's form has its sets, which are only sent with it. They're added, changed and listed as
 on a session's page (see [A set's form](#a-sets-form)), except that:
 
-- Their rows have no status, nor "↑", "↓" or "déplacer": the sets, in the order they're added in, are reordered by
-  dragging them by a handle at the start of their rows (see [Reordering](layout.md#reordering)). "×" takes a set out of
-  the list, without confirming. Their links open in a new tab. Once the session's times are valid, the list says when
-  the sets add up to more than the session, with the same warning as a session's page.
+- Their rows have no status, nor "déplacer", and they're in the order they're added in, which dragging them changes.
+  "×" takes a set out of the list, without confirming. Their links open in a new tab. Once the session's times are
+  valid, the list says when the sets add up to more than the session, with the same warning as a session's page.
 - While the session's times aren't valid, its duration isn't known: a new set then lasts an hour by default. A new
   set's form keeps the duration it opened with, even once the session's times change.
 - A takeover's collective, whose artists its sets' forms list first, is the one the session's form has picked: an open

@@ -83,10 +83,12 @@ export function SortableList({
   )
 }
 
-// The handle that drags its item, at its start, named by `label`, e.g. "réordonner Aurore".
+// The handle that drags its item, at its start, named by `label`, e.g. "réordonner Aurore". While its list can't be
+// reordered, it's only aria-disabled, so that it keeps the focus, e.g. once its item is dropped and the move is saved
+// (see "A session's page" in docs/design/client/admin/sessions.md): dnd-kit then drops its listeners.
 export function DragHandle({ handle: { ref, props, disabled }, label }: { handle: SortableHandle; label: string }) {
   return (
-    <button type="button" ref={ref} className="admin-handle" aria-label={label} disabled={disabled} {...props}>
+    <button type="button" ref={ref} className="admin-handle" aria-label={label} aria-disabled={disabled || undefined} {...props}>
       {/* Six dots, in two columns. */}
       <svg aria-hidden="true" viewBox="0 0 10 16" width="10" height="16" fill="currentColor">
         {[3, 8, 13].flatMap((y) => [2.5, 7.5].map((x) => <circle key={`${x},${y}`} cx={x} cy={y} r="1.5" />))}
