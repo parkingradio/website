@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../api/client'
 import { mockFetch, requestsTo } from '../test-utils'
 import { Programmation, ProgrammationList } from './programmation'
@@ -64,10 +64,6 @@ const data: Schema<'Events'> = {
 const eventTitles = () => screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
 
 describe('Programmation', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('loads the events from the server', async () => {
     mockFetch({ '/api/events': data })
     render(<Programmation />)

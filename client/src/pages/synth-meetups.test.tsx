@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../api/client'
 import { mockFetch, requestsTo } from '../test-utils'
 import { SynthMeetups } from './synth-meetups'
@@ -33,10 +33,6 @@ const events: Schema<'Events'> = {
 describe('SynthMeetups', () => {
   beforeEach(() => {
     mockFetch({ '/api/events': events })
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
   })
 
   it('renders without crashing', () => {
