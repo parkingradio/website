@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { Locator, Page, TestInfo } from '@playwright/test'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
+import { moveWithKeyboard } from './drag.ts'
 import { test, expect, adminMenu, logIn } from './fixtures.ts'
 
 // The sessions and their sets: the seeded ones (see seed-data.ts), searched and listed on their artists' and collectives'
@@ -296,7 +297,8 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const reminder = page.getByRole('region', { name: 'Candidature' })
   await expect(reminder.getByRole('listitem')).toHaveText([longDay(day)])
   await expect(reminder).toContainText('20:00 à 23:00')
-  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').first()).toHaveText('à déterminer')
+  // After the cell with its handle.
+  await expect(rowsOf(sets, mine.artist.name).getByRole('cell').nth(1)).toHaveText('à déterminer')
   await expect(rowsOf(sets, mine.artist.name)).toContainText('DJ, autre : Synthé')
   await timeInput(page, 'Début', 'date').fill(day)
   await timeInput(page, 'Début', 'heure').fill('20:00')
@@ -472,13 +474,21 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await newSet.getByLabel('YouTube').fill(youtubeVideo)
   await newSet.getByRole('button', { name: 'ajouter le set' }).click()
   await expect(listed.getByRole('row')).toHaveCount(3)
+  // The first one moved after the second one, which has no SoundCloud link, with the keyboard, its handle keeping the
+  // focus, though the browser loses it as the row is put back in the page. They're told apart by what the first one's
+  // performer does, in the cell after the handle's, the duration's and the performers'.
+  const performance = (row: number) => listed.getByRole('row').nth(row).getByRole('cell').nth(3)
+  await expect(performance(1)).toHaveText('DJ')
+  await moveWithKeyboard(page, listed.getByRole('row').nth(1).getByRole('button', { name: /^réordonner : / }), 1)
+  await expect(performance(2)).toHaveText('DJ')
+  await expect(listed.getByRole('row').nth(2).getByRole('button', { name: /^réordonner : / })).toBeFocused()
 
   // The server refuses the set it can't add, which the error names, and nothing is saved until it can add them all.
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('alert')).toHaveText(
     `Le set de ${mine.artist.name} n'a pas pu être ajouté : The credentials of the SoundCloud app have not been entered yet`,
   )
-  await listed.getByRole('row').nth(1).getByRole('button', { name: /^modifier : / }).click()
+  await listed.getByRole('row').nth(2).getByRole('button', { name: /^modifier : / }).click()
   const listedSet = page.getByRole('region', { name: `Set de ${mine.artist.name}` })
   await listedSet.getByLabel('SoundCloud').fill('')
   await listedSet.getByRole('button', { name: 'enregistrer' }).click()
@@ -486,7 +496,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(page.getByRole('alert')).toHaveText(
     `Le set de ${mine.artist.name} n'a pas pu être ajouté : This YouTube video is another set's (Set de ${mine.artist.name})`,
   )
-  await listed.getByRole('row').nth(2).getByRole('button', { name: /^retirer : / }).click()
+  await listed.getByRole('row').nth(1).getByRole('button', { name: /^retirer : / }).click()
   await expect(listed.getByRole('row')).toHaveCount(2)
   await page.getByRole('button', { name: 'ajouter la session' }).click()
 

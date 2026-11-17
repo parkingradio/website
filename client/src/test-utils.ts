@@ -1,3 +1,4 @@
+import { act, fireEvent } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { AppConfig } from './config-context'
 
@@ -89,4 +90,33 @@ export function visibleText(element: Element): string {
   let text = ''
   for (let node = walker.nextNode(); node; node = walker.nextNode()) if (!node.parentElement!.closest('[hidden]')) text += node.nodeValue
   return text
+}
+
+/**
+ * jsdom doesn't lay out the page, which moving an item of a list with the keyboard needs (see pages/admin/sortable.tsx):
+ * with this, each item, an <li> or a <tr>, and what's in it, is 40px tall, under the ones before it, in a list as tall as
+ * its items.
+ */
+export function mockListLayout() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    if (['OL', 'UL', 'TBODY'].includes(this.tagName)) return new DOMRect(0, 0, 800, 40 * this.children.length)
+    const item = this.closest('li, tr')
+    if (!item?.parentElement) return new DOMRect(0, 0, 0, 0)
+    return new DOMRect(0, 40 * Array.prototype.indexOf.call(item.parentElement.children, item), 800, 40)
+  })
+}
+
+/**
+ * Picks up the item of a list whose handle is `handle` with the keyboard, moves it `by` places down, or up if it's
+ * negative, and drops it there, or puts it back with Escape if `cancel` (see pages/admin/sortable.tsx), laid out by
+ * `mockListLayout`. dnd-kit reads the keys' `code`, and only listens for the arrows a moment after the item is picked up.
+ */
+export async function moveWithKeyboard(handle: HTMLElement, by: number, { cancel = false } = {}) {
+  mockListLayout()
+  handle.focus()
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+  await act(() => new Promise((resolve) => setTimeout(resolve)))
+  for (let i = 0; i < Math.abs(by); i++) fireEvent.keyDown(handle, by > 0 ? { key: 'ArrowDown', code: 'ArrowDown' } : { key: 'ArrowUp', code: 'ArrowUp' })
+  fireEvent.keyDown(handle, cancel ? { key: 'Escape', code: 'Escape' } : { key: ' ', code: 'Space' })
+  await act(() => new Promise((resolve) => setTimeout(resolve)))
 }

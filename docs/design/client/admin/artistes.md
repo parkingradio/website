@@ -80,7 +80,8 @@ collective's page. It works like the artist form (see [Adding an artist](#adding
 the server does for admins (see [Profiles](../../server/collectives.md#profiles)). It has no genres, which are the
 artists'.
 
-Its artists are in order, at least one, and can be reordered and removed. Each one is either:
+Its artists are in order, at least one, and can be reordered (see [Reordering](layout.md#reordering)) and removed. Each
+one is either:
 
 - an artist picked from those in this section who aren't among the collective's artists yet, or
 - a new artist, whose name is typed in "Ajouter un nouvel artiste", then added with a "+" button (or Enter), and whom

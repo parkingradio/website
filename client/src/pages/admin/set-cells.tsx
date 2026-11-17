@@ -65,10 +65,9 @@ export function SetsTooLong({ sets, durationMinutes }: { sets: Pick<StudioSet, '
   )
 }
 
-// "↑" and "↓", which move a set one place up or down among its session's sets, like a set's artists (see
-// ordered-list.tsx), named after the set, `name`. The first one's "↑" and the last one's "↓" can't be used. Each says what
-// it does in `data-action`, along with `data`, e.g. the set it's about, so that the focus can follow the set once it's
-// moved.
+// "↑" and "↓", which move a set one place up or down among its session's sets, named after the set, `name`. The first
+// one's "↑" and the last one's "↓" can't be used. Each says what it does in `data-action`, along with `data`, e.g. the
+// set it's about, so that the focus can follow the set once it's moved.
 export function MoveButtons({
   name,
   first,
