@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import type { ClientRect } from '@dnd-kit/core'
 import { mockListLayout, moveWithKeyboard } from '../../test-utils'
 import { DragHandle, SortableList } from './sortable'
+import { closestVertically } from './sortable-places'
 import { arrayMove, useSortableItem } from './use-sortable'
 
 // A list of A, B, C and D, reordered by their handles, and a button outside it. `onMove` is told of each move.
@@ -79,6 +81,42 @@ describe('A list reordered by dragging', () => {
     await moveWithKeyboard(handle('D'), 3, { layout: { heights: [88, 40, 40, 40] } })
     expect(onMove).toHaveBeenLastCalledWith(0, 3)
     expect(letters()).toEqual(['A', 'B', 'C', 'D'])
+    // Exactly twice as tall, which lines it up with two places at once.
+    await moveWithKeyboard(handle('A'), 3, { layout: { heights: [80, 40, 40, 40] } })
+    expect(onMove).toHaveBeenLastCalledWith(0, 3)
+    await moveWithKeyboard(handle('A'), -3, { layout: { heights: [40, 40, 40, 80] } })
+    expect(onMove).toHaveBeenLastCalledWith(3, 0)
+    expect(letters()).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('puts the dragged item over places further along as it goes further, whatever its height', () => {
+    // A row twice as tall as the others, but for 4px, B, dragged a pixel at a time from the top of the list to its bottom.
+    const heights = { A: 36, B: 76, C: 36, D: 36, E: 36 }
+    const rects = new Map<string, ClientRect>()
+    let top = 0
+    for (const [id, height] of Object.entries(heights)) {
+      rects.set(id, { top, bottom: top + height, left: 0, right: 800, width: 800, height })
+      top += height
+    }
+    const over = (dy: number) => {
+      const collisionRect = { top: 36 + dy, bottom: 112 + dy, left: 0, right: 800, width: 800, height: 76 }
+      const args = { active: { id: 'B' }, collisionRect, droppableRects: rects, droppableContainers: [...rects.keys()].map((id) => ({ id })) }
+      return closestVertically(args as unknown as Parameters<typeof closestVertically>[0])[0].id
+    }
+    const overs = Array.from({ length: 36 + 108 + 1 }, (_, i) => over(i - 36))
+    // In order, each once, however it's swept.
+    expect(overs.filter((id, i) => id !== overs[i - 1])).toEqual(['A', 'B', 'C', 'D', 'E'])
+  })
+
+  it("doesn't scroll the page sideways while an item is dragged with the keyboard", async () => {
+    render(<Letters onMove={() => {}} />)
+    mockListLayout()
+
+    handle('A').focus()
+    fireEvent.keyDown(handle('A'), { key: ' ', code: 'Space' })
+    await act(() => new Promise((resolve) => setTimeout(resolve)))
+    for (const code of ['ArrowRight', 'ArrowLeft', 'PageDown', 'End']) expect(fireEvent.keyDown(handle('A'), { key: code, code })).toBe(false)
+    fireEvent.keyDown(handle('A'), { key: 'Escape', code: 'Escape' })
   })
 
   it('puts the item back when its handle loses the focus, so that keys pressed elsewhere do not drop it', async () => {
@@ -98,5 +136,18 @@ describe('A list reordered by dragging', () => {
     await act(() => new Promise((resolve) => setTimeout(resolve)))
     expect(onMove).not.toHaveBeenCalled()
     expect(letters()).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('keeps dragging an item with the mouse when its handle loses the focus, e.g. to another window', () => {
+    render(<Letters onMove={() => {}} />)
+    mockListLayout()
+
+    handle('A').focus()
+    fireEvent.mouseDown(handle('A'), { button: 0, clientX: 10, clientY: 20 })
+    fireEvent.mouseMove(document, { clientX: 10, clientY: 40 })
+    expect(handle('A')).toHaveAttribute('aria-pressed', 'true')
+    act(() => handle('A').blur())
+    expect(handle('A')).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.mouseUp(document, { clientX: 10, clientY: 40 })
   })
 })
