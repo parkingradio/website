@@ -189,7 +189,7 @@ test("a seeded takeover links to the application it comes from, whose page links
 
 // With Collectif Béton's takeover, BÉTON 140, whose artists are Mathis, Rosalie, Kofi and Yasmine, in that order, and whose
 // second set is Mathis and Rosalie's (see seed-data.ts). Nothing is saved.
-test("a takeover's set form offers its collective's artists first, in its order, on its page and on « nouvelle session »", async ({ page }) => {
+test("a takeover's set form offers its collective's artists first, in its order, but not its performers, on its page and on « nouvelle session »", async ({ page }) => {
   // The first options of the open combobox of `form`, each its name then what it's marked with.
   const firstOptions = (form: Locator, count: number) => async () => (await form.getByRole('option').allTextContents()).slice(0, count)
 
@@ -201,15 +201,14 @@ test("a takeover's set form offers its collective's artists first, in its order,
   const set = page.getByRole('region', { name: 'Set de Mathis et Rosalie' })
   const picker = set.getByRole('combobox', { name: 'Ajouter un artiste' })
   await picker.click()
-  await expect
-    .poll(firstOptions(set, 4))
-    .toEqual(['MathisCollectif Béton · déjà dans le set', 'RosalieCollectif Béton · déjà dans le set', 'KofiCollectif Béton', 'YasmineCollectif Béton'])
+  // Not Mathis and Rosalie, who are in the set.
+  await expect.poll(firstOptions(set, 2)).toEqual(['KofiCollectif Béton', 'YasmineCollectif Béton'])
   // The guest of its first set is offered as in other sets.
   await expect(set.getByRole('option', { name: /^DJ Poutine/ })).toHaveCount(1)
   await expect(set.getByRole('option', { name: /^DJ Poutine/ })).not.toContainText('Collectif Béton')
   // Its artists whose names have an « o » come first, ahead of those whose names start with one, e.g. Ondine.
   await picker.fill('o')
-  await expect.poll(firstOptions(set, 2)).toEqual(['RosalieCollectif Béton · déjà dans le set', 'KofiCollectif Béton'])
+  await expect.poll(firstOptions(set, 1)).toEqual(['KofiCollectif Béton'])
   await expect(set.getByRole('option', { name: /^Ondine/ })).toHaveCount(1)
   await picker.press('Escape')
   await set.getByRole('button', { name: 'annuler' }).click()

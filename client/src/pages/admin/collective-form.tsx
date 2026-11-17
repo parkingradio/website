@@ -152,12 +152,8 @@ function MembersField({
   const pickerId = useId()
   const entryId = useId()
 
-  // The collective's artists are there too, so that typing one of their names finds them, but they can't be picked.
-  const options = (artists ?? []).map((artist) =>
-    members.some((member) => 'id' in member && member.id === artist.id)
-      ? { ...artistOption(artist), detail: 'déjà dans le collectif', disabled: true }
-      : artistOption(artist),
-  )
+  const memberIds = new Set(members.flatMap((member) => ('id' in member ? [member.id] : [])))
+  const options = (artists ?? []).filter((artist) => !memberIds.has(artist.id)).map(artistOption)
   // A name left typed is what's wrong with the members, if anything is, or else that there are none.
   const pending = entry.trim() !== ''
   // A member with the name typed, or else an artist, who could be picked rather than having another one created.

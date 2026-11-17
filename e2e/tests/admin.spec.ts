@@ -238,6 +238,10 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await page.getByLabel('Nom du collectif').fill(name)
   await page.getByRole('combobox', { name: 'Ajouter un artiste connu' }).fill(known)
   await page.getByRole('option', { name: known, exact: true }).click()
+  // Once added, they're no longer offered, and leaving the field with their name typed, as the next step does, doesn't
+  // add them again (see its artists below).
+  await page.getByRole('combobox', { name: 'Ajouter un artiste connu' }).fill(known)
+  await expect(page.getByRole('listbox')).toHaveText('aucun résultat')
   await page.getByLabel('Ajouter un nouvel artiste').fill(added)
   await page.getByRole('button', { name: 'ajouter ce nouvel artiste au collectif' }).click()
   await page.getByRole('button', { name: `monter ${added}` }).click()
