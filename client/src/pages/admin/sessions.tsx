@@ -62,7 +62,7 @@ import type { MovedSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
 import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
-import type { InitialSet } from './set-form'
+import type { InitialSet, TakeoverCollective } from './set-form'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
 // are its sets, and adding one.
@@ -901,10 +901,11 @@ function OpenSet({
   onClose: () => void
   onChanged: (session: Session) => void
 }) {
-  return (
+  const form = (takeover: Loaded<TakeoverCollective> | null) => (
     <SetFormWithChoices
       title={set ? setTitle(set) : 'Nouveau set'}
       initial={set ? setFormValues(set) : application ? setFromApplication(application, session) : newSetFormValues(session)}
+      takeover={takeover}
       reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}
       onCancel={onClose}
@@ -926,6 +927,14 @@ function OpenSet({
       )}
     </SetFormWithChoices>
   )
+  return session.takeover ? <WithTakeover id={session.takeover.id}>{form}</WithTakeover> : form(null)
+}
+
+// What `children` render with a takeover's collective, whose artists its sets' forms offer first, loaded each time it
+// shows.
+function WithTakeover({ id, children }: { id: string; children: (takeover: Loaded<TakeoverCollective>) => ReactNode }) {
+  const loaded = useApi('/api/admin/collectives/{id}', { params: { path: { id } } })
+  return children(loaded.kind === 'loaded' ? { kind: 'loaded', value: loaded.value.collective } : loaded)
 }
 
 // What a new set of `session` starts with, filled in from the application whose id is `id`, once it's found, with its

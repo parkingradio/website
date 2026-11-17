@@ -167,7 +167,15 @@ export function SessionForm({
       </form>
       {sets && (
         <>
-          <ListedSets sets={sets} durationMinutes={'errors' in times ? null : times.durationMinutes} open={openSet} busy={busy} onChange={setSets} onOpen={setOpenSet} />
+          <ListedSets
+            sets={sets}
+            durationMinutes={'errors' in times ? null : times.durationMinutes}
+            open={openSet}
+            takeover={(form.type === 'takeover' && collectives?.find((collective) => collective.id === form.takeover?.id)) || null}
+            busy={busy}
+            onChange={setSets}
+            onOpen={setOpenSet}
+          />
           {/* After the sets, whose forms can't be within the session's. */}
           <div className="admin-form admin-form-wide">
             <FormActions

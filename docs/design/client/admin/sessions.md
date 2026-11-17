@@ -250,6 +250,8 @@ on a session's page (see [A set's form](#a-sets-form)), except that:
   which is the order they're added in, and "×" takes it out of the list, without confirming.
 - While the session's times aren't valid, its duration isn't known: a new set then lasts an hour by default. A new
   set's form keeps the duration it opened with, even once the session's times change.
+- In a takeover's set, its collective is the one the session's form has picked: an open set's form follows it right
+  away as the collective or the type changes.
 - "ajouter la session" can't be used while a set's form is open, saying « Ajoutez d'abord le set, ou annulez-le. »,
   or « Enregistrez d'abord le set, ou annulez-le. » for a listed set's, and the sets can't be changed while it's sent.
 
@@ -261,8 +263,12 @@ top to bottom, the form has:
 
 - "Artistes": the performers, in order, at least one, which can be reordered and removed like a collective's artists
   (see [Adding a collective](artistes.md#adding-a-collective)), each picked from the artists of
-  [Artistes](artistes.md). The set's performers are offered too, greyed out and marked "déjà dans le set", but can't be
-  picked. Performers can't be created by typing a name: they're added in Artistes first.
+  [Artistes](artistes.md). In a takeover's set, its collective's artists come first, in the collective's order (see
+  [Members](../../server/collectives.md#members)), each marked with the collective's name, then the others, e.g. for a
+  guest (see [Types and names](../../server/sessions.md#types-and-names)). While a name is typed, the collective's
+  artists it finds still come first. The set's performers are offered too, greyed out and marked "déjà dans le set",
+  after the collective's name for its artists, e.g. "Ondes · déjà dans le set", but can't be picked. Performers can't be
+  created by typing a name: they're added in Artistes first.
 - "Candidature": the application the set comes from, picked from its performers' applications, or "Aucune
   candidature" (see [Applications](#applications)).
 - "Durée": how long the set lasts, in hours and minutes (see [Times](../../server/sessions.md#times)), or empty while it
@@ -277,7 +283,9 @@ top to bottom, the form has:
   [a collective's genres](artistes.md#a-collectives-genres), up to 3.
 - "SoundCloud" and "YouTube": links to the set's track and video (see [Links](../../server/sessions.md#links)).
 
-When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked.
+When the artists can't be loaded, the form says so: the set's performers stay, but others can't be picked. On a
+takeover's page, its collective is loaded along with them: when it can't be, the form says so, and lists the artists as
+in other sets.
 
 ## Moving a set to another session
 
@@ -378,8 +386,11 @@ its sets in the way is named without a link.
 - `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
   `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,
   and `GET /api/admin/sessions`, in the panel that moves a set to another session, each time it opens.
-- `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and `GET /api/admin/artists`, in a
-  set's form, to pick the performers and suggest their genres, each time the form opens.
+- `GET /api/admin/collectives`, in the session form, to pick a takeover's collective, and to list its artists first in a
+  new session's sets, and `GET /api/admin/artists`, in a set's form, to pick the performers and suggest their genres,
+  each time the form opens.
+- `GET /api/admin/collectives/:id`, in a set's form on a takeover's page, to list its collective's artists first, each
+  time the form opens.
 - `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens, and
   on "nouvelle session", along with `GET /api/admin/artists`, to find the application of `?application`, and its
   artist.

@@ -1,9 +1,13 @@
 import { useId, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useApi } from '../../api/use-api'
+import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import type { Artist, GenreId } from '../../artist-profile'
+import type { Collective } from '../../collective-profile'
 import { Combobox } from '../../combobox'
+import type { ComboboxFilter } from '../../combobox'
+import { matching } from '../../combobox-matching'
 import { checkSet, isPerformersApplication } from '../../session-fields'
 import type { Reference, SetFields, SetFormValues } from '../../session-fields'
 import { ApplicationField } from './application-field'
@@ -11,7 +15,7 @@ import { leaving, useCheckedForm } from './checked-form'
 import { artistOption, genreNames, membersGenres } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
 import { OrderedList } from './ordered-list'
-import { ApplicationsFailure, ArtistsFailure } from './profile-details'
+import { ApplicationsFailure, ArtistsFailure, TakeoverFailure } from './profile-details'
 import { GenresField } from './profile-fields'
 import type { GroupProps } from './profile-fields'
 
@@ -22,6 +26,9 @@ import type { GroupProps } from './profile-fields'
 // How many of its performers' genres a set's form suggests.
 const SUGGESTED_GENRES = 3
 
+// The collective of a takeover, whose artists its sets' forms offer first.
+export type TakeoverCollective = Pick<Collective, 'name' | 'members'>
+
 type SetFormProps = {
   // What the form starts with: a set's, to change it, or what a new one starts with.
   initial: SetFormValues
@@ -30,13 +37,15 @@ type SetFormProps = {
   artists: Artist[] | null
   // The applications the set's is picked from, or null when they couldn't be loaded, which leaves the set's as it is.
   applications: Application[] | null
+  // The collective of the set's session, for a takeover, or null when it isn't one, or its collective couldn't be loaded.
+  takeover: TakeoverCollective | null
   submitLabel: string
   // Sends the set's fields, which `form` has, and returns the error, if it failed.
   onSubmit: (fields: SetFields, form: SetFormValues) => Promise<ReactNode | null>
   onCancel: () => void
 }
 
-export function SetForm({ initial, artists, applications, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ initial, artists, applications, takeover, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const checked = checkSet(form, applications)
@@ -64,6 +73,7 @@ export function SetForm({ initial, artists, applications, submitLabel, onSubmit,
       <PerformersField
         performers={form.performers}
         artists={artists}
+        takeover={takeover}
         onChange={(performers) => {
           update({ performers })
           // So that it says right away when its application isn't one of theirs anymore.
@@ -124,19 +134,28 @@ export function SetForm({ initial, artists, applications, submitLabel, onSubmit,
 export type InitialSet = SetFormValues | ((loaded: { artists: Artist[] | null; applications: Application[] | null }) => SetFormValues | null)
 
 // A set's form, under the heading `title`, and what `children` say of the set, with every artist and application to pick
-// from, loaded each time it opens, so that they're current, and nothing until then. When they can't be loaded, it says
-// so. With `reveal`, it's brought into view once it shows, its heading focused.
+// from, loaded each time it opens, so that they're current, and nothing until then, nor until its session's `takeover`
+// collective is loaded, if it's a takeover. When they can't be loaded, it says so. With `reveal`, it's brought into view
+// once it shows, its heading focused.
 export function SetFormWithChoices({
   title,
   children,
   initial,
+  takeover,
   reveal = false,
   ...props
-}: Omit<SetFormProps, 'artists' | 'applications' | 'initial'> & { title: string; children?: ReactNode; initial: InitialSet; reveal?: boolean }) {
+}: Omit<SetFormProps, 'artists' | 'applications' | 'initial' | 'takeover'> & {
+  title: string
+  children?: ReactNode
+  initial: InitialSet
+  // Its session's collective, for a takeover, or null when it isn't one.
+  takeover: Loaded<TakeoverCollective> | null
+  reveal?: boolean
+}) {
   const artists = useApi('/api/admin/artists')
   const applications = useApi('/api/admin/applications')
   const headingId = useId()
-  const loaded = artists.kind !== 'loading' && applications.kind !== 'loading'
+  const loaded = artists.kind !== 'loading' && applications.kind !== 'loading' && takeover?.kind !== 'loading'
   const choices = { artists: artists.kind === 'loaded' ? artists.value.artists : null, applications: applications.kind === 'loaded' ? applications.value.applications : null }
   const values = !loaded ? null : typeof initial === 'function' ? initial(choices) : initial
   const shown = reveal && values !== null
@@ -157,7 +176,8 @@ export function SetFormWithChoices({
       {children}
       {artists.kind === 'error' && <ArtistsFailure message={artists.message} />}
       {applications.kind === 'error' && <ApplicationsFailure message={applications.message} />}
-      <SetForm {...props} initial={values} {...choices} />
+      {takeover?.kind === 'error' && <TakeoverFailure message={takeover.message} />}
+      <SetForm {...props} initial={values} {...choices} takeover={takeover?.kind === 'loaded' ? takeover.value : null} />
     </section>
   )
 }
@@ -174,13 +194,35 @@ function GenresSuggestion({ genres, onPick }: { genres: GenreId[]; onPick: () =>
 }
 
 // The set's artists, in order, each of whom can be moved up or down or removed, then the field that picks another one
-// among the known artists. The set's artists are offered too, so that typing one of their names finds them, but they
-// can't be picked again.
-function PerformersField({ performers, artists, onChange, error, onLeave }: GroupProps<Reference[]> & { performers: Reference[]; artists: Artist[] | null }) {
+// among the known artists: for a takeover, its collective's first, in its order, marked with its name, which stay first
+// among those that what's typed finds. The set's artists are offered too, so that typing one of their names finds them,
+// but they can't be picked again.
+function PerformersField({
+  performers,
+  artists,
+  takeover,
+  onChange,
+  error,
+  onLeave,
+}: GroupProps<Reference[]> & { performers: Reference[]; artists: Artist[] | null; takeover: TakeoverCollective | null }) {
   const pickerId = useId()
-  const options = (artists ?? []).map((artist) =>
-    performers.some((performer) => performer.id === artist.id) ? { ...artistOption(artist), detail: 'déjà dans le set', disabled: true } : artistOption(artist),
-  )
+  const byId = new Map((artists ?? []).map((artist) => [artist.id, artist]))
+  // Those of its artists who are among the known artists, e.g. not those deleted since the collective was loaded.
+  const members = (takeover?.members ?? []).flatMap((member) => byId.get(member.id) ?? [])
+  const memberIds = new Set(members.map((member) => member.id))
+  const options = [...members, ...(artists ?? []).filter((artist) => !memberIds.has(artist.id))].map((artist) => {
+    const option = artistOption(artist)
+    // What marks the collective's artists.
+    const collective = memberIds.has(artist.id) ? takeover?.name : undefined
+    if (performers.some((performer) => performer.id === artist.id)) {
+      return { ...option, detail: [collective, 'déjà dans le set'].filter(Boolean).join(' · '), disabled: true }
+    }
+    return collective ? { ...option, detail: collective } : option
+  })
+  const filter: ComboboxFilter = (options, query) => {
+    const found = matching(options, query)
+    return [...found.filter((option) => memberIds.has(option.key)), ...found.filter((option) => !memberIds.has(option.key))]
+  }
   const pick = (id: string) => {
     const artist = artists?.find((artist) => artist.id === id)
     if (artist) onChange([...performers, { id, name: artist.name }])
@@ -197,6 +239,7 @@ function PerformersField({ performers, artists, onChange, error, onLeave }: Grou
           options={options}
           selected={null}
           onSelect={pick}
+          filter={filter}
           placeholder={artists ? 'choisir un artiste…' : "les artistes n'ont pas pu être chargés"}
           disabled={!artists}
           invalid={!!error}
