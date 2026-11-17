@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import fastifyCookie from '@fastify/cookie'
-import { NoSuchArtist, NoSuchCollective } from './store.js'
+import { NoSuchArtist, NoSuchCollective, RejectedWhileBooked } from './store.js'
 import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import type { SessionsStore, StoredSession, StoredSet } from '../sessions/store.js'
@@ -49,7 +49,7 @@ const store: ApplicationsStore = {
       createdAt,
       updatedBy: null,
       updatedAt: null,
-      status: 'new',
+      decision: 'new',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
       artistId: null,
@@ -239,7 +239,7 @@ describe('applications routes', () => {
       expect(response.statusCode).toBe(403)
       expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
     }
-    expect(rows).toEqual([expect.objectContaining({ status: 'new', updatedBy: null })])
+    expect(rows).toEqual([expect.objectContaining({ decision: 'new', updatedBy: null })])
     expect(settings.save).not.toHaveBeenCalled()
   })
 
@@ -512,7 +512,8 @@ describe('applications routes', () => {
       const artists = await send(app, 'GET', '/api/admin/applications/application-1')
       const session = { id: 'session-2', title: 'GUEST MIXES', start: '2026-11-14T21:00:00-05:00' }
       // Without times, which sets don't have.
-      expect(artists.json().application).toMatchObject({ sessions: [] })
+      // Planned, by its set that replaced the cancelled one, though it's still new.
+      expect(artists.json().application).toMatchObject({ sessions: [], status: 'planned' })
       expect(artists.json().application.sets).toEqual([
         { id: 'set-3', durationMinutes: 60, status: 'cancelled', session },
         { id: 'set-4', durationMinutes: null, status: 'planned', session },
@@ -520,6 +521,7 @@ describe('applications routes', () => {
       expect(sessions.ofApplications).toHaveBeenCalledWith(['application-1'])
       const collectives = await send(app, 'GET', '/api/admin/applications/application-2')
       expect(collectives.json().application).toMatchObject({
+        status: 'planned',
         sets: [],
         sessions: [{ id: 'session-1', title: 'LES ONDES TAKEOVER', start: null, end: null, durationMinutes: 240, status: 'planned' }],
       })
@@ -684,21 +686,42 @@ describe('applications routes', () => {
       await create(app)
       const cookies = await sessionCookies()
       const refused = [
-        ...[{ status: 'maybe' }, {}, { status: 'toString' }, { status: 'Accepted' }].map((payload) => send(app, 'PUT', '/api/admin/applications/application-1/status', payload)),
+        // A planned or done application is one whose sets or sessions are, which no status can say instead.
+        ...[{ status: 'maybe' }, {}, { status: 'toString' }, { status: 'Accepted' }, { status: 'planned' }, { status: 'done' }, { status: 'scheduled' }].map((payload) =>
+          send(app, 'PUT', '/api/admin/applications/application-1/status', payload),
+        ),
         app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: 'null', headers: { 'content-type': 'application/json' }, cookies }),
       ]
       for (const response of await Promise.all(refused)) {
         expect(response.statusCode).toBe(400)
-        expect(response.json()).toEqual({ ok: false, error: 'The status must be one of new, accepted, scheduled, done, rejected' })
+        expect(response.json()).toEqual({ ok: false, error: 'The status must be one of new, accepted, rejected' })
       }
       const extra = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted', details: 'x' })
       expect(extra.json()).toEqual({ ok: false, error: 'Unknown field: `details`' })
-      expect(rows[0].status).toBe('new')
+      expect(rows[0].decision).toBe('new')
     })
 
     it('responds 404 for an application that does not exist', async () => {
       const app = await buildApp()
       expect((await send(app, 'PUT', '/api/admin/applications/nothing/status', { status: 'accepted' })).statusCode).toBe(404)
+    })
+
+    it('responds 409 when the application would be rejected with a set or a session that is planned or done', async () => {
+      const app = await buildApp()
+      await create(app)
+      vi.spyOn(store, 'setStatus').mockRejectedValueOnce(new RejectedWhileBooked())
+      const response = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'rejected' })
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toEqual({ ok: false, error: "A rejected application has no set or session that's planned or done" })
+    })
+
+    it('responds with the status its sets or sessions give it, whatever was decided', async () => {
+      const app = await buildApp()
+      await create(app)
+      linked = [storedSession({ sets: [storedSet({ applicationId: 'application-1', application: { id: 'application-1', receivedAt: new Date() } })] })]
+      const response = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
+      expect(response.json().application).toMatchObject({ status: 'planned', statusUpdatedBy: 'admin@example.com' })
+      expect(rows[0].decision).toBe('accepted')
     })
   })
 

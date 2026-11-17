@@ -2,7 +2,8 @@
 
 At `/admin/candidatures`: the applications of artists and collectives for a set, for the team to go through (see
 [Applications](../../server/applications.md)). Each application's status is shown as "nouvelle" (new), "retenue"
-(accepted), "planifiée" (scheduled), "faite" (done) or "refusée" (rejected). Wherever applications are listed, their rows
+(accepted), "planifiée" (planned), "jouée" (done) or "refusée" (rejected) (see
+[Status, in Applications](../../server/applications.md#status)). Wherever applications are listed, their rows
 are colored by status (see [Status colors](layout.md#status-colors)), and "nouvelle" is in bold. What the artist would do
 is picked from a list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a
 few words.
@@ -23,7 +24,7 @@ collective, as [Artistes](artistes.md) searches them, their performance types, t
 the artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
 applications with a day in December, or a Thursday, and "26 déc" those with December 26th. Clicking "Reçue le"
 (`received`), "Artiste" (`artist`), "Ville" (`city`, by city, then country), "Dates" (`dates`, by the first day the
-artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by
+artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée, jouée, then refusée) sorts the list by
 that column, and clicking it again sorts it the other way around. The status buttons count the applications the search
 finds.
 

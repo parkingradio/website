@@ -4,9 +4,20 @@ import { ApiError, ById, Day, Ok, Timestamp, Total, changesTo, firstIssue, objec
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../artists/profile.js'
 import { ApplicationLinks, NO_LINKS, linksByApplication } from '../sessions/routes.js'
 import type { SessionsStore, StoredSession } from '../sessions/store.js'
-import { ApplicationFields, ApplicationStatus, BAD_STATUS, NO_DATE, PerformanceTypeId, ReceivedAt, TimeSlot } from './fields.js'
+import {
+  ApplicationDecision,
+  ApplicationFields,
+  ApplicationStatus,
+  BAD_DECISION,
+  NO_DATE,
+  PerformanceTypeId,
+  REJECTED_APPLICATION,
+  ReceivedAt,
+  TimeSlot,
+  applicationStatus,
+} from './fields.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
-import { NoSuchArtist, NoSuchCollective } from './store.js'
+import { NoSuchArtist, NoSuchCollective, RejectedWhileBooked } from './store.js'
 import type { ApplicationChange, ApplicationOwner, ApplicationsStore, StoredApplication } from './store.js'
 
 // Admin routes for applications: create, view, change, accept or reject, and delete them, and choose who the ones artists
@@ -29,7 +40,7 @@ const Application = z
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),
     status: ApplicationStatus,
-    statusUpdatedBy: z.string().nullable(),
+    statusUpdatedBy: z.string().nullable().meta({ description: 'Who last changed what admins decided' }),
     statusUpdatedAt: Timestamp.nullable(),
     ...ApplicationLinks,
   })
@@ -41,6 +52,7 @@ const ApplicationResponse = z.object({ ok: z.literal(true), application: Applica
 const NO_SUCH_APPLICATION: z.infer<typeof ApiError> = { ok: false, error: 'No such application' }
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
 const NO_SUCH_COLLECTIVE: z.infer<typeof ApiError> = { ok: false, error: 'No such collective' }
+const REJECTED_WHILE_BOOKED: z.infer<typeof ApiError> = { ok: false, error: REJECTED_APPLICATION }
 const ONE_OWNER = 'An application belongs to either an artist or a collective: send either artistId or collectiveId'
 
 // What admins send to replace an application's fields, to change some of them, and to create one, with the artist or
@@ -67,8 +79,8 @@ function ownerOf(artistId: string | undefined, collectiveId: string | undefined)
 }
 
 // The fields are listed one by one, so that a column added to the table doesn't end up in the API unless it's added here.
-// With the sets and the sessions that come from it, which a new application doesn't have.
-function application(row: StoredApplication, links: ApplicationLinks = NO_LINKS): Application {
+// With the sets and the sessions that come from it, which its status is worked out from too.
+function application(row: StoredApplication, links: ApplicationLinks): Application {
   return {
     id: row.id,
     artistId: row.artistId,
@@ -83,7 +95,7 @@ function application(row: StoredApplication, links: ApplicationLinks = NO_LINKS)
     details: row.details,
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,
-    status: row.status,
+    status: applicationStatus(row.decision, [...links.sets, ...links.sessions].map(({ status }) => status)),
     statusUpdatedBy: row.statusUpdatedBy,
     statusUpdatedAt: row.statusUpdatedAt?.toISOString() ?? null,
     ...links,
@@ -157,7 +169,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   // The applications `rows`, as the endpoints return them, with their sets and sessions, which are found in `linked`.
   function withLinks(rows: StoredApplication[], linked: StoredSession[]): Application[] {
     const links = linksByApplication(linked)
-    return rows.map((row) => application(row, links.get(row.id)))
+    return rows.map((row) => application(row, links.get(row.id) ?? NO_LINKS))
   }
 
   // Responds with the application `id` that `found` finds, or changes, or 404 when there's none. Its sets and sessions are
@@ -267,7 +279,8 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       const owner = ownerOf(artistId, collectiveId)!
       try {
         const row = await store.create({ ...fields, ...owner, createdBy: request.user!.email })
-        return { ok: true as const, application: application(row) }
+        // A new application has no sets or sessions.
+        return { ok: true as const, application: application(row, NO_LINKS) }
       } catch (error) {
         if (error instanceof NoSuchArtist) return reply.status(400).send(NO_SUCH_ARTIST)
         if (error instanceof NoSuchCollective) return reply.status(400).send(NO_SUCH_COLLECTIVE)
@@ -319,16 +332,21 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       config: { admin: true, tool: { title: "Changer le statut d'une candidature" } },
       schema: {
         operationId: 'update_application_status',
-        summary: 'Accepts or rejects an application, or gives it another status',
+        summary: 'Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done',
         tags: ['Applications'],
         params: ById,
-        body: z.strictObject({ status: ApplicationStatus }, { error: objectError(BAD_STATUS) }),
-        response: { 200: ApplicationResponse, 404: ApiError },
+        body: z.strictObject({ status: ApplicationDecision }, { error: objectError(BAD_DECISION) }),
+        response: { 200: ApplicationResponse, 404: ApiError, 409: ApiError },
       },
     },
     async (request, reply) => {
-      const change = { status: request.body.status, statusUpdatedBy: request.user!.email, statusUpdatedAt: new Date() }
-      return respond(reply, request.params.id, store.setStatus(request.params.id, change))
+      const change = { decision: request.body.status, statusUpdatedBy: request.user!.email, statusUpdatedAt: new Date() }
+      try {
+        return await respond(reply, request.params.id, store.setStatus(request.params.id, change))
+      } catch (error) {
+        if (error instanceof RejectedWhileBooked) return reply.status(409).send(REJECTED_WHILE_BOOKED)
+        throw error
+      }
     },
   )
 

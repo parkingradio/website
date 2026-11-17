@@ -1760,7 +1760,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Accepts or rejects an application, or gives it another status */
+        /** Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done */
         put: operations["update_application_status"];
         post?: never;
         delete?: never;
@@ -2941,6 +2941,7 @@ export interface components {
             updatedBy: string | null;
             updatedAt: string | null;
             status: components["schemas"]["ApplicationStatus"];
+            /** @description Who last changed what admins decided */
             statusUpdatedBy: string | null;
             statusUpdatedAt: string | null;
             /** @description The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets */
@@ -2948,6 +2949,11 @@ export interface components {
             /** @description The sessions that come from it, which only a collective's application has, in the order of the sessions */
             sessions: components["schemas"]["ApplicationSession"][];
         };
+        /**
+         * @description What admins decide about an application: its status, unless its sets or sessions make it planned or done
+         * @enum {string}
+         */
+        ApplicationDecision: "new" | "accepted" | "rejected";
         ApplicationFields: {
             /** @description Saved sorted, without duplicates. Past days are allowed */
             dates: string[];
@@ -2998,8 +3004,11 @@ export interface components {
                 start: string | null;
             };
         };
-        /** @enum {string} */
-        ApplicationStatus: "new" | "accepted" | "scheduled" | "done" | "rejected";
+        /**
+         * @description Worked out from what admins decided and from the statuses of its sets or sessions
+         * @enum {string}
+         */
+        ApplicationStatus: "new" | "accepted" | "planned" | "done" | "rejected";
         Artist: {
             id: string;
             /** Format: date-time */
@@ -4992,7 +5001,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    status: components["schemas"]["ApplicationStatus"];
+                    status: components["schemas"]["ApplicationDecision"];
                 };
             };
         };
@@ -5039,6 +5048,15 @@ export interface operations {
             };
             /** @description Default Response */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

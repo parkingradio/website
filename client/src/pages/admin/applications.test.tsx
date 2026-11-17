@@ -132,7 +132,7 @@ describe('The list of applications', () => {
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     // Brume's genres are left out, and so is her city, which leaves her country.
     expect(rows()).toEqual([
-      ['8 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '29 oct. 2026', 'Vinyl', 'faite'],
+      ['8 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '29 oct. 2026', 'Vinyl', 'jouée'],
       ['7 octobre 2026', 'Brume', 'Canada', '-', '5 nov. 2026', 'Rap, autre : Vinyle seulement', 'refusée'],
       ['6 octobre 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '12 nov. 2026', 'Full Band', 'retenue'],
       ['28 mars 2026', 'Aurore', 'Montréal, Canada', 'techno, ambient', '10 déc. 2026, 17 déc. 2026, 7 janv. 2027 (+1)', 'DJ, autre : Vinyle seulement', 'nouvelle'],
@@ -159,7 +159,7 @@ describe('The list of applications', () => {
       'nouvelles (1)',
       'retenues (1)',
       'planifiées (0)',
-      'faites (1)',
+      'jouées (1)',
       'refusées (1)',
     ])
     expect(filters.getByRole('button', { name: 'toutes (4)' })).toHaveAttribute('aria-pressed', 'true')
@@ -369,7 +369,7 @@ describe('Searching the list of applications', () => {
       'nouvelles (1)',
       'retenues (1)',
       'planifiées (0)',
-      'faites (1)',
+      'jouées (1)',
       'refusées (0)',
     ])
 
@@ -380,7 +380,7 @@ describe('Searching the list of applications', () => {
 
   it('says there are none with a status, rather than that none matches, when there are none with it at all', async () => {
     mockFetch(LISTED)
-    renderAt('/admin/candidatures?status=scheduled&search=aurore')
+    renderAt('/admin/candidatures?status=planned&search=aurore')
 
     await waitFor(() => expect(screen.getByText('Aucune candidature avec ce statut.')).toBeInTheDocument())
   })
@@ -414,7 +414,7 @@ describe('Changing the status of an application from the list', () => {
 
     const first = await select('Aurore, reçue le 28 mars 2026')
     expect(first).toHaveValue('new')
-    expect(within(first).getAllByRole('option').map((option) => option.textContent)).toEqual(['nouvelle', 'retenue', 'planifiée', 'faite', 'refusée'])
+    expect(within(first).getAllByRole('option').map((option) => option.textContent)).toEqual(['nouvelle', 'retenue', 'planifiée', 'jouée', 'refusée'])
     expect(screen.getAllByRole('combobox').map((each) => each.getAttribute('aria-label'))).toEqual([
       'Statut : Candidature de Aurore, reçue le 8 octobre 2026',
       'Statut : Candidature de Brume, reçue le 7 octobre 2026',
@@ -440,7 +440,7 @@ describe('Changing the status of an application from the list', () => {
     expect(screen.getByText('Aucune candidature avec ce statut.')).toBeInTheDocument()
     expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
     expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
-    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (2)', 'planifiées (0)', 'faites (1)', 'refusées (1)'])
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (2)', 'planifiées (0)', 'jouées (1)', 'refusées (1)'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/)
   })
 
@@ -455,22 +455,22 @@ describe('Changing the status of an application from the list', () => {
     await waitFor(() => expect(changed.closest('tr')).toHaveClass('admin-status-rejected'))
     expect(changed).toHaveValue('rejected')
     expect(rows()).toHaveLength(4)
-    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (2)'])
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (1)', 'planifiées (0)', 'jouées (1)', 'refusées (2)'])
   })
 
   it('shows the status picked and keeps only that application from being changed while it is saved', async () => {
-    mockFetch({ ...LISTED, [PUT]: { ok: true, application: { ...OLDEST, status: 'done' } } })
+    mockFetch({ ...LISTED, [PUT]: { ok: true, application: { ...OLDEST, status: 'rejected' } } })
     renderAt('/admin/candidatures?status=all')
 
     const changed = await select('Aurore, reçue le 28 mars 2026')
     const other = await select('Brume, reçue le 7 octobre 2026')
-    fireEvent.change(changed, { target: { value: 'done' } })
+    fireEvent.change(changed, { target: { value: 'rejected' } })
 
     expect(changed).toBeDisabled()
-    expect(changed).toHaveValue('done')
+    expect(changed).toHaveValue('rejected')
     expect(other).toBeEnabled()
     await waitFor(() => expect(changed).toBeEnabled())
-    expect(changed).toHaveValue('done')
+    expect(changed).toHaveValue('rejected')
   })
 
   it('says why a status could not be changed, naming the application, which keeps its status', async () => {
@@ -525,7 +525,7 @@ describe('The default view of the list of applications', () => {
     expect(received()).toEqual(['9 octobre 2026', '8 octobre 2026', '7 octobre 2026', '6 octobre 2026', '28 mars 2026'])
     expect(header()).toHaveAttribute('aria-sort', 'descending')
 
-    fireEvent.click(screen.getByRole('button', { name: 'faites (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'jouées (1)' }))
     expect(header()).toHaveAttribute('aria-sort', 'descending')
   })
 
@@ -584,7 +584,7 @@ describe('The default view of the list of applications', () => {
     renderAt('/admin/candidatures')
 
     await expectSearch('aurore', ['28 mars 2026', '9 octobre 2026'])
-    expect(counts()).toEqual(['toutes (4)', 'nouvelles (2)', 'retenues (1)', 'planifiées (0)', 'faites (1)', 'refusées (0)'])
+    expect(counts()).toEqual(['toutes (4)', 'nouvelles (2)', 'retenues (1)', 'planifiées (0)', 'jouées (1)', 'refusées (0)'])
   })
 })
 
@@ -690,7 +690,7 @@ describe('Sorting the list of applications', () => {
     renderAt('/admin/candidatures?status=all')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Statut' }))
-    expect(rows().map((row) => row[6])).toEqual(['nouvelle', 'retenue', 'faite', 'refusée'])
+    expect(rows().map((row) => row[6])).toEqual(['nouvelle', 'retenue', 'jouée', 'refusée'])
   })
 })
 

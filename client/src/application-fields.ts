@@ -13,6 +13,7 @@ export type ApplicationFields = Schema<'ApplicationFields'>
 export type TimeSlot = Schema<'TimeSlot'>
 export type PerformanceTypeId = Schema<'PerformanceTypeId'>
 export type ApplicationStatus = Schema<'ApplicationStatus'>
+export type ApplicationDecision = Schema<'ApplicationDecision'>
 
 // The performance types' names, in French, in the order of the server's list, which is the order applications list them
 // in. The server emails them too (see server/src/applications/emails.ts), and they must be changed together.
@@ -29,8 +30,9 @@ export function performanceTypeName(id: PerformanceTypeId): string {
   return PERFORMANCE_TYPE_NAMES[id]
 }
 
-// In the order applications usually go through them (see describe.ts for their names).
-export const APPLICATION_STATUSES = everyOne<ApplicationStatus>()(['new', 'accepted', 'scheduled', 'done', 'rejected'])
+// In the order applications usually go through them (see describe.ts for their names). The server works out "planned"
+// and "done" from the application's sets and sessions, and only takes the others (see `ApplicationDecision`).
+export const APPLICATION_STATUSES = everyOne<ApplicationStatus>()(['new', 'accepted', 'planned', 'done', 'rejected'])
 
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 export const DETAILS_MAX_LENGTH = 2000

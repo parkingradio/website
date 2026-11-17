@@ -12,6 +12,7 @@
 # including while other transactions change sessions, sets that add up to more than their session, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
 # collective's takeover, or changing a set, while that collective, or one of its performers, is deleted, the applications
 # sets and sessions come from, which applications list, their rules, and deleting them, even while a set is given one,
+# what a rejected application keeps its sets and sessions from, even while they change,
 # the content of a session's event on RA, from its sets' performers, and announcing a session.
 #
 # These tests can't reach SoundCloud, so they only check what happens to a track's link before it's resolved.
@@ -963,6 +964,63 @@ expect_status 200
 json DELETE "${COLLECTIVES}/${candidates}"
 expect_status 200
 json DELETE "${ARTISTS}/${candidate}"
+expect_status 200
+
+echo "  a rejected application has no set or session that's planned or done, even while other requests change them"
+readonly REJECTED="A rejected application has no set or session that's planned or done"
+request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Refusée"}' "$ARTISTS"
+refused="$(first_id)"
+refused_application="$(application_for artistId "$refused")"
+session_form POST "$SESSIONS" "$(session_json null 60)"
+expect_status 200
+undated="$(first_id)"
+json POST "${SESSIONS}/${undated}/sets" "$(set_json "$(performers "$refused")" 60 "\"application\":\"${refused_application}\"")"
+expect_status 200
+refused_set="$(last_set)"
+json GET "${APPLICATIONS}/${refused_application}"
+expect_body_contains '"status":"planned"'
+json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+expect_status 409
+expect_body "^\\{\"ok\":false,\"error\":\"${REJECTED}\"}$"
+# With its only set cancelled, which keeps it.
+json PUT "${SETS}/${refused_set}/status" '{"status":"cancelled"}'
+expect_status 200
+json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+expect_status 200
+expect_body_contains "\"status\":\"rejected\",\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
+expect_body_contains "\"sets\":[{\"id\":\"${refused_set}\",\"durationMinutes\":60,\"status\":\"cancelled\""
+json PUT "${SETS}/${refused_set}/status" '{"status":"done"}'
+expect_status 409
+expect_body "^\\{\"ok\":false,\"error\":\"${REJECTED}\",\"session\":null,\"set\":null}$"
+json POST "${SESSIONS}/${undated}/sets" "$(set_json "$(performers "$refused")" 60 "\"application\":\"${refused_application}\"")"
+expect_status 400
+expect_body_contains "\"error\":\"${REJECTED}\""
+
+echo "  un-cancelling a set waits for its application to be rejected, then fails"
+json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"new"}'
+expect_status 200
+hold_sessions_lock "update applications set status = 'rejected' where id = '${refused_application}';"
+send_in_background PUT "${SETS}/${refused_set}/status" '{"status":"planned"}'
+wait_for_sessions_lock
+release_sessions_lock
+wait_for_background
+expect_status 409
+expect_body_contains "\"error\":\"${REJECTED}\""
+
+echo "  rejecting an application waits for its set to be un-cancelled, then fails"
+json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"accepted"}'
+expect_status 200
+hold_sessions_lock "update sets set status = 'planned' where id = '${refused_set}';"
+send_in_background PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+wait_for_sessions_lock
+release_sessions_lock
+wait_for_background
+expect_status 409
+expect_body_contains "\"error\":\"${REJECTED}\""
+[ "$(sql "select status from applications where id = '${refused_application}'")" = accepted ] || fail "expected the application to stay accepted"
+json DELETE "${SESSIONS}/${undated}"
+expect_status 200
+json DELETE "${ARTISTS}/${refused}"
 expect_status 200
 
 echo "  deleting an artist takes them out of their sets, which stay, even without performers"

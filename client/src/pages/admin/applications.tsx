@@ -5,7 +5,7 @@ import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import { APPLICATION_STATUSES } from '../../application-fields'
-import type { Application, ApplicationStatus } from '../../application-fields'
+import type { Application, ApplicationDecision, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import { ApplicationForm } from './application-form'
@@ -76,6 +76,12 @@ function applicationName(application: Application, owner: Entry | undefined): st
 
 // What the list of applications opens on.
 const DEFAULT_STATUS: ApplicationStatus = 'new'
+
+// The status picked, which is sent as it is for now: the server refuses "planned" and "done", which it works out from the
+// application's sets and sessions, and the page shows its error.
+function asDecision(status: ApplicationStatus): ApplicationDecision {
+  return status as ApplicationDecision
+}
 // Those still to go through, where the oldest come first, rather than the most recently received.
 const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
 
@@ -322,7 +328,7 @@ function ApplicationsList() {
 
   const changeStatus = async (application: Application, status: ApplicationStatus) => {
     setStatusError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status } })
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status: asDecision(status) } })
     if (result.ok) setChanged((changed) => ({ ...changed, [application.id]: result.application }))
     else setStatusError(`Le statut de «\u00a0${applicationName(application, ownerOf(application, byKey))}\u00a0» n'a pas pu être changé : ${result.error}`)
   }
@@ -549,7 +555,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
   const changeStatus = async (status: ApplicationStatus) => {
     setBusy(true)
     setError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status } })
+    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status: asDecision(status) } })
     setBusy(false)
     if (result.ok) setApplication(result.application)
     else setError(`Le statut n'a pas pu être changé : ${result.error}`)

@@ -34,16 +34,16 @@ export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   new: 'nouvelle',
   accepted: 'retenue',
-  scheduled: 'planifiée',
-  done: 'faite',
+  planned: 'planifiée',
+  done: 'jouée',
   rejected: 'refusée',
 }
 // The same, in the plural, e.g. for the filters of the applications list.
 export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
   new: 'nouvelles',
   accepted: 'retenues',
-  scheduled: 'planifiées',
-  done: 'faites',
+  planned: 'planifiées',
+  done: 'jouées',
   rejected: 'refusées',
 }
 

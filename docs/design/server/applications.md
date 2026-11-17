@@ -43,23 +43,59 @@ The endpoints below also return these fields:
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
 | `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Status changes don't count, and neither do changes to its sets and sessions |
-| `status` | `"new"`, `"accepted"`, `"scheduled"`, `"done"` or `"rejected"` | See below |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed the status (an admin's email), and when |
+| `status` | `"new"`, `"accepted"`, `"planned"`, `"done"` or `"rejected"` | Worked out from what admins decided and from its sets or sessions: see [Status](#status) |
+| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed what admins decided (an admin's email), and when, but not when its sets or sessions change its status (see [Status](#status)) |
 | `sets` | list of objects | The sets that come from the application, which only an artist's has: see below |
 | `sessions` | list of objects | The sessions that come from the application, which only a collective's has: see below |
-
-Every application starts as `"new"`, then is `"accepted"` or `"rejected"` as an admin decides, and an accepted one is
-`"scheduled"` once a date has been set with the artist, then `"done"` once they've played. That's only the usual order:
-admins can change a status to any other.
 
 An application can lead to sets, for an artist's, or to sessions, for a collective's, its takeovers (see
 [Applications, in Sessions](sessions.md#applications)). They're linked to it from the set or the session, whose
 `application` it then is, which follows the rules there, and the application lists them, so that each can be found from
-the other. It can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it. Linking them
-doesn't change the application's status, which admins still change themselves. Each one is listed with its `id`,
-`durationMinutes` and `status`, as its endpoints give them, in the order of `GET /api/admin/sessions`, then of a
-session's sets: a session with its `title`, `start` and `end` too, and a set with its `session`, an object with its
-session's `id`, `title` and `start`. Deleting an application takes it from its sets and sessions, which stay.
+the other. It can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it. Their statuses
+make the application's (see [Status](#status)). Each one is listed with its `id`, `durationMinutes` and `status`, as its
+endpoints give them, in the order of `GET /api/admin/sessions`, then of a session's sets: a session with its `title`,
+`start` and `end` too, and a set with its `session`, an object with its session's `id`, `title` and `start`. Deleting
+an application takes it from its sets and sessions, which stay.
+
+## Status
+
+An application only keeps what admins decided about it: every application starts as `"new"`, then admins accept it
+(`"accepted"`) or reject it (`"rejected"`), or make it new again, with `PUT /api/admin/applications/:id/status`. Its
+`status` is worked out from that and from the statuses of its sets or sessions (see
+[Status, in Sessions](sessions.md#status)) whenever it's read: the first of these that applies.
+
+| `status` | When |
+|---|---|
+| `"rejected"` | Admins rejected it |
+| `"planned"` | One of its sets or sessions is planned, whether it has a date or not |
+| `"done"` | One of its sets or sessions is done |
+| `"accepted"` | Admins accepted it, or it has sets or sessions, all of them cancelled |
+| `"new"` | Otherwise |
+
+```
+             accept
+  new ───────────────────▶ accepted
+   │                        │   ▲
+   │   a planned set        │   │ all its sets and sessions
+   │      or session        ▼   │ cancelled
+   └────────────────────▶ planned ───── played ─────▶ done
+
+  new, accepted ───── reject ─────▶ rejected
+```
+
+So an application is planned by being a planned set's or session's `application` (see
+[Applications, in Sessions](sessions.md#applications)), whatever admins decided, and done once it's played: never
+through `PUT /api/admin/applications/:id/status`, which only takes what admins decide. A set or a session that's planned
+wins over one that's done, e.g. for an application played once, then booked again. One whose sets and sessions are all
+cancelled is accepted, to be booked again, rather than new. What admins decided can still be changed to `"new"` or
+`"accepted"` while its sets or sessions make it planned or done: it's kept, and shows once they don't anymore.
+
+**A rejected application has no set or session that's planned or done** (see
+[Applications, in Sessions](sessions.md#applications)), even for requests sent at the same time. Rejecting an
+application fails with 409 while it has one, but one whose sets and sessions are all cancelled can be rejected, and they
+keep it.
+Then, until it's accepted or made new again, giving it to a set or a session that's planned or done fails with 400, and
+un-cancelling one of its sets or sessions, i.e. marking it planned or done, with 409.
 
 ## `GET /api/admin/applications[?artist=<id>|?collective=<id>]` (admin)
 
@@ -102,9 +138,9 @@ isn't the id of an artist or a collective that exists (in English, since only ad
 ## `PUT /api/admin/applications/:id` (admin)
 
 Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`
-or `collectiveId`, and leaving `receivedAt` out keeps the one the application has. The artist or collective and the
-status don't change. The response is the same as for `POST /api/admin/applications`, with the updated application.
-Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
+or `collectiveId`, and leaving `receivedAt` out keeps the one the application has. The artist or collective and what
+admins decided don't change. The response is the same as for `POST /api/admin/applications`, with the updated
+application. Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
 
 ## `PATCH /api/admin/applications/:id` (admin)
 
@@ -117,10 +153,13 @@ there's no field.
 
 | Request field | Type | |
 |---|---|---|
-| `status` | `"new"`, `"accepted"`, `"scheduled"`, `"done"` or `"rejected"` | |
+| `status` | `"new"`, `"accepted"` or `"rejected"` | What admins decide about the application |
 
-Changes an application's status. The response is the same as for `POST /api/admin/applications`. Fails with 400 if
-`status` isn't one of these values, or 404 if the application doesn't exist.
+Changes what admins decided about an application (see [Status](#status)). The response is the same as for
+`POST /api/admin/applications`, with the status that's then worked out, which stays planned or done while its sets or
+sessions make it so. Fails with 400 if `status` isn't one of these values, e.g. `"planned"`, 404 if the application
+doesn't exist, or 409 (`"A rejected application has no set or session that's planned or done"`) when it's rejected
+while it has a set or a session that's planned or done.
 
 ## `DELETE /api/admin/applications/:id` (admin)
 

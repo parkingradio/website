@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, check, jsonb, date, boolean, primaryKey } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
-import { APPLICATION_STATUSES } from '../applications/fields.js'
-import type { ApplicationStatus, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
+import { APPLICATION_DECISIONS } from '../applications/fields.js'
+import type { ApplicationDecision, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 import { SESSION_TYPES, STATUSES } from '../sessions/fields.js'
 import type { SessionType, Status } from '../sessions/fields.js'
@@ -199,9 +199,10 @@ export const applications = pgTable(
     // The email of the admin who last changed the application, and when (null until then).
     updatedBy: text('updated_by'),
     updatedAt: timestamp('updated_at', { withTimezone: true }),
-    // The status admins gave the application, and the email of the admin who last changed it, and when (null until
-    // then).
-    status: text('status').$type<ApplicationStatus>().notNull().default('new'),
+    // What admins decided about the application, which its status is worked out from, along with its sets' and sessions'
+    // (see `applicationStatus` in applications/fields.ts), and the email of the admin who last changed it, and when (null
+    // until then). Its column keeps its name from when it was the status itself, which older servers read.
+    decision: text('status').$type<ApplicationDecision>().notNull().default('new'),
     statusUpdatedBy: text('status_updated_by'),
     statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
   },
@@ -209,7 +210,7 @@ export const applications = pgTable(
     index('applications_artist_id_idx').on(table.artistId),
     index('applications_collective_id_idx').on(table.collectiveId),
     check('applications_owner', sql`(${table.artistId} is null) <> (${table.collectiveId} is null)`),
-    check('applications_status', oneOf(table.status, APPLICATION_STATUSES)),
+    check('applications_status', oneOf(table.decision, APPLICATION_DECISIONS)),
   ],
 )
 

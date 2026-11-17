@@ -55,3 +55,37 @@ test('the seeded sets and sessions come from the seeded applications that seed-d
   }
   expect(found.map(describe).sort()).toEqual(expected.sort())
 })
+
+test('the seeded applications have the statuses their sets and sessions give them, or else what was decided', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'seeding is the same whatever the screen')
+  await logIn(page)
+  await expect(adminMenu(page)).toBeVisible()
+  type Owner = { id: string; name: string }
+  type Found = { artistId: string | null; collectiveId: string | null; dates: string[]; status: string }
+  const get = async (path: string) => (await page.request.get(path)).json()
+  const [{ artists }, { collectives }, { applications }] = (await Promise.all(['artists', 'collectives', 'applications'].map((items) => get(`/api/admin/${items}`)))) as [
+    { artists: Owner[] },
+    { collectives: Owner[] },
+    { applications: Found[] },
+  ]
+  const owners = [...artists, ...collectives]
+  // The status of the application of the artist or the collective named `name`, whose days are `days` (see seed-data.ts).
+  const status = (name: string, days: number[]) => {
+    const { id } = owners.find((owner) => owner.name === name)!
+    const dates = days.map(day).sort().join()
+    return applications.find((found) => (found.artistId ?? found.collectiveId) === id && found.dates.join() === dates)?.status
+  }
+  // Accepted, and played, in Onde Commune's takeover.
+  expect(status('Clémentine Brûlée', [-30])).toBe('done')
+  // Never decided, but played, in its takeover.
+  expect(status('Radio Dub Laurentides', [-10])).toBe('done')
+  // Planned, in a takeover without a date, and in SOIRÉE À REVOIR.
+  expect(status('Les Sœurs Ondes', [90])).toBe('planned')
+  expect(status('Fréquence Boréale', [60, 61, 62, 67, 68, 69])).toBe('planned')
+  // Whose sets were both cancelled.
+  expect(status('Marée Basse', [30, 60])).toBe('accepted')
+  // Without sets.
+  expect(status('Rosalie Tremblay', [55])).toBe('accepted')
+  expect(status('Clément Brûlé', [70])).toBe('new')
+  expect(status('Kwame Asante', [65])).toBe('rejected')
+})

@@ -77,7 +77,7 @@ function application(id: string, owner: { artistId: string } | { collectiveId: s
 // Every application, as the server lists them, the most recently received first: Cyan's, which set-2 comes from, Ondes',
 // which its takeover comes from, then Brume's, and Aurore's.
 const APPLICATIONS_LIST = [
-  application('application-2', { artistId: 'artist-3' }, '2026-09-02T16:00:00.000Z', 'scheduled', ['2026-11-14']),
+  application('application-2', { artistId: 'artist-3' }, '2026-09-02T16:00:00.000Z', 'planned', ['2026-11-14']),
   application('application-1', { collectiveId: 'collective-1' }, '2026-09-01T16:00:00.000Z', 'accepted', ['2026-11-14', '2026-11-21']),
   application('application-4', { artistId: 'artist-2' }, '2026-08-20T16:00:00.000Z', 'accepted', ['2026-12-05']),
   application('application-3', { artistId: 'artist-1' }, '2026-08-15T16:00:00.000Z', 'new', ['2026-11-14', '2026-11-21', '2026-11-28', '2026-12-05']),

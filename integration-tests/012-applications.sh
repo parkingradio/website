@@ -2,7 +2,7 @@
 #
 # The admin routes for applications work with a real database. The server's unit tests fake the database, so this is
 # where we check:
-# - the applications table, and that the database takes every status
+# - the applications table, and that the database takes every decision, but not the statuses it works out
 # - that dates come back from the database as "YYYY-MM-DD"
 # - that an application belongs to either an artist or a collective who exists, which the database checks too
 # - that applications are listed by when they were received, the most recent first, and that an application was received
@@ -133,14 +133,18 @@ expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
 json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist")"
 expect_status 400
 expect_body_contains '"error":"Unknown field: `artistId`"'
-for status in accepted scheduled done rejected new; do
+for status in accepted rejected new; do
     json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
     expect_status 200
     expect_body_contains "\"status\":\"${status}\""
 done
 expect_body_contains "\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
-json PUT "${BASE_URL}/api/admin/applications/${first}/status" '{"status":"maybe"}'
-expect_status 400
+# Its sets and sessions make it planned or done, which admins don't decide (see 021-sessions.sh).
+for status in maybe planned done scheduled; do
+    json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
+    expect_status 400
+    expect_body_contains '"error":"The status must be one of new, accepted, rejected"'
+done
 
 echo "  an application is deleted"
 json DELETE "${BASE_URL}/api/admin/applications/${first}"

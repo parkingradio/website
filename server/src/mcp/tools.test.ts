@@ -75,6 +75,9 @@ describe('the tools of the API', () => {
     expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description', 'removeFlyer']))
     expect(tools.find(({ name }) => name === 'create_session')!.description).toContain("Tools can't send a flyer.")
     expect(updateSession.description).not.toMatch(/email|photo/)
+    // Only what admins decide: sets and sessions make applications planned or done.
+    const decide = tools.find(({ name }) => name === 'update_application_status')!
+    expect(decide.inputSchema.properties).toMatchObject({ status: { enum: ['new', 'accepted', 'rejected'] } })
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {
