@@ -135,7 +135,18 @@ describe('Combobox', () => {
     expect(active()).toBe('Aurore')
   })
 
-  it('highlights the first option found, and none when none is, when Enter picks nothing', () => {
+  it('starts from the first option going down when the one highlighted is no longer there', () => {
+    const { rerender } = render(<Strict />)
+    fireEvent.click(input())
+    fireEvent.keyDown(input(), { key: 'ArrowUp' })
+    expect(active()).toBe('Ubel')
+    rerender(<Strict options={OPTIONS.slice(0, 3)} />)
+    expect(active()).toBeNull()
+    fireEvent.keyDown(input(), { key: 'ArrowDown' })
+    expect(active()).toBe('Aurore')
+  })
+
+  it('highlights the first option found, or none when nothing is found, when Enter picks nothing', () => {
     render(<Strict />)
     fireEvent.change(input(), { target: { value: 'b' } })
     // "Brise" first, since it starts with what's typed.

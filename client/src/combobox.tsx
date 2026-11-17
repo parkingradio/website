@@ -86,8 +86,8 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
     setActive(index)
   }
 
-  // Where the option picked is when every option is shown, i.e. while nothing is typed. Starting from it there, rather
-  // than from the first option, lets Enter keep it.
+  // Where the option picked is when every option is shown, i.e. while nothing is typed, or the first one when none is
+  // picked. Starting from it there, rather than from the first option, lets Enter keep it.
   const pickedIndex = () => Math.max(0, options.findIndex((option) => option.key === mode.selected))
 
   const browse = () => {
@@ -120,8 +120,9 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
         }
       } else if (found.length > 0) {
         const step = event.key === 'ArrowDown' ? 1 : -1
-        // With none highlighted, the first one going down, and the last one going up, and around the list.
-        highlight(active < 0 ? (step > 0 ? 0 : found.length - 1) : (active + step + found.length) % found.length)
+        // With none highlighted, the first one going down and the last one going up; otherwise the next one, around the
+        // list.
+        highlight(current < 0 ? (step > 0 ? 0 : found.length - 1) : (current + step + found.length) % found.length)
       }
     } else if (event.key === 'Enter' && open) {
       // Picks an option, or closes the suggestions, rather than sending the form.
