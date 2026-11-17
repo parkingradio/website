@@ -32,7 +32,14 @@ const NO_PHOTOS: Photos = {
 // Another admin than the one who adds the sessions, to tell who changed a status.
 const OTHER_ADMIN = { ...TEST_ADMIN, id: 'other-admin-id', email: 'other@example.com' }
 
-type Tracked = { id: string; createdAt: string; status: string; statusUpdatedBy: string | null; statusUpdatedAt: string | null }
+type Tracked = {
+  id: string
+  createdAt: string
+  updatedAt: string | null
+  status: string
+  statusUpdatedBy: string | null
+  statusUpdatedAt: string | null
+}
 type Session = Tracked & { sets: Tracked[] }
 
 let database: TestDatabase
@@ -76,6 +83,7 @@ async function sessionWithSets(statuses: string[]): Promise<{ session: string; s
 
 const setStatus = (id: string, status: string, admin = TEST_ADMIN) => request('PUT', `/api/admin/sets/${id}/status`, { status }, admin)
 const sessionStatus = (id: string, status: string, admin = TEST_ADMIN) => request('PUT', `/api/admin/sessions/${id}/status`, { status }, admin)
+const moveTo = (id: string, session: string, admin = TEST_ADMIN) => request('PUT', `/api/admin/sets/${id}/session`, { session }, admin)
 
 async function sessionOf(id: string): Promise<Session> {
   return (await request('GET', `/api/admin/sessions/${id}`)).json().session
@@ -205,3 +213,66 @@ describe('marking a session done', () => {
     await checkSessionsInvariants(database.db)
   })
 })
+
+describe('moving a set to another session', () => {
+  it('makes the session it leaves follow its sets, as if it were deleted, and the one it joins, as if it were added, as the admin who moved it, when they did', async () => {
+    const from = await sessionWithSets(['done', 'planned'])
+    const to = await sessionWithSets(['done'])
+    const response = await moveTo(from.sets[1], to.session, OTHER_ADMIN)
+    expect(response.statusCode).toBe(200)
+    const { session, previousSession }: { session: Session; previousSession: Session } = response.json()
+    const moved = session.sets[1]
+    // The set keeps its status, but counts as changed.
+    expect(moved).toMatchObject({ id: from.sets[1], status: 'planned', statusUpdatedBy: null })
+    const marked = { statusUpdatedBy: OTHER_ADMIN.email, statusUpdatedAt: moved.updatedAt }
+    expect(previousSession).toMatchObject({ id: from.session, status: 'done', ...marked })
+    expect(session).toMatchObject({ id: to.session, status: 'planned', ...marked })
+    await checkSessionsInvariants(database.db)
+  })
+
+  it('makes a planned session done when a done set is moved into it, even without other sets', async () => {
+    const from = await sessionWithSets(['done', 'planned'])
+    const empty = await sessionWithSets([])
+    const planned = await sessionWithSets(['planned'])
+    let response = await moveTo(from.sets[0], empty.session)
+    expect(response.json().session.status).toBe('done')
+    // And not one that has a planned set, while the one it leaves still has one.
+    response = await moveTo(response.json().session.sets[0].id, planned.session)
+    expect(response.json().session.status).toBe('planned')
+    expect(response.json().previousSession).toMatchObject({ id: empty.session, status: 'done', sets: [] })
+    expect((await sessionOf(from.session)).status).toBe('planned')
+    await checkSessionsInvariants(database.db)
+  })
+
+  it("doesn't move a set that isn't cancelled into a cancelled session, but moves a cancelled one anywhere, still cancelled", async () => {
+    const cancelled = await sessionWithSets(['planned', 'done'])
+    expect((await sessionStatus(cancelled.session, 'cancelled')).statusCode).toBe(200)
+    const other = await sessionWithSets(['planned', 'cancelled'])
+    for (const status of ['planned', 'done']) {
+      expect((await setStatus(other.sets[0], status)).statusCode).toBe(200)
+      const response = await moveTo(other.sets[0], cancelled.session)
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toMatchObject({ error: 'This session is cancelled', session: { id: cancelled.session, status: 'cancelled' }, set: null })
+    }
+    expect((await sessionOf(other.session)).sets.map(({ id }) => id)).toEqual(other.sets)
+
+    let response = await moveTo(other.sets[1], cancelled.session)
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.sets.map(({ status }: Tracked) => status)).toEqual(['cancelled', 'cancelled', 'cancelled'])
+    // Out of the cancelled session, it stays cancelled too, to be un-cancelled by hand.
+    response = await moveTo(cancelled.sets[1], other.session)
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session.sets[1]).toMatchObject({ id: cancelled.sets[1], status: 'cancelled' })
+    expect(response.json().session.status).toBe('done')
+    await checkSessionsInvariants(database.db)
+  })
+
+  it("doesn't change any status when the set is moved to the session it's in", async () => {
+    const { session, sets } = await sessionWithSets(['done', 'done'])
+    expect((await sessionStatus(session, 'planned')).statusCode).toBe(200)
+    const response = await moveTo(sets[0], session, OTHER_ADMIN)
+    expect(response.statusCode).toBe(200)
+    expect(response.json().session).toMatchObject({ status: 'planned', statusUpdatedBy: TEST_ADMIN.email })
+  })
+})
+

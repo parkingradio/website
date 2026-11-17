@@ -1869,6 +1869,29 @@
         ],
         "additionalProperties": false
       },
+      "MovedSetResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "session": {
+            "description": "The set's session, which it was moved to, with its sets, as it is then",
+            "$ref": "#/components/schemas/Session"
+          },
+          "previousSession": {
+            "description": "The session the set was in, with its other sets, as it is then: the same one when the set was moved to the session it was in",
+            "$ref": "#/components/schemas/Session"
+          }
+        },
+        "required": [
+          "ok",
+          "session",
+          "previousSession"
+        ],
+        "additionalProperties": false
+      },
       "NewSessionConflictError": {
         "type": "object",
         "properties": {
@@ -2953,6 +2976,19 @@
         },
         "required": [
           "position"
+        ],
+        "additionalProperties": false
+      },
+      "SetSession": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "description": "The id of the session to move the set to, after that session's sets"
+          }
+        },
+        "required": [
+          "session"
         ],
         "additionalProperties": false
       },
@@ -9354,6 +9390,107 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sets/{id}/session": {
+      "put": {
+        "operationId": "update_set_session",
+        "summary": "Moves a set to another session, after its sets, without changing its status, and returns that session, and the one it was in, whose statuses this can change",
+        "tags": [
+          "Sessions"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSession"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovedSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictError"
                 }
               }
             }

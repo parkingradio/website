@@ -204,6 +204,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled, which can make its session done, or planned again |
 | [`PUT /api/admin/sets/:id/position`](sessions.md#put-apiadminsetsidposition-admin) | admin | Moving a set to another place among its session's sets |
+| [`PUT /api/admin/sets/:id/session`](sessions.md#put-apiadminsetsidsession-admin) | admin | Moving a set to another session, which can change both sessions' statuses |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |

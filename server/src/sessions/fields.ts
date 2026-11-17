@@ -48,6 +48,7 @@ export function sessionTitle({ type, name, takeover }: { type: SessionType; name
   return type === 'other' ? '' : NAMES[type]
 }
 
+export const NO_SUCH_SESSION = 'No such session'
 export const NO_SUCH_ARTIST = 'No such artist'
 export const NO_SUCH_COLLECTIVE = 'No such collective'
 export const NO_SUCH_APPLICATION = 'No such application'
@@ -274,6 +275,21 @@ export const SetPosition = z
     { error: objectError(BAD_POSITION) },
   )
   .meta({ id: 'SetPosition' })
+
+// The session a set is moved to (see "Sets' order" in docs/design/server/sessions.md), by its id, lower-cased like the
+// other ids, so that its own session's id in another case leaves it where it is.
+const BAD_SESSION = "The session must be a session's id"
+export const SetSession = z
+  .strictObject(
+    {
+      session: z
+        .string({ error: BAD_SESSION })
+        .toLowerCase()
+        .meta({ description: "The id of the session to move the set to, after that session's sets" }),
+    },
+    { error: objectError(BAD_SESSION) },
+  )
+  .meta({ id: 'SetSession' })
 
 // What adding a session sends: its fields, with the same rules as `SessionFields`, which can't be extended once it's
 // refined, and the sets to add with it, in order, each with the fields that adding a set takes. Leaving them out adds

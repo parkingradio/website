@@ -557,6 +557,63 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await deleteOwn(page, mine)
 })
 
+test("a set is moved to another session from its row, which says where it went, and can't be moved to a cancelled one", async ({ page }, testInfo) => {
+  const { unique, day, otherDay } = own(testInfo)
+  await logIn(page)
+  await expect(adminMenu(page)).toBeVisible()
+  const performer = `Artiste e2e ${unique}`
+  const artist = await page.request.post('/api/admin/artists', { multipart: { artist: JSON.stringify({ name: performer }) } })
+  expect(artist.ok()).toBe(true)
+  const artistId: string = (await artist.json()).artist.id
+  const set = { performers: [{ id: artistId }], durationMinutes: 60, performanceTypes: ['dj'], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
+  // Two sessions of the test's own, on days of their own, the first with two sets, the second, of an hour, with one.
+  const addSession = async (name: string, start: string, durationMinutes: number, sets: object[]) => {
+    const fields = { start, durationMinutes, type: 'other', takeover: null, application: null, name, raEvent: null, description: '', sets }
+    const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
+    expect(created.ok()).toBe(true)
+    return (await created.json()).session as { id: string; sets: { id: string }[] }
+  }
+  const leaving = await addSession(`E2E ${unique} DÉPART`, `${day}T20:00-04:00`, 120, [set, set])
+  const joined = await addSession(`E2E ${unique} ARRIVÉE`, `${otherDay}T21:00-04:00`, 60, [set])
+  expect((await page.request.put(`/api/admin/sets/${leaving.sets[0].id}/status`, { data: { status: 'done' } })).ok()).toBe(true)
+
+  // The second set, moved to the other session, which makes the first one jouée, since its other set is joué.
+  await page.goto(`/admin/sessions/${leaving.id}`)
+  const sets = page.getByRole('table', { name: 'Sets' })
+  await sets.getByRole('row').nth(2).getByRole('button', { name: /^déplacer : / }).click()
+  await expect(page.getByRole('heading', { level: 3, name: `Déplacer le set de ${performer}` })).toBeVisible()
+  const picker = page.getByRole('combobox', { name: 'Session' })
+  await expect(picker).toBeFocused()
+  await picker.fill(`${unique} ARRIVÉE`)
+  await page.getByRole('option', { name: new RegExp(`^E2E ${unique} ARRIVÉE, `) }).click()
+  await page.getByRole('button', { name: 'déplacer', exact: true }).click()
+  await expect(sets.getByRole('row')).toHaveCount(2)
+  await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
+  const notice = page.getByText(/a été déplacé dans la session/)
+  await expect(notice).toContainText(`Le set de ${performer} a été déplacé dans la session E2E ${unique} ARRIVÉE, `)
+
+  // There, after its set, whose page says that its sets now add up to more than it.
+  await notice.getByRole('link').click()
+  await expect(page.getByRole('heading', { level: 1, name: `E2E ${unique} ARRIVÉE` })).toBeVisible()
+  await expect(sets.getByRole('row')).toHaveCount(3)
+  await expect(page.getByText(/^\u26a0\ufe0e Les sets durent 2 h, plus que la session \(1 h\)\.$/)).toBeVisible()
+
+  // Once that session is cancelled, the set that's left can't be moved there, which its button says.
+  expect((await page.request.put(`/api/admin/sessions/${joined.id}/status`, { data: { status: 'cancelled' } })).ok()).toBe(true)
+  await page.goto(`/admin/sessions/${leaving.id}`)
+  await sets.getByRole('button', { name: /^déplacer : / }).click()
+  await picker.fill(`${unique} ARRIVÉE`)
+  await page.getByRole('option', { name: new RegExp(`^E2E ${unique} ARRIVÉE, .* · annulée$`) }).click()
+  const move = page.getByRole('button', { name: 'déplacer', exact: true })
+  await expect(move).toHaveAttribute('aria-disabled', 'true')
+  await expect(move).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas y déplacer le set.')
+  await page.getByRole('button', { name: 'annuler' }).click()
+  await expect(sets.getByRole('button', { name: /^déplacer : / })).toBeFocused()
+
+  for (const id of [leaving.id, joined.id]) expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
+  expect((await page.request.delete(`/api/admin/artists/${artistId}`)).ok()).toBe(true)
+})
+
 test.describe('in another time zone', () => {
   test.use({ timezoneId: 'Asia/Tokyo' })
 

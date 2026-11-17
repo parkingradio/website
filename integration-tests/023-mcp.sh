@@ -144,6 +144,17 @@ other="$(sql "select id from sets where session_id = '${session}' and id <> '${s
 call update_set_position "{\"id\":\"${other}\",\"position\":0}"
 expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${other}\\\""
 [ "$(sql "select position from sets where id = '${set}'")" = 1 ] || fail "expected the first set to be moved second"
+echo "  a set is moved to another session, as the admin, which gives both sessions"
+call create_session '{"durationMinutes":120,"type":"other","name":"AILLEURS","description":""}'
+elsewhere="$(sql "select id from sessions where name = 'AILLEURS'")"
+call update_set_session "{\"id\":\"${set}\",\"session\":\"${elsewhere}\"}"
+expect_body_contains "\\\"session\\\":{\\\"id\\\":\\\"${elsewhere}\\\""
+expect_body_contains "\\\"previousSession\\\":{\\\"id\\\":\\\"${session}\\\""
+[ "$(sql "select session_id || ' ' || updated_by from sets where id = '${set}'")" = "${elsewhere} ${ADMIN_EMAIL}" ] \
+    || fail "expected the set to be moved, as the admin who connected the app"
+call update_set_session "{\"id\":\"${set}\",\"session\":\"${session}\"}"
+[ "$(sql "select session_id || ' ' || position from sets where id = '${set}'")" = "${session} 1" ] || fail "expected the set to be moved back, last"
+call delete_session "{\"id\":\"${elsewhere}\"}"
 echo "  a set's status is changed as the admin, which makes its session done once none of its sets is planned, and deleting one gives its session"
 call update_set_status "{\"id\":\"${other}\",\"status\":\"done\"}"
 call delete_set "{\"id\":\"${set}\"}"

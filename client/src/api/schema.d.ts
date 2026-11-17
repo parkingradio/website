@@ -2310,6 +2310,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/sets/{id}/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Moves a set to another session, after its sets, without changing its status, and returns that session, and the one it was in, whose statuses this can change */
+        put: operations["update_set_session"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/features": {
         parameters: {
             query?: never;
@@ -3115,6 +3132,14 @@ export interface components {
             ok: true;
             email: string;
         };
+        MovedSetResponse: {
+            /** @constant */
+            ok: true;
+            /** @description The set's session, which it was moved to, with its sets, as it is then */
+            session: components["schemas"]["Session"];
+            /** @description The session the set was in, with its other sets, as it is then: the same one when the set was moved to the session it was in */
+            previousSession: components["schemas"]["Session"];
+        };
         NewSessionConflictError: {
             /** @constant */
             ok: false;
@@ -3340,6 +3365,10 @@ export interface components {
         SetPosition: {
             /** @description The set's new place among its session's `sets`, from 0 for the first, cancelled ones included. Past the last, it goes last */
             position: number;
+        };
+        SetSession: {
+            /** @description The id of the session to move the set to, after that session's sets */
+            session: string;
         };
         /** @description In Québec time, ending later the same day */
         TimeSlot: {
@@ -6066,6 +6095,86 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    update_set_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSession"];
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovedSetResponse"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictError"];
                 };
             };
             /** @description Default Response */

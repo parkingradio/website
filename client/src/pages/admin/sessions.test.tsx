@@ -516,9 +516,9 @@ describe("A session's page", () => {
     expect(within(value('Événement RA')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/6683745')
 
     expect(rows(setsTable())).toEqual([
-      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
-      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
-      ['1 h', '-', '', '-', '', 'planifiéjouéannulé', '↑ ↓ modifier ×'],
+      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
+      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
+      ['1 h', '-', '', '-', '', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
     ])
     const first = within(setsTable()).getAllByRole('row')[1]
     expect(within(first).getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
@@ -1799,6 +1799,169 @@ describe("A set's form", () => {
     await openNew()
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
     expect(screen.getByRole('combobox', { name: 'Ajouter un artiste' })).toBeDisabled()
+  })
+})
+
+describe('Moving a set to another session', () => {
+  // The next Saturday, from 21:00 to 22:00 in Québec, with a set of an hour, which is planned.
+  const NEXT: Session = {
+    ...UNDATED,
+    id: 'session-5',
+    start: '2026-11-22T02:00:00.000Z',
+    end: '2026-11-22T03:00:00.000Z',
+    durationMinutes: 60,
+    name: 'SOIRÉE SUIVANTE',
+    title: 'SOIRÉE SUIVANTE',
+    sets: [studioSet('set-7', { performers: [{ id: 'artist-2', name: 'Brume' }], durationMinutes: 60 })],
+  }
+  const CANCELLED = SESSIONS[3]
+  const MOVE_PAGE = { ...PAGE, ...ARTISTS, '/api/admin/sessions': { ok: true, total: 5, sessions: [UNDATED, NEXT, ...SESSIONS.slice(1)] } }
+  const picker = () => screen.getByRole('combobox', { name: 'Session' })
+  const go = () => screen.getByRole('button', { name: 'déplacer' })
+  const notice = () => screen.queryByText(/a été déplacé dans la session/)
+
+  it('picks the session among the others, the planned ones first, moves the set there, and says where it went, the focus on the next set', async () => {
+    const left = { ...SESSION, status: 'done' as const, sets: [CYAN_SET, SESSION.sets[2]] }
+    mockFetch({ ...MOVE_PAGE, 'PUT /api/admin/sets/set-1/session': { ok: true, session: { ...NEXT, sets: [...NEXT.sets, SET] }, previousSession: left } })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'déplacer : Set de Aurore et Brume' }))
+    expect(screen.getByRole('heading', { level: 3, name: 'Déplacer le set de Aurore et Brume' })).toBeInTheDocument()
+    await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir une session…'))
+    expect(picker()).toHaveFocus()
+    expect(go()).toHaveAttribute('aria-disabled', 'true')
+    expect(go()).toHaveAccessibleDescription("Choisissez d'abord une session.")
+
+    // Not the session itself: the planned ones in the order of the list's default view, then the others, in the order
+    // of its « toutes » view, with their status.
+    fireEvent.click(picker())
+    expect(options()).toEqual([
+      'SOIRÉE SUIVANTE, sam. 21 nov. 202621 h – 22 h',
+      'GUEST MIXES, date à déterminer3 h',
+      'SOIRÉE, ven. 2 oct. 202620 h – 21 h · jouée',
+      'LIVE PERFORMANCE, lun. 31 août 202620 h – 21 h · annulée',
+    ])
+    // Searched as the list of sessions is.
+    fireEvent.change(picker(), { target: { value: 'samedi' } })
+    expect(options()).toEqual(['SOIRÉE SUIVANTE, sam. 21 nov. 202621 h – 22 h'])
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^SOIRÉE SUIVANTE/ }))
+    expect(go()).not.toHaveAttribute('aria-disabled')
+    fireEvent.click(go())
+
+    // The focus goes to the next set's « déplacer », in the commit that removes the row (see the tests of deleting one).
+    let focused: Element | null = null
+    await waitFor(() => {
+      expect(rows(setsTable())).toHaveLength(2)
+      focused = document.activeElement
+    })
+    expect(focused).toBe(screen.getByRole('button', { name: 'déplacer : Set de Cyan' }))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-1/session')[0])).toEqual({ session: 'session-5' })
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
+    // The session it left, as the server then has it, which is now jouée.
+    expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
+    expect(notice()).toHaveTextContent(/^Le set de Aurore et Brume a été déplacé dans la session SOIRÉE SUIVANTE, sam\. 21 nov\. 2026\.$/)
+    expect(within(notice()!).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-5')
+    // It doesn't say that the sets of the session the set went to now add up to more than it: that session's page does.
+    expect(screen.queryByText(/⚠/)).not.toBeInTheDocument()
+
+    // Until another form opens.
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    expect(notice()).not.toBeInTheDocument()
+  })
+
+  it("moves the focus to the previous set's « déplacer » once the last one is moved, or to the heading once there are none", async () => {
+    const two = { ...SESSION, sets: [SET, CYAN_SET] }
+    mockFetch({
+      ...MOVE_PAGE,
+      '/api/admin/sessions/session-1': { ok: true, session: two },
+      'PUT /api/admin/sets/set-2/session': { ok: true, session: { ...NEXT, sets: [...NEXT.sets, CYAN_SET] }, previousSession: { ...two, sets: [SET] } },
+      'PUT /api/admin/sets/set-1/session': { ok: true, session: { ...NEXT, sets: [...NEXT.sets, CYAN_SET, SET] }, previousSession: { ...two, sets: [] } },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    for (const [name, next] of [
+      ['Set de Cyan', () => screen.getByRole('button', { name: 'déplacer : Set de Aurore et Brume' })],
+      ['Set de Aurore et Brume', () => screen.getByRole('heading', { level: 2, name: 'Sets' })],
+    ] as const) {
+      fireEvent.click(await screen.findByRole('button', { name: `déplacer : ${name}` }))
+      await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir une session…'))
+      fireEvent.click(picker())
+      fireEvent.mouseDown(screen.getByRole('option', { name: /^SOIRÉE SUIVANTE/ }))
+      fireEvent.click(go())
+      let focused: Element | null = null
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
+        focused = document.activeElement
+      })
+      expect(focused).toBe(next())
+      expect(notice()).toBeInTheDocument()
+    }
+  })
+
+  it("can't move a set that isn't cancelled to a cancelled session, which it says, but moves a cancelled one, and says why the server refused", async () => {
+    mockFetch({
+      ...MOVE_PAGE,
+      'PUT /api/admin/sets/set-3/session': { ok: false, error: 'This session is cancelled', session: CANCELLED, set: null },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'déplacer : Set de Cyan' }))
+    await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir une session…'))
+    fireEvent.click(picker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^LIVE PERFORMANCE/ }))
+    expect(go()).toHaveAttribute('aria-disabled', 'true')
+    expect(go()).toHaveAccessibleDescription('La session est annulée : on ne peut pas y déplacer le set.')
+    fireEvent.click(go())
+    expect(requestsTo('PUT', '/api/admin/sets/set-2/session')).toHaveLength(0)
+    // A session that's played can be picked.
+    fireEvent.click(picker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^SOIRÉE,/ }))
+    expect(go()).not.toHaveAttribute('aria-disabled')
+
+    // Closed, the focus goes back to the button that opened it.
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'déplacer : Set de Cyan' })).toHaveFocus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'déplacer : Set' }))
+    await waitFor(() => expect(picker()).toHaveAttribute('placeholder', 'choisir une session…'))
+    fireEvent.click(picker())
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^LIVE PERFORMANCE/ }))
+    expect(go()).not.toHaveAttribute('aria-disabled')
+    fireEvent.click(go())
+    // In the panel, which stays open, naming the session in the way, linked.
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      /^Le set « Set » n'a pas pu être déplacé dans une autre session : This session is cancelled \(LIVE PERFORMANCE, lun\. 31 août 2026\)$/,
+    )
+    expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-4')
+    expect(screen.getByRole('heading', { level: 3, name: 'Déplacer le set' })).toBeInTheDocument()
+    expect(rows(setsTable())).toHaveLength(3)
+  })
+
+  it("is one of the forms open one at a time, closed once its set is deleted, and says when the sessions can't be loaded", async () => {
+    mockFetch({
+      ...MOVE_PAGE,
+      '/api/admin/sessions': { ok: false, error: 'Boom' },
+      'DELETE /api/admin/sets/set-2': { ok: true, session: { ...SESSION, sets: [SET, SESSION.sets[2]] } },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'déplacer : Set de Cyan' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les sessions n'ont pas pu être chargées : Boom"))
+    fireEvent.click(picker())
+    expect(options()).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan' }))
+    expect(await screen.findByRole('heading', { level: 3, name: 'Set de Cyan' })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Session' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'déplacer : Set de Cyan' }))
+    expect(screen.getByRole('heading', { level: 3, name: 'Déplacer le set de Cyan' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Set de Cyan' })).not.toBeInTheDocument()
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan' }))
+    await waitFor(() => expect(rows(setsTable())).toHaveLength(2))
+    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
   })
 })
 

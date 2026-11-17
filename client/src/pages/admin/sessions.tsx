@@ -41,6 +41,7 @@ import {
   receivedOn,
   sessionDay,
   sessionHours,
+  sessionName,
   sessionSearchFields,
   sessionWhen,
   setDuration,
@@ -56,7 +57,8 @@ import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailur
 import { RaEventPanel } from './ra-event'
 import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
-import { CreateSet } from './session-picker'
+import { CreateSet, MoveSet } from './session-picker'
+import type { MovedSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
 import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
@@ -430,10 +432,10 @@ function SessionById({ id }: { id: string }) {
   return <LoadedSession loaded={loaded.value.session} />
 }
 
-// The one form open on a session's page, if any: the session's, its event on RA's, or a set's, by its id, or a new one's
+// The one form open on a session's page, if any: the session's, its event on RA's, a set's, by its id, or a new one's
 // (null), which can be filled in from an application, by its id (see "From an application" in
-// docs/design/client/admin/sessions.md).
-type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null; application?: string } | null
+// docs/design/client/admin/sessions.md), or the panel that moves a set to another session, by the set's id.
+type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null; application?: string } | { kind: 'move'; id: string } | null
 
 // What the address of a session's page opens, until a form opens or closes.
 const OPENING_PARAMS = ['raEvent', 'application']
@@ -457,20 +459,24 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   const [error, setError] = useState<ReactNode>(null)
   // Why whether it's announced couldn't be changed.
   const [announcedError, setAnnouncedError] = useState<ReactNode>(null)
-  // Why a set's status couldn't be changed, or why it couldn't be deleted.
+  // Why a set's status couldn't be changed, or why it couldn't be moved or deleted.
   const [setsError, setSetsError] = useState<ReactNode>(null)
+  // The set that was just moved to another session, and that session, as the server answered, which the page says.
+  const [moved, setMoved] = useState<{ set: StudioSet; to: Session } | null>(null)
   const setsHeadingId = useId()
-  // What gets the focus once a set is deleted, since its × is gone, or moved, since its arrow was disabled while the
-  // request was under way: a set's button, by the set's id and what the button does, or the heading of the sets.
-  const focusNext = useRef<{ id: string; action: 'up' | 'down' | 'delete' } | 'heading' | null>(null)
+  // What gets the focus once a set is deleted, or moved to another session, since its row is gone, or moved, since its
+  // arrow was disabled while the request was under way, or once the panel that moves it is closed: a set's button, by the
+  // set's id and what the button does, or the heading of the sets.
+  const focusNext = useRef<{ id: string; action: 'up' | 'down' | 'move' | 'delete' } | 'heading' | null>(null)
   // A layout effect, which React runs in the commit that removes the ×, rather than a passive one, which it runs in a later
-  // task when the update follows a request: the focus never falls back to the page in between.
+  // task when the update follows a request: the focus never falls back to the page in between. After every commit, since
+  // it only does something once `focusNext` is set.
   useLayoutEffect(() => {
     const next = focusNext.current
     focusNext.current = null
     if (next === 'heading') document.getElementById(setsHeadingId)?.focus()
     else if (next) document.querySelector<HTMLElement>(`[data-set="${next.id}"][data-action="${next.action}"]`)?.focus()
-  }, [session, setsHeadingId])
+  })
   const navigate = useNavigate()
   const params = { path: { id: session.id } }
   // Opens `form`, or closes the one that's open, after which the address doesn't open anything anymore.
@@ -481,12 +487,17 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     for (const name of OPENING_PARAMS) params.delete(name)
     setSearchParams(params, { replace: true })
   }
-  // Opening a form, or closing one once it's saved, also clears what the page said went wrong.
+  // Opening a form, or closing one once it's saved, also clears what the page said went wrong, or that a set was moved.
   const openForm = (form: OpenForm) => {
     showForm(form)
     setError(null)
     setAnnouncedError(null)
+    clearSetsMessages()
+  }
+  // What the page says above the sets, which changing one of them clears.
+  const clearSetsMessages = () => {
     setSetsError(null)
+    setMoved(null)
   }
   const close = () => showForm(null)
   // A change that the server answered with the session as it is now, which closes the form.
@@ -532,7 +543,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
 
   const changeSetStatus = async (set: StudioSet, status: SessionStatus) => {
     setBusy(true)
-    setSetsError(null)
+    clearSetsMessages()
     const result = await api.PUT('/api/admin/sets/{id}/status', { params: { path: { id: set.id } }, body: { status } })
     setBusy(false)
     if (result.ok) setSession(result.session)
@@ -543,7 +554,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   const moveSet = async (set: StudioSet, by: -1 | 1) => {
     const index = session.sets.findIndex((other) => other.id === set.id)
     setBusy(true)
-    setSetsError(null)
+    clearSetsMessages()
     const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: index + by } })
     setBusy(false)
     if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
@@ -552,20 +563,34 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     setSession(result.session)
   }
 
+  // The focus goes to the next set's button that does `action`, or the previous one's, or else to the heading of the sets,
+  // once `set` is gone.
+  const focusAfterRemoving = (set: StudioSet, action: 'move' | 'delete') => {
+    const index = session.sets.findIndex((other) => other.id === set.id)
+    const next = session.sets[index + 1] ?? session.sets[index - 1]
+    focusNext.current = next ? { id: next.id, action } : 'heading'
+  }
+
+  // Once a set is moved to another session, the page shows the session it left, as the server then has it, which can be
+  // done now that the set is gone, and says where the set went.
+  const movedSet = (set: StudioSet, { session: to, previousSession }: MovedSet) => {
+    focusAfterRemoving(set, 'move')
+    setSession(previousSession)
+    openForm(null)
+    setMoved({ set, to })
+  }
+
   const removeSet = async (set: StudioSet) => {
     if (!window.confirm(`Supprimer définitivement ce set (${setName(set)}) ?`)) return
     setBusy(true)
-    setSetsError(null)
+    clearSetsMessages()
     const result = await api.DELETE('/api/admin/sets/{id}', { params: { path: { id: set.id } } })
     setBusy(false)
     if (!result.ok) return setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être supprimé`, result, session.id))
-    // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
-    const index = session.sets.findIndex((other) => other.id === set.id)
-    const next = session.sets[index + 1] ?? session.sets[index - 1]
-    focusNext.current = next ? { id: next.id, action: 'delete' } : 'heading'
-    // As the server has it then, which can be done now that the set is gone.
+    focusAfterRemoving(set, 'delete')
+    // As the server has it then, which can be done now that the set is gone, without its form, or the panel that moved it.
     setSession(result.session)
-    setOpen((open) => (open?.kind === 'set' && open.id === set.id ? null : open))
+    setOpen((open) => (open && 'id' in open && open.id === set.id ? null : open))
   }
 
   const remove = async () => {
@@ -583,6 +608,8 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }
 
   const cancelled = session.status === 'cancelled'
+  // The set whose panel that moves it to another session is open, if any.
+  const moving = open?.kind === 'move' ? session.sets.find((set) => set.id === open.id) : undefined
   return (
     <>
       <BackToSessions />
@@ -684,6 +711,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         </Button>
       </div>
       <ErrorMessage error={setsError} />
+      {moved && <MovedNotice {...moved} />}
       <SetsTooLong sets={session.sets} durationMinutes={session.durationMinutes} />
       {session.sets.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
@@ -693,6 +721,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           busy={busy}
           onStatus={changeSetStatus}
           onMove={moveSet}
+          onMoveTo={(set) => openForm({ kind: 'move', id: set.id })}
           onEdit={(set) => openForm({ kind: 'set', id: set.id })}
           onDelete={removeSet}
         />
@@ -708,6 +737,19 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           onChanged={changed}
         />
       )}
+      {moving && (
+        <MoveSet
+          key={moving.id}
+          set={moving}
+          session={session}
+          onCancel={() => {
+            // Back to the button that opened it.
+            focusNext.current = { id: moving.id, action: 'move' }
+            close()
+          }}
+          onMoved={(result) => movedSet(moving, result)}
+        />
+      )}
 
       <h2>Supprimer</h2>
       <p>{deleteText(session)}</p>
@@ -715,6 +757,15 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         supprimer la session
       </button>
     </>
+  )
+}
+
+// Where a set was just moved to, linking to that session.
+function MovedNotice({ set, to }: { set: StudioSet; to: Session }) {
+  return (
+    <p className="admin-notice" role="status">
+      {capitalized(setInSentence(set))} a été déplacé dans la session <Link to={sessionPath(to)}>{sessionName(to)}</Link>.
+    </p>
   )
 }
 
@@ -741,12 +792,14 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
 }
 
 // A session's sets, in their order, each with its status as buttons that change it, arrows that move it, a button that
-// opens its form, and one that deletes it. The sets of a cancelled session can't be un-cancelled.
+// opens the panel that moves it to another session, one that opens its form, and one that deletes it. The sets of a
+// cancelled session can't be un-cancelled.
 function SetsTable({
   session,
   busy,
   onStatus,
   onMove,
+  onMoveTo,
   onEdit,
   onDelete,
 }: {
@@ -754,6 +807,7 @@ function SetsTable({
   busy: boolean
   onStatus: (set: StudioSet, status: SessionStatus) => void
   onMove: (set: StudioSet, by: -1 | 1) => void
+  onMoveTo: (set: StudioSet) => void
   onEdit: (set: StudioSet) => void
   onDelete: (set: StudioSet) => void
 }) {
@@ -800,6 +854,9 @@ function SetsTable({
                 data={{ 'data-set': set.id }}
                 onMove={(by) => onMove(set, by)}
               />{' '}
+              <button type="button" data-set={set.id} data-action="move" aria-label={`déplacer : ${setName(set)}`} onClick={() => onMoveTo(set)}>
+                déplacer
+              </button>{' '}
               <button type="button" aria-label={`modifier : ${setName(set)}`} onClick={() => onEdit(set)}>
                 modifier
               </button>{' '}

@@ -13,6 +13,7 @@ import { effectiveDescription } from './descriptions.js'
 import {
   BAD_STATUS,
   Genre,
+  NO_SUCH_SESSION,
   NewSessionFields,
   PerformanceType,
   SESSION_FIELDS,
@@ -21,6 +22,7 @@ import {
   SessionType,
   SetFields,
   SetPosition,
+  SetSession,
   Status,
   after,
   sessionTitle,
@@ -97,6 +99,17 @@ const SessionBody = z
 export type SessionBody = z.infer<typeof SessionBody>
 
 const SessionResponse = z.object({ ok: z.literal(true), session: SessionBody })
+
+// What moving a set to another session responds: both sessions, since the one it leaves can change too.
+const MovedSetResponse = z
+  .object({
+    ok: z.literal(true),
+    session: SessionBody.meta({ description: "The set's session, which it was moved to, with its sets, as it is then" }),
+    previousSession: SessionBody.meta({
+      description: 'The session the set was in, with its other sets, as it is then: the same one when the set was moved to the session it was in',
+    }),
+  })
+  .meta({ id: 'MovedSetResponse' })
 
 // The content of a session's event on RA (see sessions/ra-event.ts).
 const RaEventContent = z
@@ -186,7 +199,7 @@ const NewSessionConflictError = ConflictError.extend({
   }),
 }).meta({ id: 'NewSessionConflictError' })
 
-const NO_SUCH_SESSION: ApiError = { ok: false, error: 'No such session' }
+const NO_SUCH_SESSION_ERROR: ApiError = { ok: false, error: NO_SUCH_SESSION }
 const NO_SUCH_SET: ApiError = { ok: false, error: 'No such set' }
 
 // Why a request failed, and what's in the way, when it's about a session or a set, and which of the sets added with a
@@ -338,8 +351,19 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
   // Runs `save`, which saves a session or a set, and responds with the session it returns, or 404 with `notFound` when
   // it returns null, or the error it throws when it's expected. When it fails, the flyer stored for it, `newFlyer`, if
   // any, is deleted.
-  async function saving(reply: FastifyReply, notFound: ApiError, save: () => Promise<StoredSession | null>, newFlyer: string | null = null) {
-    let saved: StoredSession | null
+  function saving(reply: FastifyReply, notFound: ApiError, save: () => Promise<StoredSession | null>, newFlyer: string | null = null) {
+    return savingAs(reply, notFound, save, (saved) => ({ ok: true as const, session: sessionBody(saved) }), newFlyer)
+  }
+
+  // Like `saving`, but responds with what `respond` makes of what `save` returns.
+  async function savingAs<Saved, Response>(
+    reply: FastifyReply,
+    notFound: ApiError,
+    save: () => Promise<Saved | null>,
+    respond: (saved: Saved) => Response,
+    newFlyer: string | null = null,
+  ) {
+    let saved: Saved | null
     try {
       saved = await save()
     } catch (error) {
@@ -355,7 +379,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       await forgetPhoto(photos, reply.log, newFlyer)
       return reply.status(404).send(notFound)
     }
-    return { ok: true as const, session: sessionBody(saved) }
+    return respond(saved)
   }
 
   // Stores the flyer that was sent, if there's one, and returns where, as a session keeps it.
@@ -448,7 +472,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_SESSION)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       return { ok: true as const, session: sessionBody(row) }
     },
   )
@@ -467,7 +491,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_SESSION)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       return { ok: true as const, event: raEventContent(sessionBody(row)) }
     },
   )
@@ -485,7 +509,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const row = await store.get(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_SESSION)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       return sendPhoto(reply, request.log, photos, { photoKey: row.flyerKey, photoType: row.flyerType }, 'session', 'flyer')
     },
   )
@@ -517,7 +541,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const flyer = await storeFlyer(sent.flyer)
       const session = { ...sessionChanges(fields), ...flyer, createdBy }
       // It can't be missing once it's added.
-      return saving(reply, NO_SUCH_SESSION, () => store.create(session, sets), flyer.flyerKey)
+      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.create(session, sets), flyer.flyerKey)
     },
   )
 
@@ -539,7 +563,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       if (changed && flyer) await forgetPhoto(photos, request.log, changed.before.flyerKey)
       return changed?.after ?? null
     }
-    return saving(reply, NO_SUCH_SESSION, update, flyer?.flyerKey)
+    return saving(reply, NO_SUCH_SESSION_ERROR, update, flyer?.flyerKey)
   }
 
   // Not a tool: tools change sessions with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
@@ -597,7 +621,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const change = statusChange(request.body.status, request.user!.email)
-      return saving(reply, NO_SUCH_SESSION, () => store.setStatus(request.params.id, change))
+      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.setStatus(request.params.id, change))
     },
   )
 
@@ -616,7 +640,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const change = { announced: request.body.announced, announcedUpdatedBy: request.user!.email, announcedUpdatedAt: new Date() }
-      return saving(reply, NO_SUCH_SESSION, () => store.setAnnounced(request.params.id, change))
+      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.setAnnounced(request.params.id, change))
     },
   )
 
@@ -634,7 +658,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
     async (request, reply) => {
       const row = await store.delete(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_SESSION)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       // The session is gone either way.
       await forgetPhoto(photos, request.log, row.flyerKey)
       return { ok: true as const }
@@ -657,12 +681,12 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     async (request, reply) => {
       // Before the track is resolved, and again once the set is saved, in case the session changes in the meantime.
       const session = await store.get(request.params.id)
-      if (!session) return reply.status(404).send(NO_SUCH_SESSION)
+      if (!session) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       if (session.status === 'cancelled') return fail(reply, { status: 409, error: SESSION_CANCELLED, session })
       const saved = await setChanges(request.body, null)
       if ('error' in saved) return fail(reply, saved)
       const set = { ...saved, createdBy: request.user!.email }
-      return saving(reply, NO_SUCH_SESSION, () => store.addSet(session.id, set))
+      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.addSet(session.id, set))
     },
   )
 
@@ -732,7 +756,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
   api.put(
     '/api/admin/sets/:id/position',
     {
-      config: { admin: true, tool: { title: 'Déplacer un set' } },
+      config: { admin: true, tool: { title: "Changer la place d'un set dans sa session" } },
       schema: {
         operationId: 'update_set_position',
         summary: "Moves a set to another place among its session's sets, the others keeping their order, and returns its session",
@@ -743,6 +767,31 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       },
     },
     async (request, reply) => saving(reply, NO_SUCH_SET, () => store.moveSet(request.params.id, request.body.position)),
+  )
+
+  api.put(
+    '/api/admin/sets/:id/session',
+    {
+      config: { admin: true, tool: { title: 'Déplacer un set dans une autre session' } },
+      schema: {
+        operationId: 'update_set_session',
+        summary:
+          "Moves a set to another session, after its sets, without changing its status, and returns that session, and the one it was in, whose statuses this can change",
+        tags: ['Sessions'],
+        params: ById,
+        body: SetSession,
+        response: { 200: MovedSetResponse, 400: ApiError, 404: ApiError, 409: ConflictError },
+      },
+    },
+    async (request, reply) => {
+      const by = { updatedBy: request.user!.email, updatedAt: new Date() }
+      return savingAs(
+        reply,
+        NO_SUCH_SET,
+        () => store.moveSetToSession(request.params.id, request.body.session, by),
+        ({ session, previousSession }) => ({ ok: true as const, session: sessionBody(session), previousSession: sessionBody(previousSession) }),
+      )
+    },
   )
 
   api.delete(

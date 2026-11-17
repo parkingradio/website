@@ -5,7 +5,8 @@
 # of sessions hold after random requests, so this is what covers the sessions, sets and set_performers tables: performers
 # kept in order, with their names, types and takeovers, and the names they give, which follow their collective's, the
 # checks that take the database (artists and collectives that exist), starts kept as instants and sets kept in their
-# order, even while they're moved, added and deleted at the same time, sessions listed those without a start first, then the most recent first, by artist, by takeover and by when they
+# order, even while they're moved, added and deleted at the same time, or moved to another session, sessions listed
+# those without a start first, then the most recent first, by artist, by takeover and by when they
 # start, the rules of sessions (sessions don't overlap, a video or a track in at most one set, a cancelled session only
 # has cancelled sets, and a takeover has a collective, which can't be deleted), with what's in the way in their 409s,
 # including while other transactions change sessions, sets that add up to more than their session, a set's own track not being resolved again, what deleting an artist does to sets, and making a session a
@@ -750,6 +751,58 @@ done
     || fail "expected the session's sets to be at 0 to 2"
 json DELETE "${SESSIONS}/${shuffled}"
 expect_status 200
+
+echo "  a set is moved to another session, after its sets, those of the one it leaves keeping their order, which counts as changing it"
+session_form POST "$SESSIONS" "$(session_json null 240 "\"sets\":[$(set_json "$(performers "$ana")" 30),$(set_json "$(performers "$brume")" 30),$(set_json "$(performers "$ana")" 30)]")"
+expect_status 200
+leaving="$(first_id)"
+read -r -a leaving_sets <<< "$(set_ids)"
+session_form POST "$SESSIONS" "$(session_json null 240 "\"sets\":[$(set_json "$(performers "$brume")" 30)]")"
+expect_status 200
+joined="$(first_id)"
+joined_set="$(set_ids)"
+json PUT "${SETS}/${leaving_sets[1]}/session" "{\"session\":\"${joined}\"}"
+expect_status 200
+expect_body_contains "{\"ok\":true,\"session\":{\"id\":\"${joined}\","
+expect_body_contains "\"previousSession\":{\"id\":\"${leaving}\","
+# sets_in <session> -- the ids of the session's sets, in order, with their positions, as the database keeps them.
+sets_in() {
+    sql "select string_agg(id || ' ' || position, ', ' order by position) from sets where session_id = '$1'"
+}
+[ "$(sets_in "$joined")" = "${joined_set% } 0, ${leaving_sets[1]} 1" ] || fail "expected the set moved after the other session's set"
+[ "$(sets_in "$leaving")" = "${leaving_sets[0]} 0, ${leaving_sets[2]} 1" ] || fail "expected the session it left to keep its other sets in order"
+[ "$(sql "select string_agg(id::text, ' ') from sets where updated_by = '${ADMIN_EMAIL}' and session_id in ('${leaving}', '${joined}')")" = "${leaving_sets[1]}" ] \
+    || fail "expected moving the set to count as changing it, and only it"
+[ "$(sql "select count(*) from sessions where id in ('${leaving}', '${joined}') and updated_by is not null")" = 0 ] \
+    || fail "expected moving the set not to count as changing either session"
+for body in '{"session":1}' '{"session":null}' '{}' "{\"session\":\"${joined}\",\"position\":0}"; do
+    json PUT "${SETS}/${leaving_sets[0]}/session" "$body"
+    expect_status 400
+done
+for session in "$NOBODY" not-a-uuid; do
+    json PUT "${SETS}/${leaving_sets[0]}/session" "{\"session\":\"${session}\"}"
+    expect_status 400
+    expect_body_contains '"error":"No such session"'
+done
+# The set is checked before the session.
+for set in "$NOBODY" not-a-uuid; do
+    json PUT "${SETS}/${set}/session" "{\"session\":\"${NOBODY}\"}"
+    expect_status 404
+    expect_body_contains '"error":"No such set"'
+done
+
+echo "  a set moved to a session while another transaction cancels it waits for it, and is refused, staying where it is"
+hold_sessions_lock "update sessions set status = 'cancelled' where id = '${joined}'; update sets set status = 'cancelled' where session_id = '${joined}';"
+send_in_background PUT "${SETS}/${leaving_sets[0]}/session" "{\"session\":\"${joined}\"}"
+wait_for_sessions_lock
+release_sessions_lock
+wait_for_background
+expect_conflict 'This session is cancelled' "$joined"
+[ "$(sets_in "$leaving")" = "${leaving_sets[0]} 0, ${leaving_sets[2]} 1" ] || fail "expected the set to stay where it was"
+for session in "$leaving" "$joined"; do
+    json DELETE "${SESSIONS}/${session}"
+    expect_status 200
+done
 
 echo "  deleting a session and deleting an artist who played two of its sets wait for each other"
 # Each one deletes the artist's rows in set_performers, in an order of its own, so they would deadlock if they didn't
