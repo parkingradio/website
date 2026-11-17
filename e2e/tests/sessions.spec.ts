@@ -475,8 +475,8 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(sets.getByRole('row')).toHaveCount(3)
   await expect(sets.getByRole('row').nth(2).getByRole('cell').first()).toHaveText('1 h')
 
-  // The first one marked joué from its dropdown, which gets the focus back once it's saved, after the browser took it away
-  // while it was disabled: the server's answer is held back until it has.
+  // The first one marked joué from its dropdown, which gets the focus back once it's saved: the server's answer is held
+  // back until the browser has taken the focus away, while the dropdown is disabled.
   const first = sets.getByRole('row').nth(1).getByRole('combobox', { name: /^Statut : / })
   const status = '**/api/admin/sets/*/status'
   let answer!: () => void

@@ -115,9 +115,9 @@ export function StatusSelect<S extends string>({
   const [saving, setSaving] = useState<S | null>(null)
   const locked = disabled || saving !== null
   const select = useRef<HTMLSelectElement>(null)
-  // Browsers take the focus away from a control once it's disabled, as it is while its status is saved, which would leave
-  // the keyboard at the top of the page: it gets the focus back once it can be used again, if it had it when the status
-  // was picked, and the focus hasn't gone anywhere else since.
+  // Browsers take the focus away from a control once it's disabled, as it is while its status is saved, which would lose
+  // the keyboard's place: it gets the focus back once it can be used again, if it had it when the status was picked and
+  // no other control has taken it since.
   const refocus = useRef(false)
   useLayoutEffect(() => {
     if (locked || !refocus.current) return

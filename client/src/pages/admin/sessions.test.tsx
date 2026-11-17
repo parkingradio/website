@@ -828,6 +828,33 @@ describe("A session's page", () => {
     expect(refused).toHaveValue('cancelled')
   })
 
+  it('gives a dropdown the focus back once its status is saved, unless another control took it meanwhile', async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: true, session: SESSION }, 'PUT /api/admin/sets/set-2/status': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    // Browsers take the focus away from it while it's disabled, to the page itself, which jsdom doesn't, even with blur().
+    const dropFocus = () => {
+      document.body.tabIndex = -1
+      document.body.focus()
+      document.body.removeAttribute('tabindex')
+    }
+    const changed = await screen.findByRole('combobox', { name: 'Statut : Set de Aurore et Brume' })
+    changed.focus()
+    fireEvent.change(changed, { target: { value: 'done' } })
+    dropFocus()
+    expect(changed).not.toHaveFocus()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveFocus()
+
+    const other = screen.getByRole('combobox', { name: 'Statut : Set de Cyan' })
+    other.focus()
+    fireEvent.change(other, { target: { value: 'planned' } })
+    const edit = screen.getByRole('button', { name: 'modifier : Set de Cyan' })
+    edit.focus()
+    await waitFor(() => expect(other).toBeEnabled())
+    expect(edit).toHaveFocus()
+  })
+
   it("shows only the server's message when it names nothing in the way", async () => {
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'This session is cancelled', session: null, set: null } })
     renderAt('/admin/sessions/session-1')

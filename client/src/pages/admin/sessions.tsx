@@ -793,7 +793,8 @@ function linkOrMissing(link: { url: string } | null): ReactNode {
 
 // A session's sets, in their order, each with its status as a dropdown that changes it, arrows that move it, a button
 // that opens the panel that moves it to another session, one that opens its form, and one that deletes it. The sets of a
-// cancelled session can't be un-cancelled: their statuses are written out instead, and it says why above them, once.
+// cancelled session can't be un-cancelled: their statuses are written out instead, and the table says why above them,
+// once.
 function SetsTable({
   session,
   busy,
