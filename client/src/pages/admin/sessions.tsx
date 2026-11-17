@@ -564,9 +564,10 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     clearSetsMessages()
     const result = await api.PUT('/api/admin/sets/{id}/position', { params: { path: { id: set.id } }, body: { position: to } })
     setBusy(false)
+    // Like the page's other answers, the server's replaces the session, whichever came last. Only putting the set back is
+    // skipped when another answer replaced the session meanwhile, e.g. a set's form saved, which already has the sets in
+    // their order: the session as it was before would visibly undo that save.
     if (result.ok) return setSession(result.session)
-    // Unless another of the server's answers replaced it meanwhile, e.g. a set's form saved, which has the sets in their
-    // order.
     setSession((current) => (current === moved ? before : current))
     setSetsError(failure(`Le set «\u00a0${setName(set)}\u00a0» n'a pas pu être déplacé`, result, session.id))
   }

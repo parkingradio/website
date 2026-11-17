@@ -1273,8 +1273,8 @@ describe("A session's page", () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it("puts a set back where it was when its place can't be saved, saying why", async () => {
-    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' } })
+  it("puts a set back where it was when its place can't be saved, saying why, its handle keeping the focus", async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' }, 'PUT /api/admin/sets/set-3/position': { ok: false, error: 'Boom' } })
     renderAt('/admin/sessions/session-1')
 
     await screen.findByRole('table', { name: 'Sets' })
@@ -1287,6 +1287,14 @@ describe("A session's page", () => {
     expect(requestsTo('PUT', '/api/admin/sets/set-1/position').map(jsonBody)).toEqual([{ position: 1 }])
     expect(handle).not.toHaveAttribute('aria-disabled')
     expect(handle).toHaveFocus()
+
+    // Moved up, to the start, then put back at the end, which puts its row back in the page.
+    const last = screen.getByRole('button', { name: 'réordonner : Set' })
+    await moveWithKeyboard(last, -2)
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^Le set « Set » n'a pas pu être déplacé : Boom$/))
+    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore, Brume', 'Cyan', '-'])
+    expect(requestsTo('PUT', '/api/admin/sets/set-3/position').map(jsonBody)).toEqual([{ position: 0 }])
+    expect(last).toHaveFocus()
   })
 
   it("doesn't put a set back over what the server answered for another change while its place was saved", async () => {

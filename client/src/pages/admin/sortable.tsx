@@ -40,24 +40,28 @@ export function SortableList({
 
   // dnd-kit says the item is over its own place as soon as it's picked up, which would cut what's announced then.
   const pickedUp = useRef(false)
+  // An item can leave the list while it's dragged, e.g. once the server answers for another change: nothing is said of
+  // it, and it isn't moved.
+  const listed = (...items: (string | number)[]) => items.every((id) => ids.includes(String(id)))
   const name = (id: string | number) => nameOf(ids.indexOf(String(id)))
   const place = (id: string | number) => `position ${ids.indexOf(String(id)) + 1} sur ${ids.length}`
   const announcements: Announcements = {
     onDragStart({ active }) {
       pickedUp.current = true
-      return `Vous déplacez ${name(active.id)} en ${place(active.id)}.`
+      if (listed(active.id)) return `Vous déplacez ${name(active.id)} en ${place(active.id)}.`
     },
     onDragOver({ active, over }) {
-      if (!over || (pickedUp.current && over.id === active.id)) return
+      if (!over || (pickedUp.current && over.id === active.id) || !listed(active.id, over.id)) return
       pickedUp.current = false
       return `${name(active.id)}\u00a0: ${place(over.id)}.`
     },
     onDragEnd({ active, over }) {
-      if (over && over.id !== active.id) return `${name(active.id)} est maintenant en ${place(over.id)}.`
+      if (!listed(active.id)) return
+      if (over && over.id !== active.id && listed(over.id)) return `${name(active.id)} est maintenant en ${place(over.id)}.`
       return `${name(active.id)} reste en ${place(active.id)}.`
     },
     onDragCancel({ active }) {
-      return `Déplacement annulé\u00a0: ${name(active.id)} reste en ${place(active.id)}.`
+      if (listed(active.id)) return `Déplacement annulé\u00a0: ${name(active.id)} reste en ${place(active.id)}.`
     },
   }
 
@@ -73,7 +77,7 @@ export function SortableList({
       onDragEnd={({ active, over }) => {
         const from = ids.indexOf(String(active.id))
         const to = over ? ids.indexOf(String(over.id)) : from
-        if (from !== to) onMove(from, to)
+        if (from >= 0 && to >= 0 && from !== to) onMove(from, to)
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>

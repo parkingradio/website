@@ -9,8 +9,9 @@ import { test, expect, adminMenu, logIn } from './fixtures.ts'
 
 // The rows of a page or a table that have `text`, and what a page says of `label`.
 const rowsOf = (within: Page | Locator, text: string) => within.getByRole('row').filter({ hasText: text })
-// A set's duration, in its row, after the cell of the handle that reorders the sets.
+// A set's duration and its status, in its row, whose first cell has the handle that reorders the sets.
 const durationOf = (row: Locator) => row.getByRole('cell').nth(1)
+const statusOf = (row: Locator) => row.getByRole('cell').nth(6)
 // What the session's record, or the content of its event on RA, which is within it, says for `label`.
 const recordValue = (page: Page, record: string, label: string) =>
   page.getByLabel(record, { exact: true }).locator(':scope > dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
@@ -637,8 +638,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
-  // In the cell after the handle's, the duration's, the performers', the performance's, the genres' and the links'.
-  await expect(sets.getByRole('row').nth(1).getByRole('cell').nth(6)).toHaveText('annulé')
+  await expect(statusOf(sets.getByRole('row').nth(1))).toHaveText('annulé')
   // It stays announced, until it's un-announced.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
   // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.
