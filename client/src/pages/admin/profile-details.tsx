@@ -47,6 +47,15 @@ export function CollectivesFailure({ message }: { message: string }) {
   )
 }
 
+// That the collective of a set's takeover, whose artists its form offers first, couldn't be loaded, and why.
+export function TakeoverFailure({ message }: { message: string }) {
+  return (
+    <p className="admin-error" role="alert">
+      Le collectif du takeover n'a pas pu être chargé&nbsp;: {message}
+    </p>
+  )
+}
+
 export function ApplicationsFailure({ message }: { message: string }) {
   return (
     <p className="admin-error" role="alert">

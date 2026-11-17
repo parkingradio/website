@@ -88,6 +88,8 @@ export function SessionForm({
   if (flyerProblem) errors.flyer = flyerProblem
   // The listed set whose form is open, if any.
   const [openSet, setOpenSet] = useState<OpenListedSet | null>(null)
+  // The collective whose artists the listed sets' forms offer first, for a takeover.
+  const takeover = (form.type === 'takeover' && collectives?.find((collective) => collective.id === form.takeover?.id)) || null
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => {
     // There are fields, since there are no errors by then.
     const session = sets ? { ...checked.fields!, sets: sets.map(listedSetFields) } : checked.fields!
@@ -167,7 +169,15 @@ export function SessionForm({
       </form>
       {sets && (
         <>
-          <ListedSets sets={sets} durationMinutes={'errors' in times ? null : times.durationMinutes} open={openSet} busy={busy} onChange={setSets} onOpen={setOpenSet} />
+          <ListedSets
+            sets={sets}
+            durationMinutes={'errors' in times ? null : times.durationMinutes}
+            open={openSet}
+            takeover={takeover}
+            busy={busy}
+            onChange={setSets}
+            onOpen={setOpenSet}
+          />
           {/* After the sets, whose forms can't be within the session's. */}
           <div className="admin-form admin-form-wide">
             <FormActions

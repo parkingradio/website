@@ -187,6 +187,44 @@ test("a seeded takeover links to the application it comes from, whose page links
   await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
 })
 
+// With Collectif Béton's takeover, BÉTON 140, whose artists are Mathis, Rosalie, Kofi and Yasmine, in that order, and whose
+// second set is Mathis and Rosalie's (see seed-data.ts). Nothing is saved.
+test("a takeover's set form offers its collective's artists first, in its order, on its page and on « nouvelle session »", async ({ page }) => {
+  // The first options of the open combobox of `form`, each its name then what it's marked with.
+  const firstOptions = (form: Locator, count: number) => async () => (await form.getByRole('option').allTextContents()).slice(0, count)
+
+  await logIn(page, { at: '/admin/sessions?status=all' })
+  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('béton 140')
+  await rowsOf(page, 'BÉTON 140').getByRole('link').first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
+  await page.getByRole('button', { name: 'modifier : Set de Mathis et Rosalie' }).click()
+  const set = page.getByRole('region', { name: 'Set de Mathis et Rosalie' })
+  const picker = set.getByRole('combobox', { name: 'Ajouter un artiste' })
+  await picker.click()
+  await expect
+    .poll(firstOptions(set, 4))
+    .toEqual(['MathisCollectif Béton · déjà dans le set', 'RosalieCollectif Béton · déjà dans le set', 'KofiCollectif Béton', 'YasmineCollectif Béton'])
+  // The guest of its first set is offered as in other sets.
+  await expect(set.getByRole('option', { name: /^DJ Poutine/ })).toHaveCount(1)
+  await expect(set.getByRole('option', { name: /^DJ Poutine/ })).not.toContainText('Collectif Béton')
+  // Its artists whose names have an « o » come first, ahead of those whose names start with one, e.g. Ondine.
+  await picker.fill('o')
+  await expect.poll(firstOptions(set, 2)).toEqual(['RosalieCollectif Béton · déjà dans le set', 'KofiCollectif Béton'])
+  await expect(set.getByRole('option', { name: /^Ondine/ })).toHaveCount(1)
+  await picker.press('Escape')
+  await set.getByRole('button', { name: 'annuler' }).click()
+
+  // As its collective is picked on « nouvelle session ».
+  await page.goto('/admin/sessions/nouvelle')
+  await page.getByRole('radio', { name: 'Takeover' }).check()
+  await page.getByRole('combobox', { name: 'Collectif' }).fill('Collectif Béton')
+  await page.getByRole('option', { name: /^Collectif Béton/ }).click()
+  await page.getByRole('button', { name: 'ajouter un set' }).click()
+  const newSet = page.getByRole('region', { name: 'Nouveau set' })
+  await newSet.getByRole('combobox', { name: 'Ajouter un artiste' }).click()
+  await expect.poll(firstOptions(newSet, 4)).toEqual(['MathisCollectif Béton', 'RosalieCollectif Béton', 'KofiCollectif Béton', 'YasmineCollectif Béton'])
+})
+
 test('a takeover and its set are given the applications they come from in their forms, which link to them, until they are taken away', async ({ page }, testInfo) => {
   const { unique, day } = own(testInfo)
   await logIn(page)

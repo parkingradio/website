@@ -5,6 +5,7 @@ import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, se
 import { arrowAfterMove } from './list'
 import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
+import type { TakeoverCollective } from './set-form'
 
 // The sets listed in a new session's form, to be added with it, all at once (see "A new session's sets" in
 // docs/design/client/admin/sessions.md): each one is changed in its form, or taken out of the list, without sending
@@ -26,6 +27,7 @@ export function ListedSets({
   sets,
   durationMinutes,
   open,
+  takeover,
   busy,
   onChange,
   onOpen,
@@ -34,6 +36,8 @@ export function ListedSets({
   // How long the session lasts, as its form has it, or null while its times aren't valid.
   durationMinutes: number | null
   open: OpenListedSet | null
+  // The collective the session's form has picked, for a takeover, whose artists the sets' forms offer first.
+  takeover: TakeoverCollective | null
   // Whether the session is being sent, with its sets, which then can't be changed.
   busy: boolean
   onChange: (sets: ListedSet[]) => void
@@ -141,6 +145,7 @@ export function ListedSets({
           key={open.index === null ? 'new' : keyOf(sets[open.index])}
           title={open.index === null ? 'Nouveau set' : setTitle(sets[open.index])}
           initial={open.index === null ? newSetFormValues({ durationMinutes, sets }) : setFormValues(shownSet(sets[open.index]))}
+          takeover={takeover && { kind: 'loaded', value: takeover }}
           submitLabel={open.index === null ? 'ajouter le set' : 'enregistrer'}
           onCancel={() => onOpen(null)}
           onSubmit={async (fields, form) => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
@@ -491,7 +491,8 @@ const RA_EVENT = {
 const RA_EVENTS = {
   '/api/admin/sessions/session-1/ra-event': { ok: true, event: RA_EVENT },
 }
-const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION } }
+// With its takeover's collective, which its sets' forms load.
+const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
 const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
@@ -1859,6 +1860,88 @@ describe("A set's form", () => {
     expect(screen.getByRole('alert')).toHaveTextContent("Les artistes n'ont pas pu être chargés : Boom")
     expect(screen.getByRole('combobox', { name: 'Ajouter un artiste' })).toBeDisabled()
   })
+
+  describe("in a takeover's set", () => {
+    const LE_BRUME = artist('artist-4', 'Le Brume', ['ambient'])
+    // Ondes' artists, out of the order of their names, one of whom was deleted since.
+    const members = [
+      { id: 'artist-3', name: 'Cyan' },
+      { id: 'artist-1', name: 'Aurore' },
+      { id: 'artist-9', name: 'Zéphyr' },
+      { id: 'artist-4', name: 'Le Brume' },
+    ]
+    const TAKEOVER_PAGE = {
+      ...PAGE,
+      ...APPLICATIONS,
+      '/api/admin/artists': { ok: true, artists: [AURORE, BRUME, CYAN, LE_BRUME] },
+      '/api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, members } },
+    }
+    const picker = () => screen.getByRole('combobox', { name: 'Ajouter un artiste' })
+
+    it("offers its collective's artists first, in its order, marked with its name, which stay first while a name is typed", async () => {
+      mockFetch(TAKEOVER_PAGE)
+      renderAt('/admin/sessions/session-1')
+
+      await openNew()
+      pick('Cyan')
+      fireEvent.click(picker())
+      expect(options()).toEqual(['CyanOndes · déjà dans le set', 'AuroreOndes', 'Le BrumeOndes', 'Brumebrume@example.com'])
+      fireEvent.keyDown(picker(), { key: 'Escape' })
+
+      // Ahead of Brume, whose name starts with it.
+      fireEvent.change(picker(), { target: { value: 'brume' } })
+      expect(options()).toEqual(['Le BrumeOndes', 'Brumebrume@example.com'])
+      fireEvent.keyDown(picker(), { key: 'Enter' })
+      expect(screen.getByRole('button', { name: 'retirer Le Brume' })).toBeInTheDocument()
+    })
+
+    it('waits for its collective before it shows', async () => {
+      let answer: (value: Response) => void = () => {}
+      const answered: string[] = []
+      mockFetch(TAKEOVER_PAGE)
+      const answering = vi.mocked(fetch).getMockImplementation()!
+      // The collective is held back until it's answered.
+      vi.mocked(fetch).mockImplementation(async (input, options) => {
+        const url = input instanceof Request ? input.url : String(input)
+        if (url.endsWith('/api/admin/collectives/collective-1')) return new Promise((resolve) => (answer = resolve))
+        const response = await answering(input, options)
+        answered.push(new URL(url, 'http://localhost').pathname)
+        return response
+      })
+      renderAt('/admin/sessions/session-1')
+
+      fireEvent.click(await screen.findByRole('button', { name: 'ajouter un set' }))
+      await waitFor(() => expect(answered).toEqual(expect.arrayContaining(['/api/admin/artists', '/api/admin/applications'])))
+      // Time enough for the form to show, if it didn't wait.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
+      expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
+
+      answer(Response.json({ ok: true, collective: { ...ONDES, members } }))
+      await screen.findByRole('heading', { name: 'Nouveau set' })
+      fireEvent.click(picker())
+      expect(options()).toEqual(['CyanOndes', 'AuroreOndes', 'Le BrumeOndes', 'Brumebrume@example.com'])
+    })
+
+    it('says when its collective could not be loaded, and offers the artists as in other sets', async () => {
+      mockFetch({ ...TAKEOVER_PAGE, '/api/admin/collectives/collective-1': { ok: false, error: 'Boom' } })
+      renderAt('/admin/sessions/session-1')
+
+      await openNew()
+      expect(screen.getByRole('alert')).toHaveTextContent("Le collectif du takeover n'a pas pu être chargé : Boom")
+      fireEvent.click(picker())
+      expect(options()).toEqual(['Auroreaurore@example.com', 'Brumebrume@example.com', 'Cyancyan@example.com', 'Le Brumele brume@example.com'])
+    })
+
+    it("doesn't load a collective for another type's set", async () => {
+      mockFetch({ ...TAKEOVER_PAGE, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, type: 'guest-mixes', takeover: null, application: null, title: 'GUEST MIXES' } } })
+      renderAt('/admin/sessions/session-1')
+
+      await openNew()
+      fireEvent.click(picker())
+      expect(options()).toEqual(['Auroreaurore@example.com', 'Brumebrume@example.com', 'Cyancyan@example.com', 'Le Brumele brume@example.com'])
+      expect(requestsTo('GET', '/api/admin/collectives/collective-1')).toEqual([])
+    })
+  })
 })
 
 describe('Moving a set to another session', () => {
@@ -2606,6 +2689,38 @@ describe("A new session's sets", () => {
     refusing({ error: 'Another session overlaps this one', session: SESSIONS[2], set: null })
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/^La session n'a pas pu être ajoutée : Another session overlaps this one \(SOIRÉE/))
+  })
+
+  it("offers the artists of the takeover's collective first in a set's form, which follows the collective and the type", async () => {
+    const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com', members: [{ id: 'artist-3', name: 'Cyan' }, { id: 'artist-2', name: 'Brume' }] }
+    mockFetch({ ...NEW, '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] } })
+    renderAt('/admin/sessions/nouvelle')
+
+    await fillIn({ type: 'Takeover' })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Ondes/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'ajouter un set' }))
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    const form = setForm('Nouveau set')
+    const picker = () => form.getByRole('combobox', { name: 'Ajouter un artiste' })
+    fireEvent.click(picker())
+    fireEvent.mouseDown(form.getByRole('option', { name: /^Cyan/ }))
+    lasting('0', '45')(form)
+    fireEvent.click(picker())
+    expect(options()).toEqual(['AuroreOndes', 'Brumebrume@example.com', 'Cyandéjà dans le set'])
+    fireEvent.keyDown(picker(), { key: 'Escape' })
+
+    // The set's form follows it, with what it has.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Collectif' }))
+    fireEvent.mouseDown(screen.getByRole('option', { name: /^Vagues/ }))
+    expect(form.getByRole('button', { name: 'retirer Cyan' })).toBeInTheDocument()
+    expect(durationIn(form)).toEqual(['0', '45'])
+    fireEvent.click(picker())
+    expect(options()).toEqual(['CyanVagues · déjà dans le set', 'BrumeVagues', 'Auroreaurore@example.com'])
+    fireEvent.keyDown(picker(), { key: 'Escape' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
+    fireEvent.click(picker())
+    expect(options()).toEqual(['Auroreaurore@example.com', 'Brumebrume@example.com', 'Cyandéjà dans le set'])
   })
 })
 

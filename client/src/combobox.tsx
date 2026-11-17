@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import { matching } from './combobox-matching'
 import { normalize } from './normalize'
 import './combobox.css'
 
@@ -33,15 +34,6 @@ type ComboboxProps = {
       text: { value: string; onChange: (value: string) => void }
     }
 )
-
-// The options whose label contains `query`, those that start with it first, or whose key is `query`, e.g. "FR", unless
-// the combobox is given a `filter` of its own.
-function matching(options: ComboboxOption[], query: string): ComboboxOption[] {
-  const q = normalize(query)
-  if (!q) return options
-  const found = options.filter((option) => normalize(option.label).includes(q) || option.key.toLowerCase() === q)
-  return [...found.filter((option) => normalize(option.label).startsWith(q)), ...found.filter((option) => !normalize(option.label).startsWith(q))]
-}
 
 // The first option that can be picked, starting at `from` and going by `step`, around the list, or -1 if there's none.
 function enabled(options: ComboboxOption[], from: number, step: 1 | -1): number {
