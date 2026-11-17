@@ -111,7 +111,7 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
     [A set's form](#a-sets-form)), even while the session is cancelled. The first set's "↑" and the last one's "↓"
     can't be used.
   - "modifier", which opens its form (see [A set's form](#a-sets-form)).
-  - "×", which deletes it for good, after confirming. Its artists stay.
+  - "×", which deletes it for good, after confirming.
 
   Changing a set's status, adding one or deleting one can change the session's status (see
   [Status](../../server/sessions.md#status)).

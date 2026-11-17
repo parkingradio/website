@@ -553,7 +553,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   }
 
   const removeSet = async (set: StudioSet) => {
-    if (!window.confirm(`Supprimer définitivement ce set (${setName(set)}) ?${set.performers.length > 0 ? ' Ses artistes restent.' : ''}`)) return
+    if (!window.confirm(`Supprimer définitivement ce set (${setName(set)}) ?`)) return
     setBusy(true)
     setSetsError(null)
     const result = await api.DELETE('/api/admin/sets/{id}', { params: { path: { id: set.id } } })

@@ -1639,7 +1639,7 @@ describe("A set's form", () => {
     expect(screen.queryByRole('button', { name: /supprimer le set/ })).not.toBeInTheDocument()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan' }))
-    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set de Cyan) ? Ses artistes restent.')
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set de Cyan) ?')
     expect(requestsTo('DELETE', '/api/admin/sets/set-2')).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set de Cyan' }))
     // The focus goes to the next set's ×, in the commit that removes the row. It's read in the waitFor that sees the row
@@ -1656,7 +1656,6 @@ describe("A set's form", () => {
     mockFetch({ ...SET_PAGE, 'DELETE /api/admin/sets/set-3': { ok: false, error: 'Boom' } })
     vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer : Set' }))
-    expect(window.confirm).toHaveBeenLastCalledWith('Supprimer définitivement ce set (Set) ?')
     expect(await screen.findByRole('alert')).toHaveTextContent("Le set « Set » n'a pas pu être supprimé : Boom")
     expect(rows(setsTable())).toHaveLength(2)
   })
