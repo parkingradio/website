@@ -241,7 +241,7 @@ describe('Connecting Claude', () => {
     render(<Admins />)
     fireEvent.click((await appRow('Claude')).getByRole('button', { name: 'déconnecter' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("L'application n'a pas pu être déconnectée : No such connection")
-    // A failed disconnect reloads the list too, in case it's out of date, e.g. the app was disconnected already.
+    // In case the list is out of date, e.g. the app was disconnected already.
     await waitFor(() => expect(requestsTo('GET', '/api/admin/connections')).toHaveLength(2))
   })
 

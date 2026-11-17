@@ -42,8 +42,9 @@ beforeEach(() => {
 
 afterEach(() => {
   // Unmounting first runs what's pending, e.g. the page opened once a request was answered, which can send requests and
-  // pause audio elements, so the stubs and mocks are restored after it. A test file's own `afterEach`, whether at its top
-  // level or in a `describe`, runs before this one, so it leaves restoring them to this, unless it unmounts first.
+  // pause audio elements, so the stubbed globals and the mocks are restored after it. A test file's own `afterEach`,
+  // whether at its top level or in a `describe`, runs before this one, so it leaves restoring them to this one, unless
+  // it unmounts first.
   cleanup()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
