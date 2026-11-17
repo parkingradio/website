@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { CONFIG, jsonBody, mockFetch, requestsTo, visibleText } from '../../test-utils'
+import { CONFIG, jsonBody, mockFetch, moveWithKeyboard, requestsTo, visibleText } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
@@ -250,8 +250,13 @@ function renderAt(path: string) {
 const rows = (table: HTMLElement | null = screen.queryByRole('table')) =>
   (table ? within(table).queryAllByRole('row') : [])
     .slice(1)
-    // A dropdown by the option it shows.
-    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? visibleText(cell)))
+    // A dropdown by the option it shows. Not the cell with the handle that reorders the rows, which shows nothing else.
+    .map((row) =>
+      within(row)
+        .getAllByRole('cell')
+        .filter((cell) => !cell.querySelector('.admin-handle'))
+        .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? visibleText(cell)),
+    )
 const days = () => rows().map((row) => row[0])
 
 async function expectSearch(query: string, found: string[]) {
@@ -1544,12 +1549,14 @@ describe("A set's form", () => {
     fireEvent.click(screen.getByRole('button', { name: 'reprendre les genres des artistes' }))
     expect(screen.getByRole('button', { name: 'retirer house' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'reprendre les genres des artistes' })).not.toBeInTheDocument()
+    // Aurore first, dragged up by her handle.
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner Aurore' }), -1)
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter le set' }))
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument())
     expect(rows(setsTable())).toHaveLength(4)
     expect(jsonBody(requestsTo('POST', '/api/admin/sessions/session-1/sets')[0])).toEqual({
-      performers: [{ id: 'artist-3' }, { id: 'artist-1' }],
+      performers: [{ id: 'artist-1' }, { id: 'artist-3' }],
       durationMinutes: 30,
       performanceTypes: ['dj'],
       otherPerformanceType: '',
@@ -2474,7 +2481,7 @@ describe("A new session's sets", () => {
     fireEvent.change(group.getByLabelText('minutes'), { target: { value: minutes } })
   }
 
-  it('lists sets in the order they are added, which the arrows change, and sends them with the session in that order', async () => {
+  it('lists sets in the order they are added, which dragging them changes, and sends them with the session in that order', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')
 
@@ -2507,15 +2514,21 @@ describe("A new session's sets", () => {
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Brume' })).not.toBeInTheDocument())
     expect(rows(setsTable())[0][0]).toBe('1 h')
 
-    // Moved down, twice, the focus staying on its arrow, or going to the other one once it's last.
-    expect(screen.getByRole('button', { name: 'monter : Set de Brume' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'descendre : Set de Aurore' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Brume' }))
-    expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', 'Brume', 'Aurore'])
-    expect(screen.getByRole('button', { name: 'descendre : Set de Brume' })).toHaveFocus()
-    fireEvent.click(screen.getByRole('button', { name: 'descendre : Set de Brume' }))
+    // Moved down two places with its handle, which keeps the focus, while another set's form is open, which stays that
+    // set's, though it's moved up.
+    fireEvent.click(screen.getByRole('button', { name: 'modifier : Set de Cyan' }))
+    await screen.findByRole('heading', { name: 'Set de Cyan' })
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner : Set de Brume' }), 2)
     expect(rows(setsTable()).map((row) => row[1])).toEqual(['Cyan', 'Aurore', 'Brume'])
-    expect(screen.getByRole('button', { name: 'monter : Set de Brume' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'réordonner : Set de Brume' })).toHaveFocus()
+    lasting('0', '45')(setForm('Set de Cyan'))
+    fireEvent.click(setForm('Set de Cyan').getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Set de Cyan' })).not.toBeInTheDocument())
+    expect(rows(setsTable()).map((row) => row.slice(0, 2))).toEqual([
+      ['45 min', 'Cyan'],
+      ['à déterminer', 'Aurore'],
+      ['1 h', 'Brume'],
+    ])
     fireEvent.click(screen.getByRole('button', { name: 'retirer : Set de Cyan' }))
     expect(rows(setsTable()).map((row) => row[1])).toEqual(['Aurore', 'Brume'])
 
@@ -2658,6 +2671,7 @@ describe("A new session's sets", () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeDisabled())
     expect(screen.getByRole('button', { name: 'modifier : Set de Aurore' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'retirer : Set de Aurore' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'réordonner : Set de Aurore' })).toBeDisabled()
     answer(Response.json({ ok: false, error: 'Boom' }, { status: 500 }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'ajouter un set' })).toBeEnabled())
   })

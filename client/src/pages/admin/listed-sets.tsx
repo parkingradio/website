@@ -1,11 +1,12 @@
 import { useId, useLayoutEffect, useRef } from 'react'
-import type { ListedSet } from '../../session-fields'
+import type { ListedSet, SetValues } from '../../session-fields'
 import { listedSet, newSetFormValues, setFormValues, shownSet } from '../../session-fields'
 import { MISSING, describePerformanceTypes, genreNames, setDuration, setName, setTitle } from './describe'
-import { arrowAfterMove } from './list'
-import { MoveButtons, Performers, SetLinks, SetsTooLong } from './set-cells'
+import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { TakeoverCollective } from './set-form'
+import { DragHandle, SortableList } from './sortable'
+import { arrayMove, useSortableItem } from './use-sortable'
 
 // The sets listed in a new session's form, to be added with it, all at once (see "A new session's sets" in
 // docs/design/client/admin/sessions.md): each one is changed in its form, or taken out of the list, without sending
@@ -44,14 +45,14 @@ export function ListedSets({
   onOpen: (open: OpenListedSet | null) => void
 }) {
   const headingId = useId()
-  // What gets the focus once the sets change, since the button that changed them can be gone, disabled or moved, which
-  // loses it: a set's button, by its key and what it does, or the heading of the sets, as on a session's page.
-  const focusNext = useRef<{ key: number; action: 'up' | 'down' | 'remove' } | 'heading' | null>(null)
+  // What gets the focus once a set is taken out of the list, since its × is gone: another set's ×, by its key, or the
+  // heading of the sets, as on a session's page.
+  const focusNext = useRef<number | 'heading' | null>(null)
   useLayoutEffect(() => {
     const next = focusNext.current
     focusNext.current = null
     if (next === 'heading') document.getElementById(headingId)?.focus()
-    else if (next !== null) document.querySelector<HTMLElement>(`[data-set="${next.key}"][data-action="${next.action}"]`)?.focus()
+    else if (next !== null) document.querySelector<HTMLElement>(`[data-set="${next}"][data-action="remove"]`)?.focus()
   }, [sets, headingId])
 
   // In their order, which is the one they're added in.
@@ -59,20 +60,17 @@ export function ListedSets({
   const remove = (index: number) => {
     // The focus goes to the next set's ×, or the previous one's, or else to the heading of the sets.
     const next = rows[index + 1] ?? rows[index - 1]
-    focusNext.current = next ? { key: next.key, action: 'remove' } : 'heading'
+    focusNext.current = next?.key ?? 'heading'
     onChange(sets.filter((_, i) => i !== index))
     if (open?.index === index) onOpen(null)
     // The open form's set moves up in the list.
     else if (open?.index != null && open.index > index) onOpen({ ...open, index: open.index - 1 })
   }
-  // Swaps the set at `index` with the one `by` places from it, the open form's set included.
-  const move = (index: number, by: -1 | 1) => {
-    const moved = [...sets]
-    ;[moved[index], moved[index + by]] = [moved[index + by], moved[index]]
-    focusNext.current = { key: keyOf(sets[index]), action: arrowAfterMove(by, index + by, sets.length) }
+  // Moves the set at `from` to `to`, where the open form's set stays open.
+  const move = (from: number, to: number) => {
+    const moved = arrayMove(sets, from, to)
     onChange(moved)
-    if (open?.index === index) onOpen({ ...open, index: index + by })
-    else if (open?.index === index + by) onOpen({ ...open, index })
+    if (open?.index != null) onOpen({ ...open, index: moved.indexOf(sets[open.index]) })
   }
 
   return (
@@ -89,55 +87,38 @@ export function ListedSets({
       {rows.length === 0 ? (
         <p className="admin-placeholder">Aucun set.</p>
       ) : (
-        <table className="admin-table admin-table-controls" aria-label="Sets">
-          <thead>
-            <tr>
-              <th>Durée</th>
-              <th>Artistes</th>
-              <th>Prestation</th>
-              <th>Genres</th>
-              <th>Liens</th>
-              <th aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ index, key, shown }) => (
-              <tr key={key}>
-                <td className="admin-day">{setDuration(shown)}</td>
-                {/* Its links open in a new tab, so that the form isn't left. */}
-                <td>{shown.performers.length > 0 ? <Performers performers={shown.performers} newTab /> : MISSING}</td>
-                <td>{describePerformanceTypes(shown)}</td>
-                <td>{genreNames(shown.genres)}</td>
-                <td>
-                  <SetLinks set={shown} newTab />
-                </td>
-                <td>
-                  <MoveButtons
-                    name={setName(shown)}
-                    first={index === 0}
-                    last={index === rows.length - 1}
-                    disabled={busy}
-                    data={{ 'data-set': key }}
-                    onMove={(by) => move(index, by)}
-                  />{' '}
-                  <button type="button" aria-label={`modifier : ${setName(shown)}`} disabled={busy} onClick={() => onOpen({ index })}>
-                    modifier
-                  </button>{' '}
-                  <button
-                    type="button"
-                    data-set={key}
-                    data-action="remove"
-                    aria-label={`retirer : ${setName(shown)}`}
-                    disabled={busy}
-                    onClick={() => remove(index)}
-                  >
-                    ×
-                  </button>
-                </td>
+        <SortableList
+          ids={rows.map(({ key }) => String(key))}
+          nameOf={(index) => `«\u00a0${setName(rows[index].shown)}\u00a0»`}
+          disabled={busy}
+          onMove={move}
+        >
+          <table className="admin-table admin-table-controls" aria-label="Sets">
+            <thead>
+              <tr>
+                <th aria-label="Ordre" />
+                <th>Durée</th>
+                <th>Artistes</th>
+                <th>Prestation</th>
+                <th>Genres</th>
+                <th>Liens</th>
+                <th aria-label="Actions" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map(({ index, key, shown }) => (
+                <ListedSetRow
+                  key={key}
+                  id={key}
+                  set={shown}
+                  busy={busy}
+                  onEdit={() => onOpen({ index })}
+                  onRemove={() => remove(index)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </SortableList>
       )}
       {open && (
         <SetFormWithChoices
@@ -157,5 +138,33 @@ export function ListedSets({
         />
       )}
     </section>
+  )
+}
+
+// A listed set's row, which is dragged by its handle to reorder the sets.
+function ListedSetRow({ id, set, busy, onEdit, onRemove }: { id: number; set: SetValues; busy: boolean; onEdit: () => void; onRemove: () => void }) {
+  const { ref, style, dragging, handle } = useSortableItem(String(id))
+  return (
+    <tr ref={ref} style={style} data-dragging={dragging || undefined}>
+      <td>
+        <DragHandle handle={handle} label={`réordonner : ${setName(set)}`} />
+      </td>
+      <td className="admin-day">{setDuration(set)}</td>
+      {/* Its links open in a new tab, so that the form isn't left. */}
+      <td>{set.performers.length > 0 ? <Performers performers={set.performers} newTab /> : MISSING}</td>
+      <td>{describePerformanceTypes(set)}</td>
+      <td>{genreNames(set.genres)}</td>
+      <td>
+        <SetLinks set={set} newTab />
+      </td>
+      <td>
+        <button type="button" aria-label={`modifier : ${setName(set)}`} disabled={busy} onClick={onEdit}>
+          modifier
+        </button>{' '}
+        <button type="button" data-set={id} data-action="remove" aria-label={`retirer : ${setName(set)}`} disabled={busy} onClick={onRemove}>
+          ×
+        </button>
+      </td>
+    </tr>
   )
 }

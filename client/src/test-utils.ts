@@ -1,3 +1,4 @@
+import { act, fireEvent } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { AppConfig } from './config-context'
 
@@ -89,4 +90,43 @@ export function visibleText(element: Element): string {
   let text = ''
   for (let node = walker.nextNode(); node; node = walker.nextNode()) if (!node.parentElement!.closest('[hidden]')) text += node.nodeValue
   return text
+}
+
+/** The sizes of a list's items, by their place in it, for `mockListLayout`: 800 by 40px unless they're given. */
+export type ListLayout = { widths?: number[]; heights?: number[] }
+
+/**
+ * jsdom doesn't lay out the page, which moving an item of a list with the keyboard needs (see pages/admin/sortable.tsx):
+ * with this, each item, an <li> or a <tr>, and what's in it, is as `layout` says, at the left, under the ones before it,
+ * in a list as tall as its items. What it returns undoes it.
+ */
+export function mockListLayout({ widths = [], heights = [] }: ListLayout = {}) {
+  const top = (index: number) => Array.from({ length: index }, (_, i) => heights[i] ?? 40).reduce((sum, height) => sum + height, 0)
+  return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    if (['OL', 'UL', 'TBODY'].includes(this.tagName)) return new DOMRect(0, 0, 800, top(this.children.length))
+    const item = this.closest('li, tr')
+    if (!item?.parentElement) return new DOMRect(0, 0, 0, 0)
+    const index = Array.prototype.indexOf.call(item.parentElement.children, item)
+    return new DOMRect(0, top(index), widths[index] ?? 800, heights[index] ?? 40)
+  })
+}
+
+/**
+ * Picks up the item of a list whose handle is `handle` with the keyboard, moves it `by` places down, or up if it's
+ * negative, and drops it there, or puts it back with Escape if `cancel` (see pages/admin/sortable.tsx), with the list laid
+ * out as `layout` says (see `mockListLayout`). dnd-kit reads the keys' `code`, and only listens for the arrows a moment
+ * after the item is picked up.
+ */
+export async function moveWithKeyboard(handle: HTMLElement, by: number, { cancel = false, layout = {} }: { cancel?: boolean; layout?: ListLayout } = {}) {
+  const laidOut = mockListLayout(layout)
+  try {
+    handle.focus()
+    fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+    await act(() => new Promise((resolve) => setTimeout(resolve)))
+    for (let i = 0; i < Math.abs(by); i++) fireEvent.keyDown(handle, by > 0 ? { key: 'ArrowDown', code: 'ArrowDown' } : { key: 'ArrowUp', code: 'ArrowUp' })
+    fireEvent.keyDown(handle, cancel ? { key: 'Escape', code: 'Escape' } : { key: ' ', code: 'Space' })
+    await act(() => new Promise((resolve) => setTimeout(resolve)))
+  } finally {
+    laidOut.mockRestore()
+  }
 }

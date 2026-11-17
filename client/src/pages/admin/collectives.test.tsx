@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { mockFetch, requestsTo } from '../../test-utils'
+import { mockFetch, mockListLayout, moveWithKeyboard, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
@@ -129,7 +129,7 @@ async function edit() {
 const described = (term: string) => screen.getByText(term, { selector: 'dt' }).nextElementSibling
 // The error shown under a field, found from its input.
 const errorOf = (input: HTMLElement) => input.closest('.admin-field, fieldset')?.querySelector('.admin-field-error')?.textContent ?? null
-// The collective's artists in the form, as they read, e.g. "1Aurore↑↓×".
+// The collective's artists in the form, as they read, e.g. "1Aurore×".
 const chosen = () =>
   within(membersField())
     .queryAllByRole('listitem')
@@ -324,17 +324,15 @@ describe('A collective’s page', () => {
     expect(screen.getByLabelText('Nom du collectif')).toHaveValue('Ondes')
     expect(screen.getByLabelText('Adresse e-mail du contact')).toHaveValue('ondes@example.com')
     expect(screen.getByRole('img', { name: 'Photo actuelle' }).getAttribute('src')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=/)
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
-    expect(screen.getByRole('button', { name: 'monter Aurore' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'descendre Cyan' })).toBeDisabled()
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×'])
 
     pick('Dora')
     addNew('Élise')
     addNew('Fé', { enter: true })
-    fireEvent.click(screen.getByRole('button', { name: 'monter Fé' }))
-    fireEvent.click(screen.getByRole('button', { name: 'descendre Aurore' }))
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner Fé' }), -1)
+    await moveWithKeyboard(screen.getByRole('button', { name: 'réordonner Aurore' }), 1)
     fireEvent.click(screen.getByRole('button', { name: 'retirer Élise' }))
-    expect(chosen()).toEqual(['1Cyan↑↓×', '2Aurore↑↓×', '3Dora↑↓×', '4Fé (nouveau)↑↓×'])
+    expect(chosen()).toEqual(['1Cyan×', '2Aurore×', '3Dora×', '4Fé (nouveau)×'])
     expect(picker()).toHaveValue('')
     expect(newArtist()).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Nom du collectif'), { target: { value: 'Ondes 2' } })
@@ -370,7 +368,7 @@ describe('A collective’s page', () => {
     fireEvent.change(picker(), { target: { value: 'cy' } })
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['CyanBruxelles, Belgique'])
     fireEvent.keyDown(picker(), { key: 'Enter' })
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×'])
   })
 
   it("doesn't find the collective's artists by their name, so doesn't add them again, whether entered or typed", async () => {
@@ -385,12 +383,12 @@ describe('A collective’s page', () => {
     expect(picker()).not.toHaveAttribute('aria-activedescendant')
     fireEvent.keyDown(picker(), { key: 'ArrowDown' })
     fireEvent.keyDown(picker(), { key: 'Enter' })
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×'])
 
     // Nor by leaving the field with their whole name typed.
     fireEvent.change(picker(), { target: { value: 'Aurore' } })
     fireEvent.blur(picker())
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×'])
     expect(picker()).toHaveValue('')
   })
 
@@ -406,7 +404,7 @@ describe('A collective’s page', () => {
     expect(active()).toBe('DoraBrise')
     fireEvent.keyDown(picker(), { key: 'ArrowDown' })
     fireEvent.keyDown(picker(), { key: 'Enter' })
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Eden↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Eden×'])
     expect(picker()).toHaveFocus()
 
     // Dora rather than Fanny, who's now where Eden was.
@@ -416,7 +414,7 @@ describe('A collective’s page', () => {
     fireEvent.keyDown(picker(), { key: 'Enter' })
     fireEvent.keyDown(picker(), { key: 'ArrowDown' })
     fireEvent.keyDown(picker(), { key: 'Enter' })
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Eden↑↓×', '4Dora↑↓×', '5Fanny↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Eden×', '4Dora×', '5Fanny×'])
 
     fireEvent.keyDown(picker(), { key: 'ArrowDown' })
     expect(screen.queryAllByRole('option')).toEqual([])
@@ -441,7 +439,7 @@ describe('A collective’s page', () => {
     expect(screen.queryByText(/^Un artiste s'appelle déjà/)).not.toBeInTheDocument()
     addNew('Élise')
     addNew('  ')
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Élise (nouveau)↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Élise (nouveau)×'])
   })
 
   it('does not add the name of one of its artists, and says so, keeping it typed', async () => {
@@ -468,7 +466,7 @@ describe('A collective’s page', () => {
     fireEvent.change(newArtist(), { target: { value: 'Soeur JeanMarie' } })
     expect(screen.queryByText(/est déjà parmi/)).not.toBeInTheDocument()
     fireEvent.change(newArtist(), { target: { value: 'ELISE' } })
-    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Élise (nouveau)↑↓×', '4Sœur Jean-Marie (nouveau)↑↓×'])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Élise (nouveau)×', '4Sœur Jean-Marie (nouveau)×'])
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(errorOf(membersField())).toBe('« ELISE » est déjà parmi les artistes du collectif : effacez ce nom.')
@@ -476,25 +474,67 @@ describe('A collective’s page', () => {
     expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
   })
 
-  it('keeps the focus on the member moved or after the one removed, so that the keyboard can go on', async () => {
+  it('reorders the members by their handles with the keyboard, keeping the focus, and says so to screen readers', async () => {
+    mockListLayout()
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
     pick('Dora')
     const button = (name: string) => screen.getByRole('button', { name })
-    fireEvent.click(button('descendre Aurore'))
-    expect(button('descendre Aurore')).toHaveFocus()
-    // Once it's last, the other arrow, rather than the one that's now disabled.
-    fireEvent.click(button('descendre Aurore'))
-    expect(chosen()).toEqual(['1Cyan↑↓×', '2Dora↑↓×', '3Aurore↑↓×'])
-    expect(button('monter Aurore')).toHaveFocus()
-    fireEvent.click(button('monter Dora'))
-    expect(button('descendre Dora')).toHaveFocus()
+    const announced = () => within(membersField()).getByRole('status').textContent
+    const later = () => act(() => new Promise((resolve) => setTimeout(resolve)))
+    const handle = button('réordonner Aurore')
+    expect(handle).toHaveAccessibleDescription(
+      'Espace ou Entrée pour saisir, flèches haut et bas pour déplacer, Espace ou Entrée pour déposer, Échap pour annuler.',
+    )
+
+    // Picked up, then moved down twice, the list only changing once it's dropped.
+    handle.focus()
+    fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+    await later()
+    expect(announced()).toBe('Vous déplacez Aurore en position 1 sur 3.')
+    fireEvent.keyDown(handle, { key: 'ArrowDown', code: 'ArrowDown' })
+    await later()
+    expect(announced()).toBe('Aurore\u00a0: position 2 sur 3.')
+    fireEvent.keyDown(handle, { key: 'ArrowDown', code: 'ArrowDown' })
+    await later()
+    expect(announced()).toBe('Aurore\u00a0: position 3 sur 3.')
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Dora×'])
+    fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+    await later()
+    expect(chosen()).toEqual(['1Cyan×', '2Dora×', '3Aurore×'])
+    expect(announced()).toBe('Aurore est maintenant en position 3 sur 3.')
+    expect(button('réordonner Aurore')).toHaveFocus()
+
+    // Put back with Escape, or dropped where it was, it stays there.
+    await moveWithKeyboard(button('réordonner Dora'), -1, { cancel: true })
+    expect(chosen()).toEqual(['1Cyan×', '2Dora×', '3Aurore×'])
+    expect(announced()).toBe('Déplacement annulé\u00a0: Dora reste en position 2 sur 3.')
+    expect(button('réordonner Dora')).toHaveFocus()
+    await moveWithKeyboard(button('réordonner Cyan'), 0)
+    expect(chosen()).toEqual(['1Cyan×', '2Dora×', '3Aurore×'])
+    expect(announced()).toBe('Cyan reste en position 1 sur 3.')
+
+    // Up.
+    await moveWithKeyboard(button('réordonner Aurore'), -2)
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Dora×'])
+    expect(button('réordonner Aurore')).toHaveFocus()
+  })
+
+  it('keeps the focus after the member removed, so that the keyboard can go on', async () => {
+    mockFetch(ONDES_PAGE)
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await edit()
+    pick('Dora')
+    const button = (name: string) => screen.getByRole('button', { name })
 
     // The next member's ×, or else the field that picks an artist.
+    fireEvent.click(button('retirer Cyan'))
+    expect(button('retirer Dora')).toHaveFocus()
     fireEvent.click(button('retirer Dora'))
-    expect(button('retirer Cyan')).toHaveFocus()
+    expect(picker()).toHaveFocus()
     fireEvent.click(button('retirer Aurore'))
     expect(picker()).toHaveFocus()
   })

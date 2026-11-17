@@ -1,3 +1,4 @@
+import { centerOf, drag, swipe } from './drag.ts'
 import { test, expect, admin, adminMenu, logIn, submitLogin, PHOTO } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
@@ -217,6 +218,7 @@ test('a collective that applied through the form has its artists, with their pro
 
 test('a collective is added with an artist picked and one added by name, shown, changed, and deleted without its artists', async ({
   page,
+  hasTouch,
 }, testInfo) => {
   // Like the artist above, everything the test creates has a name of its own, and so do its artists, so that the test
   // doesn't change the seeded artists, and finds its own.
@@ -244,7 +246,20 @@ test('a collective is added with an artist picked and one added by name, shown, 
   await expect(page.getByRole('listbox')).toHaveText('aucun résultat')
   await page.getByLabel('Ajouter un nouvel artiste').fill(added)
   await page.getByRole('button', { name: 'ajouter ce nouvel artiste au collectif' }).click()
-  await page.getByRole('button', { name: `monter ${added}` }).click()
+  // Dragged first by its handle, with a finger on touch screens, where swiping from an artist's name scrolls the page
+  // instead.
+  const membersList = page.getByRole('group', { name: 'Artistes du collectif' }).getByRole('listitem')
+  await expect(membersList).toHaveText([new RegExp(known), new RegExp(added)])
+  if (hasTouch) {
+    await membersList.first().scrollIntoViewIfNeeded()
+    const from = await centerOf(membersList.first().getByText(known))
+    const scrolled = await page.evaluate(() => window.scrollY)
+    await swipe(page, from, { x: from.x, y: from.y - 150 })
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrolled)
+    await expect(membersList).toHaveText([new RegExp(known), new RegExp(added)])
+  }
+  await drag(page, page.getByRole('button', { name: `réordonner ${added}` }), membersList.first(), { touch: hasTouch })
+  await expect(membersList).toHaveText([new RegExp(added), new RegExp(known)])
   await page.getByLabel('Adresse e-mail du contact').fill(`e2e-${unique}@example.com`)
   await page.getByLabel('Photo').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: PHOTO })
   await page.getByRole('button', { name: 'ajouter le collectif' }).click()

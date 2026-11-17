@@ -784,10 +784,71 @@ dl.admin-record {
   border: none;
 }
 
-/* Picks in order, e.g. a collective's artists, one per line, since they're moved up and down. */
+/* Picks in order, e.g. a collective's artists, one per line, since they're moved up and down, each starting with its
+   handle. */
 .admin-ordered {
   flex-direction: column;
   align-items: flex-start;
+}
+
+.admin-ordered li {
+  padding-left: 0;
+}
+
+/* The handle that drags an item to another place in its list (see sortable.tsx), as tall as the buttons beside it, but
+   without their border. Only the handle starts a drag, so that swiping elsewhere scrolls the page, and holding it on a
+   touch screen doesn't select text or open the browser's menu. As specific as the buttons of `.admin-chosen`, after them. */
+.admin button.admin-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  padding-inline: 6px;
+  border-color: transparent;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* While its item is dragged. */
+.admin button.admin-handle[aria-pressed='true'] {
+  cursor: grabbing;
+}
+
+/* Big enough for a finger. In a table's row, whose cells are aligned at their top, it's centered on the first line of
+   the others as far as its cell's padding allows, rather than overlapping the next row's handle. */
+@media (pointer: coarse) {
+  .admin button.admin-handle {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .admin-table-controls td button.admin-handle {
+    margin-block: max(calc((1lh - 40px) / 2), -0.5rem);
+  }
+}
+
+/* The item being dragged, over the others, which its background hides: white, unless it's a row whose color says its
+   status. It's outlined, or for a row, its cells are, since Safari doesn't outline rows. */
+[data-dragging] {
+  position: relative;
+  z-index: 1;
+}
+
+:where([data-dragging]) {
+  background: #fff;
+}
+
+.admin-ordered li[data-dragging] {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+}
+
+tr[data-dragging] > td {
+  box-shadow:
+    inset 0 1px #000,
+    inset 0 -1px #000;
 }
 
 .admin-actions {
