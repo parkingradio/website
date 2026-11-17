@@ -4,8 +4,8 @@ import { matching } from './combobox-matching'
 import { normalize } from './normalize'
 import './combobox.css'
 
-// `detail` is shown next to the label, e.g. a city's region. A `disabled` option is shown, but can't be picked.
-export type ComboboxOption = { key: string; label: string; detail?: string | null; disabled?: boolean }
+// `detail` is shown next to the label, e.g. a city's region.
+export type ComboboxOption = { key: string; label: string; detail?: string | null }
 // The options that what's typed finds, in the order they're shown.
 export type ComboboxFilter = (options: ComboboxOption[], query: string) => ComboboxOption[]
 
@@ -35,20 +35,11 @@ type ComboboxProps = {
     }
 )
 
-// The first option that can be picked, starting at `from` and going by `step`, around the list, or -1 if there's none.
-function enabled(options: ComboboxOption[], from: number, step: 1 | -1): number {
-  for (let i = 0; i < options.length; i++) {
-    const index = (((from + i * step) % options.length) + options.length) % options.length
-    if (!options[index].disabled) return index
-  }
-  return -1
-}
-
 // A text input with options under it.
 //
 // With `selected`, it suggests the options matching what's typed, or all of them once clicked, of which only one can be
 // picked: what's typed is only a way of finding it. Leaving the field without picking another option keeps the one that
-// was picked, unless what's typed is exactly the label of an option that can be picked, which is then picked.
+// was picked, unless what's typed is exactly the label of an option, which is then picked.
 //
 // With `text`, what's typed is the answer, and the options are only suggestions for it, e.g. from a web service, shown
 // while typing once there are some. Leaving the field without picking one keeps what's typed.
@@ -78,8 +69,8 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
   // A strict list says when nothing matches, while suggestions are only shown when there are some.
   const open = strict ? query !== null : suggesting && options.length > 0
   const selectedLabel = options.find((option) => option.key === mode.selected)?.label ?? ''
-  // The option highlighted, if it can be picked, which it can't be only once the options change under it.
-  const current = found[active] && !found[active].disabled ? active : -1
+  // The option highlighted, if there's one there: there isn't when nothing is found, or once the options change under it.
+  const current = found[active] ? active : -1
 
   // After every render rather than when the option changes, since typing can leave it at the same place while the options
   // under it change.
@@ -95,12 +86,9 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
     setActive(index)
   }
 
-  // Where the option picked is when every option is shown, i.e. while nothing is typed. Starting from it there, rather
-  // than from the first option, lets Enter keep it.
-  const pickedIndex = () => {
-    const index = options.findIndex((option) => option.key === mode.selected)
-    return index >= 0 && !options[index].disabled ? index : enabled(options, 0, 1)
-  }
+  // Where the option picked is when every option is shown, i.e. while nothing is typed, or the first one when none is
+  // picked. Starting from it there, rather than from the first option, lets Enter keep it.
+  const pickedIndex = () => Math.max(0, options.findIndex((option) => option.key === mode.selected))
 
   const browse = () => {
     setQuery('')
@@ -132,9 +120,9 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
         }
       } else if (found.length > 0) {
         const step = event.key === 'ArrowDown' ? 1 : -1
-        // With none highlighted, the first one going down, and the last one going up. Options that can't be picked are
-        // skipped, as a native select does, rather than highlighted.
-        highlight(enabled(found, active < 0 ? (step > 0 ? 0 : found.length - 1) : active + step, step))
+        // With none highlighted, the first one going down and the last one going up; otherwise the next one, around the
+        // list.
+        highlight(current < 0 ? (step > 0 ? 0 : found.length - 1) : (current + step + found.length) % found.length)
       }
     } else if (event.key === 'Enter' && open) {
       // Picks an option, or closes the suggestions, rather than sending the form.
@@ -171,7 +159,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
             setActive(-1)
           } else {
             setQuery(event.target.value)
-            highlight(normalize(event.target.value) ? enabled(find(options, event.target.value), 0, 1) : pickedIndex())
+            highlight(normalize(event.target.value) ? 0 : pickedIndex())
           }
         }}
         onFocus={(event) => {
@@ -181,7 +169,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
           if (strict && query === null) browse()
         }}
         onBlur={() => {
-          if (strict && query !== null) pick(options.find((option) => !option.disabled && normalize(option.label) === normalize(query)))
+          if (strict && query !== null) pick(options.find((option) => normalize(option.label) === normalize(query)))
           else close()
           onBlur?.()
         }}
@@ -201,18 +189,16 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
             data-index={index}
             role="option"
             aria-selected={index === current}
-            aria-disabled={option.disabled || undefined}
             onMouseMove={(event) => {
               const at = `${event.screenX},${event.screenY}`
               if (at === mouseAt.current) return
               mouseAt.current = at
-              if (!option.disabled && index !== active) setActive(index)
+              if (index !== active) setActive(index)
             }}
             // On mousedown rather than click, which comes after the input has lost the focus and closed the list.
             onMouseDown={(event) => {
               event.preventDefault()
-              // One that can't be picked leaves the list as it is.
-              if (!option.disabled) pick(option)
+              pick(option)
             }}
           >
             <span>{option.label}</span>

@@ -6,7 +6,7 @@ import type { ComboboxFilter, ComboboxOption } from './combobox'
 
 const OPTIONS: ComboboxOption[] = [
   { key: 'a', label: 'Aurore' },
-  { key: 'b', label: 'Brise', disabled: true },
+  { key: 'b', label: 'Brise' },
   { key: 'c', label: 'Cyan' },
   { key: 'd', label: 'Dora' },
   { key: 'e', label: 'Ubel' },
@@ -126,34 +126,36 @@ describe('Combobox', () => {
     expect(picked()).toBe('ra')
   })
 
-  it("shows options that can't be picked, which the mouse and the arrow keys skip", () => {
+  it('goes around the list with the arrow keys', () => {
     render(<Strict />)
     fireEvent.click(input())
-    expect(option('Brise')).toHaveAttribute('aria-disabled', 'true')
-    expect(option('Aurore')).not.toHaveAttribute('aria-disabled')
-
-    fireEvent.keyDown(input(), { key: 'ArrowDown' })
-    expect(active()).toBe('Cyan')
     fireEvent.keyDown(input(), { key: 'ArrowUp' })
+    expect(active()).toBe('Ubel')
+    fireEvent.keyDown(input(), { key: 'ArrowDown' })
     expect(active()).toBe('Aurore')
-    hover('Brise')
-    expect(active()).toBe('Aurore')
-    expect(option('Brise')).toHaveAttribute('aria-selected', 'false')
-
-    // Clicking it leaves the list as it is.
-    fireEvent.mouseDown(option('Brise'))
-    expect(picked()).toBe('')
-    expect(input()).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('highlights the first option that can be picked, and none when none can, when Enter picks nothing', () => {
+  it('starts from the first option going down when the one highlighted is no longer there', () => {
+    const { rerender } = render(<Strict />)
+    fireEvent.click(input())
+    fireEvent.keyDown(input(), { key: 'ArrowUp' })
+    expect(active()).toBe('Ubel')
+    rerender(<Strict options={OPTIONS.slice(0, 3)} />)
+    expect(active()).toBeNull()
+    fireEvent.keyDown(input(), { key: 'ArrowDown' })
+    expect(active()).toBe('Aurore')
+  })
+
+  it('highlights the first option found, or none when nothing is found, when Enter picks nothing', () => {
     render(<Strict />)
     fireEvent.change(input(), { target: { value: 'b' } })
     // "Brise" first, since it starts with what's typed.
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Brise', 'Ubel'])
-    expect(active()).toBe('Ubel')
+    expect(active()).toBe('Brise')
 
-    fireEvent.change(input(), { target: { value: 'bri' } })
+    fireEvent.change(input(), { target: { value: 'x' } })
+    expect(screen.queryAllByRole('option')).toEqual([])
+    expect(screen.getByRole('listbox')).toHaveTextContent(/^aucun résultat$/)
     expect(active()).toBeNull()
     fireEvent.keyDown(input(), { key: 'ArrowDown' })
     expect(active()).toBeNull()
@@ -176,8 +178,8 @@ describe('Combobox', () => {
     expect(picked()).toBe('b')
   })
 
-  it("starts from the first option that can be picked when the one picked can't be anymore", () => {
-    render(<Strict initial="b" />)
+  it('starts from the first option when the one picked is no longer among them', () => {
+    render(<Strict initial="z" />)
     fireEvent.click(input())
     expect(active()).toBe('Aurore')
   })
@@ -186,7 +188,7 @@ describe('Combobox', () => {
     // Those whose label has what's typed, whatever its case, the last first.
     const filter: ComboboxFilter = (options, query) => options.filter((option) => option.label.toLowerCase().includes(query)).reverse()
     render(<Strict filter={filter} />)
-    // Without the filter, "Brise", which can't be picked, would be first, since it starts with "b", and "Ubel" second.
+    // Without the filter, "Brise" would be first, since it starts with "b", and "Ubel" second.
     fireEvent.change(input(), { target: { value: 'b' } })
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Ubel', 'Brise'])
     expect(active()).toBe('Ubel')

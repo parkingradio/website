@@ -363,17 +363,9 @@ describe('A collective’s page', () => {
 
     await edit()
     fireEvent.click(picker())
-    // Its artists are shown, but can't be picked.
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Auroredéjà dans le collectif',
-      'Cyandéjà dans le collectif',
-      'DoraBrise',
-    ])
-    expect(screen.getAllByRole('option', { name: /déjà dans le collectif/ }).map((option) => option.getAttribute('aria-disabled'))).toEqual([
-      'true',
-      'true',
-    ])
-    expect(screen.getByRole('option', { name: /^Dora/ })).not.toHaveAttribute('aria-disabled')
+    // Not its artists.
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['DoraBrise'])
+    // Who are offered again once taken out.
     fireEvent.click(screen.getByRole('button', { name: 'retirer Cyan' }))
     fireEvent.change(picker(), { target: { value: 'cy' } })
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['CyanBruxelles, Belgique'])
@@ -381,22 +373,16 @@ describe('A collective’s page', () => {
     expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
   })
 
-  it("finds the collective's artists by their name, but doesn't add them again, whether clicked, entered or typed", async () => {
+  it("doesn't find the collective's artists by their name, so doesn't add them again, whether entered or typed", async () => {
     mockFetch(ONDES_PAGE)
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
     fireEvent.click(picker())
     fireEvent.change(picker(), { target: { value: 'aurore' } })
-    const aurore = screen.getByRole('option', { name: /^Aurore/ })
-    expect(aurore).toHaveTextContent('Auroredéjà dans le collectif')
-    expect(aurore).toHaveAttribute('aria-disabled', 'true')
-    expect(aurore).toHaveAttribute('aria-selected', 'false')
+    expect(screen.queryAllByRole('option')).toEqual([])
+    expect(screen.getByRole('listbox')).toHaveTextContent(/^aucun résultat$/)
     expect(picker()).not.toHaveAttribute('aria-activedescendant')
-
-    fireEvent.mouseMove(aurore, { screenX: 1, screenY: 1 })
-    expect(picker()).not.toHaveAttribute('aria-activedescendant')
-    fireEvent.mouseDown(aurore)
     fireEvent.keyDown(picker(), { key: 'ArrowDown' })
     fireEvent.keyDown(picker(), { key: 'Enter' })
     expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
@@ -406,6 +392,36 @@ describe('A collective’s page', () => {
     fireEvent.blur(picker())
     expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×'])
     expect(picker()).toHaveValue('')
+  })
+
+  it('picks the artists left with the keyboard, from the first one each time, until there are none', async () => {
+    mockFetch({ ...ONDES_PAGE, '/api/admin/artists': { ok: true, artists: [...ARTISTS, artist('artist-5', 'Eden'), artist('artist-6', 'Fanny')] } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+    // What the highlighted option says, if one is.
+    const active = () => document.getElementById(picker().getAttribute('aria-activedescendant') ?? '')?.textContent ?? null
+
+    await edit()
+    picker().focus()
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    expect(active()).toBe('DoraBrise')
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    fireEvent.keyDown(picker(), { key: 'Enter' })
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Eden↑↓×'])
+    expect(picker()).toHaveFocus()
+
+    // Dora rather than Fanny, who's now where Eden was.
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['DoraBrise', 'Fannyfanny@example.com'])
+    expect(active()).toBe('DoraBrise')
+    fireEvent.keyDown(picker(), { key: 'Enter' })
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    fireEvent.keyDown(picker(), { key: 'Enter' })
+    expect(chosen()).toEqual(['1Aurore↑↓×', '2Cyan↑↓×', '3Eden↑↓×', '4Dora↑↓×', '5Fanny↑↓×'])
+
+    fireEvent.keyDown(picker(), { key: 'ArrowDown' })
+    expect(screen.queryAllByRole('option')).toEqual([])
+    expect(screen.getByRole('listbox')).toHaveTextContent(/^aucun résultat$/)
+    expect(active()).toBeNull()
   })
 
   it('says when a new artist has the name of a known one', async () => {

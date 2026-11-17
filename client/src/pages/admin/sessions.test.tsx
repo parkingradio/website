@@ -1529,10 +1529,14 @@ describe("A set's form", () => {
 
     pick('Cyan')
     pick('Aurore')
-    // Already in the set, so it can't be picked again.
-    fireEvent.click(screen.getByRole('combobox', { name: 'Ajouter un artiste' }))
-    expect(screen.getByRole('option', { name: /^Cyan/ })).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.getByRole('option', { name: /^Cyan/ })).toHaveTextContent('déjà dans le set')
+    // Those in the set aren't offered again.
+    const picker = screen.getByRole('combobox', { name: 'Ajouter un artiste' })
+    fireEvent.click(picker)
+    expect(options()).toEqual(['Brumebrume@example.com'])
+    fireEvent.change(picker, { target: { value: 'cyan' } })
+    expect(options()).toEqual([])
+    expect(screen.getByRole('listbox')).toHaveTextContent(/^aucun résultat$/)
+    fireEvent.keyDown(picker, { key: 'Escape' })
     fireEvent.click(screen.getByLabelText('DJ'))
 
     // Their first genres, in the order of a collective's genres, up to 3.
@@ -1878,14 +1882,14 @@ describe("A set's form", () => {
     }
     const picker = () => screen.getByRole('combobox', { name: 'Ajouter un artiste' })
 
-    it("offers its collective's artists first, in its order, marked with its name, which stay first while a name is typed", async () => {
+    it("offers its collective's artists first, in its order, marked with its name, which stay first while a name is typed, but not the set's", async () => {
       mockFetch(TAKEOVER_PAGE)
       renderAt('/admin/sessions/session-1')
 
       await openNew()
       pick('Cyan')
       fireEvent.click(picker())
-      expect(options()).toEqual(['CyanOndes · déjà dans le set', 'AuroreOndes', 'Le BrumeOndes', 'Brumebrume@example.com'])
+      expect(options()).toEqual(['AuroreOndes', 'Le BrumeOndes', 'Brumebrume@example.com'])
       fireEvent.keyDown(picker(), { key: 'Escape' })
 
       // Ahead of Brume, whose name starts with it.
@@ -2707,7 +2711,7 @@ describe("A new session's sets", () => {
     fireEvent.mouseDown(form.getByRole('option', { name: /^Cyan/ }))
     lasting('0', '45')(form)
     fireEvent.click(picker())
-    expect(options()).toEqual(['AuroreOndes', 'Brumebrume@example.com', 'Cyandéjà dans le set'])
+    expect(options()).toEqual(['AuroreOndes', 'Brumebrume@example.com'])
     fireEvent.keyDown(picker(), { key: 'Escape' })
 
     // The set's form follows it, with what it has.
@@ -2716,11 +2720,11 @@ describe("A new session's sets", () => {
     expect(form.getByRole('button', { name: 'retirer Cyan' })).toBeInTheDocument()
     expect(durationIn(form)).toEqual(['0', '45'])
     fireEvent.click(picker())
-    expect(options()).toEqual(['CyanVagues · déjà dans le set', 'BrumeVagues', 'Auroreaurore@example.com'])
+    expect(options()).toEqual(['BrumeVagues', 'Auroreaurore@example.com'])
     fireEvent.keyDown(picker(), { key: 'Escape' })
     fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
     fireEvent.click(picker())
-    expect(options()).toEqual(['Auroreaurore@example.com', 'Brumebrume@example.com', 'Cyandéjà dans le set'])
+    expect(options()).toEqual(['Auroreaurore@example.com', 'Brumebrume@example.com'])
   })
 })
 

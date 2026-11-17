@@ -263,12 +263,11 @@ top to bottom, the form has:
 
 - "Artistes": the performers, in order, at least one, which can be reordered and removed like a collective's artists
   (see [Adding a collective](artistes.md#adding-a-collective)), each picked from the artists of
-  [Artistes](artistes.md). In a takeover's set, its collective's artists come first, in the collective's order (see
-  [Members](../../server/collectives.md#members)), each marked with the collective's name, then the others, e.g. for a
-  guest (see [Types and names](../../server/sessions.md#types-and-names)). While a name is typed, the collective's
-  artists it finds still come first. The set's performers are offered too, greyed out and marked "déjà dans le set",
-  after the collective's name for its artists, e.g. "Ondes · déjà dans le set", but can't be picked. Performers can't be
-  created by typing a name: they're added in Artistes first.
+  [Artistes](artistes.md) other than the set's performers. In a takeover's set, its collective's artists come first, in
+  the collective's order (see [Members](../../server/collectives.md#members)), each marked with the collective's name,
+  then the others, e.g. for a guest (see [Types and names](../../server/sessions.md#types-and-names)). While a name is
+  typed, the collective's artists it finds still come first. Performers can't be created by typing a name: they're
+  added in Artistes first.
 - "Candidature": the application the set comes from, picked from its performers' applications, or "Aucune
   candidature" (see [Applications](#applications)).
 - "Durée": how long the set lasts, in hours and minutes (see [Times](../../server/sessions.md#times)), or empty while it

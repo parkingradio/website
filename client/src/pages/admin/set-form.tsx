@@ -194,9 +194,8 @@ function GenresSuggestion({ genres, onPick }: { genres: GenreId[]; onPick: () =>
 }
 
 // The set's artists, in order, each of whom can be moved up or down or removed, then the field that picks another one
-// among the known artists: for a takeover, its collective's first, in its order, marked with its name, which stay first
-// among those that what's typed finds. The set's artists are offered too, so that typing one of their names finds them,
-// but they can't be picked again.
+// among the other known artists: for a takeover, its collective's first, in its order, marked with its name, which stay
+// first among those that what's typed finds.
 function PerformersField({
   performers,
   artists,
@@ -210,15 +209,14 @@ function PerformersField({
   // Those of its artists who are among the known artists, e.g. not those deleted since the collective was loaded.
   const members = (takeover?.members ?? []).flatMap((member) => byId.get(member.id) ?? [])
   const memberIds = new Set(members.map((member) => member.id))
-  const options = [...members, ...(artists ?? []).filter((artist) => !memberIds.has(artist.id))].map((artist) => {
-    const option = artistOption(artist)
-    // What marks the collective's artists.
-    const collective = takeover && memberIds.has(artist.id) ? takeover.name : null
-    if (performers.some((performer) => performer.id === artist.id)) {
-      return { ...option, detail: collective ? `${collective} · déjà dans le set` : 'déjà dans le set', disabled: true }
-    }
-    return collective ? { ...option, detail: collective } : option
-  })
+  const performerIds = new Set(performers.map((performer) => performer.id))
+  const options = [...members, ...(artists ?? []).filter((artist) => !memberIds.has(artist.id))]
+    .filter((artist) => !performerIds.has(artist.id))
+    .map((artist) => {
+      const option = artistOption(artist)
+      // What marks the collective's artists.
+      return takeover && memberIds.has(artist.id) ? { ...option, detail: takeover.name } : option
+    })
   const filter: ComboboxFilter = (options, query) => {
     const found = matching(options, query)
     return [...found.filter((option) => memberIds.has(option.key)), ...found.filter((option) => !memberIds.has(option.key))]
