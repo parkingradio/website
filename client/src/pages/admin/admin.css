@@ -397,13 +397,8 @@
   white-space: nowrap;
 }
 
-/* A table whose rows have buttons, e.g. a set's status: they're on the row's first line, with their text in line with
-   the row's, since their vertical padding and border (see `.admin button`) overflow into the cell's padding. */
-.admin-table-controls td .admin-filters {
-  flex-wrap: nowrap;
-  margin-top: 0;
-}
-
+/* A table whose rows have buttons, e.g. a set's arrows: their text is in line with the row's, since their vertical
+   padding and border (see `.admin button`) overflow into the cell's padding. */
 .admin-table-controls td button {
   margin-block: calc(-4.5px - 1px);
 }
@@ -423,9 +418,9 @@
   font-weight: 700;
 }
 
-/* An application's status, as a dropdown that changes it in the list: a pill, with its own arrow, in the color and the
-   weight of the row's text, which overflows into its cell's padding (see `.admin-table-controls`). Its line height is
-   set since, otherwise, Chrome makes it a pixel taller the first time it's hovered or focused. */
+/* A status, as a dropdown that changes it in a list's row, e.g. an application's: a pill, with its own arrow, in the
+   color and the weight of the row's text, which overflows into its cell's padding (see `.admin-table-controls`). Its
+   line height is set since, otherwise, Chrome makes it a pixel taller the first time it's hovered or focused. */
 .admin-status-select {
   appearance: none;
   margin-block: calc(-4.5px - 1px);

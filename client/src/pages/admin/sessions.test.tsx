@@ -107,7 +107,12 @@ const EVENTS = {
 }
 
 // What each option the open combobox shows says, e.g. an event's title and day, then its number.
-const options = () => screen.queryAllByRole('option').map((option) => option.textContent)
+const options = () =>
+  screen
+    .queryAllByRole('option')
+    // Not those of the sets' statuses.
+    .filter((option) => !option.closest('select'))
+    .map((option) => option.textContent)
 
 const TRACKED = {
   createdAt: '2026-10-01T16:00:00.000Z',
@@ -245,7 +250,8 @@ function renderAt(path: string) {
 const rows = (table: HTMLElement | null = screen.queryByRole('table')) =>
   (table ? within(table).queryAllByRole('row') : [])
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell').map(visibleText))
+    // A dropdown by the option it shows.
+    .map((row) => within(row).getAllByRole('cell').map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? visibleText(cell)))
 const days = () => rows().map((row) => row[0])
 
 async function expectSearch(query: string, found: string[]) {
@@ -516,9 +522,9 @@ describe("A session's page", () => {
     expect(within(value('Événement RA')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/6683745')
 
     expect(rows(setsTable())).toEqual([
-      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
-      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
-      ['1 h', '-', '', '-', '', 'planifiéjouéannulé', '↑ ↓ déplacer modifier ×'],
+      ['1 h', 'Aurore, Brume', 'DJ', 'techno', 'SoundCloud · YouTube', 'planifié', '↑ ↓ déplacer modifier ×'],
+      ['1 h 30', 'Cyan', 'Performance Live, autre : Synthé', 'ambient', 'Candidature', 'joué', '↑ ↓ déplacer modifier ×'],
+      ['1 h', '-', '', '-', '', 'annulé', '↑ ↓ déplacer modifier ×'],
     ])
     const first = within(setsTable()).getAllByRole('row')[1]
     expect(within(first).getByRole('link', { name: 'Aurore' })).toHaveAttribute('href', '/admin/artistes/artist-1')
@@ -527,10 +533,10 @@ describe("A session's page", () => {
     const application = within(second).getByRole('link', { name: 'Candidature reçue le 2 septembre 2026' })
     expect(application).toHaveTextContent(/^Candidature$/)
     expect(application).toHaveAttribute('href', '/admin/candidatures/application-2')
-    expect(within(screen.getByRole('group', { name: 'Statut : Set de Cyan' })).getByRole('button', { name: 'joué' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    const cyan = screen.getByRole('combobox', { name: 'Statut : Set de Cyan' })
+    expect(cyan).toHaveValue('done')
+    expect(within(cyan).getAllByRole('option').map((option) => option.textContent)).toEqual(['planifié', 'joué', 'annulé'])
+    expect(screen.queryByText(/on ne peut pas rétablir ses sets/)).not.toBeInTheDocument()
     const setRows = within(setsTable()).getAllByRole('row').slice(1)
     expect(setRows[0]).toHaveClass('admin-status-planned')
     expect(setRows[1]).toHaveClass('admin-status-done')
@@ -627,22 +633,39 @@ describe("A session's page", () => {
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
     expect(screen.getByText(/^Statut changé par admin@example.com le/)).toBeInTheDocument()
 
-    // Its sets can't be added to, or un-cancelled, which the buttons say, greyed out, rather than the page.
-    expect(visibleText(document.body)).not.toMatch(/La session est annulée/)
+    // Sets can't be added to it, which the button says, greyed out. Its sets can't be un-cancelled: their statuses are
+    // written out, and the page says why once, above them.
     const add = screen.getByRole('button', { name: 'ajouter un set' })
     expect(add).toHaveAttribute('aria-disabled', 'true')
     expect(add).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas lui ajouter de set.')
     fireEvent.click(add)
     expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()
-    const setStatuses = within(screen.getByRole('group', { name: 'Statut : Set de Cyan' }))
-    for (const status of ['planifié', 'joué']) {
-      const button = setStatuses.getByRole('button', { name: status })
-      expect(button).toHaveAttribute('aria-disabled', 'true')
-      expect(button).toHaveAccessibleDescription('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')
-    }
-    fireEvent.click(setStatuses.getByRole('button', { name: 'joué' }))
-    expect(requestsTo('PUT', '/api/admin/sets/set-2/status')).toHaveLength(0)
-    expect(setStatuses.getByRole('button', { name: 'annulé' })).not.toHaveAttribute('aria-disabled')
+    expect(within(setsTable()).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(rows(setsTable()).map((row) => row[5])).toEqual(['annulé', 'annulé', 'annulé'])
+    const why = screen.getByText(/on ne peut pas rétablir ses sets/)
+    expect(why.textContent).toBe('La session est annulée\u00a0: on ne peut pas rétablir ses sets.')
+    expect(why.compareDocumentPosition(setsTable()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(visibleText(document.body).match(/La session est annulée/g)).toHaveLength(1)
+  })
+
+  it("brings its sets' dropdowns back once it's un-cancelled, and says nothing of sets it doesn't have", async () => {
+    const sets = SESSION.sets.map((set) => ({ ...set, status: 'cancelled' as const }))
+    const cancelled: Session = { ...SESSION, status: 'cancelled', sets }
+    // Its sets stay cancelled.
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: cancelled }, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: { ...cancelled, status: 'planned' } } })
+    const page = renderAt('/admin/sessions/session-1')
+
+    expect(await screen.findByText(/on ne peut pas rétablir ses sets/)).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'planifiée' }))
+    await waitFor(() => expect(within(setsTable()).getAllByRole('combobox')).toHaveLength(3))
+    expect(screen.getByRole('combobox', { name: 'Statut : Set de Cyan' })).toHaveValue('cancelled')
+    expect(screen.queryByText(/on ne peut pas rétablir ses sets/)).not.toBeInTheDocument()
+    page.unmount()
+
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: { ...cancelled, sets: [] } } })
+    renderAt('/admin/sessions/session-1')
+    expect(await screen.findByText('Aucun set.')).toBeInTheDocument()
+    expect(screen.queryByText(/on ne peut pas rétablir ses sets/)).not.toBeInTheDocument()
   })
 
   it('names the one set that cancelling a played session cancels, saying that it was played', async () => {
@@ -675,10 +698,7 @@ describe("A session's page", () => {
     fireEvent.click(await statusButton('jouée'))
     await waitFor(async () => expect(await statusButton('jouée')).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'done' })
-    expect(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'joué' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(screen.getByRole('combobox', { name: 'Statut : Set de Aurore et Brume' })).toHaveValue('done')
     page.unmount()
 
     // Several, each on a line of its own.
@@ -778,29 +798,68 @@ describe("A session's page", () => {
     expect(within(alert).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-3')
   })
 
-  it("changes a set's status, saying above the sets why it couldn't, without naming the session it's on", async () => {
-    const done = { ...SESSION, sets: [{ ...SET, status: 'done' as const }, CYAN_SET, SESSION.sets[2]] }
+  it("changes a set's status from its dropdown, saying above the sets why it couldn't, without naming the session it's on", async () => {
+    // Its other sets are done or cancelled, so the session is done too.
+    const done: Session = { ...SESSION, status: 'done', sets: [{ ...SET, status: 'done' }, CYAN_SET, SESSION.sets[2]] }
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: true, session: done } })
     renderAt('/admin/sessions/session-1')
 
-    const statuses = within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume' }))
-    fireEvent.click(statuses.getByRole('button', { name: 'joué' }))
-    await waitFor(() => expect(statuses.getByRole('button', { name: 'joué' })).toHaveAttribute('aria-pressed', 'true'))
+    const changed = await screen.findByRole('combobox', { name: 'Statut : Set de Aurore et Brume' })
+    expect(changed.closest('tr')).toHaveClass('admin-status-planned')
+    fireEvent.change(changed, { target: { value: 'done' } })
+    // While it's saved, it shows the status picked, and no set can be changed.
+    expect(changed).toHaveValue('done')
+    for (const select of within(setsTable()).getAllByRole('combobox')) expect(select).toBeDisabled()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('done')
+    expect(changed.closest('tr')).toHaveClass('admin-status-done')
     expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-1/status')[0])).toEqual({ status: 'done' })
+    expect(within(screen.getByRole('group', { name: 'Statut' })).getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
 
+    // Back to the set's status when it can't be changed.
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-3/status': { ok: false, error: 'This session is cancelled', session: SESSION, set: null } })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set' })).getByRole('button', { name: 'planifié' }))
+    const refused = screen.getByRole('combobox', { name: 'Statut : Set' })
+    fireEvent.change(refused, { target: { value: 'planned' } })
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/^Le statut de « Set » n'a pas pu être changé : This session is cancelled$/)
     expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
     expect(alert.compareDocumentPosition(setsTable()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await waitFor(() => expect(refused).toBeEnabled())
+    expect(refused).toHaveValue('cancelled')
+  })
+
+  it('gives a dropdown the focus back once its status is saved, unless another control took it meanwhile', async () => {
+    mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: true, session: SESSION }, 'PUT /api/admin/sets/set-2/status': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    // Browsers take the focus away from it while it's disabled, to the page itself, which jsdom doesn't, even with blur().
+    const dropFocus = () => {
+      document.body.tabIndex = -1
+      document.body.focus()
+      document.body.removeAttribute('tabindex')
+    }
+    const changed = await screen.findByRole('combobox', { name: 'Statut : Set de Aurore et Brume' })
+    changed.focus()
+    fireEvent.change(changed, { target: { value: 'done' } })
+    dropFocus()
+    expect(changed).not.toHaveFocus()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveFocus()
+
+    const other = screen.getByRole('combobox', { name: 'Statut : Set de Cyan' })
+    other.focus()
+    fireEvent.change(other, { target: { value: 'planned' } })
+    const edit = screen.getByRole('button', { name: 'modifier : Set de Cyan' })
+    edit.focus()
+    await waitFor(() => expect(other).toBeEnabled())
+    expect(edit).toHaveFocus()
   })
 
   it("shows only the server's message when it names nothing in the way", async () => {
     mockFetch({ ...PAGE, 'PUT /api/admin/sets/set-1/status': { ok: false, error: 'This session is cancelled', session: null, set: null } })
     renderAt('/admin/sessions/session-1')
 
-    fireEvent.click(within(await screen.findByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'annulé' }))
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Statut : Set de Aurore et Brume' }), { target: { value: 'cancelled' } })
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/^Le statut de « Set de Aurore et Brume » n'a pas pu être changé : This session is cancelled$/)
   })
@@ -1359,7 +1418,7 @@ describe("A session's event on RA", () => {
     await openPanel()
 
     mockFetch({ ...UNPUBLISHED_PAGE, [RA_URL]: { ok: true, event: { ...RA_EVENT, lineup: 'Cyan' } }, 'PUT /api/admin/sets/set-1/status': { ok: true, session: cancelled } })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Statut : Set de Aurore et Brume' })).getByRole('button', { name: 'annulé' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Statut : Set de Aurore et Brume' }), { target: { value: 'cancelled' } })
     await waitFor(() => expect(raValue('Line-up')).toHaveTextContent(/^Cyancopier$/))
   })
 
