@@ -2,11 +2,11 @@
 
 Creating a session's event on Resident Advisor from its page, with a bookmarklet: a bookmark that runs Parking Radio's
 code on RA's site, as the admin logged in to RA there. RA has no public API, so the bookmarklet calls the GraphQL
-endpoint RA's own site calls, like the server already does to read events (see [Events](../../server/events.md)). It's a
-convenience that can stop working whenever RA changes its site, without warning: admins then create the event by hand,
-with the copy buttons of the session's page (see [Creating its event on RA](sessions.md#creating-its-event-on-ra)),
-while it gets fixed. Nothing else depends on it: a session's event on RA is its `raEvent`, which can always be set by
-hand.
+endpoint RA's own site calls, like the server already does to read events (see [RA events](../../server/ra-events.md)).
+It's a convenience that can stop working whenever RA changes its site, without warning: admins then create the event by
+hand, with the copy buttons of the session's page (see
+[Creating its event on RA](sessions.md#creating-its-event-on-ra)), while it gets fixed. Nothing else depends on it: a
+session's event on RA is its `raEvent`, which can always be set by hand.
 
 Publishing works from every environment, but the events it creates on RA are real, whatever environment they come from:
 outside production, the session's panel and the bookmarklet both warn about it, naming the environment as the navigation

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
-import { eventsRoutes } from './routes.js'
+import { raEventsRoutes } from './routes.js'
 
-const raEvent = {
+const graphqlEvent = {
   id: '2512073',
   title: 'PLEINE LUNE TAKEOVER',
   startTime: '2026-09-25T18:00:00.000',
@@ -22,8 +22,8 @@ const raResponse = {
   data: {
     promoter: {
       contentUrl: '/promoters/183980',
-      upcoming: [raEvent],
-      past: [{ ...raEvent, id: '1', contentUrl: '/events/1', venue: null, lineup: null, artists: [{ name: 'Tagged Only' }], images: [], endTime: null }],
+      upcoming: [graphqlEvent],
+      past: [{ ...graphqlEvent, id: '1', contentUrl: '/events/1', venue: null, lineup: null, artists: [{ name: 'Tagged Only' }], images: [], endTime: null }],
     },
   },
 }
@@ -33,11 +33,11 @@ const fetchMock = vi.fn()
 async function buildApp() {
   const app = Fastify({ logger: false })
   useZodSchemas(app)
-  await app.register(eventsRoutes)
+  await app.register(raEventsRoutes)
   return app
 }
 
-describe('GET /api/events', () => {
+describe('GET /api/ra-events', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -53,7 +53,7 @@ describe('GET /api/events', () => {
     fetchMock.mockResolvedValue(Response.json(raResponse))
     const app = await buildApp()
 
-    const response = await app.inject({ method: 'GET', url: '/api/events' })
+    const response = await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({
@@ -96,7 +96,7 @@ describe('GET /api/events', () => {
     fetchMock.mockResolvedValue(Response.json(raResponse))
     const app = await buildApp()
 
-    await app.inject({ method: 'GET', url: '/api/events' })
+    await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     const [, init] = fetchMock.mock.calls[0]
     const { query, variables } = JSON.parse(init.body)
@@ -114,11 +114,11 @@ describe('GET /api/events', () => {
     ['WORKSHOP', 'other'],
     ['SYNTHWAVE MEETUP', 'other'],
   ])('categorizes an event titled "%s" as %s', async (title, category) => {
-    const promoter = { ...raResponse.data.promoter, upcoming: [{ ...raEvent, title }] }
+    const promoter = { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, title }] }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
     const app = await buildApp()
 
-    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/ra-events' })).json()
 
     expect(upcoming[0].category).toBe(category)
   })
@@ -127,30 +127,30 @@ describe('GET /api/events', () => {
     fetchMock.mockResolvedValue(Response.json(raResponse))
     const app = await buildApp()
 
-    const { upcoming, past } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+    const { upcoming, past } = (await app.inject({ method: 'GET', url: '/api/ra-events' })).json()
 
     expect(upcoming[0].lineup).toEqual(['Nadia Quartz', 'DJ ORPHEA', 'ILAN & PAPA V'])
     expect(past[0].lineup).toEqual(['Tagged Only'])
   })
 
   it('falls back to the tagged artists when the Line-up text has nothing but blank lines and tags', async () => {
-    const blank = { ...raEvent, lineup: '<artist id="1"></artist>\u00a0\n \n', artists: [{ name: 'Tagged Only' }] }
+    const blank = { ...graphqlEvent, lineup: '<artist id="1"></artist>\u00a0\n \n', artists: [{ name: 'Tagged Only' }] }
     const promoter = { ...raResponse.data.promoter, upcoming: [blank] }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
     const app = await buildApp()
 
-    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/ra-events' })).json()
 
     expect(upcoming[0].lineup).toEqual(['Tagged Only'])
   })
 
   it('decodes HTML entities in the Line-up text', async () => {
     const lineup = 'Andr&eacute;e\nL&#233;a &#x26; Zo&euml;\nDJ &lt;3\nR&amp;lt;B\nMoon&nbsp;Child&nbsp;\n'
-    const promoter = { ...raResponse.data.promoter, upcoming: [{ ...raEvent, lineup }] }
+    const promoter = { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, lineup }] }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
     const app = await buildApp()
 
-    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/events' })).json()
+    const { upcoming } = (await app.inject({ method: 'GET', url: '/api/ra-events' })).json()
 
     expect(upcoming[0].lineup).toEqual(['Andrée', 'Léa & Zoë', 'DJ <3', 'R&lt;B', 'Moon\u00a0Child'])
   })
@@ -158,12 +158,12 @@ describe('GET /api/events', () => {
   it('defaults the optional fields that RA leaves out', async () => {
     const promoter = {
       ...raResponse.data.promoter,
-      upcoming: [{ ...raEvent, endTime: null, venue: null, images: null, artists: null, lineup: null }],
+      upcoming: [{ ...graphqlEvent, endTime: null, venue: null, images: null, artists: null, lineup: null }],
     }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
     const app = await buildApp()
 
-    const response = await app.inject({ method: 'GET', url: '/api/events' })
+    const response = await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().upcoming[0]).toMatchObject({ end: null, venue: null, city: null, flyer: null, lineup: [] })
@@ -171,7 +171,7 @@ describe('GET /api/events', () => {
 
   it('passes on whatever RA answers that it accepts', async () => {
     const quirky = {
-      ...raEvent,
+      ...graphqlEvent,
       id: '',
       title: '',
       startTime: '2026-09-25T18:00',
@@ -183,12 +183,12 @@ describe('GET /api/events', () => {
       images: [{ filename: '', type: 'FLYERFRONT' }],
     }
     // Fields that are undefined are left out of the JSON.
-    const sparse = { ...raEvent, endTime: undefined, venue: undefined, lineup: undefined, artists: null, images: null }
+    const sparse = { ...graphqlEvent, endTime: undefined, venue: undefined, lineup: undefined, artists: null, images: null }
     const promoter = { ...raResponse.data.promoter, upcoming: [quirky], past: [sparse] }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
     const app = await buildApp()
 
-    const response = await app.inject({ method: 'GET', url: '/api/events' })
+    const response = await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().upcoming).toEqual([
@@ -222,7 +222,7 @@ describe('GET /api/events', () => {
       'a single event is missing its start time',
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, upcoming: [raEvent, { ...raEvent, startTime: null }] } },
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [graphqlEvent, { ...graphqlEvent, startTime: null }] } },
         }),
     ],
     [
@@ -232,7 +232,7 @@ describe('GET /api/events', () => {
           data: {
             promoter: {
               ...raResponse.data.promoter,
-              upcoming: Array.from({ length: 100 }, (_, i) => ({ ...raEvent, id: String(i) })),
+              upcoming: Array.from({ length: 100 }, (_, i) => ({ ...graphqlEvent, id: String(i) })),
             },
           },
         }),
@@ -244,7 +244,7 @@ describe('GET /api/events', () => {
           data: {
             promoter: {
               ...raResponse.data.promoter,
-              past: Array.from({ length: 2000 }, (_, i) => ({ ...raEvent, id: String(i) })),
+              past: Array.from({ length: 2000 }, (_, i) => ({ ...graphqlEvent, id: String(i) })),
             },
           },
         }),
@@ -253,49 +253,49 @@ describe('GET /api/events', () => {
       "a single event's start time isn't a local time",
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-09-25 18:00:00' }] } },
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, startTime: '2026-09-25 18:00:00' }] } },
         }),
     ],
     [
       "a single event starts on a day that doesn't exist",
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-02-30T18:00:00.000' }] } },
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, startTime: '2026-02-30T18:00:00.000' }] } },
         }),
     ],
     [
       "a single event starts in a month that doesn't exist",
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, startTime: '2026-13-01T18:00:00.000' }] } },
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, startTime: '2026-13-01T18:00:00.000' }] } },
         }),
     ],
     [
       "a single event ends at a time that doesn't exist",
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, past: [{ ...raEvent, endTime: '2026-09-25T24:30:00.000' }] } },
+          data: { promoter: { ...raResponse.data.promoter, past: [{ ...graphqlEvent, endTime: '2026-09-25T24:30:00.000' }] } },
         }),
     ],
     [
       "a single event's end time isn't a local time",
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, past: [{ ...raEvent, endTime: '2026-9-25T22:00' }] } },
+          data: { promoter: { ...raResponse.data.promoter, past: [{ ...graphqlEvent, endTime: '2026-9-25T22:00' }] } },
         }),
     ],
     [
       'a single event links outside of RA',
       () =>
         Response.json({
-          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...raEvent, contentUrl: 'https://example.com' }] } },
+          data: { promoter: { ...raResponse.data.promoter, upcoming: [{ ...graphqlEvent, contentUrl: 'https://example.com' }] } },
         }),
     ],
   ])('responds 502 when %s', async (_, raReply) => {
     fetchMock.mockImplementation(async () => raReply())
     const app = await buildApp()
 
-    const response = await app.inject({ method: 'GET', url: '/api/events' })
+    const response = await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     expect(response.statusCode).toBe(502)
     expect(response.json()).toEqual({ ok: false, error: 'Events are unavailable right now' })
@@ -305,13 +305,13 @@ describe('GET /api/events', () => {
     fetchMock.mockImplementation(async () => Response.json(raResponse))
     const app = await buildApp()
 
-    await app.inject({ method: 'GET', url: '/api/events' })
+    await app.inject({ method: 'GET', url: '/api/ra-events' })
     vi.advanceTimersByTime(90 * 1000)
-    await app.inject({ method: 'GET', url: '/api/events' })
+    await app.inject({ method: 'GET', url: '/api/ra-events' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(60 * 1000)
-    await app.inject({ method: 'GET', url: '/api/events' })
+    await app.inject({ method: 'GET', url: '/api/ra-events' })
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -319,7 +319,7 @@ describe('GET /api/events', () => {
     fetchMock.mockImplementation(async () => Response.json(raResponse))
     const app = await buildApp()
 
-    const responses = await Promise.all([1, 2, 3].map(() => app.inject({ method: 'GET', url: '/api/events' })))
+    const responses = await Promise.all([1, 2, 3].map(() => app.inject({ method: 'GET', url: '/api/ra-events' })))
 
     expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -328,11 +328,11 @@ describe('GET /api/events', () => {
   it('does not fall back on the last good answer when RA fails', async () => {
     fetchMock.mockResolvedValueOnce(Response.json(raResponse))
     const app = await buildApp()
-    await app.inject({ method: 'GET', url: '/api/events' })
+    await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     vi.advanceTimersByTime(3 * 60 * 1000)
     fetchMock.mockResolvedValueOnce(new Response('nope', { status: 500 }))
-    const response = await app.inject({ method: 'GET', url: '/api/events' })
+    const response = await app.inject({ method: 'GET', url: '/api/ra-events' })
 
     expect(response.statusCode).toBe(502)
   })
@@ -340,15 +340,15 @@ describe('GET /api/events', () => {
   it('waits 2 minutes before asking RA again after a failure, then recovers', async () => {
     fetchMock.mockResolvedValueOnce(new Response('nope', { status: 500 }))
     const app = await buildApp()
-    expect((await app.inject({ method: 'GET', url: '/api/events' })).statusCode).toBe(502)
+    expect((await app.inject({ method: 'GET', url: '/api/ra-events' })).statusCode).toBe(502)
 
     fetchMock.mockResolvedValueOnce(Response.json(raResponse))
     vi.advanceTimersByTime(90 * 1000)
-    expect((await app.inject({ method: 'GET', url: '/api/events' })).statusCode).toBe(502)
+    expect((await app.inject({ method: 'GET', url: '/api/ra-events' })).statusCode).toBe(502)
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(60 * 1000)
-    expect((await app.inject({ method: 'GET', url: '/api/events' })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'GET', url: '/api/ra-events' })).statusCode).toBe(200)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -356,7 +356,7 @@ describe('GET /api/events', () => {
   type Spec = [id: string, startTime: string, zone?: string | null]
   function answer(upcoming: Spec[], past: Spec[] = []) {
     const toRa = ([id, startTime, zone = 'America/Toronto']: Spec) => ({
-      ...raEvent,
+      ...graphqlEvent,
       id,
       startTime,
       endTime: null,
@@ -384,7 +384,7 @@ describe('GET /api/events', () => {
   ])("gives the start of an event %s as an instant in Québec time, read in its venue's time zone", async (_, zone, local, start) => {
     answer([['1', local, zone]])
 
-    const response = await get('/api/events')
+    const response = await get('/api/ra-events')
 
     expect(response.json().upcoming[0].start).toBe(start)
   })
@@ -393,14 +393,14 @@ describe('GET /api/events', () => {
     const promoter = {
       ...raResponse.data.promoter,
       upcoming: [
-        { ...raEvent, id: 'paris', startTime: '2026-10-24T22:00', endTime: '2026-10-25T05:00', venue: { name: 'Club', area: { name: 'Paris', ianaTimeZone: 'Europe/Paris' } } },
-        { ...raEvent, id: 'no-venue', venue: null },
-        { ...raEvent, id: 'no-area', venue: { name: 'Club', area: null } },
+        { ...graphqlEvent, id: 'paris', startTime: '2026-10-24T22:00', endTime: '2026-10-25T05:00', venue: { name: 'Club', area: { name: 'Paris', ianaTimeZone: 'Europe/Paris' } } },
+        { ...graphqlEvent, id: 'no-venue', venue: null },
+        { ...graphqlEvent, id: 'no-area', venue: { name: 'Club', area: null } },
       ],
     }
     fetchMock.mockResolvedValue(Response.json({ data: { promoter } }))
 
-    const { upcoming } = (await get('/api/events')).json()
+    const { upcoming } = (await get('/api/ra-events')).json()
 
     // The clocks go back during the night in Paris.
     expect(upcoming.find((event: { id: string }) => event.id === 'paris')).toMatchObject({ start: '2026-10-24T16:00:00-04:00', end: '2026-10-25T00:00:00-04:00' })
@@ -416,7 +416,7 @@ describe('GET /api/events', () => {
       [['old', '2026-03-29T15:00'], ['recent', '2026-10-31T18:00'], ['middle', '2026-07-01T00:30', 'Europe/Paris'], ['middle-quebec', '2026-06-30T20:00']],
     )
 
-    const { upcoming, past } = (await get('/api/events')).json()
+    const { upcoming, past } = (await get('/api/ra-events')).json()
 
     expect(ids(upcoming)).toEqual(['paris', 'quebec', 'later'])
     expect(ids(past)).toEqual(['recent', 'middle-quebec', 'middle', 'old'])
@@ -427,7 +427,7 @@ describe('GET /api/events', () => {
   it('only gives the 20 most recent past events, without a time range', async () => {
     answer([['upcoming', '2026-11-14T21:00']], pastDays.toReversed())
 
-    const { upcoming, past } = (await get('/api/events')).json()
+    const { upcoming, past } = (await get('/api/ra-events')).json()
 
     expect(ids(upcoming)).toEqual(['upcoming'])
     expect(ids(past)).toEqual(pastDays.slice(5).map(([id]) => id).toReversed())
@@ -436,7 +436,7 @@ describe('GET /api/events', () => {
   it('never lists an event both as upcoming and past', async () => {
     answer([['both', '2026-11-14T21:00']], [['both', '2026-11-14T21:00'], ['past', '2026-08-01T18:00']])
 
-    const { upcoming, past } = (await get('/api/events')).json()
+    const { upcoming, past } = (await get('/api/ra-events')).json()
 
     expect(ids(upcoming)).toEqual(['both'])
     expect(ids(past)).toEqual(['past'])
@@ -452,7 +452,7 @@ describe('GET /api/events', () => {
   ])('gives the events that start in a time range: %s', async (_, query, upcoming, past) => {
     answer([['upcoming-1', '2026-11-14T21:00'], ['upcoming-2', '2026-11-21T21:00']], pastDays.toReversed())
 
-    const response = await get(`/api/events${query}`)
+    const response = await get(`/api/ra-events${query}`)
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toMatchObject({ promoterUrl: 'https://ra.co/promoters/183980' })
@@ -463,7 +463,7 @@ describe('GET /api/events', () => {
   it("compares the time range with the instants events start at, read in their venue's time zone", async () => {
     answer([], [['paris', '2026-08-10T02:00', 'Europe/Paris'], ['quebec', '2026-08-10T02:00']])
 
-    const response = await get('/api/events?from=2026-08-09T20:00-04:00&to=2026-08-09T20:01-04:00')
+    const response = await get('/api/ra-events?from=2026-08-09T20:00-04:00&to=2026-08-09T20:01-04:00')
 
     expect(ids(response.json().past)).toEqual(['paris'])
   })
@@ -483,7 +483,7 @@ describe('GET /api/events', () => {
   ])('responds 400 without asking RA when %s', async (_, query, error) => {
     answer([])
 
-    const response = await get(`/api/events${query}`)
+    const response = await get(`/api/ra-events${query}`)
 
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ ok: false, error: expect.stringMatching(error) })
@@ -493,7 +493,7 @@ describe('GET /api/events', () => {
   it('responds 502 with a time range too when the events can\'t be read from RA', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }))
 
-    const response = await get('/api/events?from=2026-08-01T00:00-04:00')
+    const response = await get('/api/ra-events?from=2026-08-01T00:00-04:00')
 
     expect(response.statusCode).toBe(502)
     expect(response.json()).toEqual({ ok: false, error: 'Events are unavailable right now' })
@@ -504,7 +504,7 @@ describe('GET /api/events', () => {
     const app = await buildApp()
 
     for (const query of ['', '?from=2026-08-01T00:00-04:00', '?to=2026-08-10T00:00-04:00', '?from=2026-08-05T00:00-04:00&to=2026-12-01T00:00-05:00']) {
-      expect((await app.inject({ method: 'GET', url: `/api/events${query}` })).statusCode).toBe(200)
+      expect((await app.inject({ method: 'GET', url: `/api/ra-events${query}` })).statusCode).toBe(200)
     }
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

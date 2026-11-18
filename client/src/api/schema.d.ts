@@ -528,7 +528,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/events": {
+    "/api/ra-events": {
         parameters: {
             query?: never;
             header?: never;
@@ -536,7 +536,7 @@ export interface paths {
             cookie?: never;
         };
         /** Parking Radio's events on Resident Advisor, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given */
-        get: operations["list_events"];
+        get: operations["list_ra_events"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3099,27 +3099,6 @@ export interface components {
         };
         /** @enum {string} */
         Country: "AD" | "AE" | "AF" | "AG" | "AI" | "AL" | "AM" | "AO" | "AQ" | "AR" | "AS" | "AT" | "AU" | "AW" | "AX" | "AZ" | "BA" | "BB" | "BD" | "BE" | "BF" | "BG" | "BH" | "BI" | "BJ" | "BL" | "BM" | "BN" | "BO" | "BQ" | "BR" | "BS" | "BT" | "BV" | "BW" | "BY" | "BZ" | "CA" | "CC" | "CD" | "CF" | "CG" | "CH" | "CI" | "CK" | "CL" | "CM" | "CN" | "CO" | "CR" | "CU" | "CV" | "CW" | "CX" | "CY" | "CZ" | "DE" | "DJ" | "DK" | "DM" | "DO" | "DZ" | "EC" | "EE" | "EG" | "EH" | "ER" | "ES" | "ET" | "FI" | "FJ" | "FK" | "FM" | "FO" | "FR" | "GA" | "GB" | "GD" | "GE" | "GF" | "GG" | "GH" | "GI" | "GL" | "GM" | "GN" | "GP" | "GQ" | "GR" | "GS" | "GT" | "GU" | "GW" | "GY" | "HK" | "HM" | "HN" | "HR" | "HT" | "HU" | "ID" | "IE" | "IL" | "IM" | "IN" | "IO" | "IQ" | "IR" | "IS" | "IT" | "JE" | "JM" | "JO" | "JP" | "KE" | "KG" | "KH" | "KI" | "KM" | "KN" | "KP" | "KR" | "KW" | "KY" | "KZ" | "LA" | "LB" | "LC" | "LI" | "LK" | "LR" | "LS" | "LT" | "LU" | "LV" | "LY" | "MA" | "MC" | "MD" | "ME" | "MF" | "MG" | "MH" | "MK" | "ML" | "MM" | "MN" | "MO" | "MP" | "MQ" | "MR" | "MS" | "MT" | "MU" | "MV" | "MW" | "MX" | "MY" | "MZ" | "NA" | "NC" | "NE" | "NF" | "NG" | "NI" | "NL" | "NO" | "NP" | "NR" | "NU" | "NZ" | "OM" | "PA" | "PE" | "PF" | "PG" | "PH" | "PK" | "PL" | "PM" | "PN" | "PR" | "PS" | "PT" | "PW" | "PY" | "QA" | "RE" | "RO" | "RS" | "RU" | "RW" | "SA" | "SB" | "SC" | "SD" | "SE" | "SG" | "SH" | "SI" | "SJ" | "SK" | "SL" | "SM" | "SN" | "SO" | "SR" | "SS" | "ST" | "SV" | "SX" | "SY" | "SZ" | "TC" | "TD" | "TF" | "TG" | "TH" | "TJ" | "TK" | "TL" | "TM" | "TN" | "TO" | "TR" | "TT" | "TV" | "TW" | "TZ" | "UA" | "UG" | "UM" | "US" | "UY" | "UZ" | "VA" | "VC" | "VE" | "VG" | "VI" | "VN" | "VU" | "WF" | "WS" | "XK" | "YE" | "YT" | "ZA" | "ZM" | "ZW";
-        Event: {
-            id: string;
-            title: string;
-            /** @enum {string} */
-            category: "synth-meetup" | "other";
-            /** Format: date-time */
-            start: string;
-            end: string | null;
-            venue: string | null;
-            city: string | null;
-            lineup: string[];
-            url: string;
-            flyer: string | null;
-        };
-        Events: {
-            promoterUrl: string;
-            /** @description The soonest first */
-            upcoming: components["schemas"]["Event"][];
-            /** @description The most recent first: without `from` and `to`, only the 20 most recent */
-            past: components["schemas"]["Event"][];
-        };
         Feature: {
             id: components["schemas"]["FeatureId"];
             enabled: boolean;
@@ -3237,6 +3216,20 @@ export interface components {
             date: string | null;
             durationMs: number;
         };
+        RaEvent: {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            category: "synth-meetup" | "other";
+            /** Format: date-time */
+            start: string;
+            end: string | null;
+            venue: string | null;
+            city: string | null;
+            lineup: string[];
+            url: string;
+            flyer: string | null;
+        };
         RaEventContent: {
             title: string;
             /** @description The session's start, or null when it has none. RA takes it in Québec time, without its offset */
@@ -3251,6 +3244,13 @@ export interface components {
             promoterIds: string[];
             /** @description Its effective description */
             content: string;
+        };
+        RaEvents: {
+            promoterUrl: string;
+            /** @description The soonest first */
+            upcoming: components["schemas"]["RaEvent"][];
+            /** @description The most recent first: without `from` and `to`, only the 20 most recent */
+            past: components["schemas"]["RaEvent"][];
         };
         Reference: {
             id: string;
@@ -3421,7 +3421,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_events: {
+    list_ra_events: {
         parameters: {
             query?: {
                 /** @description Only the events that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-09T00:00-05:00" */
@@ -3441,7 +3441,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Events"];
+                    "application/json": components["schemas"]["RaEvents"];
                 };
             };
             /** @description Default Response */

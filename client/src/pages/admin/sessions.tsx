@@ -982,15 +982,15 @@ function setFromApplication(id: string, session: Session): InitialSet {
   }
 }
 
-// Events from the year 2000 on, the earliest the server takes, which are every one of Parking Radio's events (see "Time
-// ranges" in docs/design/server/events.md).
-const EVERY_EVENT_FROM = '2000-01-01T00:00-05:00'
+// RA events from the year 2000 on, the earliest the server takes, which are every one of Parking Radio's events (see
+// "Time ranges" in docs/design/server/ra-events.md).
+const EVERY_RA_EVENT_FROM = '2000-01-01T00:00-05:00'
 
 // A new session's form starts from the application whose id is `id`, if it's found among the applications, and, for an
 // artist's, its artist among `artists` (see "From an application" in docs/design/client/admin/sessions.md).
 type FromApplication = { id: string; artists: Loaded<{ artists: Artist[] }> }
 
-type SessionFormWithChoicesProps = Omit<SessionFormProps, 'collectives' | 'applications' | 'events'> & {
+type SessionFormWithChoicesProps = Omit<SessionFormProps, 'collectives' | 'applications' | 'raEvents'> & {
   takeoverId?: string | null
   fromApplication?: FromApplication
 }
@@ -1009,7 +1009,7 @@ function SessionFormWithChoices({
   const collectives = useApi('/api/admin/collectives')
   const applications = useApi('/api/admin/applications')
   // Asked for along with them, but not waited for.
-  const events = useApi('/api/events', { params: { query: { from: EVERY_EVENT_FROM } } })
+  const raEvents = useApi('/api/ra-events', { params: { query: { from: EVERY_RA_EVENT_FROM } } })
   if (collectives.kind === 'loading' || applications.kind === 'loading') return null
   const applicationList = applications.kind === 'loaded' ? applications.value.applications : null
   const artists = fromApplication?.artists
@@ -1043,7 +1043,7 @@ function SessionFormWithChoices({
         sets={found?.artist ? [listedSetFromApplication(found.application, found.artist)] : sets}
         collectives={collectiveList}
         applications={applicationList}
-        events={events}
+        raEvents={raEvents}
       />
     </>
   )

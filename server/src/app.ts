@@ -16,7 +16,7 @@ import { collectivesRoutes } from './collectives/routes.js'
 import type { CollectivesStore } from './collectives/store.js'
 import type { SendEmail } from './core/email.js'
 import type { Queryable } from './db/connection.js'
-import { eventsRoutes } from './events/routes.js'
+import { raEventsRoutes } from './ra-events/routes.js'
 import { featuresRoutes } from './features/routes.js'
 import type { FeaturesStore } from './features/store.js'
 import type { OnAirStore } from './radio/on-air.js'
@@ -81,7 +81,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(configRoutes, { store: deps.features, environment: deps.environment })
   await app.register(authRoutes, { db: deps.db })
   await app.register(adminRoutes, { store: deps.admins, sendEmail: deps.sendEmail, origin: deps.siteOrigin })
-  await app.register(eventsRoutes)
+  await app.register(raEventsRoutes)
   // The radio and sessions share it (see radio/soundcloud-app.ts).
   const soundcloud = soundCloudApp(deps.soundcloud, deps.soundCloudCredentials)
   await app.register(radioRoutes, { soundcloud, onAir: deps.onAir, settings: deps.radioSettings })

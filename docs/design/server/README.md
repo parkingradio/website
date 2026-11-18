@@ -19,9 +19,9 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   show twice in the fall is sent with either offset, each its own instant. Responses give them as
   `YYYY-MM-DDTHH:MM:SS±HH:MM`, to the second, with the fraction of a second dropped, e.g. `"2026-11-14T21:00:00-05:00"`.
   Days are `"YYYY-MM-DD"`, and times of day `"HH:MM"`, from `"00:00"` to `"23:59"`, both in Québec time, without an
-  offset, e.g. an application's `dates` and `timeSlots`. Events' `start` and `end` are instants too: Resident Advisor
+  offset, e.g. an application's `dates` and `timeSlots`. RA events' `start` and `end` are instants too: Resident Advisor
   gives them as local times, which the server reads in the time zone of the event's venue (see
-  [Events](events.md#times)).
+  [RA events](ra-events.md#times)).
 - **Text.** Text that endpoints keep or look up can't contain the NUL character (U+0000), which the database can't
   store: requests with it fail with 400 rather than having it removed.
 - **Names.** The API's paths, query parameters and fields, and the values they take from fixed lists (e.g. statuses,
@@ -36,7 +36,7 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   the database's, gets a 500, unless the endpoint says otherwise. Either way, its message only says that something went
   wrong: what went wrong is logged, but without the personal data it could include, e.g. the values of a failed
   database query. Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
-  `GET /api/events`, `GET /api/radio`, `GET /api/radio/tracks/:id/stream` and `GET /api/video`. Unknown paths under
+  `GET /api/ra-events`, `GET /api/radio`, `GET /api/radio/tracks/:id/stream` and `GET /api/video`. Unknown paths under
   `/api` get a 404 error, whatever the request's body. What apps call for OAuth and MCP has its own errors (see below).
 - **OAuth and MCP.** What apps call follows its standards rather than the conventions above: the endpoints that get and
   revoke tokens take forms (`application/x-www-form-urlencoded`), and they and the metadata documents under
@@ -206,6 +206,6 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sets/:id/position`](sessions.md#put-apiadminsetsidposition-admin) | admin | Moving a set to another place among its session's sets |
 | [`PUT /api/admin/sets/:id/session`](sessions.md#put-apiadminsetsidsession-admin) | admin | Moving a set to another session, which can change both sessions' statuses |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
-| [`GET /api/events`](events.md#get-apievents) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
+| [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

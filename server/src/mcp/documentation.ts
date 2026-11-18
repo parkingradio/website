@@ -36,13 +36,13 @@ export function serverName(environment: string): string {
 }
 
 // The areas whose rules `read_documentation` gives, by the name of their design document.
-export const AREAS = ['radio', 'video', 'artists', 'collectives', 'applications', 'sessions', 'events'] as const
+export const AREAS = ['radio', 'video', 'artists', 'collectives', 'applications', 'sessions', 'ra-events'] as const
 export type Area = (typeof AREAS)[number]
 export const isArea = (name: unknown): name is Area => (AREAS as readonly unknown[]).includes(name)
 
 // The area whose rules an endpoint follows, by its path: that of the document that has it.
 export function areaOf(url: string): Area | undefined {
-  const name = /^\/api\/(?:admin\/)?([a-z]+)/.exec(url)?.[1]
+  const name = /^\/api\/(?:admin\/)?([a-z-]+)/.exec(url)?.[1]
   if (name === 'sets') return 'sessions'
   return isArea(name) ? name : undefined
 }

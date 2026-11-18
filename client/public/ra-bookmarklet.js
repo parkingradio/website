@@ -3,9 +3,9 @@
 // file from Parking Radio's site each time it's clicked, so that fixing it never requires reinstalling it. It's public,
 // and holds no secrets.
 //
-// RA has no public API, so this calls the GraphQL endpoint RA's own site calls, like the server does to read events (see
-// server/src/events/routes.ts). It can stop working whenever RA changes its site: it then says so, and admins create the
-// event by hand, with the copy buttons of the session's page.
+// RA has no public API, so this calls the GraphQL endpoint RA's own site calls, like the server does to read events
+// (see server/src/ra-events/routes.ts). It can stop working whenever RA changes its site: it then says so, and admins
+// create the event by hand, with the copy buttons of the session's page.
 //
 // What it shows comes from the page's address, which anyone can write, and from RA: it's only ever shown as text.
 ;(() => {

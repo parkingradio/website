@@ -20,7 +20,7 @@ import {
   startChanges,
   typeName,
 } from '../../session-fields'
-import type { ListedSet, RaEvent, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
+import type { ListedSet, RaEventLink, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
@@ -53,7 +53,7 @@ export type SessionFormProps = {
   // is.
   applications: Application[] | null
   // Every one of Parking Radio's events, read from RA, which the form doesn't wait for.
-  events: Loaded<Schema<'Events'>>
+  raEvents: Loaded<Schema<'RaEvents'>>
   // For a new session: the sets listed to be added with it at first, which can be changed in the form, and are sent
   // with it.
   sets?: ListedSet[]
@@ -71,7 +71,7 @@ export function SessionForm({
   flyer: current = null,
   collectives,
   applications,
-  events,
+  raEvents,
   sets: initialSets,
   submitLabel,
   onSubmit,
@@ -167,7 +167,7 @@ export function SessionForm({
           error={shown('flyer')}
         />
 
-        <RaEventField event={form.raEvent} own={initial.raEvent} events={events} onChange={(raEvent) => update({ raEvent })} />
+        <RaEventField event={form.raEvent} own={initial.raEvent} raEvents={raEvents} onChange={(raEvent) => update({ raEvent })} />
 
         {!sets && <FormActions error={error} busy={busy} submitLabel={submitLabel} onCancel={onCancel} />}
       </form>
@@ -409,9 +409,9 @@ const NO_EVENT: ComboboxOption = { key: '', label: 'Aucun événement RA' }
 
 // The options of the event on RA, keyed by their event's number (see "The session form" in
 // docs/design/client/admin/sessions.md), with each one's event and what it's searched by.
-function raEventChoices(loaded: Loaded<Schema<'Events'>>, own: RaEvent | null) {
+function raEventChoices(loaded: Loaded<Schema<'RaEvents'>>, own: RaEventLink | null) {
   const read = loaded.kind === 'loaded' ? [...loaded.value.upcoming, ...loaded.value.past] : []
-  const choices = new Map<string, { event: RaEvent; searched: string[] }>(
+  const choices = new Map<string, { event: RaEventLink; searched: string[] }>(
     read.map((event) => [event.id, { event: { id: event.id, url: event.url }, searched: [event.title, formatLongQuebecDay(event.start)] }]),
   )
   const options = [NO_EVENT]
@@ -441,13 +441,13 @@ function raEventChoices(loaded: Loaded<Schema<'Events'>>, own: RaEvent | null) {
 function RaEventField({
   event,
   own,
-  events: loaded,
+  raEvents: loaded,
   onChange,
 }: {
-  event: RaEvent | null
-  own: RaEvent | null
-  events: Loaded<Schema<'Events'>>
-  onChange: (event: RaEvent | null) => void
+  event: RaEventLink | null
+  own: RaEventLink | null
+  raEvents: Loaded<Schema<'RaEvents'>>
+  onChange: (event: RaEventLink | null) => void
 }) {
   const id = useId()
   const { options, choices, filter } = useMemo(() => raEventChoices(loaded, own), [loaded, own])

@@ -1,6 +1,6 @@
-# Events
+# RA events
 
-Parking Radio's events are managed on Resident Advisor, under the Parking Radio promoter page
+RA events are Parking Radio's events on Resident Advisor, managed there under its promoter page
 (`https://ra.co/promoters/183980`).
 
 ## Reading the events from RA
@@ -35,15 +35,15 @@ two instants, and one that they skip, as they go forward, is moved forward by as
 
 ## Time ranges
 
-Without a time range, [`GET /api/events`](#get-apievents) gives every upcoming event, but only the 20 most recent past
-ones. With one, it gives every event that starts in that range, upcoming or past, from all of the promoter's events: to
-go through past events, ask for a range, e.g. a few months at a time, since there are many of them. A range is given by
-`from` and `to`, instants like those requests send (see [Times, in Conventions](README.md#conventions)), each with the
-offset in effect at that time, and gives the events that start at or after `from` and before `to`. `from` alone gives
-those from then on, and `to` alone those before it. E.g. for October 2026: `from` `"2026-10-01T00:00-04:00"`, `to`
-`"2026-11-01T00:00-04:00"`.
+Without a time range, [`GET /api/ra-events`](#get-apira-events) gives every upcoming event, but only the 20 most recent
+past ones. With one, it gives every event that starts in that range, upcoming or past, from all of the promoter's
+events: to go through past events, ask for a range, e.g. a few months at a time, since there are many of them. A range
+is given by `from` and `to`, instants like those requests send (see [Times, in Conventions](README.md#conventions)),
+each with the offset in effect at that time, and gives the events that start at or after `from` and before `to`. `from`
+alone gives those from then on, and `to` alone those before it. E.g. for October 2026: `from`
+`"2026-10-01T00:00-04:00"`, `to` `"2026-11-01T00:00-04:00"`.
 
-## `GET /api/events`
+## `GET /api/ra-events`
 
 Every query parameter can be left out (see [Time ranges](#time-ranges)):
 

@@ -342,7 +342,7 @@ Requests send each of these as a string, or null, or a blank string, when there'
 `https://` ones, with or without `www.` or `m.`, and a trailing `/` and parameters, e.g. `?si=...`, are allowed:
 
 - A session's `raEvent`: the event's id on RA, which is only digits, up to 20, as
-  [`GET /api/events`](events.md#get-apievents) gives it, e.g. `"6683745"`, or a link to its page,
+  [`GET /api/ra-events`](ra-events.md#get-apira-events) gives it, e.g. `"6683745"`, or a link to its page,
   `https://ra.co/events/<id>`. It isn't checked against RA, so any event can be given, e.g. another promoter's. Several sessions can have the same one.
 - A set's `soundcloudTrack`: a link to the track on soundcloud.com, e.g.
   `https://soundcloud.com/parkingdotradio/3tons`, or a private track's private link, which ends with its secret, e.g.
@@ -367,9 +367,9 @@ Responses give each one as an object, or null when there's none, with an `id` an
 
 ## Events on RA
 
-Parking Radio lists its sessions as events on Resident Advisor, under its promoter page (see [Events](events.md)). A
-session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA from the content the server
-gives for the session, whatever its status, and whether it's announced or not (see
+Parking Radio lists its sessions as events on Resident Advisor, under its promoter page (see
+[RA events](ra-events.md)). A session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA
+from the content the server gives for the session, whatever its status, and whether it's announced or not (see
 [`GET /api/admin/sessions/:id/ra-event`](#get-apiadminsessionsidra-event-admin)), then sets as its `raEvent`. The server
 never creates events on RA itself. The content is:
 
