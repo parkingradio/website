@@ -65,10 +65,10 @@ export function StatusFilters<S extends string>({
 }
 
 // Buttons that change a status to one of the `statuses`, each named by `labels`, where the current one is pressed, and
-// is the only one that's black, even while another one is hovered, e.g. the one just clicked, when the entry didn't get
-// that status, like an application whose cancelled sets keep it "retenue" once it's made "nouvelle". They're named
-// `label`, e.g. "Statut". They're disabled while `disabled`, e.g. while a change is saved, but those that a rule
-// keeps from being picked are greyed out, saying why (`unavailable`, see button.tsx).
+// is the only one that's black, even while another one is hovered, e.g. the one just clicked when saving it fails, or
+// when a rule keeps it from being picked again. They're named `label`, e.g. "Statut". They're disabled while `disabled`,
+// e.g. while a change is saved, but those that a rule keeps from being picked are greyed out, saying why (`unavailable`,
+// see button.tsx).
 export function StatusButtons<S extends string>({
   label = 'Statut',
   statuses,

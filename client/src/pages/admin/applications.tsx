@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
-import { APPLICATION_DECISIONS, APPLICATION_STATUSES, isDecision } from '../../application-fields'
+import { APPLICATION_STATUSES, isDecision, pickableDecisions } from '../../application-fields'
 import type { Application, ApplicationDecision, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
@@ -14,6 +14,8 @@ import { Button } from './button'
 import {
   KIND_LABELS,
   LISTED_DATES,
+  SESSION_STATUS_LABELS,
+  SET_STATUS_LABELS,
   STATUS_LABELS,
   STATUS_PLURALS,
   applicationOwner,
@@ -80,11 +82,17 @@ const DEFAULT_STATUS: ApplicationStatus = 'new'
 // Those still to go through, where the oldest come first, rather than the most recently received.
 const OLDEST_FIRST: (ApplicationStatus | null)[] = [DEFAULT_STATUS, 'accepted']
 
-// The status of an application that its sets, or its sessions for a collective's, give it, and why.
-function linkedStatus(application: Application): string {
-  const played = application.status === 'done'
-  if (applicationOwner(application).kind === 'collective') return played ? 'Jouée : une de ses sessions a été jouée.' : 'Planifiée : une de ses sessions est planifiée.'
-  return played ? 'Jouée : un de ses sets a été joué.' : 'Planifiée : un de ses sets est planifié.'
+// Why `application` can't be given `status`, or null when it can (see `pickableDecisions`), about its sets, or its
+// sessions for a collective's.
+function unpickable(application: Application, status: ApplicationStatus): string | null {
+  if (isDecision(status) && pickableDecisions(application).includes(status)) return null
+  const sessions = applicationOwner(application).kind === 'collective'
+  const { planned, done, cancelled } = sessions ? SESSION_STATUS_LABELS : SET_STATUS_LABELS
+  const [them, one, ofThem, none] = sessions ? ['sessions', 'une de ses sessions', "l'une d'elles", 'aucune'] : ['sets', 'un de ses sets', "l'un d'eux", 'aucun']
+  if (status === 'planned') return `Une candidature est planifiée quand ${one} est ${planned}.`
+  if (status === 'done') return `Une candidature est jouée quand ${one} a été ${done}, et qu'${none} n'est ${planned}.`
+  if (!isDecision(application.status)) return `Son statut vient de ses ${them} tant que ${ofThem} est ${planned} ou ${done}.`
+  return `Elle reste retenue tant qu'elle a des ${them}, même ${cancelled}s.`
 }
 
 // The columns the list of applications can be sorted by, where statuses are in the order applications usually go through
@@ -184,7 +192,7 @@ export function ApplicationsTable({
                 {changeStatus && isDecision(application.status) ? (
                   <StatusSelect
                     label={`Statut : ${applicationName(application, owner)}`}
-                    statuses={APPLICATION_DECISIONS}
+                    statuses={pickableDecisions(application)}
                     labels={STATUS_LABELS}
                     status={application.status}
                     onChange={(status) => changeStatus(application, status)}
@@ -591,13 +599,17 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
       {application.updatedBy && <p className="admin-meta">{byWhom('Modifiée', application.updatedBy, application.updatedAt)}</p>}
 
       <h2>Statut</h2>
-      {isDecision(application.status) ? (
-        <>
-          <StatusButtons statuses={APPLICATION_DECISIONS} labels={STATUS_LABELS} status={application.status} disabled={busy} onChange={changeStatus} />
-          {application.statusUpdatedBy && <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>}
-        </>
-      ) : (
-        <p>{linkedStatus(application)}</p>
+      <StatusButtons
+        statuses={APPLICATION_STATUSES}
+        labels={STATUS_LABELS}
+        status={application.status}
+        disabled={busy}
+        unavailable={(status) => unpickable(application, status)}
+        onChange={(status) => isDecision(status) && changeStatus(status)}
+      />
+      {/* Who decided, which doesn't show while its sets or sessions decide its status. */}
+      {application.statusUpdatedBy && isDecision(application.status) && (
+        <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>
       )}
       {error && (
         <p className="admin-error" role="alert">

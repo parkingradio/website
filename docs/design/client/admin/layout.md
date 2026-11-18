@@ -71,10 +71,10 @@ and background, and those of rejected applications and of cancelled sessions and
 color of their own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't
 told by color alone.
 
-Buttons that change a status, e.g. on a session's page, show the status the entry has in black, and the others only
-turn grey while hovered, rather than black like other buttons, so that the one just clicked doesn't look picked when
-the entry doesn't get that status, e.g. an application whose sets, all cancelled, keep it "retenue" once it's made
-"nouvelle".
+Buttons that change a status, e.g. on a session's page, show the status the entry has in black, even when it can't be
+picked (see [Controls that can't be used](#controls-that-cant-be-used)), e.g. an application's that its sets give it,
+and the others only turn grey while hovered, rather than black like other buttons, so that the one just clicked doesn't
+look picked when the entry doesn't get that status, e.g. when saving it fails.
 
 ## Warnings
 

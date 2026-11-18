@@ -77,6 +77,10 @@ const APPLICATION: Application = {
   sessions: [],
 }
 
+// A set, or a session, that comes from an application, with `status`.
+const linkedSet = (status: string) => ({ id: 'set-1', durationMinutes: 60, status, session: { id: 'session-1', title: 'GUEST MIXES', start: null } })
+const linkedSession = (status: string) => ({ id: 'session-1', title: 'ONDES TAKEOVER', start: null, end: null, durationMinutes: 240, status })
+
 // The most recently received first, as the server lists them. The last one came by email in March, and was created after
 // the others.
 const APPLICATIONS: Application[] = [
@@ -422,6 +426,15 @@ describe('Changing the status of an application from the list', () => {
       'Statut : Candidature de Aurore, reçue le 6 octobre 2026',
       'Statut : Candidature de Aurore, reçue le 28 mars 2026',
     ])
+  })
+
+  it('only offers the statuses it would then show: not « nouvelle » while it has sets, all of them cancelled', async () => {
+    const accepted = { ...APPLICATION, receivedAt: '2026-03-28T14:00:00.000Z', status: 'accepted', sets: [linkedSet('cancelled')] }
+    mockFetch({ ...LISTED, '/api/admin/applications': { ok: true, applications: [accepted] } })
+    renderAt('/admin/candidatures?status=all')
+
+    const options = within(await select('Aurore, reçue le 28 mars 2026')).getAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual(['retenue', 'refusée'])
   })
 
   it('names an application whose artist is not known by what the list shows instead', async () => {
@@ -798,35 +811,42 @@ describe('An application’s page', () => {
     expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
   })
 
+  const COLLECTIVES = { artistId: null, collectiveId: 'collective-1' }
+
   it.each([
-    [{ status: 'planned' }, 'Planifiée : un de ses sets est planifié.'],
-    [{ status: 'done' }, 'Jouée : un de ses sets a été joué.'],
-    [{ status: 'planned', artistId: null, collectiveId: 'collective-1' }, 'Planifiée : une de ses sessions est planifiée.'],
-    [{ status: 'done', artistId: null, collectiveId: 'collective-1' }, 'Jouée : une de ses sessions a été jouée.'],
-  ])('only shows the status that its sets or sessions give it, without who decided what: %o', async (changes, text) => {
-    const linked = { ...APPLICATION, ...changes, statusUpdatedBy: 'other@example.com', statusUpdatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: linked } })
+    ['new, without sets', { status: 'new' }, 'nouvelle', ['nouvelle', 'retenue', 'refusée']],
+    ['accepted, with only cancelled sets', { status: 'accepted', sets: [linkedSet('cancelled')] }, 'retenue', ['retenue', 'refusée']],
+    ['rejected, with only cancelled sets', { status: 'rejected', sets: [linkedSet('cancelled')] }, 'refusée', ['retenue', 'refusée']],
+    ['planned, by its sets', { status: 'planned', sets: [linkedSet('planned')] }, 'planifiée', []],
+    ['done, by its sessions', { status: 'done', ...COLLECTIVES, sessions: [linkedSession('done')] }, 'jouée', []],
+  ])('shows every status, its own pressed, and only lets the statuses it then shows be picked: %s', async (_, changes, pressed, pickable) => {
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: { ...APPLICATION, ...changes } } })
     renderAt('/admin/candidatures/application-1')
 
-    expect(await screen.findByText(text)).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Statut' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/^Changé par/)).not.toBeInTheDocument()
+    const buttons = within(await screen.findByRole('group', { name: 'Statut' })).getAllByRole('button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['nouvelle', 'retenue', 'planifiée', 'jouée', 'refusée'])
+    expect(buttons.filter((button) => button.getAttribute('aria-pressed') === 'true').map((button) => button.textContent)).toEqual([pressed])
+    expect(buttons.filter((button) => button.getAttribute('aria-disabled') !== 'true').map((button) => button.textContent)).toEqual(pickable)
   })
 
-  it('shows the status its sets give it once what was decided is saved, rather than buttons', async () => {
-    const planned = { ...APPLICATION, status: 'planned', statusUpdatedBy: 'other@example.com', statusUpdatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1/status': { ok: true, application: planned } })
+  it('says why a status cannot be picked, about its sets or its sessions', async () => {
+    const accepted = { ...APPLICATION, ...COLLECTIVES, status: 'accepted', sessions: [linkedSession('cancelled')] }
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: accepted } })
     renderAt('/admin/candidatures/application-1')
 
-    expect(within(await screen.findByRole('group', { name: 'Statut' })).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'nouvelle',
-      'retenue',
-      'refusée',
-    ])
-    fireEvent.click(screen.getByRole('button', { name: 'retenue' }))
+    expect(await screen.findByRole('button', { name: 'nouvelle' })).toHaveAccessibleDescription("Elle reste retenue tant qu'elle a des sessions, même annulées.")
+    expect(screen.getByRole('button', { name: 'planifiée' })).toHaveAccessibleDescription('Une candidature est planifiée quand une de ses sessions est planifiée.')
+    expect(screen.getByRole('button', { name: 'jouée' })).toHaveAccessibleDescription("Une candidature est jouée quand une de ses sessions a été jouée, et qu'aucune n'est planifiée.")
+  })
 
-    expect(await screen.findByText('Planifiée : un de ses sets est planifié.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'retenue' })).not.toBeInTheDocument()
+  it('says which admin decided, unless its sets give it its status, which no admin chose', async () => {
+    const decided = { statusUpdatedBy: 'other@example.com', statusUpdatedAt: '2026-10-06T16:00:00.000Z' }
+    const planned = { ...APPLICATION, ...decided, status: 'planned', sets: [linkedSet('planned')] }
+    mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: planned } })
+    renderAt('/admin/candidatures/application-1')
+
+    expect(await screen.findByRole('button', { name: 'nouvelle' })).toHaveAccessibleDescription("Son statut vient de ses sets tant que l'un d'eux est planifié ou joué.")
+    expect(screen.queryByText(/^Changé par/)).not.toBeInTheDocument()
   })
 
   it('says when the status could not be changed', async () => {

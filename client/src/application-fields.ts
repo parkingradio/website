@@ -1,6 +1,7 @@
 import type { Schema } from './api/client'
 import { checkLine, checkText, everyOne } from './checks'
 import type { FieldErrors } from './checks'
+import type { SessionStatus } from './session-fields'
 
 // How an application is shown and checked in the browser, by the admin pages and by the "Appliquer" form alike.
 //
@@ -33,11 +34,30 @@ export function performanceTypeName(id: PerformanceTypeId): string {
 // In the order applications usually go through them (see describe.ts for their names). The server works out "planned"
 // and "done" from the application's sets and sessions, and only takes the others, what admins decide.
 export const APPLICATION_STATUSES = everyOne<ApplicationStatus>()(['new', 'accepted', 'planned', 'done', 'rejected'])
-export const APPLICATION_DECISIONS = everyOne<ApplicationDecision>()(['new', 'accepted', 'rejected'])
+const APPLICATION_DECISIONS = everyOne<ApplicationDecision>()(['new', 'accepted', 'rejected'])
 
-// Whether an application with `status` can be given another one, which its sets and sessions don't decide.
+// Whether `status` is one that admins decide, rather than one that an application's sets and sessions give it.
 export function isDecision(status: ApplicationStatus): status is ApplicationDecision {
   return (APPLICATION_DECISIONS as readonly ApplicationStatus[]).includes(status)
+}
+
+// The status of an application whose decision is `decision`, and whose sets or sessions have `linked` statuses: the
+// server's rule (see `applicationStatus` in server/src/applications/fields.ts), which must be changed together with it.
+function applicationStatus(decision: ApplicationDecision, linked: readonly SessionStatus[]): ApplicationStatus {
+  if (decision === 'rejected') return 'rejected'
+  if (linked.includes('planned')) return 'planned'
+  if (linked.includes('done')) return 'done'
+  return decision === 'accepted' || linked.length > 0 ? 'accepted' : 'new'
+}
+
+// What admins can decide about `application` that it then shows as its status (see "Status" in
+// docs/design/server/applications.md), e.g. not "new" while it has sets or sessions, all of them cancelled, which keep it
+// accepted. Nothing while its sets or sessions make it planned or done, which the server doesn't let it be rejected for
+// either.
+export function pickableDecisions({ status, sets, sessions }: Application): readonly ApplicationDecision[] {
+  if (!isDecision(status)) return []
+  const linked = [...sets, ...sessions].map((item) => item.status)
+  return APPLICATION_DECISIONS.filter((decision) => applicationStatus(decision, linked) === decision)
 }
 
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60

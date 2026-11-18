@@ -200,8 +200,9 @@ test("a seeded takeover links to the application it comes from, which it makes d
   await value(page, 'Candidature').getByRole('link', { name: /^reçue le / }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Candidature de Collectif Béton' })).toBeVisible()
   // Which its takeover makes done, rather than what was decided, which can't be changed meanwhile.
-  await expect(page.getByText('Jouée : une de ses sessions a été jouée.')).toBeVisible()
-  await expect(page.getByRole('group', { name: 'Statut' })).toBeHidden()
+  const status = page.getByRole('group', { name: 'Statut' })
+  await expect(status.getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
+  for (const name of ['nouvelle', 'retenue', 'planifiée', 'jouée', 'refusée']) await expect(status.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
   const sessions = page.getByRole('table', { name: 'Sessions' })
   await expect(rowsOf(sessions, 'BÉTON 140')).toContainText('jouée')
   await rowsOf(sessions, 'BÉTON 140').getByRole('link').click()

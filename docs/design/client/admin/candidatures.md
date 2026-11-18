@@ -11,8 +11,8 @@ few words.
 The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
 by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status,
-as a dropdown that changes it to "nouvelle", "retenue" or "refusée", without confirming, or only its name for a
-"planifiée" or "jouée" application, which its sets or sessions make so.
+as a dropdown that changes it, without confirming, to those it can be given (see [Statuses](#statuses)), or only its
+name for a "planifiée" or "jouée" application, which its sets or sessions make so.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
 "retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first. When
@@ -34,10 +34,11 @@ search and order in its address (see [Going through the list](#going-through-the
 it was received (unless that's the day it was created), who created it and when, or that it was sent through the form,
 and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
-- "Statut": "nouvelle", "retenue" and "refusée", as buttons that change the status (see
-  [Status colors](layout.md#status-colors)), and which admin last changed it, and when. While its sets or sessions make
-  it "planifiée" or "jouée", what admins decided doesn't show, and can't be changed: the section only says so, and why,
-  e.g. « Planifiée : un de ses sets est planifié. » or « Jouée : une de ses sessions a été jouée. ».
+- "Statut": the five statuses, as buttons, the application's in black (see [Status colors](layout.md#status-colors)),
+  where those it can be given change it (see [Statuses](#statuses)), and the others are greyed out, saying why (see
+  [Controls that can't be used](layout.md#controls-that-cant-be-used)), e.g. « Une candidature est planifiée quand un de
+  ses sets est planifié. ». Under them, which admin last changed what was decided, and when, unless its sets or sessions
+  make it "planifiée" or "jouée", which no admin chose.
 - "Artiste" or "Collectif": the artist's or the collective's photo and profile, as their page shows them (see
   [An artist's page](artistes.md#an-artists-page) and [A collective's page](artistes.md#a-collectives-page)), starting
   with their name, which links to their page. It leaves out who added them and who last changed them, and what their
@@ -72,6 +73,13 @@ known artist or collective. The application form says what's wrong with each fie
 (see [Artistes](artistes.md)): it checks the application as the server does (see
 [Applications](../../server/applications.md)), for immediate feedback. The server's check is the one that counts: if it
 refuses what the form accepted, the form shows the server's message.
+
+## Statuses
+
+Admins only give an application what they decide, "nouvelle", "retenue" or "refusée" (see
+[Status, in Applications](../../server/applications.md#status)), and only when it's then the status it shows: nothing
+while its sets or sessions make it "planifiée" or "jouée", and not "nouvelle" while it has sets or sessions, all of them
+cancelled, which keep it "retenue".
 
 ## Going through the list
 

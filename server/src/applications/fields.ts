@@ -41,7 +41,8 @@ export const ApplicationStatus = z
 export type ApplicationStatus = z.infer<typeof ApplicationStatus>
 
 // The status of an application whose decision is `decision`, and whose sets or sessions have `linked` statuses (see
-// "Status" in docs/design/server/applications.md): the first of these that applies.
+// "Status" in docs/design/server/applications.md): the first of these that applies. The client has a copy, to offer only
+// the decisions that change what an application shows (see client/src/application-fields.ts).
 export function applicationStatus(decision: ApplicationDecision, linked: readonly Status[]): ApplicationStatus {
   if (decision === 'rejected') return 'rejected'
   if (linked.includes('planned')) return 'planned'
