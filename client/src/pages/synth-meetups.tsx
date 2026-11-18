@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { useAssetUrl } from '../config-context'
+import { useAssetUrl, useFeature } from '../config-context'
 import { useApi } from '../api/use-api'
 import { RA_PROMOTER_URL } from '../ra'
 import { formatLongQuebecDay } from '../quebec-time'
+import { CANCELLED } from '../public-events'
 import './synth-meetups.css'
 
 // Most recent first, so the gallery shows newer posters higher up.
@@ -53,35 +54,77 @@ type Poster = (typeof POSTERS)[number]
 
 const NDI_URL = 'https://ndi.video/tools/'
 
+// An upcoming synth meetup, whether it's read from RA or from the public events.
+type Meetup = {
+  id: string
+  start: string
+  // Its event on RA, which its date links to, or null when it has none.
+  url: string | null
+  cancelled: boolean
+}
+
+// The upcoming synth meetups from RA while the `evenements-publics` flag is off, or from the public events once it's on.
+// The flag is known before either is asked for: until then, the dates are loading, as they would be either way.
 function UpcomingDates() {
+  const publicEvents = useFeature('evenements-publics')
+  if (publicEvents === undefined) return <DatesStatus failed={false} />
+  return publicEvents ? <PublicDates /> : <RaDates />
+}
+
+function RaDates() {
   const events = useApi('/api/ra-events')
-
-  if (events.kind === 'error') {
-    return (
-      <p>
-        les dates n'ont pas pu être chargées.{' '}
-        <a href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
-          {/* A non-breaking space keeps the arrow from wrapping onto a line of its own. */}
-          voir nos événements sur Resident Advisor&nbsp;→
-        </a>
-      </p>
-    )
-  }
-  if (events.kind === 'loading') return <p>chargement…</p>
-
+  if (events.kind !== 'loaded') return <DatesStatus failed={events.kind === 'error'} />
   // In the server's order: the soonest first.
-  const meetups = events.value.upcoming.filter((event) => event.category === 'synth-meetup')
+  const meetups = events.value.upcoming
+    .filter((event) => event.category === 'synth-meetup')
+    .map((event) => ({ id: event.id, start: event.start, url: event.url, cancelled: false }))
+  return <DateList meetups={meetups} />
+}
+
+function PublicDates() {
+  const events = useApi('/api/events')
+  if (events.kind !== 'loaded') return <DatesStatus failed={events.kind === 'error'} />
+  // In the server's order: the soonest first.
+  const meetups = events.value.upcoming
+    .filter((event) => event.type === 'synth-meetup')
+    .map((event) => ({ id: event.id, start: event.start, url: event.raEvent, cancelled: event.cancelled }))
+  return <DateList meetups={meetups} />
+}
+
+// The dates while they're loading, or once they couldn't be.
+function DatesStatus({ failed }: { failed: boolean }) {
+  if (!failed) return <p>chargement…</p>
+  return (
+    <p>
+      les dates n'ont pas pu être chargées.{' '}
+      <a href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
+        {/* A non-breaking space keeps the arrow from wrapping onto a line of its own. */}
+        voir nos événements sur Resident Advisor&nbsp;→
+      </a>
+    </p>
+  )
+}
+
+function DateList({ meetups }: { meetups: Meetup[] }) {
   if (meetups.length === 0) return <p>aucune date annoncée pour le moment. revenez bientôt.</p>
 
   return (
     <ul>
-      {meetups.map((meetup) => (
-        <li key={meetup.id}>
-          <a href={meetup.url} target="_blank" rel="noreferrer">
-            <time dateTime={meetup.start}>{formatLongQuebecDay(meetup.start)}</time>
-          </a>
-        </li>
-      ))}
+      {meetups.map((meetup) => {
+        const day = <time dateTime={meetup.start}>{formatLongQuebecDay(meetup.start)}</time>
+        return (
+          <li key={meetup.id}>
+            {meetup.cancelled && `${CANCELLED} `}
+            {meetup.url ? (
+              <a href={meetup.url} target="_blank" rel="noreferrer">
+                {day}
+              </a>
+            ) : (
+              day
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }

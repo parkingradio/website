@@ -3350,7 +3350,9 @@ export interface components {
             assetsDomain: string;
             turnstileSiteKey: string;
             environment: string;
-            features: Record<string, never>;
+            features: {
+                "evenements-publics"?: boolean;
+            };
         };
         ConflictError: {
             /** @constant */
@@ -3431,7 +3433,8 @@ export interface components {
             updatedBy: string | null;
             updatedAt: string | null;
         };
-        FeatureId: unknown;
+        /** @enum {string} */
+        FeatureId: "evenements-publics";
         /** @enum {string} */
         GenreId: "house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber";
         LeftOutTrack: {

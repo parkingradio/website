@@ -75,12 +75,13 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   // Which stays announced.
   await expect(rowsOf(page, 'Les Nuits Basses')).toContainText('annoncée')
 
-  // Those of the other types, among which a synth meetup, which has no sets.
+  // Those of the other types, among which a synth meetup, which has no sets: the one that's been played.
   await page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: /^toutes/ }).click()
   await search.fill('synth meetup')
-  await expect(rowsOf(page, 'SYNTH MEETUPS')).toContainText('Synth meetup')
+  const meetup = rowsOf(page, 'SYNTH MEETUPS').filter({ hasText: 'jouée' })
+  await expect(meetup).toContainText('Synth meetup')
   // Which has the description its type gives it, and a flyer.
-  await rowsOf(page, 'SYNTH MEETUPS').getByRole('link').first().click()
+  await meetup.getByRole('link').first().click()
   await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 64)
   // Its event on RA has a lineup, though it has no sets.

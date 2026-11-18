@@ -1311,7 +1311,11 @@
           },
           "features": {
             "type": "object",
-            "properties": {},
+            "properties": {
+              "evenements-publics": {
+                "type": "boolean"
+              }
+            },
             "additionalProperties": false
           }
         },
@@ -1938,7 +1942,10 @@
         "additionalProperties": false
       },
       "FeatureId": {
-        "not": {}
+        "type": "string",
+        "enum": [
+          "evenements-publics"
+        ]
       },
       "GenreId": {
         "type": "string",

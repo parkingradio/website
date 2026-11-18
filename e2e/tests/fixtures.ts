@@ -10,8 +10,8 @@ import { admin } from '../env.ts'
 // changes or deletes seeded ones. No test assumes that the seeded entities are all there is, either.
 //
 // In particular, feature flags apply to every visitor at once: tests assume they're all off, as they are until an admin
-// turns one on. A test that turns a flag on has to run apart from the others, e.g. in a project of its own that
-// `dependencies` runs after them, and turn it back off.
+// turns one on. A test that needs a flag on fakes it for its own page instead, with the configuration the server gives
+// and the flag on (see `withFeature`), which leaves the server as it is.
 
 // The options projects set (see playwright.config.ts).
 export type Options = {
@@ -80,4 +80,16 @@ export async function submitLogin(page: Page, { email = admin.email, password = 
 // The admin menu, which the admin pages show once logged in.
 export function adminMenu(page: Page) {
   return page.getByRole('navigation', { name: 'admin' })
+}
+
+// Has the page see the feature flag `id` as on, from the next page it loads, by answering `/api/config` with what the
+// server answers and the flag on. Nothing changes on the server, so other tests still see every flag off.
+export async function withFeature(page: Page, id: string) {
+  await page.route(
+    (url) => url.pathname === '/api/config',
+    async (route) => {
+      const config = await (await route.fetch()).json()
+      await route.fulfill({ json: { ...config, features: { ...config.features, [id]: true } } })
+    },
+  )
 }

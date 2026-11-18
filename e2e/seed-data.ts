@@ -827,4 +827,24 @@ export const SEED_SESSIONS: SeedSession[] = [
     status: 'done',
     sets: [],
   },
+  // Upcoming synth meetups, announced, so that Synth Meetups lists them once it reads the public events: one with its event
+  // on RA and a flyer, the other with neither.
+  {
+    type: 'synth-meetup',
+    announced: true,
+    raEvent: '2403003',
+    flyer: '#e9c46a',
+    when: { day: 8, start: '18:00' },
+    durationMinutes: 180,
+    status: 'planned',
+    sets: [],
+  },
+  {
+    type: 'synth-meetup',
+    announced: true,
+    when: { day: 22, start: '18:00' },
+    durationMinutes: 180,
+    status: 'planned',
+    sets: [],
+  },
 ]

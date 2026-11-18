@@ -1,6 +1,6 @@
 import { act, fireEvent } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { AppConfig } from './config-context'
+import type { AppConfig, ConfigState } from './config-context'
 
 export type Body = Record<string, unknown>
 
@@ -11,6 +11,9 @@ export const CONFIG: AppConfig = {
   environment: 'production',
   features: {},
 }
+
+// The configuration once it's been fetched, as `CONFIG` with these feature flags, e.g. to render a page with a flag on.
+export const configWith = (features: AppConfig['features']): ConfigState => ({ kind: 'loaded', config: { ...CONFIG, features } })
 
 // The bodies of the `Request`s that `mockFetch`'s `fetch` got, read as it got them, since reading them is asynchronous,
 // or the FormData they were made with. That's what they send in a browser, but in the tests, jsdom's FormData is turned

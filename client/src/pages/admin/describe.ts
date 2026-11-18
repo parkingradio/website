@@ -48,7 +48,13 @@ export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
 }
 
 // What each feature flag is: its name, and what turning it on does (see docs/design/server/features.md).
-export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {}
+export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {
+  'evenements-publics': {
+    name: 'Événements publics',
+    description:
+      "Les pages « Programmation » et « Synth Meetups » montrent les sessions annoncées plutôt que les événements de Resident Advisor. À n'allumer qu'une fois les événements qui ne sont que sur RA ajoutés comme sessions, et les sessions passées ajoutées et annoncées.",
+  },
+}
 
 // What an app that's allowed a scope can do, as the page where admins allow it says it, in plain words (see
 // docs/design/server/oauth.md): a sentence, then what's left out of it, listed under it. For `admin`, that's what the MCP

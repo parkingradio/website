@@ -66,8 +66,8 @@ Running it again for an existing admin gives a link that resets their password.
 ### Seed data
 
 With `npm run dev` running, fill the dev database with artists, their photos and their applications, collectives of some
-of them, with their applications, and sessions and their sets, of every kind the admin pages have to show (see
-`e2e/seed-data.ts`):
+of them, with their applications, and sessions and their sets, of every kind the admin pages and the public pages have to
+show (see `e2e/seed-data.ts`):
 
 ```sh
 npm run seed
