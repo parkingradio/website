@@ -6,8 +6,8 @@ import { ApiError, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { cached } from '../core/cache.js'
 import { RA_ORIGIN, RA_PROMOTER_ID } from './ra.js'
 
-// Events are managed on Resident Advisor, under Parking Radio's promoter page. RA has no public API, so
-// this uses the GraphQL endpoint that ra.co itself calls. It isn't documented and could change. We don't
+// RA events are Parking Radio's events on Resident Advisor, managed there under its promoter page. RA has no public
+// API, so this uses the GraphQL endpoint that ra.co itself calls. It isn't documented and could change. We don't
 // normally favour calling private APIs, but this is the only way to implement what we need. We try to
 // mitigate the brittleness of the setup by validating our expectations of what GraphQL returns and failing
 // loudly when they are not satisfied.

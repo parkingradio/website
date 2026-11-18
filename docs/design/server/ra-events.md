@@ -1,6 +1,6 @@
 # RA events
 
-RA events are Parking Radio's events on Resident Advisor, which are managed there, under the Parking Radio promoter page
+RA events are Parking Radio's events on Resident Advisor, managed there under its promoter page
 (`https://ra.co/promoters/183980`).
 
 ## Reading the events from RA

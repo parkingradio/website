@@ -94,12 +94,12 @@ function raEvent(id: string, title: string, start: string) {
 }
 
 // Every one of Parking Radio's events, from the year 2000 on.
-const EVENTS_URL = '/api/ra-events?from=2000-01-01T00%3A00-05%3A00'
+const RA_EVENTS_URL = '/api/ra-events?from=2000-01-01T00%3A00-05%3A00'
 
 // RA's events, as the server orders them: the upcoming ones the soonest first, and the past ones the most recent first.
 // The past ones' numbers are close to each other, as Parking Radio's often are.
-const EVENTS = {
-  [EVENTS_URL]: {
+const RA_EVENTS = {
+  [RA_EVENTS_URL]: {
     ok: true,
     promoterUrl: 'https://ra.co/promoters/183980',
     upcoming: [raEvent('2300000', 'ONDES TAKEOVER', '2026-12-05T20:00:00-05:00'), raEvent('2400000', 'PLUS TARD', '2027-01-10T20:00:00-05:00')],
@@ -497,11 +497,11 @@ const RA_EVENT = {
   promoterIds: ['183980'],
   content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
 }
-const RA_EVENTS = {
+const RA_EVENT_CONTENT = {
   '/api/admin/sessions/session-1/ra-event': { ok: true, event: RA_EVENT },
 }
 // With its takeover's collective, which its sets' forms load.
-const PAGE = { ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
+const PAGE = { ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
 const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
@@ -718,7 +718,7 @@ describe("A session's page", () => {
     page.unmount()
 
     // Several, each on a line of its own.
-    mockFetch({ ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    mockFetch({ ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     const undated = renderAt('/admin/sessions/session-2')
     confirm.mockReturnValueOnce(false)
     fireEvent.click(await statusButton('jouée'))
@@ -772,7 +772,7 @@ describe("A session's page", () => {
   })
 
   it("can't announce a session without a date, which its button says", async () => {
-    mockFetch({ ...LOGGED_IN, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    mockFetch({ ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
     const button = within(await screen.findByRole('group', { name: 'Annonce' })).getByRole('button', { name: 'annoncée' })
@@ -783,7 +783,7 @@ describe("A session's page", () => {
   })
 
   it('says right away, in its form, that an announced session keeps its date', async () => {
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, announced: true } } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: { ...SESSION, announced: true } } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -882,7 +882,7 @@ describe("A session's page", () => {
 
   it('changes the session in a form in its place, sending its start back as it was', async () => {
     const changed = { ...SESSION, name: 'AUTRE', title: 'AUTRE', updatedBy: 'admin@example.com', updatedAt: '2026-10-02T16:00:00.000Z' }
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: changed } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: changed } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -931,7 +931,7 @@ describe("A session's page", () => {
     const session = { ...SESSION, status, sets: SESSION.sets.map((set) => ({ ...set, status: status === 'cancelled' ? status : set.status })) }
     mockFetch({
       ...PAGE,
-      ...EVENTS,
+      ...RA_EVENTS,
       ...COLLECTIVES,
       '/api/admin/sessions/session-1': { ok: true, session },
       '/api/admin/applications': { ok: true, total: 5, applications: [rejected, ...APPLICATIONS_LIST] },
@@ -952,7 +952,7 @@ describe("A session's page", () => {
     const vagues = application('application-5', { collectiveId: 'collective-2' }, '2026-09-10T16:00:00.000Z', 'new', ['2026-12-12'])
     mockFetch({
       ...PAGE,
-      ...EVENTS,
+      ...RA_EVENTS,
       '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] },
       '/api/admin/applications': { ok: true, total: 5, applications: [vagues, ...APPLICATIONS_LIST] },
       'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION },
@@ -987,7 +987,7 @@ describe("A session's page", () => {
   })
 
   it("keeps the takeover's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
-    mockFetch({ ...PAGE, ...EVENTS, '/api/admin/collectives': { ok: true, collectives: [ONDES] }, '/api/admin/applications': { ok: false, error: 'Boom' } })
+    mockFetch({ ...PAGE, ...RA_EVENTS, '/api/admin/collectives': { ok: true, collectives: [ONDES] }, '/api/admin/applications': { ok: false, error: 'Boom' } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -998,7 +998,7 @@ describe("A session's page", () => {
   })
 
   it('sends no application for another type than a takeover', async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1018,7 +1018,7 @@ describe("A session's page", () => {
 
   it('changes its description and its flyer, which it can also remove, in the form', async () => {
     const withFlyer = { ...SESSION, hasFlyer: true }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: withFlyer }, 'PUT /api/admin/sessions/session-1': { ok: true, session: withFlyer } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: withFlyer }, 'PUT /api/admin/sessions/session-1': { ok: true, session: withFlyer } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1067,7 +1067,7 @@ describe("A session's page", () => {
 
   it("keeps the session's event on RA when it isn't among those read from RA, and offers it until the form closes", async () => {
     const other = { ...SESSION, raEvent: { id: '1000000', url: 'https://ra.co/events/1000000' } }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: other }, 'PUT /api/admin/sessions/session-1': { ok: true, session: other } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: other }, 'PUT /api/admin/sessions/session-1': { ok: true, session: other } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1107,7 +1107,7 @@ describe("A session's page", () => {
   })
 
   it("keeps the session's event on RA while RA's events can't be read, which it says, and only lets it be removed", async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, [EVENTS_URL]: { ok: false, error: 'The events cannot be read from RA.' }, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, [RA_EVENTS_URL]: { ok: false, error: 'The events cannot be read from RA.' }, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1128,7 +1128,7 @@ describe("A session's page", () => {
   it('keeps a session that starts at the second 1:30 of the night clocks fall back where it is when its name changes', async () => {
     // 1:30 in winter time, an hour after the first 1:30, for 2 hours.
     const second = { ...SESSION, start: '2026-11-01T06:30:00.000Z', end: '2026-11-01T08:30:00.000Z', durationMinutes: 120, sets: [] }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1143,7 +1143,7 @@ describe("A session's page", () => {
   it('keeps a session that ends at the second 1:30 of the night clocks fall back where it ends while its end is unchanged', async () => {
     // From midnight, in summer time, to 1:30 in winter time.
     const second = { ...SESSION, start: '2026-11-01T04:00:00.000Z', end: '2026-11-01T06:30:00.000Z', durationMinutes: 150, sets: [] }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1166,7 +1166,7 @@ describe("A session's page", () => {
   })
 
   it('goes through the years a date field gives as a year is typed, saying what is wrong', async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1182,7 +1182,7 @@ describe("A session's page", () => {
   })
 
   it('moves an overnight session to another day, its end with it, and back', async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1341,7 +1341,7 @@ describe("A session's page", () => {
   })
 
   it("has one form open at a time, the session's or a set's", async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...EVENTS, ...ARTISTS })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, ...ARTISTS })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1370,7 +1370,7 @@ describe("A session's page", () => {
 
   it("gives a session without a date a day and a start, its end filled in from its duration", async () => {
     const dated = { ...UNDATED, start: '2026-11-15T02:00:00.000Z', end: '2026-11-15T05:00:00.000Z' }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'PUT /api/admin/sessions/session-2': { ok: true, session: dated } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'PUT /api/admin/sessions/session-2': { ok: true, session: dated } })
     renderAt('/admin/sessions/session-2')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -2269,7 +2269,7 @@ async function fillIn({ day = '2026-11-14', start = '21:00', endDay = '2026-11-1
 }
 
 describe('Adding a session', () => {
-  const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS }
+  const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS }
 
   it('adds a session, from its start to its end, each a day and a time, and goes to its page', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
@@ -2464,7 +2464,7 @@ describe('Adding a session', () => {
     expect(screen.queryByLabelText("Lien de l'événement")).not.toBeInTheDocument()
     const picker = screen.getByRole('combobox', { name: 'Événement RA' })
     await waitFor(() => expect(picker).not.toHaveAttribute('placeholder', 'chargement des événements…'))
-    expect(requestsTo('GET', EVENTS_URL)).toHaveLength(1)
+    expect(requestsTo('GET', RA_EVENTS_URL)).toHaveLength(1)
     expect(picker).toHaveValue('Aucun événement RA')
     fireEvent.click(picker)
     // Each by the day it starts on in Québec, e.g. October 31, though it's November 1 in UTC.
@@ -2589,7 +2589,7 @@ describe('Adding a session', () => {
 })
 
 describe("A new session's sets", () => {
-  const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, ...ARTISTS }
+  const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, ...ARTISTS }
 
   // The open set's form, under its title.
   const setForm = (title: string) => within(screen.getByRole('region', { name: title }))
@@ -2967,7 +2967,7 @@ describe('From an application', () => {
   })
 
   describe('on "nouvelle session"', () => {
-    const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...EVENTS, ...WITH_AURORES }
+    const NEW = { ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, ...WITH_AURORES }
     const reminder = () => within(screen.getByRole('region', { name: 'Candidature' }))
 
     it("lists a set filled in from an artist's application, whose duration isn't known, under when the artist would like to play", async () => {
