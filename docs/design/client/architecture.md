@@ -30,14 +30,15 @@ The admin pages aren't linked from the navigation bar (see [Admin](admin/layout.
 ## Configuration
 
 The app reads [`GET /api/config`](../server/README.md#get-apiconfig) once, when it loads. Until it has it, what depends
-on it waits: assets don't show, pages that depend on a feature flag show nothing, and pages don't say which
-environment they're in.
+on it waits: assets don't show, pages that depend on a feature flag show nothing that depends on it, and pages don't
+say which environment they're in.
 
 ### Feature flags
 
-A page that depends on a feature flag (see [Features](../server/features.md)) shows nothing until it knows whether the
-flag is on, rather than switching from one version to the other in front of the visitor. When it can't know, it behaves
-as if the flag were off. Since the flags are read when the app loads, visitors get a change as soon as they load a page
+A page that depends on a feature flag (see [Features](../server/features.md)) shows nothing that differs between its two
+versions until it knows whether the flag is on, rather than switching from one version to the other in front of the
+visitor: it can only show what both versions share, e.g. that it's loading. When it can't know, it behaves as if the flag
+were off. Since the flags are read when the app loads, visitors get a change as soon as they load a page
 of the site, and a page they already have open stays as it was until they load it again.
 
 ### Environment

@@ -10,7 +10,7 @@ import { featureFlags } from '../db/schema.js'
 // `npm run generate:api`. Retiring one takes removing it from here, and listing it among the retired flags of
 // docs/design/server/features.md: the server ignores what it saved for flags that aren't in FEATURES, and a retired
 // flag's id isn't reused, since what was saved for it would apply to the new flag.
-export const FEATURES = [] as const
+export const FEATURES = ['evenements-publics'] as const
 
 export const FeatureId = z.enum(FEATURES).meta({ id: 'FeatureId' })
 export type FeatureId = z.infer<typeof FeatureId>

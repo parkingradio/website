@@ -8,7 +8,8 @@ import type { RaEventContent, SessionBody } from './routes.js'
 const SYNTH_MEETUP_LINEUP = 'OPEN JAM'
 
 // One performer per line, from the sets that aren't cancelled, in order, without repeated lines. RA needs a lineup, so a
-// session without such performers has one of its own.
+// session without such performers has one of its own. Programmation's lineups of public events follow the same rule,
+// except for events without such performers (`lineup` in client/src/pages/programmation/listing.ts).
 function lineup(session: SessionBody): string {
   const names = session.sets.filter((set) => set.status !== 'cancelled').flatMap((set) => set.performers.map((performer) => performer.name))
   if (names.length > 0) return [...new Set(names)].join('\n')

@@ -21,9 +21,10 @@ export function useAssetUrl(): (key: string) => string | undefined {
 }
 
 /**
- * Returns whether a feature flag is on (see docs/design/server/features.md), or undefined until that's known. A page that
- * depends on a flag shows nothing until then, rather than one version of itself before switching to the other. When
- * the configuration can't be fetched, every flag is off, since off is the safe option.
+ * Returns whether a feature flag is on (see docs/design/server/features.md), or undefined until that's known. Until then, a
+ * page that depends on a flag shows nothing that differs between its two versions, e.g. only that it's loading, rather
+ * than one version of itself before switching to the other. When the configuration can't be fetched, every flag is off,
+ * since off is the safe option.
  */
 export function useFeature(id: FeatureId): boolean | undefined {
   const state = use(ConfigContext)

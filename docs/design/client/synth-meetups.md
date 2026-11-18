@@ -7,10 +7,16 @@ collaborators. From top to bottom, it shows:
 - The Synth Meetups animated banner.
 - A short introduction to the meetups.
 - "dates à venir": the upcoming meetup dates (e.g. "mercredi 7 octobre 2026"), in Québec time, whatever the browser's
-  time zone, soonest first, each linking to its event on Resident Advisor. They're the upcoming events in the synth
-  meetups category (see [RA events](../server/ra-events.md)), so a meetup shows up here once it's created on RA. When
-  there are none, it says that no date is announced yet. When the events can't be loaded, it says so, and links to the
-  promoter page on RA.
+  time zone, soonest first. While the `evenements-publics` feature flag is off (see
+  [Features](../server/features.md)), they're the upcoming events in the synth meetups category (see
+  [RA events](../server/ra-events.md)), so a meetup shows up here once it's created on RA, and each links to its event
+  there. Once the flag is on, they're the upcoming public events of type `synth-meetup` (see
+  [Events](../server/events.md)), so a meetup shows up here once its session is announced. Each one links to its event
+  on RA when it has one, and is plain text otherwise, and a cancelled one stays listed, marked like on Programmation,
+  e.g. "[CANCELLED] mercredi 25 novembre 2026". The dates are only asked for once the page knows whether the flag is
+  on, and say that they're loading until then (see [Feature flags](architecture.md#feature-flags)). When there are
+  none, it says that no date is announced yet. When the events can't be loaded, it says so, and links to the promoter
+  page on RA.
 - "mandat": the goals of the meetups.
 - "le plafond": how to show visuals on the studio's LED ceiling
 - "évènements passés": a gallery of past meetup posters, most recent first, as cropped portrait thumbnails.
@@ -23,4 +29,5 @@ page's code, so adding a poster means uploading it with `tools/manage-assets` an
 
 ## Endpoints
 
-- `GET /api/ra-events`.
+- `GET /api/ra-events`, while the flag is off.
+- `GET /api/events`, once it's on.

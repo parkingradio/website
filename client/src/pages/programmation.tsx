@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import type { Schema } from '../api/client'
 import { useApi } from '../api/use-api'
+import { useFeature } from '../config-context'
 import { RA_PROMOTER_URL } from '../ra'
 import { QUEBEC_TIME_ZONE } from '../quebec-time'
+import { eventsListing, raListing } from './programmation/listing'
+import type { Listing, Row } from './programmation/listing'
 import './programmation.css'
 
 type Filter = 'upcoming' | 'past'
@@ -22,25 +24,35 @@ function lowercaseName(text: string) {
   return text.replace(/parking\.radio/gi, 'parking.radio')
 }
 
-// Flyers are full-size uploads (often 1080×1920), so rows load a small square crop from RA's image resizer,
-// the same one ra.co uses. It takes the original URL in URL-safe base64.
-function flyerThumbnail(flyer: string) {
-  const encoded = btoa(flyer).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  return `https://imgproxy.ra.co/_/quality:66/w:240/h:240/rt:fill/${encoded}`
+// The events from RA while the `evenements-publics` flag is off, or the public events once it's on. The flag is known
+// before either is asked for: until then, the page is loading, as it would be either way.
+export function Programmation() {
+  const publicEvents = useFeature('evenements-publics')
+  if (publicEvents === undefined) return <ProgrammationStatus failed={false} />
+  return publicEvents ? <PublicProgrammation /> : <RaProgrammation />
 }
 
-export function Programmation() {
+function RaProgrammation() {
   const events = useApi('/api/ra-events')
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} />
+  return <ProgrammationList {...raListing(events.value)} />
+}
 
-  if (events.kind === 'loaded') return <ProgrammationList data={events.value} />
+function PublicProgrammation() {
+  const events = useApi('/api/events')
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} />
+  return <ProgrammationList {...eventsListing(events.value)} />
+}
 
+// The page while the events are loading, or once they couldn't be.
+function ProgrammationStatus({ failed }: { failed: boolean }) {
   return (
     <div className="programmation">
       <div className="programmation-inner">
         <header className="programmation-header">
           <h1>Programmation</h1>
         </header>
-        {events.kind === 'error' ? (
+        {failed ? (
           <p className="status">
             La programmation n'a pas pu être chargée.{' '}
             <a href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
@@ -56,11 +68,11 @@ export function Programmation() {
   )
 }
 
-export function ProgrammationList({ data }: { data: Schema<'RaEvents'> }) {
+export function ProgrammationList({ upcoming, past }: Listing) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
   // In the server's order: the soonest first, or the most recent first.
-  const shown = filter === 'upcoming' ? data.upcoming : data.past
+  const shown = filter === 'upcoming' ? upcoming : past
 
   return (
     <div className="programmation">
@@ -68,7 +80,7 @@ export function ProgrammationList({ data }: { data: Schema<'RaEvents'> }) {
         <header className="programmation-header">
           <div>
             <h1>Programmation</h1>
-            <a className="ra-link" href={data.promoterUrl} target="_blank" rel="noreferrer">
+            <a className="ra-link" href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
               parking.radio sur Resident Advisor ↗
             </a>
           </div>
@@ -103,13 +115,13 @@ export function ProgrammationList({ data }: { data: Schema<'RaEvents'> }) {
   )
 }
 
-function EventRow({ event }: { event: Schema<'RaEvent'> }) {
+function EventRow({ event }: { event: Row }) {
   const title = lowercaseName(event.title)
   const start = new Date(event.start)
   const time = event.end
     ? `${timeFormat.format(start)} – ${timeFormat.format(new Date(event.end))}`
     : timeFormat.format(start)
-  const meta = [event.venue, event.city, time].filter((part) => part !== null).map(lowercaseName)
+  const meta = [...event.places, time].map(lowercaseName)
 
   return (
     <li className="event">
@@ -118,30 +130,16 @@ function EventRow({ event }: { event: Schema<'RaEvent'> }) {
         <span className="day">{dayFormat.format(start)}</span>
         <span className="short-month">{shortMonthFormat.format(start).replace('.', '')}</span>
       </time>
-      {event.flyer ? (
-        // The title links to the same page, so this link is skipped by keyboard and screen readers.
-        <a
-          className="event-flyer"
-          href={event.url}
-          target="_blank"
-          rel="noreferrer"
-          tabIndex={-1}
-          aria-hidden="true"
-        >
-          <img src={flyerThumbnail(event.flyer)} alt="" loading="lazy" />
-        </a>
-      ) : (
-        <div className="event-flyer placeholder" aria-hidden="true">
-          parking
-          <br />
-          .radio
-        </div>
-      )}
+      <Flyer event={event} />
       <div className="event-body">
         <h3>
-          <a href={event.url} target="_blank" rel="noreferrer">
-            {title}
-          </a>
+          {event.url ? (
+            <a href={event.url} target="_blank" rel="noreferrer">
+              {title}
+            </a>
+          ) : (
+            title
+          )}
         </h3>
         <p className="event-meta">
           {meta.map((part, index) => (
@@ -153,15 +151,44 @@ function EventRow({ event }: { event: Schema<'RaEvent'> }) {
         </p>
         {event.lineup.length > 0 && <p className="event-lineup">{lowercaseName(event.lineup.join(' / '))}</p>}
       </div>
-      <a className="event-ra" href={event.url} target="_blank" rel="noreferrer" aria-label={`${title} sur RA`}>
-        voir sur RA →
-      </a>
+      {event.url && (
+        <a className="event-ra" href={event.url} target="_blank" rel="noreferrer" aria-label={`${title} sur RA`}>
+          voir sur RA →
+        </a>
+      )}
     </li>
   )
 }
 
-function groupByMonth(events: Schema<'RaEvent'>[]): [string, Schema<'RaEvent'>[]][] {
-  const groups = new Map<string, Schema<'RaEvent'>[]>()
+// The event's flyer, or a placeholder when it has none.
+function Flyer({ event }: { event: Row }) {
+  if (!event.flyer) {
+    return (
+      <div className="event-flyer placeholder" aria-hidden="true">
+        parking
+        <br />
+        .radio
+      </div>
+    )
+  }
+  const image = <img src={event.flyer} alt="" loading="lazy" />
+  if (!event.url) {
+    return (
+      <div className="event-flyer" aria-hidden="true">
+        {image}
+      </div>
+    )
+  }
+  return (
+    // The title links to the same page, so this link is skipped by keyboard and screen readers.
+    <a className="event-flyer" href={event.url} target="_blank" rel="noreferrer" tabIndex={-1} aria-hidden="true">
+      {image}
+    </a>
+  )
+}
+
+function groupByMonth(events: Row[]): [string, Row[]][] {
+  const groups = new Map<string, Row[]>()
   for (const event of events) {
     const month = monthFormat.format(new Date(event.start))
     groups.set(month, [...(groups.get(month) ?? []), event])
