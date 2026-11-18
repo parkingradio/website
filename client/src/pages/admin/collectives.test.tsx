@@ -193,6 +193,17 @@ describe('A collective’s page', () => {
     expect(within(table).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
+  it('links the status its sessions give an application to the first session with it, rather than to one before it', async () => {
+    // A planned session whose day has passed, after a newer one that's done, as the server lists them.
+    const session = (id: string, start: string, status: string) => ({ id, title: 'ONDES TAKEOVER', start, end: null, durationMinutes: 240, status })
+    const sessions = [session('session-2', '2026-10-03T00:00:00.000Z', 'done'), session('session-1', '2026-09-13T00:00:00.000Z', 'planned')]
+    mockFetch({ ...ONDES_PAGE, '/api/admin/applications?collective=collective-1': { ok: true, applications: [{ ...APPLICATION, status: 'planned', sessions }] } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const table = await screen.findByRole('table', { name: 'Candidatures' })
+    expect(within(table).getByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+  })
+
   it('says when its applications could not be loaded', async () => {
     mockFetch({ ...ONDES_PAGE, '/api/admin/applications?collective=collective-1': { ok: false, error: 'Boom' } })
     renderAt('/admin/artistes/collectifs/collective-1')

@@ -456,6 +456,19 @@ describe('An artist’s page', () => {
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
+  it('links the status their sets give an application to the first set with it, rather than to one before it', async () => {
+    // A planned set whose day has passed, after a newer one that's done, as the server lists them.
+    const sets: Application['sets'] = [
+      { id: 'set-2', durationMinutes: 60, status: 'done', session: { id: 'session-2', title: 'SOIRÉE', start: '2026-10-03T00:00:00.000Z' } },
+      { id: 'set-1', durationMinutes: 60, status: 'planned', session: { id: 'session-1', title: 'ONDES TAKEOVER', start: '2026-09-13T00:00:00.000Z' } },
+    ]
+    mockFetch({ ...AURORE_PAGE, '/api/admin/applications?artist=artist-1': { ok: true, applications: [application('application-1', 'artist-1', { status: 'planned', sets })] } })
+    renderAt('/admin/artistes/artist-1')
+
+    const table = await screen.findByRole('table', { name: 'Candidatures' })
+    expect(within(table).getByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+  })
+
   it('shows everything about the artist, and their applications', async () => {
     mockFetch(AURORE_PAGE)
     renderAt('/admin/artistes/artist-1')

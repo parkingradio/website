@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
-import { APPLICATION_STATUSES, isDecision, pickableDecisions } from '../../application-fields'
+import { APPLICATION_STATUSES, isDecision, pickableDecisions, statusSession } from '../../application-fields'
 import type { Application, ApplicationDecision, ApplicationStatus } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
@@ -32,9 +32,11 @@ import {
   genreNames,
   place,
   receivedOn,
+  sessionName,
 } from './describe'
 import type { Entry, EntryKind, Owner } from './describe'
 import { ApplicationsFailure, ArtistDetails, ArtistsFailure, CollectiveDetails, CollectivesFailure } from './profile-details'
+import { sessionPath } from './session-errors'
 import { ApplicationSessions, ApplicationSets } from './sessions'
 import { compareText, listQuery, search, useQueryParams, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
@@ -113,11 +115,24 @@ function applicationColumns(owners: Owners, status: ApplicationStatus | null): R
   }
 }
 
+// The status of `application`, linking to the page of the session it comes from, if any (see `statusSession`, and
+// "Candidatures" in docs/design/client/admin/candidatures.md).
+function StatusOf({ application }: { application: Application }) {
+  const label = STATUS_LABELS[application.status]
+  const session = statusSession(application)
+  if (!session) return label
+  return (
+    <Link to={sessionPath(session)} aria-label={`${label} : ${sessionName(session)}`}>
+      {label}
+    </Link>
+  )
+}
+
 // Applications, as listed in this section, or on an artist's or a collective's page, under the heading whose id is
 // `labelledBy`, where `owners` is left out since they're all theirs, and so are the columns about them. The columns sort
 // the list when there's `sorting`, and the statuses that admins decide are dropdowns that change them when there's
-// `decide`, while those that sets and sessions give are only shown. The links to the applications' pages keep
-// `linkQuery`, the list they go through, if any.
+// `decide`, while those that sets and sessions give link to where they come from (see `StatusOf`). The links to the
+// applications' pages keep `linkQuery`, the list they go through, if any.
 export function ApplicationsTable({
   applications,
   owners,
@@ -198,7 +213,7 @@ export function ApplicationsTable({
                     onChange={(decision) => decide(application, decision)}
                   />
                 ) : (
-                  STATUS_LABELS[application.status]
+                  <StatusOf application={application} />
                 )}
               </td>
             </tr>

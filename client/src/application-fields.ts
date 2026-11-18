@@ -42,7 +42,8 @@ export function isDecision(status: ApplicationStatus): status is ApplicationDeci
 }
 
 // The status of an application whose decision is `decision`, and whose sets or sessions have `linked` statuses: the
-// server's rule (see `applicationStatus` in server/src/applications/fields.ts), which must be changed together with it.
+// server's rule (see `applicationStatus` in server/src/applications/fields.ts), which must be changed together with it, and
+// with `statusSession`.
 function applicationStatus(decision: ApplicationDecision, linked: readonly SessionStatus[]): ApplicationStatus {
   if (decision === 'rejected') return 'rejected'
   if (linked.includes('planned')) return 'planned'
@@ -58,6 +59,14 @@ export function pickableDecisions({ status, sets, sessions }: Application): read
   if (!isDecision(status)) return []
   const linked = [...sets, ...sessions].map((item) => item.status)
   return APPLICATION_DECISIONS.filter((decision) => applicationStatus(decision, linked) === decision)
+}
+
+// The session that `application`'s status comes from, when its sets or sessions give it (see `applicationStatus`): that of
+// the first of them with that status, in their order, which for a set is its session, or null for a status that admins
+// decide.
+export function statusSession({ status, sets, sessions }: Application): Pick<Application['sessions'][number], 'id' | 'title' | 'start'> | null {
+  if (isDecision(status)) return null
+  return sets.find((set) => set.status === status)?.session ?? sessions.find((session) => session.status === status) ?? null
 }
 
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
