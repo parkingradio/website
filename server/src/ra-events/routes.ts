@@ -42,10 +42,10 @@ const RA_QUERY = `
   }
 `
 
-// The API's response (see docs/design/server/events.md). It checks no more than RaResponse does, e.g. its strings are
-// plain strings, so that every answer from RA that RaResponse accepts makes a valid response, rather than failing with
-// 500.
-const Event = z
+// The API's response (see docs/design/server/ra-events.md). It checks no more than RaResponse does, e.g. its strings
+// are plain strings, so that every answer from RA that RaResponse accepts makes a valid response, rather than failing
+// with 500.
+const RaEvent = z
   .object({
     id: z.string(),
     title: z.string(),
@@ -58,17 +58,17 @@ const Event = z
     url: z.string(),
     flyer: z.string().nullable(),
   })
-  .meta({ id: 'Event' })
-type Event = z.infer<typeof Event>
+  .meta({ id: 'RaEvent' })
+type RaEvent = z.infer<typeof RaEvent>
 
-const Events = z
+const RaEvents = z
   .object({
     promoterUrl: z.string(),
-    upcoming: z.array(Event).meta({ description: 'The soonest first' }),
-    past: z.array(Event).meta({ description: `The most recent first: without \`from\` and \`to\`, only the ${RECENT_PAST_EVENTS} most recent` }),
+    upcoming: z.array(RaEvent).meta({ description: 'The soonest first' }),
+    past: z.array(RaEvent).meta({ description: `The most recent first: without \`from\` and \`to\`, only the ${RECENT_PAST_EVENTS} most recent` }),
   })
-  .meta({ id: 'Events' })
-type Events = z.infer<typeof Events>
+  .meta({ id: 'RaEvents' })
+type RaEvents = z.infer<typeof RaEvents>
 
 // RA gives local times, without an offset, e.g. "2026-09-25T18:00:00.000", which are cut to the minute: whatever follows
 // is ignored. The day and the time have to exist, e.g. not February 30, rather than roll over.
@@ -85,7 +85,7 @@ const raLocalTime = z
 // RA's response is checked against these schemas rather than trusted. Anything that doesn't match fails
 // the whole fetch, even a single event, so that the page shows an error and we get it fixed rather than
 // silently showing an incomplete list. Fields we can do without are defaulted instead of rejected.
-const RaEvent = z.object({
+const RaGraphqlEvent = z.object({
   id: z.string(),
   title: z.string(),
   startTime: raLocalTime,
@@ -101,19 +101,19 @@ const RaEvent = z.object({
   artists: z.array(z.object({ name: z.string() })).nullish().transform((artists) => artists ?? []),
   images: z.array(z.object({ filename: z.string(), type: z.string() })).nullish().transform((images) => images ?? []),
 })
-type RaEvent = z.infer<typeof RaEvent>
+type RaGraphqlEvent = z.infer<typeof RaGraphqlEvent>
 
 const RaResponse = z.object({
   data: z.object({
     promoter: z.object({
       contentUrl: z.string().startsWith('/'),
-      upcoming: z.array(RaEvent),
-      past: z.array(RaEvent),
+      upcoming: z.array(RaGraphqlEvent),
+      past: z.array(RaGraphqlEvent),
     }),
   }),
 })
 
-async function fetchFromRa(): Promise<Events> {
+async function fetchFromRa(): Promise<RaEvents> {
   const response = await fetch(`${RA_ORIGIN}/graphql`, {
     method: 'POST',
     headers: {
@@ -141,24 +141,24 @@ async function fetchFromRa(): Promise<Events> {
     throw new Error(`RA returned ${promoter.past.length} past events, some are probably missing`)
   }
 
-  const upcoming = promoter.upcoming.map(toEvent)
+  const upcoming = promoter.upcoming.map(toRaEvent)
   const upcomingIds = new Set(upcoming.map((event) => event.id))
   return {
     promoterUrl: RA_ORIGIN + promoter.contentUrl,
     upcoming: byStart(upcoming, 1),
     // Should RA's lists change while it answers, an event isn't both upcoming and past.
-    past: byStart(promoter.past.map(toEvent).filter((event) => !upcomingIds.has(event.id)), -1),
+    past: byStart(promoter.past.map(toRaEvent).filter((event) => !upcomingIds.has(event.id)), -1),
   }
 }
 
 // `events` by start, the soonest first, or the most recent first when `direction` is -1.
-function byStart(events: Event[], direction: 1 | -1): Event[] {
+function byStart(events: RaEvent[], direction: 1 | -1): RaEvent[] {
   return events.toSorted((a, b) => direction * (Date.parse(a.start) - Date.parse(b.start)))
 }
 
 // RA's local times are read in the time zone of the event's venue, or in Québec's when RA doesn't say, since that's where
 // Parking Radio's events are (see `instantIn` for the times the clocks skip or show twice).
-function toEvent(event: RaEvent): Event {
+function toRaEvent(event: RaGraphqlEvent): RaEvent {
   const instant = (local: string) => instantIn(event.venue?.area?.ianaTimeZone, local).toISOString()
   return {
     id: event.id,
@@ -176,12 +176,12 @@ function toEvent(event: RaEvent): Event {
 
 // RA has no notion of event categories, so they're derived from the titles Parking Radio gives its events
 // on RA (e.g. "SYNTH MEETUPS").
-function categorize(title: string): Event['category'] {
+function categorize(title: string): RaEvent['category'] {
   return /\bsynth meetups?\b/i.test(title) ? 'synth-meetup' : 'other'
 }
 
 // The lines of the event's Line-up text, or its tagged artists when it has none.
-function parseLineup(event: RaEvent): string[] {
+function parseLineup(event: RaGraphqlEvent): string[] {
   // Strip the tags before decoding, so that an escaped "&lt;" in a name isn't mistaken for a tag.
   const lines = decodeHTML((event.lineup ?? '').replace(/<[^>]*>/g, ''))
     .split('\n')
@@ -191,7 +191,7 @@ function parseLineup(event: RaEvent): string[] {
   return lines.length > 0 ? [...new Set(lines)] : event.artists.map((artist) => artist.name)
 }
 
-export async function eventsRoutes(app: FastifyInstance) {
+export async function raEventsRoutes(app: FastifyInstance) {
   const api = zodRoutes(app)
   // The messages of these routes' schemas are whole sentences, which are sent as they are.
   app.setSchemaErrorFormatter(firstIssue)
@@ -209,15 +209,15 @@ export async function eventsRoutes(app: FastifyInstance) {
   )
 
   api.get(
-    '/api/events',
+    '/api/ra-events',
     {
-      config: { tool: { title: 'Voir les événements' } },
+      config: { tool: { title: 'Voir les événements RA' } },
       schema: {
-        operationId: 'list_events',
+        operationId: 'list_ra_events',
         summary: `Parking Radio's events on Resident Advisor, upcoming and past: every upcoming one and the ${RECENT_PAST_EVENTS} most recent past ones, or every one that starts in a time range when one is given`,
-        tags: ['Events'],
+        tags: ['RA events'],
         querystring: z.object(startRange('events')).refine(...fromBeforeTo),
-        response: { 200: Events, 502: ApiError },
+        response: { 200: RaEvents, 502: ApiError },
       },
     },
     async (request, reply) => {
@@ -225,7 +225,7 @@ export async function eventsRoutes(app: FastifyInstance) {
       if (!events) return reply.status(502).send({ ok: false, error: 'Events are unavailable right now' })
       const { from, to } = request.query
       if (!from && !to) return { ...events, past: events.past.slice(0, RECENT_PAST_EVENTS) }
-      const inRange = (event: Event) => (!from || Date.parse(event.start) >= from.getTime()) && (!to || Date.parse(event.start) < to.getTime())
+      const inRange = (event: RaEvent) => (!from || Date.parse(event.start) >= from.getTime()) && (!to || Date.parse(event.start) < to.getTime())
       return { ...events, upcoming: events.upcoming.filter(inRange), past: events.past.filter(inRange) }
     },
   )

@@ -222,21 +222,21 @@ bottom, the form has:
   removes it once the session is saved, and a flyer that's chosen replaces it. It's checked as soon as it's chosen, as
   the server checks it (see [Flyers](../../server/sessions.md#flyers)).
 - "Événement RA": picked from every one of Parking Radio's events, past ones included, read from RA (see
-  [Events](../../server/events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its title and
-  the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g. "n° 6683745", the
-  upcoming ones first, the soonest first, then the past ones, the most recent first. The field searches them by their
-  title and their day, written out (e.g. "samedi 14 novembre 2026", which "14 nov" finds), as the lists are searched
-  (see [Searching lists](layout.md#searching-lists)), and, when only digits are typed, by their number too, or part of
-  it, exactly (e.g. "2026" finds the events of 2026, and those whose number has "2026" in it), since Parking Radio's
-  numbers are close to each other. A link to an event's page on RA, as a session's `raEvent` takes it (see
-  [Links](../../server/sessions.md#links)), with or without its `https://`, finds that event, or nothing when it isn't
-  offered. "Aucun événement RA" is found by what it shows, and the session's own event, when it isn't among those read
-  (see below), by "Événement RA" and by its number, like the others. Once an event is picked, the form links to its page
-  on RA, showing its address, like the session's page. The session's own event, when it isn't among those read from RA,
-  e.g. another promoter's (see [Links](../../server/sessions.md#links)), is offered too, as "Événement RA n° 6683745",
-  so that the session keeps it unless another one is picked. The form doesn't wait for RA: until the events are read, or
-  when they can't be, only the session's own event and "Aucun événement RA" can be picked, and the form says when they
-  couldn't be.
+  [RA events](../../server/ra-events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its
+  title and the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g.
+  "n° 6683745", the upcoming ones first, the soonest first, then the past ones, the most recent first. The field
+  searches them by their title and their day, written out (e.g. "samedi 14 novembre 2026", which "14 nov" finds), as the
+  lists are searched (see [Searching lists](layout.md#searching-lists)), and, when only digits are typed, by their
+  number too, or part of it, exactly (e.g. "2026" finds the events of 2026, and those whose number has "2026" in it),
+  since Parking Radio's numbers are close to each other. A link to an event's page on RA, as a session's `raEvent` takes
+  it (see [Links](../../server/sessions.md#links)), with or without its `https://`, finds that event, or nothing when it
+  isn't offered. "Aucun événement RA" is found by what it shows, and the session's own event, when it isn't among those
+  read (see below), by "Événement RA" and by its number, like the others. Once an event is picked, the form links to its
+  page on RA, showing its address, like the session's page. The session's own event, when it isn't among those read from
+  RA, e.g. another promoter's (see [Links](../../server/sessions.md#links)), is offered too, as
+  "Événement RA n° 6683745", so that the session keeps it unless another one is picked. The form doesn't wait for RA:
+  until the events are read, or when they can't be, only the session's own event and "Aucun événement RA" can be picked,
+  and the form says when they couldn't be.
 
 When the collectives can't be loaded, the form says so: the session's collective stays, but another one can't be picked.
 
@@ -395,5 +395,5 @@ its sets in the way is named without a link.
 - `GET /api/admin/applications`, in both forms, to pick the application they come from, each time the form opens, and
   on "nouvelle session", along with `GET /api/admin/artists`, to find the application of `?application`, and its
   artist.
-- `GET /api/events`, in the session form, to pick the event on RA, each time it opens, from the year 2000 on, to get
-  every one (see [Time ranges](../../server/events.md#time-ranges)).
+- `GET /api/ra-events`, in the session form, to pick the event on RA, each time it opens, from the year 2000 on, to
+  get every one (see [Time ranges](../../server/ra-events.md#time-ranges)).

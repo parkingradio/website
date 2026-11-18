@@ -1652,107 +1652,6 @@
           "ZW"
         ]
       },
-      "Event": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "synth-meetup",
-              "other"
-            ]
-          },
-          "start": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "venue": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "city": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "lineup": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "url": {
-            "type": "string"
-          },
-          "flyer": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "category",
-          "start",
-          "end",
-          "venue",
-          "city",
-          "lineup",
-          "url",
-          "flyer"
-        ],
-        "additionalProperties": false
-      },
-      "Events": {
-        "type": "object",
-        "properties": {
-          "promoterUrl": {
-            "type": "string"
-          },
-          "upcoming": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Event"
-            },
-            "description": "The soonest first"
-          },
-          "past": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Event"
-            },
-            "description": "The most recent first: without `from` and `to`, only the 20 most recent"
-          }
-        },
-        "required": [
-          "promoterUrl",
-          "upcoming",
-          "past"
-        ],
-        "additionalProperties": false
-      },
       "Feature": {
         "type": "object",
         "properties": {
@@ -2273,6 +2172,79 @@
         ],
         "additionalProperties": false
       },
+      "RaEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "synth-meetup",
+              "other"
+            ]
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "venue": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lineup": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "flyer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "category",
+          "start",
+          "end",
+          "venue",
+          "city",
+          "lineup",
+          "url",
+          "flyer"
+        ],
+        "additionalProperties": false
+      },
       "RaEventContent": {
         "type": "object",
         "properties": {
@@ -2331,6 +2303,34 @@
           "venueId",
           "promoterIds",
           "content"
+        ],
+        "additionalProperties": false
+      },
+      "RaEvents": {
+        "type": "object",
+        "properties": {
+          "promoterUrl": {
+            "type": "string"
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaEvent"
+            },
+            "description": "The soonest first"
+          },
+          "past": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaEvent"
+            },
+            "description": "The most recent first: without `from` and `to`, only the 20 most recent"
+          }
+        },
+        "required": [
+          "promoterUrl",
+          "upcoming",
+          "past"
         ],
         "additionalProperties": false
       },
@@ -3636,12 +3636,12 @@
         }
       }
     },
-    "/api/events": {
+    "/api/ra-events": {
       "get": {
-        "operationId": "list_events",
+        "operationId": "list_ra_events",
         "summary": "Parking Radio's events on Resident Advisor, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given",
         "tags": [
-          "Events"
+          "RA events"
         ],
         "parameters": [
           {
@@ -3669,7 +3669,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Events"
+                  "$ref": "#/components/schemas/RaEvents"
                 }
               }
             }

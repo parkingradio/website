@@ -42,7 +42,7 @@ design: when they disagree, these documents still win.
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |
-| [Events](server/events.md) | Parking Radio's events, read from Resident Advisor |
+| [RA events](server/ra-events.md) | Parking Radio's events, read from Resident Advisor |
 | [Features](server/features.md) | Feature flags |
 
 ## Client

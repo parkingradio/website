@@ -1,4 +1,4 @@
-import { RA_PROMOTER_ID, RA_VENUE_ID } from '../events/ra.js'
+import { RA_PROMOTER_ID, RA_VENUE_ID } from '../ra-events/ra.js'
 import type { RaEventContent, SessionBody } from './routes.js'
 
 // The content of a session's event on Resident Advisor, which an admin creates there from it (see "Events on RA" in

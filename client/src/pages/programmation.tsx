@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Schema } from '../api/client'
 import { useApi } from '../api/use-api'
-import { RA_PROMOTER_URL } from '../events'
+import { RA_PROMOTER_URL } from '../ra'
 import { QUEBEC_TIME_ZONE } from '../quebec-time'
 import './programmation.css'
 
@@ -30,7 +30,7 @@ function flyerThumbnail(flyer: string) {
 }
 
 export function Programmation() {
-  const events = useApi('/api/events')
+  const events = useApi('/api/ra-events')
 
   if (events.kind === 'loaded') return <ProgrammationList data={events.value} />
 
@@ -56,7 +56,7 @@ export function Programmation() {
   )
 }
 
-export function ProgrammationList({ data }: { data: Schema<'Events'> }) {
+export function ProgrammationList({ data }: { data: Schema<'RaEvents'> }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
   // In the server's order: the soonest first, or the most recent first.
@@ -103,7 +103,7 @@ export function ProgrammationList({ data }: { data: Schema<'Events'> }) {
   )
 }
 
-function EventRow({ event }: { event: Schema<'Event'> }) {
+function EventRow({ event }: { event: Schema<'RaEvent'> }) {
   const title = lowercaseName(event.title)
   const start = new Date(event.start)
   const time = event.end
@@ -160,8 +160,8 @@ function EventRow({ event }: { event: Schema<'Event'> }) {
   )
 }
 
-function groupByMonth(events: Schema<'Event'>[]): [string, Schema<'Event'>[]][] {
-  const groups = new Map<string, Schema<'Event'>[]>()
+function groupByMonth(events: Schema<'RaEvent'>[]): [string, Schema<'RaEvent'>[]][] {
+  const groups = new Map<string, Schema<'RaEvent'>[]>()
   for (const event of events) {
     const month = monthFormat.format(new Date(event.start))
     groups.set(month, [...(groups.get(month) ?? []), event])

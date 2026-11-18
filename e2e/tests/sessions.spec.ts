@@ -258,7 +258,7 @@ test('a takeover and its set are given the applications they come from in their 
   const id: string = (await created.json()).session.id
   const set = { performers: [{ id: mine.artist.id }], durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: null }
   expect((await page.request.post(`/api/admin/sessions/${id}/sets`, { data: set })).ok()).toBe(true)
-  await mockEvents(page)
+  await mockRaEvents(page)
 
   // The takeover's, among its collective's.
   await page.goto(`/admin/sessions/${id}`)
@@ -303,7 +303,7 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   const fields = { dates: [day], timeSlots: [{ start: '20:00', end: '23:00' }], otherPerformanceType: 'Synthé' }
   const artists = await addOwnApplication(page, { artistId: mine.artist.id, ...fields })
   const collectives = await addOwnApplication(page, { collectiveId: mine.collective.id, ...fields })
-  await mockEvents(page)
+  await mockRaEvents(page)
   const name = `E2E ${unique}`
   const sets = page.getByRole('table', { name: 'Sets' })
   const sessionPicker = page.getByRole('combobox', { name: 'Session' })
@@ -439,7 +439,7 @@ async function deleteOwn(page: Page, { collective, artist }: Awaited<ReturnType<
 
 // Parking Radio's events on RA, as the server would read them, which the session form is given instead, so that it
 // doesn't depend on RA. Their numbers are close to each other, as Parking Radio's often are.
-async function mockEvents(page: Page) {
+async function mockRaEvents(page: Page) {
   const event = (id: string, start: string) => ({
     id,
     title: 'GUEST MIXES',
@@ -453,7 +453,7 @@ async function mockEvents(page: Page) {
     flyer: null,
   })
   const events = { promoterUrl: 'https://ra.co/promoters/183980', upcoming: [], past: [event('1234568', '2026-10-17T21:00:00-04:00'), event('1234567', '2026-10-10T21:00:00-04:00')] }
-  await page.route((url) => url.pathname === '/api/events', (route) => route.fulfill({ json: events }))
+  await page.route((url) => url.pathname === '/api/ra-events', (route) => route.fulfill({ json: events }))
 }
 
 // E.g. "samedi 14 novembre 2026", for a day as "YYYY-MM-DD".
@@ -466,7 +466,7 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await logIn(page)
   const mine = await addOwnCollective(page, unique)
   const name = `E2E ${unique}`
-  await mockEvents(page)
+  await mockRaEvents(page)
 
   // From the collective's page, as its takeover already, whose name it gives.
   await page.goto(`/admin/artistes/collectifs/${mine.collective.id}`)
@@ -768,7 +768,7 @@ test("a session's event on RA is published from the panel under its « Événeme
   const created = await page.request.post('/api/admin/sessions', { multipart: { session: JSON.stringify(fields) } })
   expect(created.ok()).toBe(true)
   const id: string = (await created.json()).session.id
-  await mockEvents(page)
+  await mockRaEvents(page)
 
   // The server under test isn't production, so publishing warns that the event will be created on RA all the same.
   const createButton = () => value(page, 'Événement RA').getByRole('button', { name: 'créer' })

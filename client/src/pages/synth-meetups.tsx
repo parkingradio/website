@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useAssetUrl } from '../config-context'
 import { useApi } from '../api/use-api'
-import { RA_PROMOTER_URL } from '../events'
+import { RA_PROMOTER_URL } from '../ra'
 import { formatLongQuebecDay } from '../quebec-time'
 import './synth-meetups.css'
 
@@ -54,7 +54,7 @@ type Poster = (typeof POSTERS)[number]
 const NDI_URL = 'https://ndi.video/tools/'
 
 function UpcomingDates() {
-  const events = useApi('/api/events')
+  const events = useApi('/api/ra-events')
 
   if (events.kind === 'error') {
     return (

@@ -1,4 +1,4 @@
-// Parking Radio on Resident Advisor: where its events are read from (see events/routes.ts), and created under (see
+// Parking Radio on Resident Advisor: where its events are read from (see ra-events/routes.ts), and created under (see
 // sessions/ra-event.ts).
 export const RA_ORIGIN = 'https://ra.co'
 // Its promoter page (https://ra.co/promoters/183980).

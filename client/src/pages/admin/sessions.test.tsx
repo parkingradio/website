@@ -94,7 +94,7 @@ function raEvent(id: string, title: string, start: string) {
 }
 
 // Every one of Parking Radio's events, from the year 2000 on.
-const EVENTS_URL = '/api/events?from=2000-01-01T00%3A00-05%3A00'
+const EVENTS_URL = '/api/ra-events?from=2000-01-01T00%3A00-05%3A00'
 
 // RA's events, as the server orders them: the upcoming ones the soonest first, and the past ones the most recent first.
 // The past ones' numbers are close to each other, as Parking Radio's often are.

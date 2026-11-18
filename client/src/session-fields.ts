@@ -26,7 +26,7 @@ export type SetFields = Schema<'SetFields'>
 // An artist or a collective, by their id and name, as sessions and sets name them.
 export type Reference = Schema<'Reference'>
 // An event on RA, by its id and the link to its page, as sessions give it.
-export type RaEvent = Schema<'SessionLink'>
+export type RaEventLink = Schema<'SessionLink'>
 // The application a session or a set comes from, by its id and when it was received, as they give it.
 export type ApplicationLink = Schema<'ApplicationLink'>
 // Who an application belongs to, by their id.
@@ -184,7 +184,7 @@ export type SessionFormValues = {
   takeover: Reference | null
   application: ApplicationLink | null
   name: string
-  raEvent: RaEvent | null
+  raEvent: RaEventLink | null
   description: string
 }
 

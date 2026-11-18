@@ -5,7 +5,7 @@ import { mockFetch, requestsTo } from '../test-utils'
 import { Programmation, ProgrammationList } from './programmation'
 
 // The events as the server gives them: the upcoming ones the soonest first, and the past ones the most recent first.
-const data: Schema<'Events'> = {
+const data: Schema<'RaEvents'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
     {
@@ -65,15 +65,15 @@ const eventTitles = () => screen.getAllByRole('heading', { level: 3 }).map((head
 
 describe('Programmation', () => {
   it('loads the events from the server', async () => {
-    mockFetch({ '/api/events': data })
+    mockFetch({ '/api/ra-events': data })
     render(<Programmation />)
 
     expect(await screen.findByRole('heading', { name: 'Soon Party' })).toBeInTheDocument()
-    expect(requestsTo('GET', '/api/events')).toHaveLength(1)
+    expect(requestsTo('GET', '/api/ra-events')).toHaveLength(1)
   })
 
   it('points to Resident Advisor when the events cannot be loaded', async () => {
-    mockFetch({ '/api/events': { ok: false, error: 'Events are unavailable right now' } })
+    mockFetch({ '/api/ra-events': { ok: false, error: 'Events are unavailable right now' } })
     render(<Programmation />)
 
     expect(await screen.findByRole('link', { name: /Resident Advisor/ })).toHaveAttribute(

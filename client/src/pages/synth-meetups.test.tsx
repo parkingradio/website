@@ -4,7 +4,7 @@ import type { Schema } from '../api/client'
 import { mockFetch, requestsTo } from '../test-utils'
 import { SynthMeetups } from './synth-meetups'
 
-function event(id: string, category: Schema<'Event'>['category'], start: string): Schema<'Event'> {
+function event(id: string, category: Schema<'RaEvent'>['category'], start: string): Schema<'RaEvent'> {
   return {
     id,
     title: 'Event',
@@ -20,7 +20,7 @@ function event(id: string, category: Schema<'Event'>['category'], start: string)
 }
 
 // The events as the server gives them: the upcoming ones the soonest first.
-const events: Schema<'Events'> = {
+const events: Schema<'RaEvents'> = {
   promoterUrl: 'https://ra.co/promoters/183980',
   upcoming: [
     event('soon', 'synth-meetup', '2026-10-07T18:00:00-04:00'),
@@ -32,7 +32,7 @@ const events: Schema<'Events'> = {
 
 describe('SynthMeetups', () => {
   beforeEach(() => {
-    mockFetch({ '/api/events': events })
+    mockFetch({ '/api/ra-events': events })
   })
 
   it('renders without crashing', () => {
@@ -78,7 +78,7 @@ describe('SynthMeetups', () => {
       ['mercredi 7 octobre 2026', 'https://ra.co/events/soon'],
       ['mercredi 11 novembre 2026', 'https://ra.co/events/later'],
     ])
-    expect(requestsTo('GET', '/api/events')).toHaveLength(1)
+    expect(requestsTo('GET', '/api/ra-events')).toHaveLength(1)
   })
 
   it("gives the days of the synth meetups in Québec time, whatever the browser's time zone", async () => {
@@ -98,14 +98,14 @@ describe('SynthMeetups', () => {
   })
 
   it('says so when no synth meetup is coming up', async () => {
-    mockFetch({ '/api/events': { ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00:00-04:00')] } })
+    mockFetch({ '/api/ra-events': { ...events, upcoming: [event('mixes', 'other', '2026-10-09T11:00:00-04:00')] } })
     render(<SynthMeetups />)
 
     expect(await screen.findByText(/aucune date annoncée/)).toBeInTheDocument()
   })
 
   it('points to Resident Advisor when the dates cannot be loaded', async () => {
-    mockFetch({ '/api/events': { ok: false, error: 'Events are unavailable right now' } })
+    mockFetch({ '/api/ra-events': { ok: false, error: 'Events are unavailable right now' } })
     render(<SynthMeetups />)
 
     expect(await screen.findByRole('link', { name: /Resident Advisor/ })).toHaveAttribute(
