@@ -42,9 +42,10 @@ The endpoints below also return these fields:
 | `receivedAt` | string | When the artist sent the application, which isn't always when it was created: one that came by email, or through the original Google Form, can be brought in long after. For one sent through `POST /api/applications`, that's when it was created. For one an admin created, it's what the admin said, or else when it was created. Admins can change it either way |
 | `createdAt` | string | When the application was created |
 | `createdBy` | string or null | The email of the admin who created the application, or null if the artist sent it themselves |
-| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Changes to what admins decided don't count, and neither do changes to its sets and sessions |
-| `status` | `"new"`, `"accepted"`, `"planned"`, `"done"` or `"rejected"` | Worked out from what admins decided and from its sets or sessions: see [Status](#status) |
-| `statusUpdatedBy`, `statusUpdatedAt` | string or null | Who last changed what admins decided (an admin's email), and when, but not when its sets or sessions change its status (see [Status](#status)) |
+| `updatedBy`, `updatedAt` | string or null | Who last changed the application (an admin's email), and when. Changes to its `decision` don't count, and neither do changes to its sets and sessions |
+| `status` | `"new"`, `"accepted"`, `"planned"`, `"done"` or `"rejected"` | Worked out from its `decision` and from its sets or sessions: see [Status](#status) |
+| `decision` | `"new"`, `"accepted"` or `"rejected"` | What admins decided about it: see [Status](#status) |
+| `decisionUpdatedBy`, `decisionUpdatedAt` | string or null | Who last changed its `decision` (an admin's email), and when |
 | `sets` | list of objects | The sets that come from the application, which only an artist's has: see below |
 | `sessions` | list of objects | The sessions that come from the application, which only a collective's has: see below |
 
@@ -59,10 +60,10 @@ an application takes it from its sets and sessions, which stay.
 
 ## Status
 
-An application only keeps what admins decided about it: every application starts as `"new"`, then admins accept it
-(`"accepted"`) or reject it (`"rejected"`), or make it new again, with `PUT /api/admin/applications/:id/status`. Its
-`status` is worked out from that and from the statuses of its sets or sessions (see
-[Status, in Sessions](sessions.md#status)) whenever it's read: the first of these that applies.
+An application only keeps what admins decided about it, its `decision`: every application starts as `"new"`, then
+admins accept it (`"accepted"`) or reject it (`"rejected"`), or make it new again, with
+`PUT /api/admin/applications/:id/decision`. Its `status` is worked out from that and from the statuses of its sets or
+sessions (see [Status, in Sessions](sessions.md#status)) whenever it's read: the first of these that applies.
 
 | `status` | When |
 |---|---|
@@ -85,7 +86,7 @@ An application only keeps what admins decided about it: every application starts
 
 So an application, whether it's new or accepted, is planned by being a planned set's or session's `application` (see
 [Applications, in Sessions](sessions.md#applications)), and done once it's played: never through
-`PUT /api/admin/applications/:id/status`, which only takes what admins decide. Once its sets and sessions are all
+`PUT /api/admin/applications/:id/decision`, which only takes what admins decide. Once its sets and sessions are all
 cancelled, it's accepted, to be booked again. What admins decided can still be changed to `"new"` or `"accepted"` while
 its sets or sessions make it planned or done: it's kept, and shows once they don't anymore.
 
@@ -147,15 +148,15 @@ Changes the fields of an application it's sent, and leaves the others as they ar
 takes, `receivedAt` included, which can't be null either. Responds like `PUT`, and fails like it, but with 400 when
 there's no field.
 
-## `PUT /api/admin/applications/:id/status` (admin)
+## `PUT /api/admin/applications/:id/decision` (admin)
 
 | Request field | Type | |
 |---|---|---|
-| `status` | `"new"`, `"accepted"` or `"rejected"` | What admins decide about the application |
+| `decision` | `"new"`, `"accepted"` or `"rejected"` | What admins decide about the application |
 
-Changes what admins decided about an application (see [Status](#status)). The response is the same as for
+Changes an application's `decision` (see [Status](#status)). The response is the same as for
 `POST /api/admin/applications`, with the status that's then worked out, which stays planned or done while its sets or
-sessions make it so. Fails with 400 if `status` isn't one of these values, e.g. `"planned"`, 404 if the application
+sessions make it so. Fails with 400 if `decision` isn't one of these values, e.g. `"planned"`, 404 if the application
 doesn't exist, or 409 (`"A rejected application has no set or session that's planned or done"`) when it's rejected
 while it has a set or a session that's planned or done.
 

@@ -201,16 +201,16 @@ export const applications = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }),
     // What admins decided about the application, which its status is worked out from, along with its sets' and sessions'
     // (see `applicationStatus` in applications/fields.ts), and the email of the admin who last changed it, and when (null
-    // until then). Its column keeps its name from when it was the status itself, which older servers read.
-    decision: text('status').$type<ApplicationDecision>().notNull().default('new'),
-    statusUpdatedBy: text('status_updated_by'),
-    statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }),
+    // until then).
+    decision: text('decision').$type<ApplicationDecision>().notNull().default('new'),
+    decisionUpdatedBy: text('decision_updated_by'),
+    decisionUpdatedAt: timestamp('decision_updated_at', { withTimezone: true }),
   },
   (table) => [
     index('applications_artist_id_idx').on(table.artistId),
     index('applications_collective_id_idx').on(table.collectiveId),
     check('applications_owner', sql`(${table.artistId} is null) <> (${table.collectiveId} is null)`),
-    check('applications_status', oneOf(table.decision, APPLICATION_DECISIONS)),
+    check('applications_decision', oneOf(table.decision, APPLICATION_DECISIONS)),
   ],
 )
 

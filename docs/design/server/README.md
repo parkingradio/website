@@ -184,7 +184,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
 | [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Replacing an application's fields |
 | [`PATCH /api/admin/applications/:id`](applications.md#patch-apiadminapplicationsid-admin) | admin | Changing an application, only the fields it's sent |
-| [`PUT /api/admin/applications/:id/status`](applications.md#put-apiadminapplicationsidstatus-admin) | admin | Accepting or rejecting an application |
+| [`PUT /api/admin/applications/:id/decision`](applications.md#put-apiadminapplicationsiddecision-admin) | admin | Accepting or rejecting an application |
 | [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application, but not its sets and sessions, which stay without it |
 | [`POST /api/applications`](applications.md#post-apiapplications) | public | A new artist or collective applying, with their profile and maybe a photo |
 | [`GET /api/admin/applications/recipients`](applications.md#get-apiadminapplicationsrecipients-admin) | admin | Who applications from artists are emailed to |

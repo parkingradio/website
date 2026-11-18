@@ -97,8 +97,8 @@ async function statuses(...ids: string[]) {
 }
 
 // What admins decide about the application `id`.
-async function decide(id: string, status: string) {
-  return request('PUT', `/api/admin/applications/${id}/status`, { status })
+async function decide(id: string, decision: string) {
+  return request('PUT', `/api/admin/applications/${id}/decision`, { decision })
 }
 
 function expectError(response: { statusCode: number; json(): unknown }, error: string) {
@@ -277,11 +277,11 @@ describe("the application's status", () => {
       expect((await request('PATCH', `/api/admin/applications/${id}`, { details: 'Changée.' })).statusCode).toBe(200)
     }
     const tracked = async (id: string) => {
-      const { statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt } = await application(id)
-      return { statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt }
+      const { decision, decisionUpdatedBy, decisionUpdatedAt, updatedBy, updatedAt } = await application(id)
+      return { decision, decisionUpdatedBy, decisionUpdatedAt, updatedBy, updatedAt }
     }
     const before = [await tracked(artists), await tracked(collectives)]
-    expect(before[0]).toMatchObject({ statusUpdatedBy: 'admin@example.com', updatedBy: 'admin@example.com' })
+    expect(before[0]).toMatchObject({ decision: 'accepted', decisionUpdatedBy: 'admin@example.com', updatedBy: 'admin@example.com' })
     expect(await statuses(artists, collectives)).toEqual(['accepted', 'accepted'])
 
     const session = await sessionId({ type: 'takeover', takeover: collective, application: collectives })
@@ -342,13 +342,13 @@ describe('a rejected application', () => {
         const response = await decide(id, 'rejected')
         expect(response.statusCode).toBe(409)
         expect(response.json()).toEqual({ ok: false, error: REJECTED_APPLICATION })
-        expect(await application(id)).toMatchObject({ status, statusUpdatedBy: null })
+        expect(await application(id)).toMatchObject({ status, decision: 'new', decisionUpdatedBy: null })
       }
     }
     // Cancelling the session cancels its set.
     expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
     for (const id of [artists, collectives]) {
-      expect((await decide(id, 'rejected')).json().application).toMatchObject({ status: 'rejected', statusUpdatedBy: 'admin@example.com' })
+      expect((await decide(id, 'rejected')).json().application).toMatchObject({ status: 'rejected', decisionUpdatedBy: 'admin@example.com' })
     }
     const { session: kept } = (await request('GET', `/api/admin/sessions/${session}`)).json()
     expect(kept).toMatchObject({ application: { id: collectives }, sets: [{ id: set, application: { id: artists } }] })

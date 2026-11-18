@@ -64,7 +64,11 @@ function sessionOptions(sessions: Session[], dates: string[]): ComboboxOption[] 
   return [NEW_SESSION, ...wished, ...others]
 }
 
-export function CreateSet({ application }: { application: Pick<Application, 'id' | 'dates'> }) {
+// Why a rejected application can't lead to a set or a session, which would be planned (see "Applications" in
+// docs/design/server/sessions.md).
+export const REJECTED_CANT_BOOK = 'Une candidature refusée ne peut pas avoir de set ou de session planifié.'
+
+export function CreateSet({ application }: { application: Pick<Application, 'id' | 'dates' | 'decision'> }) {
   const [picking, setPicking] = useState(false)
   // Whether the field was closed, which then gives the focus back to the button that opens it.
   const closed = useRef(false)
@@ -86,9 +90,13 @@ export function CreateSet({ application }: { application: Pick<Application, 'id'
   }
   return (
     <div className="admin-toolbar">
-      <button ref={button} type="button" onClick={() => setPicking(true)}>
-        créer un set
-      </button>
+      {application.decision === 'rejected' ? (
+        <Button unavailable={REJECTED_CANT_BOOK}>créer un set</Button>
+      ) : (
+        <button ref={button} type="button" onClick={() => setPicking(true)}>
+          créer un set
+        </button>
+      )}
     </div>
   )
 }

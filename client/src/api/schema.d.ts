@@ -1752,7 +1752,7 @@ export interface paths {
         patch: operations["update_application"];
         trace?: never;
     };
-    "/api/admin/applications/{id}/status": {
+    "/api/admin/applications/{id}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -1761,7 +1761,7 @@ export interface paths {
         };
         get?: never;
         /** Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done */
-        put: operations["update_application_status"];
+        put: operations["update_application_decision"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2941,9 +2941,9 @@ export interface components {
             updatedBy: string | null;
             updatedAt: string | null;
             status: components["schemas"]["ApplicationStatus"];
-            /** @description Who last changed what admins decided */
-            statusUpdatedBy: string | null;
-            statusUpdatedAt: string | null;
+            decision: components["schemas"]["ApplicationDecision"];
+            decisionUpdatedBy: string | null;
+            decisionUpdatedAt: string | null;
             /** @description The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets */
             sets: components["schemas"]["ApplicationSet"][];
             /** @description The sessions that come from it, which only a collective's application has, in the order of the sessions */
@@ -4989,7 +4989,7 @@ export interface operations {
             };
         };
     };
-    update_application_status: {
+    update_application_decision: {
         parameters: {
             query?: never;
             header?: never;
@@ -5001,7 +5001,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    status: components["schemas"]["ApplicationDecision"];
+                    decision: components["schemas"]["ApplicationDecision"];
                 };
             };
         };

@@ -4,8 +4,9 @@ import { matching } from './combobox-matching'
 import { normalize } from './normalize'
 import './combobox.css'
 
-// `detail` is shown next to the label, e.g. a city's region.
-export type ComboboxOption = { key: string; label: string; detail?: string | null }
+// `detail` is shown next to the label, e.g. a city's region. An `unavailable` option is shown greyed out, and can't be
+// picked.
+export type ComboboxOption = { key: string; label: string; detail?: string | null; unavailable?: boolean }
 // The options that what's typed finds, in the order they're shown.
 export type ComboboxFilter = (options: ComboboxOption[], query: string) => ComboboxOption[]
 
@@ -101,6 +102,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
   }
 
   const pick = (option: ComboboxOption | undefined) => {
+    if (option?.unavailable) return
     if (option) {
       if (mode.text) mode.text.onChange(option.label)
       else mode.onSelect(option.key)
@@ -169,7 +171,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
           if (strict && query === null) browse()
         }}
         onBlur={() => {
-          if (strict && query !== null) pick(options.find((option) => normalize(option.label) === normalize(query)))
+          if (strict && query !== null) pick(options.find((option) => !option.unavailable && normalize(option.label) === normalize(query)))
           else close()
           onBlur?.()
         }}
@@ -189,6 +191,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
             data-index={index}
             role="option"
             aria-selected={index === current}
+            aria-disabled={option.unavailable || undefined}
             onMouseMove={(event) => {
               const at = `${event.screenX},${event.screenY}`
               if (at === mouseAt.current) return

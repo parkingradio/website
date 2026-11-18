@@ -39,13 +39,15 @@ type SetFormProps = {
   applications: Application[] | null
   // The collective of the set's session, for a takeover, or null when it isn't one, or its collective couldn't be loaded.
   takeover: TakeoverCollective | null
+  // Whether the set is cancelled, which a new one isn't.
+  cancelled?: boolean
   submitLabel: string
   // Sends the set's fields, which `form` has, and returns the error, if it failed.
   onSubmit: (fields: SetFields, form: SetFormValues) => Promise<ReactNode | null>
   onCancel: () => void
 }
 
-export function SetForm({ initial, artists, applications, takeover, submitLabel, onSubmit, onCancel }: SetFormProps) {
+export function SetForm({ initial, artists, applications, takeover, cancelled = false, submitLabel, onSubmit, onCancel }: SetFormProps) {
   const [form, setForm] = useState(initial)
   const update = (changes: Partial<SetFormValues>) => setForm((form) => ({ ...form, ...changes }))
   const checked = checkSet(form, applications)
@@ -88,6 +90,7 @@ export function SetForm({ initial, artists, applications, takeover, submitLabel,
         applications={applications}
         own={initial.application}
         selected={form.application}
+        cancelled={cancelled}
         ownerName={artistName}
         empty={
           form.performers.length === 0

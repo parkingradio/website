@@ -89,21 +89,21 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status": {
-          "name": "status",
+        "decision": {
+          "name": "decision",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'new'"
         },
-        "status_updated_by": {
-          "name": "status_updated_by",
+        "decision_updated_by": {
+          "name": "decision_updated_by",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "status_updated_at": {
-          "name": "status_updated_at",
+        "decision_updated_at": {
+          "name": "decision_updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -177,9 +177,9 @@
           "name": "applications_owner",
           "value": "(\"applications\".\"artist_id\" is null) <> (\"applications\".\"collective_id\" is null)"
         },
-        "applications_status": {
-          "name": "applications_status",
-          "value": "\"applications\".\"status\" in ('new', 'accepted', 'rejected')"
+        "applications_decision": {
+          "name": "applications_decision",
+          "value": "\"applications\".\"decision\" in ('new', 'accepted', 'rejected')"
         }
       },
       "isRLSEnabled": false

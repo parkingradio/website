@@ -58,6 +58,11 @@
   color: #f9f9f9;
 }
 
+.combobox-list li[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .combobox-list .combobox-none {
   color: #666;
   cursor: default;

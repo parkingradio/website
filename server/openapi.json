@@ -716,14 +716,16 @@
           "status": {
             "$ref": "#/components/schemas/ApplicationStatus"
           },
-          "statusUpdatedBy": {
-            "description": "Who last changed what admins decided",
+          "decision": {
+            "$ref": "#/components/schemas/ApplicationDecision"
+          },
+          "decisionUpdatedBy": {
             "type": [
               "string",
               "null"
             ]
           },
-          "statusUpdatedAt": {
+          "decisionUpdatedAt": {
             "anyOf": [
               {
                 "type": "string",
@@ -764,8 +766,9 @@
           "updatedBy",
           "updatedAt",
           "status",
-          "statusUpdatedBy",
-          "statusUpdatedAt",
+          "decision",
+          "decisionUpdatedBy",
+          "decisionUpdatedAt",
           "sets",
           "sessions"
         ],
@@ -7204,9 +7207,9 @@
         }
       }
     },
-    "/api/admin/applications/{id}/status": {
+    "/api/admin/applications/{id}/decision": {
       "put": {
-        "operationId": "update_application_status",
+        "operationId": "update_application_decision",
         "summary": "Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done",
         "tags": [
           "Applications"
@@ -7218,12 +7221,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "status": {
+                  "decision": {
                     "$ref": "#/components/schemas/ApplicationDecision"
                   }
                 },
                 "required": [
-                  "status"
+                  "decision"
                 ],
                 "additionalProperties": false
               }

@@ -116,20 +116,20 @@ function applicationColumns(owners: Owners, status: ApplicationStatus | null): R
 // Applications, as listed in this section, or on an artist's or a collective's page, under the heading whose id is
 // `labelledBy`, where `owners` is left out since they're all theirs, and so are the columns about them. The columns sort
 // the list when there's `sorting`, and the statuses that admins decide are dropdowns that change them when there's
-// `changeStatus`, while those that sets and sessions give are only shown. The links to the applications' pages keep
+// `decide`, while those that sets and sessions give are only shown. The links to the applications' pages keep
 // `linkQuery`, the list they go through, if any.
 export function ApplicationsTable({
   applications,
   owners,
   sorting,
-  changeStatus,
+  decide,
   linkQuery = '',
   labelledBy,
 }: {
   applications: Application[]
   owners?: Owners
   sorting?: Sorting<ApplicationColumn>
-  changeStatus?: (application: Application, status: ApplicationDecision) => Promise<void>
+  decide?: (application: Application, decision: ApplicationDecision) => Promise<void>
   linkQuery?: string
   labelledBy?: string
 }) {
@@ -189,13 +189,13 @@ export function ApplicationsTable({
               </td>
               <td>{describePerformanceTypes(application)}</td>
               <td className="admin-status">
-                {changeStatus && isDecision(application.status) ? (
+                {decide && isDecision(application.status) ? (
                   <StatusSelect
                     label={`Statut : ${applicationName(application, owner)}`}
                     statuses={pickableDecisions(application)}
                     labels={STATUS_LABELS}
                     status={application.status}
-                    onChange={(status) => changeStatus(application, status)}
+                    onChange={(decision) => decide(application, decision)}
                   />
                 ) : (
                   STATUS_LABELS[application.status]
@@ -337,9 +337,9 @@ function ApplicationsList() {
   const all = applications.value.applications.map((application) => changed[application.id] ?? application)
   const { found, listed } = list(all)
 
-  const changeStatus = async (application: Application, status: ApplicationDecision) => {
+  const decide = async (application: Application, decision: ApplicationDecision) => {
     setStatusError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params: { path: { id: application.id } }, body: { status } })
+    const result = await api.PUT('/api/admin/applications/{id}/decision', { params: { path: { id: application.id } }, body: { decision } })
     if (result.ok) setChanged((changed) => ({ ...changed, [application.id]: result.application }))
     else setStatusError(`Le statut de «\u00a0${applicationName(application, ownerOf(application, byKey))}\u00a0» n'a pas pu être changé : ${result.error}`)
   }
@@ -370,7 +370,7 @@ function ApplicationsList() {
               : 'Aucune candidature ne correspond à la recherche.'}
         </p>
       ) : (
-        <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} changeStatus={changeStatus} linkQuery={address.query} />
+        <ApplicationsTable applications={listed} owners={byKey} sorting={sorting} decide={decide} linkQuery={address.query} />
       )}
     </>
   )
@@ -563,10 +563,10 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
     )
   }
 
-  const changeStatus = async (status: ApplicationDecision) => {
+  const decide = async (decision: ApplicationDecision) => {
     setBusy(true)
     setError(null)
-    const result = await api.PUT('/api/admin/applications/{id}/status', { params, body: { status } })
+    const result = await api.PUT('/api/admin/applications/{id}/decision', { params, body: { decision } })
     setBusy(false)
     if (result.ok) setApplication(result.application)
     else setError(`Le statut n'a pas pu être changé : ${result.error}`)
@@ -605,11 +605,11 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
         status={application.status}
         disabled={busy}
         unavailable={(status) => unpickable(application, status)}
-        onChange={(status) => isDecision(status) && changeStatus(status)}
+        onChange={(status) => isDecision(status) && decide(status)}
       />
       {/* Who decided, which doesn't show while its sets or sessions decide its status. */}
-      {application.statusUpdatedBy && isDecision(application.status) && (
-        <p className="admin-meta">{byWhom('Changé', application.statusUpdatedBy, application.statusUpdatedAt)}</p>
+      {application.decisionUpdatedBy && isDecision(application.status) && (
+        <p className="admin-meta">{byWhom('Changé', application.decisionUpdatedBy, application.decisionUpdatedAt)}</p>
       )}
       {error && (
         <p className="admin-error" role="alert">

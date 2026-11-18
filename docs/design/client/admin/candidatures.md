@@ -59,7 +59,10 @@ and who last changed it and when, if anyone did. From top to bottom, it then sho
   "nouvelle session", with the application (see [From an application](sessions.md#from-an-application)): it can't be
   used until a session is picked, saying « Choisissez d'abord une session. ». "annuler" closes the field. When the
   sessions can't be loaded, the field says so, and only offers "nouvelle session". A collective's application's
-  "Sessions" has "créer une session", which leads to "nouvelle session" with the application.
+  "Sessions" has "créer une session", which leads to "nouvelle session" with the application. Neither can be used while
+  the application is rejected, since its new set or session would be planned (see
+  [Applications, in Sessions](../../server/sessions.md#applications)), saying « Une candidature refusée ne peut pas avoir
+  de set ou de session planifié. ».
 - "Supprimer": deletes the application for good, after confirming, then shows the list as "← candidatures" does. The
   artist or the collective stays, and so do the sets or sessions that come from it. When there are some, the page says
   « Les sets associés restent. » or « Les sessions associées restent. ».
@@ -101,8 +104,8 @@ are skipped: after accepting the 5th of 12 new applications, « suivante » show
 ## Endpoints
 
 - `GET /api/admin/applications`, for the list, and on an application's page, for « précédente » and « suivante », and
-  `PUT /api/admin/applications/:id/status`, to change a status from the list.
-- `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/status` and
+  `PUT /api/admin/applications/:id/decision`, to change a status from the list.
+- `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/decision` and
   `DELETE /api/admin/applications/:id`, for an application's page.
 - `GET /api/admin/sessions`, on an artist's application's page, to pick the session to add a set to, each time
   "créer un set" opens the field.

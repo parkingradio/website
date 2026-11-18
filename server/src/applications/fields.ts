@@ -26,7 +26,7 @@ export type PerformanceTypeId = z.infer<typeof PerformanceTypeId>
 // What admins decide about an application, which is all that's stored of its status: every application starts as "new",
 // then admins accept or reject it, or make it new again. Only admins see the error.
 export const APPLICATION_DECISIONS = ['new', 'accepted', 'rejected'] as const
-export const BAD_DECISION = `The status must be one of ${APPLICATION_DECISIONS.join(', ')}`
+export const BAD_DECISION = `The decision must be one of ${APPLICATION_DECISIONS.join(', ')}`
 export const ApplicationDecision = z
   .enum(APPLICATION_DECISIONS, { error: BAD_DECISION })
   .meta({ id: 'ApplicationDecision', description: "What admins decide about an application: its status, unless its sets or sessions make it planned or done" })

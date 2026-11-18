@@ -40,8 +40,9 @@ const Application = z
     updatedBy: z.string().nullable(),
     updatedAt: Timestamp.nullable(),
     status: ApplicationStatus,
-    statusUpdatedBy: z.string().nullable().meta({ description: 'Who last changed what admins decided' }),
-    statusUpdatedAt: Timestamp.nullable(),
+    decision: ApplicationDecision,
+    decisionUpdatedBy: z.string().nullable(),
+    decisionUpdatedAt: Timestamp.nullable(),
     ...ApplicationLinks,
   })
   .meta({ id: 'Application' })
@@ -96,8 +97,9 @@ function application(row: StoredApplication, links: ApplicationLinks): Applicati
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     status: applicationStatus(row.decision, [...links.sets, ...links.sessions].map(({ status }) => status)),
-    statusUpdatedBy: row.statusUpdatedBy,
-    statusUpdatedAt: row.statusUpdatedAt?.toISOString() ?? null,
+    decision: row.decision,
+    decisionUpdatedBy: row.decisionUpdatedBy,
+    decisionUpdatedAt: row.decisionUpdatedAt?.toISOString() ?? null,
     ...links,
   }
 }
@@ -327,22 +329,22 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
   )
 
   api.put(
-    '/api/admin/applications/:id/status',
+    '/api/admin/applications/:id/decision',
     {
-      config: { admin: true, tool: { title: "Changer le statut d'une candidature" } },
+      config: { admin: true, tool: { title: 'Retenir ou refuser une candidature' } },
       schema: {
-        operationId: 'update_application_status',
+        operationId: 'update_application_decision',
         summary: 'Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done',
         tags: ['Applications'],
         params: ById,
-        body: z.strictObject({ status: ApplicationDecision }, { error: objectError(BAD_DECISION) }),
+        body: z.strictObject({ decision: ApplicationDecision }, { error: objectError(BAD_DECISION) }),
         response: { 200: ApplicationResponse, 404: ApiError, 409: ApiError },
       },
     },
     async (request, reply) => {
-      const change = { decision: request.body.status, statusUpdatedBy: request.user!.email, statusUpdatedAt: new Date() }
+      const change = { decision: request.body.decision, decisionUpdatedBy: request.user!.email, decisionUpdatedAt: new Date() }
       try {
-        return await respond(reply, request.params.id, store.setStatus(request.params.id, change))
+        return await respond(reply, request.params.id, store.decide(request.params.id, change))
       } catch (error) {
         if (error instanceof RejectedWhileBooked) return reply.status(409).send(REJECTED_WHILE_BOOKED)
         throw error

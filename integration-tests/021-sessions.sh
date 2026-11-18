@@ -979,15 +979,15 @@ expect_status 200
 refused_set="$(last_set)"
 json GET "${APPLICATIONS}/${refused_application}"
 expect_body_contains '"status":"planned"'
-json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+json PUT "${APPLICATIONS}/${refused_application}/decision" '{"decision":"rejected"}'
 expect_status 409
 expect_body "^\\{\"ok\":false,\"error\":\"${REJECTED}\"}$"
 # With its only set cancelled, which keeps it.
 json PUT "${SETS}/${refused_set}/status" '{"status":"cancelled"}'
 expect_status 200
-json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+json PUT "${APPLICATIONS}/${refused_application}/decision" '{"decision":"rejected"}'
 expect_status 200
-expect_body_contains "\"status\":\"rejected\",\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
+expect_body_contains "\"status\":\"rejected\",\"decision\":\"rejected\",\"decisionUpdatedBy\":\"${ADMIN_EMAIL}\""
 expect_body_contains "\"sets\":[{\"id\":\"${refused_set}\",\"durationMinutes\":60,\"status\":\"cancelled\""
 json PUT "${SETS}/${refused_set}/status" '{"status":"done"}'
 expect_status 409
@@ -997,9 +997,9 @@ expect_status 400
 expect_body_contains "\"error\":\"${REJECTED}\""
 
 echo "  un-cancelling a set waits for its application to be rejected, then fails"
-json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"new"}'
+json PUT "${APPLICATIONS}/${refused_application}/decision" '{"decision":"new"}'
 expect_status 200
-hold_sessions_lock "update applications set status = 'rejected' where id = '${refused_application}';"
+hold_sessions_lock "update applications set decision = 'rejected' where id = '${refused_application}';"
 send_in_background PUT "${SETS}/${refused_set}/status" '{"status":"planned"}'
 wait_for_sessions_lock
 release_sessions_lock
@@ -1008,16 +1008,16 @@ expect_status 409
 expect_body_contains "\"error\":\"${REJECTED}\""
 
 echo "  rejecting an application waits for its set to be un-cancelled, then fails"
-json PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"accepted"}'
+json PUT "${APPLICATIONS}/${refused_application}/decision" '{"decision":"accepted"}'
 expect_status 200
 hold_sessions_lock "update sets set status = 'planned' where id = '${refused_set}';"
-send_in_background PUT "${APPLICATIONS}/${refused_application}/status" '{"status":"rejected"}'
+send_in_background PUT "${APPLICATIONS}/${refused_application}/decision" '{"decision":"rejected"}'
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
 expect_status 409
 expect_body_contains "\"error\":\"${REJECTED}\""
-[ "$(sql "select status from applications where id = '${refused_application}'")" = accepted ] || fail "expected the application to stay accepted"
+[ "$(sql "select decision from applications where id = '${refused_application}'")" = accepted ] || fail "expected the application to stay accepted"
 json DELETE "${SESSIONS}/${undated}"
 expect_status 200
 json DELETE "${ARTISTS}/${refused}"

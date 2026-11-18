@@ -162,10 +162,10 @@ const REJECTED = "A rejected application has no set or session that's planned or
 
 // What admins decided about the application of the session or the set `id`, if it has one.
 async function decisionOf({ database }: Context, table: 'sessions' | 'sets', id: string): Promise<string | null> {
-  const { rows } = await database.db.execute<{ status: string }>(
-    sql`select applications.status from ${sql.identifier(table)} join applications on applications.id = application_id where ${sql.identifier(table)}.id = ${id}`,
+  const { rows } = await database.db.execute<{ decision: string }>(
+    sql`select applications.decision from ${sql.identifier(table)} join applications on applications.id = application_id where ${sql.identifier(table)}.id = ${id}`,
   )
-  return rows[0]?.status ?? null
+  return rows[0]?.decision ?? null
 }
 
 // Checks a 409 that says a session or a set can't stop being cancelled, to `status`, since its application is rejected.
@@ -608,7 +608,7 @@ const OPERATIONS = {
   decideApplication: {
     weight: 2,
     args: fc.record({ application: fc.nat(), decision: mostly(fc.constantFrom('new', 'accepted', 'rejected'), fc.constantFrom('planned', 'scheduled')) }),
-    run: (context, { application, decision }) => send(context, 'PUT', `/api/admin/applications/${applicationAt(context, application)}/status`, { status: decision }),
+    run: (context, { application, decision }) => send(context, 'PUT', `/api/admin/applications/${applicationAt(context, application)}/decision`, { decision }),
     conflicts: {
       [REJECTED]: async (_body, { application, decision }, context) => {
         expect(decision).toBe('rejected')

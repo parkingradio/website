@@ -71,8 +71,9 @@ const APPLICATION: Application = {
   updatedBy: null,
   updatedAt: null,
   status: 'new',
-  statusUpdatedBy: null,
-  statusUpdatedAt: null,
+  decision: 'new',
+  decisionUpdatedBy: null,
+  decisionUpdatedAt: null,
   sets: [],
   sessions: [],
 }
@@ -409,7 +410,7 @@ describe('Changing the status of an application from the list', () => {
   const LISTED = { ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications: APPLICATIONS } }
   // The one that's new.
   const OLDEST = APPLICATIONS.at(-1)!
-  const PUT = 'PUT /api/admin/applications/application-1/status'
+  const PUT = 'PUT /api/admin/applications/application-1/decision'
   const select = (of: string) => screen.findByRole('combobox', { name: `Statut : Candidature de ${of}` })
 
   it('offers what admins decide, by a name that tells the applications apart, and only shows the status sets give', async () => {
@@ -452,7 +453,7 @@ describe('Changing the status of an application from the list', () => {
 
     await waitFor(() => expect(rows()).toEqual([]))
     expect(screen.getByText('Aucune candidature avec ce statut.')).toBeInTheDocument()
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/decision')[0])).toEqual({ decision: 'accepted' })
     expect(requestsTo('GET', '/api/admin/applications')).toHaveLength(1)
     expect(counts()).toEqual(['toutes (4)', 'nouvelles (0)', 'retenues (2)', 'planifiées (0)', 'jouées (1)', 'refusées (1)'])
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/candidatures$/)
@@ -799,8 +800,8 @@ describe('An application’s page', () => {
   })
 
   it('changes the status, and says who did', async () => {
-    const accepted = { ...APPLICATION, status: 'accepted', statusUpdatedBy: 'other@example.com', statusUpdatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1/status': { ok: true, application: accepted } })
+    const accepted = { ...APPLICATION, status: 'accepted', decisionUpdatedBy: 'other@example.com', decisionUpdatedAt: '2026-10-06T16:00:00.000Z' }
+    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1/decision': { ok: true, application: accepted } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'retenue' }))
@@ -808,7 +809,7 @@ describe('An application’s page', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'retenue' })).toHaveAttribute('aria-pressed', 'true'))
     expect(screen.getByRole('button', { name: 'nouvelle' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByText(/^Changé par/)).toHaveTextContent(/^Changé par other@example.com le 6 octobre 2026/)
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/status')[0])).toEqual({ status: 'accepted' })
+    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1/decision')[0])).toEqual({ decision: 'accepted' })
   })
 
   const COLLECTIVES = { artistId: null, collectiveId: 'collective-1' }
@@ -840,7 +841,7 @@ describe('An application’s page', () => {
   })
 
   it('says which admin decided, unless its sets give it its status, which no admin chose', async () => {
-    const decided = { statusUpdatedBy: 'other@example.com', statusUpdatedAt: '2026-10-06T16:00:00.000Z' }
+    const decided = { decisionUpdatedBy: 'other@example.com', decisionUpdatedAt: '2026-10-06T16:00:00.000Z' }
     const planned = { ...APPLICATION, ...decided, status: 'planned', sets: [linkedSet('planned')] }
     mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: planned } })
     renderAt('/admin/candidatures/application-1')
@@ -850,7 +851,7 @@ describe('An application’s page', () => {
   })
 
   it('says when the status could not be changed', async () => {
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1/status': { ok: false, error: 'No such application' } })
+    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1/decision': { ok: false, error: 'No such application' } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'refusée' }))
@@ -1327,7 +1328,7 @@ describe('Going through the list from an application’s page', () => {
 
   it('keeps its place once its status is changed, which the next one’s précédente then skips', async () => {
     const accepted = { ...LATER, status: 'accepted' as const }
-    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5/status': { ok: true, application: accepted } })
+    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5/decision': { ok: true, application: accepted } })
     renderAt('/admin/candidatures/application-5?status=new')
 
     expect(await position()).toHaveTextContent('2 / 3')
@@ -1656,6 +1657,22 @@ describe('Adding a set or a session from an application’s page', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("Les sessions n'ont pas pu être chargées : Boom"))
     fireEvent.click(picker())
     expect(options()).toEqual(['nouvelle session'])
+  })
+
+  it('can not lead to a set or a session once rejected, which would be planned, and says why', async () => {
+    const REJECTED = 'Une candidature refusée ne peut pas avoir de set ou de session planifié.'
+    for (const owner of [{}, { artistId: null, collectiveId: 'collective-1' }]) {
+      const rejected = { ...APPLICATION, ...owner, status: 'rejected', decision: 'rejected' }
+      mockFetch({ ...PAGE, '/api/admin/applications/application-1': { ok: true, application: rejected }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } })
+      const { unmount } = renderAt('/admin/candidatures/application-1')
+
+      const create = await screen.findByRole('button', { name: 'collectiveId' in owner ? 'créer une session' : 'créer un set' })
+      expect(create).toHaveAttribute('aria-disabled', 'true')
+      expect(create).toHaveAccessibleDescription(REJECTED)
+      fireEvent.click(create)
+      expect(screen.queryByRole('combobox', { name: 'Session' })).not.toBeInTheDocument()
+      unmount()
+    }
   })
 
   it("leads to a new session as a collective's takeover, from its application", async () => {

@@ -33,14 +33,14 @@ describe('the migration 0016_application_decisions', () => {
     return { db, artist, ids }
   }
 
-  it('keeps what admins decided, and makes scheduled and done applications accepted', async () => {
+  it("keeps what admins decided, makes scheduled and done applications accepted, and renames the status's columns to the decision's", async () => {
     const statuses = ['new', 'accepted', 'scheduled', 'done', 'rejected']
     const { db, ids } = await withApplications(statuses)
     await migrateDatabase(db)
-    const { rows } = await db.execute<{ id: string; status: string }>(sql`select id, status from applications`)
-    const migrated = new Map(rows.map(({ id, status }) => [id, status]))
+    const { rows } = await db.execute<{ id: string; decision: string }>(sql`select id, decision from applications`)
+    const migrated = new Map(rows.map(({ id, decision }) => [id, decision]))
     expect(ids.map((id) => migrated.get(id))).toEqual(['new', 'accepted', 'accepted', 'accepted', 'rejected'])
-    await expect(db.execute(sql`update applications set status = 'done'`)).rejects.toMatchObject({ cause: { constraint: 'applications_status' } })
+    await expect(db.execute(sql`update applications set decision = 'done'`)).rejects.toMatchObject({ cause: { constraint: 'applications_decision' } })
   })
 
   it('fails while a rejected application has a set or a session that is planned or done, and not when they are cancelled', async () => {
@@ -57,7 +57,7 @@ describe('the migration 0016_application_decisions', () => {
     await db.execute(sql`update sessions set status = 'cancelled'`)
     await db.execute(sql`update sets set status = 'cancelled'`)
     await migrateDatabase(db)
-    const { rows: migrated } = await db.execute<{ status: string }>(sql`select status from applications`)
-    expect(migrated).toEqual([{ status: 'rejected' }])
+    const { rows: migrated } = await db.execute<{ decision: string }>(sql`select decision from applications`)
+    expect(migrated).toEqual([{ decision: 'rejected' }])
   })
 })

@@ -67,8 +67,10 @@ function application(id: string, owner: { artistId: string } | { collectiveId: s
     updatedBy: null,
     updatedAt: null,
     status,
-    statusUpdatedBy: null,
-    statusUpdatedAt: null,
+    // What's consistent with its status.
+    decision: status === 'planned' || status === 'done' ? 'accepted' : status,
+    decisionUpdatedBy: null,
+    decisionUpdatedAt: null,
     sets: [],
     sessions: [],
   }
@@ -1896,6 +1898,41 @@ describe("A set's form", () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-1')).toHaveLength(1))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-1')[0])).toMatchObject({ performers: [{ id: 'artist-2' }, { id: 'artist-1' }], application: 'application-3' })
+  })
+
+  // As Brume's application is rejected.
+  const WITH_REJECTED = {
+    '/api/admin/applications': {
+      ok: true,
+      total: APPLICATIONS_LIST.length,
+      applications: APPLICATIONS_LIST.map((each) => (each.id === 'application-4' ? { ...each, status: 'rejected', decision: 'rejected' } : each)),
+    },
+  }
+  const brumes = () => screen.getByRole('option', { name: /^Brume, reçue le 20 août 2026/ })
+
+  // Opens the form of the set of Aurore and Brume, with its session and its sets that have `status`, and its applications.
+  async function openWithRejected(status: Session['status']) {
+    const session = { ...SESSION, status, sets: SESSION.sets.map((set) => ({ ...set, status })) }
+    mockFetch({ ...SET_PAGE, ...WITH_REJECTED, '/api/admin/sessions/session-1': { ok: true, session } })
+    renderAt('/admin/sessions/session-1')
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore et Brume' }))
+    await screen.findByRole('heading', { name: 'Set de Aurore et Brume' })
+    fireEvent.click(applicationPicker())
+  }
+
+  it("greys out its performers' rejected applications, which a planned set can't have", async () => {
+    await openWithRejected('planned')
+    expect(brumes()).toHaveTextContent('refusée')
+    expect(brumes()).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.mouseDown(brumes())
+    expect(screen.getByRole('listbox')).toBeVisible()
+  })
+
+  it("lets a cancelled set have its performers' rejected applications", async () => {
+    await openWithRejected('cancelled')
+    expect(brumes()).not.toHaveAttribute('aria-disabled')
+    fireEvent.mouseDown(brumes())
+    expect(applicationPicker()).toHaveValue('Brume, reçue le 20 août 2026')
   })
 
   it('says when there is no application to pick, before it has performers, or when they have none', async () => {

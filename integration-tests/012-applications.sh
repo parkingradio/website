@@ -133,17 +133,19 @@ expect_body_contains '"receivedAt":"2026-03-27T00:00:00-04:00"'
 json PUT "${BASE_URL}/api/admin/applications/${third}" "$(application "$artist")"
 expect_status 400
 expect_body_contains '"error":"Unknown field: `artistId`"'
-for status in accepted rejected new; do
-    json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
+for decision in accepted rejected new; do
+    json PUT "${BASE_URL}/api/admin/applications/${first}/decision" "{\"decision\":\"${decision}\"}"
     expect_status 200
-    expect_body_contains "\"status\":\"${status}\""
+    expect_body_contains "\"status\":\"${decision}\""
+    expect_body_contains "\"decision\":\"${decision}\""
+    expect_body_contains "\"decisionUpdatedBy\":\"${ADMIN_EMAIL}\""
 done
-expect_body_contains "\"statusUpdatedBy\":\"${ADMIN_EMAIL}\""
+[ "$(sql "select decision from applications where id = '${first}'")" = new ] || fail "expected the decision to be saved"
 # Its sets and sessions make it planned or done, which admins don't decide (see 021-sessions.sh).
-for status in maybe planned done scheduled; do
-    json PUT "${BASE_URL}/api/admin/applications/${first}/status" "{\"status\":\"${status}\"}"
+for decision in maybe planned done scheduled; do
+    json PUT "${BASE_URL}/api/admin/applications/${first}/decision" "{\"decision\":\"${decision}\"}"
     expect_status 400
-    expect_body_contains '"error":"The status must be one of new, accepted, rejected"'
+    expect_body_contains '"error":"The decision must be one of new, accepted, rejected"'
 done
 
 echo "  an application is deleted"
@@ -160,7 +162,7 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
     json PATCH "${BASE_URL}/api/admin/applications/${id}" '{"details":""}'
     expect_status 404
-    json PUT "${BASE_URL}/api/admin/applications/${id}/status" '{"status":"accepted"}'
+    json PUT "${BASE_URL}/api/admin/applications/${id}/decision" '{"decision":"accepted"}'
     expect_status 404
     json DELETE "${BASE_URL}/api/admin/applications/${id}"
     expect_status 404

@@ -253,7 +253,7 @@ async function addApplication(server: Server, owner: { artistId: string } | { co
 
 // Gives an application what admins decided about it, which is "new" until then.
 async function decide(server: Server, id: string, decision: ApplicationDecision): Promise<void> {
-  if (decision !== 'new') await server.call('PUT', `/api/admin/applications/${id}/status`, { status: decision })
+  if (decision !== 'new') await server.call('PUT', `/api/admin/applications/${id}/decision`, { decision })
 }
 
 // The id of the application of the artist or the collective whose days are `days` (see `SeedApplication`), or null when

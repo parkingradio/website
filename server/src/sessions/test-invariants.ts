@@ -33,7 +33,7 @@ const INVARIANTS: Record<string, SQL> = {
     where applications.collective_id is distinct from sessions.takeover_id`,
   "A rejected application has no set or session that's planned or done": sql`
     select applications.id::text from applications
-    where status = 'rejected' and (
+    where decision = 'rejected' and (
       exists (select from sets where application_id = applications.id and status <> 'cancelled')
       or exists (select from sessions where application_id = applications.id and status <> 'cancelled'))`,
   // The positions the server keeps them in, which the database's constraints only keep from being repeated.

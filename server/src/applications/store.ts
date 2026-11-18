@@ -47,9 +47,9 @@ export type ApplicationsStore = {
   create(application: ApplicationFields & ApplicationOwner & { createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
   // Changes the application's fields that `changes` has, and returns the updated application.
   update(id: string, changes: ApplicationChange & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
-  // Changes what admins decided about the application, its stored status, and returns the updated application. Throws a
-  // RejectedWhileBooked when it's rejected while it has a set or a session that's planned or done.
-  setStatus(id: string, change: { decision: ApplicationDecision; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
+  // Changes what admins decided about the application, and returns the updated application. Throws a RejectedWhileBooked
+  // when it's rejected while it has a set or a session that's planned or done.
+  decide(id: string, change: { decision: ApplicationDecision; decisionUpdatedBy: string; decisionUpdatedAt: Date }): Promise<StoredApplication | null>
   // Returns false if the application didn't exist. Its sets and sessions stay, without it.
   delete(id: string): Promise<boolean>
 }
@@ -103,7 +103,7 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
 
     update: (id, changes) => changeIn(db, id, changes),
 
-    async setStatus(id, change) {
+    async decide(id, change) {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         // So that its sets and sessions can't be planned, or un-cancelled, in the meantime (see `lockSessions`).
