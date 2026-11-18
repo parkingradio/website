@@ -1760,7 +1760,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done */
+        /** Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions give it another (see Status) */
         put: operations["update_application_decision"];
         post?: never;
         delete?: never;
@@ -2950,7 +2950,7 @@ export interface components {
             sessions: components["schemas"]["ApplicationSession"][];
         };
         /**
-         * @description What admins decide about an application: its status, unless its sets or sessions make it planned or done
+         * @description What admins decide about an application: its status, unless its sets or sessions give it another (see Status)
          * @enum {string}
          */
         ApplicationDecision: "new" | "accepted" | "rejected";

@@ -781,7 +781,7 @@
           "accepted",
           "rejected"
         ],
-        "description": "What admins decide about an application: its status, unless its sets or sessions make it planned or done"
+        "description": "What admins decide about an application: its status, unless its sets or sessions give it another (see Status)"
       },
       "ApplicationFields": {
         "type": "object",
@@ -7210,7 +7210,7 @@
     "/api/admin/applications/{id}/decision": {
       "put": {
         "operationId": "update_application_decision",
-        "summary": "Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done",
+        "summary": "Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions give it another (see Status)",
         "tags": [
           "Applications"
         ],

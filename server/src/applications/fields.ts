@@ -29,7 +29,7 @@ export const APPLICATION_DECISIONS = ['new', 'accepted', 'rejected'] as const
 export const BAD_DECISION = `The decision must be one of ${APPLICATION_DECISIONS.join(', ')}`
 export const ApplicationDecision = z
   .enum(APPLICATION_DECISIONS, { error: BAD_DECISION })
-  .meta({ id: 'ApplicationDecision', description: "What admins decide about an application: its status, unless its sets or sessions make it planned or done" })
+  .meta({ id: 'ApplicationDecision', description: 'What admins decide about an application: its status, unless its sets or sessions give it another (see Status)' })
 export type ApplicationDecision = z.infer<typeof ApplicationDecision>
 
 // An application's status, worked out from its decision and its sets' or sessions' statuses (see `applicationStatus`), in

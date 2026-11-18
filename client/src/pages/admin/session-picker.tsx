@@ -77,7 +77,8 @@ export function CreateSet({ application }: { application: Pick<Application, 'id'
     if (!picking && closed.current) button.current?.focus()
     closed.current = false
   }, [picking])
-  if (picking) {
+  // Closed once the application is rejected, which can't lead to a set.
+  if (picking && application.decision !== 'rejected') {
     return (
       <SessionPicker
         application={application}

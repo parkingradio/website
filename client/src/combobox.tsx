@@ -40,7 +40,7 @@ type ComboboxProps = {
 //
 // With `selected`, it suggests the options matching what's typed, or all of them once clicked, of which only one can be
 // picked: what's typed is only a way of finding it. Leaving the field without picking another option keeps the one that
-// was picked, unless what's typed is exactly the label of an option, which is then picked.
+// was picked, unless what's typed is exactly the label of an option that can be picked, which is then picked.
 //
 // With `text`, what's typed is the answer, and the options are only suggestions for it, e.g. from a web service, shown
 // while typing once there are some. Leaving the field without picking one keeps what's typed.

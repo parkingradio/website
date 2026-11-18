@@ -97,7 +97,8 @@ A control that a rule keeps from being used, e.g. "ajouter un set" while a sessi
 greyed out, and its tooltip says why (see [Tooltips](#tooltips)), rather than the page explaining the rule in a
 sentence. It keeps the keyboard's focus, so that its tooltip can be read, and screen readers announce it as unavailable.
 Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
-without a tooltip.
+without a tooltip. An option that a rule keeps from being picked in a list of options, e.g. a rejected application in a
+planned set's form, is listed greyed out, and screen readers announce it as unavailable.
 
 A dropdown that a rule keeps from being used in every row of a list, e.g. the statuses of a cancelled session's sets, is
 replaced by its value, written out, and the list says why once, above it, rather than in a tooltip.

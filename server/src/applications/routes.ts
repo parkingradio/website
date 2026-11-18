@@ -334,7 +334,7 @@ export async function applicationsRoutes(app: FastifyInstance, { store, settings
       config: { admin: true, tool: { title: 'Retenir ou refuser une candidature' } },
       schema: {
         operationId: 'update_application_decision',
-        summary: 'Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions make it planned or done',
+        summary: 'Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions give it another (see Status)',
         tags: ['Applications'],
         params: ById,
         body: z.strictObject({ decision: ApplicationDecision }, { error: objectError(BAD_DECISION) }),

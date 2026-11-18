@@ -6,8 +6,9 @@ import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 
 // The migration that only keeps what admins decided about applications, 0016_application_decisions, on applications as
-// the migrations before it left them: "scheduled" and "done" become "accepted", and it fails rather than leave a rejected
-// application with a set or a session that's planned or done.
+// the migrations before it left them: "scheduled" and "done" become "accepted", the status's columns become the
+// decision's, status_updated_by and status_updated_at included, and it fails rather than leave a rejected application
+// with a set or a session that's planned or done.
 
 describe('the migration 0016_application_decisions', () => {
   let database: TestDatabase | undefined
@@ -26,8 +27,8 @@ describe('the migration 0016_application_decisions', () => {
     const ids: string[] = []
     for (const status of statuses) {
       const { rows: added } = await db.execute<{ id: string }>(sql`
-        insert into applications (artist_id, dates, time_slots, performance_types, other_performance_type, details, status)
-        values (${artist}, '{2026-11-14}', '[]', '{}', '', '', ${status}) returning id`)
+        insert into applications (artist_id, dates, time_slots, performance_types, other_performance_type, details, status, status_updated_by, status_updated_at)
+        values (${artist}, '{2026-11-14}', '[]', '{}', '', '', ${status}, 'admin@example.com', '2026-11-01T12:00:00Z') returning id`)
       ids.push(added[0].id)
     }
     return { db, artist, ids }
@@ -37,9 +38,12 @@ describe('the migration 0016_application_decisions', () => {
     const statuses = ['new', 'accepted', 'scheduled', 'done', 'rejected']
     const { db, ids } = await withApplications(statuses)
     await migrateDatabase(db)
-    const { rows } = await db.execute<{ id: string; decision: string }>(sql`select id, decision from applications`)
-    const migrated = new Map(rows.map(({ id, decision }) => [id, decision]))
-    expect(ids.map((id) => migrated.get(id))).toEqual(['new', 'accepted', 'accepted', 'accepted', 'rejected'])
+    const { rows } = await db.execute<{ id: string; decision: string; by: string; at: boolean }>(
+      sql`select id, decision, decision_updated_by as by, decision_updated_at = '2026-11-01T12:00:00Z' as at from applications`,
+    )
+    const migrated = new Map(rows.map(({ id, ...row }) => [id, row]))
+    expect(ids.map((id) => migrated.get(id)?.decision)).toEqual(['new', 'accepted', 'accepted', 'accepted', 'rejected'])
+    for (const id of ids) expect(migrated.get(id)).toMatchObject({ by: 'admin@example.com', at: true })
     await expect(db.execute(sql`update applications set decision = 'done'`)).rejects.toMatchObject({ cause: { constraint: 'applications_decision' } })
   })
 

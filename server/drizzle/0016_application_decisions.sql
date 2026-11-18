@@ -3,7 +3,8 @@
 -- and "done" become "accepted", which their sets or sessions then make planned or done, once they're linked to them. The
 -- status's columns become the decision's. A rejected application has no set or session that's planned or done, which
 -- this checks first, failing rather than leaving data that breaks it. Older servers can't read applications once it's
--- applied, since their columns are renamed, so a problem found afterwards is fixed forward (see docs/deployment.md).
+-- applied, since their columns are renamed, so a problem found afterwards is fixed forward: take a manual snapshot before
+-- deploying it (see "Database migrations" in docs/deployment.md).
 DO $$
 BEGIN
   IF EXISTS (

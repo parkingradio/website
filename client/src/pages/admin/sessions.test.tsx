@@ -926,6 +926,27 @@ describe("A session's page", () => {
     })
   })
 
+  it.each(['planned', 'cancelled'] as const)("greys out its collective's rejected applications unless the takeover is cancelled: %s", async (status) => {
+    const rejected = application('application-6', { collectiveId: 'collective-1' }, '2026-09-10T16:00:00.000Z', 'rejected', ['2026-12-12'])
+    const session = { ...SESSION, status, sets: SESSION.sets.map((set) => ({ ...set, status: status === 'cancelled' ? status : set.status })) }
+    mockFetch({
+      ...PAGE,
+      ...EVENTS,
+      ...COLLECTIVES,
+      '/api/admin/sessions/session-1': { ok: true, session },
+      '/api/admin/applications': { ok: true, total: 5, applications: [rejected, ...APPLICATIONS_LIST] },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Candidature' }))
+    const option = screen.getByRole('option', { name: /^Reçue le 10 septembre 2026/ })
+    expect(option).toHaveTextContent('refusée')
+    fireEvent.mouseDown(option)
+    if (status === 'planned') expect(option).toHaveAttribute('aria-disabled', 'true')
+    else expect(screen.getByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 10 septembre 2026')
+  })
+
   it("picks a takeover's application among its collective's, which it keeps while another type is picked, but only a takeover sends", async () => {
     const VAGUES: Collective = { ...ONDES, id: 'collective-2', name: 'Vagues', email: 'vagues@example.com' }
     const vagues = application('application-5', { collectiveId: 'collective-2' }, '2026-09-10T16:00:00.000Z', 'new', ['2026-12-12'])
