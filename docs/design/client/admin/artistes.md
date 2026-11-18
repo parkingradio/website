@@ -27,8 +27,8 @@ button changes the artist in a form in its place. The form shows the artist's ph
 artist is saved, and a photo that's chosen replaces it, shown in its place with an × that takes it back. Under it, their
 applications are listed like in [Candidatures](candidatures.md), with a button to create another one. Since they're all
 the artist's, the list doesn't show the artist, their city or genres, and since they're few, it can't be searched,
-filtered or sorted. Their statuses aren't dropdowns. Under them, the sets they played, whatever their status, but not
-the other sets of the same sessions, are listed like a session's sets (see
+filtered or sorted. Their statuses aren't dropdowns: those that admins decide are only shown. Under them, the sets they
+played, whatever their status, but not the other sets of the same sessions, are listed like a session's sets (see
 [A session's page](sessions.md#a-sessions-page)), with their session's day ("Date") and title ("Session", see
 [Names](sessions.md#names)), linking to its page, but without being changed there: their status is only shown. Sets are
 added in their session, so there's no button to add one, and the list can't be searched, filtered or sorted either. At

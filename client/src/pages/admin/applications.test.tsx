@@ -80,7 +80,7 @@ const APPLICATION: Application = {
 
 // A set, or a session, that comes from an application, with `status`, in `session`, or as `session`.
 type LinkedSession = Application['sets'][number]['session']
-const linkedSet = (status: string, session: LinkedSession = { id: 'session-1', title: 'GUEST MIXES', start: null }) => ({ id: 'set-1', durationMinutes: 60, status, session })
+const linkedSet = (status: string, session: LinkedSession = { id: 'session-1', title: 'GUEST MIXES', start: null }, id = 'set-1') => ({ id, durationMinutes: 60, status, session })
 const linkedSession = (status: string, session: LinkedSession = { id: 'session-1', title: 'ONDES TAKEOVER', start: null }) => ({ ...session, end: null, durationMinutes: 240, status })
 
 // The most recently received first, as the server lists them. The last one came by email in March, and was created after
@@ -203,15 +203,18 @@ describe('The list of applications', () => {
     const newer: LinkedSession = { id: 'session-2', title: 'SOIRÉE', start: '2026-10-03T00:00:00.000Z' }
     const older: LinkedSession = { id: 'session-1', title: 'ONDES TAKEOVER', start: '2026-09-13T00:00:00.000Z' }
     const applications = [
-      { ...APPLICATION, id: 'application-5', status: 'planned', sets: [linkedSet('cancelled', undated), linkedSet('done', newer), linkedSet('planned', older)] },
+      { ...APPLICATION, id: 'application-5', status: 'planned', sets: [linkedSet('cancelled', undated, 'set-3'), linkedSet('done', newer, 'set-2'), linkedSet('planned', older, 'set-1')] },
       { ...APPLICATION, id: 'application-6', artistId: null, collectiveId: 'collective-1', status: 'done', sessions: [linkedSession('cancelled', undated), linkedSession('done', newer)] },
+      // Whose session has no date yet.
+      { ...APPLICATION, id: 'application-7', artistId: null, collectiveId: 'collective-1', status: 'planned', sessions: [linkedSession('planned', undated)] },
     ]
     mockFetch({ ...LOGGED_IN, ...ARTISTS, '/api/admin/applications': { ok: true, applications } })
     renderAt('/admin/candidatures?status=all')
 
     expect(await screen.findByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(screen.getByRole('link', { name: 'jouée : SOIRÉE, ven. 2 oct. 2026' })).toHaveAttribute('href', '/admin/sessions/session-2')
-    expect(rows().map((row) => row.at(-1))).toEqual(['planifiée', 'jouée'])
+    expect(screen.getByRole('link', { name: 'planifiée : GUEST MIXES, date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-3')
+    expect(rows().map((row) => row.at(-1))).toEqual(['planifiée', 'jouée', 'planifiée'])
   })
 
   it('lists the applications without their collectives when those could not be loaded', async () => {

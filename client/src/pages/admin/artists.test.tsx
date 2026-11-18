@@ -469,6 +469,20 @@ describe('An artist’s page', () => {
     expect(within(table).getByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
   })
 
+  it('only shows the statuses that admins decide, even with sets, all of them cancelled', async () => {
+    const cancelled: Application['sets'] = [{ id: 'set-1', durationMinutes: 60, status: 'cancelled', session: { id: 'session-1', title: 'ONDES TAKEOVER', start: null } }]
+    const applications = [
+      application('application-1', 'artist-1', { status: 'accepted', sets: cancelled }),
+      application('application-2', 'artist-1', { status: 'rejected', decision: 'rejected', sets: cancelled }),
+    ]
+    mockFetch({ ...AURORE_PAGE, '/api/admin/applications?artist=artist-1': { ok: true, applications } })
+    renderAt('/admin/artistes/artist-1')
+
+    const table = await screen.findByRole('table', { name: 'Candidatures' })
+    expect(within(table).getAllByRole('cell', { name: /^(retenue|refusée)$/ }).map((cell) => cell.textContent)).toEqual(['retenue', 'refusée'])
+    expect(within(table).queryByRole('link', { name: /^(retenue|refusée)/ })).not.toBeInTheDocument()
+  })
+
   it('shows everything about the artist, and their applications', async () => {
     mockFetch(AURORE_PAGE)
     renderAt('/admin/artistes/artist-1')

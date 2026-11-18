@@ -64,7 +64,7 @@ export function pickableDecisions({ status, sets, sessions }: Application): read
 // The session that `application`'s status comes from, when its sets or sessions give it (see `applicationStatus`): that of
 // the first of them with that status, in their order, which for a set is its session, or null for a status that admins
 // decide.
-export function statusSession({ status, sets, sessions }: Application): Pick<Application['sessions'][number], 'id' | 'title' | 'start'> | null {
+export function statusSession({ status, sets, sessions }: Application): Application['sets'][number]['session'] | null {
   if (isDecision(status)) return null
   return sets.find((set) => set.status === status)?.session ?? sessions.find((session) => session.status === status) ?? null
 }
