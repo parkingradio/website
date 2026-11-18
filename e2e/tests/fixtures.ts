@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import type { components } from '../../client/src/api/schema.d.ts'
 import { admin } from '../env.ts'
 
 // What every test is written with: Playwright's `test`, where the browser only reaches the server under test, under an
@@ -84,7 +85,7 @@ export function adminMenu(page: Page) {
 
 // Has the page see the feature flag `id` as on, from the next page it loads, by answering `/api/config` with what the
 // server answers and the flag on. Nothing changes on the server, so other tests still see every flag off.
-export async function withFeature(page: Page, id: string) {
+export async function withFeature(page: Page, id: components['schemas']['FeatureId']) {
   await page.route(
     (url) => url.pathname === '/api/config',
     async (route) => {

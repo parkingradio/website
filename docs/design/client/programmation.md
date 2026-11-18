@@ -33,7 +33,8 @@ Once the flag is on, each event shows:
   studio.
 - Its lineup: the performers of its sets that aren't cancelled, in order, each name once. A synth meetup without such
   performers that isn't cancelled shows "OPEN JAM", as on RA, and any other event without them shows no lineup.
-- Its flyer as the server gives it, full size, loaded once it's about to come into view.
+- Its flyer as the server gives it, downloaded full size, once it's about to come into view, and shown as the same
+  small square thumbnail.
 
 When the event has an event on RA, its flyer, title and a "voir sur RA" button link to it. Otherwise, neither its flyer
 nor its title is a link, and there's no button.

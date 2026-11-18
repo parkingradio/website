@@ -162,7 +162,7 @@ function EventRow({ event }: { event: Row }) {
 
 // The event's flyer, or a placeholder when it has none.
 function Flyer({ event }: { event: Row }) {
-  if (event.flyer === null) {
+  if (!event.flyer) {
     return (
       <div className="event-flyer placeholder" aria-hidden="true">
         parking
@@ -172,7 +172,7 @@ function Flyer({ event }: { event: Row }) {
     )
   }
   const image = <img src={event.flyer} alt="" loading="lazy" />
-  if (event.url === null) {
+  if (!event.url) {
     return (
       <div className="event-flyer" aria-hidden="true">
         {image}

@@ -31,7 +31,7 @@ export function raListing(data: Schema<'RaEvents'>): Listing {
     end: event.end,
     places: [event.venue, event.city].filter((part) => part !== null),
     lineup: event.lineup,
-    flyer: event.flyer && flyerThumbnail(event.flyer),
+    flyer: event.flyer ? flyerThumbnail(event.flyer) : null,
     url: event.url,
   })
   return { upcoming: data.upcoming.map(row), past: data.past.map(row) }
@@ -41,8 +41,9 @@ export function raListing(data: Schema<'RaEvents'>): Listing {
 const SYNTH_MEETUP_LINEUP = 'OPEN JAM'
 
 // The performers of the sets that aren't cancelled, in order, each name once, or else OPEN JAM for a synth meetup that
-// isn't cancelled: like the lineup of a session's event on RA (`lineup` in server/src/sessions/ra-event.ts, which must be
-// changed together with this), but with nothing for other events, rather than their title.
+// isn't cancelled. It follows the same rule as the lineup of a session's event on RA (`lineup` in
+// server/src/sessions/ra-event.ts), except that other events without performers have none, rather than their title, and
+// a cancelled synth meetup none rather than OPEN JAM.
 function lineup(event: Schema<'Event'>): string[] {
   const names = event.sets.filter((set) => !set.cancelled).flatMap((set) => set.performers.map((performer) => performer.name))
   if (names.length > 0) return [...new Set(names)]
