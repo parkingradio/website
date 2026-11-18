@@ -27,6 +27,7 @@ import { sesEmailSender } from './core/email.js'
 import { adminsStore } from './admins/store.js'
 import { featuresStore } from './features/store.js'
 import { sessionsStore } from './sessions/store.js'
+import { eventsStore } from './events/store.js'
 import { oauthStore } from './oauth/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
@@ -64,6 +65,7 @@ await registerRoutes(app, {
   apply: applyStore(db),
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
   sessions: sessionsStore(db),
+  events: eventsStore(db),
   oauth: oauthStore(db),
 })
 

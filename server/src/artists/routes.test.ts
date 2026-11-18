@@ -31,6 +31,9 @@ const store: ArtistsStore = {
       ? [...rows].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
       : (members.get(collectiveId) ?? []).map((id) => rows.find((row) => row.id === id)!),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
+  // Who's public is worked out by the database, which the public routes are tested against (see
+  // events/public.db.test.ts).
+  getPublic: async () => null,
   create: vi.fn<ArtistsStore['create']>(async (artist) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
     const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist }

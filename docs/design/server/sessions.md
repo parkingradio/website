@@ -4,8 +4,9 @@ What's played at the studio: **sessions**, the occasions at the studio, and the 
 played, what they did, and where the recordings are. A session is e.g. an evening of three artists, or a collective's
 4-hour takeover. A set is one performance during a session, usually about an hour, streamed as its own YouTube live and
 uploaded as its own SoundCloud track: a 4-hour takeover is one session of 4 sets. The recordings stay on SoundCloud and
-YouTube, which the server only links to. Sessions and sets are only reachable by admins for now. They have nothing to do
-with admins' sessions, which are about logging in (see [Sessions, in Admins](admins.md#sessions)).
+YouTube, which the server only links to. Only admins see sessions and sets, until a session is announced, which makes it
+public, as an event (see [Announced](#announced)). They have nothing to do with admins' sessions, which are about
+logging in (see [Sessions, in Admins](admins.md#sessions)).
 
 Each session is a row of the `sessions` table (`server/src/db/schema.ts`), and each set a row of `sets`, with its
 performers in `set_performers`. The rules each of their fields follows are the schemas `SessionFields` and `SetFields`
@@ -210,7 +211,9 @@ one that's planned can have sets that are done.
 
 ## Announced
 
-A session is prepared behind the scenes, then announced, which means that it's meant to be public, with its sets. A new
+A session is prepared behind the scenes, then announced, which makes it public, as an event, with its sets, and makes
+public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members
+(see [Events](events.md)). Un-announcing it makes them private again, unless something else makes them public. A new
 session isn't announced. Whether it's announced doesn't depend on its status, e.g. a cancelled session can stay
 announced. Only a session with a start can be announced, and an announced session's start can't be removed until it's
 un-announced, which it always can be: requests that would leave an announced session without a start fail with 400
@@ -362,7 +365,7 @@ Responses give each one as an object, or null when there's none, with an `id` an
 | Field | `id` | `url` |
 |---|---|---|
 | `raEvent` | The event's id on RA | `https://ra.co/events/<id>` |
-| `soundcloudTrack` | SoundCloud's id for the track, which doesn't change when the track is renamed | The link it was resolved from, reduced as above: a private track's private link mustn't be shown to the public |
+| `soundcloudTrack` | SoundCloud's id for the track, which doesn't change when the track is renamed | The link it was resolved from, reduced as above: a private link mustn't be shown to the public, which events don't (see [Events](events.md#whats-public)) |
 | `youtubeVideo` | The video's id | `https://www.youtube.com/watch?v=<id>` |
 
 ## Events on RA

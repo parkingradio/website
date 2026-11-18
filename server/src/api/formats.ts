@@ -157,6 +157,9 @@ export function startRange(things: string, note = '') {
   return { from: bound('from', 'at or after', '2026-11-09T00:00-05:00'), to: bound('to', 'before', '2026-11-16T00:00-05:00') }
 }
 
+// How many past events the lists of events, Parking Radio's and RA's, give without `from` and `to`: the most recent.
+export const RECENT_PAST_EVENTS = 20
+
 // Refines a query with `startRange`: `from` has to be before `to`.
 export const fromBeforeTo = [
   ({ from, to }: { from?: Date; to?: Date }) => from === undefined || to === undefined || from < to,

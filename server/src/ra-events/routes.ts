@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { decodeHTML } from 'entities'
 import { z } from 'zod'
-import { Day, TIME_OF_DAY, fromBeforeTo, instantIn, startRange } from '../api/formats.js'
+import { Day, RECENT_PAST_EVENTS, TIME_OF_DAY, fromBeforeTo, instantIn, startRange } from '../api/formats.js'
 import { ApiError, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { cached } from '../core/cache.js'
 import { RA_ORIGIN, RA_PROMOTER_ID } from './ra.js'
@@ -12,8 +12,6 @@ import { RA_ORIGIN, RA_PROMOTER_ID } from './ra.js'
 // mitigate the brittleness of the setup by validating our expectations of what GraphQL returns and failing
 // loudly when they are not satisfied.
 
-// How many past events the response has without `from` and `to`, the most recent.
-const RECENT_PAST_EVENTS = 20
 // RA only returns 10 upcoming events, and 50 past ones, unless asked for more, so ask for far more than we ever schedule
 // at once, and than we've ever had, which is about 150 a year. Getting that many back fails the fetch, since the list is
 // then probably cut short.

@@ -1261,7 +1261,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1290,6 +1290,97 @@ export interface paths {
                 };
                 /** @description Default Response */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/artists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A public artist's profile, as the public sees it: an artist who isn't public is not found */
+        get: operations["get_public_artist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/artists/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A public artist's photo */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1483,7 +1574,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1512,6 +1603,97 @@ export interface paths {
                 };
                 /** @description Default Response */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/collectives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A public collective's profile, as the public sees it, with its members: a collective that isn't public is not found */
+        get: operations["get_public_collective"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/collectives/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A public collective's photo */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2050,7 +2232,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
+                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2139,7 +2321,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Announces a session, which means it is meant to be public, with its sets, or un-announces it */
+        /** Announces a session, which makes it public, as an event, with its sets, and makes public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members, or un-announces it */
         put: operations["update_session_announced"];
         post?: never;
         delete?: never;
@@ -2320,6 +2502,97 @@ export interface paths {
         get?: never;
         /** Moves a set to another session, after its sets, without changing its status, and returns that session, and the one it was in, whose statuses this can change */
         put: operations["update_set_session"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parking Radio's public events, which are its announced sessions, with their sets, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given */
+        get: operations["list_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{id}/flyer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An event's flyer */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                        "image/png": Blob;
+                        "image/webp": Blob;
+                    };
+                };
+                /** @description The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3099,6 +3372,51 @@ export interface components {
         };
         /** @enum {string} */
         Country: "AD" | "AE" | "AF" | "AG" | "AI" | "AL" | "AM" | "AO" | "AQ" | "AR" | "AS" | "AT" | "AU" | "AW" | "AX" | "AZ" | "BA" | "BB" | "BD" | "BE" | "BF" | "BG" | "BH" | "BI" | "BJ" | "BL" | "BM" | "BN" | "BO" | "BQ" | "BR" | "BS" | "BT" | "BV" | "BW" | "BY" | "BZ" | "CA" | "CC" | "CD" | "CF" | "CG" | "CH" | "CI" | "CK" | "CL" | "CM" | "CN" | "CO" | "CR" | "CU" | "CV" | "CW" | "CX" | "CY" | "CZ" | "DE" | "DJ" | "DK" | "DM" | "DO" | "DZ" | "EC" | "EE" | "EG" | "EH" | "ER" | "ES" | "ET" | "FI" | "FJ" | "FK" | "FM" | "FO" | "FR" | "GA" | "GB" | "GD" | "GE" | "GF" | "GG" | "GH" | "GI" | "GL" | "GM" | "GN" | "GP" | "GQ" | "GR" | "GS" | "GT" | "GU" | "GW" | "GY" | "HK" | "HM" | "HN" | "HR" | "HT" | "HU" | "ID" | "IE" | "IL" | "IM" | "IN" | "IO" | "IQ" | "IR" | "IS" | "IT" | "JE" | "JM" | "JO" | "JP" | "KE" | "KG" | "KH" | "KI" | "KM" | "KN" | "KP" | "KR" | "KW" | "KY" | "KZ" | "LA" | "LB" | "LC" | "LI" | "LK" | "LR" | "LS" | "LT" | "LU" | "LV" | "LY" | "MA" | "MC" | "MD" | "ME" | "MF" | "MG" | "MH" | "MK" | "ML" | "MM" | "MN" | "MO" | "MP" | "MQ" | "MR" | "MS" | "MT" | "MU" | "MV" | "MW" | "MX" | "MY" | "MZ" | "NA" | "NC" | "NE" | "NF" | "NG" | "NI" | "NL" | "NO" | "NP" | "NR" | "NU" | "NZ" | "OM" | "PA" | "PE" | "PF" | "PG" | "PH" | "PK" | "PL" | "PM" | "PN" | "PR" | "PS" | "PT" | "PW" | "PY" | "QA" | "RE" | "RO" | "RS" | "RU" | "RW" | "SA" | "SB" | "SC" | "SD" | "SE" | "SG" | "SH" | "SI" | "SJ" | "SK" | "SL" | "SM" | "SN" | "SO" | "SR" | "SS" | "ST" | "SV" | "SX" | "SY" | "SZ" | "TC" | "TD" | "TF" | "TG" | "TH" | "TJ" | "TK" | "TL" | "TM" | "TN" | "TO" | "TR" | "TT" | "TV" | "TW" | "TZ" | "UA" | "UG" | "UM" | "US" | "UY" | "UZ" | "VA" | "VC" | "VE" | "VG" | "VI" | "VN" | "VU" | "WF" | "WS" | "XK" | "YE" | "YT" | "ZA" | "ZM" | "ZW";
+        Event: {
+            id: string;
+            /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+            title: string;
+            type: components["schemas"]["SessionType"];
+            /** @description The collective whose takeover the session is, which only takeovers have */
+            takeover: components["schemas"]["Reference"] | null;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            cancelled: boolean;
+            description: string;
+            /** @description Where its flyer is, or null when it has none */
+            flyer: string | null;
+            /** @description The page of its event on RA, or null when it has none */
+            raEvent: string | null;
+            /** @description In their order, cancelled ones included */
+            sets: components["schemas"]["EventSet"][];
+        };
+        Events: {
+            /** @constant */
+            ok: true;
+            /** @description Those whose end hasn't passed, the soonest first */
+            upcoming: components["schemas"]["Event"][];
+            /** @description Those whose end has passed, the most recent first: without `from` and `to`, only the 20 most recent */
+            past: components["schemas"]["Event"][];
+        };
+        EventSet: {
+            id: string;
+            /** @description The artists who played, in order */
+            performers: components["schemas"]["Reference"][];
+            /** @description Null while it isn't known */
+            durationMinutes: number | null;
+            performanceTypes: ("dj" | "vinyl" | "live-performance" | "rap" | "full-band")[];
+            otherPerformanceType: string;
+            genres: ("house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber")[];
+            youtubeVideo: components["schemas"]["SessionLink"] | null;
+            cancelled: boolean;
+            soundcloudTrack: {
+                id: string;
+                /** @description Null when the link is a private link, which is a secret */
+                url: string | null;
+            } | null;
+        };
         Feature: {
             id: components["schemas"]["FeatureId"];
             enabled: boolean;
@@ -3173,6 +3491,29 @@ export interface components {
         };
         /** @enum {string} */
         PerformanceTypeId: "dj" | "vinyl" | "live-performance" | "rap" | "full-band";
+        PublicArtist: {
+            id: string;
+            name: string;
+            country: components["schemas"]["Country"] | "";
+            city: string;
+            genres: components["schemas"]["GenreId"][];
+            bio: string;
+            links: components["schemas"]["ArtistLinks"];
+            /** @description Where their photo is, or null when they have none */
+            photo: string | null;
+        };
+        PublicCollective: {
+            id: string;
+            name: string;
+            country: components["schemas"]["Country"] | "";
+            city: string;
+            description: string;
+            links: components["schemas"]["ArtistLinks"];
+            /** @description In order */
+            members: components["schemas"]["Reference"][];
+            /** @description Where its photo is, or null when it has none */
+            photo: string | null;
+        };
         Radio: {
             current: {
                 track: components["schemas"]["RadioTrack"];
@@ -3295,7 +3636,7 @@ export interface components {
             status: components["schemas"]["SessionStatus"];
             statusUpdatedBy: string | null;
             statusUpdatedAt: string | null;
-            /** @description Whether it is announced, which means it is meant to be public, with its sets */
+            /** @description Whether it is announced, which makes it public, as an event, with its sets, and makes public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members */
             announced: boolean;
             announcedUpdatedBy: string | null;
             announcedUpdatedAt: string | null;
@@ -4212,6 +4553,59 @@ export interface operations {
             };
         };
     };
+    get_public_artist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        artist: components["schemas"]["PublicArtist"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     list_collectives: {
         parameters: {
             query?: never;
@@ -4577,6 +4971,59 @@ export interface operations {
             };
             /** @description Default Response */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_public_collective: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        collective: components["schemas"]["PublicCollective"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6193,6 +6640,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    list_events: {
+        parameters: {
+            query?: {
+                /** @description Only the events that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-09T00:00-05:00" */
+                from?: string;
+                /** @description Only the events that start before this date and time, in Québec time, with the offset from UTC in effect then, e.g. "2026-11-16T00:00-05:00" */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Events"];
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

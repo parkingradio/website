@@ -42,6 +42,7 @@ describe('the tools of the API', () => {
         ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'update_session_announced'],
         'delete_session',
         ...['create_set', 'update_set', 'update_set_status', 'update_set_position', 'update_set_session', 'delete_set'],
+        ...['list_events', 'get_public_artist', 'get_public_collective'],
       ].sort(),
     )
   })
@@ -63,7 +64,10 @@ describe('the tools of the API', () => {
       expect(tool.description, tool.name).toMatch(new RegExp(`^Once per conversation, before using it, read the rules with \`read_documentation\`, area \`(${AREAS.join('|')})\`\\. `))
     }
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
-    expect(areas).toMatchObject({ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' })
+    expect(areas).toMatchObject({
+      ...{ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
+      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives' },
+    })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
       expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone', 'removePhoto']),

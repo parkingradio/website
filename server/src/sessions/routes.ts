@@ -55,7 +55,7 @@ const Tracked = {
 }
 
 // A set, as the endpoints return it: its fields, as they were saved, and what the server knows of it.
-const SetBody = z
+export const SetBody = z
   .object({
     id: z.string(),
     performers: z.array(Reference).meta({ description: 'The artists who played, in order' }),
@@ -73,8 +73,13 @@ const SetBody = z
   .meta({ id: 'Set' })
 type SetBody = z.infer<typeof SetBody>
 
+// What announcing a session does, which its field and its endpoint say, so that the tools do too (see "Announced" in
+// docs/design/server/sessions.md).
+const WHAT_ANNOUNCING_DOES =
+  "which makes it public, as an event, with its sets, and makes public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members"
+
 // A session, as the endpoints return it, with its sets.
-const SessionBody = z
+export const SessionBody = z
   .object({
     id: z.string(),
     start: Timestamp.nullable().meta({ description: "Null while the session's date isn't known" }),
@@ -91,7 +96,7 @@ const SessionBody = z
     hasFlyer: z.boolean(),
     sets: z.array(SetBody).meta({ description: 'In their order, which is the order they take place in, one after the other, cancelled ones included' }),
     ...Tracked,
-    announced: z.boolean().meta({ description: 'Whether it is announced, which means it is meant to be public, with its sets' }),
+    announced: z.boolean().meta({ description: `Whether it is announced, ${WHAT_ANNOUNCING_DOES}` }),
     announcedUpdatedBy: z.string().nullable(),
     announcedUpdatedAt: Timestamp.nullable(),
   })
@@ -213,7 +218,7 @@ type Failure = {
   otherSetIndex?: number
 }
 
-function link(id: string | null, url: (id: string) => string): z.infer<typeof Link> | null {
+export function link(id: string | null, url: (id: string) => string): z.infer<typeof Link> | null {
   return id === null ? null : { id, url: url(id) }
 }
 
@@ -631,7 +636,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       config: { admin: true, tool: { title: 'Annoncer une session, ou retirer son annonce' } },
       schema: {
         operationId: 'update_session_announced',
-        summary: 'Announces a session, which means it is meant to be public, with its sets, or un-announces it',
+        summary: `Announces a session, ${WHAT_ANNOUNCING_DOES}, or un-announces it`,
         tags: ['Sessions'],
         params: ById,
         body: AnnouncedBody,

@@ -130,7 +130,7 @@ function imageResponses(image: 'photo' | 'flyer') {
     200: {
       description:
         `The ${image}, with the type it was checked to have. Browsers are told not to guess another ` +
-        "(`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a " +
+        '(`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a ' +
         'shared cache, but have to check with the server before showing it again (`Cache-Control: private, ' +
         `no-cache\`). Its \`ETag\` changes whenever the ${image} does`,
       content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
@@ -154,16 +154,16 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
   return ifNoneMatch?.split(',').some((tag) => tag.trim().replace(/^W\//, '') === etag) ?? false
 }
 
-// Sends the photo of an artist or a collective, or the flyer of a session (as `what` and `image` say), or a 404 when they
-// have none, or when it's missing. A photo's ETag is its key, which is never used for another one: it changes exactly
-// when the photo does. So a request that already has it gets a 304 without the photo being read, even when it's
-// missing.
+// Sends the photo of an artist or a collective, or the flyer of a session or an event (as `what` and `image` say), or a
+// 404 when they have none, or when it's missing, once the route has checked that whoever asks can see them. A photo's
+// ETag is its key, which is never used for another one: it changes exactly when the photo does. So a request that
+// already has it gets a 304 without the photo being read, even when it's missing.
 export async function sendPhoto(
   reply: FastifyReply,
   log: FastifyBaseLogger,
   photos: Photos,
   row: { photoKey: string | null; photoType: string | null },
-  what: 'artist' | 'collective' | 'session',
+  what: 'artist' | 'collective' | 'session' | 'event',
   image: 'photo' | 'flyer' = 'photo',
 ) {
   if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
@@ -173,8 +173,9 @@ export async function sendPhoto(
   }
   const photo = await photos.read(row.photoKey)
   if (!photo) {
-    log.error({ key: row.photoKey }, `The ${image} of a ${what} is missing`)
-    return reply.status(404).send({ ok: false, error: `The ${image} of this ${what} is missing` })
+    const error = `The ${image} of this ${what} is missing`
+    log.error({ key: row.photoKey }, error)
+    return reply.status(404).send({ ok: false, error })
   }
   // The type was checked from the photo's contents when it was sent, and browsers mustn't guess another.
   return reply

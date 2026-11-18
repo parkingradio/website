@@ -13,8 +13,8 @@ import { Conflict } from '../sessions/store.js'
 import { InvalidMember } from './store.js'
 import type { CollectivesStore, StoredCollective } from './store.js'
 
-// The admin pages' side of collectives: adding, viewing, changing and deleting them (see
-// docs/design/server/collectives.md). They work like artists' (see artists/routes.ts).
+// The admin pages' side of collectives: adding, viewing, changing and deleting them, and the public profiles of the
+// collectives that are public (see docs/design/server/collectives.md). They work like artists' (see artists/routes.ts).
 
 // A collective, as the endpoints return it: its profile, as it was saved, and what the server knows of it.
 const Collective = z
@@ -38,6 +38,12 @@ const Collective = z
 type Collective = z.infer<typeof Collective>
 
 const CollectiveResponse = z.object({ ok: z.literal(true), collective: Collective })
+
+// A public collective's profile, as the public sees it, with its members, who are public through it.
+const PublicCollective = Collective.pick({ id: true, name: true, country: true, city: true, description: true, links: true, members: true })
+  .extend({ photo: z.string().nullable().meta({ description: 'Where its photo is, or null when it has none' }) })
+  .meta({ id: 'PublicCollective' })
+type PublicCollective = z.infer<typeof PublicCollective>
 
 // What adding a collective sends, as multipart/form-data, and changing one with `removePhoto`. The route reads it itself
 // (see `readProfileForm`): only the profile is checked against its schema here.
@@ -74,6 +80,20 @@ function collective(row: StoredCollective): Collective {
     updatedBy: row.updatedBy,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     hasPhoto: row.photoKey !== null,
+  }
+}
+
+// The fields are listed one by one, so that nothing else the admin endpoints give ends up public unless it's added here.
+function publicCollective(row: StoredCollective): PublicCollective {
+  return {
+    id: row.id,
+    name: row.name,
+    country: row.country,
+    city: row.city,
+    description: row.description,
+    links: row.links,
+    members: row.members,
+    photo: row.photoKey === null ? null : `/api/collectives/${row.id}/photo`,
   }
 }
 
@@ -268,6 +288,43 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
       // The collective is gone either way.
       await forgetPhoto(photos, request.log, row.photoKey)
       return { ok: true as const }
+    },
+  )
+
+  api.get(
+    '/api/collectives/:id',
+    {
+      config: { tool: { title: "Voir le profil public d'un collectif" } },
+      schema: {
+        operationId: 'get_public_collective',
+        summary: "A public collective's profile, as the public sees it, with its members: a collective that isn't public is not found",
+        tags: ['Collectives'],
+        params: ById,
+        response: { 200: z.object({ ok: z.literal(true), collective: PublicCollective }), 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      // A private collective is not found, like one that doesn't exist.
+      const row = await store.getPublic(request.params.id)
+      if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
+      return { ok: true as const, collective: publicCollective(row) }
+    },
+  )
+
+  api.get(
+    '/api/collectives/:id/photo',
+    {
+      schema: {
+        summary: "A public collective's photo",
+        tags: ['Collectives'],
+        params: ById,
+        response: { ...PhotoResponses, 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const row = await store.getPublic(request.params.id)
+      if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
+      return sendPhoto(reply, request.log, photos, row, 'collective')
     },
   )
 }

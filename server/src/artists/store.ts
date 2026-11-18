@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './profile.js'
@@ -10,6 +10,7 @@ import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
 import { isUuid } from '../db/uuid.js'
+import { isPublicArtist } from '../events/store.js'
 import { lockSessions } from '../sessions/store.js'
 
 // Checks the profiles and photos sent for artists against the rules in artists/profile.ts, keeps artists in the
@@ -83,6 +84,9 @@ export type ArtistsStore = {
   // there's no such collective.
   list(collectiveId?: string): Promise<StoredArtist[]>
   get(id: string): Promise<StoredArtist | null>
+  // The artist, without their collectives, only when they're public (see "Public profiles" in
+  // docs/design/server/artists.md).
+  getPublic(id: string): Promise<ArtistRow | null>
   // `createdBy` is the email of the admin who adds the artist, or null if they come through the form, applying alone or
   // as one of a collective's artists.
   // Throws an EmailTaken.
@@ -144,6 +148,15 @@ export function artistsStore(db: Queryable): ArtistsStore {
       return row ? withCollectives(db, row) : null
     },
 
+    async getPublic(id) {
+      if (!isUuid(id)) return null
+      const [row] = await db
+        .select()
+        .from(artists)
+        .where(and(eq(artists.id, id), isPublicArtist(db, artists.id)))
+      return row ?? null
+    },
+
     async create(artist) {
       try {
         const [row] = await db.insert(artists).values(artist).returning()
@@ -190,7 +203,8 @@ export function artistsStore(db: Queryable): ArtistsStore {
 export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
 // Artists' and collectives' photos, and sessions' flyers. They're private files (see core/private-bucket.ts), rather
-// than public assets: photos are personal data, and flyers are only for admins until their sessions are made public.
+// than public assets: photos are personal data, and both are only for admins until their artist, collective or session
+// is public, when the server serves them to anyone (see docs/design/server/events.md).
 export type Photos = Pick<PrivateFiles, 'read' | 'delete'> & {
   // Stores the photo under a new key in `folder`, and returns that key.
   store(photo: SentPhoto, folder: PhotoFolder): Promise<string>

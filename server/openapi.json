@@ -1652,6 +1652,252 @@
           "ZW"
         ]
       },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+          },
+          "type": {
+            "$ref": "#/components/schemas/SessionType"
+          },
+          "takeover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The collective whose takeover the session is, which only takeovers have"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "flyer": {
+            "description": "Where its flyer is, or null when it has none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raEvent": {
+            "description": "The page of its event on RA, or null when it has none",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventSet"
+            },
+            "description": "In their order, cancelled ones included"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "type",
+          "takeover",
+          "start",
+          "end",
+          "cancelled",
+          "description",
+          "flyer",
+          "raEvent",
+          "sets"
+        ],
+        "additionalProperties": false
+      },
+      "Events": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "description": "Those whose end hasn't passed, the soonest first"
+          },
+          "past": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "description": "Those whose end has passed, the most recent first: without `from` and `to`, only the 20 most recent"
+          }
+        },
+        "required": [
+          "ok",
+          "upcoming",
+          "past"
+        ],
+        "additionalProperties": false
+      },
+      "EventSet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "performers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "The artists who played, in order"
+          },
+          "durationMinutes": {
+            "description": "Null while it isn't known",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "performanceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dj",
+                "vinyl",
+                "live-performance",
+                "rap",
+                "full-band"
+              ]
+            }
+          },
+          "otherPerformanceType": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "house",
+                "deep-house",
+                "tech-house",
+                "afro-house",
+                "amapiano",
+                "disco",
+                "nu-disco",
+                "italo",
+                "techno",
+                "hard-techno",
+                "minimal",
+                "acid",
+                "electro",
+                "trance",
+                "ebm-industrial",
+                "drum-and-bass",
+                "jungle",
+                "breakbeat",
+                "uk-garage",
+                "dubstep",
+                "bass",
+                "footwork-juke",
+                "baile-funk",
+                "hip-hop",
+                "rap",
+                "trap",
+                "rnb",
+                "funk-soul",
+                "jazz",
+                "reggae-dub",
+                "dancehall",
+                "reggaeton-latin",
+                "afrobeat",
+                "cumbia",
+                "ambient",
+                "downtempo",
+                "experimental",
+                "noise",
+                "leftfield",
+                "pop",
+                "indie-rock",
+                "punk",
+                "synthwave",
+                "hardcore-gabber"
+              ]
+            }
+          },
+          "youtubeVideo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancelled": {
+            "type": "boolean"
+          },
+          "soundcloudTrack": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "description": "Null when the link is a private link, which is a secret",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "performers",
+          "durationMinutes",
+          "performanceTypes",
+          "otherPerformanceType",
+          "genres",
+          "youtubeVideo",
+          "cancelled",
+          "soundcloudTrack"
+        ],
+        "additionalProperties": false
+      },
       "Feature": {
         "type": "object",
         "properties": {
@@ -1973,6 +2219,117 @@
           "rap",
           "full-band"
         ]
+      },
+      "PublicArtist": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Country"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GenreId"
+            }
+          },
+          "bio": {
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/ArtistLinks"
+          },
+          "photo": {
+            "description": "Where their photo is, or null when they have none",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "country",
+          "city",
+          "genres",
+          "bio",
+          "links",
+          "photo"
+        ],
+        "additionalProperties": false
+      },
+      "PublicCollective": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Country"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/ArtistLinks"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reference"
+            },
+            "description": "In order"
+          },
+          "photo": {
+            "description": "Where its photo is, or null when it has none",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "country",
+          "city",
+          "description",
+          "links",
+          "members",
+          "photo"
+        ],
+        "additionalProperties": false
       },
       "Radio": {
         "type": "object",
@@ -2517,7 +2874,7 @@
           },
           "announced": {
             "type": "boolean",
-            "description": "Whether it is announced, which means it is meant to be public, with its sets"
+            "description": "Whether it is announced, which makes it public, as an event, with its sets, and makes public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members"
           },
           "announcedUpdatedBy": {
             "type": [
@@ -5449,7 +5806,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -5485,6 +5842,159 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artists/{id}": {
+      "get": {
+        "operationId": "get_public_artist",
+        "summary": "A public artist's profile, as the public sees it: an artist who isn't public is not found",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/PublicArtist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artists/{id}/photo": {
+      "get": {
+        "summary": "A public artist's photo",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+          },
+          "400": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -6317,7 +6827,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -6353,6 +6863,159 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collectives/{id}": {
+      "get": {
+        "operationId": "get_public_collective",
+        "summary": "A public collective's profile, as the public sees it, with its members: a collective that isn't public is not found",
+        "tags": [
+          "Collectives"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/PublicCollective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collectives/{id}/photo": {
+      "get": {
+        "summary": "A public collective's photo",
+        "tags": [
+          "Collectives"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+          },
+          "400": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -8297,7 +8960,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the admin's browser, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
+            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -8494,7 +9157,7 @@
     "/api/admin/sessions/{id}/announced": {
       "put": {
         "operationId": "update_session_announced",
-        "summary": "Announces a session, which means it is meant to be public, with its sets, or un-announces it",
+        "summary": "Announces a session, which makes it public, as an event, with its sets, and makes public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members, or un-announces it",
         "tags": [
           "Sessions"
         ],
@@ -9515,6 +10178,143 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "list_events",
+        "summary": "Parking Radio's public events, which are its announced sessions, with their sets, upcoming and past: every upcoming one and the 20 most recent past ones, or every one that starts in a time range when one is given",
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "Only the events that start at or after this date and time, in Québec time, with the offset from UTC in effect then, e.g. \"2026-11-09T00:00-05:00\""
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "Only the events that start before this date and time, in Québec time, with the offset from UTC in effect then, e.g. \"2026-11-16T00:00-05:00\""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Events"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/flyer": {
+      "get": {
+        "summary": "An event's flyer",
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again"
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }

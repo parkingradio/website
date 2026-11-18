@@ -60,3 +60,9 @@ export function soundcloudTrackLink(sent: string): string | null {
   const path = SOUNDCLOUD_TRACK_LINK.exec(sent)?.[1]
   return path ? `https://soundcloud.com${path}` : null
 }
+
+// Whether `link`, a track's link as `soundcloudTrackLink` reduces it, is a private link, which ends with its secret, as
+// its third segment: the public mustn't be given it (see "What's public" in docs/design/server/events.md).
+export function isPrivateTrackLink(link: string): boolean {
+  return /^https:\/\/soundcloud\.com\/[^/]+\/[^/]+\/s-/.test(link)
+}
