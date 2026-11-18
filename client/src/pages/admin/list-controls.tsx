@@ -64,9 +64,11 @@ export function StatusFilters<S extends string>({
   )
 }
 
-// Buttons that change a status to one of the `statuses`, each named by `labels`, where the current one is pressed. They're
-// named `label`, e.g. "Statut". They're disabled while `disabled`, e.g. while a change is saved, but those that a rule
-// keeps from being picked are greyed out, saying why (`unavailable`, see button.tsx).
+// Buttons that change a status to one of the `statuses`, each named by `labels`, where the current one is pressed, and
+// is the only one that's black, even while another one is hovered, e.g. the one just clicked when saving it fails, or
+// when a rule keeps it from being picked again. They're named `label`, e.g. "Statut". They're disabled while `disabled`,
+// e.g. while a change is saved, but those that a rule keeps from being picked are greyed out, saying why (`unavailable`,
+// see button.tsx).
 export function StatusButtons<S extends string>({
   label = 'Statut',
   statuses,
@@ -85,7 +87,7 @@ export function StatusButtons<S extends string>({
   onChange: (status: S) => void
 }) {
   return (
-    <div className="admin-filters" role="group" aria-label={label}>
+    <div className="admin-filters admin-status-buttons" role="group" aria-label={label}>
       {statuses.map((each) => (
         <Button key={each} aria-pressed={status === each} disabled={disabled} unavailable={unavailable?.(each)} onClick={() => onChange(each)}>
           {labels[each]}

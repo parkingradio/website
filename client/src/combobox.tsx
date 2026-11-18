@@ -4,8 +4,9 @@ import { matching } from './combobox-matching'
 import { normalize } from './normalize'
 import './combobox.css'
 
-// `detail` is shown next to the label, e.g. a city's region.
-export type ComboboxOption = { key: string; label: string; detail?: string | null }
+// `detail` is shown next to the label, e.g. a city's region. An `unavailable` option is shown greyed out, and can't be
+// picked.
+export type ComboboxOption = { key: string; label: string; detail?: string | null; unavailable?: boolean }
 // The options that what's typed finds, in the order they're shown.
 export type ComboboxFilter = (options: ComboboxOption[], query: string) => ComboboxOption[]
 
@@ -39,7 +40,7 @@ type ComboboxProps = {
 //
 // With `selected`, it suggests the options matching what's typed, or all of them once clicked, of which only one can be
 // picked: what's typed is only a way of finding it. Leaving the field without picking another option keeps the one that
-// was picked, unless what's typed is exactly the label of an option, which is then picked.
+// was picked, unless what's typed is exactly the label of an option that can be picked, which is then picked.
 //
 // With `text`, what's typed is the answer, and the options are only suggestions for it, e.g. from a web service, shown
 // while typing once there are some. Leaving the field without picking one keeps what's typed.
@@ -101,6 +102,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
   }
 
   const pick = (option: ComboboxOption | undefined) => {
+    if (option?.unavailable) return
     if (option) {
       if (mode.text) mode.text.onChange(option.label)
       else mode.onSelect(option.key)
@@ -169,7 +171,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
           if (strict && query === null) browse()
         }}
         onBlur={() => {
-          if (strict && query !== null) pick(options.find((option) => normalize(option.label) === normalize(query)))
+          if (strict && query !== null) pick(options.find((option) => !option.unavailable && normalize(option.label) === normalize(query)))
           else close()
           onBlur?.()
         }}
@@ -189,6 +191,7 @@ export function Combobox({ id, options, onBlur, invalid, placeholder, disabled, 
             data-index={index}
             role="option"
             aria-selected={index === current}
+            aria-disabled={option.unavailable || undefined}
             onMouseMove={(event) => {
               const at = `${event.screenX},${event.screenY}`
               if (at === mouseAt.current) return

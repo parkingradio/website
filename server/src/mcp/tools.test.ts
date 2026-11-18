@@ -37,7 +37,7 @@ describe('the tools of the API', () => {
         'get_youtube_credentials',
         ...['list_artists', 'get_artist', 'create_artist', 'update_artist', 'delete_artist'],
         ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective'],
-        ...['list_applications', 'get_application', 'create_application', 'update_application', 'update_application_status'],
+        ...['list_applications', 'get_application', 'create_application', 'update_application', 'update_application_decision'],
         ...['delete_application', 'get_application_recipients'],
         ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'update_session_announced'],
         'delete_session',
@@ -75,6 +75,9 @@ describe('the tools of the API', () => {
     expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description', 'removeFlyer']))
     expect(tools.find(({ name }) => name === 'create_session')!.description).toContain("Tools can't send a flyer.")
     expect(updateSession.description).not.toMatch(/email|photo/)
+    // Only what admins decide: sets and sessions make applications planned or done.
+    const decide = tools.find(({ name }) => name === 'update_application_decision')!
+    expect(decide.inputSchema.properties).toMatchObject({ decision: { enum: ['new', 'accepted', 'rejected'] } })
   })
 
   it("can't be led to another endpoint by an id that's another route's segment", async () => {

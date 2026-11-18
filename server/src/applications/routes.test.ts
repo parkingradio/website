@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import fastifyCookie from '@fastify/cookie'
-import { NoSuchArtist, NoSuchCollective } from './store.js'
+import { NoSuchArtist, NoSuchCollective, RejectedWhileBooked } from './store.js'
 import type { ApplicationsStore, StoredApplication } from './store.js'
 import type { ApplicationsSettings, ApplicationsSettingsStore } from './settings.js'
 import type { SessionsStore, StoredSession, StoredSet } from '../sessions/store.js'
@@ -49,9 +49,9 @@ const store: ApplicationsStore = {
       createdAt,
       updatedBy: null,
       updatedAt: null,
-      status: 'new',
-      statusUpdatedBy: null,
-      statusUpdatedAt: null,
+      decision: 'new',
+      decisionUpdatedBy: null,
+      decisionUpdatedAt: null,
       artistId: null,
       collectiveId: null,
       ...application,
@@ -60,7 +60,7 @@ const store: ApplicationsStore = {
     return row
   }),
   update: async (id, changes) => change(id, changes),
-  setStatus: async (id, status) => change(id, status),
+  decide: async (id, decision) => change(id, decision),
   delete: async (id) => {
     const before = rows.length
     rows = rows.filter((row) => row.id !== id)
@@ -194,7 +194,7 @@ describe('applications routes', () => {
       app.inject({ method: 'POST', url: '/api/admin/applications', payload: application() }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: fields() }),
       app.inject({ method: 'PATCH', url: '/api/admin/applications/application-1', payload: { details: '' } }),
-      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: { status: 'accepted' } }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/decision', payload: { decision: 'accepted' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1' }),
       app.inject({ method: 'GET', url: '/api/admin/applications/recipients' }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/recipients', payload: { recipients: [] } }),
@@ -212,7 +212,7 @@ describe('applications routes', () => {
     for (const [method, url] of [
       ['POST', '/api/admin/applications'],
       ['PUT', '/api/admin/applications/application-1'],
-      ['PUT', '/api/admin/applications/application-1/status'],
+      ['PUT', '/api/admin/applications/application-1/decision'],
       ['PUT', '/api/admin/applications/recipients'],
     ] as const) {
       for (const sent of [{ payload: { dates: 'x', status: 'maybe', recipients: 42 } }, { payload: 'null', headers: json }, { payload: '{', headers: json }]) {
@@ -231,7 +231,7 @@ describe('applications routes', () => {
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/applications', payload: application(), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: application(), ...options }),
-      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: { status: 'accepted' }, ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/decision', payload: { decision: 'accepted' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1', ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/recipients', payload: { recipients: [] }, ...options }),
     ]
@@ -239,7 +239,7 @@ describe('applications routes', () => {
       expect(response.statusCode).toBe(403)
       expect(response.json()).toEqual({ ok: false, error: 'Cross-origin request refused' })
     }
-    expect(rows).toEqual([expect.objectContaining({ status: 'new', updatedBy: null })])
+    expect(rows).toEqual([expect.objectContaining({ decision: 'new', updatedBy: null })])
     expect(settings.save).not.toHaveBeenCalled()
   })
 
@@ -272,8 +272,9 @@ describe('applications routes', () => {
           updatedBy: null,
           updatedAt: null,
           status: 'new',
-          statusUpdatedBy: null,
-          statusUpdatedAt: null,
+          decision: 'new',
+          decisionUpdatedBy: null,
+          decisionUpdatedAt: null,
           sets: [],
           sessions: [],
         },
@@ -512,7 +513,8 @@ describe('applications routes', () => {
       const artists = await send(app, 'GET', '/api/admin/applications/application-1')
       const session = { id: 'session-2', title: 'GUEST MIXES', start: '2026-11-14T21:00:00-05:00' }
       // Without times, which sets don't have.
-      expect(artists.json().application).toMatchObject({ sessions: [] })
+      // Planned, by its set that replaced the cancelled one, though it's still new.
+      expect(artists.json().application).toMatchObject({ sessions: [], status: 'planned' })
       expect(artists.json().application.sets).toEqual([
         { id: 'set-3', durationMinutes: 60, status: 'cancelled', session },
         { id: 'set-4', durationMinutes: null, status: 'planned', session },
@@ -520,6 +522,7 @@ describe('applications routes', () => {
       expect(sessions.ofApplications).toHaveBeenCalledWith(['application-1'])
       const collectives = await send(app, 'GET', '/api/admin/applications/application-2')
       expect(collectives.json().application).toMatchObject({
+        status: 'planned',
         sets: [],
         sessions: [{ id: 'session-1', title: 'LES ONDES TAKEOVER', start: null, end: null, durationMinutes: 240, status: 'planned' }],
       })
@@ -536,7 +539,7 @@ describe('applications routes', () => {
     it('replaces the fields, keeps the artist and the status, and says who changed it', async () => {
       const app = await buildApp()
       await create(app)
-      await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
+      await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'accepted' })
       const response = await send(
         app,
         'PUT',
@@ -621,7 +624,7 @@ describe('applications routes', () => {
     it('changes only the fields it is sent, keeps the others, the artist and the status, and says who changed it', async () => {
       const app = await buildApp()
       await create(app, { receivedAt: '2026-03-28T10:03-04:00' })
-      await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted' })
+      await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'accepted' })
       const response = await send(app, 'PATCH', '/api/admin/applications/application-1', { details: '  Corrigé. ', timeSlots: [] })
 
       expect(response.statusCode).toBe(200)
@@ -669,36 +672,57 @@ describe('applications routes', () => {
     })
   })
 
-  describe('PUT /api/admin/applications/:id/status', () => {
-    it('changes the status, and says who changed it', async () => {
+  describe('PUT /api/admin/applications/:id/decision', () => {
+    it('changes the decision, and says who changed it', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'rejected' })
+      const response = await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'rejected' })
       expect(response.statusCode).toBe(200)
-      expect(response.json().application).toMatchObject({ status: 'rejected', statusUpdatedBy: 'admin@example.com', updatedBy: null })
-      expect(response.json().application.statusUpdatedAt).toEqual(expect.any(String))
+      expect(response.json().application).toMatchObject({ status: 'rejected', decision: 'rejected', decisionUpdatedBy: 'admin@example.com', updatedBy: null })
+      expect(response.json().application.decisionUpdatedAt).toEqual(expect.any(String))
     })
 
-    it('refuses anything but a status', async () => {
+    it('refuses anything but a decision', async () => {
       const app = await buildApp()
       await create(app)
       const cookies = await sessionCookies()
       const refused = [
-        ...[{ status: 'maybe' }, {}, { status: 'toString' }, { status: 'Accepted' }].map((payload) => send(app, 'PUT', '/api/admin/applications/application-1/status', payload)),
-        app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/status', payload: 'null', headers: { 'content-type': 'application/json' }, cookies }),
+        // A planned or done application is one whose sets or sessions are, which no decision can say instead.
+        ...[{ decision: 'maybe' }, {}, { decision: 'toString' }, { decision: 'Accepted' }, { decision: 'planned' }, { decision: 'done' }, { status: 'accepted' }].map((payload) =>
+          send(app, 'PUT', '/api/admin/applications/application-1/decision', payload),
+        ),
+        app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/decision', payload: 'null', headers: { 'content-type': 'application/json' }, cookies }),
       ]
       for (const response of await Promise.all(refused)) {
         expect(response.statusCode).toBe(400)
-        expect(response.json()).toEqual({ ok: false, error: 'The status must be one of new, accepted, scheduled, done, rejected' })
+        expect(response.json()).toEqual({ ok: false, error: 'The decision must be one of new, accepted, rejected' })
       }
-      const extra = await send(app, 'PUT', '/api/admin/applications/application-1/status', { status: 'accepted', details: 'x' })
+      const extra = await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'accepted', details: 'x' })
       expect(extra.json()).toEqual({ ok: false, error: 'Unknown field: `details`' })
-      expect(rows[0].status).toBe('new')
+      expect(rows[0].decision).toBe('new')
     })
 
     it('responds 404 for an application that does not exist', async () => {
       const app = await buildApp()
-      expect((await send(app, 'PUT', '/api/admin/applications/nothing/status', { status: 'accepted' })).statusCode).toBe(404)
+      expect((await send(app, 'PUT', '/api/admin/applications/nothing/decision', { decision: 'accepted' })).statusCode).toBe(404)
+    })
+
+    it('responds 409 when the application would be rejected with a set or a session that is planned or done', async () => {
+      const app = await buildApp()
+      await create(app)
+      vi.spyOn(store, 'decide').mockRejectedValueOnce(new RejectedWhileBooked())
+      const response = await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'rejected' })
+      expect(response.statusCode).toBe(409)
+      expect(response.json()).toEqual({ ok: false, error: "A rejected application has no set or session that's planned or done" })
+    })
+
+    it('responds with the status its sets or sessions give it, whatever was decided', async () => {
+      const app = await buildApp()
+      await create(app)
+      linked = [storedSession({ sets: [storedSet({ applicationId: 'application-1', application: { id: 'application-1', receivedAt: new Date() } })] })]
+      const response = await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'accepted' })
+      expect(response.json().application).toMatchObject({ status: 'planned', decision: 'accepted', decisionUpdatedBy: 'admin@example.com' })
+      expect(rows[0].decision).toBe('accepted')
     })
   })
 

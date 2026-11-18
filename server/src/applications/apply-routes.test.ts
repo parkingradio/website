@@ -36,9 +36,9 @@ function addApplication(fields: ApplicationFields, owner: { artistId: string } |
     collectiveId: null,
     updatedBy: null,
     updatedAt: null,
-    status: 'new',
-    statusUpdatedBy: null,
-    statusUpdatedAt: null,
+    decision: 'new',
+    decisionUpdatedBy: null,
+    decisionUpdatedAt: null,
     ...fields,
     ...owner,
   }

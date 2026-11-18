@@ -192,13 +192,17 @@ test("a control that can't be used says why in a tooltip, right under it, while 
 })
 
 // With Collectif Béton's takeover, BÉTON 140, which comes from its application (see seed-data.ts).
-test("a seeded takeover links to the application it comes from, whose page links back to it", async ({ page }) => {
+test("a seeded takeover links to the application it comes from, which it makes done, and whose page links back to it", async ({ page }) => {
   await logIn(page, { at: '/admin/sessions?status=all' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('béton 140')
   await rowsOf(page, 'BÉTON 140').getByRole('link').first().click()
   await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
   await value(page, 'Candidature').getByRole('link', { name: /^reçue le / }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Candidature de Collectif Béton' })).toBeVisible()
+  // Which its takeover makes done, rather than what was decided, which can't be changed meanwhile.
+  const status = page.getByRole('group', { name: 'Statut' })
+  await expect(status.getByRole('button', { name: 'jouée' })).toHaveAttribute('aria-pressed', 'true')
+  for (const name of ['nouvelle', 'retenue', 'planifiée', 'jouée', 'refusée']) await expect(status.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
   const sessions = page.getByRole('table', { name: 'Sessions' })
   await expect(rowsOf(sessions, 'BÉTON 140')).toContainText('jouée')
   await rowsOf(sessions, 'BÉTON 140').getByRole('link').click()

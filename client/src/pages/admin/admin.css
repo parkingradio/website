@@ -74,6 +74,18 @@
   cursor: default;
 }
 
+/* A status button that isn't pressed is only grey when hovered, so that only the status its entry has is black, even
+   while the one just clicked is still hovered, e.g. when saving it fails (see list-controls.tsx). */
+.admin .admin-status-buttons button:not([aria-pressed='true']):hover {
+  background: #ddd;
+  color: #1c1c1c;
+}
+
+/* And the status it has stays black even when it can't be picked again, e.g. an application's that its sets give it. */
+.admin .admin-status-buttons button[aria-disabled='true'][aria-pressed='true'] {
+  opacity: 1;
+}
+
 /* A greyed-out button, which can't be used, but keeps the focus (see button.tsx), isn't black when hovered, unless it's
    pressed. */
 .admin button[aria-disabled='true']:not([aria-pressed='true']):hover {

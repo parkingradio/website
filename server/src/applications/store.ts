@@ -3,9 +3,9 @@ import { violatesConstraint } from '../api/errors.js'
 import type { Queryable } from '../db/connection.js'
 import { applications } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
-import { lockSessions } from '../sessions/store.js'
+import { isBooked, lockSessions } from '../sessions/store.js'
 import { ApplicationFields } from './fields.js'
-import type { ApplicationStatus } from './fields.js'
+import type { ApplicationDecision } from './fields.js'
 
 // Checks applications against the rules in applications/fields.ts, and stores them in the database.
 
@@ -30,6 +30,9 @@ export class NoSuchCollective extends Error {}
 // received, unless that's left out.
 export type ApplicationChange = Partial<ApplicationFields> & { receivedAt?: Date }
 
+// Thrown when rejecting an application that has a set or a session that's planned or done.
+export class RejectedWhileBooked extends Error {}
+
 // Who an application belongs to: an artist or a collective, by their id.
 export type ApplicationOwner = { artistId: string; collectiveId?: undefined } | { collectiveId: string; artistId?: undefined }
 
@@ -44,8 +47,9 @@ export type ApplicationsStore = {
   create(application: ApplicationFields & ApplicationOwner & { createdBy: string | null; receivedAt?: Date }): Promise<StoredApplication>
   // Changes the application's fields that `changes` has, and returns the updated application.
   update(id: string, changes: ApplicationChange & { updatedBy: string; updatedAt: Date }): Promise<StoredApplication | null>
-  // Changes the application's status, and returns the updated application.
-  setStatus(id: string, change: { status: ApplicationStatus; statusUpdatedBy: string; statusUpdatedAt: Date }): Promise<StoredApplication | null>
+  // Changes what admins decided about the application, and returns the updated application. Throws a RejectedWhileBooked
+  // when it's rejected while it has a set or a session that's planned or done.
+  decide(id: string, change: { decision: ApplicationDecision; decisionUpdatedBy: string; decisionUpdatedAt: Date }): Promise<StoredApplication | null>
   // Returns false if the application didn't exist. Its sets and sessions stay, without it.
   delete(id: string): Promise<boolean>
 }
@@ -60,9 +64,10 @@ function ownedBy(owner: ApplicationOwner) {
 }
 
 export function applicationsStore(db: Queryable): ApplicationsStore {
-  async function change(id: string, changes: Partial<typeof applications.$inferInsert>) {
+  // Changes the application `id` in `tx`.
+  async function changeIn(tx: Queryable, id: string, changes: Partial<typeof applications.$inferInsert>) {
     if (!isUuid(id)) return null
-    const [row] = await db.update(applications).set(changes).where(eq(applications.id, id)).returning()
+    const [row] = await tx.update(applications).set(changes).where(eq(applications.id, id)).returning()
     return row ?? null
   }
 
@@ -96,8 +101,17 @@ export function applicationsStore(db: Queryable): ApplicationsStore {
       }
     },
 
-    update: change,
-    setStatus: change,
+    update: (id, changes) => changeIn(db, id, changes),
+
+    async decide(id, change) {
+      if (!isUuid(id)) return null
+      return db.transaction(async (tx) => {
+        // So that its sets and sessions can't be planned, or un-cancelled, in the meantime (see `lockSessions`).
+        await lockSessions(tx)
+        if (change.decision === 'rejected' && (await isBooked(tx, id))) throw new RejectedWhileBooked()
+        return changeIn(tx, id, change)
+      })
+    },
 
     async delete(id) {
       if (!isUuid(id)) return false

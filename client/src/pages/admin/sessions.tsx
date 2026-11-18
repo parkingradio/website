@@ -57,7 +57,7 @@ import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailur
 import { RaEventPanel } from './ra-event'
 import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
-import { CreateSet, MoveSet } from './session-picker'
+import { CreateSet, MoveSet, REJECTED_CANT_BOOK } from './session-picker'
 import type { MovedSet } from './session-picker'
 import type { SessionFormProps } from './session-form'
 import { Performers, SetLinks, SetsTooLong } from './set-cells'
@@ -302,9 +302,13 @@ export function ApplicationSessions({ application }: { application: Application 
     <>
       <h2 id={headingId}>Sessions</h2>
       <div className="admin-toolbar">
-        <Link to={newSessionPath({ application: application.id })} className="admin-button">
-          créer une session
-        </Link>
+        {application.decision === 'rejected' ? (
+          <Button unavailable={REJECTED_CANT_BOOK}>créer une session</Button>
+        ) : (
+          <Link to={newSessionPath({ application: application.id })} className="admin-button">
+            créer une session
+          </Link>
+        )}
       </div>
       {sessions.length === 0 ? (
         <p className="admin-placeholder">Aucune session.</p>
@@ -648,6 +652,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
         <SessionFormWithChoices
           initial={sessionFormValues(session)}
           announced={session.announced}
+          cancelled={cancelled}
           flyer={session.hasFlyer ? flyerUrl(session) : null}
           submitLabel="enregistrer"
           onCancel={close}
@@ -934,6 +939,7 @@ function OpenSet({
       title={set ? setTitle(set) : 'Nouveau set'}
       initial={set ? setFormValues(set) : application ? setFromApplication(application, session) : newSetFormValues(session)}
       takeover={takeover}
+      cancelled={set?.status === 'cancelled'}
       reveal={application !== undefined}
       submitLabel={set ? 'enregistrer' : 'ajouter le set'}
       onCancel={onClose}

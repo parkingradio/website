@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { sql } from 'drizzle-orm'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
@@ -16,6 +16,7 @@ import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
+import { REJECTED_APPLICATION } from '../applications/fields.js'
 import { NOT_THE_SESSIONS_APPLICATION, NOT_THE_SETS_APPLICATION } from './fields.js'
 import { sessionsRoutes } from './routes.js'
 import { sessionsStore } from './store.js'
@@ -23,7 +24,9 @@ import { checkSessionsInvariants } from './test-invariants.js'
 
 // The applications that sets and sessions come from, against a real database: the rules of what a set's or a session's
 // application can be, checked on the set or the session as it would then be, what deleting an application or an artist
-// does to them, and what applications list of them (see "Applications" in docs/design/server/sessions.md).
+// does to them, what applications list of them, the statuses they give applications, and what a rejected application
+// keeps them from (see "Applications" in docs/design/server/sessions.md, and "Status" in
+// docs/design/server/applications.md).
 
 // Photos and flyers aren't sent, so there are none to read or delete.
 const NO_PHOTOS: Photos = {
@@ -86,6 +89,16 @@ async function setId(sessionId: string, fields: object): Promise<string> {
 
 async function application(id: string) {
   return (await request('GET', `/api/admin/applications/${id}`)).json().application
+}
+
+// The statuses of the applications `ids`, in order.
+async function statuses(...ids: string[]) {
+  return Promise.all(ids.map(async (id) => (await application(id)).status))
+}
+
+// What admins decide about the application `id`.
+async function decide(id: string, decision: string) {
+  return request('PUT', `/api/admin/applications/${id}/decision`, { decision })
 }
 
 function expectError(response: { statusCode: number; json(): unknown }, error: string) {
@@ -254,32 +267,192 @@ describe("a session's application", () => {
   })
 })
 
-describe('the application', () => {
-  it("doesn't change, its status included, when sets and sessions are given it, have it taken away, or are deleted", async () => {
+describe("the application's status", () => {
+  it("is worked out from its sets and sessions, while what was decided, and who decided it, stay as they are", async () => {
     const aurore = await createArtist('Aurore')
     const collective = await createCollective('Haute Rive', [{ id: aurore }])
     const [artists, collectives] = [await createApplication({ artistId: aurore }), await createApplication({ collectiveId: collective })]
     for (const id of [artists, collectives]) {
-      expect((await request('PUT', `/api/admin/applications/${id}/status`, { status: 'accepted' })).statusCode).toBe(200)
+      expect((await decide(id, 'accepted')).statusCode).toBe(200)
       expect((await request('PATCH', `/api/admin/applications/${id}`, { details: 'Changée.' })).statusCode).toBe(200)
     }
     const tracked = async (id: string) => {
-      const { status, statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt } = await application(id)
-      return { status, statusUpdatedBy, statusUpdatedAt, updatedBy, updatedAt }
+      const { decision, decisionUpdatedBy, decisionUpdatedAt, updatedBy, updatedAt } = await application(id)
+      return { decision, decisionUpdatedBy, decisionUpdatedAt, updatedBy, updatedAt }
     }
     const before = [await tracked(artists), await tracked(collectives)]
-    expect(before[0]).toMatchObject({ status: 'accepted', updatedBy: 'admin@example.com' })
+    expect(before[0]).toMatchObject({ decision: 'accepted', decisionUpdatedBy: 'admin@example.com', updatedBy: 'admin@example.com' })
+    expect(await statuses(artists, collectives)).toEqual(['accepted', 'accepted'])
 
     const session = await sessionId({ type: 'takeover', takeover: collective, application: collectives })
     const set = await setId(session, { performers: [{ id: aurore }], application: artists })
+    expect(await statuses(artists, collectives)).toEqual(['planned', 'planned'])
     expect((await request('PATCH', `/api/admin/sets/${set}`, { application: null })).statusCode).toBe(200)
     expect((await request('PATCH', `/api/admin/sessions/${session}`, { application: null })).statusCode).toBe(200)
+    expect(await statuses(artists, collectives)).toEqual(['accepted', 'accepted'])
     expect((await request('PATCH', `/api/admin/sets/${set}`, { application: artists })).statusCode).toBe(200)
     expect((await request('PATCH', `/api/admin/sessions/${session}`, { application: collectives })).statusCode).toBe(200)
+    // Marking the session done marks its set done.
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'done' })).statusCode).toBe(200)
+    expect(await statuses(artists, collectives)).toEqual(['done', 'done'])
     expect([await tracked(artists), await tracked(collectives)]).toEqual(before)
     expect((await request('DELETE', `/api/admin/sets/${set}`)).statusCode).toBe(200)
     expect((await request('DELETE', `/api/admin/sessions/${session}`)).statusCode).toBe(200)
+    expect(await statuses(artists, collectives)).toEqual(['accepted', 'accepted'])
     expect([await tracked(artists), await tracked(collectives)]).toEqual(before)
+  })
+
+  it('is planned while one of its sets is, even with one that is done, then accepted once they are all cancelled, and new without any', async () => {
+    const aurore = await createArtist('Aurore')
+    const applied = await createApplication({ artistId: aurore })
+    const status = async () => (await application(applied)).status
+    expect(await status()).toBe('new')
+    const first = await sessionId({ name: 'PREMIÈRE' })
+    const played = await setId(first, { performers: [{ id: aurore }], application: applied })
+    expect(await status()).toBe('planned')
+    expect((await request('PUT', `/api/admin/sets/${played}/status`, { status: 'done' })).statusCode).toBe(200)
+    expect(await status()).toBe('done')
+    // Booked again, in a session without a date.
+    const again = await setId(await sessionId({ start: null, name: 'UN JOUR' }), { performers: [{ id: aurore }], application: applied })
+    expect(await status()).toBe('planned')
+    expect((await request('PUT', `/api/admin/sets/${again}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    expect(await status()).toBe('done')
+    expect((await request('DELETE', `/api/admin/sets/${played}`)).statusCode).toBe(200)
+    expect(await status()).toBe('accepted')
+    expect((await request('DELETE', `/api/admin/sets/${again}`)).statusCode).toBe(200)
+    expect(await status()).toBe('new')
+  })
+})
+
+describe('a rejected application', () => {
+  function expectConflict(response: { statusCode: number; json(): unknown }) {
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toEqual({ ok: false, error: REJECTED_APPLICATION, session: null, set: null })
+  }
+
+  it("can't be rejected while it has a set or a session that's planned or done, but can with only cancelled ones, which keep it", async () => {
+    const aurore = await createArtist('Aurore')
+    const collective = await createCollective('Haute Rive', [{ id: aurore }])
+    const [artists, collectives] = [await createApplication({ artistId: aurore }), await createApplication({ collectiveId: collective })]
+    const session = await sessionId({ type: 'takeover', takeover: collective, application: collectives })
+    const set = await setId(session, { performers: [{ id: aurore }], application: artists })
+    for (const status of ['planned', 'done']) {
+      expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status })).statusCode).toBe(200)
+      for (const id of [artists, collectives]) {
+        const response = await decide(id, 'rejected')
+        expect(response.statusCode).toBe(409)
+        expect(response.json()).toEqual({ ok: false, error: REJECTED_APPLICATION })
+        expect(await application(id)).toMatchObject({ status, decision: 'new', decisionUpdatedBy: null })
+      }
+    }
+    // Cancelling the session cancels its set.
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    for (const id of [artists, collectives]) {
+      expect((await decide(id, 'rejected')).json().application).toMatchObject({ status: 'rejected', decisionUpdatedBy: 'admin@example.com' })
+    }
+    const { session: kept } = (await request('GET', `/api/admin/sessions/${session}`)).json()
+    expect(kept).toMatchObject({ application: { id: collectives }, sets: [{ id: set, application: { id: artists } }] })
+    await checkSessionsInvariants(database.db)
+  })
+
+  it("can't be given to a set or a session that's planned or done, but can to a cancelled one, which can then still be changed", async () => {
+    const aurore = await createArtist('Aurore')
+    const collective = await createCollective('Haute Rive', [{ id: aurore }])
+    const [artists, collectives] = [await createApplication({ artistId: aurore }), await createApplication({ collectiveId: collective })]
+    for (const id of [artists, collectives]) expect((await decide(id, 'rejected')).statusCode).toBe(200)
+    const performers = [{ id: aurore }]
+
+    expectError(await createSession({ type: 'takeover', takeover: collective, application: collectives }), REJECTED_APPLICATION)
+    const withSets = await createSession({ sets: [{ performers, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], soundcloudTrack: null, youtubeVideo: null, application: artists }] })
+    expect(withSets.statusCode).toBe(400)
+    expect(withSets.json()).toEqual({ ok: false, error: REJECTED_APPLICATION, setIndex: 0 })
+    const session = await sessionId({ type: 'takeover', takeover: collective })
+    expectError(await addSet(session, { performers, application: artists }), REJECTED_APPLICATION)
+    const set = await setId(session, { performers })
+    expectError(await request('PATCH', `/api/admin/sets/${set}`, { application: artists }), REJECTED_APPLICATION)
+    expectError(await request('PATCH', `/api/admin/sessions/${session}`, { application: collectives }), REJECTED_APPLICATION)
+    expect((await request('PUT', `/api/admin/sets/${set}/status`, { status: 'done' })).statusCode).toBe(200)
+    expectError(await request('PATCH', `/api/admin/sets/${set}`, { application: artists }), REJECTED_APPLICATION)
+
+    // Once cancelled, they can have it, and be changed with it, e.g. as forms send it back.
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sets/${set}`, { application: artists })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sessions/${session}`, { application: collectives })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sets/${set}`, { durationMinutes: 45, application: artists })).statusCode).toBe(200)
+    expect((await request('PATCH', `/api/admin/sessions/${session}`, { durationMinutes: 90 })).statusCode).toBe(200)
+    expect(await application(artists)).toMatchObject({ status: 'rejected', sets: [{ id: set, status: 'cancelled' }] })
+    await checkSessionsInvariants(database.db)
+  })
+
+  it("keeps its cancelled sets and sessions from being un-cancelled, or marked done, until it isn't rejected anymore, while they can still be moved", async () => {
+    const aurore = await createArtist('Aurore')
+    const collective = await createCollective('Haute Rive', [{ id: aurore }])
+    const [artists, collectives] = [await createApplication({ artistId: aurore }), await createApplication({ collectiveId: collective })]
+    const session = await sessionId({ type: 'takeover', takeover: collective, application: collectives })
+    const set = await setId(session, { performers: [{ id: aurore }], application: artists })
+    const other = await sessionId({ start: '2026-11-21T21:00-05:00' })
+    const kept = await setId(other, { performers: [{ id: aurore }] })
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    for (const id of [artists, collectives]) expect((await decide(id, 'rejected')).statusCode).toBe(200)
+
+    for (const status of ['planned', 'done']) expectConflict(await request('PUT', `/api/admin/sessions/${session}/status`, { status }))
+    // Its set is in a cancelled session, which is in the way first, then in another session.
+    const moved = await request('PUT', `/api/admin/sets/${set}/session`, { session: other })
+    expect(moved.statusCode).toBe(200)
+    expect(moved.json().session.sets.map(({ id, status }: { id: string; status: string }) => [id, status])).toEqual([[kept, 'planned'], [set, 'cancelled']])
+    for (const status of ['planned', 'done']) expectConflict(await request('PUT', `/api/admin/sets/${set}/status`, { status }))
+    // Cancelling them again changes nothing.
+    expect((await request('PUT', `/api/admin/sets/${set}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'cancelled' })).statusCode).toBe(200)
+    await checkSessionsInvariants(database.db)
+
+    for (const [id, decision] of [[artists, 'accepted'], [collectives, 'new']]) expect((await decide(id, decision)).statusCode).toBe(200)
+    expect((await request('PUT', `/api/admin/sets/${set}/status`, { status: 'planned' })).statusCode).toBe(200)
+    expect((await request('PUT', `/api/admin/sessions/${session}/status`, { status: 'planned' })).statusCode).toBe(200)
+    expect(await statuses(artists, collectives)).toEqual(['planned', 'planned'])
+  })
+
+  // Whichever goes second finds the other done, and fails.
+  it('is either rejected or has a set that is planned, never both, even when both are asked at the same time', async () => {
+    const aurore = await createArtist('Aurore')
+    const session = await sessionId({})
+    const set = await setId(session, { performers: [{ id: aurore }] })
+    // Each way of giving the application a planned set, which `prepare` readies, then the request that races its rejection,
+    // which fails with 409 when it comes second, or with 400 when it gives a planned set the application.
+    const ways: Record<string, { prepare?: (applied: string) => Promise<void>; book: (applied: string) => Promise<LightMyRequestResponse>; fails: number }> = {
+      'un-cancelling its set': {
+        prepare: async (applied: string) => {
+          await request('PATCH', `/api/admin/sets/${set}`, { application: applied })
+          await request('PUT', `/api/admin/sets/${set}/status`, { status: 'cancelled' })
+        },
+        book: () => request('PUT', `/api/admin/sets/${set}/status`, { status: 'planned' }),
+        fails: 409,
+      },
+      'giving it to a planned set': {
+        book: (applied: string) => request('PATCH', `/api/admin/sets/${set}`, { application: applied }),
+        fails: 400,
+      },
+      'adding a set with it': {
+        book: (applied: string) => addSet(session, { performers: [{ id: aurore }], application: applied }),
+        fails: 400,
+      },
+    }
+    for (const [way, { prepare, book, fails }] of Object.entries(ways)) {
+      for (let i = 0; i < 10; i++) {
+        const applied = await createApplication({ artistId: aurore })
+        await prepare?.(applied)
+        const [booked, rejected] = await Promise.all([book(applied), decide(applied, 'rejected')])
+        if (booked.statusCode === 200) expect(rejected.statusCode, way).toBe(409)
+        else {
+          expect([booked.statusCode, rejected.statusCode], way).toEqual([fails, 200])
+          expect(booked.json().error, way).toBe(REJECTED_APPLICATION)
+        }
+        await checkSessionsInvariants(database.db)
+        // The set is free again for the next run.
+        await request('PATCH', `/api/admin/sets/${set}`, { application: null })
+        await request('PUT', `/api/admin/sets/${set}/status`, { status: 'planned' })
+      }
+    }
   })
 })
 

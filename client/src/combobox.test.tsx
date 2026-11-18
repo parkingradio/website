@@ -178,6 +178,18 @@ describe('Combobox', () => {
     expect(picked()).toBe('b')
   })
 
+  it("shows an unavailable option, which can't be picked with the mouse, Enter, or by typing its label", () => {
+    render(<Strict options={OPTIONS.map((option) => (option.key === 'b' ? { ...option, unavailable: true } : option))} initial="a" />)
+    fireEvent.click(input())
+    expect(option('Brise')).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.mouseDown(option('Brise'))
+    fireEvent.change(input(), { target: { value: 'bri' } })
+    fireEvent.keyDown(input(), { key: 'Enter' })
+    fireEvent.change(input(), { target: { value: 'Brise' } })
+    fireEvent.blur(input())
+    expect(picked()).toBe('a')
+  })
+
   it('starts from the first option when the one picked is no longer among them', () => {
     render(<Strict initial="z" />)
     fireEvent.click(input())

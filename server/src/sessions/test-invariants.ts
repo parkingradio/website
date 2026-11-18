@@ -31,6 +31,11 @@ const INVARIANTS: Record<string, SQL> = {
   "A session's application is that of the collective whose takeover it is": sql`
     select sessions.id::text from sessions join applications on applications.id = sessions.application_id
     where applications.collective_id is distinct from sessions.takeover_id`,
+  "A rejected application has no set or session that's planned or done": sql`
+    select applications.id::text from applications
+    where decision = 'rejected' and (
+      exists (select from sets where application_id = applications.id and status <> 'cancelled')
+      or exists (select from sessions where application_id = applications.id and status <> 'cancelled'))`,
   // The positions the server keeps them in, which the database's constraints only keep from being repeated.
   "A session's sets are in an order: their positions are 0 to n - 1": sql`
     select session_id::text from sets group by session_id having min(position) <> 0 or max(position) <> count(*) - 1 or count(distinct position) <> count(*)`,

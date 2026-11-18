@@ -20,7 +20,7 @@ type CollectivesResponse = paths['/api/admin/collectives']['get']['responses'][2
 type ApplicationsResponse = paths['/api/admin/applications']['get']['responses'][200]['content']['application/json']
 type ApplicationResponse = paths['/api/admin/applications']['post']['responses'][200]['content']['application/json']
 type NewApplication = paths['/api/admin/applications']['post']['requestBody']['content']['application/json']
-type ApplicationStatus = components['schemas']['ApplicationStatus']
+type ApplicationDecision = components['schemas']['ApplicationDecision']
 type SessionsResponse = paths['/api/admin/sessions']['get']['responses'][200]['content']['application/json']
 type SessionResponse = paths['/api/admin/sessions']['post']['responses'][200]['content']['application/json']
 type NewSession = paths['/api/admin/sessions']['post']['requestBody']['content']['multipart/form-data']['session']
@@ -70,7 +70,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
         // Applying through the form created the artist along with their first application.
         const applied = await findApplied(server, artist)
         artistId = applied.artistId
-        await setStatus(server, applied.applicationId, artist.applications[0].status)
+        await decide(server, applied.applicationId, artist.applications[0].decision)
       }
       for (const application of artist.form ? artist.applications.slice(1) : artist.applications) await addApplication(server, { artistId }, application)
     } catch (error) {
@@ -95,7 +95,7 @@ export async function seed({ url, credentials }: SeedOptions): Promise<{ seeded:
         // Applying through the form created the collective along with its first application.
         const applied = await findAppliedCollective(server, collective)
         collectiveId = applied.collectiveId
-        await setStatus(server, applied.applicationId, collective.applications[0].status)
+        await decide(server, applied.applicationId, collective.applications[0].decision)
       }
       for (const application of collective.form ? collective.applications.slice(1) : collective.applications) {
         await addApplication(server, { collectiveId }, application)
@@ -243,17 +243,17 @@ async function firstApplication(server: Server, query: string): Promise<string> 
   return applications[0].id
 }
 
-// Adds an application for the artist or the collective, as an admin would, with its status.
+// Adds an application for the artist or the collective, as an admin would, with what they decided about it.
 async function addApplication(server: Server, owner: { artistId: string } | { collectiveId: string }, application: SeedApplication): Promise<void> {
   const body: NewApplication = { ...applicationFields(application), ...owner }
   if (application.receivedDaysAgo !== undefined) body.receivedAt = quebecDateTime(new Date(Date.now() - application.receivedDaysAgo * DAY_MS))
   const { id } = (await server.call<ApplicationResponse>('POST', '/api/admin/applications', body)).application
-  await setStatus(server, id, application.status)
+  await decide(server, id, application.decision)
 }
 
-// Gives an application its status, which is "new" until then.
-async function setStatus(server: Server, id: string, status: ApplicationStatus): Promise<void> {
-  if (status !== 'new') await server.call('PUT', `/api/admin/applications/${id}/status`, { status })
+// Gives an application what admins decided about it, which is "new" until then.
+async function decide(server: Server, id: string, decision: ApplicationDecision): Promise<void> {
+  if (decision !== 'new') await server.call('PUT', `/api/admin/applications/${id}/decision`, { decision })
 }
 
 // The id of the application of the artist or the collective whose days are `days` (see `SeedApplication`), or null when

@@ -2,6 +2,8 @@ import { and, asc, count, desc, eq, exists, gt, gte, inArray, lt, ne, not, or, s
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
+import { REJECTED_APPLICATION } from '../applications/fields.js'
+import type { ApplicationDecision } from '../applications/fields.js'
 import type { Queryable } from '../db/connection.js'
 import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
@@ -80,9 +82,10 @@ function check(broken: BrokenRule | null) {
 
 // Thrown when saving a session or a set, or deleting a collective that has takeovers, would break one of the rules of
 // sessions. The message says which, and `session` and `set` are what's in the way: `set` is a set, if it's one, and
-// `session` is the session in the way, or that set's. Both are null when what's in the way is another of the sets added
-// with a session, which isn't saved, whose place among them is then `otherSetIndex`, and otherwise only if it can't be
-// found anymore, which only something outside the server could cause (see `checkingRules`).
+// `session` is the session in the way, or that set's. Both are null when what's in the way isn't another session or set,
+// e.g. a rejected application (see `checkUncancelled`), when it's another of the sets added with a session, which isn't
+// saved, whose place among them is then `otherSetIndex`, and otherwise only if it can't be found anymore, which only
+// something outside the server could cause (see `checkingRules`).
 export class Conflict extends Refused {
   session: StoredSession | null
   set: StoredSet | null
@@ -266,8 +269,9 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 
 // Every transaction that writes sessions, sets or their performers takes this lock first, and so do deleting an artist,
 // which writes them too, by deleting the artist's rows in set_performers, and their applications (see below), deleting a
-// collective, which mustn't have takeovers, and deleting an application, which takes it from its sets and sessions (see
-// artists/store.ts, collectives/store.ts and applications/store.ts). They're done one at a time, so that:
+// collective, which mustn't have takeovers, deleting an application, which takes it from its sets and sessions, and
+// changing what admins decided about an application, since a rejected one mustn't have sets or sessions that are planned
+// or done (see artists/store.ts, collectives/store.ts and applications/store.ts). They're done one at a time, so that:
 // - Two sessions that would overlap can't both be inserted into the index of the exclusion constraint sessions_no_overlap,
 //   then each wait for the other to end before it could tell whether they overlap, which Postgres would end as a
 //   deadlock, rather than with the constraint's error. Taking an application from a session rewrites its row, which
@@ -277,9 +281,10 @@ async function setWithId(db: Queryable, id: string): Promise<{ session: StoredSe
 //   and so whether the foreign keys hold, rather than failing unexpectedly once they're checked, without locking their
 //   rows, which would keep their profiles from being changed in the meantime, whether a collective that's deleted has
 //   takeovers, the statuses of a session's sets, which its own follows (see `followSets`), who an application belongs
-//   to, which its rules are about (see "Applications" in docs/design/server/sessions.md), and a session's sets'
-//   positions and how many there are, which adding, moving and deleting a set work from, so that the positions stay 0 to
-//   n - 1 (see "sets" in db/schema.ts).
+//   to and whether it's rejected, which its rules are about (see "Applications" in docs/design/server/sessions.md), and
+//   whether an application has sets or sessions that are planned or done, which rejecting it is about, and a session's
+//   sets' positions and how many there are, which adding, moving and deleting a set work from, so that the positions stay
+//   0 to n - 1 (see "sets" in db/schema.ts).
 // - Deleting a session and deleting an artist can't take the artist's rows in set_performers in opposite orders, and
 //   deadlock. Nor can saving a set or a session, which takes a lock on its application's row to check its foreign key
 //   once its own row is written, and deleting that application, which writes the set's or the session's row once it has
@@ -316,30 +321,61 @@ function checkPerformers(tx: Queryable, performers: SentPerformer[]) {
   )
 }
 
-// Who the application `id` belongs to, which it does until the transaction `tx`, which holds the sessions' lock, ends,
-// since deleting it takes it too (see `lockSessions`), and its owner doesn't change. Throws a NoSuchReference when
-// there's no such application.
-async function applicationOwner(tx: Queryable, id: string): Promise<Pick<typeof applications.$inferSelect, 'artistId' | 'collectiveId'>> {
+// Who the application `id` belongs to, and what admins decided about it, which stay as they are until the transaction
+// `tx`, which holds the sessions' lock, ends, since deleting it and changing its decision take it too (see
+// `lockSessions`), and its owner doesn't change. Throws a NoSuchReference when there's no such application.
+async function savedApplication(tx: Queryable, id: string): Promise<Pick<typeof applications.$inferSelect, 'artistId' | 'collectiveId' | 'decision'>> {
   const [found] = isUuid(id)
-    ? await tx.select({ artistId: applications.artistId, collectiveId: applications.collectiveId }).from(applications).where(eq(applications.id, id))
+    ? await tx
+        .select({ artistId: applications.artistId, collectiveId: applications.collectiveId, decision: applications.decision })
+        .from(applications)
+        .where(eq(applications.id, id))
     : []
   if (!found) throw new NoSuchReference(NO_SUCH_APPLICATION)
   return found
 }
 
-// Checks that a session's application, if it has one, is that of the collective whose takeover it is (see
-// "Applications" in docs/design/server/sessions.md), once its fields are checked, so that it's a takeover (see
-// `brokenSessionRule`), and its collective exists. Throws a NoSuchReference or a BrokenFields.
-async function checkSessionApplication(tx: Queryable, { applicationId, takeoverId }: Pick<SessionRow, 'applicationId' | 'takeoverId'>) {
-  if (applicationId === null) return
-  if ((await applicationOwner(tx, applicationId)).collectiveId !== takeoverId) throw new BrokenFields(NOT_THE_SESSIONS_APPLICATION)
+// Whether a set or a session whose application has `decision`, which would have `status`, would break the rule that a
+// rejected application has no set or session that's planned or done (see "Applications" in
+// docs/design/server/sessions.md).
+function breaksRejection({ decision }: { decision: ApplicationDecision }, status: Status): boolean {
+  return decision === 'rejected' && status !== 'cancelled'
 }
 
-// Checks that a set's application is that of one of its performers, `performerIds`, once they're checked. Throws a
-// NoSuchReference or a BrokenFields.
-async function checkSetApplication(tx: Queryable, applicationId: string, performerIds: string[]) {
-  const { artistId } = await applicationOwner(tx, applicationId)
-  if (artistId === null || !performerIds.includes(artistId)) throw new BrokenFields(NOT_THE_SETS_APPLICATION)
+// Checks that a session's application, if it has one, is that of the collective whose takeover it is, and isn't rejected
+// unless the session, with `status`, is cancelled (see "Applications" in docs/design/server/sessions.md), once its fields
+// are checked, so that it's a takeover (see `brokenSessionRule`), and its collective exists. Throws a NoSuchReference or a
+// BrokenFields.
+async function checkSessionApplication(tx: Queryable, { applicationId, takeoverId, status }: Pick<SessionRow, 'applicationId' | 'takeoverId' | 'status'>) {
+  if (applicationId === null) return
+  const application = await savedApplication(tx, applicationId)
+  if (application.collectiveId !== takeoverId) throw new BrokenFields(NOT_THE_SESSIONS_APPLICATION)
+  if (breaksRejection(application, status)) throw new BrokenFields(REJECTED_APPLICATION)
+}
+
+// Checks that a set's application is that of one of its performers, `performerIds`, once they're checked, and isn't
+// rejected unless the set, with `status`, is cancelled. Throws a NoSuchReference or a BrokenFields.
+async function checkSetApplication(tx: Queryable, applicationId: string, performerIds: string[], status: Status) {
+  const application = await savedApplication(tx, applicationId)
+  if (application.artistId === null || !performerIds.includes(application.artistId)) throw new BrokenFields(NOT_THE_SETS_APPLICATION)
+  if (breaksRejection(application, status)) throw new BrokenFields(REJECTED_APPLICATION)
+}
+
+// Whether the application `id` has a set or a session that's planned or done, which can't change until the transaction
+// `tx`, which holds the sessions' lock, ends.
+export async function isBooked(tx: Queryable, id: string): Promise<boolean> {
+  const booked = (table: typeof sets | typeof sessions) => exists(tx.select().from(table).where(and(eq(table.applicationId, id), ne(table.status, 'cancelled'))))
+  const { rows } = await tx.execute<{ found: boolean }>(sql`select ${or(booked(sets), booked(sessions))} as found`)
+  return rows[0].found
+}
+
+// Throws a Conflict when a set or a session with the application `applicationId` can't go from status `from` to `to`
+// because that application is rejected, which only happens when it stops being cancelled, since one that isn't can't
+// have a rejected application. In a transaction that holds the sessions' lock, so that the application can't be rejected
+// in the meantime.
+async function checkUncancelled(tx: Queryable, applicationId: string | null, from: Status, to: Status) {
+  if (applicationId === null || from !== 'cancelled' || to === 'cancelled') return
+  if (breaksRejection(await savedApplication(tx, applicationId), to)) throw new Conflict(REJECTED_APPLICATION, null)
 }
 
 // The ids of the performers of the set `setId`, as they're saved.
@@ -440,7 +476,8 @@ async function insertSet(
   { added, position }: { added?: Map<string, number>; position?: number } = {},
 ): Promise<string> {
   await checkPerformers(tx, performers)
-  if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers))
+  // A new set is planned.
+  if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, idsOf(performers), 'planned')
   const row = { ...set, sessionId, position: position ?? (await setCount(tx, sessionId)) }
   const [{ id }] = await checkingSetRules(tx, null, row, (savepoint) => savepoint.insert(sets).values(row).returning({ id: sets.id }), added)
   await addPerformers(tx, id, performers)
@@ -479,10 +516,10 @@ async function sessionRow(tx: Queryable, id: string): Promise<SessionRow | null>
   return session ?? null
 }
 
-// The session of the set `id`, or null when there's no such set.
-async function sessionOfSet(tx: Queryable, id: string): Promise<SessionRow | null> {
-  const [found] = await tx.select({ session: sessions }).from(sets).innerJoin(sessions, eq(sessions.id, sets.sessionId)).where(eq(sets.id, id))
-  return found?.session ?? null
+// The set `id`, without its performers, and its session, or null when there's no such set.
+async function setAndSession(tx: Queryable, id: string): Promise<{ set: SetRow; session: SessionRow } | null> {
+  const [found] = await tx.select({ set: sets, session: sessions }).from(sets).innerJoin(sessions, eq(sessions.id, sets.sessionId)).where(eq(sets.id, id))
+  return found ?? null
 }
 
 export function sessionsStore(db: Queryable): SessionsStore {
@@ -513,7 +550,8 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return db.transaction(async (tx) => {
         await lockSessions(tx)
         await checkTakeover(tx, session.takeoverId)
-        await checkSessionApplication(tx, session)
+        // A new session is planned.
+        await checkSessionApplication(tx, { ...session, status: 'planned' })
         const [row] = await checkingSessionRules(tx, null, session, (savepoint) => savepoint.insert(sessions).values(session).returning({ id: sessions.id }))
         // The sets added so far, by id, with their place among them.
         const added = new Map<string, number>()
@@ -563,6 +601,7 @@ export function sessionsStore(db: Queryable): SessionsStore {
         // With its start and duration, which the status doesn't change.
         const before = await sessionRow(tx, id)
         if (!before) return null
+        await checkUncancelled(tx, before.applicationId, before.status, change.status)
         await checkingSessionRules(tx, id, before, (savepoint) => savepoint.update(sessions).set(change).where(eq(sessions.id, id)))
         // Cancelling it cancels its sets that aren't, and marking it done marks those that are planned.
         if (change.status !== 'planned') {
@@ -629,7 +668,9 @@ export function sessionsStore(db: Queryable): SessionsStore {
         const set = changed(before, changes)
         if (performers) await checkPerformers(tx, performers)
         // Against its new performers, or else those it has.
-        if (set.applicationId !== null) await checkSetApplication(tx, set.applicationId, performers ? idsOf(performers) : await savedPerformerIds(tx, id))
+        if (set.applicationId !== null) {
+          await checkSetApplication(tx, set.applicationId, performers ? idsOf(performers) : await savedPerformerIds(tx, id), set.status)
+        }
         await checkingSetRules(tx, id, set, (savepoint) => savepoint.update(sets).set(changes).where(eq(sets.id, id)))
         if (performers) {
           await tx.delete(setPerformers).where(eq(setPerformers.setId, id))
@@ -643,11 +684,13 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (!isUuid(id)) return null
       return db.transaction(async (tx) => {
         await lockSessions(tx)
-        const session = await sessionOfSet(tx, id)
-        if (!session) return null
+        const found = await setAndSession(tx, id)
+        if (!found) return null
+        const { session, set } = found
         if (session.status === 'cancelled' && change.status !== 'cancelled') {
           throw new Conflict(SESSION_CANCELLED, await sessionWithId(tx, session.id))
         }
+        await checkUncancelled(tx, set.applicationId, set.status, change.status)
         await tx.update(sets).set(change).where(eq(sets.id, id))
         await followSets(tx, session.id, change)
         return sessionWithId(tx, session.id)

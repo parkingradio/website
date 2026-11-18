@@ -21,6 +21,9 @@ type ApplicationFieldProps = {
   own: ApplicationLink | null
   // The application picked, or null for none.
   selected: ApplicationLink | null
+  // Whether the set or the session is cancelled: only then can a rejected application be picked, which is greyed out
+  // otherwise (see "Applications" in docs/design/server/sessions.md).
+  cancelled: boolean
   // Who an application is for, as its label starts with in a set's form. In a session's, it's the takeover's collective,
   // which is left out.
   ownerName?: (application: Application) => string | undefined
@@ -34,7 +37,7 @@ type ApplicationFieldProps = {
 
 // The application picked among `candidates`, or none, or the one picked before, which stays among the options even when
 // it isn't one of them anymore, e.g. once its artist is taken out of the set, so that what's wrong with it can be seen.
-export function ApplicationField({ candidates, applications, own, selected, ownerName, empty, onChange, error, onLeave }: ApplicationFieldProps) {
+export function ApplicationField({ candidates, applications, own, selected, cancelled, ownerName, empty, onChange, error, onLeave }: ApplicationFieldProps) {
   const id = useId()
   const optionOf = (link: ApplicationLink): ComboboxOption => {
     const application = applications?.find((application) => application.id === link.id)
@@ -45,6 +48,7 @@ export function ApplicationField({ candidates, applications, own, selected, owne
       key: link.id,
       label: name ? `${name}, ${receivedOn(application)}` : capitalized(receivedOn(application)),
       detail: `${STATUS_LABELS[application.status]} · ${listedDates(application.dates)}`,
+      unavailable: application.decision === 'rejected' && !cancelled,
     }
   }
   const kept = [own, selected].filter(

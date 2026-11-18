@@ -42,6 +42,8 @@ export type SessionFormProps = {
   initial: SessionFormValues
   // Whether the session is announced, which it has to have a date for.
   announced?: boolean
+  // Whether the session is cancelled, which a new one isn't.
+  cancelled?: boolean
   // The address of the session's flyer, if it has one.
   flyer?: string | null
   // The collectives a takeover's is picked from, or null when they couldn't be loaded, which leaves the session's as it
@@ -65,6 +67,7 @@ export type SessionFormProps = {
 export function SessionForm({
   initial,
   announced = false,
+  cancelled = false,
   flyer: current = null,
   collectives,
   applications,
@@ -138,6 +141,7 @@ export function SessionForm({
               applications={applications}
               own={initial.application}
               selected={form.application}
+              cancelled={cancelled}
               empty={form.takeover ? 'Aucune candidature de ce collectif.' : "Choisissez d'abord le collectif."}
               onChange={(application) => update({ application })}
               error={shown('application')}

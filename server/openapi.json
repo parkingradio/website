@@ -716,13 +716,16 @@
           "status": {
             "$ref": "#/components/schemas/ApplicationStatus"
           },
-          "statusUpdatedBy": {
+          "decision": {
+            "$ref": "#/components/schemas/ApplicationDecision"
+          },
+          "decisionUpdatedBy": {
             "type": [
               "string",
               "null"
             ]
           },
-          "statusUpdatedAt": {
+          "decisionUpdatedAt": {
             "anyOf": [
               {
                 "type": "string",
@@ -763,12 +766,22 @@
           "updatedBy",
           "updatedAt",
           "status",
-          "statusUpdatedBy",
-          "statusUpdatedAt",
+          "decision",
+          "decisionUpdatedBy",
+          "decisionUpdatedAt",
           "sets",
           "sessions"
         ],
         "additionalProperties": false
+      },
+      "ApplicationDecision": {
+        "type": "string",
+        "enum": [
+          "new",
+          "accepted",
+          "rejected"
+        ],
+        "description": "What admins decide about an application: its status, unless its sets or sessions give it another (see Status)"
       },
       "ApplicationFields": {
         "type": "object",
@@ -984,10 +997,11 @@
         "enum": [
           "new",
           "accepted",
-          "scheduled",
+          "planned",
           "done",
           "rejected"
-        ]
+        ],
+        "description": "Worked out from what admins decided and from the statuses of its sets or sessions"
       },
       "Artist": {
         "type": "object",
@@ -7193,10 +7207,10 @@
         }
       }
     },
-    "/api/admin/applications/{id}/status": {
+    "/api/admin/applications/{id}/decision": {
       "put": {
-        "operationId": "update_application_status",
-        "summary": "Accepts or rejects an application, or gives it another status",
+        "operationId": "update_application_decision",
+        "summary": "Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions give it another (see Status)",
         "tags": [
           "Applications"
         ],
@@ -7207,12 +7221,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "status": {
-                    "$ref": "#/components/schemas/ApplicationStatus"
+                  "decision": {
+                    "$ref": "#/components/schemas/ApplicationDecision"
                   }
                 },
                 "required": [
-                  "status"
+                  "decision"
                 ],
                 "additionalProperties": false
               }
@@ -7287,6 +7301,16 @@
             }
           },
           "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Default Response",
             "content": {
               "application/json": {

@@ -2,7 +2,8 @@
 
 At `/admin/candidatures`: the applications of artists and collectives for a set, for the team to go through (see
 [Applications](../../server/applications.md)). Each application's status is shown as "nouvelle" (new), "retenue"
-(accepted), "planifiée" (scheduled), "faite" (done) or "refusée" (rejected). Wherever applications are listed, their rows
+(accepted), "planifiée" (planned), "jouée" (done) or "refusée" (rejected) (see
+[Status, in Applications](../../server/applications.md#status)). Wherever applications are listed, their rows
 are colored by status (see [Status colors](layout.md#status-colors)), and "nouvelle" is in bold. What the artist would do
 is picked from a list, and shown by its name, the same on the "Appliquer" form and on the admin pages, plus "autre" in a
 few words.
@@ -10,7 +11,8 @@ few words.
 The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
 by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status,
-as a dropdown that changes it, without confirming.
+as a dropdown that changes it, without confirming, to those it can be given (see [Statuses](#statuses)), or only its
+name for a "planifiée" or "jouée" application, which its sets or sessions make so.
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
 "retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first. When
@@ -23,7 +25,7 @@ collective, as [Artistes](artistes.md) searches them, their performance types, t
 the artist would like to play, written out (e.g. "jeudi 10 décembre 2026"), so that "décembre" or "jeudi" finds the
 applications with a day in December, or a Thursday, and "26 déc" those with December 26th. Clicking "Reçue le"
 (`received`), "Artiste" (`artist`), "Ville" (`city`, by city, then country), "Dates" (`dates`, by the first day the
-artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée, faite, then refusée) sorts the list by
+artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée, jouée, then refusée) sorts the list by
 that column, and clicking it again sorts it the other way around. The status buttons count the applications the search
 finds.
 
@@ -32,7 +34,11 @@ search and order in its address (see [Going through the list](#going-through-the
 it was received (unless that's the day it was created), who created it and when, or that it was sent through the form,
 and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
-- "Statut": the status, as buttons that change it, and which admin last changed it, and when.
+- "Statut": the five statuses, as buttons, the application's in black (see [Status colors](layout.md#status-colors)),
+  where those it can be given change it (see [Statuses](#statuses)), and the others are greyed out, saying why (see
+  [Controls that can't be used](layout.md#controls-that-cant-be-used)), e.g. « Une candidature est planifiée quand un de
+  ses sets est planifié. ». Under them, which admin last changed what was decided, and when, unless its sets or sessions
+  make it "planifiée" or "jouée", which no admin chose.
 - "Artiste" or "Collectif": the artist's or the collective's photo and profile, as their page shows them (see
   [An artist's page](artistes.md#an-artists-page) and [A collective's page](artistes.md#a-collectives-page)), starting
   with their name, which links to their page. It leaves out who added them and who last changed them, and what their
@@ -53,7 +59,10 @@ and who last changed it and when, if anyone did. From top to bottom, it then sho
   "nouvelle session", with the application (see [From an application](sessions.md#from-an-application)): it can't be
   used until a session is picked, saying « Choisissez d'abord une session. ». "annuler" closes the field. When the
   sessions can't be loaded, the field says so, and only offers "nouvelle session". A collective's application's
-  "Sessions" has "créer une session", which leads to "nouvelle session" with the application.
+  "Sessions" has "créer une session", which leads to "nouvelle session" with the application. Neither can be used while
+  the application is rejected, since its new set or session would be planned (see
+  [Applications, in Sessions](../../server/sessions.md#applications)), saying « Une candidature refusée ne peut pas avoir
+  de set ou de session planifié. ».
 - "Supprimer": deletes the application for good, after confirming, then shows the list as "← candidatures" does. The
   artist or the collective stays, and so do the sets or sessions that come from it. When there are some, the page says
   « Les sets associés restent. » or « Les sessions associées restent. ».
@@ -67,6 +76,13 @@ known artist or collective. The application form says what's wrong with each fie
 (see [Artistes](artistes.md)): it checks the application as the server does (see
 [Applications](../../server/applications.md)), for immediate feedback. The server's check is the one that counts: if it
 refuses what the form accepted, the form shows the server's message.
+
+## Statuses
+
+Admins only give an application what they decide, "nouvelle", "retenue" or "refusée" (see
+[Status, in Applications](../../server/applications.md#status)), and only when it's then the status it shows: nothing
+while its sets or sessions make it "planifiée" or "jouée", and not "nouvelle" while it has sets or sessions, all of them
+cancelled, which keep it "retenue".
 
 ## Going through the list
 
@@ -88,8 +104,8 @@ are skipped: after accepting the 5th of 12 new applications, « suivante » show
 ## Endpoints
 
 - `GET /api/admin/applications`, for the list, and on an application's page, for « précédente » and « suivante », and
-  `PUT /api/admin/applications/:id/status`, to change a status from the list.
-- `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/status` and
+  `PUT /api/admin/applications/:id/decision`, to change a status from the list.
+- `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/decision` and
   `DELETE /api/admin/applications/:id`, for an application's page.
 - `GET /api/admin/sessions`, on an artist's application's page, to pick the session to add a set to, each time
   "créer un set" opens the field.

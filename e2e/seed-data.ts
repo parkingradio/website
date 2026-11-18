@@ -23,12 +23,14 @@ export type SeedArtist = {
 }
 
 type ApplicationFields = components['schemas']['ApplicationFields']
-type ApplicationStatus = components['schemas']['ApplicationStatus']
+type ApplicationDecision = components['schemas']['ApplicationDecision']
 
 export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
   // The days the artist would like to play, as how many days after the day it's seeded (before, if negative).
   days: number[]
-  status: ApplicationStatus
+  // What admins decided about it, which is its status unless the sets or the sessions that come from it make it planned or
+  // done (see "Status" in docs/design/server/applications.md).
+  decision: ApplicationDecision
   // How many days before the day it's seeded the artist sent it, or when it's seeded if it's left out. Not for the
   // application sent through the form, which is received when it's sent.
   receivedDaysAgo?: number
@@ -38,8 +40,8 @@ export type SeedApplication = Omit<ApplicationFields, 'dates'> & {
 // they only know by name.
 const LEFT_OUT = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' } satisfies Partial<Profile>
 
-function application(days: number[], status: ApplicationStatus, fields: Partial<SeedApplication> = {}): SeedApplication {
-  return { days, status, timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '', ...fields }
+function application(days: number[], decision: ApplicationDecision, fields: Partial<SeedApplication> = {}): SeedApplication {
+  return { days, decision, timeSlots: [], performanceTypes: ['dj'], otherPerformanceType: '', details: '', ...fields }
 }
 
 const EVENING = { start: '18:00', end: '22:00' }
@@ -72,7 +74,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
     photo: '#e4572e',
     applications: [
       application([45, 52], 'new', { timeSlots: [EVENING], receivedDaysAgo: 2 }),
-      application([-30], 'done', { timeSlots: [EVENING], receivedDaysAgo: 120 }),
+      application([-30], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 120 }),
     ],
   },
   {
@@ -191,7 +193,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       bio: "Venu par l'ancien formulaire Google, qui ne demandait ni la ville ni les liens.",
       email: 'noe.lavigne@example.com',
     },
-    applications: [application([-200], 'done', { receivedDaysAgo: 300 })],
+    applications: [application([-200], 'accepted', { receivedDaysAgo: 300 })],
   },
   {
     // Known only by name.
@@ -199,8 +201,8 @@ export const SEED_ARTISTS: SeedArtist[] = [
     applications: [
       // Her set at the guest mixes was cancelled, then she was booked again for Les Nuits Basses' takeover, which was
       // cancelled too: two sets come from it.
-      application([30, 60], 'scheduled', { performanceTypes: ['live-performance'], receivedDaysAgo: 40 }),
-      application([-180], 'done', { receivedDaysAgo: 280 }),
+      application([30, 60], 'accepted', { performanceTypes: ['live-performance'], receivedDaysAgo: 40 }),
+      application([-180], 'accepted', { receivedDaysAgo: 280 }),
     ],
   },
   {
@@ -222,7 +224,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       bio: 'Pays connu, ville inconnue.',
       email: 'takeshi.mori@example.com',
     },
-    applications: [application([-100], 'done', { performanceTypes: ['live-performance'], receivedDaysAgo: 210 })],
+    applications: [application([-100], 'accepted', { performanceTypes: ['live-performance'], receivedDaysAgo: 210 })],
   },
   {
     profile: {
@@ -247,9 +249,9 @@ export const SEED_ARTISTS: SeedArtist[] = [
     },
     photo: '#6a994e',
     applications: [
-      application([20], 'scheduled', { timeSlots: [EVENING], receivedDaysAgo: 60 }),
-      application([-90], 'done', { timeSlots: [EVENING], receivedDaysAgo: 180 }),
-      application([-365], 'done', { receivedDaysAgo: 400 }),
+      application([20], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 60 }),
+      application([-90], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 180 }),
+      application([-365], 'accepted', { receivedDaysAgo: 400 }),
     ],
   },
   {
@@ -335,7 +337,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'felix.ouellet@example.com',
       phone: '418 555-0111',
     },
-    applications: [application([50], 'scheduled', { performanceTypes: ['full-band'], receivedDaysAgo: 35 })],
+    applications: [application([50], 'accepted', { performanceTypes: ['full-band'], receivedDaysAgo: 35 })],
   },
   {
     profile: {
@@ -397,7 +399,7 @@ export const SEED_ARTISTS: SeedArtist[] = [
       email: 'antoine.bergeron@example.com',
       phone: '450 555-0116',
     },
-    applications: [application([-45], 'done', { timeSlots: [MIDDAY], receivedDaysAgo: 100 })],
+    applications: [application([-45], 'accepted', { timeSlots: [MIDDAY], receivedDaysAgo: 100 })],
   },
   {
     profile: {
@@ -562,7 +564,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
         photo: '#c73e1d',
       },
     ],
-    applications: [application([90], 'scheduled', { timeSlots: [MIDDAY], performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire' })],
+    applications: [application([90], 'accepted', { timeSlots: [MIDDAY], performanceTypes: ['live-performance'], otherPerformanceType: 'Synthé modulaire' })],
   },
   {
     profile: {
@@ -593,7 +595,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     ],
     applications: [
       application([30, 31], 'accepted', { timeSlots: [EVENING] }),
-      application([-60], 'done', { timeSlots: [EVENING], receivedDaysAgo: 150 }),
+      application([-60], 'accepted', { timeSlots: [EVENING], receivedDaysAgo: 150 }),
     ],
   },
   {
@@ -608,7 +610,7 @@ export const SEED_COLLECTIVES: SeedCollective[] = [
     },
     members: [{ name: 'Jah Pierre' }],
     photo: '#7d5ba6',
-    applications: [application([-10], 'done', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
+    applications: [application([-10], 'new', { timeSlots: [MIDDAY, AFTERNOON], receivedDaysAgo: 90 })],
   },
   {
     // Known only by name, from its past takeover, with its artists, who are new, known by name too.
@@ -750,10 +752,12 @@ export const SEED_SESSIONS: SeedSession[] = [
       { performers: ['Marée Basse'], durationMinutes: null, performanceTypes: ['live-performance'], application: [30, 60], status: 'cancelled' },
     ],
   },
-  // A takeover put together before its date is known, whose last set's duration isn't known either.
+  // A takeover put together before its date is known, whose last set's duration isn't known either, which comes from its
+  // collective's application, which it makes planned without a date.
   {
     type: 'takeover',
     takeover: 'soeurs.ondes@example.com',
+    application: [90],
     durationMinutes: 180,
     status: 'planned',
     sets: [
@@ -763,7 +767,8 @@ export const SEED_SESSIONS: SeedSession[] = [
     ],
   },
   // An evening whose sets are being changed: they add up to more than it, which its page says (see "Sets' order" in
-  // docs/design/server/sessions.md). It has no description, which its type doesn't give.
+  // docs/design/server/sessions.md). It has no description, which its type doesn't give. Its first set comes from its
+  // artist's accepted application, which it makes planned.
   {
     type: 'other',
     name: 'SOIRÉE À REVOIR',
@@ -771,7 +776,7 @@ export const SEED_SESSIONS: SeedSession[] = [
     durationMinutes: 120,
     status: 'planned',
     sets: [
-      { performers: ['boreale@example.com'], durationMinutes: 60, performanceTypes: ['vinyl'], status: 'planned' },
+      { performers: ['boreale@example.com'], durationMinutes: 60, performanceTypes: ['vinyl'], application: [60, 61, 62, 67, 68, 69], status: 'planned' },
       { performers: ['Ondine'], durationMinutes: 45, performanceTypes: ['live-performance'], status: 'planned' },
       { performers: ['Jah Pierre'], durationMinutes: 30, status: 'planned' },
     ],

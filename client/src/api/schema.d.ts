@@ -1752,7 +1752,7 @@ export interface paths {
         patch: operations["update_application"];
         trace?: never;
     };
-    "/api/admin/applications/{id}/status": {
+    "/api/admin/applications/{id}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -1760,8 +1760,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Accepts or rejects an application, or gives it another status */
-        put: operations["update_application_status"];
+        /** Accepts or rejects an application, or makes it new again: its status, unless its sets or sessions give it another (see Status) */
+        put: operations["update_application_decision"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2941,13 +2941,19 @@ export interface components {
             updatedBy: string | null;
             updatedAt: string | null;
             status: components["schemas"]["ApplicationStatus"];
-            statusUpdatedBy: string | null;
-            statusUpdatedAt: string | null;
+            decision: components["schemas"]["ApplicationDecision"];
+            decisionUpdatedBy: string | null;
+            decisionUpdatedAt: string | null;
             /** @description The sets that come from it, which only an artist's application has, in the order of the sessions, then of their sets */
             sets: components["schemas"]["ApplicationSet"][];
             /** @description The sessions that come from it, which only a collective's application has, in the order of the sessions */
             sessions: components["schemas"]["ApplicationSession"][];
         };
+        /**
+         * @description What admins decide about an application: its status, unless its sets or sessions give it another (see Status)
+         * @enum {string}
+         */
+        ApplicationDecision: "new" | "accepted" | "rejected";
         ApplicationFields: {
             /** @description Saved sorted, without duplicates. Past days are allowed */
             dates: string[];
@@ -2998,8 +3004,11 @@ export interface components {
                 start: string | null;
             };
         };
-        /** @enum {string} */
-        ApplicationStatus: "new" | "accepted" | "scheduled" | "done" | "rejected";
+        /**
+         * @description Worked out from what admins decided and from the statuses of its sets or sessions
+         * @enum {string}
+         */
+        ApplicationStatus: "new" | "accepted" | "planned" | "done" | "rejected";
         Artist: {
             id: string;
             /** Format: date-time */
@@ -4980,7 +4989,7 @@ export interface operations {
             };
         };
     };
-    update_application_status: {
+    update_application_decision: {
         parameters: {
             query?: never;
             header?: never;
@@ -4992,7 +5001,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    status: components["schemas"]["ApplicationStatus"];
+                    decision: components["schemas"]["ApplicationDecision"];
                 };
             };
         };
@@ -5039,6 +5048,15 @@ export interface operations {
             };
             /** @description Default Response */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

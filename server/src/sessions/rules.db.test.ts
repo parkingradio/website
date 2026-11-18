@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
-import { sql } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
@@ -158,12 +158,34 @@ const SESSION_CANCELLED = 'This session is cancelled'
 const TRACK_TAKEN = "This SoundCloud track is another set's"
 const VIDEO_TAKEN = "This YouTube video is another set's"
 const HAS_TAKEOVERS = 'This collective has takeovers: give them another collective, or another type, first'
+const REJECTED = "A rejected application has no set or session that's planned or done"
+
+// What admins decided about the application of the session or the set `id`, if it has one.
+async function decisionOf({ database }: Context, table: 'sessions' | 'sets', id: string): Promise<string | null> {
+  const { rows } = await database.db.execute<{ decision: string }>(
+    sql`select applications.decision from ${sql.identifier(table)} join applications on applications.id = application_id where ${sql.identifier(table)}.id = ${id}`,
+  )
+  return rows[0]?.decision ?? null
+}
+
+// Checks a 409 that says a session or a set can't stop being cancelled, to `status`, since its application is rejected.
+async function expectRejected(body: Body, context: Context, table: 'sessions' | 'sets', id: string, status: string) {
+  expect(body.session).toBeNull()
+  expect(body.set).toBeNull()
+  expect(status).not.toBe('cancelled')
+  expect(await decisionOf(context, table, id)).toBe('rejected')
+}
 
 // An id that's never one of anything's.
 const NONE = '00000000-0000-4000-8000-000000000000'
 
 function pick(ids: string[], index: number): string {
   return ids.length === 0 ? NONE : ids[index % ids.length]
+}
+
+// The id of the application at `index` (see `pick`).
+function applicationAt(context: Context, index: number): string {
+  return pick(context.ids.applications.map(({ id }) => id), index)
 }
 
 const STATUS = fc.constantFrom('planned', 'done', 'cancelled')
@@ -453,6 +475,7 @@ const OPERATIONS = {
         const { start, durationMinutes } = (await send(context, 'GET', `/api/admin/sessions/${id}`)).json().session as Session
         expectOverlappingSession(body.session, id, period(start!, durationMinutes))
       },
+      [REJECTED]: (body, { session, status }, context) => expectRejected(body, context, 'sessions', pick(context.ids.sessions, session), status),
     },
   } satisfies Operation<{ session: number; status: string }>,
 
@@ -519,6 +542,7 @@ const OPERATIONS = {
         expect(body.session?.sets.map(({ id }) => id)).toContain(pick(context.ids.sets, set))
         expect(body.set).toBeNull()
       },
+      [REJECTED]: (body, { set, status }, context) => expectRejected(body, context, 'sets', pick(context.ids.sets, set), status),
     },
   } satisfies Operation<{ set: number; status: string }>,
 
@@ -580,11 +604,28 @@ const OPERATIONS = {
     statusRequest: (context, set) => ({ deletedSet: pick(context.ids.sets, set) }),
   } satisfies Operation<number>,
 
+  // What admins decide about an application: rejecting it fails while it has a set or a session that's planned or done.
+  decideApplication: {
+    weight: 2,
+    args: fc.record({ application: fc.nat(), decision: mostly(fc.constantFrom('new', 'accepted', 'rejected'), fc.constantFrom('planned', 'scheduled')) }),
+    run: (context, { application, decision }) => send(context, 'PUT', `/api/admin/applications/${applicationAt(context, application)}/decision`, { decision }),
+    conflicts: {
+      [REJECTED]: async (_body, { application, decision }, context) => {
+        expect(decision).toBe('rejected')
+        const id = applicationAt(context, application)
+        const { rows } = await context.database.db.execute(sql`
+          select from sets where application_id = ${id} and status <> 'cancelled'
+          union all select from sessions where application_id = ${id} and status <> 'cancelled'`)
+        expect(rows.length, 'its sets and sessions that are planned or done').toBeGreaterThan(0)
+      },
+    },
+  } satisfies Operation<{ application: number; decision: string }>,
+
   // Takes the application from its sets and sessions.
   deleteApplication: {
     weight: 1,
     args: fc.nat(),
-    run: (context, application) => remove(context, `/api/admin/applications/${pick(context.ids.applications.map(({ id }) => id), application)}`),
+    run: (context, application) => remove(context, `/api/admin/applications/${applicationAt(context, application)}`),
   } satisfies Operation<number>,
 
   // Takes the artist out of their sets, and their applications from them.
@@ -640,11 +681,13 @@ async function buildApp(database: TestDatabase) {
   return app
 }
 
-// Empties the database, but for 4 artists, 2 collectives, an application of each, and 2 sessions of 4 hours, one of them
-// announced, and the other without a date, which is the second collective's takeover, and comes from its application,
-// each with 2 sets, one after the other, the first of which comes from its performer's application, so that even short
-// sequences act on sets, on a collective with a takeover, on applications that sets and sessions come from, and on an
-// announced session, and returns their ids, in the order they were added.
+// Empties the database, but for 4 artists, 2 collectives, an application of each, the second artist's and the first
+// collective's rejected, and 3 sessions of 4 hours: one announced, one without a date, which is the second collective's
+// takeover, and comes from its application, each with 2 sets, one after the other, the first of which comes from its
+// performer's application, while the second artist's, which is cancelled, comes from theirs, and the first collective's
+// takeover, without a date, cancelled, from its application, without sets. So even short sequences act on sets, on a
+// collective with a takeover, on applications that sets and sessions come from, on an announced session, and on
+// cancelled sets and sessions whose applications are rejected. Returns their ids, in the order they were added.
 async function reset(database: TestDatabase): Promise<Ids> {
   await database.db.execute(sql`truncate sessions, artists, collectives cascade`)
   const profile = { country: '' as const, city: '', links: {}, phone: '' }
@@ -667,20 +710,26 @@ async function reset(database: TestDatabase): Promise<Ids> {
     .returning({ id: applications.id, artistId: applications.artistId, collectiveId: applications.collectiveId })
   const applicationIds = applicationRows.map(({ id, artistId, collectiveId }) => ({ id, owner: (artistId ?? collectiveId)! }))
   const applicationOf = (owner: string) => applicationIds.find((candidate) => candidate.owner === owner)!.id
+  const rejected = [artistIds[1], collectiveIds[0]].map(applicationOf)
+  await database.db.update(applications).set({ decision: 'rejected' }).where(inArray(applications.id, rejected))
   const sessionRows = await database.db
     .insert(sessions)
     .values([
       { startAt: new Date('2026-11-15T02:00:00Z'), type: 'guest-mixes' as const, takeoverId: null, announced: true },
       { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[1], applicationId: applicationOf(collectiveIds[1]) },
+      { startAt: null, type: 'takeover' as const, takeoverId: collectiveIds[0], applicationId: applicationOf(collectiveIds[0]), status: 'cancelled' as const },
     ].map((session) => ({ ...session, durationMinutes: 240, name: '', createdBy: 'seed' })))
     .returning({ id: sessions.id })
   const sessionIds = sessionRows.map(({ id }) => id)
   const setIds: string[] = []
-  for (const sessionId of sessionIds) {
+  // The cancelled takeover, the last one, has none.
+  for (const sessionId of sessionIds.slice(0, -1)) {
     for (const position of [0, 1]) {
       const artistId = artistIds[setIds.length % artistIds.length]
-      const applicationId = position === 0 ? applicationOf(artistId) : null
-      const set = { sessionId, position, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], applicationId, createdBy: 'seed' }
+      const isRejected = rejected.includes(applicationOf(artistId))
+      const applicationId = position === 0 || isRejected ? applicationOf(artistId) : null
+      const status = isRejected ? ('cancelled' as const) : ('planned' as const)
+      const set = { sessionId, position, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [], applicationId, status, createdBy: 'seed' }
       const [{ id }] = await database.db.insert(sets).values(set).returning({ id: sets.id })
       await database.db.insert(setPerformers).values({ setId: id, artistId, position: 0 })
       setIds.push(id)

@@ -71,6 +71,11 @@ and background, and those of rejected applications and of cancelled sessions and
 color of their own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't
 told by color alone.
 
+Buttons that change a status, e.g. on a session's page, show the status the entry has in black, even when it can't be
+picked (see [Controls that can't be used](#controls-that-cant-be-used)), e.g. an application's that its sets give it,
+and the others only turn grey while hovered, rather than black like other buttons, so that the one just clicked doesn't
+look picked when the entry doesn't get that status, e.g. when saving it fails.
+
 ## Warnings
 
 A warning, about something that's probably a mistake but that doesn't prevent anything, e.g. a session's sets that add up
@@ -92,7 +97,8 @@ A control that a rule keeps from being used, e.g. "ajouter un set" while a sessi
 greyed out, and its tooltip says why (see [Tooltips](#tooltips)), rather than the page explaining the rule in a
 sentence. It keeps the keyboard's focus, so that its tooltip can be read, and screen readers announce it as unavailable.
 Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
-without a tooltip.
+without a tooltip. An option that a rule keeps from being picked in a list of options, e.g. a rejected application in a
+planned set's form, is listed greyed out, and screen readers announce it as unavailable.
 
 A dropdown that a rule keeps from being used in every row of a list, e.g. the statuses of a cancelled session's sets, is
 replaced by its value, written out, and the list says why once, above it, rather than in a tooltip.

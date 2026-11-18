@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { DATE_TIME_DESCRIPTION, EARLIEST_INSTANT, TIME_OF_DAY, dateTimeWith, dayWith } from '../api/formats.js'
 import { line, text } from '../artists/profile.js'
+import type { Status } from '../sessions/fields.js'
 
 // An application's fields: the lists and rules every application has to follow (see
 // docs/design/server/applications.md), as the zod schemas the server checks applications with, which openapi.json is
@@ -22,13 +23,37 @@ export const PERFORMANCE_TYPES = ['dj', 'vinyl', 'live-performance', 'rap', 'ful
 export const PerformanceTypeId = z.enum(PERFORMANCE_TYPES, { error: "Une des prestations n'est pas dans la liste." }).meta({ id: 'PerformanceTypeId' })
 export type PerformanceTypeId = z.infer<typeof PerformanceTypeId>
 
-// Admins follow applications on the admin pages, in this order: every application starts as "new", then is "accepted"
-// or "rejected", and an accepted one is "scheduled" once a date has been set with the artist, then "done" once they have
-// played. This order is only a convention: admins can change a status to any other. Only admins see the error.
-export const APPLICATION_STATUSES = ['new', 'accepted', 'scheduled', 'done', 'rejected'] as const
-export const BAD_STATUS = `The status must be one of ${APPLICATION_STATUSES.join(', ')}`
-export const ApplicationStatus = z.enum(APPLICATION_STATUSES, { error: BAD_STATUS }).meta({ id: 'ApplicationStatus' })
+// What admins decide about an application, which is all that's stored of its status: every application starts as "new",
+// then admins accept or reject it, or make it new again. Only admins see the error.
+export const APPLICATION_DECISIONS = ['new', 'accepted', 'rejected'] as const
+export const BAD_DECISION = `The decision must be one of ${APPLICATION_DECISIONS.join(', ')}`
+export const ApplicationDecision = z
+  .enum(APPLICATION_DECISIONS, { error: BAD_DECISION })
+  .meta({ id: 'ApplicationDecision', description: 'What admins decide about an application: its status, unless its sets or sessions give it another (see Status)' })
+export type ApplicationDecision = z.infer<typeof ApplicationDecision>
+
+// An application's status, worked out from its decision and its sets' or sessions' statuses (see `applicationStatus`), in
+// the order applications usually go through them.
+export const APPLICATION_STATUSES = ['new', 'accepted', 'planned', 'done', 'rejected'] as const
+export const ApplicationStatus = z
+  .enum(APPLICATION_STATUSES)
+  .meta({ id: 'ApplicationStatus', description: 'Worked out from what admins decided and from the statuses of its sets or sessions' })
 export type ApplicationStatus = z.infer<typeof ApplicationStatus>
+
+// The status of an application whose decision is `decision`, and whose sets or sessions have `linked` statuses (see
+// "Status" in docs/design/server/applications.md): the first of these that applies. The client has a copy, to offer only
+// the decisions that change what an application shows (see client/src/application-fields.ts).
+export function applicationStatus(decision: ApplicationDecision, linked: readonly Status[]): ApplicationStatus {
+  if (decision === 'rejected') return 'rejected'
+  if (linked.includes('planned')) return 'planned'
+  if (linked.includes('done')) return 'done'
+  // Otherwise, they're all cancelled, if there are any.
+  return decision === 'accepted' || linked.length > 0 ? 'accepted' : 'new'
+}
+
+// The rule between applications and their sets and sessions (see "Applications" in docs/design/server/sessions.md),
+// which every error about it states.
+export const REJECTED_APPLICATION = "A rejected application has no set or session that's planned or done"
 
 export const OTHER_PERFORMANCE_TYPE_MAX_LENGTH = 60
 const DETAILS_MAX_LENGTH = 2000

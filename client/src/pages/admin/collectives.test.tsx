@@ -88,8 +88,9 @@ const APPLICATION: Application = {
   updatedBy: null,
   updatedAt: null,
   status: 'accepted',
-  statusUpdatedBy: null,
-  statusUpdatedAt: null,
+  decision: 'accepted',
+  decisionUpdatedBy: null,
+  decisionUpdatedAt: null,
   sets: [],
   sessions: [],
 }

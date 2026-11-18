@@ -123,6 +123,8 @@ changing statuses instead (see [Status](#status)). Requests fail with 409 for:
 - adding or changing a session so that it overlaps another one, or un-cancelling it when it would then overlap one,
 - adding a set to a cancelled session, moving a set that isn't cancelled into one, or un-cancelling one of its sets,
 - giving a set a track or a video that's another set's, including another set added in the same request,
+- un-cancelling a set or a session, i.e. marking it planned or done, whose application is rejected (see
+  [Applications](#applications)),
 - deleting a collective that has takeovers.
 
 These 409s also have `session` and `set`, what's in the way, as the endpoints return them, so that it can be named and
@@ -132,9 +134,9 @@ in the way, or that set's session. In particular:
 - A set that's added to, moved into, or un-cancelled in a cancelled session has that session in the way.
 - Deleting a collective that has takeovers has one of them in the way.
 - When several things are in the way, it's one of them.
-- Both are null for the 409s that aren't about a session or a set, and when the set in the way is another one of the
-  same request, which `otherSetIndex` gives instead, by its place in the list of sets sent, from 0 (see
-  [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
+- Both are null for the 409s that aren't about a session or a set, e.g. those about a rejected application, and when the
+  set in the way is another one of the same request, which `otherSetIndex` gives instead, by its place in the list of
+  sets sent, from 0 (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
 ## Sets' order
 
@@ -163,7 +165,8 @@ deleting it, stops it counting.
 ## Status
 
 A new session or set is `"planned"`, then `"done"` once it's been played, or `"cancelled"`, e.g. a set whose artist
-didn't show up. Any status can be changed to any other, except as below. Statuses only change when an admin:
+didn't show up. Any status can be changed to any other, except as below, and except that a cancelled set or session
+whose application is rejected stays cancelled (see [Applications](#applications)). Statuses only change when an admin:
 
 - changes a session's or a set's status,
 - adds a set,
@@ -273,7 +276,8 @@ A set or a session can have the application it comes from (see [Applications](ap
 the other: its `application`, which neither has to have. A set's is an artist's application, whose artist is one of the
 set's performers, and a session's is a collective's application, whose collective is the one whose takeover the session
 is. An application can be several sets' or sessions', e.g. a cancelled set's and the set that replaces it, and it lists
-them (see [Applications](applications.md)). Neither changes the other's status: admins change each one's themselves.
+them (see [Applications](applications.md)). Their statuses make the application's (see
+[Status, in Applications](applications.md#status)), while an application never changes theirs.
 
 Requests send `application` as the application's id, or null, or a blank string, when there's none. One that isn't a
 string or null fails with 400 (`"The application must be an application's id, or null"`), and so does a string that
@@ -285,8 +289,18 @@ performers exist. So, in the same request, taking the application's artist out o
 `application` as null, or as an application of one of its other performers, changing a session that has an application
 to another type takes sending `application` as null, and changing its takeover's collective takes sending it as null,
 or as an application of the new collective. A change that only sends `application` is checked against the performers,
-or the type and the collective, that the set or the session already has. These rules hold even for requests sent at the
-same time.
+or the type and the collective, that the set or the session already has.
+
+**A rejected application has no set or session that's planned or done** (see
+[Status, in Applications](applications.md#status)). So adding or changing a set or a session so that it has a rejected
+application while it's planned or done fails with 400 (`"A rejected application has no set or session that's planned or
+done"`), like an application that doesn't go with it, which is checked first. A new set or session is planned, and a
+change keeps the status it has, so a cancelled set or session can keep its rejected application, or be given one, and be
+changed with it. It can't be un-cancelled, though: marking it planned or done fails with 409, with that same message,
+and `session` and `set` null (see [Rules](#rules)), until its application is accepted or made new again. Rejecting an
+application fails with 409 while it has a set or a session that's planned or done.
+
+These rules hold even for requests sent at the same time.
 
 Deleting an application takes it from its sets and sessions, which stay, without one, and so does deleting an artist,
 which deletes their applications. A collective with an application that's a session's can't be deleted anyway, since
@@ -435,7 +449,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | The request is malformed, a field isn't valid, the session would end after the start of the year 3000 (see [Times](#times)), the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist or doesn't go with the session (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 |
+| 400 | The request is malformed, a field isn't valid, the session would end after the start of the year 3000 (see [Times](#times)), the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist, doesn't go with the session, or is rejected (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)), or one of the sets would fail with 409, with what's in the way, or, when that's another set of the list, its place in `sets`, `otherSetIndex` |
 | 413 | The flyer is larger than 10 MB |
 | 502 | One of the sets' tracks has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
@@ -470,7 +484,9 @@ it's checked against the other sessions, as the session would then be. Responds 
 
 Changes a session's status, and its sets' when it's cancelled or marked done (see [Status](#status)), and responds like
 `POST /api/admin/sessions`, with its sets as they are then. Fails with 400 if `status` isn't one of these values, 404 when
-there's no such session, or 409 when the session would then overlap another one, with that session in `session`.
+there's no such session, or 409 when the session would then overlap another one, with that session in `session`, or
+when it wouldn't be cancelled anymore while its application is rejected, with `session` and `set` null (see
+[Applications](#applications)).
 
 ## `PUT /api/admin/sessions/:id/announced` (admin)
 
@@ -504,7 +520,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | A field isn't valid, a performer doesn't exist, the application doesn't exist or isn't one of the performers' (see [Applications](#applications)), a link isn't one of those above, or SoundCloud shows no track at `soundcloudTrack` |
+| 400 | A field isn't valid, a performer doesn't exist, the application doesn't exist, isn't one of the performers', or is rejected (see [Applications](#applications)), a link isn't one of those above, or SoundCloud shows no track at `soundcloudTrack` |
 | 404 | There's no such session, which is checked before the track is resolved |
 | 409 | The session is cancelled, which is checked before the track is resolved too, or the set's track or its video is another set's, with what's in the way in `session` and `set` (see [Rules](#rules)). Or `soundcloudTrack` has to be resolved and the credentials of the SoundCloud app haven't been entered yet, with both null |
 | 502 | `soundcloudTrack` has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |
@@ -536,7 +552,8 @@ there's no field.
 Changes a set's status, and its session's when that makes it done, or planned again (see [Status](#status)), and
 responds like `POST /api/admin/sessions/:id/sets`, with the session as it is then. Fails with 400 if `status` isn't one
 of these values, 404 when there's no such set, or 409 when the set wouldn't be cancelled anymore while its session is,
-with that session in `session`.
+with that session in `session`, or else while its application is rejected, with `session` and `set` null (see
+[Applications](#applications)).
 
 ## `PUT /api/admin/sets/:id/position` (admin)
 
