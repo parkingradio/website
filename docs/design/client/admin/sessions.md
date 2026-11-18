@@ -321,7 +321,9 @@ Each artist's or collective's applications are listed newest first, by when they
 option names the artist and when the application was received, e.g. "Aurore, reçue le 15 août 2026". In a takeover's form, it only
 says when, e.g. "Reçue le 1 septembre 2026". Each option then shows the application's status and the first few days the
 artist would like to play, written as [Candidatures](candidatures.md) lists them, e.g. "retenue · 14 nov. 2026, 21 nov.
-2026".
+2026". Rejected applications are offered too, as "refusée": the server refuses one for a set or a session that's planned
+or done (see [Applications, in Sessions](../../server/sessions.md#applications)), whose message the form then shows (see
+[Errors](#errors)).
 
 When there's nothing to pick, the field says why: "Choisissez d'abord les artistes." or "Choisissez d'abord le
 collectif." when none are picked yet, or else "Aucune candidature de cet artiste.", "Aucune candidature de ces
