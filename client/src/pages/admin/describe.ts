@@ -51,8 +51,7 @@ export const STATUS_PLURALS: Record<ApplicationStatus, string> = {
 export const FEATURE_LABELS: Record<FeatureId, { name: string; description: string }> = {
   'evenements-publics': {
     name: 'Événements publics',
-    description:
-      "Les pages « Programmation » et « Synth Meetups » montrent les sessions annoncées plutôt que les événements de Resident Advisor. À n'allumer qu'une fois les événements qui ne sont que sur RA ajoutés comme sessions, et les sessions passées ajoutées et annoncées.",
+    description: 'Les pages « Programmation » et « Synth Meetups » montrent les sessions annoncées plutôt que les événements de Resident Advisor.',
   },
 }
 
