@@ -337,7 +337,7 @@ A session can have a flyer, an image, which follows the same rules as an artist'
 kept in the app's private files, and deleted when the session is deleted, or the flyer replaced or removed. It's sent
 along with the session's fields (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), and the MCP server's
 tools can't send one: a session added with a tool has none, and one changed with a tool keeps its own, unless
-`removeFlyer` is `true`.
+`removeFlyer` is `true`. An announced session's flyer is public, as its event's (see [Events](events.md)).
 
 ## Links
 

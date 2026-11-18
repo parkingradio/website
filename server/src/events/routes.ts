@@ -28,10 +28,10 @@ type EventSet = z.infer<typeof EventSet>
 // An event, as the public sees it: an announced session.
 const Event = SessionBody.pick({ id: true, title: true, type: true, takeover: true })
   .extend({
-    start: Timestamp,
-    end: Timestamp,
-    cancelled: z.boolean(),
-    description: z.string(),
+    start: Timestamp.meta({ description: "The session's start" }),
+    end: Timestamp.meta({ description: 'Its start plus its duration' }),
+    cancelled: z.boolean().meta({ description: 'Whether the session is cancelled, which it stays public as' }),
+    description: z.string().meta({ description: 'Its description, or else the one its type gives it, or empty when neither has one' }),
     flyer: z.string().nullable().meta({ description: 'Where its flyer is, or null when it has none' }),
     raEvent: z.string().nullable().meta({ description: 'The page of its event on RA, or null when it has none' }),
     sets: z.array(EventSet).meta({ description: 'In their order, cancelled ones included' }),

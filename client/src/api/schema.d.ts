@@ -3379,11 +3379,19 @@ export interface components {
             type: components["schemas"]["SessionType"];
             /** @description The collective whose takeover the session is, which only takeovers have */
             takeover: components["schemas"]["Reference"] | null;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description The session's start
+             */
             start: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Its start plus its duration
+             */
             end: string;
+            /** @description Whether the session is cancelled, which it stays public as */
             cancelled: boolean;
+            /** @description Its description, or else the one its type gives it, or empty when neither has one */
             description: string;
             /** @description Where its flyer is, or null when it has none */
             flyer: string | null;

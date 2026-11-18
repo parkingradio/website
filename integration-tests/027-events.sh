@@ -25,7 +25,7 @@ request --header "Cookie: ${cookie}" --form-string "collective={\"name\":\"Les M
 expect_status 200
 marees="$(first_id)"
 request --header "Cookie: ${cookie}" --form "flyer=@${FILES}/flyer.jpg" --form-string \
-    "session={\"start\":\"2031-03-01T21:00-05:00\",\"durationMinutes\":120,\"type\":\"takeover\",\"takeover\":\"${marees}\",\"application\":null,\"name\":\"\",\"raEvent\":null,\"description\":\"\",\"sets\":[{\"performers\":[{\"id\":\"${aube}\"}],\"durationMinutes\":60,\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[],\"soundcloudTrack\":null,\"youtubeVideo\":null,\"application\":null}]}" \
+    "session={\"start\":\"2990-03-01T21:00-05:00\",\"durationMinutes\":120,\"type\":\"takeover\",\"takeover\":\"${marees}\",\"application\":null,\"name\":\"\",\"raEvent\":null,\"description\":\"\",\"sets\":[{\"performers\":[{\"id\":\"${aube}\"}],\"durationMinutes\":60,\"performanceTypes\":[\"dj\"],\"otherPerformanceType\":\"\",\"genres\":[],\"soundcloudTrack\":null,\"youtubeVideo\":null,\"application\":null}]}" \
     "${BASE_URL}/api/admin/sessions"
 expect_status 200
 session="$(first_id)"
@@ -35,14 +35,14 @@ for url in "/api/artists/${aube}" "/api/collectives/${marees}" "/api/events/${se
     request "${BASE_URL}${url}"
     expect_status 404
 done
-request "${BASE_URL}/api/events?from=2031-03-01T00:00-05:00&to=2031-03-02T00:00-05:00"
+request "${BASE_URL}/api/events?from=2990-03-01T00:00-05:00&to=2990-03-02T00:00-05:00"
 expect_status 200
 expect_body '^\{"ok":true,"upcoming":\[\],"past":\[\]\}$'
 
 echo "  once it's announced, they're served to anyone, its flyer included"
 json PUT "${BASE_URL}/api/admin/sessions/${session}/announced" '{"announced":true}'
 expect_status 200
-request "${BASE_URL}/api/events?from=2031-03-01T00:00-05:00&to=2031-03-02T00:00-05:00"
+request "${BASE_URL}/api/events?from=2990-03-01T00:00-05:00&to=2990-03-02T00:00-05:00"
 expect_status 200
 expect_body_contains "\"upcoming\":[{\"id\":\"${session}\",\"title\":\"LES MARÉES TAKEOVER\""
 expect_body_contains "\"flyer\":\"/api/events/${session}/flyer\""

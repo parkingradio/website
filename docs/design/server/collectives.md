@@ -76,11 +76,11 @@ deleted the same way when the collective is deleted, or the photo is replaced or
 
 ## Public profiles
 
-A collective is public when it has a takeover that's an [event](events.md), whatever its status, and its members are
-then public too (see [Public profiles, in Artists](artists.md#public-profiles)). So announcing a takeover makes its
-collective public, and un-announcing it, or making it another type of session, makes it private again, unless it has
-another takeover that's an event. Every other collective is private: there's no public list of collectives, and the
-public endpoints fail with 404 for a private collective, as for one that doesn't exist.
+A collective is public when it has a takeover that's an [event](events.md), whatever that takeover's status, and its
+members are then public too (see [Public profiles, in Artists](artists.md#public-profiles)). So announcing a takeover
+makes its collective public, and un-announcing it, or making it another type of session, makes it private again, unless
+it has another takeover that's an event. Every other collective is private: there's no public list of collectives, and
+the public endpoints fail with 404 for a private collective, as for one that doesn't exist.
 
 A collective's public profile has its `id`, `name`, `country`, `city`, `description` and `links`, as the admin endpoints
 give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where its photo is,

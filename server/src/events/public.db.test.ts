@@ -150,9 +150,10 @@ function announce(id: string, announced: boolean) {
   return admin('PUT', `/api/admin/sessions/${id}/announced`, { announced })
 }
 
-// Days in the past and in the future, whatever the day the tests run.
+// Days long past, and far in the future, which sessions can still end before the year 3000 in (see "Times" in
+// docs/design/server/sessions.md).
 const PAST = (day: number) => `2020-01-${String(day).padStart(2, '0')}T21:00-05:00`
-const FUTURE = (day: number) => `2030-01-${String(day).padStart(2, '0')}T21:00-05:00`
+const FUTURE = (day: number) => `2990-01-${String(day).padStart(2, '0')}T21:00-05:00`
 
 describe('GET /api/events', () => {
   it('gives the announced sessions, whatever their status, with their sets, and nothing that is not public', async () => {
@@ -181,8 +182,8 @@ describe('GET /api/events', () => {
           id: takeover.id,
           title: 'LES ONDES TAKEOVER',
           type: 'takeover',
-          start: '2030-01-10T21:00:00-05:00',
-          end: '2030-01-10T23:00:00-05:00',
+          start: '2990-01-10T21:00:00-05:00',
+          end: '2990-01-10T23:00:00-05:00',
           cancelled: false,
           description: 'Une soirée',
           flyer: `/api/events/${takeover.id}/flyer`,
@@ -232,8 +233,8 @@ describe('GET /api/events', () => {
           id: cancelled.id,
           title: 'SYNTH MEETUPS',
           type: 'synth-meetup',
-          start: '2030-01-12T21:00:00-05:00',
-          end: '2030-01-12T23:00:00-05:00',
+          start: '2990-01-12T21:00:00-05:00',
+          end: '2990-01-12T23:00:00-05:00',
           cancelled: true,
           description: DEFAULT_DESCRIPTIONS['synth-meetup'],
           flyer: null,
@@ -284,13 +285,19 @@ describe('EventsStore.list', () => {
     for (let day = 1; day <= 22; day++) past.push((await createSession(PAST(day))).id)
     const later = await createSession(FUTURE(2))
     const sooner = await createSession(FUTURE(1))
-    // A cancelled session can start when another one does: they're then in the order they were added.
-    const alongside = await createSession(FUTURE(3))
-    await admin('PUT', `/api/admin/sessions/${alongside.id}/status`, { status: 'cancelled' })
-    await admin('PATCH', `/api/admin/sessions/${alongside.id}`, { start: FUTURE(1) })
+    // A cancelled session can start when another one does, and is then ordered by when it was added: the first added
+    // first among upcoming events, and last among past ones.
+    async function cancelledAlongside(start: string, elsewhere: string) {
+      const session = await createSession(elsewhere)
+      await admin('PUT', `/api/admin/sessions/${session.id}/status`, { status: 'cancelled' })
+      await admin('PATCH', `/api/admin/sessions/${session.id}`, { start })
+      return session.id
+    }
+    const upcomingAlongside = await cancelledAlongside(FUTURE(1), FUTURE(3))
+    const pastAlongside = await cancelledAlongside(PAST(22), PAST(25))
     const listed = idsOf(await events.list({ now: new Date('2026-11-14T21:00-05:00') }))
-    expect(listed.upcoming).toEqual([sooner.id, alongside.id, later.id])
-    expect(listed.past).toEqual(past.toReversed().slice(0, 20))
+    expect(listed.upcoming).toEqual([sooner.id, upcomingAlongside, later.id])
+    expect(listed.past).toEqual([pastAlongside, ...past.toReversed().slice(0, 19)])
   })
 
   it('has every event that starts in the time range, upcoming or past', async () => {
@@ -316,6 +323,7 @@ describe('GET /api/artists/:id', () => {
   it("gives a public artist's profile, without their contact details, their collectives, or who added them", async () => {
     const ana = await createArtist('Ana', JPEG)
     const brume = await createArtist('Brume')
+    // A collective that isn't public, which their profile mustn't name.
     await createCollective('Privé', [ana])
     await createSession(FUTURE(1), [set([ana]), set([brume])])
     expect((await get(`/api/artists/${ana}`)).json()).toEqual({

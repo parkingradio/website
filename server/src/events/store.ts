@@ -43,8 +43,9 @@ export function isPublicArtist(db: Queryable, artistId: AnyColumn): SQL {
 export type EventsStore = {
   // Those that start at or after `from` and before `to`, when they're given, split into those whose end hasn't passed,
   // the soonest first, and those whose end has, the most recent first: only the RECENT_PAST_EVENTS most recent without
-  // `from` and `to`. Sessions that start at the same time, which only cancelled ones can, are then ordered by when they
-  // were added, so that the order doesn't change from one request to the next.
+  // `from` and `to`. Sessions that start at the same time, all of them but one at most cancelled, are then ordered by
+  // when they were added, so that the order doesn't change from one request to the next: the first added first among
+  // the upcoming ones, and last among the past ones.
   list(range: { from?: Date; to?: Date; now: Date }): Promise<{ upcoming: StoredSession[]; past: StoredSession[] }>
   // Where the flyer of the event with `id` is kept, as `sendPhoto` takes it, or null when there's no such event, e.g. a
   // session that isn't announced, which is the case of any id that isn't a UUID.

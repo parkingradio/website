@@ -1678,17 +1678,21 @@
           },
           "start": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "The session's start"
           },
           "end": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Its start plus its duration"
           },
           "cancelled": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether the session is cancelled, which it stays public as"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Its description, or else the one its type gives it, or empty when neither has one"
           },
           "flyer": {
             "description": "Where its flyer is, or null when it has none",

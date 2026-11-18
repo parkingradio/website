@@ -38,7 +38,7 @@ A set of an event has:
 | `performanceTypes`, `otherPerformanceType`, `genres` | | As the admin endpoints give them (see [Sets](sessions.md#sets)) |
 | `cancelled` | boolean | Whether the set is cancelled |
 | `soundcloudTrack` | object or null | Its track on SoundCloud, with its `id` and `url`, as the admin endpoints give them (see [Links](sessions.md#links)), except that `url` is null when the set's link is a private link, which ends with its secret: that link would let anyone play the private track, like those of the radio's rotation, which aren't handed out either (see [Radio](radio.md#the-rotation)) |
-| `youtubeVideo` | object or null | Its video on YouTube, with its `id` and `url`, as the admin endpoints give it |
+| `youtubeVideo` | object or null | Its video on YouTube, with its `id` and `url`, as the admin endpoints give it, whatever the video's visibility on YouTube, unlisted included, unlike a SoundCloud track's private link |
 
 Nothing else is public: not who added or changed a session or a set, their statuses, other than whether they're
 cancelled, nor their applications.
