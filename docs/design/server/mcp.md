@@ -67,7 +67,8 @@ There's no rate limit (see [Conventions](README.md#conventions)).
 
 Each tool does what one endpoint does, as the connection's user, with its arguments as the request, and gives back the
 endpoint's response: e.g. what it changes has that admin's email in `updatedBy`. The tools are those of the admin
-endpoints, `GET /api/radio` and `GET /api/ra-events`, except:
+endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/events`, `GET /api/artists/:id` and
+`GET /api/collectives/:id`, e.g. to check what the public sees once a session is announced, except:
 
 - The admin endpoints of [Admins](admins.md) and of [OAuth](oauth.md), and `PUT /api/admin/applications/recipients`,
   which chooses who applications are emailed to: the model reads text that the public wrote, which could try to make it
@@ -88,12 +89,13 @@ There's also [`read_documentation`](#read_documentation).
 Each tool's name is its endpoint's operation id in `server/openapi.json`, in snake case: a verb (`list`, `get`,
 `create`, `update`, `delete`, or another one for what the others don't say, e.g. `preview`), then what it acts on, then
 the field it changes, if it only changes one, e.g. `list_sessions` for `GET /api/admin/sessions`, `create_set` for
-`POST /api/admin/sessions/:id/sets`, or `update_set_status` for `PUT /api/admin/sets/:id/status`. Its description starts
-by pointing to its area's rules in `read_documentation`, e.g. "Once per conversation, before using it, read the rules
-with `read_documentation`, area `sessions`.": the area whose document has its endpoint. Then it's its endpoint's
-summary, which says what it does, including what else it changes, e.g. "Deletes an artist, their photo and their
-applications, and takes them out of their collectives and their sets". It also has a title in French, which admins see
-when an app asks them to confirm a change, e.g. "Supprimer un artiste".
+`POST /api/admin/sessions/:id/sets`, or `update_set_status` for `PUT /api/admin/sets/:id/status`. The tools of the
+public profiles are `get_public_artist` and `get_public_collective`, since `get_artist` and `get_collective` are the
+admin ones. A tool's description starts by pointing to its area's rules in `read_documentation`, e.g. "Once per
+conversation, before using it, read the rules with `read_documentation`, area `sessions`.": the area whose document has
+its endpoint. Then it's its endpoint's summary, which says what it does, including what else it changes, e.g. "Deletes
+an artist, their photo and their applications, and takes them out of their collectives and their sets". It also has a
+title in French, which admins see when an app asks them to confirm a change, e.g. "Supprimer un artiste".
 
 ### Arguments
 
@@ -144,9 +146,9 @@ own. Every tool has `openWorldHint` set to `false`.
 
 Gives the model the rules of an area, e.g. the rules sessions and sets follow, their statuses and what deleting them
 does, rather than finding them out from errors. It takes `area`, one of `radio`, `video`, `artists`, `collectives`,
-`applications`, `sessions` and `ra-events`, and gives the instructions (see [The endpoint](#the-endpoint)), as they are,
-the sentence about the environment included, for the apps that don't give them to the model, then the part of that
-area's document in this directory before its first endpoint, as it is, except for its links, which the model can't
+`applications`, `sessions`, `events` and `ra-events`, and gives the instructions (see [The endpoint](#the-endpoint)), as
+they are, the sentence about the environment included, for the apps that don't give them to the model, then the part of
+that area's document in this directory before its first endpoint, as it is, except for its links, which the model can't
 follow: a link to another of these areas says to read it with `read_documentation`, and the others only keep their text.
 That part is, e.g., [Sessions](sessions.md) from its beginning to
 [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin). The endpoints are left out, since the tools already

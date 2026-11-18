@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import { EmailTaken, artistsStore } from '../artists/store.js'
 import type { ArtistsStore, StoredPhoto } from '../artists/store.js'
@@ -6,6 +6,7 @@ import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
+import { isPublicCollective } from '../events/store.js'
 import { Conflict, lockSessions, takeoverOf } from '../sessions/store.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import type { CollectiveProfile, SentMember } from './profile.js'
@@ -27,6 +28,8 @@ export type CollectivesStore = {
   // By name, whatever its case.
   list(): Promise<StoredCollective[]>
   get(id: string): Promise<StoredCollective | null>
+  // The collective, only when it's public (see "Public profiles" in docs/design/server/collectives.md).
+  getPublic(id: string): Promise<StoredCollective | null>
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
   // sent by name are created, as artists whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
   create(collective: CollectiveProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredCollective>
@@ -123,6 +126,15 @@ export function collectivesStore(db: Queryable): CollectivesStore {
     async get(id) {
       if (!isUuid(id)) return null
       const [row] = await db.select().from(collectives).where(eq(collectives.id, id))
+      return row ? withMembers(db, row) : null
+    },
+
+    async getPublic(id) {
+      if (!isUuid(id)) return null
+      const [row] = await db
+        .select()
+        .from(collectives)
+        .where(and(eq(collectives.id, id), isPublicCollective(db, collectives.id)))
       return row ? withMembers(db, row) : null
     },
 

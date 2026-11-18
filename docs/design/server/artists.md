@@ -58,6 +58,18 @@ It's kept in the app's private S3 bucket, or in a local directory in development
 the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the bucket's previous versions
 for as long as the database's backups are kept, like the artist's row, and is gone for good after that.
 
+## Public profiles
+
+An artist is public when they're a performer of a set of an [event](events.md), cancelled sets included, or a member of
+a public collective (see [Public profiles, in Collectives](collectives.md#public-profiles)). So announcing a session
+makes its sets' performers public, and un-announcing it makes them private again, unless something else makes them
+public. Everyone else is private, e.g. the artists who only applied: there's no public list of artists, and the public
+endpoints fail with 404 for a private artist, as for one that doesn't exist.
+
+An artist's public profile has their `id`, `name`, `country`, `city`, `genres`, `bio` and `links`, as the admin
+endpoints give them, and `photo`, where their photo is, `/api/artists/<id>/photo`, or null when they have none. Never
+their email or phone, who added or changed them, or their collectives, which could name collectives that aren't public.
+
 ## `GET /api/admin/artists[?collective=<id>]` (admin)
 
 | Response field | Type | |
@@ -80,8 +92,8 @@ Fails with 404 when there's no such artist.
 ## `GET /api/admin/artists/:id/photo` (admin)
 
 Responds with the photo itself, with the type it was checked to have, rather than JSON. Browsers are told not to
-guess another type (`X-Content-Type-Options: nosniff`), and that they can keep the photo, only in the admin's browser,
-never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private,
+guess another type (`X-Content-Type-Options: nosniff`), and that they can keep the photo, only in the browser that asked
+for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private,
 no-cache`). It has an `ETag` of its own, which changes whenever the photo does, and a request with it in `If-None-Match`
 gets a 304 without the photo, even when the photo is missing. Otherwise, fails with 404 when there's no such artist,
 when they have no photo, or when their photo is missing.
@@ -121,3 +133,19 @@ Deletes an artist, their photo if they have one and their own applications, but 
 them out of their collectives and their [sets](sessions.md#performers), and their applications out of the sets that come
 from them (see [Applications, in Sessions](sessions.md#applications)), and responds `{"ok": true}`. Fails with 404
 when there's no such artist.
+
+## `GET /api/artists/:id`
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `artist` | object | The artist's public profile (see [Public profiles](#public-profiles)) |
+
+Fails with 404 when there's no such artist, or when they're private.
+
+## `GET /api/artists/:id/photo`
+
+Responds with a public artist's photo, like [`GET /api/admin/artists/:id/photo`](#get-apiadminartistsidphoto-admin), or
+a 304. Browsers check with the server before showing it again, so it stops being shown once the artist is private.
+Otherwise, fails with 404 when there's no such artist, when they're private, when they have no photo, or when their
+photo is missing.

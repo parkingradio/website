@@ -227,7 +227,7 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
 
 // The sessions that match `where`, in the order of `list`, or only the first `limit` of them, with their takeovers and
 // their sets.
-async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {
+export async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {
   const query = db
     .select({ session: sessions, takeoverName: collectives.name, receivedAt: applications.receivedAt })
     .from(sessions)

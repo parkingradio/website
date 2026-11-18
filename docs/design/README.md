@@ -35,10 +35,11 @@ design: when they disagree, these documents still win.
 | [README](server/README.md) | Conventions every endpoint follows, how the server serves the client, `/healthz`, `/api/config`, emails, and the index of every endpoint |
 | [Radio](server/radio.md) | The radio's rotation, read from a SoundCloud playlist, and the SoundCloud app it's read through |
 | [Video](server/video.md) | The video the site shows, read from YouTube, and the credentials it's read with |
-| [Artists](server/artists.md) | Artists and their photos |
-| [Collectives](server/collectives.md) | Collectives, their members and their photos |
+| [Artists](server/artists.md) | Artists, their photos, and their public profiles |
+| [Collectives](server/collectives.md) | Collectives, their members, their photos, and their public profiles |
 | [Applications](server/applications.md) | Artists' and collectives' applications, applying through the form, and the emails about them |
 | [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
+| [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |

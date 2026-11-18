@@ -74,6 +74,18 @@ be changed on their own.
 A collective's photo is optional, and follows the same rules as an artist's (see [Photos](artists.md#photos)): it's
 deleted the same way when the collective is deleted, or the photo is replaced or removed.
 
+## Public profiles
+
+A collective is public when it has a takeover that's an [event](events.md), whatever that takeover's status, and its
+members are then public too (see [Public profiles, in Artists](artists.md#public-profiles)). So announcing a takeover
+makes its collective public, and un-announcing it, or making it another type of session, makes it private again, unless
+it has another takeover that's an event. Every other collective is private: there's no public list of collectives, and
+the public endpoints fail with 404 for a private collective, as for one that doesn't exist.
+
+A collective's public profile has its `id`, `name`, `country`, `city`, `description` and `links`, as the admin endpoints
+give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where its photo is,
+`/api/collectives/<id>/photo`, or null when it has none. Never its contact's email or phone, or who added or changed it.
+
 ## `GET /api/admin/collectives` (admin)
 
 | Response field | Type | |
@@ -133,3 +145,19 @@ Deletes a collective, its photo if it has one and its [applications](application
 [Types and names](sessions.md#types-and-names)), with one of them in `session`, and `set` null, like the 409s of sessions
 (see [Rules](sessions.md#rules)). Its takeovers are listed with `GET /api/admin/sessions?takeover=<id>`, and are given
 another collective, or another type, first.
+
+## `GET /api/collectives/:id`
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `collective` | object | The collective's public profile (see [Public profiles](#public-profiles)) |
+
+Fails with 404 when there's no such collective, or when it's private.
+
+## `GET /api/collectives/:id/photo`
+
+Responds with a public collective's photo, like
+[`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), or a 304. Browsers check with the
+server before showing it again, so it stops being shown once the collective is private. Otherwise, fails with 404 when
+there's no such collective, when it's private, when it has no photo, or when its photo is missing.

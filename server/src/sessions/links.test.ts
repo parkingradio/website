@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
+import { isPrivateTrackLink, raEventId, soundcloudTrackLink, youtubeVideoId } from './links.js'
 
 // What the links of sessions and sets are reduced to (see "Links" in docs/design/server/sessions.md).
 
@@ -74,5 +74,19 @@ describe('soundcloudTrackLink', () => {
     ['something that is not a link', 'parkingdotradio/3tons'],
   ])('refuses %s', (_, sent) => {
     expect(soundcloudTrackLink(sent)).toBeNull()
+  })
+})
+
+describe('isPrivateTrackLink', () => {
+  it('tells a private link by the secret it ends with', () => {
+    expect(isPrivateTrackLink('https://soundcloud.com/parkingdotradio/3tons/s-AbC123')).toBe(true)
+  })
+
+  it.each([
+    ['a public link', 'https://soundcloud.com/parkingdotradio/3tons'],
+    ['a track whose name starts with s-', 'https://soundcloud.com/parkingdotradio/s-mix'],
+    ['an account whose name starts with s-', 'https://soundcloud.com/s-acct/track'],
+  ])("doesn't take %s for one", (_, link) => {
+    expect(isPrivateTrackLink(link)).toBe(false)
   })
 })

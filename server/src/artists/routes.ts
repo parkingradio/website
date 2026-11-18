@@ -6,9 +6,10 @@ import { INVALID_REQUEST, PhotoResponses, readProfileForm, sendPhoto } from './p
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
-import type { ArtistsStore, Photos, SentPhoto, StoredArtist } from './store.js'
+import type { ArtistRow, ArtistsStore, Photos, SentPhoto, StoredArtist } from './store.js'
 
-// The admin pages' side of artists: adding, viewing, changing and deleting them (see docs/design/server/artists.md).
+// The admin pages' side of artists: adding, viewing, changing and deleting them, and the public profiles of the artists
+// who are public (see docs/design/server/artists.md).
 
 // An artist, as the endpoints return them: their profile, as it was saved, and what the server knows of them.
 const Artist = z
@@ -33,6 +34,12 @@ const Artist = z
 type Artist = z.infer<typeof Artist>
 
 const ArtistResponse = z.object({ ok: z.literal(true), artist: Artist })
+
+// A public artist's profile, as the public sees it.
+const PublicArtist = Artist.pick({ id: true, name: true, country: true, city: true, genres: true, bio: true, links: true })
+  .extend({ photo: z.string().nullable().meta({ description: 'Where their photo is, or null when they have none' }) })
+  .meta({ id: 'PublicArtist' })
+type PublicArtist = z.infer<typeof PublicArtist>
 
 // What adding an artist sends, as multipart/form-data, and changing one with `removePhoto`. The route reads it itself
 // (see `readProfileForm`): only the profile is checked against its schema here.
@@ -70,6 +77,20 @@ function artist(row: StoredArtist): Artist {
     updatedAt: row.updatedAt?.toISOString() ?? null,
     hasPhoto: row.photoKey !== null,
     collectives: row.collectives,
+  }
+}
+
+// The fields are listed one by one, so that nothing else the admin endpoints give ends up public unless it's added here.
+function publicArtist(row: ArtistRow): PublicArtist {
+  return {
+    id: row.id,
+    name: row.name,
+    country: row.country,
+    city: row.city,
+    genres: row.genres,
+    bio: row.bio,
+    links: row.links,
+    photo: row.photoKey === null ? null : `/api/artists/${row.id}/photo`,
   }
 }
 
@@ -265,6 +286,43 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       // The artist is gone either way.
       await forgetPhoto(photos, request.log, row.photoKey)
       return { ok: true as const }
+    },
+  )
+
+  api.get(
+    '/api/artists/:id',
+    {
+      config: { tool: { title: "Voir le profil public d'un artiste" } },
+      schema: {
+        operationId: 'get_public_artist',
+        summary: "A public artist's profile, as the public sees it: an artist who isn't public is not found",
+        tags: ['Artists'],
+        params: ById,
+        response: { 200: z.object({ ok: z.literal(true), artist: PublicArtist }), 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      // A private artist is not found, like one that doesn't exist.
+      const row = await store.getPublic(request.params.id)
+      if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
+      return { ok: true as const, artist: publicArtist(row) }
+    },
+  )
+
+  api.get(
+    '/api/artists/:id/photo',
+    {
+      schema: {
+        summary: "A public artist's photo",
+        tags: ['Artists'],
+        params: ById,
+        response: { ...PhotoResponses, 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const row = await store.getPublic(request.params.id)
+      if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
+      return sendPhoto(reply, request.log, photos, row, 'artist')
     },
   )
 }

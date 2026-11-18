@@ -45,6 +45,9 @@ function members(sent: Parameters<CollectivesStore['create']>[0]['members']) {
 const store: CollectivesStore = {
   list: async () => [...rows].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
   get: async (id) => rows.find((row) => row.id === id) ?? null,
+  // Who's public is worked out by the database, which the public routes are tested against (see
+  // events/public.db.test.ts).
+  getPublic: async () => null,
   create: vi.fn<CollectivesStore['create']>(async (collective) => {
     if (emailTaken(collective.email)) throw new EmailTaken()
     const row: StoredCollective = {
