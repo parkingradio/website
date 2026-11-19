@@ -4,9 +4,9 @@ import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
-import { FlyerResponses, INVALID_REQUEST, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { FlyerResponses, INVALID_REQUEST, readPhotoForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
-import { forgetPhoto } from '../artists/store.js'
+import { InvalidProfile, forgetPhoto, validatePhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
@@ -154,6 +154,8 @@ const SessionForm = z.object({
     .optional()
     .meta({ description: '"true" removes the session\'s flyer, when there\'s no new one. Anything else keeps it' }),
 })
+// What giving a session a flyer, or replacing its flyer, sends, as multipart/form-data, which the route reads itself.
+const FlyerForm = z.object({ flyer: FlyerFile })
 
 // What changing some of a session's fields sends, as JSON, and some of a set's.
 const SessionChangesBody = changesTo({
@@ -608,6 +610,36 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     async (request, reply) => {
       const { removeFlyer, ...fields } = request.body
       return updateSession(request, reply, fields, null, removeFlyer === true)
+    },
+  )
+
+  // Not a tool: tools can't send files (see docs/design/server/mcp.md).
+  api.put(
+    '/api/admin/sessions/:id/flyer',
+    {
+      config: { admin: true, tool: null },
+      schema: {
+        summary: 'Gives a session a flyer, or replaces its flyer, which is deleted, and changes nothing else',
+        tags: ['Sessions'],
+        params: ById,
+        multipart: FlyerForm,
+        response: { 200: SessionResponse, 404: ApiError, 413: ApiError },
+      },
+    },
+    async (request, reply) => {
+      // Other fields and files are ignored, but not a second flyer (see `readPhotoForm`).
+      const form = await readPhotoForm(request, { photoPart: 'flyer' })
+      if (form === 'malformed') return fail(reply, INVALID_REQUEST)
+      if ('tooLarge' in form) return fail(reply, { status: 413, error: FLYER_ERRORS.tooLarge })
+      let flyer: SentPhoto | null
+      try {
+        flyer = validatePhoto(form.photo, FLYER_ERRORS)
+      } catch (error) {
+        if (!(error instanceof InvalidProfile)) throw error
+        return fail(reply, { status: 400, error: error.message })
+      }
+      if (!flyer) return fail(reply, { status: 400, error: 'The request has no flyer' })
+      return updateSession(request, reply, {}, flyer, false)
     },
   )
 

@@ -267,6 +267,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'POST', url: '/api/admin/sessions', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { start: 'x' } }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/flyer', ...multipartBody({ flyer: JPEG }) }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
@@ -292,6 +293,7 @@ describe('sessions routes', () => {
       app.inject({ method: 'POST', url: '/api/admin/sessions', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { name: 'X' }, ...options }),
+      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/flyer', ...multipartBody({ flyer: JPEG }), ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
@@ -772,12 +774,12 @@ describe('sessions routes', () => {
       const cookies = await sessionCookies()
       const { payload, headers } = multipartBody({ session: JSON.stringify(session()), submit: 'ajouter' })
       expect((await app.inject({ method: 'POST', url: '/api/admin/sessions', payload, headers, cookies })).statusCode).toBe(200)
-      const twice = Buffer.concat([
-        sessionForm(session({ start: null })).payload.subarray(0, -'--test-boundary--\r\n'.length),
-        multipartBody({ flyer: JPEG }).payload.subarray(0, -'--test-boundary--\r\n'.length),
-        multipartBody({ flyer: PNG }).payload,
+      const twice = multipartBody([
+        ['session', JSON.stringify(session({ start: null }))],
+        ['flyer', JPEG],
+        ['flyer', PNG],
       ])
-      const response = await app.inject({ method: 'POST', url: '/api/admin/sessions', payload: twice, headers, cookies })
+      const response = await app.inject({ method: 'POST', url: '/api/admin/sessions', ...twice, cookies })
       expect(response.statusCode).toBe(400)
       expect(rows).toHaveLength(1)
     })
@@ -849,6 +851,94 @@ describe('sessions routes', () => {
       response = await get(app, '/api/admin/sessions/session-1/flyer')
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'The flyer of this session is missing' })
+    })
+
+    describe('PUT /api/admin/sessions/:id/flyer', () => {
+      const putFlyer = async (app: App, id: string, parts: Parameters<typeof multipartBody>[0]) =>
+        app.inject({ method: 'PUT', url: `/api/admin/sessions/${id}/flyer`, ...multipartBody(parts), cookies: await sessionCookies() })
+      // What saving only a flyer changes of the session.
+      const flyerChange = (flyerKey: string, flyerType: string) => ({ flyerKey, flyerType, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+
+      it('gives a session a flyer, then replaces it, deleting the one it had, and changes nothing else', async () => {
+        const app = await buildApp()
+        await sessionWithSet(app)
+        const before = (await send(app, 'GET', '/api/admin/sessions/session-1')).json().session
+        vi.clearAllMocks()
+
+        let response = await putFlyer(app, 'session-1', { flyer: JPEG })
+        expect(response.statusCode).toBe(200)
+        // Its flyer is part of the session, so who changed it, and when, are the session's.
+        expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: true, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
+        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.jpeg', 'image/jpeg'))
+        expect(photos.store).toHaveBeenCalledExactlyOnceWith({ body: JPEG, type: 'image/jpeg' }, 'sessions')
+        expect(photos.delete).not.toHaveBeenCalled()
+        const served = await get(app, '/api/admin/sessions/session-1/flyer')
+        expect(served.headers['content-type']).toBe('image/jpeg')
+        expect(served.rawPayload).toEqual(JPEG)
+
+        response = await putFlyer(app, 'session-1', { flyer: PNG })
+        expect(response.statusCode).toBe(200)
+        expect(store.update).toHaveBeenLastCalledWith('session-1', flyerChange('sessions/flyer-2.png', 'image/png'))
+        expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect([...stored.keys()]).toEqual(['sessions/flyer-2.png'])
+        // The new flyer has another ETag, so a browser that has the one it replaced gets it.
+        const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
+        expect(replaced.statusCode).toBe(200)
+        expect(replaced.headers['content-type']).toBe('image/png')
+        expect(replaced.rawPayload).toEqual(PNG)
+      })
+
+      it('refuses a flyer that is not a JPEG, PNG or WebP image, or too large, no flyer, and a malformed request, storing and deleting nothing', async () => {
+        const app = await buildApp()
+        await createSession(app, {}, { flyer: JPEG })
+        vi.clearAllMocks()
+        const cookies = await sessionCookies()
+        for (const [sent, status, error] of [
+          [multipartBody({ flyer: Buffer.from('%PDF-1.7') }), 400, 'The flyer must be a JPEG, PNG or WebP image'],
+          [multipartBody({ flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]) }), 413, 'The flyer is larger than 10 MB'],
+          [multipartBody({ submit: 'envoyer' }), 400, 'The request has no flyer'],
+          [multipartBody({ flyer: Buffer.alloc(0) }), 400, 'The request has no flyer'],
+          [multipartBody([['flyer', JPEG], ['flyer', PNG]]), 400, 'Invalid request'],
+          [{ payload: JSON.stringify({ flyer: 'x' }), headers: { 'content-type': 'application/json' } }, 400, 'Invalid request'],
+        ] as const) {
+          const response = await app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/flyer', ...sent, cookies })
+          expect(response.statusCode, error).toBe(status)
+          expect(response.json()).toEqual({ ok: false, error })
+        }
+        expect(photos.store).not.toHaveBeenCalled()
+        expect(photos.delete).not.toHaveBeenCalled()
+        expect(store.update).not.toHaveBeenCalled()
+      })
+
+      it("ignores other fields and files, even the session's fields and removeFlyer", async () => {
+        const app = await buildApp()
+        await createSession(app)
+        vi.clearAllMocks()
+        const response = await putFlyer(app, 'session-1', {
+          session: JSON.stringify(session({ description: 'Ignorée.' })),
+          removeFlyer: 'true',
+          flyer: PNG,
+          other: JPEG,
+          submit: 'envoyer',
+        })
+        expect(response.statusCode).toBe(200)
+        expect(response.json().session).toMatchObject({ description: '', hasFlyer: true })
+        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.png', 'image/png'))
+      })
+
+      it("deletes the new flyer, keeping the session's, when there's no such session, or the session isn't saved", async () => {
+        const app = await buildApp()
+        await createSession(app, {}, { flyer: JPEG })
+        vi.clearAllMocks()
+        const response = await putFlyer(app, 'session-9', { flyer: PNG })
+        expect(response.statusCode).toBe(404)
+        expect(response.json()).toEqual({ ok: false, error: 'No such session' })
+        vi.mocked(store.update).mockRejectedValueOnce(new Error('The database is down'))
+        expect((await putFlyer(app, 'session-1', { flyer: PNG })).statusCode).toBe(500)
+        expect(photos.store).toHaveBeenCalledTimes(2)
+        expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
+        expect([...stored.keys()]).toEqual(['sessions/flyer-1.jpeg'])
+      })
     })
   })
 
