@@ -1,13 +1,15 @@
 # Server
 
 The server provides the API under `/api`, which this directory specifies, and the [MCP server](mcp.md) at `/mcp`, which
-apps connect to through [OAuth](oauth.md), and serves the client app.
+apps connect to through [OAuth](oauth.md), the calendar feed of the public events at
+[`/calendar.ics`](events.md#get-calendarics), and serves the client app.
 
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
-  is JSON, except for photos and flyers. A body of a type the endpoint doesn't take fails with a 4xx, and the server
-  refuses bodies other than `multipart/form-data` that are larger than any endpoint needs, with a 413. One exception: in
+  is JSON, except for photos, flyers and the calendar feed ([`GET /calendar.ics`](events.md#get-calendarics)). A body of
+  a type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
+  are larger than any endpoint needs, with a 413. One exception: in
   production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
   collective's application with 5 photos.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
@@ -35,7 +37,7 @@ apps connect to through [OAuth](oauth.md), and serves the client app.
   endpoints of sessions and sets have what's in the way (see [Rules](sessions.md#rules)). An unexpected failure, e.g.
   the database's, gets a 500, unless the endpoint says otherwise. Either way, its message only says that something went
   wrong: what went wrong is logged, but without the personal data it could include, e.g. the values of a failed
-  database query. Successful responses have `ok` set to `true`, except for those of `GET /api/config`,
+  database query. Successful responses in JSON have `ok` set to `true`, except for those of `GET /api/config`,
   `GET /api/ra-events`, `GET /api/radio`, `GET /api/radio/tracks/:id/stream` and `GET /api/video`. Unknown paths under
   `/api` get a 404 error, whatever the request's body. What apps call for OAuth and MCP has its own errors (see below).
 - **OAuth and MCP.** What apps call follows its standards rather than the conventions above: the endpoints that get and
@@ -89,12 +91,12 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request outside `/api`, `/assets`, where the build's files are, `/mcp` and `/.well-known`, where the metadata
-documents of [OAuth](oauth.md) are. The app then shows the page for that path. This includes paths that aren't one of
-the app's pages (a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't know which
-pages the app has. Other requests for paths that don't exist, whatever their body, and paths that don't exist under
-`/assets` and `/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see
-[Conventions](#conventions)).
+`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, and those under `/api`, `/mcp`,
+`/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where the build's files are. The
+app then shows the page for that path. This includes paths that aren't one of the app's pages (a "soft 404", see
+[Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has. Other requests for
+paths that don't exist, whatever their body, and paths that don't exist under `/assets` and `/.well-known`, e.g.
+`/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
 
 Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors
 'none'`), so that they can't trick admins into clicking its buttons, e.g. to allow an app (see
@@ -213,6 +215,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/:id/flyer`](events.md#get-apieventsidflyer) | public | An event's flyer |
+| [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

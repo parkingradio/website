@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useApi } from '../api/use-api'
 import { useFeature } from '../config-context'
 import { RA_PROMOTER_URL } from '../ra'
@@ -38,19 +39,33 @@ function RaProgrammation() {
   return <ProgrammationList {...raListing(events.value)} />
 }
 
+// The public events, with the link to their calendar feed, which doesn't depend on whether they could be loaded.
 function PublicProgrammation() {
   const events = useApi('/api/events')
-  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} />
-  return <ProgrammationList {...eventsListing(events.value)} />
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={<CalendarLink />} />
+  return <ProgrammationList {...eventsListing(events.value)} headerExtra={<CalendarLink />} />
+}
+
+// Subscribing to the calendar feed of the public events (see `GET /calendar.ics` in docs/design/server/events.md), which
+// a webcal:// link opens in the calendar app.
+function CalendarLink() {
+  return (
+    <a className="calendar-link" href={`webcal://${window.location.host}/calendar.ics`}>
+      s'abonner au calendrier
+    </a>
+  )
 }
 
 // The page while the events are loading, or once they couldn't be.
-function ProgrammationStatus({ failed }: { failed: boolean }) {
+function ProgrammationStatus({ failed, headerExtra }: { failed: boolean; headerExtra?: ReactNode }) {
   return (
     <div className="programmation">
       <div className="programmation-inner">
         <header className="programmation-header">
-          <h1>Programmation</h1>
+          <div>
+            <h1>Programmation</h1>
+            {headerExtra}
+          </div>
         </header>
         {failed ? (
           <p className="status">
@@ -68,7 +83,8 @@ function ProgrammationStatus({ failed }: { failed: boolean }) {
   )
 }
 
-export function ProgrammationList({ upcoming, past }: Listing) {
+// `headerExtra`: what the header has under its title, e.g. the link to the calendar feed of the public events.
+export function ProgrammationList({ upcoming, past, headerExtra }: Listing & { headerExtra?: ReactNode }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
   // In the server's order: the soonest first, or the most recent first.
@@ -83,6 +99,7 @@ export function ProgrammationList({ upcoming, past }: Listing) {
             <a className="ra-link" href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
               parking.radio sur Resident Advisor ↗
             </a>
+            {headerExtra}
           </div>
           <div className="filters" role="group" aria-label="période">
             <button type="button" aria-pressed={filter === 'upcoming'} onClick={() => setFilter('upcoming')}>

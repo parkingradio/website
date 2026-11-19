@@ -40,13 +40,11 @@ export function raListing(data: Schema<'RaEvents'>): Listing {
 // What a synth meetup without performers has as its lineup, as Parking Radio's synth meetups do on RA.
 const SYNTH_MEETUP_LINEUP = 'OPEN JAM'
 
-// The performers of the sets that aren't cancelled, in order, each name once, or else OPEN JAM for a synth meetup that
-// isn't cancelled. It follows the same rule as the lineup of a session's event on RA (`lineup` in
-// server/src/sessions/ra-event.ts), except that other events without performers have none, rather than their title, and
-// a cancelled synth meetup none rather than OPEN JAM.
+// The event's lineup, as the server gives it, or else OPEN JAM for a synth meetup that isn't cancelled, as the calendar feed
+// has it (`description` in server/src/events/calendar.ts). Unlike the lineup of a session's event on RA (`raLineup` in
+// server/src/sessions/ra-event.ts), other events without one have none, rather than their title.
 function lineup(event: Schema<'Event'>): string[] {
-  const names = event.sets.filter((set) => !set.cancelled).flatMap((set) => set.performers.map((performer) => performer.name))
-  if (names.length > 0) return [...new Set(names)]
+  if (event.lineup.length > 0) return event.lineup.map((artist) => artist.name)
   return event.type === 'synth-meetup' && !event.cancelled ? [SYNTH_MEETUP_LINEUP] : []
 }
 

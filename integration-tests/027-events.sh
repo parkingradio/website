@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # The public events, artists and collectives, in the server's Docker image: they're served without a session, once a
-# session is announced, with its flyer, from where the server keeps it. What's public is tested against a real database
-# by the server's own tests (server/src/events/public.db.test.ts).
+# session is announced, with its flyer, from where the server keeps it, and the calendar feed has it. What's public is
+# tested against a real database by the server's own tests (server/src/events/public.db.test.ts), and the feed itself by
+# server/src/events/calendar.test.ts.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -38,6 +39,9 @@ done
 request "${BASE_URL}/api/events?from=2990-03-01T00:00-05:00&to=2990-03-02T00:00-05:00"
 expect_status 200
 expect_body '^\{"ok":true,"upcoming":\[\],"past":\[\]\}$'
+request "${BASE_URL}/calendar.ics"
+expect_status 200
+expect_body_lacks "UID:${session}@parking.radio"
 
 echo "  once it's announced, they're served to anyone, its flyer included"
 json PUT "${BASE_URL}/api/admin/sessions/${session}/announced" '{"announced":true}'
@@ -46,6 +50,7 @@ request "${BASE_URL}/api/events?from=2990-03-01T00:00-05:00&to=2990-03-02T00:00-
 expect_status 200
 expect_body_contains "\"upcoming\":[{\"id\":\"${session}\",\"title\":\"LES MARÉES TAKEOVER\""
 expect_body_contains "\"flyer\":\"/api/events/${session}/flyer\""
+expect_body_contains "\"lineup\":[{\"id\":\"${aube}\",\"name\":\"Aube\"}]"
 request "${BASE_URL}/api/artists/${aube}"
 expect_status 200
 expect_body "^\\{\"ok\":true,\"artist\":\\{\"id\":\"${aube}\",\"name\":\"Aube\","
@@ -55,3 +60,13 @@ expect_body_contains "\"members\":[{\"id\":\"${aube}\",\"name\":\"Aube\"}]"
 expect_body_lacks 'marees@events.test'
 curl --silent --output "${FILES}/served" "${BASE_URL}/api/events/${session}/flyer"
 cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
+
+echo "  the calendar feed has it, as iCalendar, which can be kept for 5 minutes"
+request "${BASE_URL}/calendar.ics"
+expect_status 200
+expect_header 'Content-Type' 'text/calendar; charset=utf-8$'
+expect_header 'Cache-Control' 'public, max-age=300$'
+expect_body $'^BEGIN:VCALENDAR\r$'
+expect_body_contains $'X-WR-CALNAME:Parking Radio\r'
+expect_body_contains $'UID:'"${session}"$'@parking.radio\r'
+expect_body $'^SUMMARY:LES MARÉES TAKEOVER\r$'

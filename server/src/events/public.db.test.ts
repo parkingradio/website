@@ -17,6 +17,7 @@ import type { TestDatabase } from '../db/test-database.js'
 import { DEFAULT_DESCRIPTIONS } from '../sessions/descriptions.js'
 import { sessionsRoutes } from '../sessions/routes.js'
 import { sessionsStore } from '../sessions/store.js'
+import { calendarRoutes } from './calendar.js'
 import { eventsRoutes } from './routes.js'
 import { eventsStore } from './store.js'
 import type { EventsStore } from './store.js'
@@ -63,6 +64,7 @@ beforeAll(async () => {
   await app.register(collectivesRoutes, { store: collectivesStore(database.db), photos })
   events = eventsStore(database.db)
   await app.register(eventsRoutes, { store: events, photos })
+  await app.register(calendarRoutes, { store: events, siteOrigin: 'https://parking.radio' })
 })
 
 afterAll(async () => {
@@ -228,6 +230,11 @@ describe('GET /api/events', () => {
               youtubeVideo: null,
             },
           ],
+          // Cyan's set is cancelled, and Ana is in it once.
+          lineup: [
+            { id: brume, name: 'Brume' },
+            { id: ana, name: 'Ana' },
+          ],
         },
         {
           id: cancelled.id,
@@ -241,6 +248,7 @@ describe('GET /api/events', () => {
           raEvent: null,
           takeover: null,
           sets: [],
+          lineup: [],
         },
       ],
       past: [],
@@ -316,6 +324,53 @@ describe('EventsStore.list', () => {
     await createSession(PAST(1), [], { announced: false })
     await createSession(FUTURE(1), [], { announced: false })
     expect(idsOf(await events.list({ now: new Date('2026-11-14T21:00-05:00') }))).toEqual({ upcoming: [], past: [] })
+  })
+})
+
+describe('GET /calendar.ics', () => {
+  it('has the announced sessions, as events, with their lineups, until they are un-announced', async () => {
+    const [ana, brume] = [await createArtist('Ana'), await createArtist('Brume')]
+    const session = await createSession(FUTURE(10), [set([ana, brume]), set([ana])], { description: 'Une soirée' })
+    await createSession(FUTURE(11), [set([brume])], { announced: false })
+    // Long past.
+    await createSession(PAST(10))
+
+    const response = await get('/calendar.ics')
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-type']).toBe('text/calendar; charset=utf-8')
+    const vevents = response.body.match(/BEGIN:VEVENT[^]*?END:VEVENT/g)
+    expect(vevents).toHaveLength(1)
+    expect(vevents![0]).toContain(`UID:${session.id}@parking.radio\r\n`)
+    expect(vevents![0]).toContain('DTSTART:29900111T020000Z\r\nDTEND:29900111T040000Z\r\nSUMMARY:GUEST MIXES\r\n')
+    expect(vevents![0]).toContain('DESCRIPTION:Ana\\nBrume\\n\\nUne soirée\r\nURL:https://parking.radio/programmation\r\n')
+
+    await announce(session.id, false)
+    expect((await get('/calendar.ics')).body).not.toContain('BEGIN:VEVENT')
+  })
+})
+
+describe('EventsStore.feed', () => {
+  const now = new Date('2026-11-14T21:00-05:00')
+  const since = new Date('2025-11-14T21:00-05:00')
+  const idsOf = (sessions: { id: string }[]) => sessions.map(({ id }) => id)
+
+  it('has the events that start at or after `since`, past and upcoming', async () => {
+    await createSession('2025-11-14T20:59-05:00', [], { durationMinutes: 1 })
+    const ids = [
+      await createSession('2026-11-14T22:00-05:00'),
+      await createSession('2025-11-14T21:00-05:00'),
+      await createSession('2026-06-01T21:00-04:00'),
+    ].map(({ id }) => id)
+    await createSession('2026-01-01T21:00-05:00', [], { announced: false })
+    expect(idsOf(await events.feed({ since, now })).toSorted()).toEqual(ids.toSorted())
+  })
+
+  it('has an event that started before `since` while it has not ended', async () => {
+    // Two years long, until January 1st, 2027, at 21:00.
+    const { id } = await createSession('2025-01-01T21:00-05:00', [], { durationMinutes: 2 * 365 * 24 * 60 })
+    expect(idsOf(await events.feed({ since, now }))).toEqual([id])
+    const later = new Date('2027-02-01T00:00-05:00')
+    expect(idsOf(await events.feed({ since: new Date('2026-02-01T00:00-05:00'), now: later }))).toEqual([])
   })
 })
 

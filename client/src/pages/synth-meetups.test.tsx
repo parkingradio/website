@@ -35,7 +35,7 @@ const events: Schema<'RaEvents'> = {
 // A public event, which is a synth meetup unless it's given another type, without an event on RA unless it's given one.
 function publicEvent(id: string, start: string, fields: Partial<Schema<'Event'>> = {}): Schema<'Event'> {
   const end = new Date(new Date(start).getTime() + 3 * 60 * 60 * 1000).toISOString()
-  return { id, title: 'SYNTH MEETUPS', type: 'synth-meetup', takeover: null, start, end, cancelled: false, description: '', flyer: null, raEvent: null, sets: [], ...fields }
+  return { id, title: 'SYNTH MEETUPS', type: 'synth-meetup', takeover: null, start, end, cancelled: false, description: '', flyer: null, raEvent: null, sets: [], lineup: [], ...fields }
 }
 
 // The public events as the server gives them: the upcoming ones the soonest first.

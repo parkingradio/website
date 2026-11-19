@@ -3,8 +3,8 @@ import { addDays, formatLongQuebecDay, quebecDayAndTime, quebecInstant } from '.
 import { test, expect, withFeature } from './fixtures.ts'
 
 // Programmation and Synth Meetups once they read the public events, the announced sessions, which the
-// `evenements-publics` flag switches them to, with the seeded sessions (see seed-data.ts). Other tests announce sessions
-// of their own, so these only look for the seeded ones.
+// `evenements-publics` flag switches them to, with the seeded sessions (see seed-data.ts), and the calendar feed of them.
+// Other tests announce sessions of their own, so these only look for the seeded ones.
 
 // The row of the event titled `title`, on Programmation.
 const rowOf = (page: Page, title: string) =>
@@ -46,6 +46,36 @@ test('Programmation lists the announced sessions, with their lineups, their flye
   // A past one.
   await page.getByRole('button', { name: 'passés' }).click()
   await expect(rowOf(page, 'ONDE COMMUNE TAKEOVER').locator('.event-lineup')).toHaveText('Clémentine Brûlée / Fréquence Boréale / Kwame Asante')
+})
+
+test('Programmation links to the calendar feed', async ({ page, baseURL }) => {
+  await page.goto('/programmation')
+  await expect(page.getByRole('link', { name: "s'abonner au calendrier" })).toHaveAttribute('href', `webcal://${new URL(baseURL!).host}/calendar.ics`)
+})
+
+test('The calendar feed has the announced sessions, with their lineups', async ({ request }) => {
+  const response = await request.get('/calendar.ics')
+  expect(response.headers()['content-type']).toBe('text/calendar; charset=utf-8')
+  // Its events, with their lines unfolded.
+  const vevents = (await response.text()).replace(/\r\n /g, '').match(/BEGIN:VEVENT[^]*?END:VEVENT/g) ?? []
+  const veventWith = (line: string) => {
+    const found = vevents.filter((vevent) => vevent.split('\r\n').includes(line))
+    expect(found, line).toHaveLength(1)
+    return found[0].split('\r\n')
+  }
+
+  // The cancelled takeover, which stays in it.
+  const cancelled = veventWith('URL:https://ra.co/events/2302002')
+  expect(cancelled).toContain('SUMMARY:[CANCELLED] LES NUITS BASSES TAKEOVER')
+  expect(cancelled).toContain('STATUS:CANCELLED')
+  // The live performance, with its own description.
+  expect(veventWith('DESCRIPTION:Ondine\\n\\nOndine au synthé modulaire\\, une heure en direct du parking.')).toContain('SUMMARY:LIVE PERFORMANCE')
+  // The synth meetup, which has OPEN JAM as its lineup.
+  const meetup = veventWith('URL:https://ra.co/events/2403003')
+  expect(meetup.find((line) => line.startsWith('DESCRIPTION:'))).toMatch(/^DESCRIPTION:OPEN JAM\\n\\nSYNTH MEETUPS/)
+  // A past one, with its lineup, then its description.
+  const past = veventWith('URL:https://ra.co/events/2201001')
+  expect(past.find((line) => line.startsWith('DESCRIPTION:'))).toMatch(/^DESCRIPTION:Clémentine Brûlée\\nFréquence Boréale\\nKwame Asante\\n\\nONDE COMMUNE TAKEOVER\\n/)
 })
 
 test('Synth Meetups lists the announced synth meetups, linking those with an event on RA to it', async ({ page }) => {

@@ -31,15 +31,20 @@ Once the flag is on, each event shows:
   cancelled events.
 - Its start and end (see [Events](../server/events.md)), but no venue or city, since the events are always at the
   studio.
-- Its lineup: the performers of its sets that aren't cancelled, in order, each name once. A synth meetup without such
-  performers that isn't cancelled shows "OPEN JAM", as on RA, and any other event without them shows no lineup.
+- Its lineup, the event's `lineup` (see [Events](../server/events.md#whats-public)). A synth meetup without one that
+  isn't cancelled shows "OPEN JAM", as on RA, and any other event without one shows no lineup.
 - Its flyer as the server gives it, downloaded full size, once it's about to come into view, and shown as the same
   small square thumbnail.
 
 When the event has an event on RA, its flyer, title and a "voir sur RA" button link to it. Otherwise, neither its flyer
 nor its title is a link, and there's no button.
 
+The header also links to the calendar feed of the events (see
+[`GET /calendar.ics`](../server/events.md#get-calendarics)), whether the events are loading, loaded, or couldn't be, since
+the feed doesn't depend on them: "s'abonner au calendrier", a link to `webcal://<site's host>/calendar.ics`, which opens
+the calendar app.
+
 ## Endpoints
 
 - `GET /api/ra-events`, while the flag is off.
-- `GET /api/events` and `GET /api/events/:id/flyer`, once it's on.
+- `GET /api/events` and `GET /api/events/:id/flyer`, once it's on, and it links to `GET /calendar.ics`.

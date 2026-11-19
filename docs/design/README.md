@@ -39,7 +39,7 @@ design: when they disagree, these documents still win.
 | [Collectives](server/collectives.md) | Collectives, their members, their photos, and their public profiles |
 | [Applications](server/applications.md) | Artists' and collectives' applications, applying through the form, and the emails about them |
 | [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
-| [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets |
+| [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets, and their calendar feed |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |

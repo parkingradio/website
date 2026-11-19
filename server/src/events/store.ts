@@ -1,4 +1,4 @@
-import { and, eq, exists, gte, lt, not, sql } from 'drizzle-orm'
+import { and, eq, exists, gte, lt, not, or, sql } from 'drizzle-orm'
 import type { AnyColumn, SQL } from 'drizzle-orm'
 import { RECENT_PAST_EVENTS } from '../api/formats.js'
 import type { Queryable } from '../db/connection.js'
@@ -12,6 +12,10 @@ import type { StoredSession } from '../sessions/store.js'
 
 // Whether a session is an event.
 const isEvent = eq(sessions.announced, true)
+
+// Whether an event's end has passed at `now`. An event always has a start, and it's past from its end on, which its period
+// excludes.
+const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
 
 // Whether the collective whose id is `collectiveId` is public: it has a takeover that's an event.
 export function isPublicCollective(db: Queryable, collectiveId: AnyColumn): SQL {
@@ -47,6 +51,9 @@ export type EventsStore = {
   // when they were added, so that the order doesn't change from one request to the next: the first added first among
   // the upcoming ones, and last among the past ones.
   list(range: { from?: Date; to?: Date; now: Date }): Promise<{ upcoming: StoredSession[]; past: StoredSession[] }>
+  // The events of the calendar feed, in any order: those that start at or after `since`, and those whose end hasn't passed
+  // at `now`.
+  feed(window: { since: Date; now: Date }): Promise<StoredSession[]>
   // Where the flyer of the event with `id` is kept, as `sendPhoto` takes it, or null when there's no such event, e.g. a
   // session that isn't announced, which is the case of any id that isn't a UUID.
   getFlyer(id: string): Promise<{ photoKey: string | null; photoType: string | null } | null>
@@ -56,14 +63,17 @@ export function eventsStore(db: Queryable): EventsStore {
   return {
     async list({ from, to, now }) {
       const inRange = and(isEvent, from && gte(sessions.startAt, from), to && lt(sessions.startAt, to))
-      // An event always has a start, and it's past from its end on, which its period excludes.
-      const ended = sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
+      const ended = hasEnded(now)
       const [upcoming, past] = await Promise.all([
         sessionsWhere(db, and(inRange, not(ended))),
         sessionsWhere(db, and(inRange, ended), from || to ? undefined : RECENT_PAST_EVENTS),
       ])
       // sessionsWhere gives every upcoming one, the most recent first: reversed, they're the soonest first.
       return { upcoming: upcoming.toReversed(), past }
+    },
+
+    async feed({ since, now }) {
+      return sessionsWhere(db, and(isEvent, or(gte(sessions.startAt, since), not(hasEnded(now)))))
     },
 
     async getFlyer(id) {
