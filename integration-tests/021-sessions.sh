@@ -305,8 +305,28 @@ expect_body_contains '"hasFlyer":false'
 request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_status 404
 expect_body_contains '"error":"This session has no flyer"'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png"
+# A flyer can be given on its own, which keeps the session's fields as they are.
+put_flyer() { request --header "Cookie: ${cookie}" --request PUT "$@"; }
+put_flyer --form "flyer=@${FILES}/flyer.pdf" "${SESSIONS}/${described}/flyer"
+expect_status 400
+expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
+put_flyer --form-string submit=envoyer "${SESSIONS}/${described}/flyer"
+expect_status 400
+expect_body_contains '"error":"The request has no flyer"'
+put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${NOBODY}/flyer"
+expect_status 404
+[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the flyers that weren't saved to be deleted"
+put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${described}/flyer"
+expect_status 200
+expect_body_contains '"start":null,"end":null,"durationMinutes":60,"type":"guest-mixes"'
+expect_body_contains '"name":"HAUTE RIVE TAKEOVER"'
+expect_body_contains '"hasFlyer":true'
 [ "$(photos_on_disk sessions)" = 1 ] || fail "expected the session's flyer on disk"
+put_flyer --form "flyer=@${FILES}/flyer.jpg" "${SESSIONS}/${described}/flyer"
+expect_status 200
+[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the replaced flyer to be deleted"
+request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
+expect_header Content-Type 'image/jpeg'
 json DELETE "${SESSIONS}/${described}"
 expect_status 200
 [ "$(photos_on_disk sessions)" = 0 ] || fail "expected the deleted session's flyer to be deleted"
