@@ -190,8 +190,8 @@ sent the request that this email belongs to an artist, or to a collective. To ma
 only checks the email after Turnstile has accepted the token.
 
 **When the page needs a new token.** Cloudflare only accepts each token once. To let artists fix their mistakes, the
-server checks the profile, each artist's profile for a collective, the application and the types and sizes of all the
-photos before it sends the token to Cloudflare. So if the request fails because one of those isn't valid, the page can
+server checks the profile, each artist's profile for a collective, the application, and that the photos are of the
+right type, and of at most 10 MB, before it sends the token to Cloudflare. So if the request fails because one of those isn't valid, the page can
 send it again with the same token. The photos are only read once Cloudflare has accepted the token, though, since that
 takes the most work: a photo that can't be read (see [Photos](artists.md#photos)) is refused after that. After that
 error, or any other one, the token may already be used up, and the page needs to get a new one from the widget.

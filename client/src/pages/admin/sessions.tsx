@@ -43,12 +43,12 @@ import {
   sessionHours,
   sessionName,
   sessionSearchFields,
-  shownUrl,
   sessionWhen,
   setDuration,
   setInSentence,
   setName,
   setTitle,
+  shownUrl,
 } from './describe'
 import type { Announced } from './describe'
 import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'

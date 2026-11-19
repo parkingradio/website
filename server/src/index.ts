@@ -41,8 +41,10 @@ const privateFiles = privateBucket(config.privateFiles)
 // starts closing, and the server waits for the photo it's making, if any.
 const backfill = sizesBackfill(() => storedImages(db), privateFiles, app.log)
 app.addHook('preClose', async () => backfill.stop())
-app.addHook('onClose', () => backfill.stopped())
 app.addHook('onClose', () => db.$client.end())
+// After the database's hook, since Fastify runs the onClose hooks of the root instance from the last one added: the
+// backfill is done with the database before it's closed, e.g. when the server closes while it lists the photos.
+app.addHook('onClose', () => backfill.stopped())
 
 try {
   await migrateDatabase(db)

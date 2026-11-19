@@ -107,12 +107,12 @@ describe('sizesBackfill', () => {
     )
 
     expect(await kept()).toEqual(['artists/cut.jpg', 'artists/failing.jpg', 'artists/fine.jpg', sizeKey('artists/fine.jpg', 1280), sizeKey('artists/fine.jpg', 320)])
-    expect(log.warn).toHaveBeenCalledOnce()
+    expect(log.warn).toHaveBeenCalledTimes(2)
     expect(log.warn).toHaveBeenCalledWith(
       expect.objectContaining({ of: 'artist', id: 'cut', key: 'artists/cut.jpg', err: expect.any(Error) }),
       "Can't make the sizes of a photo or flyer: it can't be read",
     )
-    expect(log.info).toHaveBeenCalledWith({ of: 'collective', id: 'gone', key: 'collectives/gone.jpg' }, expect.stringMatching(/missing too/))
+    expect(log.warn).toHaveBeenCalledWith({ of: 'collective', id: 'gone', key: 'collectives/gone.jpg' }, expect.stringMatching(/missing too/))
     expect(log.error).toHaveBeenCalledOnce()
     expect(log.error).toHaveBeenCalledWith(
       expect.objectContaining({ of: 'artist', id: 'failing', key: 'artists/failing.jpg' }),

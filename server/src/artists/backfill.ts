@@ -49,7 +49,8 @@ export function sizesBackfill(list: () => Promise<StoredImage[]>, files: Private
         const outcome = await completeSizes(files, key, log)
         counts[outcome]++
         if (outcome === 'missing') {
-          log.info({ of, id, key }, 'A photo or flyer whose sizes were missing is missing too, e.g. because it was deleted or replaced meanwhile')
+          // Unless it was deleted or replaced meanwhile, it's lost: the public endpoints, which only read sizes, can't tell.
+          log.warn({ of, id, key }, 'A photo or flyer whose sizes were missing is missing too, e.g. because it was deleted or replaced meanwhile')
         }
       } catch (error) {
         if (error instanceof UnreadablePhoto) {

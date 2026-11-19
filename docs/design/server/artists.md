@@ -113,8 +113,8 @@ in the browser that asked for it, never in a shared cache, but have to check wit
 (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes
 whenever the photo does, and a request with it in `If-None-Match` gets a 304 without the photo, even when the photo is
 missing. Otherwise, fails with 400 when `width` is anything else, or is given more than once, and 404 when there's no
-such artist, when they have no photo, when their photo is missing, or when it doesn't have that size (see
-[Photos](#photos)): it can still be had as it was sent, and replaced.
+such artist, when they have no photo, or when what's asked for is missing: the photo, or, with `width`, that size of it,
+e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still be had as it was sent, and replaced.
 
 ## `POST /api/admin/artists` (admin)
 
