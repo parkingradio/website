@@ -28,7 +28,7 @@ An event has:
 | `raEvent` | string or null | The page of its event on RA, `https://ra.co/events/<id>`, or null when it has none |
 | `takeover` | object or null | The collective whose takeover it is, with its `id` and `name`, or null when it isn't a takeover |
 | `sets` | list of sets | Its sets, in their order, cancelled ones included (see [Sets' order](sessions.md#sets-order)) |
-| `lineup` | list of objects | Its lineup: the performers of its sets that aren't cancelled, in the sets' order then each set's performers' order, each artist once, even when another artist has the same name, with their `id` and `name`, like a set's `performers`. It's empty when there are none, e.g. for a synth meetup without sets: what to show then is up to each page |
+| `lineup` | list of objects | Its lineup: the performers of its sets that aren't cancelled, in the sets' order then each set's performers' order, each artist once, even when another artist has the same name, with their `id` and `name`, like a set's `performers`. It's empty when there are none, e.g. for a synth meetup without sets: what to show then is up to each consumer |
 
 A set of an event has:
 
@@ -96,9 +96,9 @@ The calendar has `VERSION:2.0`, a `PRODID`, and is named "Parking Radio", in bot
 apps read. It asks apps to read it again every hour (`REFRESH-INTERVAL;VALUE=DURATION:PT1H` and `X-PUBLISHED-TTL:PT1H`),
 which some of them do, while others keep their own schedule.
 
-It has every event that starts at most a year before the request, i.e. at or after the same date and time in UTC a year
-earlier, and every upcoming one (see [Upcoming and past](#upcoming-and-past)). Older events fall out of the feed, and so out of
-subscribers' calendars. Each event is a `VEVENT` with:
+It has every event that starts at most a year before the request, and every upcoming one (see
+[Upcoming and past](#upcoming-and-past)). Older events fall out of the feed, and so out of subscribers' calendars. Each
+event is a `VEVENT` with:
 
 | Property | Value |
 |---|---|

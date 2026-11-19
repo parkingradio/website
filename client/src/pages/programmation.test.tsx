@@ -4,7 +4,7 @@ import type { Schema } from '../api/client'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
 import { configWith, mockFetch, requestsTo } from '../test-utils'
-import { CalendarLinks, Programmation, ProgrammationList } from './programmation'
+import { Programmation, ProgrammationList } from './programmation'
 import { eventsListing, raListing } from './programmation/listing'
 
 // The events as the server gives them: the upcoming ones the soonest first, and the past ones the most recent first.
@@ -394,32 +394,68 @@ describe('ProgrammationList, from the public events', () => {
 describe('the links of the calendar feed', () => {
   const address = `${location.origin}/calendar.ics`
   const copyButton = () => screen.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' })
+  const withClipboard = (clipboard: Partial<Clipboard> | undefined) =>
+    Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true })
+
+  // The page with the public events, loaded.
+  async function loadedPage() {
+    mockFetch({ '/api/events': events })
+    renderPage(configured(true))
+    expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
+  }
 
   afterEach(() => {
     vi.useRealTimers()
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
-  it('copies the https address of the feed, and says so for a moment', async () => {
+  it('copies the https address of the feed, and says so for a moment after each copy', async () => {
     const writeText = vi.fn(async () => {})
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    withClipboard({ writeText })
+    await loadedPage()
     vi.useFakeTimers()
-    render(<CalendarLinks />)
 
     await act(async () => fireEvent.click(copyButton()))
     expect(writeText).toHaveBeenCalledWith(address)
     expect(screen.getByRole('status')).toHaveTextContent(/^lien copié$/)
-    act(() => vi.advanceTimersByTime(2000))
+    act(() => vi.advanceTimersByTime(1500))
+    // Copied again, which says so for another moment.
+    await act(async () => fireEvent.click(copyButton()))
+    act(() => vi.advanceTimersByTime(1500))
+    expect(screen.getByRole('status')).toHaveTextContent(/^lien copié$/)
+    act(() => vi.advanceTimersByTime(500))
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 
   it('gives the address to copy by hand, for good, when it cannot be copied, e.g. without a clipboard', async () => {
-    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    withClipboard(undefined)
+    await loadedPage()
     vi.useFakeTimers()
-    render(<CalendarLinks />)
 
     await act(async () => fireEvent.click(copyButton()))
     expect(screen.getByRole('alert')).toHaveTextContent(`Le lien n'a pas pu être copié : ${address}`)
     act(() => vi.advanceTimersByTime(10_000))
     expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('keeps saying that the address could not be copied once the events are loaded', async () => {
+    withClipboard(undefined)
+    mockFetch({ '/api/events': events })
+    // The events are only answered once they're let through.
+    let letThrough!: () => void
+    const gate = new Promise<void>((resolve) => (letThrough = resolve))
+    const answer = fetch
+    vi.stubGlobal('fetch', async (...request: Parameters<typeof fetch>) => {
+      await gate
+      return answer(...request)
+    })
+    renderPage(configured(true))
+
+    await act(async () => fireEvent.click(copyButton()))
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByText('Chargement…')).toBeInTheDocument()
+    letThrough()
+    expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(`Le lien n'a pas pu être copié : ${address}`)
   })
 })

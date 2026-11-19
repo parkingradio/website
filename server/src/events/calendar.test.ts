@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import fc from 'fast-check'
 import ICAL from 'ical.js'
 import { calendar, contentLine, text } from './calendar.js'
 import type { Event } from './routes.js'
@@ -131,6 +132,27 @@ describe('calendar', () => {
     const lines = body.slice(0, -2).split('\r\n')
     for (const line of lines) expect(octets(line)).toBeLessThanOrEqual(75)
     expect(body.replace(/\r\n/g, '')).not.toMatch(/[\r\n]/)
+  })
+})
+
+describe('calendar, with any text', () => {
+  // Text with what has to be escaped, line breaks, control characters, tabs, and characters of every size in UTF-8, among
+  // any others.
+  const special = fc.constantFrom('\\', ';', ',', '\r', '\n', '\r\n', '\t', '\u0000', '\u0007', '\u001f', '\u007f', '\u0085', 'é', '€', '🎛', ' ')
+  const anyText = fc.string({ unit: fc.oneof(special, fc.string({ unit: 'binary', minLength: 1, maxLength: 1 })), minLength: 1, maxLength: 200 })
+  // What a value is read back as: its line breaks as LF, without control characters other than tabs.
+  const readBack = (value: string) => value.replace(/\r\n?/g, '\n').replace(/[^\P{Cc}\t\n]/gu, '')
+
+  it('reads back the title, the lineup and the description as they were, in lines of at most 75 octets', () => {
+    fc.assert(
+      fc.property(anyText, anyText, anyText, (title, name, description) => {
+        const body = feed([event({ title, lineup: [{ id: 'artist-1', name }], description })])
+        for (const line of body.slice(0, -2).split('\r\n')) expect(octets(line)).toBeLessThanOrEqual(75)
+        const { value } = parsedEvent({ title, lineup: [{ id: 'artist-1', name }], description })
+        expect(value('summary')).toBe(readBack(title))
+        expect(value('description')).toBe(readBack(`${name}\n\n${description}`))
+      }),
+    )
   })
 })
 

@@ -39,47 +39,56 @@ function RaProgrammation() {
   return <ProgrammationList {...raListing(events.value)} />
 }
 
-// The public events, with the calendar feed of them, which doesn't depend on whether they could be loaded.
+// The public events, with the calendar feed of them, which doesn't depend on whether they could be loaded. What copying
+// its address gave is kept here, since the header's links are rendered by another component once the events are loaded,
+// so that it stays as they load.
 function PublicProgrammation() {
   const events = useApi('/api/events')
-  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={<CalendarLinks />} />
-  return <ProgrammationList {...eventsListing(events.value)} headerExtra={<CalendarLinks />} />
+  const address = `${window.location.origin}/calendar.ics`
+  const [copy, copyAddress] = useCopy(address)
+  const calendar = <CalendarLinks address={address} copy={copy} onCopy={copyAddress} />
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={calendar} />
+  return <ProgrammationList {...eventsListing(events.value)} headerExtra={calendar} />
+}
+
+// What copying gave last, a new one each time, so that each copy says so for its own moment.
+type Copy = { status: 'idle' | 'copied' | 'failed' }
+const NOT_COPIED: Copy = { status: 'idle' }
+
+// Copies `text` when asked, and says that it's copied for a moment, but that it couldn't be until it's copied.
+function useCopy(text: string): [Copy, () => Promise<void>] {
+  const [copy, setCopy] = useState(NOT_COPIED)
+  useEffect(() => {
+    if (copy.status !== 'copied') return
+    const timeout = setTimeout(() => setCopy(NOT_COPIED), 2000)
+    return () => clearTimeout(timeout)
+  }, [copy])
+  // `navigator.clipboard` is undefined outside a secure context, which this catches too.
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopy({ status: 'copied' })
+    } catch {
+      setCopy({ status: 'failed' })
+    }
+  }
+  return [copy, copyText]
 }
 
 // Subscribing to the calendar feed of the public events (see `GET /calendar.ics` in docs/design/server/events.md): a link
 // that opens the calendar app, and the feed's https address to copy, for the apps that don't open webcal:// links.
-export function CalendarLinks() {
-  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const address = `${window.location.origin}/calendar.ics`
-
-  // Says that it's copied for a moment, but that it couldn't be until it's copied.
-  useEffect(() => {
-    if (copy !== 'copied') return
-    const timeout = setTimeout(() => setCopy('idle'), 2000)
-    return () => clearTimeout(timeout)
-  }, [copy])
-
-  // `navigator.clipboard` is undefined outside a secure context, which this catches too.
-  const copyAddress = async () => {
-    try {
-      await navigator.clipboard.writeText(address)
-      setCopy('copied')
-    } catch {
-      setCopy('failed')
-    }
-  }
-
+function CalendarLinks({ address, copy, onCopy }: { address: string; copy: Copy; onCopy: () => void }) {
   return (
     <div className="calendar-links">
       <a href={`webcal://${window.location.host}/calendar.ics`}>s'abonner au calendrier</a>
       {' · '}
-      <button type="button" onClick={copyAddress}>
+      <button type="button" onClick={onCopy}>
         copier le lien (Google Agenda, Outlook)
       </button>{' '}
       <span className="calendar-copied" role="status">
-        {copy === 'copied' && 'lien copié'}
+        {copy.status === 'copied' && 'lien copié'}
       </span>
-      {copy === 'failed' && (
+      {copy.status === 'failed' && (
         <p className="calendar-failed" role="alert">
           Le lien n'a pas pu être copié&nbsp;: {address}
         </p>
