@@ -2,6 +2,7 @@
 
 Parking Radio's public schedule. Publicly, an **event** is an announced [session](sessions.md), with its sets: what's
 played at the studio, once admins have made it public (see [Announced](sessions.md#announced)). It has the session's id.
+The events are also a calendar feed, which calendar apps subscribe to (see [`GET /calendar.ics`](#get-calendarics)).
 The admin side keeps calling them sessions. They have nothing to do with RA events, Parking Radio's events on Resident
 Advisor, which the server reads from there (see [RA events](ra-events.md)).
 
@@ -27,6 +28,7 @@ An event has:
 | `raEvent` | string or null | The page of its event on RA, `https://ra.co/events/<id>`, or null when it has none |
 | `takeover` | object or null | The collective whose takeover it is, with its `id` and `name`, or null when it isn't a takeover |
 | `sets` | list of sets | Its sets, in their order, cancelled ones included (see [Sets' order](sessions.md#sets-order)) |
+| `lineup` | list of objects | Its lineup: the performers of its sets that aren't cancelled, in the sets' order then each set's performers' order, each artist once, even when another artist has the same name, with their `id` and `name`, like a set's `performers`. It's empty when there are none, e.g. for a synth meetup without sets: what to show then is up to each page |
 
 A set of an event has:
 
@@ -79,3 +81,35 @@ Responds with an event's flyer, like [`GET /api/admin/artists/:id/photo`](artist
 or a 304. Browsers check with the server before showing it again, so it stops being shown once its session is
 un-announced. Otherwise, fails with 404 when there's no such event, e.g. a session that isn't announced, when it has no
 flyer, or when its flyer is missing.
+
+## `GET /calendar.ics`
+
+The events as a calendar feed, in iCalendar (RFC 5545), which calendar apps subscribe to and read again on their own
+schedule, so that their calendar follows as events are announced, changed or cancelled. It's public, and it isn't JSON,
+so it isn't under `/api`, nor a tool of the [MCP server](mcp.md). It takes no parameters.
+
+It responds with `Content-Type: text/calendar; charset=utf-8` and `Cache-Control: public, max-age=300`: browsers and
+calendar apps can keep it for 5 minutes. Unless it fails unexpectedly (see [Errors, in Conventions](README.md#conventions)),
+it responds with a calendar, even without any event.
+
+The calendar has `VERSION:2.0`, a `PRODID`, and is named "Parking Radio", in both `NAME` and `X-WR-CALNAME`, which more
+apps read. It asks apps to read it again every hour (`REFRESH-INTERVAL;VALUE=DURATION:PT1H` and `X-PUBLISHED-TTL:PT1H`),
+which some of them do, while others keep their own schedule.
+
+It has every event that starts at most a year before the request, i.e. at or after the same date and time in UTC a year
+earlier, and every upcoming one (see [Upcoming and past](#upcoming-and-past)). Older events fall out of the feed, and so out of
+subscribers' calendars. Each event is a `VEVENT` with:
+
+| Property | Value |
+|---|---|
+| `UID` | `<id>@parking.radio`, from its `id`, so that a change updates the event in calendars rather than adding another one |
+| `DTSTAMP` | The time of the request |
+| `DTSTART`, `DTEND` | Its `start` and `end`, in UTC, e.g. `20261115T020000Z` |
+| `SUMMARY` | Its `title`, or, for a cancelled event, `[CANCELLED] ` then its title, as on [Programmation](../client/programmation.md) |
+| `STATUS` | `CANCELLED` for a cancelled event, which stays in the feed. Other events don't have one |
+| `LOCATION` | `parking.radio` |
+| `DESCRIPTION` | The names of its `lineup`, one per line, then a blank line and its `description`. With an empty lineup, it starts with "OPEN JAM" instead for a synth meetup that isn't cancelled, as on Programmation, and otherwise only has its description. Either can be empty, which leaves out the blank line, and an event without either has no `DESCRIPTION` |
+| `URL` | Its `raEvent`, or else the site's Programmation page, e.g. `https://parking.radio/programmation` |
+
+Text values have their backslashes, semicolons, commas and line breaks escaped, and control characters other than tabs
+removed, and lines longer than 75 octets are folded, without splitting a character, as RFC 5545 requires.

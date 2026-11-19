@@ -381,7 +381,7 @@ never creates events on RA itself. The content is:
 |---|---|---|
 | `title` | string | The session's `title` |
 | `start`, `end` | string or null | The session's `start` and `end`, as it gives them, or null when it has no `start`. RA takes them in Québec time without their offset |
-| `lineup` | string | One performer per line: the performers of the session's sets that aren't cancelled, in the order of its `sets`, each set's in their order, without repeated lines, e.g. `"Aurore\nBrume"` for a set of Aurore and Brume. RA needs one, so a session without such performers has `"OPEN JAM"` for a `"synth-meetup"`, as Parking Radio's synth meetups do on RA, or else its `title` |
+| `lineup` | string | One performer per line: the names of the session's lineup, as its event gives it, or would once it's announced (see `lineup` in [Events](events.md#whats-public)): the performers of its sets that aren't cancelled, in the order of its `sets`, each set's in their order, each artist once, e.g. `"Aurore\nBrume"` for a set of Aurore and Brume. RA needs one, so a session without such performers has `"OPEN JAM"` for a `"synth-meetup"`, as Parking Radio's synth meetups do on RA, or else its `title` |
 | `venueId` | string | Parking Radio's venue on RA, `"288529"` (`https://ra.co/clubs/288529`) |
 | `promoterIds` | list of strings | Parking Radio's promoter page on RA, `["183980"]` (`https://ra.co/promoters/183980`) |
 | `content` | string | The session's `effectiveDescription` |

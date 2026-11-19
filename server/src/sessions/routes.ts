@@ -124,7 +124,7 @@ const RaEventContent = z
     end: Timestamp.nullable().meta({ description: "The session's end, or null when it has no start. RA takes it in Québec time, without its offset" }),
     lineup: z.string().meta({
       description:
-        "One performer per line: those of its sets that aren't cancelled, in order, without repeated lines, or else OPEN JAM for a synth meetup, or its title",
+        "One performer per line: those of its sets that aren't cancelled, in order, each artist once, or else OPEN JAM for a synth meetup, or its title",
     }),
     venueId: z.string().meta({ description: "Parking Radio's venue on RA" }),
     promoterIds: z.array(z.string()).meta({ description: "Parking Radio's promoter page on RA" }),

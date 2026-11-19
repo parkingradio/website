@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../api/client'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
 import { configWith, mockFetch, requestsTo } from '../test-utils'
-import { Programmation, ProgrammationList } from './programmation'
+import { CalendarLinks, Programmation, ProgrammationList } from './programmation'
 import { eventsListing, raListing } from './programmation/listing'
 
 // The events as the server gives them: the upcoming ones the soonest first, and the past ones the most recent first.
@@ -64,10 +64,13 @@ const data: Schema<'RaEvents'> = {
   ],
 }
 
-// A public event, with no sets, flyer or event on RA unless it's given them.
+// A public event, with no sets, lineup, flyer or event on RA unless it's given them.
 function publicEvent(fields: Partial<Schema<'Event'>> & Pick<Schema<'Event'>, 'id' | 'title' | 'start' | 'end'>): Schema<'Event'> {
-  return { type: 'other', takeover: null, cancelled: false, description: '', flyer: null, raEvent: null, sets: [], ...fields }
+  return { type: 'other', takeover: null, cancelled: false, description: '', flyer: null, raEvent: null, sets: [], lineup: [], ...fields }
 }
+
+// A lineup, as the server gives it.
+const lineupOf = (names: string[]) => names.map((name) => ({ id: name.toLowerCase(), name }))
 
 // A set of a public event, played by these artists, unless it's cancelled.
 function publicSet(names: string[], cancelled = false): Schema<'EventSet'> {
@@ -99,6 +102,7 @@ const events: Schema<'Events'> = {
       raEvent: 'https://ra.co/events/2201001',
       // Brume plays twice, and Dune's set is cancelled.
       sets: [publicSet(['Aurore', 'Brume']), publicSet(['Dune'], true), publicSet(['Brume', 'Cyan'])],
+      lineup: lineupOf(['Aurore', 'Brume', 'Cyan']),
     }),
     publicEvent({ id: 'meetup', title: 'SYNTH MEETUPS', type: 'synth-meetup', start: '2026-10-07T18:00:00-04:00', end: '2026-10-07T21:00:00-04:00' }),
     publicEvent({
@@ -130,6 +134,7 @@ const events: Schema<'Events'> = {
       start: '2026-09-05T20:00:00-04:00',
       end: '2026-09-05T21:00:00-04:00',
       sets: [publicSet(['Ondine'])],
+      lineup: lineupOf(['Ondine']),
     }),
   ],
 }
@@ -184,6 +189,33 @@ describe('Programmation', () => {
     expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
     expect(requestsTo('GET', '/api/events')).toHaveLength(1)
     expect(requestsTo('GET', '/api/ra-events')).toHaveLength(0)
+  })
+
+  it('has the links of the calendar feed once the flag is on, whether the events are loading, loaded or not', async () => {
+    const webcal = `webcal://${location.host}/calendar.ics`
+    const subscribe = () => screen.queryByRole('link', { name: "s'abonner au calendrier" })
+
+    mockFetch({ '/api/events': events })
+    const loaded = renderPage(configured(true))
+    expect(screen.getByText('Chargement…')).toBeInTheDocument()
+    expect(subscribe()).toHaveAttribute('href', webcal)
+    expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
+    expect(subscribe()).toHaveAttribute('href', webcal)
+    loaded.unmount()
+
+    mockFetch({ '/api/events': { ok: false, error: 'Events are unavailable right now' } })
+    renderPage(configured(true))
+    expect(await screen.findByText(/La programmation n'a pas pu être chargée/)).toBeInTheDocument()
+    expect(subscribe()).toHaveAttribute('href', webcal)
+    expect(screen.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' })).toBeInTheDocument()
+  })
+
+  it('has no links of the calendar feed while the flag is off', async () => {
+    mockFetch({ '/api/ra-events': data })
+    renderPage(configured(false))
+    expect(await screen.findByRole('heading', { name: 'Soon Party' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: "s'abonner au calendrier" })).toBeNull()
+    expect(screen.queryByRole('button', { name: /copier le lien/ })).toBeNull()
   })
 
   it.each([
@@ -311,12 +343,12 @@ describe('ProgrammationList, from the public events', () => {
     expect(rowOf('mixes').querySelector('.event-meta')).toHaveTextContent(/^21 h 00 – 23 h 30$/)
   })
 
-  it("shows as the lineup the performers of the sets that aren't cancelled, in order, each once", () => {
+  it('shows the lineup the server gives', () => {
     render(<ProgrammationList {...eventsListing(events)} />)
     expect(rowOf('mixes').querySelector('.event-lineup')).toHaveTextContent(/^Aurore \/ Brume \/ Cyan$/)
   })
 
-  it("shows OPEN JAM as the lineup of a synth meetup without performers, unless it's cancelled, and no lineup otherwise", () => {
+  it("shows OPEN JAM as the lineup of a synth meetup without one, unless it's cancelled, and no lineup otherwise", () => {
     render(<ProgrammationList {...eventsListing(events)} />)
     expect(rowOf('meetup').querySelector('.event-lineup')).toHaveTextContent(/^OPEN JAM$/)
     for (const id of ['cancelled', 'cancelled-meetup', 'workshop']) expect(rowOf(id).querySelector('.event-lineup')).toBeNull()
@@ -356,5 +388,38 @@ describe('ProgrammationList, from the public events', () => {
   it('says so when nothing is coming up', () => {
     render(<ProgrammationList {...eventsListing({ ...events, upcoming: [] })} />)
     expect(screen.getByText(/Rien de prévu/)).toBeInTheDocument()
+  })
+})
+
+describe('the links of the calendar feed', () => {
+  const address = `${location.origin}/calendar.ics`
+  const copyButton = () => screen.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('copies the https address of the feed, and says so for a moment', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    vi.useFakeTimers()
+    render(<CalendarLinks />)
+
+    await act(async () => fireEvent.click(copyButton()))
+    expect(writeText).toHaveBeenCalledWith(address)
+    expect(screen.getByRole('status')).toHaveTextContent(/^lien copié$/)
+    act(() => vi.advanceTimersByTime(2000))
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+
+  it('gives the address to copy by hand, for good, when it cannot be copied, e.g. without a clipboard', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    vi.useFakeTimers()
+    render(<CalendarLinks />)
+
+    await act(async () => fireEvent.click(copyButton()))
+    expect(screen.getByRole('alert')).toHaveTextContent(`Le lien n'a pas pu être copié : ${address}`)
+    act(() => vi.advanceTimersByTime(10_000))
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })

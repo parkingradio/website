@@ -1,18 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { RECENT_PAST_EVENTS, fromBeforeTo, startRange } from '../api/formats.js'
-import { ApiError, ById, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { FlyerResponses, sendPhoto } from '../artists/photo-form.js'
 import type { Photos } from '../artists/store.js'
 import { effectiveDescription } from '../sessions/descriptions.js'
 import { after, sessionTitle } from '../sessions/fields.js'
+import { lineup } from '../sessions/lineup.js'
 import { isPrivateTrackLink, raEventUrl, youtubeVideoUrl } from '../sessions/links.js'
 import { SessionBody, SetBody, link } from '../sessions/routes.js'
 import type { StoredSession, StoredSet } from '../sessions/store.js'
 import type { EventsStore } from './store.js'
 
 // The public schedule: the events, which are the announced sessions, with their sets, and their flyers (see
-// docs/design/server/events.md).
+// docs/design/server/events.md). Their calendar feed is in calendar.ts.
 
 // A set of an event, as the public sees it.
 const EventSet = SetBody.pick({ id: true, performers: true, durationMinutes: true, performanceTypes: true, otherPerformanceType: true, genres: true, youtubeVideo: true })
@@ -35,9 +36,12 @@ const Event = SessionBody.pick({ id: true, title: true, type: true, takeover: tr
     flyer: z.string().nullable().meta({ description: 'Where its flyer is, or null when it has none' }),
     raEvent: z.string().nullable().meta({ description: 'The page of its event on RA, or null when it has none' }),
     sets: z.array(EventSet).meta({ description: 'In their order, cancelled ones included' }),
+    lineup: z.array(Reference).meta({
+      description: "The performers of its sets that aren't cancelled, in the sets' order then their performers', each artist once: empty when there are none",
+    }),
   })
   .meta({ id: 'Event' })
-type Event = z.infer<typeof Event>
+export type Event = z.infer<typeof Event>
 
 const Events = z
   .object({
@@ -68,7 +72,7 @@ function eventSet(row: StoredSet): EventSet {
 }
 
 // An event always has a start (see `sessions_announced` in db/schema.ts).
-function event(row: StoredSession): Event {
+export function event(row: StoredSession): Event {
   return {
     id: row.id,
     title: sessionTitle(row),
@@ -81,6 +85,7 @@ function event(row: StoredSession): Event {
     raEvent: row.raEventId === null ? null : raEventUrl(row.raEventId),
     takeover: row.takeover,
     sets: row.sets.map(eventSet),
+    lineup: lineup(row.sets),
   }
 }
 

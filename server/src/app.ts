@@ -16,6 +16,7 @@ import { collectivesRoutes } from './collectives/routes.js'
 import type { CollectivesStore } from './collectives/store.js'
 import type { SendEmail } from './core/email.js'
 import type { Queryable } from './db/connection.js'
+import { calendarRoutes } from './events/calendar.js'
 import { eventsRoutes } from './events/routes.js'
 import type { EventsStore } from './events/store.js'
 import { raEventsRoutes } from './ra-events/routes.js'
@@ -102,6 +103,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   })
   await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
+  await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })

@@ -3491,6 +3491,8 @@ export interface components {
             raEvent: string | null;
             /** @description In their order, cancelled ones included */
             sets: components["schemas"]["EventSet"][];
+            /** @description The performers of its sets that aren't cancelled, in the sets' order then their performers', each artist once: empty when there are none */
+            lineup: components["schemas"]["Reference"][];
         };
         Events: {
             /** @constant */
@@ -3678,7 +3680,7 @@ export interface components {
             start: string | null;
             /** @description The session's end, or null when it has no start. RA takes it in Québec time, without its offset */
             end: string | null;
-            /** @description One performer per line: those of its sets that aren't cancelled, in order, without repeated lines, or else OPEN JAM for a synth meetup, or its title */
+            /** @description One performer per line: those of its sets that aren't cancelled, in order, each artist once, or else OPEN JAM for a synth meetup, or its title */
             lineup: string;
             /** @description Parking Radio's venue on RA */
             venueId: string;

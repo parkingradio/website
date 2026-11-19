@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useApi } from '../api/use-api'
 import { useFeature } from '../config-context'
 import { RA_PROMOTER_URL } from '../ra'
@@ -38,19 +39,65 @@ function RaProgrammation() {
   return <ProgrammationList {...raListing(events.value)} />
 }
 
+// The public events, with the calendar feed of them, which doesn't depend on whether they could be loaded.
 function PublicProgrammation() {
   const events = useApi('/api/events')
-  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} />
-  return <ProgrammationList {...eventsListing(events.value)} />
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={<CalendarLinks />} />
+  return <ProgrammationList {...eventsListing(events.value)} headerExtra={<CalendarLinks />} />
+}
+
+// Subscribing to the calendar feed of the public events (see `GET /calendar.ics` in docs/design/server/events.md): a link
+// that opens the calendar app, and the feed's https address to copy, for the apps that don't open webcal:// links.
+export function CalendarLinks() {
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const address = `${window.location.origin}/calendar.ics`
+
+  // Says that it's copied for a moment, but that it couldn't be until it's copied.
+  useEffect(() => {
+    if (copy !== 'copied') return
+    const timeout = setTimeout(() => setCopy('idle'), 2000)
+    return () => clearTimeout(timeout)
+  }, [copy])
+
+  // `navigator.clipboard` is undefined outside a secure context, which this catches too.
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address)
+      setCopy('copied')
+    } catch {
+      setCopy('failed')
+    }
+  }
+
+  return (
+    <div className="calendar-links">
+      <a href={`webcal://${window.location.host}/calendar.ics`}>s'abonner au calendrier</a>
+      {' · '}
+      <button type="button" onClick={copyAddress}>
+        copier le lien (Google Agenda, Outlook)
+      </button>{' '}
+      <span className="calendar-copied" role="status">
+        {copy === 'copied' && 'lien copié'}
+      </span>
+      {copy === 'failed' && (
+        <p className="calendar-failed" role="alert">
+          Le lien n'a pas pu être copié&nbsp;: {address}
+        </p>
+      )}
+    </div>
+  )
 }
 
 // The page while the events are loading, or once they couldn't be.
-function ProgrammationStatus({ failed }: { failed: boolean }) {
+function ProgrammationStatus({ failed, headerExtra }: { failed: boolean; headerExtra?: ReactNode }) {
   return (
     <div className="programmation">
       <div className="programmation-inner">
         <header className="programmation-header">
-          <h1>Programmation</h1>
+          <div>
+            <h1>Programmation</h1>
+            {headerExtra}
+          </div>
         </header>
         {failed ? (
           <p className="status">
@@ -68,7 +115,8 @@ function ProgrammationStatus({ failed }: { failed: boolean }) {
   )
 }
 
-export function ProgrammationList({ upcoming, past }: Listing) {
+// `headerExtra`: what the header has under its title, e.g. the links of the calendar feed of the public events.
+export function ProgrammationList({ upcoming, past, headerExtra }: Listing & { headerExtra?: ReactNode }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 
   // In the server's order: the soonest first, or the most recent first.
@@ -83,6 +131,7 @@ export function ProgrammationList({ upcoming, past }: Listing) {
             <a className="ra-link" href={RA_PROMOTER_URL} target="_blank" rel="noreferrer">
               parking.radio sur Resident Advisor ↗
             </a>
+            {headerExtra}
           </div>
           <div className="filters" role="group" aria-label="période">
             <button type="button" aria-pressed={filter === 'upcoming'} onClick={() => setFilter('upcoming')}>
