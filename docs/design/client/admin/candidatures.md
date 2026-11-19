@@ -11,8 +11,11 @@ few words.
 The section lists the applications, each with when it was received ("reçue le"), the artist or the collective, followed
 by "(collectif)" for a collective, their city and genres (see
 [A collective's genres](artistes.md#a-collectives-genres)), the first few dates, the performance types and the status,
-as a dropdown that changes it, without confirming, to those it can be given (see [Statuses](#statuses)), or only its
-name for a "planifiée" or "jouée" application, which its sets or sessions make so.
+as a dropdown that changes it, without confirming, to those it can be given (see [Statuses](#statuses)), except for a
+"planifiée" or "jouée" application, which its sets or sessions make so: its status then links to the page of the
+session it comes from, that of the first set or session with that status in the application's "Sets" or "Sessions"
+(see below), or for a set, its session. Screen readers name that link by the status and that session (see
+[Names](sessions.md#names)), e.g. "planifiée : HAUTE RIVE TAKEOVER, sam. 14 nov. 2026".
 Buttons above the list show only the applications with a status, or all of them ("toutes"), with how many there are of
 each. It opens on "nouvelles", its default view (see [Searching lists](layout.md#searching-lists)). "nouvelles" and
 "retenues" list the oldest received first, and the other statuses and "toutes" the most recently received first. When

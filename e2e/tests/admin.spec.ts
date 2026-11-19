@@ -197,7 +197,9 @@ test("a collective's application is listed with its city and its artists' genres
 
 // With Collectif Béton, which applied through the "Appliquer" form (see seed-data.ts), which created its artists, with
 // their profiles and the photo of the second one.
-test('a collective that applied through the form has its artists, with their profiles, and its applications', async ({ page }) => {
+test('a collective that applied through the form has its artists, with their profiles, and its applications, whose status links to its takeover', async ({
+  page,
+}) => {
   await logIn(page, { at: '/admin/artistes' })
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('collectif beton')
   await page.getByRole('link', { name: 'Collectif Béton', exact: true }).click()
@@ -207,7 +209,12 @@ test('a collective that applied through the form has its artists, with their pro
   await expect(members).toHaveText(['Mathis', 'Rosalie', 'Kofi', 'Yasmine'])
   await expect(page.locator('dt', { hasText: 'Genres de ses artistes' }).locator('+ dd')).toHaveText('hard techno, EBM / industriel')
   // The one it sent, and the one an admin added.
-  await expect(page.getByRole('table', { name: 'Candidatures' }).getByRole('row')).toHaveCount(3)
+  const applications = page.getByRole('table', { name: 'Candidatures' })
+  await expect(applications.getByRole('row')).toHaveCount(3)
+  // The one an admin added is done, through its takeover, BÉTON 140, which its status leads to.
+  await applications.getByRole('link', { name: /^jouée : BÉTON 140, / }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'BÉTON 140' })).toBeVisible()
+  await page.goBack()
 
   await members.getByText('Rosalie').click()
   await expect(page.getByRole('heading', { name: 'Rosalie', exact: true })).toBeVisible()
