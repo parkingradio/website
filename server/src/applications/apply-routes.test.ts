@@ -6,7 +6,7 @@ import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
 import type { StoredArtist } from '../artists/store.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, PNG, memoryPhotos } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -80,10 +80,6 @@ const settings: Pick<ApplicationsSettingsStore, 'load'> = {
   load: vi.fn(async () => (recipients ? { recipients, updatedBy: 'admin@example.com', updatedAt: new Date() } : null)),
 }
 const sendEmail = vi.fn<SendEmail>(async () => {})
-
-// The smallest things that start like a JPEG and a PNG file.
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
 function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {

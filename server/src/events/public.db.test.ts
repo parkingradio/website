@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { fakeSize, memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, fakeSize, memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
@@ -30,8 +30,6 @@ import type { EventsStore } from './store.js'
 const photos = memoryPhotos()
 const stored = photos.stored
 
-// The smallest thing that starts like a JPEG image.
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
 const NOBODY = '00000000-0000-4000-8000-000000000000'
 
 let database: TestDatabase

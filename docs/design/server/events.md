@@ -24,7 +24,7 @@ An event has:
 | `start`, `end` | string | The session's `start` and `end`, which an event always has |
 | `cancelled` | boolean | Whether the session is cancelled |
 | `description` | string | The session's `effectiveDescription` (see [Descriptions](sessions.md#descriptions)) |
-| `flyer` | string or null | Where its flyer is, `/api/events/<id>/flyer`, which takes `width` (see [Photos, in Artists](artists.md#photos)), or null when it has none |
+| `flyer` | string or null | Where its flyer is, `/api/events/<id>/flyer`, which takes `width` (see [Photos](artists.md#photos)), or null when it has none |
 | `raEvent` | string or null | The page of its event on RA, `https://ra.co/events/<id>`, or null when it has none |
 | `takeover` | object or null | The collective whose takeover it is, with its `id` and `name`, or null when it isn't a takeover |
 | `sets` | list of sets | Its sets, in their order, cancelled ones included (see [Sets' order](sessions.md#sets-order)) |

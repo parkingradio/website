@@ -9,7 +9,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { applicationsRoutes } from '../applications/routes.js'
@@ -659,9 +659,6 @@ const STEP: fc.Arbitrary<Step> = fc.oneof(
     weight: operation.weight,
   })),
 )
-
-// Photos and flyers aren't sent here.
-const NO_PHOTOS = memoryPhotos()
 
 async function buildApp(database: TestDatabase) {
   const app = Fastify()

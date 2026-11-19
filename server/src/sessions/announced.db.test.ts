@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from './routes.js'
@@ -15,9 +15,6 @@ import { sessionsStore } from './store.js'
 // Announcing sessions, against a real database: only a session with a start can be announced, and an announced session
 // keeps its start, whatever its status (see "Announced" in docs/design/server/sessions.md). The property-based tests of
 // rules.db.test.ts announce sessions too.
-
-// Flyers aren't sent here.
-const NO_PHOTOS = memoryPhotos()
 
 const START = '2026-11-14T21:00-05:00'
 

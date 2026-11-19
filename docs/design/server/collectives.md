@@ -107,9 +107,9 @@ Fails with 404 when there's no such collective.
 
 ## `GET /api/admin/collectives/:id/photo` (admin)
 
-Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the same `width`,
-with the photo, or one of its sizes, or a 304, and fails like it, with 404 when there's no such collective, when it has
-no photo, or when its photo is missing.
+Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), which takes the same
+`width`, with the collective's photo, one of its sizes, or a 304, and fails like it, with 404 when there's no such
+collective, when it has no photo, or when its photo is missing.
 
 ## `POST /api/admin/collectives` (admin)
 

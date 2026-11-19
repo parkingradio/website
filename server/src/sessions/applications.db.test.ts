@@ -11,7 +11,7 @@ import { applicationsSettingsStore } from '../applications/settings.js'
 import { applicationsStore } from '../applications/store.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
@@ -27,9 +27,6 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // does to them, what applications list of them, the statuses they give applications, and what a rejected application
 // keeps them from (see "Applications" in docs/design/server/sessions.md, and "Status" in
 // docs/design/server/applications.md).
-
-// Photos and flyers aren't sent here.
-const NO_PHOTOS = memoryPhotos()
 
 let database: TestDatabase
 let app: FastifyInstance

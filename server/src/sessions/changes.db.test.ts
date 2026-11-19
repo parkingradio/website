@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { artists, collectiveMembers } from '../db/schema.js'
@@ -23,9 +23,6 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // docs/design/server/README.md). The property-based tests of rules.db.test.ts send random PATCHes too.
 
 const TRACK = 'https://soundcloud.com/parkingdotradio/3tons'
-
-// Photos and flyers aren't sent here.
-const NO_PHOTOS = memoryPhotos()
 
 let database: TestDatabase
 let app: FastifyInstance

@@ -58,14 +58,10 @@ It's kept in the app's private S3 bucket, or in a local directory in development
 the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the bucket's previous versions
 for as long as the database's backups are kept, like the artist's row, and is gone for good after that.
 
-Pages show photos much smaller than they're sent, so the server also serves them at two sizes: 320 pixels wide, for
-thumbnails, and 1280, for pages where the photo is the content. A size is a WebP image, turned upright as the photo's
-EXIF orientation says, without any of the photo's metadata, e.g. where it was taken, and never larger than the photo,
-which keeps its width when it's narrower, nor taller than WebP allows, 16383 pixels. The server makes it the first time
-it's asked for, then keeps it with the photo, and deletes it along with it. The endpoints that serve a photo take the
-size as a query parameter, `width`, `320` or `1280`, and ignore any other parameter. The public endpoints only ever
-serve a size, so that the photo itself, and its metadata, stay private, while the admin endpoints serve the photo as it
-was sent without `width`.
+The server also serves each photo at two sizes, 320 and 1280 pixels wide: WebP images, upright as its EXIF orientation
+says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller than WebP allows. A
+size is made the first time it's asked for, kept with the photo, and deleted with it. The public endpoints only ever
+serve a size, so that the photo itself and its metadata stay private.
 
 ## Public profiles
 
@@ -104,6 +100,8 @@ Fails with 404 when there's no such artist.
 | Query parameter | |
 |---|---|
 | `width` | `320` or `1280`: that size of the photo (see [Photos](#photos)). Without it, the photo as it was sent |
+
+Other query parameters are ignored.
 
 Responds with the photo itself, with the type it was checked to have, or with its size, as `image/webp`, rather than
 JSON. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only
@@ -164,6 +162,8 @@ Fails with 404 when there's no such artist, or when they're private.
 | Query parameter | |
 |---|---|
 | `width` | `320` or `1280`, the size of the photo (see [Photos](#photos)). Without it, `1280` |
+
+Other query parameters are ignored.
 
 Responds with that size of a public artist's photo, never with the photo itself, like
 [`GET /api/admin/artists/:id/photo`](#get-apiadminartistsidphoto-admin) with `width`, or a 304, and fails like it, and

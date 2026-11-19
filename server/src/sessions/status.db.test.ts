@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { memoryPhotos } from '../artists/test-photos.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from './routes.js'
@@ -19,9 +19,6 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // planned sets done, a done session that gets a planned set is planned again, and a planned session becomes done once
 // its sets are played, even with requests sent at the same time (see "Status" in docs/design/server/sessions.md). The
 // property-based tests of rules.db.test.ts check these after random requests too.
-
-// Photos and flyers aren't sent here.
-const NO_PHOTOS = memoryPhotos()
 
 // Another admin than the one who adds the sessions, to tell who changed a status.
 const OTHER_ADMIN = { ...TEST_ADMIN, id: 'other-admin-id', email: 'other@example.com' }

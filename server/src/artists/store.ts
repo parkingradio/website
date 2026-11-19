@@ -238,10 +238,17 @@ export function privatePhotos(files: PrivateFiles): Photos {
     const at = sizeKey(key, width)
     try {
       await files.put(at, size, SIZE_TYPE)
+    } catch (error) {
+      log.error({ err: error, key: at }, 'Failed to keep the size of a photo')
+      return size
+    }
+    try {
       // The photo may have been deleted while this was made, after its sizes were (see `delete`): then this one is too.
       if (!(await files.exists(key))) await files.delete(at)
     } catch (error) {
-      log.error({ err: error, key: at }, 'Failed to keep the size of a photo')
+      // It may be left behind, though its photo is deleted: it has to be deleted by hand, like the photos that
+      // `forgetPhoto` fails to delete.
+      log.error({ err: error, key: at }, 'Failed to delete the size of a photo that may have been deleted')
     }
     return size
   }

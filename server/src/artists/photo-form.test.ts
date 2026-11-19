@@ -5,9 +5,9 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 
-import { readPhotoForm } from './photo-form.js'
-
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
+import { useZodSchemas, zodRoutes } from '../api/schemas.js'
+import { photoRoute, readPhotoForm, sendPhoto } from './photo-form.js'
+import { JPEG, memoryPhotos } from './test-photos.js'
 
 // A multipart/form-data body with a field, and a file part named "photo" for each of `photos`.
 function form(photos: Buffer[]) {
@@ -68,5 +68,26 @@ describe('readPhotoForm', () => {
     } finally {
       agent.destroy()
     }
+  })
+})
+
+describe('sendPhoto', () => {
+  it('never serves the public a photo as it was sent, nor serves a photo on a route that does not say who it is for', async () => {
+    const app = Fastify()
+    useZodSchemas(app)
+    const photos = memoryPhotos()
+    const key = await photos.store({ body: JPEG, type: 'image/jpeg' }, 'artists')
+    const row = { photoKey: key, photoType: 'image/jpeg' }
+    const api = zodRoutes(app)
+    // As if its schema let a request without `width` through.
+    api.get('/public/:id', photoRoute('artist', 'public', { summary: 'A photo', tags: [] }), (_, reply) => sendPhoto(reply, photos, row, 'artist', undefined))
+    api.get('/sized/:id', photoRoute('artist', 'public', { summary: 'A photo', tags: [] }), (request, reply) => sendPhoto(reply, photos, row, 'artist', request.query.width))
+    app.get('/other/:id', { schema: { summary: 'A photo' } }, (_, reply) => sendPhoto(reply, photos, row, 'artist', 320))
+    expect((await app.inject('/public/1')).statusCode).toBe(500)
+    expect((await app.inject('/other/1')).statusCode).toBe(500)
+    expect(photos.read).not.toHaveBeenCalled()
+    expect(photos.sized).not.toHaveBeenCalled()
+    expect((await app.inject('/sized/1')).statusCode).toBe(200)
+    await app.close()
   })
 })

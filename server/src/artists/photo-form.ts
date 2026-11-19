@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream'
-import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyContextConfig, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { ApiError, ById, firstIssue, nulError } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './profile.js'
@@ -129,6 +129,13 @@ const Photo = z.union([z.instanceof(Readable), z.instanceof(Buffer)]).meta({ typ
 // ever get its sizes (see "Photos" in docs/design/server/artists.md).
 type Access = 'admin' | 'public'
 
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    // Who the route serves photos or flyers to, for those declared with `photoRoute`.
+    photos?: Access
+  }
+}
+
 // What a photo is of: an artist's or a collective's photo, or a session's or an event's flyer.
 type PhotoOf = 'artist' | 'collective' | 'session' | 'event'
 const imageOf = (what: PhotoOf) => (what === 'session' || what === 'event' ? 'flyer' : 'photo')
@@ -136,53 +143,48 @@ const imageOf = (what: PhotoOf) => (what === 'session' || what === 'event' ? 'fl
 // The width the public gets a photo at, when the request doesn't say.
 const DEFAULT_PUBLIC_WIDTH: PhotoWidth = 1280
 
-// How each endpoint serves photos, and what openapi.json says of it. Browsers can keep them, only in the browser that
-// asked, never in a shared cache, e.g. Cloudflare's: admins' after checking with the server, and the public's for 5
-// minutes without checking.
-const SERVED = {
-  admin: {
-    cacheControl: 'private, no-cache',
-    types: PHOTO_TYPES,
-    without: 'Without it, it is served as it was sent',
-    what: (image: string) => `The ${image}, with the type it was checked to have, or, with \`width\`, its size at that width, as WebP`,
-    caching: 'they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again',
-    etag: (image: string) => `The ${image} and each of its sizes have an \`ETag\` of their own`,
-  },
-  public: {
-    cacheControl: 'private, max-age=300',
-    types: [SIZE_TYPE],
-    without: `Without it, ${DEFAULT_PUBLIC_WIDTH}`,
-    what: (image: string) => `The ${image}'s size at \`width\`, as WebP`,
-    caching: 'they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache',
-    etag: () => 'Each size has an `ETag` of its own',
-  },
-} satisfies Record<Access, unknown>
+// Browsers can keep photos, only in the browser that asked, never in a shared cache, e.g. Cloudflare's: admins' after
+// checking with the server, and the public's for 5 minutes without checking.
+const CACHE_CONTROL: Record<Access, string> = { admin: 'private, no-cache', public: 'private, max-age=300' }
 
-// The options of a route that serves a photo or a flyer with `sendPhoto`, which tell who it's for (see Access), along with
-// its summary and tags.
+// What openapi.json says an endpoint that serves a photo or a flyer responds.
+function description(access: Access, image: 'photo' | 'flyer'): string {
+  const nosniff = 'Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)'
+  return access === 'admin'
+    ? `The ${image}, with the type it was checked to have, or, with \`width\`, its size at that width, as WebP. ${nosniff}, ` +
+        'and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with ' +
+        `the server before showing it again (\`Cache-Control: ${CACHE_CONTROL.admin}\`). The ${image} and each of its sizes ` +
+        `have an \`ETag\` of their own, which changes whenever the ${image} does`
+    : `The ${image}'s size at \`width\`, as WebP. ${nosniff}, and that they can show it again for 5 minutes without ` +
+        'checking with the server, only in the browser that asked for it, never in a shared cache ' +
+        `(\`Cache-Control: ${CACHE_CONTROL.public}\`). Each size has an \`ETag\` of its own, which changes whenever the ${image} does`
+}
+
+// The options of a route that serves a photo or a flyer with `sendPhoto`, to whoever `access` says, along with its
+// summary and tags.
 export function photoRoute(what: PhotoOf, access: Access, { summary, tags }: { summary: string; tags: string[] }) {
   const image = imageOf(what)
-  const served = SERVED[access]
+  const config: FastifyContextConfig = access === 'admin' ? { admin: true, tool: null, photos: access } : { photos: access }
   const width = z
-    .enum(PHOTO_WIDTHS.map(String) as ['320', '1280'], { error: `\`width\` must be ${PHOTO_WIDTHS.join(' or ')}.` })
+    .enum(PHOTO_WIDTHS.map(String) as [`${PhotoWidth}`, ...`${PhotoWidth}`[]], { error: `\`width\` must be ${PHOTO_WIDTHS.join(' or ')}.` })
     .transform((width) => Number(width) as PhotoWidth)
   return {
-    ...(access === 'admin' && { config: { admin: true, tool: null } }),
+    config,
     schema: {
       summary,
       tags,
       params: ById,
       querystring: z.object({
         width: (access === 'admin' ? width.optional() : width.prefault(`${DEFAULT_PUBLIC_WIDTH}`)).meta({
-          description: `The width to serve it at, in pixels: ${PHOTO_WIDTHS.join(' or ')}, or narrower when it is, as WebP. ${served.without}`,
+          description:
+            `The width to serve it at, in pixels: ${PHOTO_WIDTHS.join(' or ')}, or narrower when it is, as WebP. Without it, ` +
+            (access === 'admin' ? 'it is served as it was sent' : `${DEFAULT_PUBLIC_WIDTH}`),
         }),
       }),
       response: {
         200: {
-          description:
-            `${served.what(image)}. Browsers are told not to guess another type (\`X-Content-Type-Options: nosniff\`), and that ` +
-            `${served.caching} (\`Cache-Control: ${served.cacheControl}\`). ${served.etag(image)}, which changes whenever the ${image} does`,
-          content: Object.fromEntries(served.types.map((type) => [type, { schema: Photo }])),
+          description: description(access, image),
+          content: Object.fromEntries((access === 'admin' ? PHOTO_TYPES : [SIZE_TYPE]).map((type) => [type, { schema: Photo }])),
         },
         // Without a body, which @fastify/swagger documents for a schema of type null.
         304: z.null().meta({
@@ -215,10 +217,13 @@ export async function sendPhoto(
   what: PhotoOf,
   width: PhotoWidth | undefined,
 ) {
+  const access = reply.request.routeOptions.config.photos
+  // The public never gets a photo as it was sent, whatever the route's schema lets through.
+  if (!access || (access === 'public' && !width)) throw new Error('Photos are only served as photoRoute says')
   const image = imageOf(what)
   if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
   const etag = `"${width ? sizeKey(row.photoKey, width) : row.photoKey}"`
-  const { cacheControl } = SERVED[reply.request.routeOptions.config.admin ? 'admin' : 'public']
+  const cacheControl = CACHE_CONTROL[access]
   if (hasEtag(reply.request.headers['if-none-match'], etag)) {
     return reply.status(304).header('ETag', etag).header('Cache-Control', cacheControl).send()
   }

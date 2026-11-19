@@ -22,7 +22,13 @@ export type PrivateFiles = {
 // The private files, kept where `config.privateFiles` says.
 export function privateBucket(where: typeof config.privateFiles): PrivateFiles {
   if ('bucket' in where) {
-    const s3 = new S3Client({ region: config.awsRegion })
+    // A request that stalls fails rather than holding up what waits for it, e.g. the resizing of photos, which reads them
+    // a few at a time (see `takingTurns` in artists/sizes.ts): when connecting, waiting for the response, or reading it
+    // without anything coming for a while, though a large file can take longer in all.
+    const s3 = new S3Client({
+      region: config.awsRegion,
+      requestHandler: { connectionTimeout: 5_000, requestTimeout: 30_000, throwOnRequestTimeout: true, socketTimeout: 30_000 },
+    })
     return {
       async put(key, body, contentType) {
         await s3.send(new PutObjectCommand({ Bucket: where.bucket, Key: key, Body: body, ContentType: contentType }))
