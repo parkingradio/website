@@ -623,7 +623,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
         tags: ['Sessions'],
         params: ById,
         multipart: FlyerForm,
-        response: { 200: SessionResponse, 404: ApiError, 413: ApiError },
+        response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 413: ApiError },
       },
     },
     async (request, reply) => {

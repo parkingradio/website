@@ -493,8 +493,8 @@ Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, a
 session's flyer, and deletes it, and `false` keeps it, like leaving it out. A flyer is only given or replaced with
 `PUT /api/admin/sessions/:id` or [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin). Its
 `start` and `durationMinutes` are checked together, and so are its `type`, `takeover`, `application` and `name`, and
-it's checked against the other sessions, as the session would then be. Responds like `PUT`, and fails like it, but with
-400 when there's no field.
+it's checked against the other sessions, as the session would then be. Responds like `PUT /api/admin/sessions/:id`, and
+fails like it, but with 400 when there's no field.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 
