@@ -1,41 +1,47 @@
 import { Readable } from 'node:stream'
 import { vi } from 'vitest'
 import sharp from 'sharp'
+import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import type { PhotoFolder, Photos, SentPhoto } from './store.js'
+import type { PhotoFolder, Photos, SizedPhoto } from './store.js'
 
-// For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, as the bucket
-// would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg", counted from 1 again after `reset`. Their
-// sizes are made up (see `fakeSize`) rather than resized, which store.test.ts and sizes.test.ts cover.
+// For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, with their sizes
+// under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg", counted from 1
+// again after `reset`.
 export function memoryPhotos(name = 'photo') {
   const stored = new Map<string, Buffer>()
   let next = 0
+  const read = (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)
   return {
     stored,
     reset() {
       stored.clear()
       next = 0
     },
-    store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
+    store: vi.fn(async ({ body, type, sizes }: SizedPhoto, folder: PhotoFolder) => {
       const key = `${folder}/${name}-${++next}.${type.split('/')[1]}`
       stored.set(key, body)
+      for (const [width, size] of sizes) stored.set(sizeKey(key, width), size)
       return key
     }),
-    read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-    sized: vi.fn<Photos['sized']>(async (key, width) => {
-      const photo = stored.get(key)
-      return photo ? fakeSize(photo, width) : null
-    }),
+    read: vi.fn(async (key: string) => read(key)),
+    readSize: vi.fn<Photos['readSize']>(async (key, width) => read(sizeKey(key, width))),
     delete: vi.fn(async (key: string) => {
       stored.delete(key)
+      for (const width of PHOTO_WIDTHS) stored.delete(sizeKey(key, width))
     }),
+    // The photos that are stored, without their sizes.
+    photos: () => [...stored.keys()].filter((key) => !/\.w\d+\.webp$/.test(key)),
+    // The size at `width` of the photo with `key`, as it was stored with it.
+    size: (key: string, width: PhotoWidth) => stored.get(sizeKey(key, width)),
   } satisfies Photos & Record<string, unknown>
 }
 
-// The smallest things that start like a JPEG and a PNG image, which is all the type check needs, though they can't be
-// decoded.
-export const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
-export const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
+// Small images of one colour, which can be read, and their sizes made: a JPEG, a PNG, and a JPEG cut short, which
+// starts like one, and so passes the check of its type, but can't be read.
+export const JPEG = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#e4572e' } }).jpeg().toBuffer()
+export const PNG = await sharp({ create: { width: 48, height: 64, channels: 3, background: '#2e86ab' } }).png().toBuffer()
+export const UNREADABLE_JPEG = JPEG.subarray(0, JPEG.length / 2)
 
 // For the tests that never send photos or flyers: storing one fails, and there are none to read.
 export const NO_PHOTOS: Photos = {
@@ -43,13 +49,8 @@ export const NO_PHOTOS: Photos = {
     throw new Error('No photos or flyers in these tests')
   },
   read: async () => null,
-  sized: async () => null,
+  readSize: async () => null,
   delete: async () => {},
-}
-
-// What the photos above give as the size of `photo` at `width`.
-export function fakeSize(photo: Buffer, width: PhotoWidth): Buffer {
-  return Buffer.concat([Buffer.from(`${width}:`), photo])
 }
 
 // An image of one colour, `width` by `height`, in `format`, with EXIF that tells where it was taken and on what, with

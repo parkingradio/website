@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { JPEG, fakeSize, memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
@@ -502,15 +502,17 @@ describe('the photos and flyers of what is public', () => {
     const ana = await createArtist('Ana', JPEG)
     const ondes = await createCollective('Les Ondes', [ana], JPEG)
     const takeover = await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG })
-    for (const [url, adminUrl] of [
-      [`/api/artists/${ana}/photo`, `/api/admin/artists/${ana}/photo`],
-      [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`],
-      [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`],
+    // Stored in that order.
+    const [anaPhoto, ondesPhoto, flyer] = photos.photos()
+    for (const [url, adminUrl, key] of [
+      [`/api/artists/${ana}/photo`, `/api/admin/artists/${ana}/photo`, anaPhoto],
+      [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`, ondesPhoto],
+      [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`, flyer],
     ]) {
       const headers = { 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' }
       const response = await get(url)
       expect(response.statusCode, url).toBe(200)
-      expect(response.rawPayload).toEqual(fakeSize(JPEG, 1280))
+      expect(response.rawPayload).toEqual(photos.size(key, 1280))
       expect(response.headers).toMatchObject(headers)
       // The admin endpoint gives the same size, with the same ETag, but as admins' are.
       const etag = await etagOf(`${adminUrl}?width=1280`)
@@ -521,14 +523,14 @@ describe('the photos and flyers of what is public', () => {
 
       const thumbnail = await get(`${url}?width=320`)
       expect(thumbnail.statusCode, url).toBe(200)
-      expect(thumbnail.rawPayload).toEqual(fakeSize(JPEG, 320))
+      expect(thumbnail.rawPayload).toEqual(photos.size(key, 320))
       expect(thumbnail.headers).toMatchObject(headers)
       expect(thumbnail.headers.etag).not.toBe(etag)
 
       // What browsers kept before the public endpoints served sizes: the photo as it was sent, whose ETag isn't a size's.
       const sent = await get(url, { 'if-none-match': await etagOf(adminUrl) })
       expect(sent.statusCode, url).toBe(200)
-      expect(sent.rawPayload).toEqual(fakeSize(JPEG, 1280))
+      expect(sent.rawPayload).toEqual(photos.size(key, 1280))
 
       expect((await get(`${url}?width=640`)).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     }
@@ -557,9 +559,10 @@ describe('the photos and flyers of what is public', () => {
     stored.clear()
     for (const [url, error] of [
       [`/api/artists/${ana}/photo`, 'This artist has no photo'],
-      [`/api/artists/${brume}/photo`, 'The photo of this artist is missing'],
+      // The public only ever gets its sizes, so that's what's missing.
+      [`/api/artists/${brume}/photo`, 'The photo of this artist has no size 1280 pixels wide'],
       [`/api/events/${without.id}/flyer`, 'This event has no flyer'],
-      [`/api/events/${missing.id}/flyer`, 'The flyer of this event is missing'],
+      [`/api/events/${missing.id}/flyer`, 'The flyer of this event has no size 1280 pixels wide'],
       [`/api/events/${NOBODY}/flyer`, 'No such event'],
       ['/api/events/x/flyer', 'No such event'],
     ]) {

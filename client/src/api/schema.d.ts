@@ -1146,7 +1146,7 @@ export interface paths {
                         artist: components["schemas"]["AdminArtistProfile"];
                         /**
                          * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
                          */
                         photo?: Blob;
                         /** @description "true" removes the artist's photo, when there's no new one. Anything else keeps it */
@@ -1463,7 +1463,7 @@ export interface paths {
                         collective: components["schemas"]["AdminCollectiveProfile"];
                         /**
                          * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
                          */
                         photo?: Blob;
                         /** @description "true" removes the collective's photo, when there's no new one. Anything else keeps it */
@@ -1983,7 +1983,7 @@ export interface paths {
                         application: components["schemas"]["ApplicationFields"];
                         /**
                          * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
                          */
                         photo?: Blob;
                         /** @description For a collective, its artists' photos, a part each, in the order of its artists, where an empty part is no photo. Those after the last photo can be left out */
@@ -2108,7 +2108,7 @@ export interface paths {
                         session: components["schemas"]["SessionFields"];
                         /**
                          * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer
                          */
                         flyer?: Blob;
                         /** @description "true" removes the session's flyer, when there's no new one. Anything else keeps it */
@@ -2314,7 +2314,7 @@ export interface paths {
                     "multipart/form-data": {
                         /**
                          * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer
                          */
                         flyer: Blob;
                     };
@@ -4357,7 +4357,7 @@ export interface operations {
                     artist: components["schemas"]["AdminArtistProfile"];
                     /**
                      * Format: binary
-                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
                      */
                     photo?: Blob;
                 };
@@ -4778,7 +4778,7 @@ export interface operations {
                     collective: components["schemas"]["AdminCollectiveProfile"];
                     /**
                      * Format: binary
-                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo
+                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
                      */
                     photo?: Blob;
                 };
@@ -5712,7 +5712,7 @@ export interface operations {
                     session: components["schemas"]["NewSessionFields"];
                     /**
                      * Format: binary
-                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer
+                     * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer
                      */
                     flyer?: Blob;
                 };

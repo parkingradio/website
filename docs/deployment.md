@@ -197,6 +197,17 @@ Each deployment gets a private S3 bucket for the files only the app reads and wr
 assets. The bucket is versioned and keeps the previous versions of files for as long as the database's backups
 are kept.
 
+Photos and flyers are kept there with their sizes, which the server makes when they're sent (see
+[Photos](design/server/artists.md#photos)). Whenever the server starts, it makes, in the background, one photo at a
+time, the sizes that the photos and flyers it keeps don't have, e.g. those sent before there were sizes, the first time
+an image with them is deployed. Until it's done, pages show those photos and flyers as missing images. Its log, which
+is read as in [Database migrations](#database-migrations), says when it starts (`Making the missing sizes of photos and
+flyers`) and when it's done (`Made the missing sizes of photos and flyers`, with how many it made, and how many it
+couldn't). A photo or flyer that it can't read is logged as `Can't make the sizes of a photo or flyer: it can't be
+read`, with what it's of (`of`, e.g. `artist`, and `id`), and its key: it has no sizes until it's replaced, on the
+admin pages, which still have it as it was sent. A failure to make them for any other reason, e.g. of the bucket, is
+logged as `Failed to make the sizes of a photo or flyer`, and tried again the next time the server starts.
+
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

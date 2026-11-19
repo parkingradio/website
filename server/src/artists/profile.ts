@@ -94,15 +94,23 @@ export const GenreId = z.enum(GENRES, { error: "Un des genres n'est pas dans la 
 export type GenreId = z.infer<typeof GenreId>
 
 // The photo is optional, and sent as a file, next to the profile: a JPEG, PNG or WebP image of up to PHOTO_MAX_BYTES,
-// whose type the server tells from its contents (see `validatePhoto` in artists/store.ts).
+// whose type the server tells from its contents (see `validatePhoto` in artists/store.ts), and which it can read in full,
+// of at most PHOTO_MAX_PIXELS (see `withSizes` in artists/store.ts).
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024
+// E.g. a 100 MP camera's, far more than a photo of up to PHOTO_MAX_BYTES usually has, unless it compresses very well,
+// e.g. a flat image. Reading a PNG of this many pixels, which can't be decoded smaller than it is, as a JPEG can, takes
+// about 120 MB.
+export const PHOTO_MAX_PIXELS = 100_000_000
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 export const PHOTO_WRONG_TYPE = 'La photo doit être en JPEG, PNG ou WebP.'
 export const PHOTO_TOO_LARGE = `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
+export const PHOTO_UNREADABLE = `La photo ne peut pas être lue : elle est endommagée, ou dépasse ${PHOTO_MAX_PIXELS / 1_000_000} millions de pixels.`
+// What the descriptions of the files that are photos or flyers say they must be, in openapi.json.
+export const PHOTO_RULES =
+  `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents, ` +
+  `that can be read, of at most ${PHOTO_MAX_PIXELS / 1_000_000} million pixels`
 // The photo, as a part of a multipart/form-data request, which the route reads itself (see `readPhotoForm`).
-export const PhotoFile = z.file().meta({
-  description: `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents. An empty file is no photo`,
-})
+export const PhotoFile = z.file().meta({ description: `${PHOTO_RULES}. An empty file is no photo` })
 
 // Whether `value` looks like an email address. Only the shape is checked, not that it exists. Besides spaces and @, it
 // can't have the characters that make it more than a single address, or an address with a name, e.g. "Name <address>"

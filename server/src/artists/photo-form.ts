@@ -5,8 +5,8 @@ import { ApiError, ById, firstIssue, nulError } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './profile.js'
 import { PHOTO_WIDTHS, SIZE_TYPE, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import { InvalidProfile, PHOTO_ERRORS, validatePhoto, validateProfile } from './store.js'
-import type { PhotoErrors, Photos, SentPhoto } from './store.js'
+import { InvalidProfile, PHOTO_ERRORS, readPhoto, validateProfile } from './store.js'
+import type { PhotoErrors, Photos, SizedPhoto } from './store.js'
 
 // Reading requests that send a photo with a few fields, e.g. a profile, and serving photos, for the routes of artists,
 // collectives and applications, and the same for sessions' flyers, which follow the same rules.
@@ -96,15 +96,16 @@ export const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as cons
 // Reads the profile, as JSON from the part `part`, and the photo from a request that adds or changes an artist or a
 // collective, and checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character
 // (see `refusingNul` in api/schemas.ts), along with the "removePhoto" field, which only changing one reads. Returns the
-// checked profile and photo (null when there's none), or the error to reply with when the request is malformed or
-// invalid, with where in the profile, when it's about one of its fields. A session's fields and flyer are read the same
-// way, with `photoPart` naming the flyer's part, `remove` the field that removes it, and `errors` what's wrong with it.
+// checked profile and photo, with its sizes (null when there's none), or the error to reply with when the request is
+// malformed or invalid, e.g. when the photo can't be read, with where in the profile, when it's about one of its fields.
+// A session's fields and flyer are read the same way, with `photoPart` naming the flyer's part, `remove` the field that
+// removes it, and `errors` what's wrong with it.
 export async function readProfileForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   part: string,
   schema: Schema,
   { photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { photoPart?: string; remove?: string; errors?: PhotoErrors } = {},
-): Promise<{ profile: z.output<Schema>; photo: SentPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string; path?: PropertyKey[] }> {
+): Promise<{ profile: z.output<Schema>; photo: SizedPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string; path?: PropertyKey[] }> {
   const form = await readPhotoForm(request, { photoPart })
   if (form === 'malformed') return INVALID_REQUEST
   if ('tooLarge' in form) return { status: 413, error: errors.tooLarge }
@@ -114,16 +115,16 @@ export async function readProfileForm<Schema extends z.ZodType>(
     const profile = validateProfile(sent, schema)
     const nul = nulError(profile)
     if (nul) return { status: 400, ...nul }
-    return { profile, photo: validatePhoto(form.photo, errors), removePhoto: form.fields[remove] === 'true' }
+    return { profile, photo: await readPhoto(form.photo, errors), removePhoto: form.fields[remove] === 'true' }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message, path: error.path }
   }
 }
 
-// The photo, as it's read from where it's kept, or made. Streams are sent as they are, rather than serialized, so it isn't
-// checked against this schema, which only says it's a file.
-const Photo = z.union([z.instanceof(Readable), z.instanceof(Buffer)]).meta({ type: 'string', format: 'binary' })
+// The photo, as it's read from where it's kept. Streams are sent as they are, rather than serialized, so it isn't checked
+// against this schema, which only says it's a file.
+const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
 
 // Who an endpoint that serves a photo or a flyer is for: admins, who can get it as it was sent, or the public, who only
 // ever get its sizes (see "Photos" in docs/design/server/artists.md).
@@ -207,9 +208,10 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
 
 // Sends the photo of an artist or a collective, or the flyer of a session or an event (as `what` says), on a route
 // declared with `photoRoute`, as it was sent, or its size at `width`, which the public always gets, or a 404 when they
-// have none, or when it's missing, once the route has checked that whoever asks can see them. The ETag of a photo is its
-// key, and that of a size the key it's kept under, neither ever used for another one: it changes exactly when the photo
-// does. So a request that already has it gets a 304 without anything being read, even when the photo is missing.
+// have none, when it's missing, or when it has no such size (see artists/backfill.ts), once the route has checked that
+// whoever asks can see them. The ETag of a photo is its key, and that of a size the key it's kept under, neither ever
+// used for another one: it changes exactly when the photo does. So a request that already has it gets a 304 without
+// anything being read, even when the photo is missing.
 export async function sendPhoto(
   reply: FastifyReply,
   photos: Photos,
@@ -227,7 +229,13 @@ export async function sendPhoto(
   if (hasEtag(reply.request.headers['if-none-match'], etag)) {
     return reply.status(304).header('ETag', etag).header('Cache-Control', cacheControl).send()
   }
-  const photo = width ? await photos.sized(row.photoKey, width, reply.log) : await photos.read(row.photoKey)
+  const photo = width ? await photos.readSize(row.photoKey, width) : await photos.read(row.photoKey)
+  if (!photo && width) {
+    // Until it's made, or for good when the photo can't be read: only the 404's message is logged, as for any other. A
+    // photo that's missing too, which can't be told apart here, is logged when the server starts (see
+    // artists/backfill.ts).
+    return reply.status(404).send({ ok: false, error: `The ${image} of this ${what} has no size ${width} pixels wide` })
+  }
   if (!photo) {
     const error = `The ${image} of this ${what} is missing`
     reply.log.error({ key: row.photoKey }, error)

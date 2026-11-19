@@ -5,7 +5,7 @@ import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue,
 import { INVALID_REQUEST, photoRoute, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
-import type { Photos, SentPhoto } from '../artists/store.js'
+import type { Photos, SizedPhoto } from '../artists/store.js'
 import { AdminCollectiveProfile } from './profile.js'
 import type { CollectiveProfile } from './profile.js'
 import { ConflictError, conflictBody } from '../sessions/routes.js'
@@ -189,7 +189,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     changes: Partial<CollectiveProfile>,
-    sentPhoto: SentPhoto | null,
+    sentPhoto: SizedPhoto | null,
     removePhoto: boolean,
   ) {
     // The collective's new photo, or none if it's removed. Otherwise, the collective keeps its own.

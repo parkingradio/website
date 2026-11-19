@@ -6,7 +6,7 @@ import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
 import type { StoredArtist } from '../artists/store.js'
-import { JPEG, PNG, memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -225,7 +225,7 @@ describe('POST /api/applications', () => {
       // The dates are sorted.
       expect.objectContaining({ ...fields({ dates: ['2027-01-08', '2027-01-15'] }), artistId: artists[0].id, createdBy: null }),
     ])
-    expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
   })
 
   it('adds the artist without a photo, which is optional', async () => {
@@ -253,7 +253,7 @@ describe('POST /api/applications', () => {
     expect(artists).toHaveLength(1)
     expect(artists[0]).toMatchObject({ name: 'DJ Test', photoKey: 'artists/photo-1.jpeg' })
     expect(applications).toHaveLength(1)
-    expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
   })
 
   it('adds the collective, which added itself, with its photo, its artists, with their profiles and photos, in order, and its application', async () => {
@@ -288,7 +288,7 @@ describe('POST /api/applications', () => {
     ])
     expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
     expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
-    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
   })
 
   it('takes any number of artists, but at least one', async () => {
@@ -313,7 +313,7 @@ describe('POST /api/applications', () => {
     expect(response.json()).toEqual({ ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' })
     expect(collectives).toHaveLength(1)
     expect(artists).toHaveLength(2)
-    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
     expect(photos.delete).toHaveBeenCalledTimes(3)
 
     expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)
@@ -511,6 +511,25 @@ describe('POST /api/applications', () => {
     for (const response of refused) {
       expect(response.json()).toEqual({ ok: false, error: 'Candidature invalide.' })
     }
+  })
+
+  it("refuses, in French, a photo that can't be read, once Turnstile vouches for the token, saying which artist's it is, without storing anything", async () => {
+    const app = await buildApp()
+    const unreadable = 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'
+    for (const { parts, error } of [
+      { parts: { photo: UNREADABLE_JPEG }, error: unreadable },
+      { parts: { artist: asCollective(), photo: PNG, memberPhotos: [JPEG, UNREADABLE_JPEG] }, error: `Artiste 2 : ${unreadable}` },
+    ]) {
+      verifyTurnstile.mockClear()
+      const response = await apply(app, parts)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error })
+      // Reading photos takes work, which only requests that pass Turnstile get.
+      expect(verifyTurnstile).toHaveBeenCalledOnce()
+    }
+    expect(photos.store).not.toHaveBeenCalled()
+    expect(store.apply).not.toHaveBeenCalled()
+    expect(store.applyAsCollective).not.toHaveBeenCalled()
   })
 
   it('refuses an application without a token, or with one Turnstile does not vouch for, without storing anything', async () => {

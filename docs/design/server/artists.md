@@ -53,15 +53,19 @@ An artist, as the endpoints below return them, is their profile with:
 
 ## Photos
 
-An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents.
-It's kept in the app's private S3 bucket, or in a local directory in development, and only the server reads it. When
-the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the bucket's previous versions
-for as long as the database's backups are kept, like the artist's row, and is gone for good after that.
+An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
+and which the server can read in full, of at most 100 million pixels: one it can't read, e.g. because it's damaged or
+cut short, is refused. It's kept in the app's private S3 bucket, or in a local directory in development, and only the
+server reads it. When the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the
+bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for good
+after that.
 
-The server also serves each photo at two sizes, 320 and 1280 pixels wide: WebP images, upright as its EXIF orientation
-says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller than WebP allows. A
-size is made the first time it's asked for, kept with the photo, and deleted with it. The public endpoints only ever
-serve a size, so that the photo itself and its metadata stay private.
+The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
+its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
+than WebP allows. They're deleted with it. When it starts, the server makes, in the background, the sizes that the
+photos it keeps don't have: until then, and for good for a photo it can't read, the endpoints fail with 404 for a size
+that isn't there. The public endpoints only ever serve a size, so that the photo itself and its metadata stay
+private.
 
 ## Public profiles
 
@@ -108,9 +112,9 @@ JSON. Browsers are told not to guess another type (`X-Content-Type-Options: nosn
 in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again
 (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes
 whenever the photo does, and a request with it in `If-None-Match` gets a 304 without the photo, even when the photo is
-missing. Otherwise, fails with 400 when `width` is anything else, or is given more than once, 404 when there's no such
-artist, when they have no photo, or when their photo is missing, and 500 when it can't be made into that size, e.g.
-when it's corrupt, even though its type was checked: it can still be had as it was sent, and replaced.
+missing. Otherwise, fails with 400 when `width` is anything else, or is given more than once, and 404 when there's no
+such artist, when they have no photo, when their photo is missing, or when it doesn't have that size (see
+[Photos](#photos)): it can still be had as it was sent, and replaced.
 
 ## `POST /api/admin/artists` (admin)
 
@@ -123,8 +127,8 @@ are ignored. A second photo isn't: the request fails.
 | `ok` | `true` | |
 | `artist` | artist | As they were added |
 
-Fails with 400 (an invalid profile or photo, or a malformed request), 409 (another artist has that email) or 413 (a
-photo larger than 10 MB).
+Fails with 400 (an invalid profile or photo, including one that can't be read, see [Photos](#photos), or a malformed
+request), 409 (another artist has that email) or 413 (a photo larger than 10 MB).
 
 ## `PUT /api/admin/artists/:id` (admin)
 

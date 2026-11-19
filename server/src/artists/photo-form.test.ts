@@ -7,6 +7,7 @@ import multipart from '@fastify/multipart'
 
 import { useZodSchemas, zodRoutes } from '../api/schemas.js'
 import { photoRoute, readPhotoForm, sendPhoto } from './photo-form.js'
+import { withSizes } from './store.js'
 import { JPEG, memoryPhotos } from './test-photos.js'
 
 // A multipart/form-data body with a field, and a file part named "photo" for each of `photos`.
@@ -76,7 +77,7 @@ describe('sendPhoto', () => {
     const app = Fastify()
     useZodSchemas(app)
     const photos = memoryPhotos()
-    const key = await photos.store({ body: JPEG, type: 'image/jpeg' }, 'artists')
+    const key = await photos.store(await withSizes({ body: JPEG, type: 'image/jpeg' }), 'artists')
     const row = { photoKey: key, photoType: 'image/jpeg' }
     const api = zodRoutes(app)
     // As if its schema let a request without `width` through.
@@ -86,7 +87,7 @@ describe('sendPhoto', () => {
     expect((await app.inject('/public/1')).statusCode).toBe(500)
     expect((await app.inject('/other/1')).statusCode).toBe(500)
     expect(photos.read).not.toHaveBeenCalled()
-    expect(photos.sized).not.toHaveBeenCalled()
+    expect(photos.readSize).not.toHaveBeenCalled()
     expect((await app.inject('/sized/1')).statusCode).toBe(200)
     await app.close()
   })

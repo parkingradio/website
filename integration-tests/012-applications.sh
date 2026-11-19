@@ -19,7 +19,7 @@ readonly NOBODY=00000000-0000-4000-8000-000000000000
 
 readonly PHOTO="$(mktemp)"
 trap 'rm -f "$PHOTO"' EXIT
-printf '\xff\xd8\xff\xe0JFIF' > "$PHOTO"
+make_image jpeg 64 48 > "$PHOTO"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200

@@ -5141,7 +5141,7 @@
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                   }
                 },
                 "required": [
@@ -5350,7 +5350,7 @@
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                   },
                   "removePhoto": {
                     "description": "\"true\" removes the artist's photo, when there's no new one. Anything else keeps it",
@@ -5842,21 +5842,18 @@
             "content": {
               "image/jpeg": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -6022,7 +6019,6 @@
             "content": {
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -6150,7 +6146,7 @@
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                   }
                 },
                 "required": [
@@ -6359,7 +6355,7 @@
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                   },
                   "removePhoto": {
                     "description": "\"true\" removes the collective's photo, when there's no new one. Anything else keeps it",
@@ -6882,21 +6878,18 @@
             "content": {
               "image/jpeg": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -7062,7 +7055,6 @@
             "content": {
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -8075,7 +8067,7 @@
                   "photo": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                   },
                   "memberPhoto": {
                     "description": "For a collective, its artists' photos, a part each, in the order of its artists, where an empty part is no photo. Those after the last photo can be left out",
@@ -8083,7 +8075,7 @@
                     "items": {
                       "type": "string",
                       "format": "binary",
-                      "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no photo"
+                      "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
                     }
                   },
                   "turnstileToken": {
@@ -8315,7 +8307,7 @@
                   "flyer": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer"
                   }
                 },
                 "required": [
@@ -8534,7 +8526,7 @@
                   "flyer": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer"
                   },
                   "removeFlyer": {
                     "description": "\"true\" removes the session's flyer, when there's no new one. Anything else keeps it",
@@ -9034,21 +9026,18 @@
             "content": {
               "image/jpeg": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -9115,7 +9104,7 @@
                   "flyer": {
                     "type": "string",
                     "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents. An empty file is no flyer"
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer"
                   }
                 },
                 "required": [
@@ -10489,7 +10478,6 @@
             "content": {
               "image/webp": {
                 "schema": {
-                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }

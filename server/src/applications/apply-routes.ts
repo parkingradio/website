@@ -7,9 +7,9 @@ import { useApiErrors } from '../api/errors.js'
 import { ApiError, Ok, zodRoutes } from '../api/schemas.js'
 import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { FormLimits, PhotoForm } from '../artists/photo-form.js'
-import { PHOTO_TOO_LARGE, PhotoFile } from '../artists/profile.js'
-import { EmailTaken, InvalidProfile, forgetPhoto, storePhoto, validatePhoto } from '../artists/store.js'
-import type { PhotoFolder, Photos, SentPhoto, StoredPhoto } from '../artists/store.js'
+import { PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PhotoFile } from '../artists/profile.js'
+import { EmailTaken, InvalidProfile, PHOTO_ERRORS, forgetPhoto, storePhoto, validatePhoto, withSizes } from '../artists/store.js'
+import type { PhotoFolder, Photos, SentPhoto, SizedPhoto, StoredPhoto } from '../artists/store.js'
 import type { Email, SendEmail } from '../core/email.js'
 import { Applicant, applied, memberError, validateApplicant } from './applicant.js'
 import type { Applied } from './applicant.js'
@@ -60,8 +60,8 @@ const LIMITS: FormLimits = { files: 10, fields: 10, fieldSize: 256 * 1024 }
 // its artists', in order.
 type Sent = { applied: Applied; photo: SentPhoto | null; memberPhotos: (SentPhoto | null)[]; application: ApplicationFields }
 
-// Checks who applies, the photos and the application that were sent. Returns what to save of them, or the error for the
-// first one that isn't valid.
+// Checks who applies, the types of the photos and the application that were sent. Returns what to save of them, or the
+// error for the first one that isn't valid. The photos are only read once the token is checked (see `sized`).
 function validated(form: PhotoForm): Sent | z.infer<typeof ApiError> {
   const sentArtist = jsonField(form.fields.artist)
   const sentApplication = jsonField(form.fields.application)
@@ -86,10 +86,26 @@ function validated(form: PhotoForm): Sent | z.infer<typeof ApiError> {
   }
 }
 
+// Reads the photos that were sent, one after another, and returns them with their sizes, or the error for the first one
+// that can't be read. That's what takes the most work and memory, so it's only done once Turnstile has accepted the token.
+async function sized(sent: Sent): Promise<{ photo: SizedPhoto | null; memberPhotos: (SizedPhoto | null)[] } | z.infer<typeof ApiError>> {
+  try {
+    const photo = sent.photo && (await withSizes(sent.photo))
+    const memberPhotos: (SizedPhoto | null)[] = []
+    for (const [index, memberPhoto] of sent.memberPhotos.entries()) {
+      memberPhotos.push(memberPhoto && (await withSizes(memberPhoto, { ...PHOTO_ERRORS, unreadable: memberError(index, PHOTO_UNREADABLE) })))
+    }
+    return { photo, memberPhotos }
+  } catch (error) {
+    if (!(error instanceof InvalidProfile)) throw error
+    return { ok: false, error: error.message }
+  }
+}
+
 // Stores the photos that were sent, one at a time, each in its folder, and returns where, as artists and collectives keep
 // them. If one can't be stored, those that were are deleted, and the error is thrown: storing them all at once would
 // leave those still being stored behind.
-async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, sent: { photo: SentPhoto | null; folder: PhotoFolder }[]) {
+async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, sent: { photo: SizedPhoto | null; folder: PhotoFolder }[]) {
   const stored: StoredPhoto[] = []
   try {
     for (const { photo, folder } of sent) stored.push(await storePhoto(photos, photo, folder))
@@ -196,7 +212,8 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
       if ('error' in sent) return reply.status(400).send(sent)
 
       // This comes after the checks above because Cloudflare only accepts each token once. That way, if a profile, the
-      // application or a photo isn't valid, the artist can fix it and send it again with the same token.
+      // application or a photo's type isn't valid, the artist can fix it and send it again with the same token. A photo
+      // that can't be read is only found after it, though (see `sized`).
       const token = typeof form.fields.turnstileToken === 'string' ? form.fields.turnstileToken : ''
       const verified = await verifyTurnstile(token, visitorAddress(request)).catch((error: unknown) => {
         request.log.error({ err: error }, 'Failed to check a Turnstile token with Cloudflare')
@@ -209,6 +226,8 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         request.log[misconfigured ? 'error' : 'info']({ errorCodes: verified.errorCodes }, 'Turnstile refused an application')
         return reply.status(400).send(TURNSTILE_REFUSED)
       }
+      const sizedPhotos = await sized(sent)
+      if ('error' in sizedPhotos) return reply.status(400).send(sizedPhotos)
 
       // Only new artists and collectives can apply here, so an existing email gets a 409. That tells the sender the email
       // belongs to an artist, or a collective, which is why it's only checked now: finding that out takes passing
@@ -235,8 +254,8 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
               done: 'A collective applied',
             }
       const stored = await storePhotos(photos, request.log, [
-        { photo: sent.photo, folder: how.folder },
-        ...sent.memberPhotos.map((photo) => ({ photo, folder: 'artists' as const })),
+        { photo: sizedPhotos.photo, folder: how.folder },
+        ...sizedPhotos.memberPhotos.map((photo) => ({ photo, folder: 'artists' as const })),
       ])
       let ids: Awaited<ReturnType<typeof how.save>>
       try {

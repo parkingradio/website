@@ -22,8 +22,11 @@ readonly TOKEN='XXXX.DUMMY.TOKEN.XXXX'
 
 readonly PHOTO="$(mktemp)"
 readonly EMPTY="$(mktemp)"
-trap 'rm -f "$PHOTO" "$EMPTY"' EXIT
-printf '\xff\xd8\xff\xe0JFIF' > "$PHOTO"
+readonly CUT="$(mktemp)"
+trap 'rm -f "$PHOTO" "$EMPTY" "$CUT"' EXIT
+make_image jpeg 64 48 > "$PHOTO"
+# A JPEG cut short, which starts like one, but can't be read.
+cut_short "$PHOTO" > "$CUT"
 
 # profile <name> <email> -- an artist's profile, as JSON, as the form sends it.
 profile() {
@@ -79,6 +82,19 @@ expect_status 200
 expect_body_contains '"dates":["2027-03-12"]'
 expect_body_contains '"createdBy":null'
 [ -n "$(body_field receivedAt)" ] && [ "$(body_field receivedAt)" = "$(body_field createdAt)" ] || { _show_body; fail "expected the application to be received when it was created"; }
+
+echo "  a photo that can't be read is refused, in French, saying whose it is, and nothing is stored"
+photos="$(photos_on_disk)"
+collective_photos="$(photos_on_disk collectives)"
+apply 198.51.100.27 "$(profile Unreadable unreadable@integration.test)" "$TOKEN" "$CUT"
+expect_status 400
+expect_body_contains '"error":"La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels."'
+apply 198.51.100.27 "$(collective 'Illisible' illisible@integration.test "$(member Une),$(member Deux)")" "$TOKEN" "$PHOTO" "$PHOTO" "$CUT"
+expect_status 400
+expect_body_contains '"error":"Artiste 2 : La photo ne peut pas être lue'
+[ "$(photos_on_disk)" = "$photos" ] && [ "$(photos_on_disk collectives)" = "$collective_photos" ] || fail "expected nothing to be stored"
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
+if printf '%s' "$BODY" | grep -Fq '"name":"Unreadable"'; then _show_body; fail "the artist whose photo can't be read was added"; fi
 
 echo "  an artist applies without a photo, and is added without one"
 photos="$(photos_on_disk)"

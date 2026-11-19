@@ -111,10 +111,25 @@ expect_output() {
 }
 
 # photos_on_disk [<folder>] -- how many photos the server keeps in a folder, artists' unless it says collectives' or
-# sessions' (their flyers), in the directory that stands in for the private bucket.
+# sessions' (their flyers), in the directory that stands in for the private bucket, without their sizes (see
+# `sizes_on_disk`).
 photos_on_disk() {
-    local folder="/tmp/private-bucket/${1:-artists}"
-    docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi" | wc -l | tr -d ' '
+    _files_on_disk "${1:-artists}" | grep -cvE '\.w[0-9]+\.webp$' || true
+}
+
+# sizes_on_disk [<folder>] -- how many sizes of photos the server keeps in a folder, like `photos_on_disk`.
+sizes_on_disk() {
+    _files_on_disk "${1:-artists}" | grep -cE '\.w[0-9]+\.webp$' || true
+}
+
+_files_on_disk() {
+    local folder="/tmp/private-bucket/$1"
+    docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi"
+}
+
+# cut_short <file> -- print the first half of the file, e.g. an image that then starts like one, but can't be read.
+cut_short() {
+    head -c "$(($(wc -c < "$1") / 2))" "$1"
 }
 
 # make_image <jpeg|png|webp> <width> <height> -- print an image of one colour in that format, with EXIF that has

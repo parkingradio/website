@@ -5,9 +5,9 @@ import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
 import { INVALID_REQUEST, photoRoute, readPhotoForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
-import { PHOTO_MAX_BYTES } from '../artists/profile.js'
-import { InvalidProfile, forgetPhoto, validatePhoto } from '../artists/store.js'
-import type { Photos, SentPhoto } from '../artists/store.js'
+import { PHOTO_MAX_BYTES, PHOTO_MAX_PIXELS, PHOTO_RULES } from '../artists/profile.js'
+import { InvalidProfile, forgetPhoto, readPhoto } from '../artists/store.js'
+import type { PhotoErrors, Photos, SizedPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
 import {
@@ -134,13 +134,12 @@ const RaEventContent = z
 export type RaEventContent = z.infer<typeof RaEventContent>
 
 // A session's flyer follows the rules of artists' photos (see `validatePhoto` in artists/store.ts), with errors in English.
-const FLYER_ERRORS = {
+const FLYER_ERRORS: PhotoErrors = {
   wrongType: 'The flyer must be a JPEG, PNG or WebP image',
   tooLarge: `The flyer is larger than ${PHOTO_MAX_BYTES / 1024 / 1024} MB`,
+  unreadable: `The flyer can't be read: it's damaged, or has more than ${PHOTO_MAX_PIXELS / 1_000_000} million pixels`,
 }
-const FlyerFile = z.file().meta({
-  description: `A JPEG, PNG or WebP image of up to ${PHOTO_MAX_BYTES / 1024 / 1024} MB, whose type is told from its contents. An empty file is no flyer`,
-})
+const FlyerFile = z.file().meta({ description: `${PHOTO_RULES}. An empty file is no flyer` })
 
 // What adding a session sends, as multipart/form-data, with its sets, and changing one, without them, with
 // `removeFlyer`. The route reads it itself (see `readSessionForm`): only the session's fields are checked against their
@@ -179,7 +178,7 @@ function sessionChanges({ start, durationMinutes, type, takeover, application, n
 async function readSessionForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   schema: Schema,
-): Promise<{ fields: z.output<Schema>; flyer: SentPhoto | null; removeFlyer: boolean } | Failure> {
+): Promise<{ fields: z.output<Schema>; flyer: SizedPhoto | null; removeFlyer: boolean } | Failure> {
   const sent = await readProfileForm(request, 'session', schema, { photoPart: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
   if (!('error' in sent)) return { fields: sent.profile, flyer: sent.photo, removeFlyer: sent.removePhoto }
   const [field, setIndex] = sent.path ?? []
@@ -389,8 +388,8 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     return respond(saved)
   }
 
-  // Stores the flyer that was sent, if there's one, and returns where, as a session keeps it.
-  async function storeFlyer(flyer: SentPhoto | null): Promise<StoredFlyer> {
+  // Stores the flyer that was sent, if there's one, with its sizes, and returns where, as a session keeps it.
+  async function storeFlyer(flyer: SizedPhoto | null): Promise<StoredFlyer> {
     return flyer ? { flyerKey: await photos.store(flyer, 'sessions'), flyerType: flyer.type } : { flyerKey: null, flyerType: null }
   }
 
@@ -550,7 +549,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     fields: Partial<SessionFields>,
-    sentFlyer: SentPhoto | null,
+    sentFlyer: SizedPhoto | null,
     removeFlyer: boolean,
   ) {
     // The session's new flyer, or none if it's removed. Otherwise, the session keeps its own.
@@ -623,9 +622,9 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const form = await readPhotoForm(request, { photoPart: 'flyer' })
       if (form === 'malformed') return fail(reply, INVALID_REQUEST)
       if ('tooLarge' in form) return fail(reply, { status: 413, error: FLYER_ERRORS.tooLarge })
-      let flyer: SentPhoto | null
+      let flyer: SizedPhoto | null
       try {
-        flyer = validatePhoto(form.photo, FLYER_ERRORS)
+        flyer = await readPhoto(form.photo, FLYER_ERRORS)
       } catch (error) {
         if (!(error instanceof InvalidProfile)) throw error
         return fail(reply, { status: 400, error: error.message })

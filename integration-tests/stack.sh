@@ -35,7 +35,7 @@ export ASSETS_DOMAIN="assets.integration.test"
 export ADMIN_EMAIL="admin@integration.test"
 export ADMIN_PASSWORD="integration-password"
 
-# wait_until <tries> <command...> -- run command once a second until it succeeds.
+# wait_until <tries> <command...> -- run command once a second until it succeeds. Exported for the checks too.
 wait_until() {
     local tries="$1"
     shift
@@ -45,6 +45,7 @@ wait_until() {
     done
     return 1
 }
+export -f wait_until
 
 cleanup() {
     docker rm --force "$CONTAINER" "$PG" >/dev/null 2>&1 || true

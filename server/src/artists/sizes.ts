@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { PHOTO_MAX_PIXELS } from './profile.js'
 
 // The sizes of photos and flyers that the server makes and serves (see "Photos" in docs/design/server/artists.md).
 
@@ -10,18 +11,6 @@ export type PhotoWidth = (typeof PHOTO_WIDTHS)[number]
 // the server has little of.
 sharp.cache(false)
 
-// The most pixels a photo can have to be resized, e.g. a 100 MP camera's, far more than a photo of up to PHOTO_MAX_BYTES
-// usually has, unless it compresses very well, e.g. a flat image. Resizing a PNG of this many pixels, which can't be
-// decoded smaller than it is, as a JPEG can, takes about 120 MB more.
-const MAX_INPUT_PIXELS = 100_000_000
-
-// How many photos are resized at once, at most, by the same server: the others wait their turn (see `takingTurns`).
-// Resizing one holds it in memory, up to PHOTO_MAX_BYTES, as it was read, and decoding it can take up to about 120 MB
-// more (see MAX_INPUT_PIXELS), so that the server, which has 1 GB of memory, would run out of it resizing many at once,
-// e.g. the first time a page shows many photos that don't have their sizes yet. The server has 2 CPUs, which this keeps
-// busy.
-export const RESIZED_AT_ONCE = 2
-
 // The largest width or height a WebP image can have.
 const WEBP_MAX_DIMENSION = 16383
 
@@ -29,36 +18,42 @@ const WEBP_MAX_DIMENSION = 16383
 export const SIZE_TYPE = 'image/webp'
 
 // Where the size of a photo is kept: next to it, under its key with a suffix. The suffix names how the size is encoded,
-// and has to change when that does: sizes are made only once, so those already made would otherwise be served as they
-// are.
+// and has to change when that does, since sizes are only made when they're missing: the server would otherwise keep
+// serving those already made. Those would then be left behind, so `delete` (see `privatePhotos` in store.ts) would also
+// have to delete the sizes under the old suffix, or they'd outlive their photo.
 export function sizeKey(key: string, width: PhotoWidth): string {
   return `${key}.w${width}.webp`
 }
 
+// Thrown when a photo can't be read in full, e.g. when it's damaged or cut short, even though its type was checked, or
+// has more than PHOTO_MAX_PIXELS.
+export class UnreadablePhoto extends Error {
+  constructor(cause: unknown) {
+    super("The photo can't be read", { cause })
+  }
+}
+
 // The photo at `width`, or narrower when it is, as WebP, upright as its EXIF orientation says, and without any of its
-// metadata, which sharp drops unless told to keep it. Throws when the photo can't be decoded, or is too large.
+// metadata, which sharp drops unless told to keep it. Throws when the photo can't be read in full: sharp's default
+// `failOn`, 'warning', is what refuses a photo that's cut short, which it would otherwise read, filling in what's missing.
 export async function resize(photo: Buffer, width: PhotoWidth): Promise<Buffer> {
-  return sharp(photo, { limitInputPixels: MAX_INPUT_PIXELS })
+  return sharp(photo, { limitInputPixels: PHOTO_MAX_PIXELS })
     .autoOrient()
     .resize({ width, height: WEBP_MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer()
 }
 
-// Runs the work it's given, `atOnce` at a time at most: the rest waits its turn, in order.
-export function takingTurns(atOnce: number) {
-  let running = 0
-  const waiting: (() => void)[] = []
-  return async <T>(work: () => Promise<T>): Promise<T> => {
-    if (running < atOnce) running++
-    else await new Promise<void>((resolve) => waiting.push(resolve))
+// The sizes of the photo at `widths`, all of them unless it says, made one after another, so that only one is in memory
+// as it's made. Throws an UnreadablePhoto when the photo can't be read.
+export async function makeSizes(photo: Buffer, widths: readonly PhotoWidth[] = PHOTO_WIDTHS): Promise<Map<PhotoWidth, Buffer>> {
+  const sizes = new Map<PhotoWidth, Buffer>()
+  for (const width of widths) {
     try {
-      return await work()
-    } finally {
-      // Its turn goes to the next one waiting, if there's one.
-      const next = waiting.shift()
-      if (next) next()
-      else running--
+      sizes.set(width, await resize(photo, width))
+    } catch (error) {
+      throw new UnreadablePhoto(error)
     }
   }
+  return sizes
 }

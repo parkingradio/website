@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
-import { resize, sizeKey, takingTurns } from './sizes.js'
-import { JPEG, testImage } from './test-photos.js'
+import { UnreadablePhoto, makeSizes, resize, sizeKey } from './sizes.js'
+import { testImage } from './test-photos.js'
 
 // What photos and flyers are served as, made from real images (see "Photos" in docs/design/server/artists.md).
 
@@ -55,11 +55,36 @@ describe('resize', () => {
     expect(size).toMatchObject({ height: 16383, width: 273 })
   })
 
-  it("fails for what can't be decoded, even though it starts like an image, or has too many pixels", async () => {
-    await expect(resize(JPEG, 320)).rejects.toThrow()
-    const jpeg = await testImage('jpeg', 2000, 1000)
-    await expect(resize(jpeg.subarray(0, jpeg.length / 2), 320)).rejects.toThrow()
+  it("fails for what can't be read in full, even though it starts like an image, or has too many pixels", async () => {
+    // Cut short anywhere: sharp would otherwise read what's there, and fill in the rest, unless told to fail on warnings,
+    // as it is by default.
+    for (const format of ['jpeg', 'png', 'webp'] as const) {
+      const photo = await testImage(format, 2000, 1000)
+      for (const kept of [0.05, 0.6, 0.95]) {
+        await expect(resize(photo.subarray(0, Math.floor(photo.length * kept)), 320), `${format} cut at ${kept}`).rejects.toThrow()
+      }
+    }
     await expect(resize(await testImage('png', 12000, 12000), 320)).rejects.toThrow(/pixel limit/)
+  })
+
+  it('reads a JPEG with bytes after its end, which browsers show', async () => {
+    const photo = Buffer.concat([await testImage('jpeg', 640, 480), Buffer.alloc(1000, 7)])
+    expect(await sharp(await resize(photo, 320)).metadata()).toMatchObject({ width: 320 })
+  })
+})
+
+describe('makeSizes', () => {
+  it('makes every size, or those it is asked for', async () => {
+    const photo = await testImage('jpeg', 2000, 1000)
+    const sizes = await makeSizes(photo)
+    expect([...sizes.keys()]).toEqual([320, 1280])
+    expect(await sharp(sizes.get(1280)!).metadata()).toMatchObject({ format: 'webp', width: 1280 })
+    expect([...(await makeSizes(photo, [1280])).keys()]).toEqual([1280])
+  })
+
+  it("throws an UnreadablePhoto when the photo can't be read", async () => {
+    const photo = await testImage('png', 640, 480)
+    await expect(makeSizes(photo.subarray(0, photo.length / 2))).rejects.toBeInstanceOf(UnreadablePhoto)
   })
 })
 
@@ -67,29 +92,5 @@ describe('sizeKey', () => {
   it('is next to the photo, and different for each width', () => {
     expect(sizeKey('artists/a.jpg', 320)).toMatch(/^artists\/a\.jpg.+\.webp$/)
     expect(sizeKey('artists/a.jpg', 320)).not.toBe(sizeKey('artists/a.jpg', 1280))
-  })
-})
-
-describe('takingTurns', () => {
-  it('runs the work it is given so many at a time at most, in order, even when some fails', async () => {
-    const inTurn = takingTurns(2)
-    let running = 0
-    let most = 0
-    const started: number[] = []
-    const work = (i: number) =>
-      inTurn(async () => {
-        started.push(i)
-        most = Math.max(most, ++running)
-        await new Promise((resolve) => setTimeout(resolve, 5))
-        running--
-        if (i % 3 === 0) throw new Error(`failed ${i}`)
-        return i
-      })
-    const results = await Promise.allSettled([0, 1, 2, 3, 4, 5, 6].map(work))
-    expect(most).toBe(2)
-    expect(started).toEqual([0, 1, 2, 3, 4, 5, 6])
-    expect(results.map((result) => (result.status === 'fulfilled' ? result.value : result.reason.message))).toEqual(['failed 0', 1, 2, 'failed 3', 4, 5, 'failed 6'])
-    // And then, with nothing waiting, it runs right away again.
-    expect(await inTurn(async () => 'next')).toBe('next')
   })
 })

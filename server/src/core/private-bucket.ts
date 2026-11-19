@@ -22,9 +22,10 @@ export type PrivateFiles = {
 // The private files, kept where `config.privateFiles` says.
 export function privateBucket(where: typeof config.privateFiles): PrivateFiles {
   if ('bucket' in where) {
-    // A request that stalls fails rather than holding up what waits for it, e.g. the resizing of photos, which reads them
-    // a few at a time (see `takingTurns` in artists/sizes.ts): when connecting, waiting for the response, or reading it
-    // without anything coming for a while, though a large file can take longer in all.
+    // A request that stalls fails rather than holding up what waits for it, e.g. the making of the sizes that photos
+    // don't have, one photo after another (see artists/backfill.ts), which would otherwise stall for good: when
+    // connecting, waiting for the response, or reading it without anything coming for a while, though a large file can
+    // take longer in all.
     const s3 = new S3Client({
       region: config.awsRegion,
       requestHandler: { connectionTimeout: 5_000, requestTimeout: 30_000, throwOnRequestTimeout: true, socketTimeout: 30_000 },
@@ -66,7 +67,8 @@ export function privateBucket(where: typeof config.privateFiles): PrivateFiles {
 
   const file = (key: string) => path.join(where.directory, key)
   return {
-    // Written next to where it goes, then moved there, so that it's never read half-written, as S3 never shows it.
+    // Written next to where it goes, then moved there, so that it's never read half-written, as S3 never shows it, e.g. a
+    // size, which is then taken as made (see artists/backfill.ts).
     async put(key, body) {
       await mkdir(path.dirname(file(key)), { recursive: true })
       const written = `${file(key)}.${randomUUID()}.tmp`

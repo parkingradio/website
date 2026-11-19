@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import sharp from 'sharp'
 import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
@@ -9,7 +10,8 @@ import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
 import { EmailTaken } from './store.js'
 import type { ArtistsStore, StoredArtist } from './store.js'
-import { fakeSize, JPEG, PNG, memoryPhotos } from './test-photos.js'
+import { sizeKey } from './sizes.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from './test-photos.js'
 import { inQuebecTime } from '../api/formats.js'
 
 // The artists, as the database would keep them, the ids of each collective's members, in order, those who are public,
@@ -207,8 +209,11 @@ describe('artists routes', () => {
           collectives: [],
         },
       })
-      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg' }, 'artists')
+      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'artists')
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
+      // With its sizes, made as it's sent.
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
+      expect(await sharp(photos.size('artists/photo-1.jpeg', 320)).metadata()).toMatchObject({ format: 'webp', width: 64 })
     })
 
     it('adds an artist without a photo', async () => {
@@ -245,7 +250,7 @@ describe('artists routes', () => {
       const response = await create(app, profile({ email: 'Artiste@Example.com' }), PNG)
       expect(response.statusCode).toBe(409)
       expect(rows).toHaveLength(1)
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
     })
 
     it('explains, in French, what is wrong with an invalid profile, without storing the photo', async () => {
@@ -278,6 +283,15 @@ describe('artists routes', () => {
       expect(rows).toHaveLength(0)
     })
 
+    it("refuses a photo that can't be read, though it starts like an image, in French, without storing anything", async () => {
+      const app = await buildApp()
+      const unreadable = await create(app, profile(), UNREADABLE_JPEG)
+      expect(unreadable.statusCode).toBe(400)
+      expect(unreadable.json()).toEqual({ ok: false, error: 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.' })
+      expect(photos.store).not.toHaveBeenCalled()
+      expect(rows).toHaveLength(0)
+    })
+
     it('refuses photos over the size limit', async () => {
       const app = await buildApp()
       const response = await create(app, profile(), Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]))
@@ -288,6 +302,7 @@ describe('artists routes', () => {
 
     it('takes photos up to the size limit, beyond the default limit on bodies', async () => {
       const app = await buildApp()
+      // A JPEG can have bytes after its end, which are ignored.
       const response = await create(app, profile(), Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES - JPEG.length)]))
       expect(response.statusCode).toBe(200)
     })
@@ -535,7 +550,7 @@ describe('artists routes', () => {
       for (const width of [320, 1280] as const) {
         const response = await get(app, `${PHOTO}?width=${width}&v=2026-11-19`)
         expect(response.statusCode).toBe(200)
-        expect(response.rawPayload).toEqual(fakeSize(PNG, width))
+        expect(response.rawPayload).toEqual(photos.size('artists/photo-1.png', width))
         expect(response.headers).toMatchObject({ 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-cache' })
         etags.add(response.headers.etag)
 
@@ -546,10 +561,10 @@ describe('artists routes', () => {
         // A browser that has the photo as it was sent, e.g. from before sizes were served, gets the size.
         const other = await get(app, `${PHOTO}?width=${width}`, { 'if-none-match': sent.headers.etag as string })
         expect(other.statusCode).toBe(200)
-        expect(other.rawPayload).toEqual(fakeSize(PNG, width))
+        expect(other.rawPayload).toEqual(photos.size('artists/photo-1.png', width))
       }
       expect(etags.size).toBe(3)
-      expect(photos.sized).toHaveBeenCalledTimes(4)
+      expect(photos.readSize).toHaveBeenCalledTimes(4)
     })
 
     it('refuses any other width, or more than one', async () => {
@@ -560,22 +575,21 @@ describe('artists routes', () => {
         expect(response.statusCode, query).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
       }
-      expect(photos.sized).not.toHaveBeenCalled()
+      expect(photos.readSize).not.toHaveBeenCalled()
     })
 
-    it("responds 404 when the photo is missing, and 500 when it can't be resized", async () => {
+    it("responds 404 when the photo has no size of that width, e.g. until it's made, which isn't an error worth logging", async () => {
       const logs: string[] = []
       const app = await buildApp(logs)
       await create(app, profile(), PNG)
-      photos.sized.mockRejectedValueOnce(new Error('Input buffer contains unsupported image format'))
-      const unreadable = await get(app, `${PHOTO}?width=320`)
-      expect(unreadable.statusCode).toBe(500)
-      expect(logs.join('')).toContain('unsupported image format')
-
-      stored.clear()
+      stored.delete(sizeKey('artists/photo-1.png', 320))
       const missing = await get(app, `${PHOTO}?width=320`)
       expect(missing.statusCode).toBe(404)
-      expect(missing.json()).toEqual({ ok: false, error: 'The photo of this artist is missing' })
+      expect(missing.json()).toEqual({ ok: false, error: 'The photo of this artist has no size 320 pixels wide' })
+      expect(logs.join('')).toContain('has no size 320 pixels wide')
+      expect(logs.join('')).not.toContain('"level":50')
+      // The photo as it was sent is still there.
+      expect((await get(app, PHOTO)).statusCode).toBe(200)
     })
   })
 
@@ -590,7 +604,7 @@ describe('artists routes', () => {
       for (const [url, width] of [[PHOTO, 1280], [`${PHOTO}?width=1280`, 1280], [`${PHOTO}?width=320`, 320]] as const) {
         const response = await app.inject({ method: 'GET', url })
         expect(response.statusCode, url).toBe(200)
-        expect(response.rawPayload).toEqual(fakeSize(JPEG, width))
+        expect(response.rawPayload).toEqual(photos.size('artists/photo-1.jpeg', width))
         expect(response.headers).toMatchObject({ 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' })
         if (width === 1280) expect(response.headers.etag).toBe(admin.headers.etag)
 
@@ -600,6 +614,17 @@ describe('artists routes', () => {
       }
       expect(photos.read).not.toHaveBeenCalled()
       expect((await app.inject({ method: 'GET', url: `${PHOTO}?width=640` })).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
+    })
+
+    it('responds 404 when the photo has no size of that width, rather than with the photo as it was sent', async () => {
+      const app = await buildApp()
+      await create(app, profile(), JPEG)
+      publicIds.add('artist-1')
+      stored.delete(sizeKey('artists/photo-1.jpeg', 1280))
+      const response = await app.inject({ method: 'GET', url: PHOTO })
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'The photo of this artist has no size 1280 pixels wide' })
+      expect(photos.read).not.toHaveBeenCalled()
     })
 
     it('responds 404 for an artist who is private, whatever the request has', async () => {
@@ -681,7 +706,7 @@ describe('artists routes', () => {
       const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)
       expect(response.statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png', photoType: 'image/png' })
-      expect([...stored.keys()]).toEqual(['artists/photo-2.png'])
+      expect([...stored.keys()]).toEqual(['artists/photo-2.png', sizeKey('artists/photo-2.png', 320), sizeKey('artists/photo-2.png', 1280)])
     })
 
     it('gives a photo to an artist who had none', async () => {
@@ -720,7 +745,7 @@ describe('artists routes', () => {
       expect(taken.statusCode).toBe(409)
       expect((await send(app, 'PUT', '/api/admin/artists/nobody', profile(), null, true)).statusCode).toBe(404)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
       expect(photos.delete).not.toHaveBeenCalled()
     })
 
@@ -745,7 +770,7 @@ describe('artists routes', () => {
       expect(taken.statusCode).toBe(409)
       expect(rows[0].email).toBe('ARTISTE@example.com')
       // The photo that came with it is forgotten, and the artist keeps theirs.
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', 'artists/photo-2.jpeg'])
+      expect(photos.photos()).toEqual(['artists/photo-1.jpeg', 'artists/photo-2.jpeg'])
     })
 
     it('forgets the new photo when the artist cannot be saved, and keeps theirs', async () => {
@@ -753,7 +778,7 @@ describe('artists routes', () => {
       await create(app)
       vi.mocked(store.update).mockRejectedValueOnce(new Error('database is down'))
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)).statusCode).toBe(500)
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
     })
 
     it('changes the artist even when their previous photo cannot be deleted', async () => {
@@ -778,6 +803,19 @@ describe('artists routes', () => {
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ genres: ['polka' as never] }), null)).statusCode).toBe(400)
       expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), Buffer.from('%PDF-1.7'))).statusCode).toBe(400)
       expect(rows[0].updatedBy).toBeNull()
+    })
+
+    it("refuses a photo that can't be read, leaving the artist and their photo as they were", async () => {
+      const app = await buildApp()
+      await create(app)
+      const before = { ...rows[0] }
+      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.' }), UNREADABLE_JPEG)
+      expect(response.statusCode).toBe(400)
+      expect(response.json().error).toBe('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.')
+      expect(rows[0]).toEqual(before)
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
+      expect(photos.store).toHaveBeenCalledTimes(1)
+      expect(photos.delete).not.toHaveBeenCalled()
     })
   })
 
@@ -809,7 +847,7 @@ describe('artists routes', () => {
       const app = await buildApp()
       await create(app)
       expect((await patch(app, '/api/admin/artists/artist-1', { removePhoto: false })).json().artist.hasPhoto).toBe(true)
-      expect(stored.size).toBe(1)
+      expect(photos.photos()).toHaveLength(1)
       const response = await patch(app, '/api/admin/artists/artist-1', { removePhoto: true })
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ name: 'DJ Test', bio: 'Une bio.', hasPhoto: false })
@@ -824,7 +862,7 @@ describe('artists routes', () => {
       expect(taken.statusCode).toBe(409)
       expect(taken.json()).toEqual({ ok: false, error: 'Another artist has this email address' })
       expect((await patch(app, '/api/admin/artists/nobody', { name: 'X' })).statusCode).toBe(404)
-      expect(stored.size).toBe(1)
+      expect(photos.photos()).toHaveLength(1)
     })
 
     it('explains what is wrong, the profile in French, without changing the artist', async () => {

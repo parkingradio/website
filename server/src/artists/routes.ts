@@ -6,7 +6,7 @@ import { INVALID_REQUEST, photoRoute, readProfileForm, sendPhoto } from './photo
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
-import type { ArtistRow, ArtistsStore, Photos, SentPhoto, StoredArtist } from './store.js'
+import type { ArtistRow, ArtistsStore, Photos, SizedPhoto, StoredArtist } from './store.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them, and the public profiles of the artists
 // who are public (see docs/design/server/artists.md).
@@ -193,7 +193,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     changes: Partial<Profile>,
-    sentPhoto: SentPhoto | null,
+    sentPhoto: SizedPhoto | null,
     removePhoto: boolean,
   ) {
     // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
