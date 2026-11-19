@@ -48,16 +48,9 @@ test('Programmation lists the announced sessions, with their lineups, their flye
   await expect(rowOf(page, 'ONDE COMMUNE TAKEOVER').locator('.event-lineup')).toHaveText('Clémentine Brûlée / Fréquence Boréale / Kwame Asante')
 })
 
-test('Programmation links to the calendar feed, whose https address it copies', async ({ page, context, baseURL }) => {
-  const origin = new URL(baseURL!).origin
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+test('Programmation links to the calendar feed', async ({ page, baseURL }) => {
   await page.goto('/programmation')
-
-  const header = page.locator('.programmation-header')
-  await expect(header.getByRole('link', { name: "s'abonner au calendrier" })).toHaveAttribute('href', `webcal://${new URL(origin).host}/calendar.ics`)
-  await header.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' }).click()
-  await expect(header.getByRole('status')).toHaveText('lien copié')
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}/calendar.ics`)
+  await expect(page.getByRole('link', { name: "s'abonner au calendrier" })).toHaveAttribute('href', `webcal://${new URL(baseURL!).host}/calendar.ics`)
 })
 
 test('The calendar feed has the announced sessions, with their lineups', async ({ request }) => {

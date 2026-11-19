@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useApi } from '../api/use-api'
 import { useFeature } from '../config-context'
@@ -39,61 +39,20 @@ function RaProgrammation() {
   return <ProgrammationList {...raListing(events.value)} />
 }
 
-// The public events, with the calendar feed of them, which doesn't depend on whether they could be loaded. What copying
-// its address gave is kept here, since the header's links are rendered by another component once the events are loaded,
-// so that it stays as they load.
+// The public events, with the link to their calendar feed, which doesn't depend on whether they could be loaded.
 function PublicProgrammation() {
   const events = useApi('/api/events')
-  const address = `${window.location.origin}/calendar.ics`
-  const [copy, copyAddress] = useCopy(address)
-  const calendar = <CalendarLinks address={address} copy={copy} onCopy={copyAddress} />
-  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={calendar} />
-  return <ProgrammationList {...eventsListing(events.value)} headerExtra={calendar} />
+  if (events.kind !== 'loaded') return <ProgrammationStatus failed={events.kind === 'error'} headerExtra={<CalendarLink />} />
+  return <ProgrammationList {...eventsListing(events.value)} headerExtra={<CalendarLink />} />
 }
 
-// What copying gave last, a new one each time, so that each copy says so for its own moment.
-type Copy = { status: 'idle' | 'copied' | 'failed' }
-const NOT_COPIED: Copy = { status: 'idle' }
-
-// Copies `text` when asked, and says that it's copied for a moment, but that it couldn't be until it's copied.
-function useCopy(text: string): [Copy, () => Promise<void>] {
-  const [copy, setCopy] = useState(NOT_COPIED)
-  useEffect(() => {
-    if (copy.status !== 'copied') return
-    const timeout = setTimeout(() => setCopy(NOT_COPIED), 2000)
-    return () => clearTimeout(timeout)
-  }, [copy])
-  // `navigator.clipboard` is undefined outside a secure context, which this catches too.
-  const copyText = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopy({ status: 'copied' })
-    } catch {
-      setCopy({ status: 'failed' })
-    }
-  }
-  return [copy, copyText]
-}
-
-// Subscribing to the calendar feed of the public events (see `GET /calendar.ics` in docs/design/server/events.md): a link
-// that opens the calendar app, and the feed's https address to copy, for the apps that don't open webcal:// links.
-function CalendarLinks({ address, copy, onCopy }: { address: string; copy: Copy; onCopy: () => void }) {
+// Subscribing to the calendar feed of the public events (see `GET /calendar.ics` in docs/design/server/events.md), which
+// a webcal:// link opens in the calendar app.
+function CalendarLink() {
   return (
-    <div className="calendar-links">
-      <a href={`webcal://${window.location.host}/calendar.ics`}>s'abonner au calendrier</a>
-      {' · '}
-      <button type="button" onClick={onCopy}>
-        copier le lien (Google Agenda, Outlook)
-      </button>{' '}
-      <span className="calendar-copied" role="status">
-        {copy.status === 'copied' && 'lien copié'}
-      </span>
-      {copy.status === 'failed' && (
-        <p className="calendar-failed" role="alert">
-          Le lien n'a pas pu être copié&nbsp;: {address}
-        </p>
-      )}
-    </div>
+    <a className="calendar-link" href={`webcal://${window.location.host}/calendar.ics`}>
+      s'abonner au calendrier
+    </a>
   )
 }
 
@@ -124,7 +83,7 @@ function ProgrammationStatus({ failed, headerExtra }: { failed: boolean; headerE
   )
 }
 
-// `headerExtra`: what the header has under its title, e.g. the links of the calendar feed of the public events.
+// `headerExtra`: what the header has under its title, e.g. the link to the calendar feed of the public events.
 export function ProgrammationList({ upcoming, past, headerExtra }: Listing & { headerExtra?: ReactNode }) {
   const [filter, setFilter] = useState<Filter>('upcoming')
 

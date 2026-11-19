@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../api/client'
 import { ConfigContext } from '../config-context'
 import type { ConfigState } from '../config-context'
@@ -191,7 +191,7 @@ describe('Programmation', () => {
     expect(requestsTo('GET', '/api/ra-events')).toHaveLength(0)
   })
 
-  it('has the links of the calendar feed once the flag is on, whether the events are loading, loaded or not', async () => {
+  it('links to the calendar feed once the flag is on, whether the events are loading, loaded or not', async () => {
     const webcal = `webcal://${location.host}/calendar.ics`
     const subscribe = () => screen.queryByRole('link', { name: "s'abonner au calendrier" })
 
@@ -207,15 +207,13 @@ describe('Programmation', () => {
     renderPage(configured(true))
     expect(await screen.findByText(/La programmation n'a pas pu être chargée/)).toBeInTheDocument()
     expect(subscribe()).toHaveAttribute('href', webcal)
-    expect(screen.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' })).toBeInTheDocument()
   })
 
-  it('has no links of the calendar feed while the flag is off', async () => {
+  it('has no link to the calendar feed while the flag is off', async () => {
     mockFetch({ '/api/ra-events': data })
     renderPage(configured(false))
     expect(await screen.findByRole('heading', { name: 'Soon Party' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: "s'abonner au calendrier" })).toBeNull()
-    expect(screen.queryByRole('button', { name: /copier le lien/ })).toBeNull()
   })
 
   it.each([
@@ -388,74 +386,5 @@ describe('ProgrammationList, from the public events', () => {
   it('says so when nothing is coming up', () => {
     render(<ProgrammationList {...eventsListing({ ...events, upcoming: [] })} />)
     expect(screen.getByText(/Rien de prévu/)).toBeInTheDocument()
-  })
-})
-
-describe('the links of the calendar feed', () => {
-  const address = `${location.origin}/calendar.ics`
-  const copyButton = () => screen.getByRole('button', { name: 'copier le lien (Google Agenda, Outlook)' })
-  const withClipboard = (clipboard: Partial<Clipboard> | undefined) =>
-    Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true })
-
-  // The page with the public events, loaded.
-  async function loadedPage() {
-    mockFetch({ '/api/events': events })
-    renderPage(configured(true))
-    expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
-  }
-
-  afterEach(() => {
-    vi.useRealTimers()
-    Reflect.deleteProperty(navigator, 'clipboard')
-  })
-
-  it('copies the https address of the feed, and says so for a moment after each copy', async () => {
-    const writeText = vi.fn(async () => {})
-    withClipboard({ writeText })
-    await loadedPage()
-    vi.useFakeTimers()
-
-    await act(async () => fireEvent.click(copyButton()))
-    expect(writeText).toHaveBeenCalledWith(address)
-    expect(screen.getByRole('status')).toHaveTextContent(/^lien copié$/)
-    act(() => vi.advanceTimersByTime(1500))
-    // Copied again, which says so for another moment.
-    await act(async () => fireEvent.click(copyButton()))
-    act(() => vi.advanceTimersByTime(1500))
-    expect(screen.getByRole('status')).toHaveTextContent(/^lien copié$/)
-    act(() => vi.advanceTimersByTime(500))
-    expect(screen.getByRole('status')).toBeEmptyDOMElement()
-  })
-
-  it('gives the address to copy by hand, for good, when it cannot be copied, e.g. without a clipboard', async () => {
-    withClipboard(undefined)
-    await loadedPage()
-    vi.useFakeTimers()
-
-    await act(async () => fireEvent.click(copyButton()))
-    expect(screen.getByRole('alert')).toHaveTextContent(`Le lien n'a pas pu être copié : ${address}`)
-    act(() => vi.advanceTimersByTime(10_000))
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-  })
-
-  it('keeps saying that the address could not be copied once the events are loaded', async () => {
-    withClipboard(undefined)
-    mockFetch({ '/api/events': events })
-    // The events are only answered once they're let through.
-    let letThrough!: () => void
-    const gate = new Promise<void>((resolve) => (letThrough = resolve))
-    const answer = fetch
-    vi.stubGlobal('fetch', async (...request: Parameters<typeof fetch>) => {
-      await gate
-      return answer(...request)
-    })
-    renderPage(configured(true))
-
-    await act(async () => fireEvent.click(copyButton()))
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-    expect(screen.getByText('Chargement…')).toBeInTheDocument()
-    letThrough()
-    expect(await screen.findByRole('heading', { name: 'GUEST MIXES' })).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent(`Le lien n'a pas pu être copié : ${address}`)
   })
 })

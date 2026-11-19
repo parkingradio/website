@@ -39,14 +39,10 @@ Once the flag is on, each event shows:
 When the event has an event on RA, its flyer, title and a "voir sur RA" button link to it. Otherwise, neither its flyer
 nor its title is a link, and there's no button.
 
-The header also has the calendar feed of the events (see [`GET /calendar.ics`](../server/events.md#get-calendarics)),
-whether the events are loading, loaded, or couldn't be, since the feed doesn't depend on them:
-
-- "s'abonner au calendrier", a link to the feed as `webcal://<site's host>/calendar.ics`, which opens the calendar app.
-- "copier le lien (Google Agenda, Outlook)", a button that copies the feed's `https://` address, for the apps that don't
-  open `webcal://` links, e.g. Google Calendar. It then says "lien copié" for a moment. If it can't be copied, e.g.
-  without access to the clipboard, it says "Le lien n'a pas pu être copié : " then the address, which stays, so that it
-  can be copied by hand.
+The header also links to the calendar feed of the events (see
+[`GET /calendar.ics`](../server/events.md#get-calendarics)), whether the events are loading, loaded, or couldn't be, since
+the feed doesn't depend on them: "s'abonner au calendrier", a link to `webcal://<site's host>/calendar.ics`, which opens
+the calendar app.
 
 ## Endpoints
 

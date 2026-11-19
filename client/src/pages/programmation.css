@@ -174,31 +174,13 @@
   font-size: 13px;
 }
 
-/* Plain text links, like the one to RA, the button included. */
-.programmation .calendar-links {
+/* Under the one to RA, like it. */
+.programmation .calendar-link {
+  display: block;
+  width: fit-content;
   margin-top: 0.5rem;
-  font-size: 13px;
-}
-
-.programmation .calendar-links a,
-.programmation .calendar-links button {
-  padding: 0;
-  border: none;
-  background: none;
   color: #1c1c1c;
-  font: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.programmation .calendar-copied,
-.programmation .calendar-failed {
-  color: #666;
-}
-
-.programmation .calendar-failed {
-  margin: 0.25rem 0 0;
-  overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .programmation .event-ra {
