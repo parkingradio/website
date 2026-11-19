@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, PhotoResponses, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { INVALID_REQUEST, photoRoute, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
@@ -146,19 +146,11 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
 
   api.get(
     '/api/admin/collectives/:id/photo',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "A collective's photo",
-        tags: ['Collectives'],
-        params: ById,
-        response: { ...PhotoResponses, 404: ApiError },
-      },
-    },
+    photoRoute('collective', 'admin', { summary: "A collective's photo, as it was sent, or one of its sizes", tags: ['Collectives'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
-      return sendPhoto(reply, request.log, photos, row, 'collective')
+      return sendPhoto(reply, photos, row, 'collective', request.query.width)
     },
   )
 
@@ -313,18 +305,11 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
 
   api.get(
     '/api/collectives/:id/photo',
-    {
-      schema: {
-        summary: "A public collective's photo",
-        tags: ['Collectives'],
-        params: ById,
-        response: { ...PhotoResponses, 404: ApiError },
-      },
-    },
+    photoRoute('collective', 'public', { summary: "One of the sizes of a public collective's photo", tags: ['Collectives'] }),
     async (request, reply) => {
       const row = await store.getPublic(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
-      return sendPhoto(reply, request.log, photos, row, 'collective')
+      return sendPhoto(reply, photos, row, 'collective', request.query.width)
     },
   )
 }

@@ -1,11 +1,10 @@
-import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
-import type { PhotoFolder, SentPhoto } from '../artists/store.js'
+import { fakeSize, memoryPhotos } from '../artists/test-photos.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { MAX_MINUTES } from './fields.js'
@@ -151,19 +150,8 @@ const store: SessionsStore = {
 }
 
 // Sessions' flyers, as the bucket would keep them.
-const stored = new Map<string, Buffer>()
-let nextFlyer = 0
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/flyer-${++nextFlyer}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
-  }),
-}
+const photos = memoryPhotos('flyer')
+const stored = photos.stored
 
 // The smallest things that start like a JPEG and a PNG file.
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
@@ -246,8 +234,7 @@ describe('sessions routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     nextId = 0
-    nextFlyer = 0
-    stored.clear()
+    photos.reset()
     vi.clearAllMocks()
     resolveTrack.mockImplementation(async (link) => (link.startsWith('https://soundcloud.com/parkingdotradio/') ? '42' : null))
   })
@@ -734,6 +721,16 @@ describe('sessions routes', () => {
 
       const kept = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
       expect(kept.statusCode).toBe(304)
+    })
+
+    it('serves the sizes of the flyer, with `width`', async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: PNG })
+      const served = await get(app, '/api/admin/sessions/session-1/flyer?width=320')
+      expect(served.statusCode).toBe(200)
+      expect(served.rawPayload).toEqual(fakeSize(PNG, 320))
+      expect(served.headers).toMatchObject({ 'content-type': 'image/webp', 'cache-control': 'private, no-cache' })
+      expect((await get(app, '/api/admin/sessions/session-1/flyer?width=2')).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     })
 
     it('adds the session without a flyer when its part is empty', async () => {

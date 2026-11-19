@@ -11,7 +11,7 @@ import { applicationsSettingsStore } from '../applications/settings.js'
 import { applicationsStore } from '../applications/store.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import { memoryPhotos } from '../artists/test-photos.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { NOT_THE_SETS_APPLICATION } from './fields.js'
@@ -23,14 +23,8 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // it is, and what's in the way, another session's set, or another set of the same request, and the sets in the order
 // they were sent (see `POST /api/admin/sessions` in docs/design/server/sessions.md).
 
-// Photos and flyers aren't sent, so there are none to read or delete.
-const NO_PHOTOS: Photos = {
-  store: async () => {
-    throw new Error('No photos in these tests')
-  },
-  read: async () => null,
-  delete: async () => {},
-}
+// Photos and flyers aren't sent here.
+const NO_PHOTOS = memoryPhotos()
 
 // The SoundCloud tracks, by the links that lead to them: two links lead to the same track, e.g. once it's renamed.
 const TRACKS: Record<string, string> = {

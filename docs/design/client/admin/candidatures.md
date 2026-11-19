@@ -116,6 +116,7 @@ are skipped: after accepting the 5th of 12 new applications, « suivante » show
 - `GET /api/admin/artists` and `GET /api/admin/collectives`, for the names, cities and genres of artists and collectives
   in the list, to search the applications by them, also for « précédente » and « suivante » on an application's page,
   and to pick who a new application is for.
-- `GET /api/admin/artists/:id` and `GET /api/admin/artists/:id/photo`, for the artist on an application's page, or
-  `GET /api/admin/collectives/:id`, `GET /api/admin/collectives/:id/photo` and `GET /api/admin/artists?collective=<id>`,
-  for the collective, its photo and its genres.
+- `GET /api/admin/artists/:id` and `GET /api/admin/artists/:id/photo?width=1280`, for the artist on an application's
+  page, or `GET /api/admin/collectives/:id`, `GET /api/admin/collectives/:id/photo?width=1280` and
+  `GET /api/admin/artists?collective=<id>`, for the collective, its photo and its genres. The photo links to it as it
+  was sent, as on their page.

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 #
 # The public events, artists and collectives, in the server's Docker image: they're served without a session, once a
-# session is announced, with its flyer, from where the server keeps it, and the calendar feed has it. What's public is
-# tested against a real database by the server's own tests (server/src/events/public.db.test.ts), and the feed itself by
-# server/src/events/calendar.test.ts.
+# session is announced, with its flyer, at one of its sizes, and the calendar feed has it. What's public is tested against
+# a real database by the server's own tests (server/src/events/public.db.test.ts), the feed itself by
+# server/src/events/calendar.test.ts, and the sizes of flyers by 028-photo-sizes.sh.
 
 source "$(dirname "$0")/lib.sh"
 
 readonly IP=198.51.100.33
 
 readonly FILES="$(mktemp -d)"
-# The smallest file that starts like a JPEG image.
-printf '\xff\xd8\xff\xe0JFIF' > "${FILES}/flyer.jpg"
 trap 'rm -rf "$FILES"' EXIT
+make_image jpeg 200 100 > "${FILES}/flyer.jpg"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
@@ -59,7 +58,7 @@ expect_status 200
 expect_body_contains "\"members\":[{\"id\":\"${aube}\",\"name\":\"Aube\"}]"
 expect_body_lacks 'marees@events.test'
 curl --silent --output "${FILES}/served" "${BASE_URL}/api/events/${session}/flyer"
-cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
+[ "$(image_format "${FILES}/served")" = 'webp 100x200' ] || fail "expected the flyer's size, upright, as WebP"
 
 echo "  the calendar feed has it, as iCalendar, which can be kept for 5 minutes"
 request "${BASE_URL}/calendar.ics"

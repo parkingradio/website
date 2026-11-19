@@ -1,11 +1,10 @@
-import { Readable } from 'node:stream'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
 import { EmailTaken } from '../artists/store.js'
-import type { PhotoFolder, SentPhoto } from '../artists/store.js'
+import { fakeSize, memoryPhotos } from '../artists/test-photos.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import { collectivesRoutes } from './routes.js'
 import { Conflict } from '../sessions/store.js'
@@ -19,9 +18,9 @@ import { inQuebecTime } from '../api/formats.js'
 // artists/routes.test.ts).
 let rows: StoredCollective[] = []
 let artists: { id: string; name: string }[] = []
-const stored = new Map<string, Buffer>()
+const photos = memoryPhotos()
+const stored = photos.stored
 let nextId = 0
-let nextPhoto = 0
 
 // Like the database, where two collectives can't have the same email whatever its case, but any number can have none.
 function emailTaken(email: string | null, except?: string) {
@@ -74,18 +73,6 @@ const store: CollectivesStore = {
     const row = rows.find((row) => row.id === id)
     rows = rows.filter((other) => other.id !== id)
     return row ?? null
-  }),
-}
-
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
   }),
 }
 
@@ -162,9 +149,8 @@ describe('collectives routes', () => {
       { id: 'artist-ana', name: 'Ana' },
       { id: 'artist-brume', name: 'Brume' },
     ]
-    stored.clear()
+    photos.reset()
     nextId = 0
-    nextPhoto = 0
     vi.clearAllMocks()
   })
 
@@ -333,6 +319,16 @@ describe('collectives routes', () => {
 
       const kept = await request(app, 'GET', '/api/admin/collectives/collective-1/photo', { 'if-none-match': response.headers.etag as string })
       expect(kept.statusCode).toBe(304)
+    })
+
+    it('serves the sizes of the photo, with `width`', async () => {
+      const app = await buildApp()
+      await create(app, profile(), PNG)
+      const served = await request(app, 'GET', '/api/admin/collectives/collective-1/photo?width=1280')
+      expect(served.statusCode).toBe(200)
+      expect(served.rawPayload).toEqual(fakeSize(PNG, 1280))
+      expect(served.headers).toMatchObject({ 'content-type': 'image/webp', 'cache-control': 'private, no-cache' })
+      expect((await request(app, 'GET', '/api/admin/collectives/collective-1/photo?width=12')).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     })
 
     it('responds 404 for a collective that does not exist, has no photo, or whose photo is missing', async () => {

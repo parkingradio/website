@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
-import type { Photos } from '../artists/store.js'
+import { memoryPhotos } from '../artists/test-photos.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from './routes.js'
@@ -16,14 +16,8 @@ import { sessionsStore } from './store.js'
 // keeps its start, whatever its status (see "Announced" in docs/design/server/sessions.md). The property-based tests of
 // rules.db.test.ts announce sessions too.
 
-// Flyers aren't sent, so there are none to read or delete.
-const NO_PHOTOS: Photos = {
-  store: async () => {
-    throw new Error('No flyers in these tests')
-  },
-  read: async () => null,
-  delete: async () => {},
-}
+// Flyers aren't sent here.
+const NO_PHOTOS = memoryPhotos()
 
 const START = '2026-11-14T21:00-05:00'
 

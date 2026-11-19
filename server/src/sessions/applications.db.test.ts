@@ -11,7 +11,7 @@ import { applicationsSettingsStore } from '../applications/settings.js'
 import { applicationsStore } from '../applications/store.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import { memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
@@ -28,14 +28,8 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // keeps them from (see "Applications" in docs/design/server/sessions.md, and "Status" in
 // docs/design/server/applications.md).
 
-// Photos and flyers aren't sent, so there are none to read or delete.
-const NO_PHOTOS: Photos = {
-  store: async () => {
-    throw new Error('No photos in these tests')
-  },
-  read: async () => null,
-  delete: async () => {},
-}
+// Photos and flyers aren't sent here.
+const NO_PHOTOS = memoryPhotos()
 
 let database: TestDatabase
 let app: FastifyInstance

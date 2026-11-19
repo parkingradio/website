@@ -5,7 +5,8 @@ import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
-import type { PhotoFolder, SentPhoto, StoredArtist } from '../artists/store.js'
+import type { StoredArtist } from '../artists/store.js'
+import { memoryPhotos } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -21,9 +22,9 @@ import type { TurnstileVerifier } from './turnstile.js'
 let artists: StoredArtist[] = []
 let collectives: (CollectiveRow & { members: string[] })[] = []
 let applications: StoredApplication[] = []
-const stored = new Map<string, Buffer>()
+const photos = memoryPhotos()
+const stored = photos.stored
 let nextId = 0
-let nextPhoto = 0
 
 function addApplication(fields: ApplicationFields, owner: { artistId: string } | { collectiveId: string }): StoredApplication {
   const now = new Date()
@@ -65,17 +66,6 @@ const store: ApplyStore = {
     const added = members.map(addArtist).map((artist) => artist.id)
     collectives.push({ id, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...collective, members: added })
     return { collectiveId: id, applicationId: addApplication(fields, { collectiveId: id }).id }
-  }),
-}
-
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
   }),
 }
 
@@ -213,9 +203,8 @@ describe('POST /api/applications', () => {
     artists = []
     collectives = []
     applications = []
-    stored.clear()
+    photos.reset()
     nextId = 0
-    nextPhoto = 0
     recipients = null
     vi.clearAllMocks()
   })

@@ -33,8 +33,9 @@ Once the flag is on, each event shows:
   studio.
 - Its lineup, the event's `lineup` (see [Events](../server/events.md#whats-public)). A synth meetup without one that
   isn't cancelled shows "OPEN JAM", as on RA, and any other event without one shows no lineup.
-- Its flyer as the server gives it, downloaded full size, once it's about to come into view, and shown as the same
-  small square thumbnail.
+- Its flyer, at its 320-pixel size (see [Photos](../server/artists.md#photos)), rather than the 1280-pixel one the
+  server gives without `width`, downloaded once it's about to come into view, and shown as the same small square
+  thumbnail.
 
 When the event has an event on RA, its flyer, title and a "voir sur RA" button link to it. Otherwise, neither its flyer
 nor its title is a link, and there's no button.
@@ -47,4 +48,4 @@ the calendar app.
 ## Endpoints
 
 - `GET /api/ra-events`, while the flag is off.
-- `GET /api/events` and `GET /api/events/:id/flyer`, once it's on, and it links to `GET /calendar.ics`.
+- `GET /api/events` and `GET /api/events/:id/flyer?width=320`, once it's on, and it links to `GET /calendar.ics`.

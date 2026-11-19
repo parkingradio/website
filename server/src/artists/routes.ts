@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, PhotoResponses, readProfileForm, sendPhoto } from './photo-form.js'
+import { INVALID_REQUEST, photoRoute, readProfileForm, sendPhoto } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
 import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
@@ -150,19 +150,11 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
 
   api.get(
     '/api/admin/artists/:id/photo',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "An artist's photo",
-        tags: ['Artists'],
-        params: ById,
-        response: { ...PhotoResponses, 404: ApiError },
-      },
-    },
+    photoRoute('artist', 'admin', { summary: "An artist's photo, as it was sent, or one of its sizes", tags: ['Artists'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
-      return sendPhoto(reply, request.log, photos, row, 'artist')
+      return sendPhoto(reply, photos, row, 'artist', request.query.width)
     },
   )
 
@@ -311,18 +303,11 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
 
   api.get(
     '/api/artists/:id/photo',
-    {
-      schema: {
-        summary: "A public artist's photo",
-        tags: ['Artists'],
-        params: ById,
-        response: { ...PhotoResponses, 404: ApiError },
-      },
-    },
+    photoRoute('artist', 'public', { summary: "One of the sizes of a public artist's photo", tags: ['Artists'] }),
     async (request, reply) => {
       const row = await store.getPublic(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
-      return sendPhoto(reply, request.log, photos, row, 'artist')
+      return sendPhoto(reply, photos, row, 'artist', request.query.width)
     },
   )
 }

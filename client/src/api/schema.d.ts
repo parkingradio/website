@@ -1249,10 +1249,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An artist's photo */
+        /** An artist's photo, as it was sent, or one of its sizes */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1261,7 +1264,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1272,7 +1275,7 @@ export interface paths {
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;
@@ -1349,10 +1352,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A public artist's photo */
+        /** One of the sizes of a public artist's photo */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1361,18 +1367,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": Blob;
-                        "image/png": Blob;
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;
@@ -1562,10 +1566,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A collective's photo */
+        /** A collective's photo, as it was sent, or one of its sizes */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1574,7 +1581,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1585,7 +1592,7 @@ export interface paths {
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;
@@ -1662,10 +1669,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A public collective's photo */
+        /** One of the sizes of a public collective's photo */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -1674,18 +1684,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does */
+                /** @description The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": Blob;
-                        "image/png": Blob;
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;
@@ -2220,10 +2228,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A session's flyer */
+        /** A session's flyer, as it was sent, or one of its sizes */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -2232,7 +2243,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
+                /** @description The flyer, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The flyer and each of its sizes have an `ETag` of their own, which changes whenever the flyer does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2243,7 +2254,7 @@ export interface paths {
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;
@@ -2623,10 +2634,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An event's flyer */
+        /** One of the sizes of an event's flyer */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
+                    width?: "320" | "1280";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -2635,18 +2649,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does */
+                /** @description The flyer's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the flyer does */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "image/jpeg": Blob;
-                        "image/png": Blob;
                         "image/webp": Blob;
                     };
                 };
-                /** @description The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again */
+                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
                 304: {
                     headers: {
                         [name: string]: unknown;

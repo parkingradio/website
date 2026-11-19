@@ -570,10 +570,10 @@ describe("A session's page", () => {
     // With its line breaks.
     expect(value('Description').textContent).toBe('Ligne 1\n\nLigne 2')
     expect(value('Description')).not.toHaveClass('admin-generated')
-    expect(within(value('Flyer')).getByRole('img', { name: 'Flyer de ONDES TAKEOVER' })).toHaveAttribute(
-      'src',
-      `/api/admin/sessions/session-1/flyer?v=${encodeURIComponent('2026-10-02T16:00:00.000Z')}`,
-    )
+    // At the server's larger size, linking to the flyer as it was sent.
+    const flyer = `/api/admin/sessions/session-1/flyer?v=${encodeURIComponent('2026-10-02T16:00:00.000Z')}`
+    expect(within(value('Flyer')).getByRole('img', { name: 'Flyer de ONDES TAKEOVER' })).toHaveAttribute('src', `${flyer}&width=1280`)
+    expect(within(value('Flyer')).getByRole('link', { name: 'Flyer de ONDES TAKEOVER' })).toHaveAttribute('href', flyer)
     expect(screen.getByText('La session, son flyer et ses sets seront supprimés pour de bon. Leurs artistes et le collectif de son takeover restent.')).toBeInTheDocument()
     second.unmount()
 

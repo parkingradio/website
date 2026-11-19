@@ -72,7 +72,8 @@ be changed on their own.
 ## Photos
 
 A collective's photo is optional, and follows the same rules as an artist's (see [Photos](artists.md#photos)): it's
-deleted the same way when the collective is deleted, or the photo is replaced or removed.
+served at the same sizes, and deleted the same way, with its sizes, when the collective is deleted, or the photo is
+replaced or removed.
 
 ## Public profiles
 
@@ -84,7 +85,8 @@ the public endpoints fail with 404 for a private collective, as for one that doe
 
 A collective's public profile has its `id`, `name`, `country`, `city`, `description` and `links`, as the admin endpoints
 give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where its photo is,
-`/api/collectives/<id>/photo`, or null when it has none. Never its contact's email or phone, or who added or changed it.
+`/api/collectives/<id>/photo`, which takes `width` (see [Photos](artists.md#photos)), or null when it has none. Never
+its contact's email or phone, or who added or changed it.
 
 ## `GET /api/admin/collectives` (admin)
 
@@ -105,8 +107,9 @@ Fails with 404 when there's no such collective.
 
 ## `GET /api/admin/collectives/:id/photo` (admin)
 
-Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the photo or a
-304. Otherwise, fails with 404 when there's no such collective, when it has no photo, or when its photo is missing.
+Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the same `width`,
+with the photo, or one of its sizes, or a 304, and fails like it, with 404 when there's no such collective, when it has
+no photo, or when its photo is missing.
 
 ## `POST /api/admin/collectives` (admin)
 
@@ -157,7 +160,7 @@ Fails with 404 when there's no such collective, or when it's private.
 
 ## `GET /api/collectives/:id/photo`
 
-Responds with a public collective's photo, like
-[`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), or a 304. Browsers check with the
-server before showing it again, so it stops being shown once the collective is private. Otherwise, fails with 404 when
-there's no such collective, when it's private, when it has no photo, or when its photo is missing.
+Responds with one of the sizes of a public collective's photo, like
+[`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto), with the same `width` and caching, so that it can
+still be shown for up to 5 minutes once the collective is private, or a 304. Fails like it, with 404 when there's no
+such collective, when it's private, when it has no photo, or when its photo is missing.

@@ -355,7 +355,7 @@ describe('ProgrammationList, from the public events', () => {
   it('shows the flyer from the server, full size, loaded once it comes into view, or a placeholder', () => {
     render(<ProgrammationList {...eventsListing(events)} />)
     const flyer = rowOf('mixes').querySelector('.event-flyer img')!
-    expect(flyer).toHaveAttribute('src', '/api/events/mixes/flyer')
+    expect(flyer).toHaveAttribute('src', '/api/events/mixes/flyer?width=320')
     expect(flyer).toHaveAttribute('loading', 'lazy')
     expect(rowOf('meetup').querySelector('.event-flyer')).toHaveClass('placeholder')
   })
@@ -374,7 +374,7 @@ describe('ProgrammationList, from the public events', () => {
     const row = screen.getByRole('listitem')
     expect(within(row).queryAllByRole('link', { hidden: true })).toHaveLength(0)
     expect(within(row).getByRole('heading')).toHaveTextContent('GUEST MIXES')
-    expect(row.querySelector('.event-flyer img')).toHaveAttribute('src', '/api/events/mixes/flyer')
+    expect(row.querySelector('.event-flyer img')).toHaveAttribute('src', '/api/events/mixes/flyer?width=320')
     expect(row).not.toHaveTextContent('voir sur RA')
   })
 

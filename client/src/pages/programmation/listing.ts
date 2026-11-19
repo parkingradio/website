@@ -49,7 +49,8 @@ function lineup(event: Schema<'Event'>): string[] {
 }
 
 // The public events, the announced sessions, once the `evenements-publics` flag is on. They're always at the studio, so
-// they have no venue or city, and their flyers come from our server, full size.
+// they have no venue or city, and their flyers come from our server, at its smallest size, for thumbnails (see "Photos" in
+// docs/design/server/artists.md).
 export function eventsListing(data: Schema<'Events'>): Listing {
   const row = (event: Schema<'Event'>): Row => ({
     id: event.id,
@@ -58,7 +59,7 @@ export function eventsListing(data: Schema<'Events'>): Listing {
     end: event.end,
     places: [],
     lineup: lineup(event),
-    flyer: event.flyer,
+    flyer: event.flyer && `${event.flyer}?width=320`,
     url: event.raEvent,
   })
   return { upcoming: data.upcoming.map(row), past: data.past.map(row) }

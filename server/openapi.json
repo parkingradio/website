@@ -5809,11 +5809,24 @@
     },
     "/api/admin/artists/{id}/photo": {
       "get": {
-        "summary": "An artist's photo",
+        "summary": "An artist's photo, as it was sent, or one of its sizes",
         "tags": [
           "Artists"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent"
+          },
           {
             "schema": {
               "type": "string"
@@ -5825,22 +5838,25 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -5848,7 +5864,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -5972,11 +5988,25 @@
     },
     "/api/artists/{id}/photo": {
       "get": {
-        "summary": "A public artist's photo",
+        "summary": "One of the sizes of a public artist's photo",
         "tags": [
           "Artists"
         ],
         "parameters": [
+          {
+            "schema": {
+              "default": "1280",
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+          },
           {
             "schema": {
               "type": "string"
@@ -5988,22 +6018,11 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does",
             "content": {
-              "image/jpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -6011,7 +6030,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -6830,11 +6849,24 @@
     },
     "/api/admin/collectives/{id}/photo": {
       "get": {
-        "summary": "A collective's photo",
+        "summary": "A collective's photo, as it was sent, or one of its sizes",
         "tags": [
           "Collectives"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent"
+          },
           {
             "schema": {
               "type": "string"
@@ -6846,22 +6878,25 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does",
             "content": {
               "image/jpeg": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -6869,7 +6904,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -6993,11 +7028,25 @@
     },
     "/api/collectives/{id}/photo": {
       "get": {
-        "summary": "A public collective's photo",
+        "summary": "One of the sizes of a public collective's photo",
         "tags": [
           "Collectives"
         ],
         "parameters": [
+          {
+            "schema": {
+              "default": "1280",
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+          },
           {
             "schema": {
               "type": "string"
@@ -7009,22 +7058,11 @@
         ],
         "responses": {
           "200": {
-            "description": "The photo, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the photo does",
+            "description": "The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does",
             "content": {
-              "image/jpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -7032,7 +7070,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the photo's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -8963,11 +9001,24 @@
     },
     "/api/admin/sessions/{id}/flyer": {
       "get": {
-        "summary": "A session's flyer",
+        "summary": "A session's flyer, as it was sent, or one of its sizes",
         "tags": [
           "Sessions"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, it is served as it was sent"
+          },
           {
             "schema": {
               "type": "string"
@@ -8979,22 +9030,25 @@
         ],
         "responses": {
           "200": {
-            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
+            "description": "The flyer, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The flyer and each of its sizes have an `ETag` of their own, which changes whenever the flyer does",
             "content": {
               "image/jpeg": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/png": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
               },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -9002,7 +9056,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -10401,11 +10455,25 @@
     },
     "/api/events/{id}/flyer": {
       "get": {
-        "summary": "An event's flyer",
+        "summary": "One of the sizes of an event's flyer",
         "tags": [
           "Events"
         ],
         "parameters": [
+          {
+            "schema": {
+              "default": "1280",
+              "type": "string",
+              "enum": [
+                "320",
+                "1280"
+              ]
+            },
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+          },
           {
             "schema": {
               "type": "string"
@@ -10417,22 +10485,11 @@
         ],
         "responses": {
           "200": {
-            "description": "The flyer, with the type it was checked to have. Browsers are told not to guess another (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). Its `ETag` changes whenever the flyer does",
+            "description": "The flyer's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the flyer does",
             "content": {
-              "image/jpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
               "image/webp": {
                 "schema": {
+                  "anyOf": [],
                   "type": "string",
                   "format": "binary"
                 }
@@ -10440,7 +10497,7 @@
             }
           },
           "304": {
-            "description": "The request's `If-None-Match` has the flyer's `ETag`, so the browser already has it: it isn't sent again"
+            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",

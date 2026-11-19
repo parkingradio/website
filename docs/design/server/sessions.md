@@ -334,11 +334,12 @@ become its own, and stop following its type.
 
 A session can have a flyer, an image, which follows the same rules as an artist's photo (see
 [Photos](artists.md#photos)): it's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
-kept in the app's private files, and deleted when the session is deleted, or the flyer replaced or removed. It's sent
-along with the session's fields (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
+kept in the app's private files, served at the same sizes, and deleted, with its sizes, when the session is deleted, or
+the flyer replaced or removed. It's sent along with the session's fields (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
 [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), and the MCP server's tools can't send one: a
-session added with a tool has none, and one changed with a tool keeps its own, unless `removeFlyer` is `true`. An
-announced session's flyer is public, as its event's (see [Events](events.md)).
+session added with a tool has none, and one changed with a tool keeps its own, unless `removeFlyer` is `true`. The sizes
+of an announced session's flyer are public, as its event's (see [Events](events.md)).
 
 ## Links
 
@@ -427,8 +428,9 @@ Fails with 404 when there's no such session.
 
 ## `GET /api/admin/sessions/:id/flyer` (admin)
 
-Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the flyer or a
-304. Otherwise, fails with 404 when there's no such session, when it has no flyer, or when its flyer is missing.
+Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the same `width`,
+with the flyer, or one of its sizes, or a 304, and fails like it, with 404 when there's no such session, when it has no
+flyer, or when its flyer is missing.
 
 ## `PUT /api/admin/sessions/:id/flyer` (admin)
 

@@ -24,7 +24,7 @@ An event has:
 | `start`, `end` | string | The session's `start` and `end`, which an event always has |
 | `cancelled` | boolean | Whether the session is cancelled |
 | `description` | string | The session's `effectiveDescription` (see [Descriptions](sessions.md#descriptions)) |
-| `flyer` | string or null | Where its flyer is, `/api/events/<id>/flyer`, or null when it has none |
+| `flyer` | string or null | Where its flyer is, `/api/events/<id>/flyer`, which takes `width` (see [Photos, in Artists](artists.md#photos)), or null when it has none |
 | `raEvent` | string or null | The page of its event on RA, `https://ra.co/events/<id>`, or null when it has none |
 | `takeover` | object or null | The collective whose takeover it is, with its `id` and `name`, or null when it isn't a takeover |
 | `sets` | list of sets | Its sets, in their order, cancelled ones included (see [Sets' order](sessions.md#sets-order)) |
@@ -77,10 +77,10 @@ Québec's offset then, from the year 2000 to 2999, in UTC, or if `from` isn't be
 
 ## `GET /api/events/:id/flyer`
 
-Responds with an event's flyer, like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin),
-or a 304. Browsers check with the server before showing it again, so it stops being shown once its session is
-un-announced. Otherwise, fails with 404 when there's no such event, e.g. a session that isn't announced, when it has no
-flyer, or when its flyer is missing.
+Responds with one of the sizes of an event's flyer (see [Flyers](sessions.md#flyers)), like
+[`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto), with the same `width` and caching, so that it can
+still be shown for up to 5 minutes once its session is un-announced, or a 304. Fails like it, with 404 when there's no
+such event, e.g. a session that isn't announced, when it has no flyer, or when its flyer is missing.
 
 ## `GET /calendar.ics`
 

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
-import { FlyerResponses, INVALID_REQUEST, readPhotoForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { INVALID_REQUEST, photoRoute, readPhotoForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import { InvalidProfile, forgetPhoto, validatePhoto } from '../artists/store.js'
 import type { Photos, SentPhoto } from '../artists/store.js'
@@ -505,19 +505,11 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
 
   api.get(
     '/api/admin/sessions/:id/flyer',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "A session's flyer",
-        tags: ['Sessions'],
-        params: ById,
-        response: { ...FlyerResponses, 404: ApiError },
-      },
-    },
+    photoRoute('session', 'admin', { summary: "A session's flyer, as it was sent, or one of its sizes", tags: ['Sessions'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
-      return sendPhoto(reply, request.log, photos, { photoKey: row.flyerKey, photoType: row.flyerType }, 'session', 'flyer')
+      return sendPhoto(reply, photos, { photoKey: row.flyerKey, photoType: row.flyerType }, 'session', request.query.width)
     },
   )
 

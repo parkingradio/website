@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
@@ -9,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import { fakeSize, memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { testDatabase } from '../db/test-database.js'
@@ -28,19 +27,8 @@ import type { EventsStore } from './store.js'
 // ones are asked without a session.
 
 // The photos and flyers, as the bucket would keep them, by key.
-const stored = new Map<string, Buffer>()
-let nextPhoto = 0
-const photos: Photos = {
-  store: async ({ body }, folder) => {
-    const key = `${folder}/photo-${++nextPhoto}`
-    stored.set(key, body)
-    return key
-  },
-  read: async (key) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null),
-  delete: async (key) => {
-    stored.delete(key)
-  },
-}
+const photos = memoryPhotos()
+const stored = photos.stored
 
 // The smallest thing that starts like a JPEG image.
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
@@ -74,7 +62,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await database.db.execute(sql`truncate sessions, artists, collectives cascade`)
-  stored.clear()
+  photos.reset()
 })
 
 // An admin's request, which has to succeed, with a JSON body.
@@ -512,17 +500,39 @@ describe('the photos and flyers of what is public', () => {
     return response.headers.etag as string
   }
 
-  it('are served like those of the admin pages, to anyone', async () => {
+  it('are served to anyone as their sizes, never as they were sent, which browsers can show again for 5 minutes', async () => {
     const ana = await createArtist('Ana', JPEG)
     const ondes = await createCollective('Les Ondes', [ana], JPEG)
     const takeover = await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG })
-    for (const url of [`/api/artists/${ana}/photo`, `/api/collectives/${ondes}/photo`, `/api/events/${takeover.id}/flyer`]) {
+    for (const [url, adminUrl] of [
+      [`/api/artists/${ana}/photo`, `/api/admin/artists/${ana}/photo`],
+      [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`],
+      [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`],
+    ]) {
+      const headers = { 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' }
       const response = await get(url)
       expect(response.statusCode, url).toBe(200)
-      expect(response.rawPayload).toEqual(JPEG)
-      expect(response.headers).toMatchObject({ 'content-type': 'image/jpeg', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-cache' })
-      const again = await get(url, { 'if-none-match': response.headers.etag as string })
+      expect(response.rawPayload).toEqual(fakeSize(JPEG, 1280))
+      expect(response.headers).toMatchObject(headers)
+      // The admin endpoint gives the same size, with the same ETag, but as admins' are.
+      const etag = await etagOf(`${adminUrl}?width=1280`)
+      expect(response.headers.etag).toBe(etag)
+      const again = await get(url, { 'if-none-match': etag })
       expect(again.statusCode, url).toBe(304)
+      expect(again.headers).toMatchObject({ etag, 'cache-control': 'private, max-age=300' })
+
+      const thumbnail = await get(`${url}?width=320`)
+      expect(thumbnail.statusCode, url).toBe(200)
+      expect(thumbnail.rawPayload).toEqual(fakeSize(JPEG, 320))
+      expect(thumbnail.headers).toMatchObject(headers)
+      expect(thumbnail.headers.etag).not.toBe(etag)
+
+      // What browsers kept before the public endpoints served sizes: the photo as it was sent, whose ETag isn't a size's.
+      const sent = await get(url, { 'if-none-match': await etagOf(adminUrl) })
+      expect(sent.statusCode, url).toBe(200)
+      expect(sent.rawPayload).toEqual(fakeSize(JPEG, 1280))
+
+      expect((await get(`${url}?width=640`)).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     }
   })
 
@@ -535,7 +545,7 @@ describe('the photos and flyers of what is public', () => {
       [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`, 'No such collective'],
       [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`, 'No such event'],
     ]) {
-      const response = await get(url, { 'if-none-match': await etagOf(adminUrl) })
+      const response = await get(url, { 'if-none-match': await etagOf(`${adminUrl}?width=1280`) })
       expect(response.statusCode, url).toBe(404)
       expect(response.json()).toEqual({ ok: false, error })
     }

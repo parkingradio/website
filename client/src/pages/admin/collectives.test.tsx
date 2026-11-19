@@ -160,7 +160,9 @@ describe('A collective’s page', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Ondes' })).toBeInTheDocument())
     expect(screen.getByText(/^collectif, ajouté par/)).toHaveTextContent(/^collectif, ajouté par admin@example.com le 2 octobre 2026/)
     expect(screen.queryByText(/^Modifié par/)).not.toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Photo de Ondes' }).getAttribute('src')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=/)
+    // At the server's larger size, linking to the photo as it was sent.
+    expect(screen.getByRole('img', { name: 'Photo de Ondes' }).getAttribute('src')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=[^&]+&width=1280$/)
+    expect(screen.getByRole('link', { name: 'Photo de Ondes' }).getAttribute('href')).toMatch(/^\/api\/admin\/collectives\/collective-1\/photo\?v=[^&]+$/)
     const members = within(described('Artistes du collectif') as HTMLElement).getAllByRole('link')
     expect(members.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
       ['Aurore', '/admin/artistes/artist-1'],

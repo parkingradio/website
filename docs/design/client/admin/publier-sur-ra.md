@@ -30,7 +30,8 @@ session de TEST. ».
    will be created on RA all the same. « Créer sur RA » creates it, and « Annuler », or the panel's ×, closes it without
    creating anything.
 4. Once the event is created, the bookmarklet shows its link, a link to the session's page that saves it as the
-   session's event (see [Back to the session](#back-to-the-session)), and a reminder to add the flyer on RA by hand.
+   session's event (see [Back to the session](#back-to-the-session)), and a reminder to add the flyer on RA by hand: the
+   session's page links to it as it was sent (see [A session's page](sessions.md#a-sessions-page)).
 
 ## The bookmarklet
 

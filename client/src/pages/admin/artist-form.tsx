@@ -10,7 +10,7 @@ import {
   pickedPhotoError,
 } from '../../artist-profile'
 import type { Artist, Profile } from '../../artist-profile'
-import { photoUrl } from './describe'
+import { photoUrl, shownUrl } from './describe'
 import { useCheckedForm } from './checked-form'
 import { FormActions, Labeled } from './fields'
 import { CountryField, GenresField, LinksField, PhotoField } from './profile-fields'
@@ -109,7 +109,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
       </Labeled>
 
       <PhotoField
-        current={initial?.hasPhoto ? photoUrl('artists', initial) : null}
+        current={initial?.hasPhoto ? shownUrl(photoUrl('artists', initial)) : null}
         removed={removePhoto}
         onRemove={() => setRemovePhoto(true)}
         photo={photo}

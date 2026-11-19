@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { RECENT_PAST_EVENTS, fromBeforeTo, startRange } from '../api/formats.js'
-import { ApiError, ById, Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
-import { FlyerResponses, sendPhoto } from '../artists/photo-form.js'
+import { ApiError, Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
+import { photoRoute, sendPhoto } from '../artists/photo-form.js'
 import type { Photos } from '../artists/store.js'
 import { effectiveDescription } from '../sessions/descriptions.js'
 import { after, sessionTitle } from '../sessions/fields.js'
@@ -120,18 +120,11 @@ export async function eventsRoutes(app: FastifyInstance, { store, photos }: Even
 
   api.get(
     '/api/events/:id/flyer',
-    {
-      schema: {
-        summary: "An event's flyer",
-        tags: ['Events'],
-        params: ById,
-        response: { ...FlyerResponses, 404: ApiError },
-      },
-    },
+    photoRoute('event', 'public', { summary: "One of the sizes of an event's flyer", tags: ['Events'] }),
     async (request, reply) => {
       const flyer = await store.getFlyer(request.params.id)
       if (!flyer) return reply.status(404).send(NO_SUCH_EVENT)
-      return sendPhoto(reply, request.log, photos, flyer, 'event', 'flyer')
+      return sendPhoto(reply, photos, flyer, 'event', request.query.width)
     },
   )
 }

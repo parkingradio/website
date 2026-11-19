@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import type { Readable } from 'node:stream'
+import { buffer } from 'node:stream/consumers'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './profile.js'
+import { PHOTO_WIDTHS, RESIZED_AT_ONCE, SIZE_TYPE, resize, sizeKey, takingTurns } from './sizes.js'
+import type { PhotoWidth } from './sizes.js'
 import type { AdminArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
@@ -202,17 +206,46 @@ export function artistsStore(db: Queryable): ArtistsStore {
 // whatever folder it's in.
 export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
-// Artists' and collectives' photos, and sessions' flyers. They're private files (see core/private-bucket.ts), rather
-// than public assets: photos are personal data, and both are only for admins until their artist, collective or session
-// is public, when the server serves them to anyone (see docs/design/server/events.md).
-export type Photos = Pick<PrivateFiles, 'read' | 'delete'> & {
+// Artists' and collectives' photos, and sessions' flyers, and their sizes. They're private files (see
+// core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until their
+// artist, collective or session is public, when the server serves their sizes to anyone (see
+// docs/design/server/events.md).
+export type Photos = Pick<PrivateFiles, 'read'> & {
   // Stores the photo under a new key in `folder`, and returns that key.
   store(photo: SentPhoto, folder: PhotoFolder): Promise<string>
+  // The photo with that key at `width` (see sizes.ts): the size kept next to it, or else made from it, then kept. Null
+  // when there's neither. Throws when the photo can't be resized. Failing to keep the size is only logged.
+  sized(key: string, width: PhotoWidth, log: FastifyBaseLogger): Promise<Readable | Buffer | null>
+  // Deletes the photo and its sizes.
+  delete(key: string): Promise<void>
 }
 
 const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 export function privatePhotos(files: PrivateFiles): Photos {
+  // The sizes being made, by key: other requests for one wait for it, rather than making it again.
+  const making = new Map<string, Promise<Buffer | null>>()
+  const inTurn = takingTurns(RESIZED_AT_ONCE)
+
+  // Makes the photo's size at `width` and keeps it, or returns null when the photo is missing.
+  async function make(key: string, width: PhotoWidth, log: FastifyBaseLogger): Promise<Buffer | null> {
+    // Only read in its turn, since it's held in memory until it's resized.
+    const size = await inTurn(async () => {
+      const photo = await files.read(key)
+      return photo && resize(await buffer(photo), width)
+    })
+    if (!size) return null
+    const at = sizeKey(key, width)
+    try {
+      await files.put(at, size, SIZE_TYPE)
+      // The photo may have been deleted while this was made, after its sizes were (see `delete`): then this one is too.
+      if (!(await files.exists(key))) await files.delete(at)
+    } catch (error) {
+      log.error({ err: error, key: at }, 'Failed to keep the size of a photo')
+    }
+    return size
+  }
+
   return {
     async store({ body, type }, folder) {
       const key = `${folder}/${randomUUID()}.${EXTENSIONS[type] ?? 'bin'}`
@@ -220,7 +253,25 @@ export function privatePhotos(files: PrivateFiles): Photos {
       return key
     },
     read: files.read,
-    delete: files.delete,
+    async sized(key, width, log) {
+      const at = sizeKey(key, width)
+      const pending = making.get(at)
+      if (pending) return pending
+      const kept = await files.read(at)
+      if (kept) return kept
+      // Unless another request started making it while this one read.
+      let made = making.get(at)
+      if (!made) {
+        made = make(key, width, log).finally(() => making.delete(at))
+        making.set(at, made)
+      }
+      return made
+    },
+    // The photo first, then its sizes, so that a size made in the meantime is deleted either here or where it's made.
+    async delete(key) {
+      await files.delete(key)
+      await Promise.all(PHOTO_WIDTHS.map((width) => files.delete(sizeKey(key, width))))
+    },
   }
 }
 

@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 import { buffer } from 'node:stream/consumers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, NoSuchKey, NotFound, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3'
 import { privateBucket } from './private-bucket.js'
 
 describe('privateBucket', () => {
@@ -29,6 +29,21 @@ describe('privateBucket', () => {
       expect(await files.read('artists/a.jpg')).toBeNull()
       // Deleting a file that isn't there is fine.
       await files.delete('artists/a.jpg')
+    })
+
+    it('says whether there is a file with a key', async () => {
+      const files = privateBucket({ directory })
+      expect(await files.exists('artists/a.jpg')).toBe(false)
+      await files.put('artists/a.jpg', Buffer.from('photo'), 'image/jpeg')
+      expect(await files.exists('artists/a.jpg')).toBe(true)
+    })
+
+    it('replaces a file, leaving nothing else behind', async () => {
+      const files = privateBucket({ directory })
+      await files.put('artists/a.jpg', Buffer.from('photo'), 'image/jpeg')
+      await files.put('artists/a.jpg', Buffer.from('other'), 'image/jpeg')
+      expect(await readFile(path.join(directory, 'artists/a.jpg'), 'utf8')).toBe('other')
+      expect(await readdir(path.join(directory, 'artists'))).toEqual(['a.jpg'])
     })
   })
 
@@ -56,6 +71,20 @@ describe('privateBucket', () => {
       await files.delete('artists/a.jpg')
       expect(send.mock.calls[2][0]).toBeInstanceOf(DeleteObjectCommand)
       expect(send.mock.calls[2][0].input).toEqual({ Bucket: 'parking-radio-test-private', Key: 'artists/a.jpg' })
+    })
+
+    it("says whether there's an object with a key, but not when it's denied access to it", async () => {
+      send.mockResolvedValueOnce({} as never)
+      expect(await files.exists('artists/a.jpg')).toBe(true)
+      expect(send.mock.calls[0][0]).toBeInstanceOf(HeadObjectCommand)
+      expect(send.mock.calls[0][0].input).toEqual({ Bucket: 'parking-radio-test-private', Key: 'artists/a.jpg' })
+
+      send.mockRejectedValueOnce(new NotFound({ message: 'Not Found', $metadata: {} }))
+      expect(await files.exists('artists/missing.jpg')).toBe(false)
+
+      const denied = new S3ServiceException({ name: 'Forbidden', message: 'Forbidden', $fault: 'client', $metadata: {} })
+      send.mockRejectedValueOnce(denied)
+      await expect(files.exists('artists/a.jpg')).rejects.toBe(denied)
     })
 
     it("reads a missing object as null, but not one it's denied access to", async () => {

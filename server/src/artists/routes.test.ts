@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import { DrizzleQueryError } from 'drizzle-orm'
@@ -9,16 +8,18 @@ import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
 import { EmailTaken } from './store.js'
-import type { ArtistsStore, PhotoFolder, SentPhoto, StoredArtist } from './store.js'
+import type { ArtistsStore, StoredArtist } from './store.js'
+import { fakeSize, memoryPhotos } from './test-photos.js'
 import { inQuebecTime } from '../api/formats.js'
 
-// The artists, as the database would keep them, the ids of each collective's members, in order, and the photos, as the
-// bucket would keep them.
+// The artists, as the database would keep them, the ids of each collective's members, in order, those who are public,
+// and the photos, as the bucket would keep them.
 let rows: StoredArtist[] = []
 let members = new Map<string, string[]>()
-const stored = new Map<string, Buffer>()
+let publicIds = new Set<string>()
+const photos = memoryPhotos()
+const stored = photos.stored
 let nextId = 0
-let nextPhoto = 0
 
 // Like the database, where two artists can't have the same email whatever its case, but any number can have none.
 function emailTaken(email: string | null, except?: string) {
@@ -33,7 +34,7 @@ const store: ArtistsStore = {
   get: async (id) => rows.find((row) => row.id === id) ?? null,
   // Who's public is worked out by the database, which the public routes are tested against (see
   // events/public.db.test.ts).
-  getPublic: async () => null,
+  getPublic: async (id) => (publicIds.has(id) ? (rows.find((row) => row.id === id) ?? null) : null),
   create: vi.fn<ArtistsStore['create']>(async (artist) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
     const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist }
@@ -53,18 +54,6 @@ const store: ArtistsStore = {
     rows = rows.filter((other) => other.id !== id)
     return row ?? null
   },
-}
-
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
-  }),
 }
 
 // The smallest things that start like a JPEG and a PNG file.
@@ -143,9 +132,9 @@ describe('artists routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     members = new Map()
-    stored.clear()
+    publicIds = new Set()
+    photos.reset()
     nextId = 0
-    nextPhoto = 0
     vi.clearAllMocks()
   })
 
@@ -536,6 +525,94 @@ describe('artists routes', () => {
       expect((await get(app, PHOTO, { 'if-none-match': '"anything"' })).statusCode).toBe(404)
       expect(photos.read).not.toHaveBeenCalled()
       expect(logs.join('')).not.toContain('"level":50')
+    })
+  })
+
+  describe('GET /api/admin/artists/:id/photo?width=<width>', () => {
+    const PHOTO = '/api/admin/artists/artist-1/photo'
+
+    it('returns the size of the photo at that width, as WebP, with an ETag of its own, which browsers check again', async () => {
+      const app = await buildApp()
+      await create(app, profile(), PNG)
+      const sent = await get(app, PHOTO)
+      const etags = new Set([sent.headers.etag])
+      for (const width of [320, 1280] as const) {
+        const response = await get(app, `${PHOTO}?width=${width}&v=2026-11-19`)
+        expect(response.statusCode).toBe(200)
+        expect(response.rawPayload).toEqual(fakeSize(PNG, width))
+        expect(response.headers).toMatchObject({ 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, no-cache' })
+        etags.add(response.headers.etag)
+
+        const kept = await get(app, `${PHOTO}?width=${width}`, { 'if-none-match': response.headers.etag as string })
+        expect(kept.statusCode).toBe(304)
+        expect(kept.headers).toMatchObject({ etag: response.headers.etag, 'cache-control': 'private, no-cache' })
+
+        // A browser that has the photo as it was sent, e.g. from before sizes were served, gets the size.
+        const other = await get(app, `${PHOTO}?width=${width}`, { 'if-none-match': sent.headers.etag as string })
+        expect(other.statusCode).toBe(200)
+        expect(other.rawPayload).toEqual(fakeSize(PNG, width))
+      }
+      expect(etags.size).toBe(3)
+      expect(photos.sized).toHaveBeenCalledTimes(4)
+    })
+
+    it('refuses any other width, or more than one', async () => {
+      const app = await buildApp()
+      await create(app, profile(), PNG)
+      for (const query of ['width=640', 'width=0', 'width=320.0', 'width=abc', 'width=', 'width=320&width=320']) {
+        const response = await get(app, `${PHOTO}?${query}`)
+        expect(response.statusCode, query).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
+      }
+      expect(photos.sized).not.toHaveBeenCalled()
+    })
+
+    it("responds 404 when the photo is missing, and 500 when it can't be resized", async () => {
+      const logs: string[] = []
+      const app = await buildApp(logs)
+      await create(app, profile(), PNG)
+      photos.sized.mockRejectedValueOnce(new Error('Input buffer contains unsupported image format'))
+      const unreadable = await get(app, `${PHOTO}?width=320`)
+      expect(unreadable.statusCode).toBe(500)
+      expect(logs.join('')).toContain('unsupported image format')
+
+      stored.clear()
+      const missing = await get(app, `${PHOTO}?width=320`)
+      expect(missing.statusCode).toBe(404)
+      expect(missing.json()).toEqual({ ok: false, error: 'The photo of this artist is missing' })
+    })
+  })
+
+  describe('GET /api/artists/:id/photo', () => {
+    const PHOTO = '/api/artists/artist-1/photo'
+
+    it("returns a public artist's photo only at one of its sizes, 1280 pixels wide unless asked otherwise, which browsers can show again for 5 minutes", async () => {
+      const app = await buildApp()
+      await create(app, profile(), JPEG)
+      publicIds.add('artist-1')
+      const admin = await get(app, '/api/admin/artists/artist-1/photo?width=1280')
+      for (const [url, width] of [[PHOTO, 1280], [`${PHOTO}?width=1280`, 1280], [`${PHOTO}?width=320`, 320]] as const) {
+        const response = await app.inject({ method: 'GET', url })
+        expect(response.statusCode, url).toBe(200)
+        expect(response.rawPayload).toEqual(fakeSize(JPEG, width))
+        expect(response.headers).toMatchObject({ 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' })
+        if (width === 1280) expect(response.headers.etag).toBe(admin.headers.etag)
+
+        const kept = await app.inject({ method: 'GET', url, headers: { 'if-none-match': response.headers.etag as string } })
+        expect(kept.statusCode).toBe(304)
+        expect(kept.headers).toMatchObject({ etag: response.headers.etag, 'cache-control': 'private, max-age=300' })
+      }
+      expect(photos.read).not.toHaveBeenCalled()
+      expect((await app.inject({ method: 'GET', url: `${PHOTO}?width=640` })).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
+    })
+
+    it('responds 404 for an artist who is private, whatever the request has', async () => {
+      const app = await buildApp()
+      await create(app, profile(), JPEG)
+      const etag = (await get(app, '/api/admin/artists/artist-1/photo?width=1280')).headers.etag as string
+      const response = await app.inject({ method: 'GET', url: PHOTO, headers: { 'if-none-match': etag } })
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such artist' })
     })
   })
 
