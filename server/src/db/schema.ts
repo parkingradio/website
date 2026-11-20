@@ -3,6 +3,8 @@ import { pgTable, uuid, text, timestamp, uniqueIndex, index, smallint, integer, 
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_DECISIONS } from '../applications/fields.js'
 import type { ApplicationDecision, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
+import { KEY_EXTENSIONS } from '../artists/keys.js'
+import type { PhotoFolder } from '../artists/keys.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 import { SESSION_TYPES, STATUSES } from '../sessions/fields.js'
 import type { SessionType, Status } from '../sessions/fields.js'
@@ -10,6 +12,11 @@ import type { SessionType, Status } from '../sessions/fields.js'
 // A check that `column` is one of `values`.
 function oneOf(column: AnyPgColumn, values: readonly string[]) {
   return sql`${column} in (${sql.raw(values.map((value) => `'${value}'`).join(', '))})`
+}
+
+// A check that `column` is null or a key made from a photo's content, in `folder` (see `photoKey` in artists/keys.ts).
+function contentKey(column: AnyPgColumn, folder: PhotoFolder) {
+  return sql`${column} ~ ${sql.raw(`'^${folder}/[0-9a-f]{64}[.](${KEY_EXTENSIONS.join('|')})$'`)}`
 }
 
 export const users = pgTable(
@@ -125,6 +132,7 @@ export const artists = pgTable(
   (table) => [
     uniqueIndex('artists_email_lower_idx').on(sql`lower(${table.email})`),
     check('artists_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
+    check('artists_photo_key', contentKey(table.photoKey, 'artists')),
   ],
 )
 
@@ -157,6 +165,7 @@ export const collectives = pgTable(
   (table) => [
     uniqueIndex('collectives_email_lower_idx').on(sql`lower(${table.email})`),
     check('collectives_photo', sql`(${table.photoKey} is null) = (${table.photoType} is null)`),
+    check('collectives_photo_key', contentKey(table.photoKey, 'collectives')),
   ],
 )
 
@@ -270,6 +279,7 @@ export const sessions = pgTable(
     check('sessions_takeover', sql`(${table.type} = 'takeover') = (${table.takeoverId} is not null)`),
     check('sessions_named', sql`${table.type} <> 'other' or ${table.name} <> ''`),
     check('sessions_flyer', sql`(${table.flyerKey} is null) = (${table.flyerType} is null)`),
+    check('sessions_flyer_key', contentKey(table.flyerKey, 'sessions')),
     check('sessions_announced', sql`not ${table.announced} or ${table.startAt} is not null`),
   ],
 )

@@ -15,6 +15,7 @@ import { artists, collectives, sessions } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsStore } from '../sessions/store.js'
+import type { PhotoFolder } from './keys.js'
 import { AdminArtistProfile } from './profile.js'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import { artistsStore, completeSizes, forgetPhoto, privatePhotos, validateProfile, withSizes } from './store.js'
@@ -64,6 +65,28 @@ const filesOf = (key: string) => [key, ...PHOTO_WIDTHS.map((width) => sizeKey(ke
 
 const artist = (name: string, newPhoto: NewPhoto | null) =>
   artistsStore(database.db).create({ ...validateProfile({ name }, AdminArtistProfile), photo: newPhoto, createdBy })
+const collective = (name: string, newPhoto: NewPhoto | null) =>
+  collectivesStore(database.db).create({
+    ...validateProfile({ name, members: [{ name: 'Une' }] }, AdminCollectiveProfile),
+    photo: newPhoto,
+    createdBy,
+  })
+const session = (flyer: NewPhoto | null) =>
+  sessionsStore(database.db).create(
+    {
+      startAt: null,
+      durationMinutes: 60,
+      type: 'synth-meetup',
+      takeoverId: null,
+      applicationId: null,
+      name: '',
+      raEventId: null,
+      description: '',
+      flyer,
+      createdBy,
+    },
+    [],
+  )
 const changes = (newPhoto: NewPhoto | null) => ({ photo: newPhoto, updatedBy: createdBy, updatedAt: new Date() })
 
 // Whether a transaction waits for an advisory lock, i.e. for one that another transaction holds.
@@ -90,24 +113,8 @@ async function until(condition: () => Promise<boolean>) {
 
 it("shares a session's flyer with the other sessions that have the same, and deletes it once none has it", async () => {
   const sessions = sessionsStore(database.db)
-  const session = async () =>
-    sessions.create(
-      {
-        startAt: null,
-        durationMinutes: 60,
-        type: 'synth-meetup',
-        takeoverId: null,
-        applicationId: null,
-        name: '',
-        raEventId: null,
-        description: '',
-        flyer: await photos().store(photo, 'sessions'),
-        createdBy,
-      },
-      [],
-    )
-  const first = await session()
-  const second = await session()
+  const first = await session(await photos().store(photo, 'sessions'))
+  const second = await session(await photos().store(photo, 'sessions'))
   expect(first.flyerKey).toBe(second.flyerKey)
   const key = first.flyerKey!
   expect(await kept()).toEqual(filesOf(key))
@@ -135,19 +142,21 @@ it('keeps a photo that is replaced with the same one, and deletes the one that i
   expect(await kept()).toEqual(filesOf(replaced!.after.photoKey!))
 })
 
-it('checks every table, whatever folder the key is in', async () => {
-  // A collective whose photo is under `artists/`, from when it was an artist, until it's moved: this goes in step 3 of
-  // #200 (see `isUsed` in store.ts).
-  const stored = await photos().store(photo, 'artists')
-  const ondes = await collectivesStore(database.db).create({
-    ...validateProfile({ name: 'Les Ondes', members: [{ name: 'Une' }] }, AdminCollectiveProfile),
-    photo: stored,
-    createdBy,
-  })
+// For each folder, the table of its kind, and how a row of it is added with a photo.
+const kinds: [PhotoFolder, typeof artists | typeof collectives | typeof sessions, (photo: NewPhoto) => Promise<{ id: string }>][] = [
+  ['artists', artists, (newPhoto) => artist('Ana', newPhoto)],
+  ['collectives', collectives, (newPhoto) => collective('Les Ondes', newPhoto)],
+  ['sessions', sessions, (newPhoto) => session(newPhoto)],
+]
+
+it.each(kinds)('checks the rows of the kind of the folder, %s, before deleting a photo', async (folder, table, add) => {
+  const first = await add(await photos().store(photo, folder))
+  const stored = await photos().store(photo, folder)
+  const second = await add(stored)
+  await database.db.delete(table).where(eq(table.id, first.id))
   await photos().deleteUnused(stored.key)
   expect(await kept()).toEqual(filesOf(stored.key))
-  await database.db.delete(collectives).where(eq(collectives.id, ondes.id))
-  await database.db.delete(artists)
+  await database.db.delete(table).where(eq(table.id, second.id))
   await photos().deleteUnused(stored.key)
   expect(await kept()).toEqual([])
 })

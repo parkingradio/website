@@ -312,7 +312,7 @@ describe('validatePhoto', () => {
 
 describe('withSizes', () => {
   it('returns the photo with its sizes', async () => {
-    const photo = { body: await testImage('png', 2000, 1000), type: 'image/png' }
+    const photo = { body: await testImage('png', 2000, 1000), type: 'image/png' as const }
     const sized = await withSizes(photo)
     expect(sized).toMatchObject(photo)
     expect(await sharp(sized.sizes.get(320)!).metadata()).toMatchObject({ format: 'webp', width: 320 })
@@ -320,7 +320,7 @@ describe('withSizes', () => {
   })
 
   it("refuses a photo that can't be read, in French, or as `errors` says", async () => {
-    const photo = { body: UNREADABLE_JPEG, type: 'image/jpeg' }
+    const photo = { body: UNREADABLE_JPEG, type: 'image/jpeg' as const }
     await expect(withSizes(photo)).rejects.toThrow(
       new InvalidProfile('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'),
     )

@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream'
 import { buffer } from 'node:stream/consumers'
-import { and, asc, eq, exists, or, sql } from 'drizzle-orm'
+import { and, asc, eq, exists, sql } from 'drizzle-orm'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PHOTO_WRONG_TYPE } from './profile.js'
@@ -8,7 +9,7 @@ import { PHOTO_WIDTHS, SIZE_TYPE, makeSizes, sizeKey } from './sizes.js'
 import { keyNamed, photoKey } from './keys.js'
 import type { PhotoFolder } from './keys.js'
 import type { PhotoWidth } from './sizes.js'
-import type { AdminArtistProfile, Profile } from './profile.js'
+import type { AdminArtistProfile, PhotoType, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { artists, collectiveMembers, collectives, sessions } from '../db/schema.js'
@@ -43,11 +44,11 @@ export function validateProfile(sent: unknown, schema: z.ZodType): unknown {
 }
 
 // A photo that was sent, and its MIME type, as checked from its contents.
-export type SentPhoto = { body: Buffer; type: string }
+export type SentPhoto = { body: Buffer; type: PhotoType }
 
 // The type of a photo, told from its first bytes rather than trusting what the browser says: JPEG, PNG or WebP, or
 // null for anything else.
-function photoType(body: Buffer): string | null {
+function photoType(body: Buffer): PhotoType | null {
   if (body.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) return 'image/jpeg'
   if (body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
   if (body.subarray(0, 4).toString('latin1') === 'RIFF' && body.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp'
@@ -268,7 +269,8 @@ export type Photos = Pick<PrivateFiles, 'read'> & {
   store(photo: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto>
   // The size at `width` of the photo with that key, or null when there's none, e.g. when the photo itself is missing.
   readSize(key: string, width: PhotoWidth): Promise<Readable | null>
-  // Deletes the photo with that key and its sizes, unless an artist, a collective or a session has it.
+  // Deletes the photo with that key and its sizes, unless a row of the kind of its folder has it, e.g. an artist for a
+  // photo under `artists/`.
   deleteUnused(key: string): Promise<void>
 }
 
@@ -282,17 +284,19 @@ export async function lockPhotos(tx: Queryable) {
   await tx.execute(sql`select pg_advisory_xact_lock(${PHOTOS_LOCK})`)
 }
 
-// Whether an artist, a collective or a session has the photo with `key`. Every table is checked, whatever folder the
-// key is in, only because some collectives' photos are still under `artists/`, from when they were artists (see
-// drizzle/0004_collectives.sql), until they're moved (see artists/content-keys.ts): once they are, only the table of
-// the key's folder needs to be, in step 3 of #200.
-async function isUsed(tx: Queryable, key: string): Promise<boolean> {
-  const used = or(
-    exists(tx.select().from(artists).where(eq(artists.photoKey, key))),
-    exists(tx.select().from(collectives).where(eq(collectives.photoKey, key))),
-    exists(tx.select().from(sessions).where(eq(sessions.flyerKey, key))),
-  )
-  const { rows } = await tx.execute<{ used: boolean }>(sql`select ${used} as used`)
+// The column that has the keys of the photos of each folder (see `PhotoFolder` in keys.ts).
+const KEY_COLUMNS: Record<PhotoFolder, AnyPgColumn> = { artists: artists.photoKey, collectives: collectives.photoKey, sessions: sessions.flyerKey }
+
+// The column that would have the photo with `key`, by its folder. Throws for a key in no folder of photos.
+function keyColumn(key: string): AnyPgColumn {
+  const folder = key.slice(0, key.indexOf('/'))
+  if (!Object.hasOwn(KEY_COLUMNS, folder)) throw new Error(`Not the key of a photo: ${key}`)
+  return KEY_COLUMNS[folder as PhotoFolder]
+}
+
+// Whether a row of `column`'s table has the photo with `key`.
+async function isUsed(tx: Queryable, column: AnyPgColumn, key: string): Promise<boolean> {
+  const { rows } = await tx.execute<{ used: boolean }>(sql`select ${exists(tx.select().from(column.table).where(eq(column, key)))} as used`)
   return rows[0].used
 }
 
@@ -320,11 +324,13 @@ export function privatePhotos(files: PrivateFiles, db: Queryable, log: FastifyBa
     },
     read: files.read,
     readSize: (key, width) => files.read(sizeKey(key, width)),
-    deleteUnused: (key) =>
-      db.transaction(async (tx) => {
+    deleteUnused: async (key) => {
+      const column = keyColumn(key)
+      await db.transaction(async (tx) => {
         await lockPhotos(tx)
-        if (!(await isUsed(tx, key))) await deletePhoto(files, key)
-      }),
+        if (!(await isUsed(tx, column, key))) await deletePhoto(files, key)
+      })
+    },
   }
   return photos
 }

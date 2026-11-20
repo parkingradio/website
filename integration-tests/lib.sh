@@ -127,10 +127,16 @@ _files_on_disk() {
     docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi"
 }
 
+# content_name <file> -- the name of a photo or flyer that's this file, made from its content, as its key and its public
+# URLs have it.
+content_name() {
+    sha256sum "$1" | cut -d' ' -f1
+}
+
 # flyer_path <file> -- the path under which the public gets the sizes of a flyer that's this file, e.g.
 # `<path>/w320.webp`: it's named after its content.
 flyer_path() {
-    printf '/api/events/flyers/%s' "$(sha256sum "$1" | cut -d' ' -f1)"
+    printf '/api/events/flyers/%s' "$(content_name "$1")"
 }
 
 # cut_short <file> -- print the first half of the file, e.g. an image that then starts like one, but can't be read.

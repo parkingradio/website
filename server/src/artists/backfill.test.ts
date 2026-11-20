@@ -73,9 +73,9 @@ describe('sizesBackfill', () => {
     const put = vi.spyOn(files, 'put')
 
     await backfill([
-      { of: 'session', id: 's', key: 'sessions/s.png', type: 'image/png' },
-      { of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' },
-      { of: 'collective', id: 'c', key: 'collectives/c.webp', type: 'image/webp' },
+      { of: 'session', id: 's', key: 'sessions/s.png' },
+      { of: 'artist', id: 'a', key: 'artists/a.jpg' },
+      { of: 'collective', id: 'c', key: 'collectives/c.webp' },
     ])
 
     expect(await width(sizeKey('artists/a.jpg', 320))).toBe(320)
@@ -103,10 +103,10 @@ describe('sizesBackfill', () => {
 
     await backfill(
       [
-        { of: 'artist', id: 'cut', key: 'artists/cut.jpg', type: 'image/jpeg' },
-        { of: 'collective', id: 'gone', key: 'collectives/gone.jpg', type: 'image/jpeg' },
-        { of: 'artist', id: 'failing', key: 'artists/failing.jpg', type: 'image/jpeg' },
-        { of: 'artist', id: 'fine', key: 'artists/fine.jpg', type: 'image/jpeg' },
+        { of: 'artist', id: 'cut', key: 'artists/cut.jpg' },
+        { of: 'collective', id: 'gone', key: 'collectives/gone.jpg' },
+        { of: 'artist', id: 'failing', key: 'artists/failing.jpg' },
+        { of: 'artist', id: 'fine', key: 'artists/fine.jpg' },
       ],
       failing,
     )
@@ -128,7 +128,7 @@ describe('sizesBackfill', () => {
 
   it('deletes the sizes it made of a photo that was deleted meanwhile', async () => {
     await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
-    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }], deletingOnRead())
+    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg' }], deletingOnRead())
     expect(await kept()).toEqual([])
     expect(log.error).not.toHaveBeenCalled()
     expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: 0, missing: 1 }), 'Made the missing sizes of photos and flyers')
@@ -136,7 +136,7 @@ describe('sizesBackfill', () => {
 
   it('logs a size of a deleted photo that it fails to delete', async () => {
     await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
-    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }], deletingOnRead({ delete: async () => Promise.reject(new Error('S3 is down')) }))
+    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg' }], deletingOnRead({ delete: async () => Promise.reject(new Error('S3 is down')) }))
     expect(log.error).toHaveBeenCalledExactlyOnceWith({ err: expect.any(Error), key: 'artists/a.jpg' }, 'Failed to delete a photo that is not used anymore')
   })
 
@@ -150,7 +150,7 @@ describe('sizesBackfill', () => {
   it('stops before the next photo once it is asked to, after the one it is making', async () => {
     for (const name of ['a', 'b', 'c']) await files.put(`artists/${name}.jpg`, await testImage('jpeg', 640, 480), 'image/jpeg')
     const run = sizesBackfill(
-      async () => ['a', 'b', 'c'].map((id) => ({ of: 'artist' as const, id, key: `artists/${id}.jpg`, type: 'image/jpeg' })),
+      async () => ['a', 'b', 'c'].map((id) => ({ of: 'artist' as const, id, key: `artists/${id}.jpg` })),
       {
         ...files,
         // Asked to stop while it makes the sizes of the first one.
@@ -166,38 +166,5 @@ describe('sizesBackfill', () => {
     await run.stopped()
     expect(await kept()).toEqual(['artists/a.jpg', sizeKey('artists/a.jpg', 1280), sizeKey('artists/a.jpg', 320), 'artists/b.jpg', 'artists/c.jpg'])
     expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: 1 }), 'Stopped making the missing sizes of photos and flyers')
-  })
-
-  it('runs `first` before it makes the sizes, which it lists once `first` is done', async () => {
-    await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
-    const done: string[] = []
-    const run = sizesBackfill(
-      async () => {
-        done.push('list')
-        return [{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }]
-      },
-      files,
-      unused(),
-      logger,
-      async () => {
-        done.push('first')
-      },
-    )
-    run.start()
-    await run.stopped()
-    expect(done).toEqual(['first', 'list'])
-    expect(await kept()).toContain(sizeKey('artists/a.jpg', 320))
-  })
-
-  it("doesn't make the sizes when it's asked to stop while `first` runs", async () => {
-    const list = vi.fn(async (): Promise<StoredImage[]> => [])
-    const run = sizesBackfill(list, files, unused(), logger, async (stopping) => {
-      run.stop()
-      expect(stopping()).toBe(true)
-    })
-    run.start()
-    await run.stopped()
-    expect(list).not.toHaveBeenCalled()
-    expect(log.info).not.toHaveBeenCalled()
   })
 })
