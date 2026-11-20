@@ -77,7 +77,7 @@ describe('sendPhoto', () => {
     const app = Fastify()
     useZodSchemas(app)
     const photos = memoryPhotos()
-    const key = await photos.store(await withSizes({ body: JPEG, type: 'image/jpeg' }), 'artists')
+    const { key } = await photos.store(await withSizes({ body: JPEG, type: 'image/jpeg' }), 'artists')
     const row = { photoKey: key, photoType: 'image/jpeg' }
     const api = zodRoutes(app)
     // As if its schema let a request without `width` through.

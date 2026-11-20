@@ -9,7 +9,7 @@ import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { MAX_MINUTES } from './fields.js'
-import { BrokenFields, Conflict, NoSuchReference } from './store.js'
+import { BrokenFields, Conflict, NoSuchReference, flyerColumns } from './store.js'
 import type { NewSet, SessionsStore, StoredSession, StoredSet } from './store.js'
 import { sessionsRoutes } from './routes.js'
 
@@ -77,13 +77,14 @@ const store: SessionsStore = {
     ),
   ),
   get: async (id) => rows.find((session) => session.id === id) ?? null,
-  create: vi.fn<SessionsStore['create']>(async (session, sets) => {
+  create: vi.fn<SessionsStore['create']>(async ({ flyer, ...session }, sets) => {
     const row: StoredSession = {
       id: `session-${++nextId}`,
       createdAt: CREATED_AT,
       ...NEW,
       ...UNANNOUNCED,
       ...session,
+      ...flyerColumns(flyer),
       ...takeover(session.takeoverId),
       application: null,
       ...application(session.applicationId),
@@ -93,11 +94,11 @@ const store: SessionsStore = {
     rows.push(row)
     return row
   }),
-  update: vi.fn<SessionsStore['update']>(async (id, changes) => {
+  update: vi.fn<SessionsStore['update']>(async (id, { flyer, ...changes }) => {
     const row = rows.find((session) => session.id === id)
     if (!row) return null
     const before = { ...row }
-    Object.assign(row, defined(changes), changes.takeoverId !== undefined && takeover(changes.takeoverId), application(changes.applicationId))
+    Object.assign(row, defined(changes), flyer === undefined ? {} : flyerColumns(flyer), changes.takeoverId !== undefined && takeover(changes.takeoverId), application(changes.applicationId))
     return { before, after: row }
   }),
   setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => changeSession(id, change)),
@@ -578,7 +579,7 @@ describe('sessions routes', () => {
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: other, set: null })
 
       expect(photos.store).toHaveBeenCalledTimes(4)
-      expect(photos.delete).toHaveBeenCalledTimes(4)
+      expect(photos.deleteUnused).toHaveBeenCalledTimes(4)
       expect(rows).toHaveLength(1)
     })
 
@@ -786,7 +787,7 @@ describe('sessions routes', () => {
         expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
       }
       expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpeg')
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('deletes the new flyer when the session is not added', async () => {
@@ -794,7 +795,7 @@ describe('sessions routes', () => {
       vi.mocked(store.create).mockRejectedValueOnce(new NoSuchReference('No such collective'))
       const response = await createSession(app, {}, { flyer: PNG })
       expect(response.statusCode).toBe(400)
-      expect(photos.delete.mock.calls).toEqual([['sessions/flyer-1.png']])
+      expect(photos.deleteUnused.mock.calls).toEqual([['sessions/flyer-1.png']])
       expect(rows).toEqual([])
     })
 
@@ -802,7 +803,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await createSession(app, {}, { flyer: JPEG })
       expect((await send(app, 'DELETE', '/api/admin/sessions/session-1')).statusCode).toBe(200)
-      expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+      expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
     })
 
     it('responds 404 for a session that does not exist, has no flyer, or whose flyer is missing', async () => {
@@ -826,7 +827,11 @@ describe('sessions routes', () => {
 
     describe('PUT /api/admin/sessions/:id/flyer', () => {
       // What saving only a flyer changes of the session.
-      const flyerChange = (flyerKey: string, flyerType: string) => ({ flyerKey, flyerType, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+      const flyerChange = (key: string, type: string) => ({
+        flyer: { key, type, keep: expect.any(Function) },
+        updatedBy: 'admin@example.com',
+        updatedAt: expect.any(Date),
+      })
 
       it('gives a session a flyer, then replaces it, deleting the one it had, and changes nothing else', async () => {
         const app = await buildApp()
@@ -840,7 +845,7 @@ describe('sessions routes', () => {
         expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: true, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
         expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.jpeg', 'image/jpeg'))
         expect(photos.store).toHaveBeenCalledExactlyOnceWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'sessions')
-        expect(photos.delete).not.toHaveBeenCalled()
+        expect(photos.deleteUnused).not.toHaveBeenCalled()
         const served = await get(app, '/api/admin/sessions/session-1/flyer')
         expect(served.headers['content-type']).toBe('image/jpeg')
         expect(served.rawPayload).toEqual(JPEG)
@@ -848,7 +853,7 @@ describe('sessions routes', () => {
         response = await putFlyer(app, 'session-1', { flyer: PNG })
         expect(response.statusCode).toBe(200)
         expect(store.update).toHaveBeenLastCalledWith('session-1', flyerChange('sessions/flyer-2.png', 'image/png'))
-        expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
         expect(photos.photos()).toEqual(['sessions/flyer-2.png'])
         // The new flyer has another ETag, so a browser that has the one it replaced gets it.
         const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
@@ -876,7 +881,7 @@ describe('sessions routes', () => {
           expect(response.json()).toEqual({ ok: false, error })
         }
         expect(photos.store).not.toHaveBeenCalled()
-        expect(photos.delete).not.toHaveBeenCalled()
+        expect(photos.deleteUnused).not.toHaveBeenCalled()
         expect(store.update).not.toHaveBeenCalled()
         expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
       })
@@ -906,7 +911,7 @@ describe('sessions routes', () => {
         vi.mocked(store.update).mockRejectedValueOnce(new Error('The database is down'))
         expect((await putFlyer(app, 'session-1', { flyer: PNG })).statusCode).toBe(500)
         expect(photos.store).toHaveBeenCalledTimes(2)
-        expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
+        expect(photos.deleteUnused.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
         expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
       })
 
@@ -915,7 +920,7 @@ describe('sessions routes', () => {
         await createSession(app)
         vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
         await putFlyer(app, 'session-1', { flyer: PNG })
-        expect(photos.delete.mock.calls).toEqual([['sessions/flyer-1.png']])
+        expect(photos.deleteUnused.mock.calls).toEqual([['sessions/flyer-1.png']])
         expect(rows[0].flyerKey).toBeNull()
       })
     })
@@ -933,8 +938,8 @@ describe('sessions routes', () => {
         let response = await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')
         expect(response.statusCode).toBe(200)
         expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: false, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
-        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', { flyerKey: null, flyerType: null, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
-        expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', { flyer: null, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
         expect(stored.size).toBe(0)
         // A browser that has the flyer doesn't get it anymore.
         expect((await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': etag })).json()).toEqual({ ok: false, error: 'This session has no flyer' })
@@ -942,13 +947,13 @@ describe('sessions routes', () => {
         rows[0].updatedBy = null
         response = await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')
         expect(response.json().session).toMatchObject({ hasFlyer: false, updatedBy: 'admin@example.com' })
-        expect(photos.delete).toHaveBeenCalledTimes(1)
+        expect(photos.deleteUnused).toHaveBeenCalledTimes(1)
       })
 
       it("removes the flyer even when it can't be deleted, and responds 404 for a session that does not exist", async () => {
         const app = await buildApp()
         await createSession(app, {}, { flyer: JPEG })
-        photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+        photos.deleteUnused.mockRejectedValueOnce(new Error('S3 is down'))
         expect((await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')).statusCode).toBe(200)
         expect(rows[0]).toMatchObject({ flyerKey: null, flyerType: null })
         const response = await send(app, 'DELETE', '/api/admin/sessions/session-9/flyer')

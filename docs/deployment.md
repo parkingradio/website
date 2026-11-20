@@ -198,11 +198,47 @@ assets. The bucket is versioned and keeps the previous versions of files for as 
 are kept.
 
 Photos and flyers are kept there with their sizes, which the server makes when they're sent (see
-[Photos](design/server/artists.md#photos)): those of the one with key `<key>` are `<key>.w320.webp` and
-`<key>.w1280.webp`. Whenever the server starts, it makes, in the background, one photo at a time, the sizes that the
-photos and flyers it keeps don't have, e.g. those sent before there were sizes, the first time an image with them is
-deployed. Until it's done, pages show those photos and flyers as missing images. Its log, which is read as in
-[Database migrations](#database-migrations), says:
+[Photos](design/server/artists.md#photos)). Each one is kept under `<folder>/<sha256>.<extension>`: `<folder>` is
+`artists`, `collectives` or `sessions`, for what it's of, `<sha256>` is the SHA-256 of its content, in hex, and
+`<extension>` is `jpg`, `png` or `webp`, for its type. So an image is kept once in each folder, however many artists,
+collectives or sessions have it, e.g. the same flyer for several sessions, and deleted once none has it anymore. The
+sizes of the one with key `<key>` are `<key>.w320.webp` and `<key>.w1280.webp`. Some collectives' photos are under
+`artists/`, from when they were artists.
+
+Whenever the server starts, it does two things in the background, one photo at a time, one after the other. Their log,
+which is read as in [Database migrations](#database-migrations), says what they do.
+
+First, it moves the photos and flyers it still keeps under the random keys they were kept under before,
+`<folder>/<uuid>.<extension>`, to the keys made from their content, with the sizes they have, and merges those that are
+the same, e.g. the flyers of the synth meetups backfilled from RA, which were kept once per session. A row whose image
+an admin changes meanwhile keeps the new one. Its log says:
+
+- When it starts, `Moving photos and flyers to keys made from their content`, with how many it has to move, and when
+  it's done, `Moved photos and flyers to keys made from their content`, with how many it moved, how many had changed
+  meanwhile, how many are missing, how many it failed to move, and how many are `left` to move, or
+  `Stopped moving photos and flyers to keys made from their content` when the server stops first. It goes on the next
+  time the server starts.
+- For each photo or flyer that it couldn't move, what it's of (`of`, e.g. `artist`, and `id`), and its `key`, with one
+  of these messages:
+  - `A photo or flyer to move to a key made from its content is missing`: it's lost from the bucket. It's left as it
+    is, and counted as left, until it's replaced or removed on the admin pages.
+  - `Failed to move a photo or flyer to a key made from its content`, for any other reason, e.g. the bucket's. It's
+    tried again the next time the server starts.
+
+Once `left` is 0 in every deployment, production and test, this first step can go. If the server stops after it stored
+an image under its new key, but before it moved its row there, it moves it the next time it starts, unless an admin
+replaces or removes the image in the meantime: then the files under the new key stay in the bucket, unused, and nothing
+logs it.
+
+Rolling back to a version from before keys were made from content is safe for reading images, whatever their keys,
+but that version deletes an image as soon as one artist, collective or session stops having it, even when others still
+have it, e.g. it deletes a flyer that several sessions have from all of them when it's removed from one. Such an image
+has to be restored from the bucket's previous versions, under its key, with its sizes. Deploying this version again
+moves the images that were sent meanwhile.
+
+Then, it makes the sizes that the photos and flyers it keeps don't have, e.g. those sent before there were sizes, the
+first time an image with them is deployed. Until it's done, pages show those photos and flyers as missing images. Its
+log says:
 
 - When it starts, `Making the missing sizes of photos and flyers`, and when it's done, `Made the missing sizes of photos
   and flyers`, with how many it made, and how many it couldn't, or `Stopped making the missing sizes of photos and
@@ -217,10 +253,16 @@ deployed. Until it's done, pages show those photos and flyers as missing images.
   - `Failed to make the sizes of a photo or flyer`, for any other reason, e.g. the bucket's. It's tried again the next
     time the server starts.
 
-Two messages, from requests or from making sizes, say that files of a photo that was deleted, or never used, may be
-left in the bucket, with their `key`: `Failed to delete a photo that is not used anymore`, and `Failed to delete the
-size of a photo that may have been deleted`. Delete them by hand, the photo and both of its sizes, so that they're gone
-for good once the bucket's previous versions expire, like the photos that were deleted.
+`Failed to delete a photo that is not used anymore`, from requests or from either of them, says that the files of a
+photo that nothing has anymore, with its `key`, may be left in the bucket. Delete them by hand, the photo and both of
+its sizes, so that they're gone for good once the bucket's previous versions expire, like the photos that were deleted,
+but only once no artist, collective or session has that key, which one that's sent again can have since:
+
+```sql
+select 1 from artists where photo_key = '<key>'
+union all select 1 from collectives where photo_key = '<key>'
+union all select 1 from sessions where flyer_key = '<key>'
+```
 
 ## Email
 

@@ -1,7 +1,7 @@
 import type { ApplicationFields } from './fields.js'
 import { applicationsStore } from './store.js'
-import { artistsStore } from '../artists/store.js'
-import type { StoredPhoto } from '../artists/store.js'
+import { artistsStore, lockPhotos } from '../artists/store.js'
+import type { NewPhoto } from '../artists/store.js'
 import type { ApplicantProfile, Profile } from '../artists/profile.js'
 import { collectivesStore } from '../collectives/store.js'
 import type { ApplicantCollective } from '../collectives/profile.js'
@@ -15,15 +15,15 @@ export type ApplyStore = {
   // Creates the artist, with this profile and photo, and their application, both with a null `createdBy`. Returns their
   // ids. If an artist with the same email already exists (ignoring case), throws an EmailTaken and creates nothing.
   apply(
-    artist: ApplicantProfile & StoredPhoto,
+    artist: ApplicantProfile & { photo: NewPhoto | null },
     application: ApplicationFields,
   ): Promise<{ artistId: string; applicationId: string }>
   // Creates the collective, with this profile and photo, its `members`, as new artists, in order, and its application,
   // all with a null `createdBy`. Returns the ids of the collective and its application. If a collective with the same
   // email already exists (ignoring case), throws an EmailTaken and creates nothing.
   applyAsCollective(
-    collective: ApplicantCollective & StoredPhoto,
-    members: (Profile & StoredPhoto)[],
+    collective: ApplicantCollective & { photo: NewPhoto | null },
+    members: (Profile & { photo: NewPhoto | null })[],
     application: ApplicationFields,
   ): Promise<{ collectiveId: string; applicationId: string }>
 }
@@ -43,6 +43,9 @@ export function applyStore(db: typeof Database): ApplyStore {
     applyAsCollective(collective, members, application) {
       // Likewise, and the EmailTaken that creating the collective throws rolls its artists back too.
       return db.transaction(async (tx) => {
+        // Every photo's lock at once, in their order, before each artist and the collective take theirs again, which they
+        // then have (see `Photos` in artists/store.ts).
+        await lockPhotos(tx, [collective, ...members].flatMap(({ photo }) => (photo ? [photo.key] : [])))
         const ids: { id: string }[] = []
         for (const member of members) ids.push({ id: (await artistsStore(tx).create({ ...member, createdBy: null })).id })
         const added = await collectivesStore(tx).create({ ...collective, members: ids, createdBy: null })

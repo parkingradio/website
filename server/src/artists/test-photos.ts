@@ -1,13 +1,16 @@
+import { readdir } from 'node:fs/promises'
+import path from 'node:path'
 import { Readable } from 'node:stream'
 import { vi } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import type { PhotoFolder, Photos, SizedPhoto } from './store.js'
+import type { NewPhoto, PhotoFolder, Photos, SizedPhoto } from './store.js'
 
 // For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, with their sizes
 // under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg", counted from 1
-// again after `reset`.
+// again after `reset`, rather than made from their content, and deleted whether or not something uses them: what the
+// bucket and the database do with them is tested on them (see artists/photos.db.test.ts).
 export function memoryPhotos(name = 'photo') {
   const stored = new Map<string, Buffer>()
   let next = 0
@@ -18,15 +21,15 @@ export function memoryPhotos(name = 'photo') {
       stored.clear()
       next = 0
     },
-    store: vi.fn(async ({ body, type, sizes }: SizedPhoto, folder: PhotoFolder) => {
+    store: vi.fn(async ({ body, type, sizes }: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto> => {
       const key = `${folder}/${name}-${++next}.${type.split('/')[1]}`
       stored.set(key, body)
       for (const [width, size] of sizes) stored.set(sizeKey(key, width), size)
-      return key
+      return { key, type, keep: async () => {} }
     }),
     read: vi.fn(async (key: string) => read(key)),
     readSize: vi.fn<Photos['readSize']>(async (key, width) => read(sizeKey(key, width))),
-    delete: vi.fn(async (key: string) => {
+    deleteUnused: vi.fn(async (key: string) => {
       stored.delete(key)
       for (const width of PHOTO_WIDTHS) stored.delete(sizeKey(key, width))
     }),
@@ -50,7 +53,7 @@ export const NO_PHOTOS: Photos = {
   },
   read: async () => null,
   readSize: async () => null,
-  delete: async () => {},
+  deleteUnused: async () => {},
 }
 
 // An image of one colour, `width` by `height`, in `format`, with EXIF that tells where it was taken and on what, with
@@ -66,4 +69,13 @@ export async function testImage(
     .withExif({ IFD0: { Make: 'PLANTED-MAKE' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '46/1 48/1 0/1', GPSMapDatum: 'PLANTED-GPS' } })
     .withIccProfile('p3')
   return (rotated ? image.withMetadata({ orientation: 6 }) : image)[format]().toBuffer()
+}
+
+// The keys of the files kept in `directory`, as the private files keep them there without a bucket (see
+// core/private-bucket.ts), in order.
+export async function keptFiles(directory: string): Promise<string[]> {
+  return (await readdir(directory, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name)))
+    .sort()
 }

@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import type { Readable } from 'node:stream'
 import { buffer } from 'node:stream/consumers'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, exists, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PHOTO_WRONG_TYPE } from './profile.js'
@@ -10,7 +10,7 @@ import type { PhotoWidth } from './sizes.js'
 import type { AdminArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
-import { artists, collectiveMembers, collectives } from '../db/schema.js'
+import { artists, collectiveMembers, collectives, sessions } from '../db/schema.js'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
 import { isUuid } from '../db/uuid.js'
@@ -92,12 +92,11 @@ export async function readPhoto(body: Buffer | undefined, errors = PHOTO_ERRORS)
 export type ArtistRow = typeof artists.$inferSelect
 export type StoredArtist = ArtistRow & { collectives: Reference[] }
 
-// Where the photo of an artist or a collective is stored (see `Photos`), and its MIME type, or nulls when they have
-// none: never one without the other, which the database checks too.
-export type StoredPhoto = { photoKey: string; photoType: string } | { photoKey: null; photoType: null }
-
-// What an artist or a collective without a photo stores, e.g. once it's removed.
-export const NO_PHOTO: StoredPhoto = { photoKey: null, photoType: null }
+// What an artist or a collective stores of `photo`, a photo that was stored, or null for none: where it's stored (see
+// `Photos`), and its MIME type, or nulls, never one without the other, which the database checks too.
+export function photoColumns(photo: Pick<NewPhoto, 'key' | 'type'> | null) {
+  return { photoKey: photo?.key ?? null, photoType: photo?.type ?? null }
+}
 
 // Thrown when saving an artist with the email of another one, whatever its case, and a collective with the email of
 // another collective.
@@ -114,15 +113,15 @@ export type ArtistsStore = {
   // docs/design/server/artists.md).
   getPublic(id: string): Promise<ArtistRow | null>
   // `createdBy` is the email of the admin who adds the artist, or null if they come through the form, applying alone or
-  // as one of a collective's artists.
+  // as one of a collective's artists. `photo` is their photo, once it's stored, or null for none.
   // Throws an EmailTaken.
-  create(artist: Profile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
-  // Changes the fields of the artist's profile that `changes` has, and their photo when there's a new one, or nulls to
-  // remove it. Returns the artist as they were, so that a photo that was replaced or removed can be deleted, and as they
-  // are then. Throws an EmailTaken.
+  create(artist: Profile & { photo: NewPhoto | null; createdBy: string | null }): Promise<StoredArtist>
+  // Changes the fields of the artist's profile that `changes` has, and their photo when it has one: a new one, once it's
+  // stored, or null to remove it. Returns the artist as they were, so that a photo that was replaced or removed can be
+  // deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
-    changes: Partial<Profile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<Profile> & { photo?: NewPhoto | null; updatedBy: string; updatedAt: Date },
   ): Promise<{ before: ArtistRow; after: StoredArtist } | null>
   // Returns the artist as they were, so that their photo can be deleted too. They're taken out of their collectives and
   // their sets.
@@ -183,9 +182,15 @@ export function artistsStore(db: Queryable): ArtistsStore {
       return row ?? null
     },
 
-    async create(artist) {
+    async create({ photo, ...artist }) {
+      const insert = async (tx: Queryable) => {
+        await photo?.keep(tx)
+        const [row] = await tx.insert(artists).values({ ...artist, ...photoColumns(photo) }).returning()
+        return row
+      }
       try {
-        const [row] = await db.insert(artists).values(artist).returning()
+        // Only in a transaction of its own when there's a photo to keep with it.
+        const row = photo ? await db.transaction(insert) : await insert(db)
         return { ...row, collectives: [] }
       } catch (error) {
         if (violatesConstraint(error, 'artists_email_lower_idx')) throw new EmailTaken()
@@ -193,15 +198,21 @@ export function artistsStore(db: Queryable): ArtistsStore {
       }
     },
 
-    async update(id, changes) {
+    async update(id, { photo, ...changes }) {
       if (!isUuid(id)) return null
       try {
         return await db.transaction(async (tx) => {
+          // Before the artist's row is locked (see `Photos`).
+          await photo?.keep(tx)
           // Like the update itself, which doesn't change a key, so that it doesn't wait for sets' performers referring to
           // the artist (see `lockSessions` in sessions/store.ts).
           const [before] = await tx.select().from(artists).where(eq(artists.id, id)).for('no key update')
           if (!before) return null
-          const [after] = await tx.update(artists).set(changes).where(eq(artists.id, id)).returning()
+          const [after] = await tx
+            .update(artists)
+            .set({ ...changes, ...(photo === undefined ? {} : photoColumns(photo)) })
+            .where(eq(artists.id, id))
+            .returning()
           return { before, after: await withCollectives(tx, after) }
         })
       } catch (error) {
@@ -224,45 +235,123 @@ export function artistsStore(db: Queryable): ArtistsStore {
 }
 
 // Where new photos are stored: artists' under `artists/`, collectives' under `collectives/`, and sessions' flyers under
-// `sessions/`. That only keeps the bucket tidy: what's stored is the photo's key, which is read and deleted as it is,
-// whatever folder it's in.
+// `sessions/`, so that each kind only shares its photos with its own (see `photoKey`). Otherwise, what's stored is the
+// photo's key, which is read and deleted as it is, whatever folder it's in.
 export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
+
+const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+
+// The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte, as
+// one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
+// docs/deployment.md).
+export function photoKey({ body, type }: SentPhoto, folder: PhotoFolder): string {
+  return `${folder}/${createHash('sha256').update(body).digest('hex')}.${EXTENSIONS[type] ?? 'bin'}`
+}
+
+// Whether `key` is one that `photoKey` makes, rather than one from before it (see artists/content-keys.ts).
+export function isContentKey(key: string): boolean {
+  return /^[a-z]+\/[0-9a-f]{64}\.[a-z]+$/.test(key)
+}
+
+// A photo or a flyer that was stored (see `Photos`): its key, its MIME type, and `keep`, which the transaction that
+// saves it in a row calls before anything else, except taking the sessions' lock.
+export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise<void> }
 
 // Artists' and collectives' photos, and sessions' flyers, and their sizes. They're private files (see
 // core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until their
 // artist, collective or session is public, when the server serves their sizes to anyone (see
 // docs/design/server/events.md).
+//
+// Each one is stored once, however many artists, collectives or sessions have it, and deleted once none has it anymore,
+// which takes its lock (see `lockPhotos`), so that it's never deleted from under a row that starts using it:
+// - A transaction that saves a photo in a row first calls its `keep`, which takes its lock, and stores again what was
+//   deleted since `store` stored it, then saves the row: once the transaction ends, the row is committed, and the
+//   photo is there.
+// - `deleteUnused` takes the lock in a transaction of its own, then reads whether a row has the photo, as committed by
+//   then, and only deletes it when none has.
+// So `deleteUnused` is never called while a transaction holds a photo's lock, e.g. after `keep` and before the
+// transaction ends, even when it fails: it would wait for that transaction, from another connection, while that
+// transaction waits for it, which Postgres can't tell, and the request would hang.
 export type Photos = Pick<PrivateFiles, 'read'> & {
-  // Stores the photo and its sizes under a new key in `folder`, and returns that key. If one can't be stored, those that
-  // were are deleted, or that failure is logged, and the error is thrown.
-  store(photo: SizedPhoto, folder: PhotoFolder): Promise<string>
+  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey`), unless they're there already, and
+  // returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged, and the error
+  // is thrown.
+  store(photo: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto>
   // The size at `width` of the photo with that key, or null when there's none, e.g. when the photo itself is missing.
   readSize(key: string, width: PhotoWidth): Promise<Readable | null>
-  // Deletes the photo and its sizes.
-  delete(key: string): Promise<void>
+  // Deletes the photo with that key and its sizes, unless an artist, a collective or a session has it. Every table is
+  // checked, whatever folder the key is in: some collectives' photos are under `artists/`, from when they were artists
+  // (see drizzle/0004_collectives.sql).
+  deleteUnused(key: string): Promise<void>
 }
 
-const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+// Every transaction that takes the lock of a photo takes it before any other lock, except the sessions' (see
+// `lockSessions` in sessions/store.ts), e.g. before the row of the artist whose photo it changes, and those of several
+// photos in the order of their ids, which several keys can share: so they can't be part of a deadlock.
+// The first of the two keys of the photos' advisory locks, which no other lock with two keys has. A lock with a single
+// key, e.g. the sessions', is never one of them.
+const PHOTOS_LOCK = 0x9407
 
-// The photos, kept in `files`. `log` gets what fails to be deleted.
-export function privatePhotos(files: PrivateFiles, log: FastifyBaseLogger): Photos {
+function lockId(key: string): number {
+  return createHash('sha256').update(key).digest().readInt32BE(0)
+}
+
+// Takes the lock of the photos with `keys` (see `Photos`), until the transaction `tx` ends.
+export async function lockPhotos(tx: Queryable, keys: string[]) {
+  for (const id of [...new Set(keys.map(lockId))].sort((a, b) => a - b)) {
+    await tx.execute(sql`select pg_advisory_xact_lock(${PHOTOS_LOCK}, ${id})`)
+  }
+}
+
+// Whether an artist, a collective or a session has the photo with `key`.
+async function isUsed(tx: Queryable, key: string): Promise<boolean> {
+  const used = or(
+    exists(tx.select().from(artists).where(eq(artists.photoKey, key))),
+    exists(tx.select().from(collectives).where(eq(collectives.photoKey, key))),
+    exists(tx.select().from(sessions).where(eq(sessions.flyerKey, key))),
+  )
+  const { rows } = await tx.execute<{ used: boolean }>(sql`select ${used} as used`)
+  return rows[0].used
+}
+
+// The photos, kept in `files`, and used by the rows of `db`. `log` gets what fails to be deleted.
+export function privatePhotos(files: PrivateFiles, db: Queryable, log: FastifyBaseLogger): Photos {
   const photos: Photos = {
-    async store({ body, type, sizes }, folder) {
-      const key = `${folder}/${randomUUID()}.${EXTENSIONS[type] ?? 'bin'}`
+    async store(photo, folder) {
+      const key = photoKey(photo, folder)
       try {
-        await files.put(key, body, type)
-        await putSizes(files, key, sizes)
+        await putMissing(files, key, photo)
       } catch (error) {
         await forgetPhoto(photos, log, key)
         throw error
       }
-      return key
+      return {
+        key,
+        type: photo.type,
+        // When it fails, the photo is deleted, unless it's used, once the transaction is rolled back, by whoever saves it.
+        keep: async (tx) => {
+          await lockPhotos(tx, [key])
+          await putMissing(files, key, photo)
+        },
+      }
     },
     read: files.read,
     readSize: (key, width) => files.read(sizeKey(key, width)),
-    delete: (key) => deletePhoto(files, key),
+    deleteUnused: (key) =>
+      db.transaction(async (tx) => {
+        await lockPhotos(tx, [key])
+        if (!(await isUsed(tx, key))) await deletePhoto(files, key)
+      }),
   }
   return photos
+}
+
+// Stores the photo and the sizes it has under `key`, those that aren't there.
+async function putMissing(files: PrivateFiles, key: string, { body, type, sizes }: SizedPhoto) {
+  if (!(await files.exists(key))) await files.put(key, body, type)
+  for (const [width, size] of sizes) {
+    if (!(await files.exists(sizeKey(key, width)))) await files.put(sizeKey(key, width), size, SIZE_TYPE)
+  }
 }
 
 async function putSizes(files: PrivateFiles, key: string, sizes: Map<PhotoWidth, Buffer>) {
@@ -279,7 +368,12 @@ async function deletePhoto(files: PrivateFiles, key: string) {
 // Makes the sizes that the photo with `key` doesn't have, e.g. one stored before there were sizes (see
 // artists/backfill.ts), and returns whether it had them all, they were made, or the photo is missing, e.g. because it was
 // deleted or replaced. Throws an UnreadablePhoto when it can't be read.
-export async function completeSizes(files: PrivateFiles, key: string, log: FastifyBaseLogger): Promise<'complete' | 'made' | 'missing'> {
+export async function completeSizes(
+  files: PrivateFiles,
+  photos: Pick<Photos, 'deleteUnused'>,
+  key: string,
+  log: FastifyBaseLogger,
+): Promise<'complete' | 'made' | 'missing'> {
   const kept = await Promise.all(PHOTO_WIDTHS.map((width) => files.exists(sizeKey(key, width))))
   const missing = PHOTO_WIDTHS.filter((_, index) => !kept[index])
   if (missing.length === 0) return 'complete'
@@ -291,30 +385,24 @@ export async function completeSizes(files: PrivateFiles, key: string, log: Fasti
     (error: unknown) => ({ error }),
   )
   // The photo may have been deleted while they were made, after the sizes it had were: then those that were stored are
-  // deleted too.
+  // deleted too, unless a row has started using the photo again since, which stores it again (see `Photos`).
   const deleted = !(await files.exists(key))
-  if (deleted) {
-    await deletePhoto(files, key).catch((error: unknown) => {
-      // They may be left behind, though their photo is deleted: they have to be deleted by hand, like the photos that
-      // `forgetPhoto` fails to delete.
-      log.error({ err: error, key }, 'Failed to delete the size of a photo that may have been deleted')
-    })
-  }
+  if (deleted) await forgetPhoto(photos, log, key)
   if (failed) throw failed.error
   return deleted ? 'missing' : 'made'
 }
 
-// Stores the photo that was sent, if there's one, in `folder`, with its sizes, and returns where, as an artist or a
-// collective keeps it.
-export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SizedPhoto | null, folder: PhotoFolder): Promise<StoredPhoto> {
-  return photo ? { photoKey: await photos.store(photo, folder), photoType: photo.type } : NO_PHOTO
+// Stores the photo that was sent, if there's one, in `folder`, with its sizes, and returns it, or null when there's none.
+export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SizedPhoto | null, folder: PhotoFolder): Promise<NewPhoto | null> {
+  return photo && photos.store(photo, folder)
 }
 
-// Deletes a photo (or a flyer) that was stored but that nothing uses, or uses anymore, if there's one. If that fails,
-// the error is only logged, so that the request it's part of can still succeed.
-export async function forgetPhoto(photos: Pick<Photos, 'delete'>, log: FastifyBaseLogger, key: string | null) {
+// Deletes a photo (or a flyer) that was stored, if there's one, unless something uses it, e.g. one that was replaced or
+// removed, or one that was stored for a request that failed. Never while a transaction holds its lock (see `Photos`).
+// If that fails, the error is only logged, so that the request it's part of can still succeed.
+export async function forgetPhoto(photos: Pick<Photos, 'deleteUnused'>, log: FastifyBaseLogger, key: string | null | undefined) {
   if (!key) return
-  await photos.delete(key).catch((error: unknown) => {
+  await photos.deleteUnused(key).catch((error: unknown) => {
     log.error({ err: error, key }, 'Failed to delete a photo that is not used anymore')
   })
 }

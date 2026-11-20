@@ -6,8 +6,8 @@ import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
 import { photoRoute, readImageForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES, PHOTO_MAX_PIXELS, PHOTO_RULES } from '../artists/profile.js'
-import { forgetPhoto } from '../artists/store.js'
-import type { PhotoErrors, Photos, SizedPhoto } from '../artists/store.js'
+import { forgetPhoto, storePhoto } from '../artists/store.js'
+import type { NewPhoto, PhotoErrors, Photos, SizedPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
 import {
@@ -29,8 +29,8 @@ import {
 import type { SessionFields } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
-import { BrokenFields, Conflict, NO_FLYER, NoSuchReference, SESSION_CANCELLED } from './store.js'
-import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StatusChangedBy, StoredFlyer, StoredSession, StoredSet } from './store.js'
+import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
+import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StatusChangedBy, StoredSession, StoredSet } from './store.js'
 
 // Admin routes for sessions and their sets: add, view, change, mark as planned, done or cancelled, and delete them (see
 // docs/design/server/sessions.md).
@@ -341,7 +341,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
 
   // Runs `save`, which saves a session or a set, and responds with the session it returns, or 404 with `notFound` when
   // it returns null, or the error it throws when it's expected. When it fails, the flyer stored for it, `newFlyer`, if
-  // any, is deleted.
+  // any, is deleted, unless something uses it (see `forgetPhoto`).
   function saving(reply: FastifyReply, notFound: ApiError, save: () => Promise<StoredSession | null>, newFlyer: string | null = null) {
     return savingAs(reply, notFound, save, (saved) => ({ ok: true as const, session: sessionBody(saved) }), newFlyer)
   }
@@ -371,11 +371,6 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       return reply.status(404).send(notFound)
     }
     return respond(saved)
-  }
-
-  // Stores the flyer that was sent, if there's one, with its sizes, and returns where, as a session keeps it.
-  async function storeFlyer(flyer: SizedPhoto | null): Promise<StoredFlyer> {
-    return flyer ? { flyerKey: await photos.store(flyer, 'sessions'), flyerType: flyer.type } : NO_FLYER
   }
 
   // The id of the track `link` leads to: the track of the set as it was, `before`, when that's its link, or else the one
@@ -521,10 +516,10 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
         if ('error' in saved) return fail(reply, { ...saved, setIndex })
         sets.push({ ...saved, createdBy })
       }
-      const flyer = await storeFlyer(sent.flyer)
-      const session = { ...sessionChanges(fields), ...flyer, createdBy }
+      const flyer = await storePhoto(photos, sent.flyer, 'sessions')
+      const session = { ...sessionChanges(fields), flyer, createdBy }
       // It can't be missing once it's added.
-      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.create(session, sets), flyer.flyerKey)
+      return saving(reply, NO_SUCH_SESSION_ERROR, () => store.create(session, sets), flyer?.key)
     },
   )
 
@@ -534,16 +529,16 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     fields: Partial<SessionFields>,
-    flyer: StoredFlyer | null = null,
+    flyer?: NewPhoto | null,
   ) {
-    const changes = { ...sessionChanges(fields), ...flyer, updatedBy: request.user!.email, updatedAt: new Date() }
+    const changes = { ...sessionChanges(fields), flyer, updatedBy: request.user!.email, updatedAt: new Date() }
     const update = async () => {
       const changed = await store.update(request.params.id, changes)
       // The flyer the session had, which was replaced or removed, once the session is saved.
-      if (changed && flyer) await forgetPhoto(photos, request.log, changed.before.flyerKey)
+      if (changed && flyer !== undefined) await forgetPhoto(photos, request.log, changed.before.flyerKey)
       return changed?.after ?? null
     }
-    return saving(reply, NO_SUCH_SESSION_ERROR, update, flyer?.flyerKey)
+    return saving(reply, NO_SUCH_SESSION_ERROR, update, flyer?.key)
   }
 
   api.patch(
@@ -578,7 +573,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     async (request, reply) => {
       const sent = await readImageForm(request, 'flyer', FLYER_ERRORS)
       if ('error' in sent) return fail(reply, sent)
-      return updateSession(request, reply, {}, await storeFlyer(sent.image))
+      return updateSession(request, reply, {}, await photos.store(sent.image, 'sessions'))
     },
   )
 
@@ -594,7 +589,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
         response: { 200: SessionResponse, 404: ApiError },
       },
     },
-    async (request, reply) => updateSession(request, reply, {}, NO_FLYER),
+    async (request, reply) => updateSession(request, reply, {}, null),
   )
 
   api.put(

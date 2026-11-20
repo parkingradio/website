@@ -19,7 +19,7 @@ export const SIZE_TYPE = 'image/webp'
 
 // Where the size of a photo is kept: next to it, under its key with a suffix. The suffix names how the size is encoded,
 // and has to change when that does, since sizes are only made when they're missing: the server would otherwise keep
-// serving those already made. Those would then be left behind, so `delete` (see `privatePhotos` in store.ts) would also
+// serving those already made. Those would then be left behind, so `deleteUnused` (see `privatePhotos` in store.ts) would also
 // have to delete the sizes under the old suffix, or they'd outlive their photo.
 export function sizeKey(key: string, width: PhotoWidth): string {
   return `${key}.w${width}.webp`

@@ -4,6 +4,7 @@ import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
 import { REJECTED_APPLICATION } from '../applications/fields.js'
 import type { ApplicationDecision } from '../applications/fields.js'
+import type { NewPhoto } from '../artists/store.js'
 import type { Queryable } from '../db/connection.js'
 import { applications, artists, collectives, sessions, setPerformers, sets } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
@@ -32,13 +33,15 @@ export type StoredSet = SetRow & { performers: Reference[]; application: StoredA
 export type SessionRow = typeof sessions.$inferSelect
 export type StoredSession = SessionRow & { takeover: Reference | null; application: StoredApplicationLink | null; sets: StoredSet[] }
 
-// What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status, and a
-// session's flyer, which is where it's stored (see `Photos` in artists/store.ts), and its MIME type, or nulls for none,
-// and a set's position, which the store gives it.
+// What a session stores of `flyer`, a flyer that was stored, or null for none: where it's stored (see `Photos` in
+// artists/store.ts), and its MIME type, or nulls.
+export function flyerColumns(flyer: NewPhoto | null) {
+  return { flyerKey: flyer?.key ?? null, flyerType: flyer?.type ?? null }
+}
+
+// What's saved of a session, or a set, when it's added or changed: everything but who did it, and its status, a
+// session's flyer (see `flyerColumns`), and a set's position, which the store gives it.
 export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'applicationId' | 'raEventId' | 'description'>
-export type StoredFlyer = { flyerKey: string; flyerType: string } | { flyerKey: null; flyerType: null }
-// What a session without a flyer stores, e.g. once it's removed.
-export const NO_FLYER: StoredFlyer = { flyerKey: null, flyerType: null }
 export type SetChanges = Pick<
   SetRow,
   | 'durationMinutes'
@@ -142,14 +145,15 @@ export type SessionsStore = {
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none. Throws
   // a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about one.
-  create(session: SessionChanges & StoredFlyer & { createdBy: string }, sets: NewSet[]): Promise<StoredSession>
-  // Changes the session's fields that `changes` has, and its flyer when there's a new one, or nulls to remove it, but not
-  // its status, whether it's announced, or its sets. Returns the session as it was, so that a flyer that was replaced or
+  // `flyer` is its flyer, once it's stored, or null for none.
+  create(session: SessionChanges & { flyer: NewPhoto | null; createdBy: string }, sets: NewSet[]): Promise<StoredSession>
+  // Changes the session's fields that `changes` has, and its flyer when it has one: a new one, once it's stored, or null
+  // to remove it, but not its status, whether it's announced, or its sets. Returns the session as it was, so that a flyer that was replaced or
   // removed can be deleted, and as it is then. Throws a BrokenFields, a
   // NoSuchReference or a Conflict.
   update(
     id: string,
-    changes: Partial<SessionChanges> & (StoredFlyer | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<SessionChanges> & { flyer?: NewPhoto | null; updatedBy: string; updatedAt: Date },
   ): Promise<{ before: SessionRow; after: StoredSession } | null>
   // Cancelling a session cancels its sets that aren't, and marking it done marks its planned sets done, as the same
   // admin, at the same time. Throws a Conflict.
@@ -547,9 +551,12 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return isUuid(id) ? sessionWithId(db, id) : null
     },
 
-    create(session, newSets) {
+    create({ flyer, ...fields }, newSets) {
+      const session = { ...fields, ...flyerColumns(flyer) }
       return db.transaction(async (tx) => {
         await lockSessions(tx)
+        // Right after the sessions' lock (see `Photos` in artists/store.ts).
+        await flyer?.keep(tx)
         await checkTakeover(tx, session.takeoverId)
         // A new session is planned.
         await checkSessionApplication(tx, { ...session, status: 'planned' })
@@ -569,10 +576,13 @@ export function sessionsStore(db: Queryable): SessionsStore {
       })
     },
 
-    async update(id, changes) {
+    async update(id, { flyer, ...fields }) {
       if (!isUuid(id)) return null
+      const changes = { ...fields, ...(flyer === undefined ? {} : flyerColumns(flyer)) }
       return db.transaction(async (tx) => {
         await lockSessions(tx)
+        // Right after the sessions' lock (see `Photos` in artists/store.ts).
+        await flyer?.keep(tx)
         const before = await sessionRow(tx, id)
         if (!before) return null
         // The rules are about the session as it will be, with the fields that aren't changed as they are.
