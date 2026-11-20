@@ -5,7 +5,8 @@ import { ApiError, ById, firstIssue, nulError } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES, PhotoFile } from './profile.js'
 import { PHOTO_WIDTHS, SIZE_TYPE, sizeKey, sizeName, widthNamed } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import { InvalidProfile, PHOTO_ERRORS, photoName, readPhoto, validateProfile } from './store.js'
+import { photoName } from './keys.js'
+import { InvalidProfile, PHOTO_ERRORS, readPhoto, validateProfile } from './store.js'
 import type { PhotoErrors, Photos, SizedPhoto } from './store.js'
 
 // Reading requests that send a photo with a few fields, e.g. a profile, and serving photos, for the routes of artists,
@@ -209,7 +210,7 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
 // Sends the photo of an artist or a collective, or the flyer of a session (as `what` says), to an admin, on a route
 // declared with `photoRoute`, as it was sent, or its size at `width`, or a 404 when they have none, when it's missing,
 // or when it has no such size (see artists/backfill.ts). The ETag of a photo is its key, and that of a size the key it's
-// kept under, which are only ever that photo's, wherever it's used (see `photoKey` in store.ts): it changes exactly when
+// kept under, which are only ever that photo's, wherever it's used (see `photoKey` in keys.ts): it changes exactly when
 // the photo does. So a request that already has it gets a 304 without anything being read, even when the photo is
 // missing.
 export async function sendPhoto(
@@ -260,7 +261,7 @@ export type PublicSizes = z.infer<typeof PublicSizes>
 
 // The URLs of the sizes of the photo with `key`, or null when there's none, under `path`, the route of
 // `publicSizeRoute`, e.g. `/api/artists/photos`: named after the photo, i.e. its content (see `photoName` in
-// store.ts), and the size (see `sizeName` in sizes.ts), so that they're the same for everything that has the photo, and
+// keys.ts), and the size (see `sizeName` in sizes.ts), so that they're the same for everything that has the photo, and
 // change whenever what they serve does.
 export function publicSizes(path: string, key: string | null): PublicSizes | null {
   if (key === null) return null

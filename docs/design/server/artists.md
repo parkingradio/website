@@ -72,9 +72,9 @@ photos it keeps don't have: until then, and for good for a photo it can't read, 
 that isn't there.
 
 The public only ever gets the sizes of a public artist's photo, never the photo itself, so that it and its metadata stay
-private, and anyone can keep them for good, browsers and Cloudflare's cache included. So a size that was already fetched
-can still be shown to whoever has its URL once the artist is private again, or once their photo is replaced or removed,
-though public profiles stop giving it right away. If that matters for a photo, its sizes can be purged from Cloudflare's
+private. Anyone can keep those sizes for good, browsers and Cloudflare's cache included: so a size that was already
+fetched can still be shown to whoever has its URL once the artist is private again, or once their photo is replaced or
+removed, though public profiles stop giving it right away. If that matters for a photo, its sizes can be purged from Cloudflare's
 cache (see [Cloudflare's cache](../../deployment.md#cloudflares-cache)), but not from the browsers that have them.
 
 ## Public profiles
