@@ -110,7 +110,7 @@ describe('the tools of the API', () => {
     for (const name of ['update_artist', 'update_collective', 'update_application', 'update_session', 'update_set']) expect(required(name), name).toEqual(['id'])
   })
 
-  it('change artists, collectives, applications, sessions and sets with PATCH, rather than PUT, which replaces them', async () => {
+  it('change artists, collectives, applications, sessions and sets with PATCH, never with a PUT that replaces them', async () => {
     const { routes } = await apiTools()
     const updates = routes.filter((route) => /^update_[a-z]+$/.test(route.schema.operationId!))
     expect(updates.map(({ method, url }) => `${method} ${url}`).sort()).toEqual(

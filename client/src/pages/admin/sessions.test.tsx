@@ -1323,7 +1323,7 @@ describe("A session's page", () => {
   it("doesn't put a set back over what the server answered for another change while its place was saved", async () => {
     const [first, cyan, cancelled] = SESSION.sets
     const changed = { ...SESSION, sets: [first, { ...cyan, durationMinutes: 45 }, cancelled] }
-    mockFetch({ ...PAGE, ...ARTISTS, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' }, 'PUT /api/admin/sets/set-2': { ok: true, session: changed } })
+    mockFetch({ ...PAGE, ...ARTISTS, 'PUT /api/admin/sets/set-1/position': { ok: false, error: 'Boom' }, 'PATCH /api/admin/sets/set-2': { ok: true, session: changed } })
     const answer = holdMoves()
     renderAt('/admin/sessions/session-1')
 
@@ -1691,7 +1691,7 @@ describe("A set's form", () => {
   })
 
   it('changes a set, its duration included, even when the sets then add up to more than the session', async () => {
-    mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
+    mockFetch({ ...SET_PAGE, 'PATCH /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
@@ -1704,9 +1704,9 @@ describe("A set's form", () => {
 
     fireEvent.change(duration().getByLabelText('heures'), { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-2')).toHaveLength(1))
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sets/set-2')).toHaveLength(1))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2')[0])).toEqual({
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sets/set-2')[0])).toEqual({
       performers: [{ id: 'artist-3' }],
       durationMinutes: 330,
       performanceTypes: ['live-performance'],
@@ -1802,7 +1802,7 @@ describe("A set's form", () => {
     expect(durationValues()).toEqual(['1', '0'])
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByText('Choisissez au moins un artiste.')).toBeInTheDocument()
-    expect(requestsTo('PUT', '/api/admin/sets/set-3')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sets/set-3')).toHaveLength(0)
   })
 
   it("deletes a set with the × of its row once confirmed, closing its form if it's open, or says why it couldn't", async () => {
@@ -1891,7 +1891,7 @@ describe("A set's form", () => {
   const applicationPicker = () => screen.getByRole('combobox', { name: 'Candidature' })
 
   it("picks the set's application among its performers', which it says right away once it isn't one of theirs anymore", async () => {
-    mockFetch({ ...SET_PAGE, 'PUT /api/admin/sets/set-1': { ok: true, session: SESSION } })
+    mockFetch({ ...SET_PAGE, 'PATCH /api/admin/sets/set-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Aurore et Brume' }))
@@ -1912,13 +1912,13 @@ describe("A set's form", () => {
     expect(screen.getByText(SET_ERROR)).toBeInTheDocument()
     expect(applicationPicker()).toHaveValue('Aurore, reçue le 15 août 2026')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(requestsTo('PUT', '/api/admin/sets/set-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sets/set-1')).toHaveLength(0)
     // Adding her back makes it right again.
     pick('Aurore')
     expect(screen.queryByText(SET_ERROR)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-1')[0])).toMatchObject({ performers: [{ id: 'artist-2' }, { id: 'artist-1' }], application: 'application-3' })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sets/set-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sets/set-1')[0])).toMatchObject({ performers: [{ id: 'artist-2' }, { id: 'artist-1' }], application: 'application-3' })
   })
 
   // As Brume's application is rejected.
@@ -1987,7 +1987,7 @@ describe("A set's form", () => {
   })
 
   it("keeps the set's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
-    mockFetch({ ...PAGE, ...ARTISTS, '/api/admin/applications': { ok: false, error: 'Boom' }, 'PUT /api/admin/sets/set-2': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...ARTISTS, '/api/admin/applications': { ok: false, error: 'Boom' }, 'PATCH /api/admin/sets/set-2': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier : Set de Cyan' }))
@@ -1998,8 +1998,8 @@ describe("A set's form", () => {
     expect(options()).toEqual(['Aucune candidature', 'Reçue le 2 septembre 2026'])
     fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucune candidature' }))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sets/set-2')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/sets/set-2')[0])).toMatchObject({ application: null })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sets/set-2')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sets/set-2')[0])).toMatchObject({ application: null })
   })
 
   it('says when the artists could not be loaded', async () => {

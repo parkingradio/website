@@ -946,7 +946,7 @@ function OpenSet({
       onCancel={onClose}
       onSubmit={async (fields) => {
         const result = set
-          ? await api.PUT('/api/admin/sets/{id}', { params: { path: { id: set.id } }, body: fields })
+          ? await api.PATCH('/api/admin/sets/{id}', { params: { path: { id: set.id } }, body: fields })
           : await api.POST('/api/admin/sessions/{id}/sets', { params: { path: { id: session.id } }, body: fields })
         if (!result.ok) return failure(set ? "Le set n'a pas pu être enregistré" : "Le set n'a pas pu être ajouté", result, session.id)
         onChanged(result.session)

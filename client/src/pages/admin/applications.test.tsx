@@ -884,7 +884,7 @@ describe('An application’s page', () => {
 
   it('changes the application', async () => {
     const changed = { ...APPLICATION, details: 'Corrigé.', updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: changed } })
+    mockFetch({ ...PAGE, 'PATCH /api/admin/applications/application-1': { ok: true, application: changed } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -905,7 +905,7 @@ describe('An application’s page', () => {
 
     await waitFor(() => expect(screen.getByText('Corrigé.')).toBeInTheDocument())
     // Without when it was received, which didn't change, so that the server keeps the time too.
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0])).toEqual({
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/applications/application-1')[0])).toEqual({
       dates: ['2026-12-17', '2027-01-07', '2027-01-14', '2027-02-04'],
       timeSlots: [],
       // By their ids.
@@ -917,16 +917,16 @@ describe('An application’s page', () => {
   })
 
   it('changes when the application was received, to the start of the day picked', async () => {
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
+    mockFetch({ ...PAGE, 'PATCH /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
     fireEvent.change(screen.getByLabelText('Reçue le'), { target: { value: '2026-03-28' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(1))
     // Its midnight in Québec time, like the admin pages show dates, with Québec's offset then.
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-03-28T00:00-04:00')
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-03-28T00:00-04:00')
   })
 
   it("shows and sends the day the application was received in Québec time, whatever the browser's time zone", async () => {
@@ -941,7 +941,7 @@ describe('An application’s page', () => {
       mockFetch({
         ...PAGE,
         '/api/admin/applications/application-1': { ok: true, application },
-        'PUT /api/admin/applications/application-1': { ok: true, application },
+        'PATCH /api/admin/applications/application-1': { ok: true, application },
       })
       render(
         <TokyoRouter initialEntries={['/admin/candidatures/application-1']} useTransitions={false}>
@@ -955,8 +955,8 @@ describe('An application’s page', () => {
       fireEvent.change(screen.getByLabelText('Reçue le'), { target: { value: '2026-01-15' } })
       fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-      await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-      expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-01-15T00:00-05:00')
+      await waitFor(() => expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(1))
+      expect(jsonBody(requestsTo('PATCH', '/api/admin/applications/application-1')[0]).receivedAt).toBe('2026-01-15T00:00-05:00')
     } finally {
       vi.unstubAllEnvs()
     }
@@ -981,11 +981,11 @@ describe('An application’s page', () => {
     expect(screen.getByText('Choisissez le jour où la candidature a été reçue.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(received).toHaveFocus())
-    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
   it('sends the performance types in the order of the list, whatever order they were checked in', async () => {
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
+    mockFetch({ ...PAGE, 'PATCH /api/admin/applications/application-1': { ok: true, application: APPLICATION } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -993,8 +993,8 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByLabelText('Vinyl'))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(1))
-    expect(jsonBody(requestsTo('PUT', '/api/admin/applications/application-1')[0]).performanceTypes).toEqual(['dj', 'vinyl', 'full-band'])
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/applications/application-1')[0]).performanceTypes).toEqual(['dj', 'vinyl', 'full-band'])
   })
 
   it('says what is wrong with a time slot once the time slots are left, and sends nothing', async () => {
@@ -1017,7 +1017,7 @@ describe('An application’s page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     await waitFor(() => expect(start).toHaveFocus())
-    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
   it('needs at least one date', async () => {
@@ -1030,7 +1030,7 @@ describe('An application’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     expect(screen.getByText('Choisissez au moins une date.')).toBeInTheDocument()
-    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
   it('counts a date that is left empty as wrong, rather than dropping it', async () => {
@@ -1043,11 +1043,11 @@ describe('An application’s page', () => {
 
     expect(screen.getByText('Une des dates est invalide.')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText('Date 5')).toHaveFocus())
-    expect(requestsTo('PUT', '/api/admin/applications/application-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 
   it('shows why the server refused the application, and keeps the form', async () => {
-    mockFetch({ ...PAGE, 'PUT /api/admin/applications/application-1': { ok: false, error: 'No such application' } })
+    mockFetch({ ...PAGE, 'PATCH /api/admin/applications/application-1': { ok: false, error: 'No such application' } })
     renderAt('/admin/candidatures/application-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1369,7 +1369,7 @@ describe('Going through the list from an application’s page', () => {
   })
 
   it('keeps précédente and suivante while the application is changed in its form, and once it is saved', async () => {
-    mockFetch({ ...pages(), 'PUT /api/admin/applications/application-5': { ok: true, application: { ...LATER, details: 'Autre chose.' } } })
+    mockFetch({ ...pages(), 'PATCH /api/admin/applications/application-5': { ok: true, application: { ...LATER, details: 'Autre chose.' } } })
     renderAt('/admin/candidatures/application-5?status=new')
 
     await position()

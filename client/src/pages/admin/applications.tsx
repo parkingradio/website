@@ -567,7 +567,7 @@ function LoadedApplication({ loaded, name, owner, stays }: { loaded: Application
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
           onSubmit={async (fields) => {
-            const result = await api.PUT('/api/admin/applications/{id}', { params, body: fields })
+            const result = await api.PATCH('/api/admin/applications/{id}', { params, body: fields })
             if (!result.ok) return `La candidature n'a pas pu être enregistrée : ${result.error}`
             setApplication(result.application)
             setEditing(false)

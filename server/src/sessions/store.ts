@@ -163,9 +163,8 @@ export type SessionsStore = {
   // done, as whoever adds the set, when they do (see `followSets`). Throws a NoSuchReference, a BrokenFields or a
   // Conflict.
   addSet(sessionId: string, set: NewSet): Promise<StoredSession | null>
-  // Changes the set's fields that `changes` has, all of them when they're replaced, and its performers when it has them,
-  // but not its session (see `moveSetToSession`), its position or its status. Throws a BrokenFields, a NoSuchReference or
-  // a Conflict.
+  // Changes the set's fields that `changes` has, and its performers when it has them, but not its session (see
+  // `moveSetToSession`), its position or its status. Throws a BrokenFields, a NoSuchReference or a Conflict.
   updateSet(id: string, changes: Partial<SetChanges> & { updatedBy: string; updatedAt: Date }): Promise<StoredSession | null>
   // Makes the set's session follow its sets, as the same admin, at the same time (see `followSets`). Throws a Conflict.
   setSetStatus(id: string, change: StatusChange): Promise<StoredSession | null>

@@ -256,7 +256,6 @@ describe('sessions routes', () => {
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set() }),
-      app.inject({ method: 'PUT', url: '/api/admin/sets/set-1', payload: set() }),
       app.inject({ method: 'PATCH', url: '/api/admin/sets/set-1', payload: set() }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-1/status', payload: { status: 'done' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sets/set-1' }),
@@ -282,7 +281,6 @@ describe('sessions routes', () => {
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
       app.inject({ method: 'POST', url: '/api/admin/sessions/session-1/sets', payload: set(), ...options }),
-      app.inject({ method: 'PUT', url: '/api/admin/sets/set-2', payload: set(), ...options }),
       app.inject({ method: 'PATCH', url: '/api/admin/sets/set-2', payload: { genres: [] }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sets/set-2/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sets/set-2', ...options }),
@@ -303,7 +301,7 @@ describe('sessions routes', () => {
       await sendSession(app, 'POST', '/api/admin/sessions', { ...session(), title: 'X' }),
       await sendSession(app, 'PUT', '/api/admin/sessions/session-1', { ...session(), title: 'X' }),
       await send(app, 'POST', '/api/admin/sessions/session-1/sets', { ...set(), title: 'X' }),
-      await send(app, 'PUT', '/api/admin/sets/set-2', { ...set(), title: 'X' }),
+      await send(app, 'PATCH', '/api/admin/sets/set-2', { ...set(), title: 'X' }),
     ]
     for (const response of responses) {
       expect(response.statusCode).toBe(400)
@@ -321,7 +319,7 @@ describe('sessions routes', () => {
     }
     expect(store.update).not.toHaveBeenCalled()
     // But not the fields of a set's performers, so that they can be sent back as the set returns them.
-    expect((await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-1', name: 'Ana' }] }))).statusCode).toBe(200)
+    expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { performers: [{ id: 'artist-1', name: 'Ana' }] })).statusCode).toBe(200)
   })
 
   it('refuses the NUL character in whatever sessions and sets keep or look up, before saving or asking SoundCloud', async () => {
@@ -351,7 +349,7 @@ describe('sessions routes', () => {
     ]) {
       for (const [method, url] of [
         ['POST', '/api/admin/sessions/session-1/sets'],
-        ['PUT', '/api/admin/sets/set-2'],
+        ['PATCH', '/api/admin/sets/set-2'],
       ] as const) {
         const response = await send(app, method, url, set(changes))
         expect(response.statusCode, JSON.stringify(changes)).toBe(400)
@@ -621,7 +619,7 @@ describe('sessions routes', () => {
       expect(store.updateSet).toHaveBeenLastCalledWith('set-2', expect.objectContaining({ applicationId: null }))
     })
 
-    it('needs it, or null, to add a session or a set, or replace their fields', async () => {
+    it('needs it, or null, to add a session or a set, or replace a session\'s fields, and refuses anything else in a change', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
       const error = { ok: false, error: "The application must be an application's id, or null" }
@@ -631,7 +629,6 @@ describe('sessions routes', () => {
         await sendSession(app, 'POST', '/api/admin/sessions', withoutApplication),
         await sendSession(app, 'PUT', '/api/admin/sessions/session-1', withoutApplication),
         await send(app, 'POST', '/api/admin/sessions/session-1/sets', setWithoutApplication),
-        await send(app, 'PUT', '/api/admin/sets/set-2', setWithoutApplication),
         await send(app, 'PATCH', '/api/admin/sets/set-2', { application: 42 }),
       ]) {
         expect(response.statusCode).toBe(400)
@@ -1557,12 +1554,12 @@ describe('sessions routes', () => {
     })
   })
 
-  describe('PUT /api/admin/sets/:id', () => {
-    it('replaces the set, but not its status, says who changed it, and returns its session', async () => {
+  describe('PATCH /api/admin/sets/:id', () => {
+    it('changes every field it is sent, as the set form sends them, but not the status, and says who changed it', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
       await send(app, 'PUT', '/api/admin/sets/set-2/status', { status: 'done' })
-      const response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-2' }], durationMinutes: 90, performanceTypes: [], genres: [] }))
+      const response = await send(app, 'PATCH', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-2' }], durationMinutes: 90, performanceTypes: [], genres: [] }))
 
       expect(response.statusCode).toBe(200)
       expect(response.json().session.id).toBe('session-1')
@@ -1577,65 +1574,6 @@ describe('sessions routes', () => {
       })
     })
 
-    it("doesn't resolve the set's own track again, so that it can be changed without SoundCloud", async () => {
-      const app = await buildApp()
-      await sessionWithSet(app)
-      resolveTrack.mockClear()
-      resolveTrack.mockRejectedValue(new NoSoundCloudCredentials())
-
-      // The link it returned, or one that reduces to it.
-      for (const soundcloudTrack of ['https://soundcloud.com/parkingdotradio/3tons', 'https://m.soundcloud.com/parkingdotradio/3tons?si=x']) {
-        const response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ soundcloudTrack }))
-        expect(response.statusCode).toBe(200)
-        expect(response.json().session.sets[0].soundcloudTrack).toEqual({ id: '42', url: 'https://soundcloud.com/parkingdotradio/3tons' })
-      }
-      expect(resolveTrack).not.toHaveBeenCalled()
-
-      // Another one is.
-      const response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ soundcloudTrack: 'https://soundcloud.com/parkingdotradio/other' }))
-      expect(response.statusCode).toBe(409)
-      expect(rows[0].sets[0].soundcloudTrackUrl).toBe('https://soundcloud.com/parkingdotradio/3tons')
-    })
-
-    it('resolves a new track, and removes the track', async () => {
-      const app = await buildApp()
-      await sessionWithSet(app, { soundcloudTrack: null })
-      resolveTrack.mockResolvedValueOnce('43')
-      let response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ soundcloudTrack: 'https://soundcloud.com/parkingdotradio/b2b/s-AbC' }))
-      expect(response.json().session.sets[0].soundcloudTrack).toEqual({ id: '43', url: 'https://soundcloud.com/parkingdotradio/b2b/s-AbC' })
-      response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ soundcloudTrack: null }))
-      expect(response.json().session.sets[0].soundcloudTrack).toBeNull()
-    })
-
-    it('responds 404 for a set that does not exist, before asking SoundCloud', async () => {
-      const app = await buildApp()
-      const response = await send(app, 'PUT', '/api/admin/sets/set-9', set())
-      expect(response.statusCode).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error: 'No such set' })
-      expect(resolveTrack).not.toHaveBeenCalled()
-    })
-
-    it('fails like POST', async () => {
-      const app = await buildApp()
-      await sessionWithSet(app)
-      let response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [] }))
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'A set has at least one performer' })
-      response = await send(app, 'PUT', '/api/admin/sets/set-2', set({ performers: [{ id: 'artist-9' }] }))
-      expect(response.statusCode).toBe(400)
-      vi.mocked(store.updateSet).mockRejectedValueOnce(new Conflict("This YouTube video is another set's", rows[0], rows[0].sets[0]))
-      response = await send(app, 'PUT', '/api/admin/sets/set-2', set())
-      expect(response.statusCode).toBe(409)
-      expect(response.json()).toEqual({
-        ok: false,
-        error: "This YouTube video is another set's",
-        session: expect.objectContaining({ id: 'session-1' }),
-        set: expect.objectContaining({ id: 'set-2', durationMinutes: 60 }),
-      })
-    })
-  })
-
-  describe('PATCH /api/admin/sets/:id', () => {
     it('changes only the fields it is sent, without resolving the track it is not sent, and returns its session', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
@@ -1655,6 +1593,21 @@ describe('sessions routes', () => {
       expect(resolveTrack).not.toHaveBeenCalled()
     })
 
+    it("doesn't resolve the set's own track again when it is sent, so that it can be changed without SoundCloud", async () => {
+      const app = await buildApp()
+      await sessionWithSet(app)
+      resolveTrack.mockClear()
+      resolveTrack.mockRejectedValue(new NoSoundCloudCredentials())
+
+      // The link it returned, or one that reduces to it.
+      for (const soundcloudTrack of ['https://soundcloud.com/parkingdotradio/3tons', 'https://m.soundcloud.com/parkingdotradio/3tons?si=x']) {
+        const response = await send(app, 'PATCH', '/api/admin/sets/set-2', { soundcloudTrack, genres: [] })
+        expect(response.statusCode).toBe(200)
+        expect(response.json().session.sets[0].soundcloudTrack).toEqual({ id: '42', url: 'https://soundcloud.com/parkingdotradio/3tons' })
+      }
+      expect(resolveTrack).not.toHaveBeenCalled()
+    })
+
     it('resolves the track when it is sent, and changes the performers and the video when they are', async () => {
       const app = await buildApp()
       await sessionWithSet(app, { soundcloudTrack: null })
@@ -1671,6 +1624,8 @@ describe('sessions routes', () => {
       })
       resolveTrack.mockRejectedValueOnce(new NoSoundCloudCredentials())
       expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { soundcloudTrack: 'https://soundcloud.com/parkingdotradio/c' })).statusCode).toBe(409)
+      expect(rows[0].sets[0].soundcloudTrackUrl).toBe('https://soundcloud.com/parkingdotradio/b2b')
+      expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { soundcloudTrack: null })).json().session.sets[0].soundcloudTrack).toBeNull()
     })
 
     it('explains what is wrong, or responds 404 before asking SoundCloud', async () => {
@@ -1691,6 +1646,15 @@ describe('sessions routes', () => {
       expect((await send(app, 'PATCH', '/api/admin/sets/set-2', { performers: [{ id: 'artist-3' }] })).json()).toEqual({
         ok: false,
         error: "A set's application is one of its performers'",
+      })
+      vi.mocked(store.updateSet).mockRejectedValueOnce(new Conflict("This YouTube video is another set's", rows[0], rows[0].sets[0]))
+      const conflict = await send(app, 'PATCH', '/api/admin/sets/set-2', { youtubeVideo: 'dQw4w9WgXcQ' })
+      expect(conflict.statusCode).toBe(409)
+      expect(conflict.json()).toEqual({
+        ok: false,
+        error: "This YouTube video is another set's",
+        session: expect.objectContaining({ id: 'session-1' }),
+        set: expect.objectContaining({ id: 'set-2' }),
       })
       const missing = await send(app, 'PATCH', '/api/admin/sets/set-9', { soundcloudTrack: 'https://soundcloud.com/parkingdotradio/x' })
       expect(missing.statusCode).toBe(404)

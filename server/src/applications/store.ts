@@ -26,9 +26,8 @@ export type StoredApplication = typeof applications.$inferSelect
 export class NoSuchArtist extends Error {}
 export class NoSuchCollective extends Error {}
 
-// What changing an application saves: all of its fields, when they're replaced, or some of them, and when it was
-// received, unless that's left out.
-export type ApplicationChange = Partial<ApplicationFields> & { receivedAt?: Date }
+// What changing an application saves: the fields that were sent, and when it was received, if that was sent.
+type ApplicationChange = Partial<ApplicationFields> & { receivedAt?: Date }
 
 // Thrown when rejecting an application that has a set or a session that's planned or done.
 export class RejectedWhileBooked extends Error {}

@@ -80,9 +80,9 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints of photos and flyers, which aren't JSON.
-- The `PUT` endpoints that replace an artist, a collective, an application, a session or a set: their `PATCH` endpoints
-  are the tools that change them, e.g. `update_artist`, which only send what they change, so that they can't erase what
-  they leave out, e.g. the email and the phone they never see.
+- The `PUT` endpoints that replace an artist, a collective or a session: their `PATCH` endpoints are the tools that
+  change them, e.g. `update_artist`, which only send what they change, so that they can't erase what they leave out,
+  e.g. the email and the phone they never see.
 
 There's also [`read_documentation`](#read_documentation).
 

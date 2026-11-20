@@ -515,18 +515,15 @@ const OPERATIONS = {
     },
   } satisfies Operation<{ session: number; fields: SetArgs }>,
 
-  updateSet: {
-    weight: 5,
-    args: fc.record({ set: fc.nat(), fields: SetFields }),
-    run: (context, { set, fields }) => send(context, 'PUT', `/api/admin/sets/${pick(context.ids.sets, set)}`, setBody(context, fields)),
-    conflicts: setConflicts<{ set: number; fields: SetArgs }>(({ set }, context) => pick(context.ids.sets, set)),
-  } satisfies Operation<{ set: number; fields: SetArgs }>,
-
-  // Changes some of the set's fields: its performers and its application are checked as they would then be, and its track
-  // is only resolved when it's sent.
+  // Changes some of the set's fields, or every one of them, as the admin pages' form does: its performers and its
+  // application are checked as they would then be, and its track is only resolved when it's sent.
   patchSet: {
-    weight: 5,
-    args: fc.record({ set: fc.nat(), fields: SetFields, sent: fc.subarray(SET_FIELD_NAMES, { minLength: 1 }) }),
+    weight: 10,
+    args: fc.record({
+      set: fc.nat(),
+      fields: SetFields,
+      sent: fc.oneof(fc.constant(SET_FIELD_NAMES), fc.subarray(SET_FIELD_NAMES, { minLength: 1 })),
+    }),
     run: (context, { set, fields, sent }) => send(context, 'PATCH', `/api/admin/sets/${pick(context.ids.sets, set)}`, only(setBody(context, fields), sent)),
     conflicts: setConflicts<{ set: number; fields: SetArgs; sent: string[] }>(({ set }, context) => pick(context.ids.sets, set)),
   } satisfies Operation<{ set: number; fields: SetArgs; sent: string[] }>,

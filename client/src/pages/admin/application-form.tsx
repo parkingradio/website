@@ -25,8 +25,9 @@ import { FieldError, FormActions, Labeled, PerformanceTypesField } from './field
 // it (see `checkApplication`), and says what's wrong once it's been left, or once the form is sent. The server's error is
 // shown if it refuses the application anyway.
 
-// What changing an application sends: its fields, and when it was received, if that changed.
-type ApplicationChanges = Body<'put', '/api/admin/applications/{id}'>
+// What the form sends, besides who a new application is for: its fields, and when it was received, if that was picked or
+// changed.
+type ApplicationChanges = Omit<Body<'post', '/api/admin/applications'>, 'artistId' | 'collectiveId'>
 
 const EMPTY: ApplicationFields = { dates: [], timeSlots: [], performanceTypes: [], otherPerformanceType: '', details: '' }
 

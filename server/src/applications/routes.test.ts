@@ -97,11 +97,6 @@ function application(changes: object = {}) {
   }
 }
 
-// An application's fields, as changing them sends them, without its artist.
-function fields(changes: object = {}) {
-  return Object.fromEntries(Object.entries(application(changes)).filter(([field]) => field !== 'artistId'))
-}
-
 // If `logs` is given, every line the app logs is added to it.
 async function buildApp(logs?: string[]) {
   const app = Fastify(logs ? { logger: { stream: { write: (line: string) => logs.push(line) } } } : {})
@@ -192,7 +187,6 @@ describe('applications routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/applications' }),
       app.inject({ method: 'GET', url: '/api/admin/applications/application-1' }),
       app.inject({ method: 'POST', url: '/api/admin/applications', payload: application() }),
-      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: fields() }),
       app.inject({ method: 'PATCH', url: '/api/admin/applications/application-1', payload: { details: '' } }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/decision', payload: { decision: 'accepted' } }),
       app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1' }),
@@ -211,7 +205,7 @@ describe('applications routes', () => {
     const json = { 'content-type': 'application/json' }
     for (const [method, url] of [
       ['POST', '/api/admin/applications'],
-      ['PUT', '/api/admin/applications/application-1'],
+      ['PATCH', '/api/admin/applications/application-1'],
       ['PUT', '/api/admin/applications/application-1/decision'],
       ['PUT', '/api/admin/applications/recipients'],
     ] as const) {
@@ -230,7 +224,7 @@ describe('applications routes', () => {
     const options = { headers: { 'sec-fetch-site': 'cross-site' }, cookies: await sessionCookies() }
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/applications', payload: application(), ...options }),
-      app.inject({ method: 'PUT', url: '/api/admin/applications/application-1', payload: application(), ...options }),
+      app.inject({ method: 'PATCH', url: '/api/admin/applications/application-1', payload: { details: '' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/application-1/decision', payload: { decision: 'accepted' }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/applications/application-1', ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/applications/recipients', payload: { recipients: [] }, ...options }),
@@ -535,91 +529,6 @@ describe('applications routes', () => {
     })
   })
 
-  describe('PUT /api/admin/applications/:id', () => {
-    it('replaces the fields, keeps the artist and the status, and says who changed it', async () => {
-      const app = await buildApp()
-      await create(app)
-      await send(app, 'PUT', '/api/admin/applications/application-1/decision', { decision: 'accepted' })
-      const response = await send(
-        app,
-        'PUT',
-        '/api/admin/applications/application-1',
-        fields({ timeSlots: [], performanceTypes: ['live-performance'], otherPerformanceType: 'Visuels', details: '' }),
-      )
-
-      expect(response.statusCode).toBe(200)
-      expect(response.json().application).toMatchObject({
-        artistId: 'artist-1',
-        collectiveId: null,
-        timeSlots: [],
-        performanceTypes: ['live-performance'],
-        otherPerformanceType: 'Visuels',
-        details: '',
-        status: 'accepted',
-        updatedBy: 'admin@example.com',
-      })
-      expect(response.json().application.updatedAt).toEqual(expect.any(String))
-    })
-
-    it('changes when the application was received, or keeps it when that is left out', async () => {
-      const app = await buildApp()
-      await create(app, { receivedAt: '2026-03-28T10:03-04:00' })
-      const kept = await send(app, 'PUT', '/api/admin/applications/application-1', fields({ details: 'Corrigé.' }))
-      expect(kept.json().application).toMatchObject({ receivedAt: '2026-03-28T10:03:00-04:00', details: 'Corrigé.' })
-
-      const changed = await send(app, 'PUT', '/api/admin/applications/application-1', fields({ receivedAt: '2026-03-27T00:00-04:00' }))
-      expect(changed.json().application.receivedAt).toBe('2026-03-27T00:00:00-04:00')
-    })
-
-    it('explains what is wrong with an invalid application, without changing it', async () => {
-      const app = await buildApp()
-      await create(app)
-      for (const [changes, error] of [
-        [{ dates: [] }, 'Choisissez au moins une date.'],
-        [{ receivedAt: '2099-01-01T00:00:00-05:00' }, 'La date de réception ne peut pas être dans le futur.'],
-        [{ receivedAt: '2026-03-27T00:00-05:00' }, BAD_RECEIVED_AT],
-      ] as const) {
-        const response = await send(app, 'PUT', '/api/admin/applications/application-1', fields(changes))
-        expect(response.statusCode).toBe(400)
-        expect(response.json()).toEqual({ ok: false, error })
-      }
-      expect(rows[0].updatedBy).toBeNull()
-    })
-
-    it('explains, in French, what is wrong with an application that is malformed, without changing it', async () => {
-      const app = await buildApp()
-      await create(app)
-      const cookies = await sessionCookies()
-      const json = { 'content-type': 'application/json' }
-      const url = '/api/admin/applications/application-1'
-      const malformed = [
-        { response: await app.inject({ method: 'PUT', url, payload: 'null', headers: json, cookies }), error: 'Choisissez au moins une date.' },
-        { response: await app.inject({ method: 'PUT', url, payload: '[]', headers: json, cookies }), error: 'Choisissez au moins une date.' },
-        { response: await send(app, 'PUT', url, fields({ performanceTypes: undefined })), error: 'Les prestations sont invalides.' },
-        { response: await send(app, 'PUT', url, fields({ details: 42 })), error: 'Le champ « Questions ou détails » est invalide.' },
-      ]
-      for (const { response, error } of malformed) {
-        expect(response.statusCode).toBe(400)
-        expect(response.json()).toEqual({ ok: false, error })
-      }
-      expect(rows[0].updatedBy).toBeNull()
-    })
-
-    it('responds 404 for an application that does not exist', async () => {
-      const app = await buildApp()
-      expect((await send(app, 'PUT', '/api/admin/applications/nothing', fields())).statusCode).toBe(404)
-    })
-
-    it("refuses the fields it doesn't take, naming them, e.g. the artist and the status, which it doesn't change", async () => {
-      const app = await buildApp()
-      await create(app)
-      const response = await send(app, 'PUT', '/api/admin/applications/application-1', { ...application({ artistId: 'artist-2' }), status: 'rejected' })
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Unknown fields: `artistId`, `status`' })
-      expect(rows[0].updatedBy).toBeNull()
-    })
-  })
-
   describe('PATCH /api/admin/applications/:id', () => {
     it('changes only the fields it is sent, keeps the others, the artist and the status, and says who changed it', async () => {
       const app = await buildApp()
@@ -644,7 +553,7 @@ describe('applications routes', () => {
       expect(received.json().application).toMatchObject({ receivedAt: '2026-03-27T00:00:00-04:00', details: 'Corrigé.' })
     })
 
-    it('explains what is wrong, with the same rules as PUT, without changing it', async () => {
+    it('explains what is wrong, with the same rules as POST, without changing it', async () => {
       const app = await buildApp()
       await create(app)
       const cookies = await sessionCookies()
@@ -653,6 +562,8 @@ describe('applications routes', () => {
         { response: await send(app, 'PATCH', url, { dates: [] }), error: 'Choisissez au moins une date.' },
         { response: await send(app, 'PATCH', url, { receivedAt: null }), error: BAD_RECEIVED_AT },
         { response: await send(app, 'PATCH', url, { details: 'x', status: 'done' }), error: 'Unknown field: `status`' },
+        // The artist doesn't change.
+        { response: await send(app, 'PATCH', url, application()), error: 'Unknown field: `artistId`' },
         { response: await send(app, 'PATCH', url, {}), error: 'There must be at least one field to change' },
         {
           response: await app.inject({ method: 'PATCH', url, payload: '[]', headers: { 'content-type': 'application/json' }, cookies }),
