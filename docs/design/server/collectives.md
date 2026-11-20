@@ -75,7 +75,9 @@ sent, replaced and removed the same way, with [`POST /api/admin/collectives`](#p
 [`PUT /api/admin/collectives/:id/photo`](#put-apiadmincollectivesidphoto-admin) and
 [`DELETE /api/admin/collectives/:id/photo`](#delete-apiadmincollectivesidphoto-admin), served at the same sizes, and
 deleted the same way, with its sizes, once no collective has it anymore: removing or replacing a collective's photo, or
-deleting the collective, never removes it from another collective that has the same.
+deleting the collective, never removes it from another collective that has the same. The public gets its sizes while
+the collective is public, and can keep them for good, like an artist's, even once it's private again, or its photo is
+replaced or removed.
 
 ## Public profiles
 
@@ -86,9 +88,10 @@ it has another takeover that's an event. Every other collective is private: ther
 the public endpoints fail with 404 for a private collective, as for one that doesn't exist.
 
 A collective's public profile has its `id`, `name`, `country`, `city`, `description` and `links`, as the admin endpoints
-give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where its photo is,
-`/api/collectives/<id>/photo`, which takes `width` (see [Photos](artists.md#photos)), or null when it has none. Never
-its contact's email or phone, or who added or changed it.
+give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where the public gets the
+sizes of its photo, by width, like an artist's (see [Public profiles, in Artists](artists.md#public-profiles)), e.g.
+`/api/collectives/photos/<sha256>/w320.webp`, or null when it has none. Never its contact's email or phone, or who added
+or changed it.
 
 ## `GET /api/admin/collectives` (admin)
 
@@ -166,9 +169,9 @@ null, like the 409s of sessions (see [Rules](sessions.md#rules)). Its takeovers 
 
 Fails with 404 when there's no such collective, or when it's private.
 
-## `GET /api/collectives/:id/photo`
+## `GET /api/collectives/photos/:image/:size`
 
-Responds with one of the sizes of a public collective's photo, like
-[`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto), with the same `width` and caching, so that it can
-still be shown for up to 5 minutes once the collective is private, or a 304. Fails like it, with 404 when there's no
-such collective, when it's private, when it has no photo, or when its photo is missing.
+Responds with a size of a photo that a public collective has, at the URL that its public profile gives, like
+[`GET /api/artists/photos/:image/:size`](artists.md#get-apiartistsphotosimagesize), with the same caching, and fails like
+it, with 404 when no public collective has that photo, when `:size` isn't the name of one of its sizes, or when that size
+is missing. It's only served as a collective's photo: not because an artist or an event has the same image.

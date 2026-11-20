@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
@@ -11,6 +11,7 @@ import { artistsStore } from '../artists/store.js'
 import { JPEG, memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
+import { artists, sessions } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { DEFAULT_DESCRIPTIONS } from '../sessions/descriptions.js'
@@ -81,6 +82,9 @@ async function adminForm(url: string, parts: Parameters<typeof multipartBody>[0]
 function get(url: string, headers: Record<string, string> = {}) {
   return app.inject({ method: 'GET', url, headers })
 }
+
+// The URLs of the sizes of the photo or flyer at `url`, e.g. `/api/events/flyers/photo-1`, as the public gets them.
+const sizes = (url: string) => ({ 320: `${url}/w320.webp`, 1280: `${url}/w1280.webp` })
 
 const artistStatus = async (id: string) => (await get(`/api/artists/${id}`)).statusCode
 const collectiveStatus = async (id: string) => (await get(`/api/collectives/${id}`)).statusCode
@@ -174,7 +178,7 @@ describe('GET /api/events', () => {
           end: '2990-01-10T23:00:00-05:00',
           cancelled: false,
           description: 'Une soirée',
-          flyer: `/api/events/${takeover.id}/flyer`,
+          flyer: sizes('/api/events/flyers/photo-1'),
           raEvent: 'https://ra.co/events/6683745',
           takeover: { id: ondes, name: 'Les Ondes' },
           sets: [
@@ -377,7 +381,7 @@ describe('GET /api/artists/:id', () => {
         genres: ['techno', 'house'],
         bio: 'Une bio',
         links: { soundcloud: 'someone' },
-        photo: `/api/artists/${ana}/photo`,
+        photo: sizes('/api/artists/photos/photo-1'),
       },
     })
     expect((await get(`/api/artists/${brume}`)).json().artist.photo).toBeNull()
@@ -451,7 +455,7 @@ describe('GET /api/collectives/:id', () => {
           { id: brume, name: 'Brume' },
           { id: ana, name: 'Ana' },
         ],
-        photo: `/api/collectives/${ondes}/photo`,
+        photo: sizes('/api/collectives/photos/photo-1'),
       },
     })
   })
@@ -491,84 +495,121 @@ describe('GET /api/collectives/:id', () => {
 })
 
 describe('the photos and flyers of what is public', () => {
-  // The ETag that the admin endpoint gives the image at `url`.
-  async function etagOf(url: string): Promise<string> {
-    const response = await app.inject({ method: 'GET', url, cookies: await sessionCookies() })
-    expect(response.statusCode).toBe(200)
-    return response.headers.etag as string
+  // The URLs of the sizes of the photo of the public artist or collective at `url`, e.g. `/api/artists/<id>`.
+  async function photoOf(url: string): Promise<Record<string, string>> {
+    const body = (await get(url)).json()
+    return (body.artist ?? body.collective).photo
   }
 
-  it('are served to anyone as their sizes, never as they were sent, which browsers can show again for 5 minutes', async () => {
+  // The URLs of the sizes of the flyers of the upcoming events, in their order.
+  async function flyers(): Promise<Record<string, string>[]> {
+    return (await get('/api/events')).json().upcoming.map((event: { flyer: Record<string, string> }) => event.flyer)
+  }
+
+  // Expects the public to get a 404, which isn't kept, at each of `urls`.
+  async function expectNotFound(urls: string[], error: string) {
+    for (const url of urls) {
+      const response = await get(url)
+      expect(response.statusCode, url).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error })
+      expect(response.headers['cache-control'], url).toBe('no-store')
+    }
+  }
+
+  // Gives the artist with `id` the photo of the one with `from`, as if the same photo had been sent for both.
+  async function sharePhoto(id: string, from: string) {
+    const [{ photoKey, photoType }] = await database.db.select().from(artists).where(eq(artists.id, from))
+    await database.db.update(artists).set({ photoKey, photoType }).where(eq(artists.id, id))
+  }
+
+  // Gives the session with `id` the flyer of the one with `from`, as if the same flyer had been sent for both.
+  async function shareFlyer(id: string, from: string) {
+    const [{ flyerKey, flyerType }] = await database.db.select().from(sessions).where(eq(sessions.id, from))
+    await database.db.update(sessions).set({ flyerKey, flyerType }).where(eq(sessions.id, id))
+  }
+
+  it('are served to anyone as their sizes, never as they were sent, at URLs named after them, which anyone can keep for good', async () => {
+    const ana = await createArtist('Ana', JPEG)
+    const ondes = await createCollective('Les Ondes', [ana], JPEG)
+    await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG })
+    // Stored in that order.
+    const [anaPhoto, ondesPhoto, flyer] = photos.photos()
+    const [eventFlyer] = await flyers()
+    expect(eventFlyer).toEqual(sizes('/api/events/flyers/photo-3'))
+    for (const [urls, key] of [
+      [await photoOf(`/api/artists/${ana}`), anaPhoto],
+      [await photoOf(`/api/collectives/${ondes}`), ondesPhoto],
+      [eventFlyer, flyer],
+    ] as const) {
+      for (const width of [320, 1280] as const) {
+        const response = await get(urls[width])
+        expect(response.statusCode, urls[width]).toBe(200)
+        expect(response.rawPayload).toEqual(photos.size(key, width))
+        expect(response.headers).toMatchObject({
+          'content-type': 'image/webp',
+          'x-content-type-options': 'nosniff',
+          'cache-control': 'public, max-age=31536000, immutable',
+        })
+        expect(response.headers.etag).toBeUndefined()
+      }
+    }
+    expect(photos.read).not.toHaveBeenCalled()
+  })
+
+  it("aren't served once what they're of is private, or once they're replaced", async () => {
     const ana = await createArtist('Ana', JPEG)
     const ondes = await createCollective('Les Ondes', [ana], JPEG)
     const takeover = await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG })
-    // Stored in that order.
-    const [anaPhoto, ondesPhoto, flyer] = photos.photos()
-    for (const [url, adminUrl, key] of [
-      [`/api/artists/${ana}/photo`, `/api/admin/artists/${ana}/photo`, anaPhoto],
-      [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`, ondesPhoto],
-      [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`, flyer],
-    ]) {
-      const headers = { 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' }
-      const response = await get(url)
-      expect(response.statusCode, url).toBe(200)
-      expect(response.rawPayload).toEqual(photos.size(key, 1280))
-      expect(response.headers).toMatchObject(headers)
-      // The admin endpoint gives the same size, with the same ETag, but as admins' are.
-      const etag = await etagOf(`${adminUrl}?width=1280`)
-      expect(response.headers.etag).toBe(etag)
-      const again = await get(url, { 'if-none-match': etag })
-      expect(again.statusCode, url).toBe(304)
-      expect(again.headers).toMatchObject({ etag, 'cache-control': 'private, max-age=300' })
-
-      const thumbnail = await get(`${url}?width=320`)
-      expect(thumbnail.statusCode, url).toBe(200)
-      expect(thumbnail.rawPayload).toEqual(photos.size(key, 320))
-      expect(thumbnail.headers).toMatchObject(headers)
-      expect(thumbnail.headers.etag).not.toBe(etag)
-
-      // What browsers kept before the public endpoints served sizes: the photo as it was sent, whose ETag isn't a size's.
-      const sent = await get(url, { 'if-none-match': await etagOf(adminUrl) })
-      expect(sent.statusCode, url).toBe(200)
-      expect(sent.rawPayload).toEqual(photos.size(key, 1280))
-
-      expect((await get(`${url}?width=640`)).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
-    }
+    const [photo, collectivePhoto, [flyer]] = [await photoOf(`/api/artists/${ana}`), await photoOf(`/api/collectives/${ondes}`), await flyers()]
+    // The flyer is replaced: its URLs change, and the old ones aren't served anymore.
+    const replaced = await app.inject({ method: 'PUT', url: `/api/admin/sessions/${takeover.id}/flyer`, ...multipartBody({ flyer: JPEG }), cookies: await sessionCookies() })
+    expect(replaced.statusCode).toBe(200)
+    const [replacement] = await flyers()
+    expect(replacement).not.toEqual(flyer)
+    expect((await get(replacement[320])).statusCode).toBe(200)
+    await expectNotFound(Object.values(flyer), 'No such flyer')
+    // Un-announced, nothing is public anymore.
+    await announce(takeover.id, false)
+    await expectNotFound([...Object.values(photo), ...Object.values(collectivePhoto)], 'No such photo')
+    await expectNotFound(Object.values(replacement), 'No such flyer')
   })
 
-  it("aren't served once what they're of is private, even to a browser that already has them", async () => {
+  it('are served while something public of their kind has them, whatever else has them too', async () => {
     const ana = await createArtist('Ana', JPEG)
-    const ondes = await createCollective('Les Ondes', [ana], JPEG)
-    const takeover = await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG, announced: false })
-    for (const [url, adminUrl, error] of [
-      [`/api/artists/${ana}/photo`, `/api/admin/artists/${ana}/photo`, 'No such artist'],
-      [`/api/collectives/${ondes}/photo`, `/api/admin/collectives/${ondes}/photo`, 'No such collective'],
-      [`/api/events/${takeover.id}/flyer`, `/api/admin/sessions/${takeover.id}/flyer`, 'No such event'],
-    ]) {
-      const response = await get(url, { 'if-none-match': await etagOf(`${adminUrl}?width=1280`) })
-      expect(response.statusCode, url).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error })
-    }
+    const brume = await createArtist('Brume')
+    const first = await createSession(FUTURE(1), [set([ana])], { flyer: JPEG })
+    const second = await createSession(FUTURE(2), [], { flyer: JPEG })
+    // Brume, who's private, has Ana's photo, and the second session the first's flyer.
+    await sharePhoto(brume, ana)
+    await shareFlyer(second.id, first.id)
+    const photo = await photoOf(`/api/artists/${ana}`)
+    const [flyer, same] = await flyers()
+    // Events with the same flyer give the same URLs.
+    expect(same).toEqual(flyer)
+
+    // Ana's photo is served, though Brume, who's private, has it too, but only as an artist's photo.
+    expect((await get(photo[320])).statusCode).toBe(200)
+    await expectNotFound([photo[320].replace('/api/artists/', '/api/collectives/')], 'No such photo')
+    await expectNotFound([photo[320].replace('/api/artists/photos/', '/api/events/flyers/')], 'No such flyer')
+    // The flyer is served while an event has it.
+    await announce(second.id, false)
+    expect((await get(flyer[320])).statusCode).toBe(200)
+    // Once neither session is announced, neither Ana nor Brume is public, and neither the photo nor the flyer is served.
+    await announce(first.id, false)
+    await expectNotFound(Object.values(photo), 'No such photo')
+    await expectNotFound(Object.values(flyer), 'No such flyer')
   })
 
-  it("aren't found when there's none, when it's missing, or when there's no such event", async () => {
-    const ana = await createArtist('Ana')
+  it("aren't found when nothing public has them, or when the size is missing", async () => {
     const brume = await createArtist('Brume', JPEG)
-    const without = await createSession(FUTURE(1), [set([ana]), set([brume])])
-    const missing = await createSession(FUTURE(2), [], { flyer: JPEG })
+    await createSession(FUTURE(1), [set([brume])])
+    await createSession(FUTURE(2), [], { flyer: JPEG })
+    const photo = await photoOf(`/api/artists/${brume}`)
+    const [, flyer] = await flyers()
     stored.clear()
-    for (const [url, error] of [
-      [`/api/artists/${ana}/photo`, 'This artist has no photo'],
-      // The public only ever gets its sizes, so that's what's missing.
-      [`/api/artists/${brume}/photo`, 'The photo of this artist has no size 1280 pixels wide'],
-      [`/api/events/${without.id}/flyer`, 'This event has no flyer'],
-      [`/api/events/${missing.id}/flyer`, 'The flyer of this event has no size 1280 pixels wide'],
-      [`/api/events/${NOBODY}/flyer`, 'No such event'],
-      ['/api/events/x/flyer', 'No such event'],
-    ]) {
-      const response = await get(url)
-      expect(response.statusCode, url).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error })
-    }
+    await expectNotFound([photo[1280]], 'This photo has no size 1280 pixels wide')
+    await expectNotFound([flyer[320]], 'This flyer has no size 320 pixels wide')
+    await expectNotFound(['/api/artists/photos/photo-9/w320.webp', `/api/artists/photos/${'0'.repeat(64)}/w320.webp`], 'No such photo')
+    await expectNotFound([`/api/events/flyers/${'0'.repeat(64)}/w320.webp`], 'No such flyer')
   })
 })

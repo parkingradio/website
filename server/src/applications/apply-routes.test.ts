@@ -225,7 +225,7 @@ describe('POST /api/applications', () => {
         ...profile(),
         // Only the profile names are kept.
         links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
-        photoKey: 'artists/photo-1.jpeg',
+        photoKey: 'artists/photo-1.jpg',
         photoType: 'image/jpeg',
         createdBy: null,
       }),
@@ -234,7 +234,7 @@ describe('POST /api/applications', () => {
       // The dates are sorted.
       expect.objectContaining({ ...fields({ dates: ['2027-01-08', '2027-01-15'] }), artistId: artists[0].id, createdBy: null }),
     ])
-    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpg'])
   })
 
   it('adds the artist without a photo, which is optional', async () => {
@@ -260,9 +260,9 @@ describe('POST /api/applications', () => {
     expect(response.statusCode).toBe(409)
     expect(response.json()).toEqual({ ok: false, error: 'Un artiste est déjà inscrit avec cette adresse e-mail.' })
     expect(artists).toHaveLength(1)
-    expect(artists[0]).toMatchObject({ name: 'DJ Test', photoKey: 'artists/photo-1.jpeg' })
+    expect(artists[0]).toMatchObject({ name: 'DJ Test', photoKey: 'artists/photo-1.jpg' })
     expect(applications).toHaveLength(1)
-    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpg'])
   })
 
   it('adds the collective, which added itself, with its photo, its artists, with their profiles and photos, in order, and its application', async () => {
@@ -282,7 +282,7 @@ describe('POST /api/applications', () => {
         links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' },
         email,
         phone,
-        photoKey: 'collectives/photo-1.jpeg',
+        photoKey: 'collectives/photo-1.jpg',
         photoType: 'image/jpeg',
         createdBy: null,
       }),
@@ -297,7 +297,7 @@ describe('POST /api/applications', () => {
     ])
     expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
     expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
-    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpg', 'artists/photo-2.png'])
   })
 
   it('takes any number of artists, but at least one', async () => {
@@ -322,7 +322,7 @@ describe('POST /api/applications', () => {
     expect(response.json()).toEqual({ ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' })
     expect(collectives).toHaveLength(1)
     expect(artists).toHaveLength(2)
-    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpg'])
     expect(photos.deleteUnused).toHaveBeenCalledTimes(3)
 
     expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)

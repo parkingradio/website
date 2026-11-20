@@ -213,7 +213,8 @@ one that's planned can have sets that are done.
 
 A session is prepared behind the scenes, then announced, which makes it public, as an event, with its sets, and makes
 public the profiles and photos of its sets' performers, and of the collective whose takeover it is, with its members
-(see [Events](events.md)). Un-announcing it makes them private again, unless something else makes them public. A new
+(see [Events](events.md)). Un-announcing it makes them private again, unless something else makes them public, though
+the sizes of photos and flyers that were already fetched can still be shown (see [Photos](artists.md#photos)). A new
 session isn't announced. Whether it's announced doesn't depend on its status, e.g. a cancelled session can stay
 announced. Only a session with a start can be announced, and an announced session's start can't be removed until it's
 un-announced, which it always can be: requests that would leave an announced session without a start fail with 400
@@ -340,7 +341,9 @@ when it's added (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin))
 [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), which gives the session a flyer or replaces
 its own, and it's removed with [`DELETE /api/admin/sessions/:id/flyer`](#delete-apiadminsessionsidflyer-admin): changing
 the session's fields never changes it. The MCP server's tools can't send one, so a session added with a tool has none,
-but they can remove one. The sizes of an announced session's flyer are public, as its event's (see [Events](events.md)).
+but they can remove one. The sizes of an announced session's flyer are public, as its event's (see [Events](events.md)),
+and can be kept for good, like those of photos (see [Photos](artists.md#photos)), even once it's un-announced, or its
+flyer replaced or removed.
 
 ## Links
 

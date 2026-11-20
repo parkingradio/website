@@ -98,7 +98,7 @@ const events: Schema<'Events'> = {
       type: 'guest-mixes',
       start: '2026-10-03T21:00:00-04:00',
       end: '2026-10-03T23:30:00-04:00',
-      flyer: '/api/events/mixes/flyer',
+      flyer: { 320: '/api/events/flyers/mixes/w320.webp', 1280: '/api/events/flyers/mixes/w1280.webp' },
       raEvent: 'https://ra.co/events/2201001',
       // Brume plays twice, and Dune's set is cancelled.
       sets: [publicSet(['Aurore', 'Brume']), publicSet(['Dune'], true), publicSet(['Brume', 'Cyan'])],
@@ -352,10 +352,10 @@ describe('ProgrammationList, from the public events', () => {
     for (const id of ['cancelled', 'cancelled-meetup', 'workshop']) expect(rowOf(id).querySelector('.event-lineup')).toBeNull()
   })
 
-  it('shows the flyer from the server, full size, loaded once it comes into view, or a placeholder', () => {
+  it('shows the flyer from the server, at its smallest size, loaded once it comes into view, or a placeholder', () => {
     render(<ProgrammationList {...eventsListing(events)} />)
     const flyer = rowOf('mixes').querySelector('.event-flyer img')!
-    expect(flyer).toHaveAttribute('src', '/api/events/mixes/flyer?width=320')
+    expect(flyer).toHaveAttribute('src', '/api/events/flyers/mixes/w320.webp')
     expect(flyer).toHaveAttribute('loading', 'lazy')
     expect(rowOf('meetup').querySelector('.event-flyer')).toHaveClass('placeholder')
   })
@@ -374,7 +374,7 @@ describe('ProgrammationList, from the public events', () => {
     const row = screen.getByRole('listitem')
     expect(within(row).queryAllByRole('link', { hidden: true })).toHaveLength(0)
     expect(within(row).getByRole('heading')).toHaveTextContent('GUEST MIXES')
-    expect(row.querySelector('.event-flyer img')).toHaveAttribute('src', '/api/events/mixes/flyer?width=320')
+    expect(row.querySelector('.event-flyer img')).toHaveAttribute('src', '/api/events/flyers/mixes/w320.webp')
     expect(row).not.toHaveTextContent('voir sur RA')
   })
 

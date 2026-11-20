@@ -1699,11 +1699,28 @@
             "description": "Its description, or else the one its type gives it, or empty when neither has one"
           },
           "flyer": {
-            "description": "Where its flyer is, or null when it has none",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "320": {
+                    "type": "string"
+                  },
+                  "1280": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "320",
+                  "1280"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the sizes of its flyer are, by width, or null when it has none"
           },
           "raEvent": {
             "description": "The page of its event on RA, or null when it has none",
@@ -2275,11 +2292,28 @@
             "$ref": "#/components/schemas/ArtistLinks"
           },
           "photo": {
-            "description": "Where their photo is, or null when they have none",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "320": {
+                    "type": "string"
+                  },
+                  "1280": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "320",
+                  "1280"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the sizes of their photo are, by width, or null when they have none"
           }
         },
         "required": [
@@ -2331,11 +2365,28 @@
             "description": "In order"
           },
           "photo": {
-            "description": "Where its photo is, or null when it has none",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "320": {
+                    "type": "string"
+                  },
+                  "1280": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "320",
+                  "1280"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the sizes of its photo are, by width, or null when it has none"
           }
         },
         "required": [
@@ -5989,39 +6040,35 @@
         }
       }
     },
-    "/api/artists/{id}/photo": {
+    "/api/artists/photos/{image}/{size}": {
       "get": {
-        "summary": "One of the sizes of a public artist's photo",
+        "summary": "One of the sizes of a photo that a public artist has",
         "tags": [
           "Artists"
         ],
         "parameters": [
           {
             "schema": {
-              "default": "1280",
-              "type": "string",
-              "enum": [
-                "320",
-                "1280"
-              ]
+              "type": "string"
             },
-            "in": "query",
-            "name": "width",
-            "required": false,
-            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+            "in": "path",
+            "name": "image",
+            "required": true,
+            "description": "The photo's name, as the URL of its size gives it"
           },
           {
             "schema": {
               "type": "string"
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "size",
+            "required": true,
+            "description": "The size's name, as its URL gives it, e.g. `w320.webp`"
           }
         ],
         "responses": {
           "200": {
-            "description": "The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does",
+            "description": "That size of the photo, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does",
             "content": {
               "image/webp": {
                 "schema": {
@@ -6030,9 +6077,6 @@
                 }
               }
             }
-          },
-          "304": {
-            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -7094,39 +7138,35 @@
         }
       }
     },
-    "/api/collectives/{id}/photo": {
+    "/api/collectives/photos/{image}/{size}": {
       "get": {
-        "summary": "One of the sizes of a public collective's photo",
+        "summary": "One of the sizes of a photo that a public collective has",
         "tags": [
           "Collectives"
         ],
         "parameters": [
           {
             "schema": {
-              "default": "1280",
-              "type": "string",
-              "enum": [
-                "320",
-                "1280"
-              ]
+              "type": "string"
             },
-            "in": "query",
-            "name": "width",
-            "required": false,
-            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+            "in": "path",
+            "name": "image",
+            "required": true,
+            "description": "The photo's name, as the URL of its size gives it"
           },
           {
             "schema": {
               "type": "string"
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "size",
+            "required": true,
+            "description": "The size's name, as its URL gives it, e.g. `w320.webp`"
           }
         ],
         "responses": {
           "200": {
-            "description": "The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does",
+            "description": "That size of the photo, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does",
             "content": {
               "image/webp": {
                 "schema": {
@@ -7135,9 +7175,6 @@
                 }
               }
             }
-          },
-          "304": {
-            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
@@ -10187,39 +10224,35 @@
         }
       }
     },
-    "/api/events/{id}/flyer": {
+    "/api/events/flyers/{image}/{size}": {
       "get": {
-        "summary": "One of the sizes of an event's flyer",
+        "summary": "One of the sizes of a flyer that an event has",
         "tags": [
           "Events"
         ],
         "parameters": [
           {
             "schema": {
-              "default": "1280",
-              "type": "string",
-              "enum": [
-                "320",
-                "1280"
-              ]
+              "type": "string"
             },
-            "in": "query",
-            "name": "width",
-            "required": false,
-            "description": "The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280"
+            "in": "path",
+            "name": "image",
+            "required": true,
+            "description": "The flyer's name, as the URL of its size gives it"
           },
           {
             "schema": {
               "type": "string"
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "size",
+            "required": true,
+            "description": "The size's name, as its URL gives it, e.g. `w320.webp`"
           }
         ],
         "responses": {
           "200": {
-            "description": "The flyer's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the flyer does",
+            "description": "That size of the flyer, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does",
             "content": {
               "image/webp": {
                 "schema": {
@@ -10228,9 +10261,6 @@
                 }
               }
             }
-          },
-          "304": {
-            "description": "The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again"
           },
           "400": {
             "description": "Default Response",
