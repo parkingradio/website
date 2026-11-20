@@ -5,8 +5,8 @@
 -- their key until an admin removes or replaces them.
 --
 -- It fails, and with it the server's start, while a row has another key. So before deploying it, in every deployment,
--- this must give no row, run against its database, e.g. from the app's container, through SSM (see "Database migrations"
--- in docs/deployment.md), and when it fails, it gives the rows it fails on:
+-- this must give no row, run against its database, e.g. from the app's container, through SSM, as #203 shows, and when
+-- it fails, it gives the rows it fails on:
 --
 --   select 'artist' as of, id, photo_key as key from artists where photo_key !~ '^artists/[0-9a-f]{64}[.](jpg|png|webp)$'
 --   union all select 'collective', id, photo_key from collectives where photo_key !~ '^collectives/[0-9a-f]{64}[.](jpg|png|webp)$'
