@@ -242,7 +242,7 @@ export function artistsStore(db: Queryable): ArtistsStore {
 
 // A photo or a flyer that was stored (see `Photos`): its key, its MIME type, and `keep`, which the transaction that
 // saves it in a row calls before it takes any lock but the sessions' (see `lockPhotos`).
-export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise<void> }
+export type NewPhoto = { key: string; type: PhotoType; keep(tx: Queryable): Promise<void> }
 
 // Artists' and collectives' photos, and sessions' flyers, and their sizes. They're private files (see
 // core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until
@@ -263,9 +263,9 @@ export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise
 // transaction ends, even when it fails: it would wait for that transaction, from another connection, while that
 // transaction waits for it, which Postgres can't tell, and the request would hang.
 export type Photos = Pick<PrivateFiles, 'read'> & {
-  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey` in keys.ts), unless they're there already,
-  // and returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged, and the
-  // error is thrown.
+  // Stores the photo, with its sizes, under its key in `folder` (see `photoKey` in keys.ts), unless they're there
+  // already, and returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged,
+  // and the error is thrown.
   store(photo: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto>
   // The size at `width` of the photo with that key, or null when there's none, e.g. when the photo itself is missing.
   readSize(key: string, width: PhotoWidth): Promise<Readable | null>
@@ -335,7 +335,7 @@ export function privatePhotos(files: PrivateFiles, db: Queryable, log: FastifyBa
   return photos
 }
 
-// Stores the photo and the sizes it has under `key`, those that aren't there.
+// Stores the photo and its sizes under `key`, those that aren't there.
 async function putMissing(files: PrivateFiles, key: string, { body, type, sizes }: SizedPhoto) {
   if (!(await files.exists(key))) await files.put(key, body, type)
   for (const [width, size] of sizes) {

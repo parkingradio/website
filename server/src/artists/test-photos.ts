@@ -5,7 +5,7 @@ import { vi } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import { extensionOf } from './keys.js'
+import { EXTENSIONS } from './keys.js'
 import type { PhotoFolder } from './keys.js'
 import type { NewPhoto, Photos, SizedPhoto } from './store.js'
 
@@ -25,7 +25,7 @@ export function memoryPhotos(named = (count: number) => `photo-${count}`) {
       next = 0
     },
     store: vi.fn(async ({ body, type, sizes }: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto> => {
-      const key = `${folder}/${named(++next)}.${extensionOf(type)}`
+      const key = `${folder}/${named(++next)}.${EXTENSIONS[type]}`
       stored.set(key, body)
       for (const [width, size] of sizes) stored.set(sizeKey(key, width), size)
       return { key, type, keep: async () => {} }

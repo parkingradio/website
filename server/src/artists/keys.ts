@@ -14,29 +14,22 @@ import type { PhotoType } from './profile.js'
 export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
 // The extension of the keys of photos of each MIME type.
-const EXTENSIONS: Record<PhotoType, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+export const EXTENSIONS: Record<PhotoType, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 // Every extension a key can have, which the database checks (see `contentKey` in db/schema.ts).
 export const KEY_EXTENSIONS = Object.values(EXTENSIONS)
-
-// The extension of the keys of photos of that MIME type.
-export function extensionOf(type: PhotoType): string {
-  return EXTENSIONS[type]
-}
 
 // The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte,
 // as one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
 // docs/deployment.md).
 export function photoKey({ body, type }: { body: Buffer; type: PhotoType }, folder: PhotoFolder): string {
-  return `${folder}/${createHash('sha256').update(body).digest('hex')}.${extensionOf(type)}`
+  return `${folder}/${createHash('sha256').update(body).digest('hex')}.${EXTENSIONS[type]}`
 }
 
 // The name of the photo with `key`, without its folder and its extension: the SHA-256 of its content (see `photoKey`).
 // Its public URLs are named after it (see `publicSizes` in photo-form.ts).
 export function photoName(key: string): string {
-  const file = key.slice(key.lastIndexOf('/') + 1)
-  const dot = file.lastIndexOf('.')
-  return dot === -1 ? file : file.slice(0, dot)
+  return key.slice(key.indexOf('/') + 1, key.lastIndexOf('.'))
 }
 
 // The key of the photo named `name` (see `photoName`) in `folder`, whatever its type, that `column` has in a row of its

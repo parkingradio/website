@@ -5,12 +5,20 @@
 -- their key until an admin removes or replaces them.
 --
 -- It fails, and with it the server's start, while a row has another key. So before deploying it, in every deployment,
--- this must give no row, run against its database, e.g. from the app's container, through SSM, as #203 shows, and when
--- it fails, it gives the rows it fails on:
+-- this query must give no row, and when it fails, it gives the rows it fails on:
 --
 --   select 'artist' as of, id, photo_key as key from artists where photo_key !~ '^artists/[0-9a-f]{64}[.](jpg|png|webp)$'
 --   union all select 'collective', id, photo_key from collectives where photo_key !~ '^collectives/[0-9a-f]{64}[.](jpg|png|webp)$'
 --   union all select 'session', id, flyer_key from sessions where flyer_key !~ '^sessions/[0-9a-f]{64}[.](jpg|png|webp)$'
+--
+-- The instance has no psql: run it from the app's container, which has the database's credentials, through SSM as in
+-- "Database migrations" in docs/deployment.md, with `cd /opt/app && docker compose exec -T app node --input-type=module`
+-- and this script on its input, e.g. from a heredoc:
+--
+--   import { db } from './server/dist/db/connection.js'
+--   const { rows } = await db.$client.query(`<the query>`)
+--   console.log(JSON.stringify(rows))
+--   await db.$client.end()
 --
 -- Such a row's image is either not moved yet, which a server from #201 or #202 does when it starts, or missing, which it
 -- logs (`A photo or flyer to move to a key made from its content is missing`): remove or replace it on the admin pages.
