@@ -3,7 +3,7 @@ import type { AnyColumn, SQL } from 'drizzle-orm'
 import { RECENT_PAST_EVENTS } from '../api/formats.js'
 import type { Queryable } from '../db/connection.js'
 import { collectiveMembers, sessions, setPerformers, sets } from '../db/schema.js'
-import { isUuid } from '../db/uuid.js'
+import { keyNamed } from '../artists/store.js'
 import { sessionsWhere } from '../sessions/store.js'
 import type { StoredSession } from '../sessions/store.js'
 
@@ -54,9 +54,8 @@ export type EventsStore = {
   // The events of the calendar feed, in any order: those that start at or after `since`, and those whose end hasn't passed
   // at `now`.
   feed(window: { since: Date; now: Date }): Promise<StoredSession[]>
-  // Where the flyer of the event with `id` is kept, as `sendPhoto` takes it, or null when there's no such event, e.g. a
-  // session that isn't announced, which is the case of any id that isn't a UUID.
-  getFlyer(id: string): Promise<{ photoKey: string | null; photoType: string | null } | null>
+  // The key of the flyer named `name` (see `photoName` in artists/store.ts) that an event has, or null when none has it.
+  getFlyer(name: string): Promise<string | null>
 }
 
 export function eventsStore(db: Queryable): EventsStore {
@@ -76,13 +75,6 @@ export function eventsStore(db: Queryable): EventsStore {
       return sessionsWhere(db, and(isEvent, or(gte(sessions.startAt, since), not(hasEnded(now)))))
     },
 
-    async getFlyer(id) {
-      if (!isUuid(id)) return null
-      const [found] = await db
-        .select({ photoKey: sessions.flyerKey, photoType: sessions.flyerType })
-        .from(sessions)
-        .where(and(eq(sessions.id, id), isEvent))
-      return found ?? null
-    },
+    getFlyer: (name) => keyNamed(db, sessions.flyerKey, 'sessions', name, isEvent),
   }
 }

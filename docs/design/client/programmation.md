@@ -47,4 +47,5 @@ the calendar app.
 ## Endpoints
 
 - `GET /api/ra-events`, while the flag is off.
-- `GET /api/events` and `GET /api/events/:id/flyer?width=320`, once it's on, and it links to `GET /calendar.ics`.
+- `GET /api/events`, and `GET /api/events/flyers/:image/:size` for the 320-pixel size of each flyer, at the URL its event
+  gives, once it's on, and it links to `GET /calendar.ics`.

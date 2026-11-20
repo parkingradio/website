@@ -9,7 +9,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
-import { EmailTaken, photoColumns } from './store.js'
+import { EmailTaken, photoColumns, photoName } from './store.js'
 import type { ArtistsStore, StoredArtist } from './store.js'
 import { sizeKey } from './sizes.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from './test-photos.js'
@@ -38,6 +38,8 @@ const store: ArtistsStore = {
   // Who's public is worked out by the database, which the public routes are tested against (see
   // events/public.db.test.ts).
   getPublic: async (id) => (publicIds.has(id) ? (rows.find((row) => row.id === id) ?? null) : null),
+  getPublicPhoto: async (name) =>
+    rows.find((row) => publicIds.has(row.id) && row.photoKey !== null && photoName(row.photoKey) === name)?.photoKey ?? null,
   create: vi.fn<ArtistsStore['create']>(async ({ photo, ...artist }) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
     const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist, ...photoColumns(photo) }
@@ -207,10 +209,10 @@ describe('artists routes', () => {
         },
       })
       expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'artists')
-      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpg', photoType: 'image/jpeg' })
       // With its sizes, made as it's sent.
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
-      expect(await sharp(photos.size('artists/photo-1.jpeg', 320)).metadata()).toMatchObject({ format: 'webp', width: 64 })
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpg', sizeKey('artists/photo-1.jpg', 320), sizeKey('artists/photo-1.jpg', 1280)])
+      expect(await sharp(photos.size('artists/photo-1.jpg', 320)).metadata()).toMatchObject({ format: 'webp', width: 64 })
     })
 
     it('adds an artist without a photo', async () => {
@@ -247,7 +249,7 @@ describe('artists routes', () => {
       const response = await create(app, profile({ email: 'Artiste@Example.com' }), PNG)
       expect(response.statusCode).toBe(409)
       expect(rows).toHaveLength(1)
-      expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['artists/photo-1.jpg'])
     })
 
     it('explains, in French, what is wrong with an invalid profile, without storing the photo', async () => {
@@ -599,47 +601,71 @@ describe('artists routes', () => {
     })
   })
 
-  describe('GET /api/artists/:id/photo', () => {
-    const PHOTO = '/api/artists/artist-1/photo'
+  describe('GET /api/artists/photos/:image/:size', () => {
+    const PHOTOS = '/api/artists/photos/photo-1'
 
-    it("returns a public artist's photo only at one of its sizes, 1280 pixels wide unless asked otherwise, which browsers can show again for 5 minutes", async () => {
+    it("returns a public artist's photo only at its sizes, which anyone can keep for good, without an ETag", async () => {
       const app = await buildApp()
       await create(app, profile(), JPEG)
       publicIds.add('artist-1')
-      const admin = await get(app, '/api/admin/artists/artist-1/photo?width=1280')
-      for (const [url, width] of [[PHOTO, 1280], [`${PHOTO}?width=1280`, 1280], [`${PHOTO}?width=320`, 320]] as const) {
-        const response = await app.inject({ method: 'GET', url })
-        expect(response.statusCode, url).toBe(200)
-        expect(response.rawPayload).toEqual(photos.size('artists/photo-1.jpeg', width))
-        expect(response.headers).toMatchObject({ 'content-type': 'image/webp', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' })
-        if (width === 1280) expect(response.headers.etag).toBe(admin.headers.etag)
-
-        const kept = await app.inject({ method: 'GET', url, headers: { 'if-none-match': response.headers.etag as string } })
-        expect(kept.statusCode).toBe(304)
-        expect(kept.headers).toMatchObject({ etag: response.headers.etag, 'cache-control': 'private, max-age=300' })
+      for (const width of [320, 1280] as const) {
+        const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w${width}.webp` })
+        expect(response.statusCode, `${width}`).toBe(200)
+        expect(response.rawPayload).toEqual(photos.size('artists/photo-1.jpg', width))
+        expect(response.headers).toMatchObject({
+          'content-type': 'image/webp',
+          'x-content-type-options': 'nosniff',
+          'cache-control': 'public, max-age=31536000, immutable',
+        })
+        expect(response.headers.etag).toBeUndefined()
       }
       expect(photos.read).not.toHaveBeenCalled()
-      expect((await app.inject({ method: 'GET', url: `${PHOTO}?width=640` })).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     })
 
-    it('responds 404 when the photo has no size of that width, rather than with the photo as it was sent', async () => {
+    it("responds 404, which isn't kept, for any other size, or a photo that no public artist has", async () => {
+      const app = await buildApp()
+      await create(app, profile(), JPEG)
+      await create(app, profile({ email: null }), PNG)
+      publicIds.add('artist-1')
+      for (const url of [
+        `${PHOTOS}/w640.webp`,
+        `${PHOTOS}/w320.png`,
+        `${PHOTOS}/320.webp`,
+        // The other artist's, who's private.
+        '/api/artists/photos/photo-2/w320.webp',
+        '/api/artists/photos/photo-3/w320.webp',
+        // Not a name, nor a key.
+        '/api/artists/photos/photo-1.jpg/w320.webp',
+        '/api/artists/photos/artists%2Fphoto-1/w320.webp',
+      ]) {
+        const response = await app.inject({ method: 'GET', url })
+        expect(response.statusCode, url).toBe(404)
+        expect(response.json()).toEqual({ ok: false, error: 'No such photo' })
+        expect(response.headers['cache-control'], url).toBe('no-store')
+      }
+      expect(photos.readSize).not.toHaveBeenCalled()
+    })
+
+    it("responds 404, which isn't kept, when the photo has no size of that width, rather than with the photo as it was sent", async () => {
       const app = await buildApp()
       await create(app, profile(), JPEG)
       publicIds.add('artist-1')
-      stored.delete(sizeKey('artists/photo-1.jpeg', 1280))
-      const response = await app.inject({ method: 'GET', url: PHOTO })
+      stored.delete(sizeKey('artists/photo-1.jpg', 1280))
+      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w1280.webp` })
       expect(response.statusCode).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error: 'The photo of this artist has no size 1280 pixels wide' })
+      expect(response.json()).toEqual({ ok: false, error: 'This photo has no size 1280 pixels wide' })
+      expect(response.headers['cache-control']).toBe('no-store')
       expect(photos.read).not.toHaveBeenCalled()
     })
 
-    it('responds 404 for an artist who is private, whatever the request has', async () => {
+    it("responds 500, which isn't kept, when the photo can't be read", async () => {
       const app = await buildApp()
       await create(app, profile(), JPEG)
-      const etag = (await get(app, '/api/admin/artists/artist-1/photo?width=1280')).headers.etag as string
-      const response = await app.inject({ method: 'GET', url: PHOTO, headers: { 'if-none-match': etag } })
-      expect(response.statusCode).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error: 'No such artist' })
+      publicIds.add('artist-1')
+      photos.readSize.mockRejectedValueOnce(new Error('The bucket failed'))
+      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w320.webp` })
+      expect(response.statusCode).toBe(500)
+      expect(response.headers['cache-control']).toBe('no-store')
     })
   })
 
@@ -683,7 +709,7 @@ describe('artists routes', () => {
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error: 'The request has no photo' })
       }
-      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', updatedBy: null })
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpg', updatedBy: null })
     })
 
     it('refuses more than one photo, and malformed requests, without storing anything', async () => {
@@ -734,7 +760,7 @@ describe('artists routes', () => {
       await create(app)
       vi.mocked(store.update).mockRejectedValueOnce(new Error('database is down'))
       expect((await putPhoto(app, PHOTO)).statusCode).toBe(500)
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
+      expect([...stored.keys()]).toEqual(['artists/photo-1.jpg', sizeKey('artists/photo-1.jpg', 320), sizeKey('artists/photo-1.jpg', 1280)])
     })
 
     it('replaces the photo even when the previous one cannot be deleted', async () => {
@@ -814,7 +840,7 @@ describe('artists routes', () => {
       const response = await patch(app, '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.', city: 'Lévis' }))
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ bio: 'Une nouvelle bio.', city: 'Lévis', hasPhoto: true })
-      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg' })
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpg' })
       expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 

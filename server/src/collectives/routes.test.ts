@@ -49,6 +49,7 @@ const store: CollectivesStore = {
   // Who's public is worked out by the database, which the public routes are tested against (see
   // events/public.db.test.ts).
   getPublic: async () => null,
+  getPublicPhoto: async () => null,
   create: vi.fn<CollectivesStore['create']>(async ({ photo, ...collective }) => {
     if (emailTaken(collective.email)) throw new EmailTaken()
     const row: StoredCollective = {
@@ -175,7 +176,7 @@ describe('collectives routes', () => {
     ]
     for (const response of await Promise.all(refused)) expect(response.statusCode).toBe(403)
     expect(photos.store).toHaveBeenCalledTimes(1)
-    expect(rows[0]).toMatchObject({ name: 'Les Ondes', photoKey: 'collectives/photo-1.jpeg' })
+    expect(rows[0]).toMatchObject({ name: 'Les Ondes', photoKey: 'collectives/photo-1.jpg' })
   })
 
   describe('POST /api/admin/collectives', () => {
@@ -203,9 +204,9 @@ describe('collectives routes', () => {
         },
       })
       expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'collectives')
-      expect(stored.has(sizeKey('collectives/photo-1.jpeg', 320))).toBe(true)
-      expect(stored.has(sizeKey('collectives/photo-1.jpeg', 1280))).toBe(true)
-      expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpeg', photoType: 'image/jpeg' })
+      expect(stored.has(sizeKey('collectives/photo-1.jpg', 320))).toBe(true)
+      expect(stored.has(sizeKey('collectives/photo-1.jpg', 1280))).toBe(true)
+      expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpg', photoType: 'image/jpeg' })
     })
 
     it('creates the members sent by name', async () => {
@@ -266,7 +267,7 @@ describe('collectives routes', () => {
       const response = await create(app, profile({ email: 'Contact@Example.com' }), PNG)
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'Another collective has this email address' })
-      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['collectives/photo-1.jpg'])
     })
 
     it('refuses a member who is not an artist, in English, and forgets the photo', async () => {
@@ -347,7 +348,7 @@ describe('collectives routes', () => {
       expect(missing.statusCode).toBe(404)
       expect(missing.json()).toEqual({ ok: false, error: 'The photo of this collective is missing' })
       await create(app, profile({ email: 'troisieme@example.com' }))
-      stored.delete(sizeKey('collectives/photo-2.jpeg', 320))
+      stored.delete(sizeKey('collectives/photo-2.jpg', 320))
       const noSize = await request(app, 'GET', '/api/admin/collectives/collective-3/photo?width=320')
       expect(noSize.statusCode).toBe(404)
       expect(noSize.json()).toEqual({ ok: false, error: 'The photo of this collective has no size 320 pixels wide' })
@@ -373,8 +374,8 @@ describe('collectives routes', () => {
       const unreadable = await putPhoto(app, PHOTO, { photo: UNREADABLE_JPEG })
       expect(unreadable.statusCode).toBe(400)
       expect(unreadable.json().error).toBe('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.')
-      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
-      expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpeg', updatedBy: null })
+      expect(photos.photos()).toEqual(['collectives/photo-1.jpg'])
+      expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpg', updatedBy: null })
     })
 
     it('responds 404 for a collective that does not exist, and forgets the photo', async () => {
@@ -439,7 +440,7 @@ describe('collectives routes', () => {
       const response = await patch(app, '/api/admin/collectives/collective-1', profile({ description: 'Autre.', members: [{ id: 'artist-brume' }] }))
       expect(response.statusCode).toBe(200)
       expect(response.json().collective).toMatchObject({ description: 'Autre.', members: [{ id: 'artist-brume', name: 'Brume' }], hasPhoto: true })
-      expect(rows[0].photoKey).toBe('collectives/photo-1.jpeg')
+      expect(rows[0].photoKey).toBe('collectives/photo-1.jpg')
     })
 
     it("takes out the contact's email, which frees it for another collective", async () => {
@@ -477,7 +478,7 @@ describe('collectives routes', () => {
       ] as const) {
         expect((await patch(app, '/api/admin/collectives/collective-1', changes)).json()).toEqual({ ok: false, error })
       }
-      expect(rows[0]).toMatchObject({ updatedBy: null, photoKey: 'collectives/photo-1.jpeg' })
+      expect(rows[0]).toMatchObject({ updatedBy: null, photoKey: 'collectives/photo-1.jpg' })
     })
   })
 

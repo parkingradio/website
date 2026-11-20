@@ -5,10 +5,11 @@ import { vi } from 'vitest'
 import sharp from 'sharp'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
+import { extensionOf } from './store.js'
 import type { NewPhoto, PhotoFolder, Photos, SizedPhoto } from './store.js'
 
 // For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, with their
-// sizes under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg",
+// sizes under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpg",
 // counted from 1 again after `reset`, rather than made from their content, and deleted whether or not something uses
 // them: what the bucket and the database do with them is tested on them (see artists/photos.db.test.ts).
 export function memoryPhotos(name = 'photo') {
@@ -22,7 +23,7 @@ export function memoryPhotos(name = 'photo') {
       next = 0
     },
     store: vi.fn(async ({ body, type, sizes }: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto> => {
-      const key = `${folder}/${name}-${++next}.${type.split('/')[1]}`
+      const key = `${folder}/${name}-${++next}.${extensionOf(type)}`
       stored.set(key, body)
       for (const [width, size] of sizes) stored.set(sizeKey(key, width), size)
       return { key, type, keep: async () => {} }
