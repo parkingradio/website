@@ -12,52 +12,37 @@ import type { Photos } from './store.js'
 // the server starts, in the background, one photo at a time, so that it only takes the memory of one (see "Photos" in
 // docs/design/server/artists.md).
 
-// A photo or a flyer that the server keeps: what it's of, its id, its key and its MIME type, which only moving it to
-// the key made from its content needs (see artists/content-keys.ts), and goes with it, in step 3 of #200.
-export type StoredImage = { of: 'artist' | 'collective' | 'session'; id: string; key: string; type: string }
+// A photo or a flyer that the server keeps: what it's of, its id, and its key.
+export type StoredImage = { of: 'artist' | 'collective' | 'session'; id: string; key: string }
 
 // Every photo and flyer the server keeps, sessions' flyers first, the latest first, since Programmation shows them.
 export async function storedImages(db: Queryable): Promise<StoredImage[]> {
   const flyers = await db
-    .select({ id: sessions.id, key: sessions.flyerKey, type: sessions.flyerType })
+    .select({ id: sessions.id, key: sessions.flyerKey })
     .from(sessions)
     .where(isNotNull(sessions.flyerKey))
     .orderBy(sql`${sessions.startAt} desc nulls last`)
-  const artistPhotos = await db
-    .select({ id: artists.id, key: artists.photoKey, type: artists.photoType })
-    .from(artists)
-    .where(isNotNull(artists.photoKey))
+  const artistPhotos = await db.select({ id: artists.id, key: artists.photoKey }).from(artists).where(isNotNull(artists.photoKey))
   const collectivePhotos = await db
-    .select({ id: collectives.id, key: collectives.photoKey, type: collectives.photoType })
+    .select({ id: collectives.id, key: collectives.photoKey })
     .from(collectives)
     .where(isNotNull(collectives.photoKey))
-  // Both are there, or neither, which the database checks.
-  const of = (what: StoredImage['of']) => (row: { id: string; key: string | null; type: string | null }) => ({
-    of: what,
-    id: row.id,
-    key: row.key!,
-    type: row.type!,
-  })
+  const of = (what: StoredImage['of']) => (row: { id: string; key: string | null }) => ({ of: what, id: row.id, key: row.key! })
   return [...flyers.map(of('session')), ...artistPhotos.map(of('artist')), ...collectivePhotos.map(of('collective'))]
 }
 
-// Makes the sizes that the photos and flyers `list` gives don't have, once started, one after another, once `first` is
-// done, unless it stopped. `first` moves them to the keys made from their content (see artists/content-keys.ts), and
-// goes with it, in step 3 of #200. Every failure is logged, rather than thrown, `first`'s too: the server goes on
-// without them, and tries again the next time it starts.
+// Makes the sizes that the photos and flyers `list` gives don't have, once started, one after another. Every failure is
+// logged, rather than thrown: the server goes on without them, and tries again the next time it starts.
 export function sizesBackfill(
   list: () => Promise<StoredImage[]>,
   files: PrivateFiles,
   photos: Pick<Photos, 'deleteUnused'>,
   log: FastifyBaseLogger,
-  first: (stopping: () => boolean) => Promise<void> = async () => {},
 ) {
   let stopping = false
   let running: Promise<void> = Promise.resolve()
 
   async function run() {
-    await first(() => stopping)
-    if (stopping) return
     const images = await list()
     log.info({ images: images.length }, 'Making the missing sizes of photos and flyers')
     const counts = { complete: 0, made: 0, missing: 0, unreadable: 0, failed: 0 }
@@ -92,7 +77,7 @@ export function sizesBackfill(
         log.error({ err: error }, 'Failed to make the missing sizes of photos and flyers')
       })
     },
-    // Stops before the next photo, once the one being made, or moved, is.
+    // Stops before the next photo, once the one being made is.
     stop() {
       stopping = true
     },

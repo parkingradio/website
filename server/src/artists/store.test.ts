@@ -312,7 +312,7 @@ describe('validatePhoto', () => {
 
 describe('withSizes', () => {
   it('returns the photo with its sizes', async () => {
-    const photo = { body: await testImage('png', 2000, 1000), type: 'image/png' }
+    const photo = { body: await testImage('png', 2000, 1000), type: 'image/png' as const }
     const sized = await withSizes(photo)
     expect(sized).toMatchObject(photo)
     expect(await sharp(sized.sizes.get(320)!).metadata()).toMatchObject({ format: 'webp', width: 320 })
@@ -320,7 +320,7 @@ describe('withSizes', () => {
   })
 
   it("refuses a photo that can't be read, in French, or as `errors` says", async () => {
-    const photo = { body: UNREADABLE_JPEG, type: 'image/jpeg' }
+    const photo = { body: UNREADABLE_JPEG, type: 'image/jpeg' as const }
     await expect(withSizes(photo)).rejects.toThrow(
       new InvalidProfile('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'),
     )
@@ -347,8 +347,7 @@ describe('privatePhotos', () => {
   })
 
   const kept = async () => (await readdir(directory, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).length
-  const sized = async (format: 'jpeg' | 'png' | 'webp' = 'jpeg', width = 2000) =>
-    withSizes({ body: await testImage(format, width, 1000), type: `image/${format}` })
+  const sized = async (format: 'jpeg' | 'png' | 'webp' = 'jpeg') => withSizes({ body: await testImage(format, 2000, 1000), type: `image/${format}` })
   const sha256 = (body: Buffer) => createHash('sha256').update(body).digest('hex')
 
   it('stores each photo under the SHA-256 of its content in its folder, with its type, and its sizes next to it', async () => {
@@ -386,14 +385,6 @@ describe('privatePhotos', () => {
     // Each kind has its own.
     expect((await photos.store(photo, 'artists')).key).toBe(`artists/${sha256(photo.body)}.jpg`)
     expect(await kept()).toBe(6)
-  })
-
-  it('stores only the sizes it is given', async () => {
-    const photos = privatePhotos(files, noDatabase, log)
-    const photo = await sized()
-    const { key } = await photos.store({ ...photo, sizes: new Map([[320, photo.sizes.get(320)!]]) }, 'artists')
-    expect(await files.exists(sizeKey(key, 320))).toBe(true)
-    expect(await files.exists(sizeKey(key, 1280))).toBe(false)
   })
 
   it('reads a size that is missing as null', async () => {

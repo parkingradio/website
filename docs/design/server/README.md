@@ -176,7 +176,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`DELETE /api/admin/artists/:id/photo`](artists.md#delete-apiadminartistsidphoto-admin) | admin | Removing an artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent |
-| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, which their sets lose, and taking them out of their collectives and their sets |
+| [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo if no other artist has it, and their applications, which their sets lose, and taking them out of their collectives and their sets |
 | [`GET /api/artists/:id`](artists.md#get-apiartistsid) | public | A public artist's profile |
 | [`GET /api/artists/photos/:image/:size`](artists.md#get-apiartistsphotosimagesize) | public | One of the sizes of a photo that a public artist has |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
@@ -186,7 +186,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`DELETE /api/admin/collectives/:id/photo`](collectives.md#delete-apiadmincollectivesidphoto-admin) | admin | Removing a collective's photo |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
 | [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent |
-| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo and its applications, but not its members |
+| [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo if no other collective has it, and its applications, but not its members |
 | [`GET /api/collectives/:id`](collectives.md#get-apicollectivesid) | public | A public collective's profile, with its members |
 | [`GET /api/collectives/photos/:image/:size`](collectives.md#get-apicollectivesphotosimagesize) | public | One of the sizes of a photo that a public collective has |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
@@ -208,7 +208,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled, which can mark its sets too |
 | [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
-| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
+| [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer if no other session has it, and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session, which can make it planned again |
 | [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled, which can make its session done, or planned again |
