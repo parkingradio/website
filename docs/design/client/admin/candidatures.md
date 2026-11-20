@@ -108,7 +108,7 @@ are skipped: after accepting the 5th of 12 new applications, « suivante » show
 
 - `GET /api/admin/applications`, for the list, and on an application's page, for « précédente » and « suivante », and
   `PUT /api/admin/applications/:id/decision`, to change a status from the list.
-- `GET /api/admin/applications/:id`, `PUT /api/admin/applications/:id`, `PUT /api/admin/applications/:id/decision` and
+- `GET /api/admin/applications/:id`, `PATCH /api/admin/applications/:id`, `PUT /api/admin/applications/:id/decision` and
   `DELETE /api/admin/applications/:id`, for an application's page.
 - `GET /api/admin/sessions`, on an artist's application's page, to pick the session to add a set to, each time
   "créer un set" opens the field.

@@ -75,15 +75,17 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it follow their own
   rules, e.g. the other fields of a collective's members are ignored. The parts of a `multipart/form-data` request that
   the endpoint doesn't read are ignored too, e.g. a form's submit button.
-- **Changes.** An artist, a collective, an application, a session or a set is changed with `PUT`, which replaces its
-  fields, all of them sent, or with `PATCH`, which only changes the fields it's sent, and leaves the others as they are.
-  `PATCH` takes JSON, never `multipart/form-data`, with any of the fields its `PUT` takes, at least one, each following
-  the same rules: a field that's sent replaces the item's as a whole, even a list or an object, e.g. an artist's
-  `links`, rather than being merged into it, and null, or a blank string, where `PUT` takes it, removes it the same way.
-  The rules that involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are
-  checked on the item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field
-  fails with 400. Both set `updatedBy` and `updatedAt`, even when nothing actually changes. Likewise, the endpoints that
-  change a status, or whether a session is announced, say who changed it and when even when it doesn't change.
+- **Changes.** An artist, a collective, an application, a session or a set is changed with `PATCH`, which only changes
+  the fields it's sent, and leaves the others as they are. It takes JSON, never `multipart/form-data`, with any of the
+  fields its endpoint lists, at least one, each following the rules it follows when the item is added: a field that's
+  sent replaces the item's as a whole, even a list or an object, e.g. an artist's `links`, rather than being merged into
+  it, and null, or a blank string, where adding the item takes one for none, removes it the same way. The rules that
+  involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are checked on the
+  item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field fails with 400.
+  It sets `updatedBy` and `updatedAt`, even when nothing actually changes. Artists, collectives and sessions can also be
+  changed with `PUT`, which replaces their fields, all of them sent, replaces or removes their photo or flyer, and also
+  sets `updatedBy` and `updatedAt`. Likewise, the endpoints that change a status, or whether a session is announced, say
+  who changed it and when even when it doesn't change.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.
@@ -188,7 +190,6 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
-| [`PUT /api/admin/applications/:id`](applications.md#put-apiadminapplicationsid-admin) | admin | Replacing an application's fields |
 | [`PATCH /api/admin/applications/:id`](applications.md#patch-apiadminapplicationsid-admin) | admin | Changing an application, only the fields it's sent |
 | [`PUT /api/admin/applications/:id/decision`](applications.md#put-apiadminapplicationsiddecision-admin) | admin | Accepting or rejecting an application |
 | [`DELETE /api/admin/applications/:id`](applications.md#delete-apiadminapplicationsid-admin) | admin | Deleting an application, but not its sets and sessions, which stay without it |
@@ -207,7 +208,6 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
 | [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
 | [`POST /api/admin/sessions/:id/sets`](sessions.md#post-apiadminsessionsidsets-admin) | admin | Adding a set to a session, which can make it planned again |
-| [`PUT /api/admin/sets/:id`](sessions.md#put-apiadminsetsid-admin) | admin | Replacing a set's fields |
 | [`PATCH /api/admin/sets/:id`](sessions.md#patch-apiadminsetsid-admin) | admin | Changing a set, only the fields it's sent |
 | [`PUT /api/admin/sets/:id/status`](sessions.md#put-apiadminsetsidstatus-admin) | admin | Marking a set as planned, done or cancelled, which can make its session done, or planned again |
 | [`PUT /api/admin/sets/:id/position`](sessions.md#put-apiadminsetsidposition-admin) | admin | Moving a set to another place among its session's sets |

@@ -526,7 +526,7 @@ json PUT "${SETS}/${second}/status" '{"status":"planned"}'
 expect_conflict 'This session is cancelled' "$first"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
-json PUT "${SETS}/${second}" "$(set_json "$(performers "$ana" "$brume")" 60)"
+json PATCH "${SETS}/${second}" "$(set_json "$(performers "$ana" "$brume")" 60)"
 expect_status 200
 echo "  un-cancelling a session leaves its sets cancelled, to be un-cancelled one by one"
 json PUT "${SESSIONS}/${first}/status" '{"status":"planned"}'
@@ -621,16 +621,16 @@ json POST "${SESSIONS}/${replacement}/sets" "$(set_json "$(performers "$ana")" n
 expect_conflict "This YouTube video is another set's" "$first" "$opening"
 
 echo "  a SoundCloud link has to be on soundcloud.com, and can't be resolved until the SoundCloud app's credentials are entered"
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://on.soundcloud.com/AbCdE"')"
+json PATCH "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://on.soundcloud.com/AbCdE"')"
 expect_status 400
 expect_body_contains 'must be a link to it on soundcloud.com'
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons"')"
+json PATCH "${SETS}/${later}" "$(set_json "$(performers "$brume")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons"')"
 expect_status 409
 expect_body_contains '"error":"The credentials of the SoundCloud app have not been entered yet","session":null,"set":null'
 
 echo "  but a set's own track isn't resolved again, so the set can be changed without SoundCloud"
 sql "update sets set soundcloud_track_id = '42', soundcloud_track_url = 'https://soundcloud.com/parkingdotradio/3tons' where id = '${later}'" >/dev/null
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons?si=abc"')"
+json PATCH "${SETS}/${later}" "$(set_json "$(performers "$brume" "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/3tons?si=abc"')"
 expect_status 200
 expect_body_contains '"soundcloudTrack":{"id":"42","url":"https://soundcloud.com/parkingdotradio/3tons"}'
 expect_body_contains "{\"id\":\"${later}\",\"performers\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
@@ -648,7 +648,7 @@ echo "  and the 409 names the other set and its session"
 # with its track, then waits for the sessions' lock, while another transaction gives that track to the later set.
 sql "update sets set soundcloud_track_id = '43', soundcloud_track_url = 'https://soundcloud.com/parkingdotradio/b2b' where id = '${second}'" >/dev/null
 hold_sessions_lock "update sets set soundcloud_track_id = '44' where id = '${second}'; update sets set soundcloud_track_id = '43' where id = '${later}';"
-send_in_background PUT "${SETS}/${second}" "$(set_json "$(performers "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/b2b"')"
+send_in_background PATCH "${SETS}/${second}" "$(set_json "$(performers "$ana")" 60 '"soundcloudTrack":"https://soundcloud.com/parkingdotradio/b2b"')"
 wait_for_sessions_lock
 release_sessions_lock
 wait_for_background
@@ -878,7 +878,7 @@ expect_body_contains '"type":"guest-mixes","takeover":null'
 echo "  changing a set while one of its performers is deleted doesn't deadlock"
 request --header "Cookie: ${cookie}" --form-string 'artist={"name":"Éphémère"}' "$ARTISTS"
 passing="$(first_id)"
-json PUT "${SETS}/${later}" "$(set_json "$(performers "$passing" "$brume")" 60)"
+json PATCH "${SETS}/${later}" "$(set_json "$(performers "$passing" "$brume")" 60)"
 expect_status 200
 # Another transaction holds the artist's row while the artist is deleted, then while the set is changed to keep them.
 # Deleting the artist takes the sessions' lock, then waits for their row, so changing the set waits for that lock.
@@ -887,7 +887,7 @@ expect_status 200
 hold_row artists "$passing"
 delete_in_background "${ARTISTS}/${passing}" delete
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"artists\"%')"
-send_in_background PUT "${SETS}/${later}" "$(set_json "$(performers "$brume" "$passing")" 60)"
+send_in_background PATCH "${SETS}/${later}" "$(set_json "$(performers "$brume" "$passing")" 60)"
 wait_for_sessions_lock
 release_row
 wait_for_background
@@ -1080,8 +1080,8 @@ expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
 
-echo "  a set without performers takes one again to be replaced, but its other fields and its status can still be changed"
-json PUT "${SETS}/${later}" "$(set_json '[]' 60)"
+echo "  a set without performers takes one again when its performers are changed, but its other fields and its status can still be changed"
+json PATCH "${SETS}/${later}" "$(set_json '[]' 60)"
 expect_status 400
 expect_body_contains '"error":"A set has at least one performer"'
 json PATCH "${SETS}/${later}" '{"durationMinutes":null,"genres":["ambient"]}'
@@ -1112,7 +1112,7 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
     json DELETE "${SESSIONS}/${id}"
     expect_status 404
-    json PUT "${SETS}/${id}" "$(set_json "$(performers "$ana")" null)"
+    json PATCH "${SETS}/${id}" '{"genres":[]}'
     expect_status 404
     expect_body_contains '"error":"No such set"'
     json PUT "${SETS}/${id}/status" '{"status":"done"}'

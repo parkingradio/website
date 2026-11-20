@@ -232,9 +232,8 @@ case of its id, is dropped, keeping the first. A performer that isn't an object 
 
 Responses list them as objects with the `id` and `name` of each one, in order.
 
-Deleting an artist takes them out of their sets, which stay as they are, even without performers. Replacing such a
-set's fields, or changing its performers, then takes at least one performer again, but its other fields and its status
-can still be changed on their own.
+Deleting an artist takes them out of their sets, which stay as they are, even without performers. Changing such a
+set's performers then takes at least one again, but its other fields and its status can still be changed on their own.
 
 ## Types and names
 
@@ -549,21 +548,15 @@ Fails with:
 
 When it fails, nothing is saved.
 
-## `PUT /api/admin/sets/:id` (admin)
-
-Replaces a set's fields, even when its session is cancelled, but not its session (see
-[`PUT /api/admin/sets/:id/session`](#put-apiadminsetsidsession-admin)), its place among its session's sets, or its
-status. It takes the same request as `POST /api/admin/sessions/:id/sets`, responds like it, with the session as it
-is then, and fails like it, but with 404 when there's no such set, which is checked before the track is resolved, and
-without the 409 for a cancelled session.
-
 ## `PATCH /api/admin/sets/:id` (admin)
 
-Changes the fields of a set it's sent, like `PUT /api/admin/sets/:id`, and leaves the others as they are (see
-[Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT` takes. `performers`, when it's
-sent, replaces the set's performers, and `soundcloudTrack` is only resolved when it's sent. The performers and the
-application are checked together, as the set would then be. Responds like `PUT`, and fails like it, but with 400 when
-there's no field.
+Changes the fields of a set it's sent, even when its session is cancelled, and leaves the others as they are (see
+[Changes, in Conventions](README.md#conventions)). It doesn't change the set's session (see
+[`PUT /api/admin/sets/:id/session`](#put-apiadminsetsidsession-admin)), its place among its session's sets, or its
+status. It takes any of the fields that `POST /api/admin/sessions/:id/sets` takes, and only resolves `soundcloudTrack`
+when it's sent (see [Links](#links)). Responds like `POST /api/admin/sessions/:id/sets`, with the session as it is then,
+and fails like it, but with 400 when there's no field, with 404 when there's no such set, which is checked before the
+track is resolved, and without the 409 for a cancelled session.
 
 ## `PUT /api/admin/sets/:id/status` (admin)
 

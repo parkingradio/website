@@ -718,34 +718,6 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
   )
 
-  // Saves `fields` to the set with the id of `request`, all of them or some of them, and responds with its session as it
-  // is then.
-  async function updateSet(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply, fields: Partial<SetFields>) {
-    // Before the track is resolved, which it isn't when it's the set's already.
-    const before = await store.getSet(request.params.id)
-    if (!before) return reply.status(404).send(NO_SUCH_SET)
-    const saved = await setChanges(fields, before)
-    if ('error' in saved) return fail(reply, saved)
-    const changes = { ...saved, updatedBy: request.user!.email, updatedAt: new Date() }
-    return saving(reply, NO_SUCH_SET, () => store.updateSet(before.id, changes))
-  }
-
-  // Not a tool: tools change sets with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
-  api.put(
-    '/api/admin/sets/:id',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "Replaces a set's fields, but not its session, its place among the session's sets, or its status, and returns its session",
-        tags: ['Sessions'],
-        params: ById,
-        body: SetFields,
-        response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError, 502: ApiError },
-      },
-    },
-    async (request, reply) => updateSet(request, reply, request.body),
-  )
-
   api.patch(
     '/api/admin/sets/:id',
     {
@@ -759,7 +731,15 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
         response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError, 502: ApiError },
       },
     },
-    async (request, reply) => updateSet(request, reply, request.body),
+    async (request, reply) => {
+      // Before the track is resolved, which it isn't when it's the set's already.
+      const before = await store.getSet(request.params.id)
+      if (!before) return reply.status(404).send(NO_SUCH_SET)
+      const saved = await setChanges(request.body, before)
+      if ('error' in saved) return fail(reply, saved)
+      const changes = { ...saved, updatedBy: request.user!.email, updatedAt: new Date() }
+      return saving(reply, NO_SUCH_SET, () => store.updateSet(before.id, changes))
+    },
   )
 
   api.put(

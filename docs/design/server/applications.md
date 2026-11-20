@@ -8,9 +8,9 @@ show as a whole, e.g. its performance types aren't each member's.
 
 The server checks every application against the rules in `server/src/applications/fields.ts` (the `ApplicationFields`
 schema). These rules only make sure the data is valid: every field below has to be there when an application is created,
-or its fields replaced, with its type, even when it's empty. Suggestions and limits, like which dates or time slots to
-offer, are up to the forms. Error messages are in French, like for [profiles](artists.md#profiles), because artists see
-them.
+with its type, even when it's empty, while a change only sends the fields it changes, which follow the same rules.
+Suggestions and limits, like which dates or time slots to offer, are up to the forms. Error messages are in French, like
+for [profiles](artists.md#profiles), because artists see them.
 
 Applications are created in two ways:
 
@@ -134,19 +134,13 @@ Exactly one of `artistId` and `collectiveId` has to be there (neither can be nul
 or `receivedAt` isn't valid (with a message in French), or else if there's neither or both, or if the one that's there
 isn't the id of an artist or a collective that exists (in English, since only admins send ids).
 
-## `PUT /api/admin/applications/:id` (admin)
-
-Replaces an application's fields. The request is the same as for `POST /api/admin/applications`, without `artistId`
-or `collectiveId`, and leaving `receivedAt` out keeps the one the application has. The artist or collective and what
-admins decided don't change. The response is the same as for `POST /api/admin/applications`, with the updated
-application. Fails with 400 if the application or `receivedAt` isn't valid, or 404 if it doesn't exist.
-
 ## `PATCH /api/admin/applications/:id` (admin)
 
 Changes the fields of an application it's sent, and leaves the others as they are (see
-[Changes, in Conventions](README.md#conventions)). It takes any of the fields that `PUT /api/admin/applications/:id`
-takes, `receivedAt` included, which can't be null either. Responds like `PUT`, and fails like it, but with 400 when
-there's no field.
+[Changes, in Conventions](README.md#conventions)). It takes any of the fields that `POST /api/admin/applications` takes
+but `artistId` and `collectiveId`: the artist or the collective and what admins decided don't change. `receivedAt` can't
+be null, as for `POST`. The response is the same as for `POST /api/admin/applications`, with the updated application.
+Fails with 400 if a field isn't valid, or if there's no field, and 404 if the application doesn't exist.
 
 ## `PUT /api/admin/applications/:id/decision` (admin)
 

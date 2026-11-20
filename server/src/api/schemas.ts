@@ -71,8 +71,8 @@ export function objectError(error: string) {
 const NOT_CHANGES = 'The changes must be an object with the fields to change'
 const NO_CHANGES = 'There must be at least one field to change'
 
-// What a PATCH endpoint takes (see "Changes" in docs/design/server/README.md): any of the fields of `shape`, which are
-// those its PUT takes, each with its rules, but at least one, and no other.
+// What a PATCH endpoint takes (see "Changes" in docs/design/server/README.md): any of the fields of `shape`, each with
+// its rules, but at least one, and no other.
 export function changesTo<Shape extends z.ZodRawShape>(shape: Shape) {
   return z
     .strictObject(z.object(shape).partial().shape, { error: objectError(NOT_CHANGES) })

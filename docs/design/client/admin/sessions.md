@@ -387,7 +387,7 @@ its sets in the way is named without a link.
 - `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
   `PATCH /api/admin/sessions/:id`, to save the event as the session's.
 - `POST /api/admin/sessions`, for "nouvelle session".
-- `POST /api/admin/sessions/:id/sets`, `PUT /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
+- `POST /api/admin/sessions/:id/sets`, `PATCH /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
   `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,
   and `GET /api/admin/sessions`, in the panel that moves a set to another session, each time it opens.
 - `GET /api/admin/collectives`, in the session form, to pick a takeover's collective and list its artists first in a new
