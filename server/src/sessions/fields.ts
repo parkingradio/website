@@ -170,8 +170,9 @@ function checking<T>(broken: (value: T) => BrokenRule | null) {
 }
 
 // A session's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
-// sessions/links.ts). Each one on its own, as a change can send some of them (see `changesTo` in api/schemas.ts), then
-// together, in `SessionFields`.
+// sessions/links.ts). Each one on its own, as a change can send some of them (see `changesTo` in api/schemas.ts), then,
+// when a session is added, together, in `NewSessionFields`, while a change's are checked together on the session as it
+// would then be (see `brokenSessionRule`, which the store checks too).
 export const SESSION_FIELDS = {
   start: orNone(
     (sent) => {
@@ -199,12 +200,6 @@ export const SESSION_FIELDS = {
 }
 
 const NOT_A_SESSION = objectError('A session must be an object with its fields')
-
-export const SessionFields = z
-  .strictObject(SESSION_FIELDS, { error: NOT_A_SESSION })
-  .superRefine(checking(brokenSessionRule))
-  .meta({ id: 'SessionFields' })
-export type SessionFields = z.output<typeof SessionFields>
 
 const NO_PERFORMER = 'A set has at least one performer'
 
@@ -291,9 +286,8 @@ export const SetSession = z
   )
   .meta({ id: 'SetSession' })
 
-// What adding a session sends: its fields, with the same rules as `SessionFields`, which can't be extended once it's
-// refined, and the sets to add with it, in order, each with the fields that adding a set takes. Leaving them out adds
-// none.
+// What adding a session sends: its fields, which are checked together, and the sets to add with it, in order, each with
+// the fields that adding a set takes. Leaving them out adds none.
 export const NewSessionFields = z
   .strictObject(
     {
@@ -311,3 +305,5 @@ export const NewSessionFields = z
   .superRefine(checking(brokenSessionRule))
   .meta({ id: 'NewSessionFields' })
 export type NewSessionFields = z.output<typeof NewSessionFields>
+// A session's fields, as adding one sends them, without its sets.
+export type SessionFields = Omit<NewSessionFields, 'sets'>

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# The admin routes for artists work against a real database. The server's unit tests mock the database and the
-# photos, so this is what covers the artists table, emails being unique whatever their case, artists listed by name,
-# the transaction that changes an artist, profiles read back from the database, and photos kept on disk, then deleted,
-# or no photo at all. It also covers profiles that leave out what only admins can leave out, as the database keeps
-# them, including any number of artists without an email.
+# The admin routes for artists work against a real database. The server's unit tests mock the database and the photos,
+# so this is what covers the artists table, emails being unique whatever their case, artists listed by name, the
+# transaction that changes an artist, profiles read back from the database, and photos kept on disk, replaced on their
+# own, then deleted, or no photo at all. It also covers profiles that leave out what only admins can leave out, as the
+# database keeps them, including any number of artists without an email.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -25,11 +25,16 @@ login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
 cookie="$(session_cookie)"
 
-# artist <method> <url> <profile> [<photo file>] -- add or change an artist.
+# artist <method> <url> <profile> [<photo file>] -- add an artist.
 artist() {
     local photo=()
     if [ -n "${4:-}" ]; then photo=(--form "photo=@$4"); fi
     request --header "Cookie: ${cookie}" --request "$1" --form-string "artist=$3" ${photo[@]+"${photo[@]}"} "$2"
+}
+
+# photo <url> <photo file> -- give an artist a photo, or replace theirs.
+photo() {
+    request --header "Cookie: ${cookie}" --request PUT --form "photo=@$2" "$1"
 }
 
 echo "  artists can't be listed without a session"
@@ -80,7 +85,7 @@ expect_status 409
 other="${PROFILE/artiste@integration.test/other@integration.test}"
 artist POST "${BASE_URL}/api/admin/artists" "${other/DJ Test/ana}" "${PHOTOS}/photo.png"
 expect_status 200
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/artiste@integration.test/Other@integration.test}"
+json PATCH "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/artiste@integration.test/Other@integration.test}"
 expect_status 409
 
 echo "  artists are listed by name, whatever its case"
@@ -88,28 +93,29 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists"
 expect_status 200
 expect_body '"name":"ana".*"name":"DJ Test"'
 
-echo "  an artist is changed, keeping their photo, then with another one, which replaces it"
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/Une bio./Une nouvelle bio.}"
+echo "  an artist's every field is changed as JSON, keeping their photo, then another photo replaces it"
+json PATCH "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/Une bio./Une nouvelle bio.}"
 expect_status 200
 expect_body_contains '"bio":"Une nouvelle bio."'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_header Content-Type 'image/jpeg'
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "$PROFILE" "${PHOTOS}/photo.png"
+sql "update artists set updated_by = null where id = '${id}'" >/dev/null
+photo "${BASE_URL}/api/admin/artists/${id}/photo" "${PHOTOS}/photo.png"
 expect_status 200
+expect_body_contains '"bio":"Une nouvelle bio."'
+expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_header Content-Type 'image/png'
 [ "$(photos_on_disk)" = 2 ] && [ "$(sizes_on_disk)" = 4 ] || fail "expected the replaced photo to be deleted, with its sizes"
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/Une bio./Pas changée.}" "${PHOTOS}/cut.jpg"
+photo "${BASE_URL}/api/admin/artists/${id}/photo" "${PHOTOS}/cut.jpg"
 expect_status 400
 expect_body_contains 'La photo ne peut pas être lue'
-request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
-expect_body_contains '"bio":"Une bio."'
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_header Content-Type 'image/png'
 [ "$(photos_on_disk)" = 2 ] && [ "$(sizes_on_disk)" = 4 ] || fail "expected the photo that can't be read not to be stored"
 
-echo "  some of an artist's fields are changed as JSON, keeping the others and their photo, or removing it"
+echo "  some of an artist's fields are changed as JSON, keeping the others and their photo, which is then removed"
 json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"bio":"Une bio changée.","phone":null}'
 expect_status 200
 expect_body_contains '"bio":"Une bio changée."'
@@ -121,11 +127,11 @@ expect_status 409
 json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"bio":"x","hasPhoto":false}'
 expect_status 400
 expect_body_contains 'Unknown field: `hasPhoto`'
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE%\}},\"hasPhoto\":false}"
+artist POST "${BASE_URL}/api/admin/artists" "${PROFILE%\}},\"hasPhoto\":false}"
 expect_status 400
 expect_body_contains 'Unknown field: `hasPhoto`'
 photos="$(photos_on_disk)"
-json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"removePhoto":true}'
+json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_status 200
 expect_body_contains '"bio":"Une bio changée."'
 expect_body_contains '"hasPhoto":false'
@@ -148,15 +154,19 @@ id="$(body_id)"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_status 404
 expect_body_contains 'This artist has no photo'
-artist PUT "${BASE_URL}/api/admin/artists/${id}" "$photoless" "${PHOTOS}/photo.png"
+photo "${BASE_URL}/api/admin/artists/${id}/photo" "${PHOTOS}/photo.png"
 expect_status 200
 expect_body_contains '"hasPhoto":true'
 [ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected the artist's new photo on disk"
-request --header "Cookie: ${cookie}" --request PUT --form-string "artist=${photoless}" \
-    --form-string 'removePhoto=true' "${BASE_URL}/api/admin/artists/${id}"
+json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_status 200
 expect_body_contains '"hasPhoto":false'
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected the removed photo to be deleted"
+# Removing it again changes nothing, but still says who changed the artist.
+sql "update artists set updated_by = null where id = '${id}'" >/dev/null
+json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"
+expect_status 200
+expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\",\"updatedAt\""
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
 
@@ -180,7 +190,7 @@ echo "  an artist's email is taken out, which frees it for another artist"
 artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/libre@integration.test}"
 expect_status 200
 freed="$(body_id)"
-artist PUT "${BASE_URL}/api/admin/artists/${freed}" "${PROFILE/\"artiste@integration.test\"/null}"
+json PATCH "${BASE_URL}/api/admin/artists/${freed}" '{"email":null}'
 expect_status 200
 expect_body_contains '"email":null'
 artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/LIBRE@integration.test}"
@@ -193,6 +203,7 @@ for removed in "$id" "$anonymous" "$freed" "$taker"; do
 done
 
 echo "  an artist that doesn't exist can't be viewed, changed or deleted"
+photos="$(photos_on_disk)"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${NOBODY}"
 expect_status 404
 # Postgres refuses to look up an id that isn't a UUID, which mustn't fail differently.
@@ -200,11 +211,20 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/not-a-uuid"
 expect_status 404
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/not-a-uuid/photo"
 expect_status 404
-artist PUT "${BASE_URL}/api/admin/artists/not-a-uuid" "$PROFILE"
+json PATCH "${BASE_URL}/api/admin/artists/not-a-uuid" "$PROFILE"
+expect_status 404
+photo "${BASE_URL}/api/admin/artists/not-a-uuid/photo" "${PHOTOS}/photo.png"
+expect_status 404
+json DELETE "${BASE_URL}/api/admin/artists/not-a-uuid/photo"
 expect_status 404
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/not-a-uuid"
 expect_status 404
-artist PUT "${BASE_URL}/api/admin/artists/${NOBODY}" "$PROFILE"
+json PATCH "${BASE_URL}/api/admin/artists/${NOBODY}" "$PROFILE"
 expect_status 404
+photo "${BASE_URL}/api/admin/artists/${NOBODY}/photo" "${PHOTOS}/photo.png"
+expect_status 404
+json DELETE "${BASE_URL}/api/admin/artists/${NOBODY}/photo"
+expect_status 404
+[ "$(photos_on_disk)" = "$photos" ] || fail "expected the photos sent for artists that don't exist to be deleted"
 request --header "Cookie: ${cookie}" --request DELETE "${BASE_URL}/api/admin/artists/${NOBODY}"
 expect_status 404

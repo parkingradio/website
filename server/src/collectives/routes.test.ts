@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
+import { multipartBody } from '../api/test-multipart.js'
 import { EmailTaken } from '../artists/store.js'
 import { sizeKey } from '../artists/sizes.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
@@ -91,23 +92,9 @@ function profile(changes: Record<string, unknown> = {}) {
   }
 }
 
-// A multipart/form-data body, as adding or changing a collective takes it: the profile as JSON, the photo, and whether
-// to remove the photo.
-function multipart(collective: object, photo: Buffer | null = JPEG, removePhoto = false) {
-  const boundary = 'test-boundary'
-  const chunks: Buffer[] = [
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="collective"\r\n\r\n${JSON.stringify(collective)}\r\n`),
-  ]
-  if (removePhoto) chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="removePhoto"\r\n\r\ntrue\r\n`))
-  if (photo) {
-    chunks.push(
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),
-      photo,
-      Buffer.from('\r\n'),
-    )
-  }
-  chunks.push(Buffer.from(`--${boundary}--\r\n`))
-  return { payload: Buffer.concat(chunks), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } }
+// A multipart/form-data body, as adding a collective takes it: the profile as JSON, and the photo.
+function multipart(collective: object, photo: Buffer | null = JPEG) {
+  return multipartBody({ collective: JSON.stringify(collective), photo: photo ?? undefined })
 }
 
 async function buildApp() {
@@ -121,12 +108,13 @@ async function buildApp() {
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-async function send(app: App, method: 'POST' | 'PUT', url: string, collective: object, photo?: Buffer | null, removePhoto?: boolean) {
-  return app.inject({ method, url, ...multipart(collective, photo, removePhoto), cookies: await sessionCookies() })
+async function create(app: App, collective: object = profile(), photo?: Buffer | null) {
+  return app.inject({ method: 'POST', url: '/api/admin/collectives', ...multipart(collective, photo), cookies: await sessionCookies() })
 }
 
-async function create(app: App, collective: object = profile(), photo?: Buffer | null) {
-  return send(app, 'POST', '/api/admin/collectives', collective, photo)
+// Gives the collective a photo, or replaces its own, with these parts.
+async function putPhoto(app: App, url: string, parts: Parameters<typeof multipartBody>[0] = { photo: PNG }) {
+  return app.inject({ method: 'PUT', url, ...multipartBody(parts), cookies: await sessionCookies() })
 }
 
 async function request(app: App, method: 'GET' | 'DELETE', url: string, headers: Record<string, string> = {}) {
@@ -162,17 +150,26 @@ describe('collectives routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/collectives/collective-1' }),
       app.inject({ method: 'GET', url: '/api/admin/collectives/collective-1/photo' }),
       app.inject({ method: 'POST', url: '/api/admin/collectives', ...multipart(profile()) }),
-      app.inject({ method: 'PUT', url: '/api/admin/collectives/collective-1', ...multipart(profile()) }),
       app.inject({ method: 'PATCH', url: '/api/admin/collectives/collective-1', payload: { name: 'X' } }),
+      app.inject({ method: 'PUT', url: '/api/admin/collectives/collective-1/photo', ...multipartBody({ photo: PNG }) }),
+      app.inject({ method: 'DELETE', url: '/api/admin/collectives/collective-1/photo' }),
       app.inject({ method: 'DELETE', url: '/api/admin/collectives/collective-1' }),
     ]
     for (const response of await Promise.all(requests)) expect(response.statusCode).toBe(401)
 
+    await create(app)
     const cookies = await sessionCookies()
-    const headers = { ...multipart(profile()).headers, 'sec-fetch-site': 'cross-site' }
-    const response = await app.inject({ method: 'POST', url: '/api/admin/collectives', ...multipart(profile()), headers, cookies })
-    expect(response.statusCode).toBe(403)
-    expect(photos.store).not.toHaveBeenCalled()
+    const crossSite = { 'sec-fetch-site': 'cross-site' }
+    const refused = [
+      app.inject({ method: 'POST', url: '/api/admin/collectives', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...crossSite }, cookies }),
+      app.inject({ method: 'PATCH', url: '/api/admin/collectives/collective-1', payload: { name: 'X' }, headers: crossSite, cookies }),
+      app.inject({ method: 'PUT', url: '/api/admin/collectives/collective-1/photo', ...multipartBody({ photo: PNG }), headers: { ...multipartBody({}).headers, ...crossSite }, cookies }),
+      app.inject({ method: 'DELETE', url: '/api/admin/collectives/collective-1/photo', headers: crossSite, cookies }),
+      app.inject({ method: 'DELETE', url: '/api/admin/collectives/collective-1', headers: crossSite, cookies }),
+    ]
+    for (const response of await Promise.all(refused)) expect(response.statusCode).toBe(403)
+    expect(photos.store).toHaveBeenCalledTimes(1)
+    expect(rows[0]).toMatchObject({ name: 'Les Ondes', photoKey: 'collectives/photo-1.jpeg' })
   })
 
   describe('POST /api/admin/collectives', () => {
@@ -351,84 +348,55 @@ describe('collectives routes', () => {
     })
   })
 
-  describe('PUT /api/admin/collectives/:id', () => {
-    it('replaces the profile and members, keeps the photo when none is sent, and says who changed it', async () => {
+  describe('PUT /api/admin/collectives/:id/photo', () => {
+    const PHOTO = '/api/admin/collectives/collective-1/photo'
+
+    it('replaces the photo, deletes the previous one, keeps the profile, and says who changed it', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ description: 'Autre.', members: [{ id: 'artist-brume' }] }), null)
+      const response = await putPhoto(app, PHOTO)
       expect(response.statusCode).toBe(200)
-      expect(response.json().collective).toMatchObject({
-        description: 'Autre.',
-        members: [{ id: 'artist-brume', name: 'Brume' }],
-        hasPhoto: true,
-        updatedBy: 'admin@example.com',
-      })
-      expect(rows[0].photoKey).toBe('collectives/photo-1.jpeg')
-    })
-
-    it("takes out the contact's email, which frees it for another collective", async () => {
-      const app = await buildApp()
-      await create(app, profile(), null)
-      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ email: ' ' }), null)
-      expect(response.statusCode).toBe(200)
-      expect(response.json().collective.email).toBeNull()
-      const taker = await create(app, profile({ name: 'Autres Ondes' }), null)
-      expect(taker.statusCode).toBe(200)
-      expect(taker.json().collective.email).toBe('contact@example.com')
-    })
-
-    it('takes the members as the collective returns them', async () => {
-      const app = await buildApp()
-      const created = (await create(app)).json().collective
-      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members: created.members }), null)
-      expect(response.json().collective.members).toEqual(created.members)
-    })
-
-    it('replaces the photo when one is sent, or removes it when asked to, and deletes the previous one', async () => {
-      const app = await buildApp()
-      await create(app)
-      expect((await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), PNG)).statusCode).toBe(200)
+      expect(response.json().collective).toMatchObject({ name: 'Les Ondes', description: 'Une description.', hasPhoto: true, updatedBy: 'admin@example.com' })
       expect(photos.photos()).toEqual(['collectives/photo-2.png'])
-      const removed = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), null, true)
-      expect(removed.json().collective.hasPhoto).toBe(false)
-      expect(stored.size).toBe(0)
     })
 
-    it('refuses both a photo and removing it, without storing anything', async () => {
+    it('refuses a request without a photo, or one that can\'t be read, in French, leaving the collective as it was', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), PNG, true)
-      expect(response.statusCode).toBe(400)
-      expect(photos.store).toHaveBeenCalledTimes(1)
-    })
-
-    it('forgets the new photo, and keeps the collective as it was, when it cannot be changed', async () => {
-      const app = await buildApp()
-      await create(app)
-      await create(app, profile({ email: 'autre@example.com' }), null)
-      const taken = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ email: 'AUTRE@example.com' }), PNG)
-      expect(taken.statusCode).toBe(409)
-      const invalid = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members: [{ id: 'artist-nobody' }] }), PNG)
-      expect(invalid.json()).toEqual({ ok: false, error: NO_SUCH_MEMBER })
-      const missing = await send(app, 'PUT', '/api/admin/collectives/nobody', profile(), PNG)
-      expect(missing.statusCode).toBe(404)
-      expect(missing.json()).toEqual({ ok: false, error: 'No such collective' })
-      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
-      expect(rows[0]).toMatchObject({ email: 'contact@example.com', updatedBy: null })
-      const unreadable = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), UNREADABLE_JPEG)
+      expect((await putPhoto(app, PHOTO, {})).json()).toEqual({ ok: false, error: 'The request has no photo' })
+      const unreadable = await putPhoto(app, PHOTO, { photo: UNREADABLE_JPEG })
       expect(unreadable.statusCode).toBe(400)
+      expect(unreadable.json().error).toBe('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.')
       expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
       expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpeg', updatedBy: null })
     })
 
-    it("refuses the profile's fields it doesn't take, naming them, but ignores those of its members", async () => {
+    it('responds 404 for a collective that does not exist, and forgets the photo', async () => {
+      const app = await buildApp()
+      const response = await putPhoto(app, '/api/admin/collectives/nobody/photo')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such collective' })
+      expect(stored.size).toBe(0)
+    })
+  })
+
+  describe('DELETE /api/admin/collectives/:id/photo', () => {
+    it('removes the photo, deletes it, keeps the profile, and says who changed it, even without a photo', async () => {
       const app = await buildApp()
       await create(app)
-      const members = [{ id: 'artist-ana', name: 'Ana', extra: true }]
-      const response = await send(app, 'PUT', '/api/admin/collectives/collective-1', { ...profile({ members }), hasPhoto: true }, null)
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `hasPhoto`' })
-      expect((await send(app, 'PUT', '/api/admin/collectives/collective-1', profile({ members }), null)).statusCode).toBe(200)
+      await create(app, profile({ name: 'Autres', email: 'autre@example.com' }), null)
+      for (const id of ['collective-1', 'collective-2']) {
+        const response = await request(app, 'DELETE', `/api/admin/collectives/${id}/photo`)
+        expect(response.statusCode).toBe(200)
+        expect(response.json().collective).toMatchObject({ hasPhoto: false, updatedBy: 'admin@example.com' })
+      }
+      expect(rows[0]).toMatchObject({ name: 'Les Ondes', photoKey: null, photoType: null })
+      expect(stored.size).toBe(0)
+    })
+
+    it('responds 404 for a collective that does not exist', async () => {
+      const app = await buildApp()
+      expect((await request(app, 'DELETE', '/api/admin/collectives/nobody/photo')).json()).toEqual({ ok: false, error: 'No such collective' })
     })
   })
 
@@ -459,12 +427,34 @@ describe('collectives routes', () => {
       expect((await patch(app, '/api/admin/collectives/collective-1', { members: [{ id: 'nobody' }] })).json()).toEqual({ ok: false, error: NO_SUCH_MEMBER })
     })
 
-    it('removes the photo when asked to, and deletes it', async () => {
+    it("changes every field, as the admin pages' form sends them, keeping the photo", async () => {
       const app = await buildApp()
       await create(app)
-      const response = await patch(app, '/api/admin/collectives/collective-1', { removePhoto: true })
-      expect(response.json().collective).toMatchObject({ name: 'Les Ondes', hasPhoto: false })
-      expect(stored.size).toBe(0)
+      const response = await patch(app, '/api/admin/collectives/collective-1', profile({ description: 'Autre.', members: [{ id: 'artist-brume' }] }))
+      expect(response.statusCode).toBe(200)
+      expect(response.json().collective).toMatchObject({ description: 'Autre.', members: [{ id: 'artist-brume', name: 'Brume' }], hasPhoto: true })
+      expect(rows[0].photoKey).toBe('collectives/photo-1.jpeg')
+    })
+
+    it("takes out the contact's email, which frees it for another collective", async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      const response = await patch(app, '/api/admin/collectives/collective-1', { email: ' ' })
+      expect(response.statusCode).toBe(200)
+      expect(response.json().collective.email).toBeNull()
+      const taker = await create(app, profile({ name: 'Autres Ondes' }), null)
+      expect(taker.statusCode).toBe(200)
+      expect(taker.json().collective.email).toBe('contact@example.com')
+    })
+
+    it('takes the members as the collective returns them, ignoring their other fields', async () => {
+      const app = await buildApp()
+      const created = (await create(app)).json().collective
+      const response = await patch(app, '/api/admin/collectives/collective-1', { members: created.members })
+      expect(response.json().collective.members).toEqual(created.members)
+      const extra = await patch(app, '/api/admin/collectives/collective-1', { members: [{ id: 'artist-ana', name: 'Ana', extra: true }] })
+      expect(extra.statusCode).toBe(200)
+      expect(extra.json().collective.members).toEqual([{ id: 'artist-ana', name: 'Ana' }])
     })
 
     it('explains what is wrong, or responds 404 or 409, without changing the collective', async () => {
@@ -476,7 +466,7 @@ describe('collectives routes', () => {
       for (const [changes, error] of [
         [{ name: ' ' }, 'Indiquez le nom du collectif.'],
         [{ genres: [] }, 'Unknown field: `genres`'],
-        [{ removePhoto: 1 }, '« removePhoto » doit être true ou false.'],
+        [{ removePhoto: true }, 'Unknown field: `removePhoto`'],
         [{}, 'There must be at least one field to change'],
       ] as const) {
         expect((await patch(app, '/api/admin/collectives/collective-1', changes)).json()).toEqual({ ok: false, error })

@@ -5,6 +5,7 @@ import { DrizzleQueryError } from 'drizzle-orm'
 import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
+import { multipartBody } from '../api/test-multipart.js'
 import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
@@ -75,25 +76,9 @@ function profile(changes: Partial<Profile> = {}): Profile {
 // What admins can leave out of a profile, as it's saved when they do.
 const LEFT_OUT: Partial<Profile> = { country: '', city: '', genres: [], bio: '', links: {}, email: null, phone: '' }
 
-// A multipart/form-data body, as adding or changing an artist takes it: the profile as JSON, the photo, and whether to
-// remove the photo.
-function multipart(artist: object | string, photo: Buffer | null = JPEG, removePhoto = false) {
-  const boundary = 'test-boundary'
-  const chunks: Buffer[] = [
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="artist"\r\n\r\n`),
-    Buffer.from(typeof artist === 'string' ? artist : JSON.stringify(artist)),
-    Buffer.from('\r\n'),
-  ]
-  if (removePhoto) chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="removePhoto"\r\n\r\ntrue\r\n`))
-  if (photo) {
-    chunks.push(
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="photo"\r\nContent-Type: image/jpeg\r\n\r\n`),
-      photo,
-      Buffer.from('\r\n'),
-    )
-  }
-  chunks.push(Buffer.from(`--${boundary}--\r\n`))
-  return { payload: Buffer.concat(chunks), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } }
+// A multipart/form-data body, as adding an artist takes it: the profile as JSON, and the photo.
+function multipart(artist: object | string, photo: Buffer | null = JPEG) {
+  return multipartBody({ artist: typeof artist === 'string' ? artist : JSON.stringify(artist), photo: photo ?? undefined })
 }
 
 // `logs`, when given, gets every line the app logs.
@@ -108,12 +93,17 @@ async function buildApp(logs?: string[]) {
 
 type App = Awaited<ReturnType<typeof buildApp>>
 
-async function send(app: App, method: 'POST' | 'PUT', url: string, artist: object | string, photo?: Buffer | null, removePhoto?: boolean) {
-  return app.inject({ method, url, ...multipart(artist, photo, removePhoto), cookies: await sessionCookies() })
+async function create(app: App, artist: object | string = profile(), photo?: Buffer | null) {
+  return app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(artist, photo), cookies: await sessionCookies() })
 }
 
-async function create(app: App, artist: object | string = profile(), photo?: Buffer | null) {
-  return send(app, 'POST', '/api/admin/artists', artist, photo)
+// Gives the artist a photo, or replaces theirs, with these parts.
+async function putPhoto(app: App, url: string, parts: Parameters<typeof multipartBody>[0] = { photo: PNG }) {
+  return app.inject({ method: 'PUT', url, ...multipartBody(parts), cookies: await sessionCookies() })
+}
+
+async function deletePhoto(app: App, url: string) {
+  return app.inject({ method: 'DELETE', url, cookies: await sessionCookies() })
 }
 
 // Changes some of the artist's fields, as JSON.
@@ -147,8 +137,9 @@ describe('artists routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/artists/artist-1' }),
       app.inject({ method: 'GET', url: '/api/admin/artists/artist-1/photo' }),
       app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(profile()) }),
-      app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', ...multipart(profile()) }),
       app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', payload: { name: 'X' } }),
+      app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1/photo', ...multipartBody({ photo: PNG }) }),
+      app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1/photo' }),
       app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1' }),
     ]
     for (const response of await Promise.all(requests)) {
@@ -161,7 +152,8 @@ describe('artists routes', () => {
     const app = await buildApp()
     for (const [method, url] of [
       ['POST', '/api/admin/artists'],
-      ['PUT', '/api/admin/artists/artist-1'],
+      ['PATCH', '/api/admin/artists/artist-1'],
+      ['PUT', '/api/admin/artists/artist-1/photo'],
     ] as const) {
       for (const sent of [multipart('{not json'), { payload: 'null', headers: { 'content-type': 'application/json' } }, { payload: '{', headers: { 'content-type': 'application/json' } }]) {
         const response = await app.inject({ method, url, ...sent })
@@ -177,8 +169,9 @@ describe('artists routes', () => {
     const headers = { 'sec-fetch-site': 'cross-site' }
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/artists', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
-      app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', ...multipart(profile()), headers: { ...multipart(profile()).headers, ...headers }, cookies }),
       app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', payload: { name: 'X' }, headers, cookies }),
+      app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1/photo', ...multipartBody({ photo: PNG }), headers: { ...multipartBody({}).headers, ...headers }, cookies }),
+      app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1/photo', headers, cookies }),
       app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', headers, cookies }),
     ]
     for (const response of await Promise.all(requests)) {
@@ -319,6 +312,15 @@ describe('artists routes', () => {
         cookies: await sessionCookies(),
       })
       expect(response.statusCode).toBe(200)
+    })
+
+    it('takes the profile in a part that says it is JSON', async () => {
+      const app = await buildApp()
+      const { payload, headers } = multipart(profile({ bio: 'Une autre bio.' }), null)
+      const json = Buffer.from(payload.toString('latin1').replace('name="artist"\r\n', 'name="artist"\r\nContent-Type: application/json\r\n'), 'latin1')
+      const response = await app.inject({ method: 'POST', url: '/api/admin/artists', payload: json, headers, cookies: await sessionCookies() })
+      expect(response.statusCode).toBe(200)
+      expect(rows[0]).toMatchObject({ bio: 'Une autre bio.' })
     })
 
     it("refuses the profile's fields it doesn't take, naming them, without storing the photo", async () => {
@@ -496,13 +498,13 @@ describe('artists routes', () => {
       const app = await buildApp()
       await create(app, profile(), PNG)
       const etag = (await get(app, PHOTO)).headers.etag as string
-      await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), JPEG)
+      await putPhoto(app, PHOTO, { photo: JPEG })
       const replaced = await get(app, PHOTO, { 'if-none-match': etag })
       expect(replaced.statusCode).toBe(200)
       expect(replaced.rawPayload).toEqual(JPEG)
       expect(replaced.headers.etag).not.toBe(etag)
 
-      await patch(app, '/api/admin/artists/artist-1', { removePhoto: true })
+      await deletePhoto(app, PHOTO)
       const removed = await get(app, PHOTO, { 'if-none-match': replaced.headers.etag as string })
       expect(removed.statusCode).toBe(404)
       expect(removed.json()).toEqual({ ok: false, error: 'This artist has no photo' })
@@ -637,74 +639,16 @@ describe('artists routes', () => {
     })
   })
 
-  describe('PUT /api/admin/artists/:id', () => {
-    it('replaces the profile, keeps the photo when none is sent, and says who changed it', async () => {
+  describe('PUT /api/admin/artists/:id/photo', () => {
+    const PHOTO = '/api/admin/artists/artist-1/photo'
+
+    it('replaces the photo, deletes the previous one, keeps the profile, and says who changed it', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.', city: 'Lévis' }), null)
-
+      const response = await putPhoto(app, PHOTO)
       expect(response.statusCode).toBe(200)
-      expect(response.json().artist).toMatchObject({ id: 'artist-1', bio: 'Une nouvelle bio.', city: 'Lévis', updatedBy: 'admin@example.com' })
+      expect(response.json().artist).toMatchObject({ ...profile({ links: { soundcloud: 'parkingdotradio', instagram: 'parking.radio' } }), hasPhoto: true, updatedBy: 'admin@example.com' })
       expect(response.json().artist.updatedAt).toEqual(expect.any(String))
-      expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.', photoKey: 'artists/photo-1.jpeg' })
-      expect(photos.delete).not.toHaveBeenCalled()
-    })
-
-    it("takes out the artist's country, city, genres, bio, links, email and phone", async () => {
-      const app = await buildApp()
-      await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(LEFT_OUT), null)
-      expect(response.statusCode).toBe(200)
-      expect(response.json().artist).toMatchObject(LEFT_OUT)
-    })
-
-    it('frees the email it takes out for another artist', async () => {
-      const app = await buildApp()
-      await create(app, profile(), null)
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', { ...profile(), email: ' ' }, null)).json().artist.email).toBeNull()
-      const response = await create(app, profile({ name: 'Autre DJ' }), null)
-      expect(response.statusCode).toBe(200)
-      expect(response.json().artist.email).toBe('artiste@example.com')
-    })
-
-    it('keeps the photo when the photo sent is empty, as a form sends when no file was chosen', async () => {
-      const app = await buildApp()
-      await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.' }), Buffer.alloc(0))
-      expect(response.statusCode).toBe(200)
-      expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.', photoKey: 'artists/photo-1.jpeg' })
-      expect(photos.store).toHaveBeenCalledTimes(1)
-    })
-
-    it('ignores files sent as anything but the photo, with or without a photo', async () => {
-      const app = await buildApp()
-      await create(app)
-      const file = Buffer.from('--test-boundary\r\nContent-Disposition: form-data; name="other"; filename="x"\r\n\r\nxyz\r\n')
-      const put = async (photo: Buffer | null) => {
-        const { payload, headers } = multipart(profile({ bio: 'Une nouvelle bio.' }), photo)
-        return app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: Buffer.concat([file, payload]), headers, cookies: await sessionCookies() })
-      }
-      expect((await put(null)).statusCode).toBe(200)
-      expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.', photoKey: 'artists/photo-1.jpeg' })
-      expect((await put(PNG)).statusCode).toBe(200)
-      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png' })
-    })
-
-    it('takes the profile in a part that says it is JSON', async () => {
-      const app = await buildApp()
-      await create(app)
-      const { payload, headers } = multipart(profile({ bio: 'Une nouvelle bio.' }), null)
-      const json = Buffer.from(payload.toString('latin1').replace('name="artist"\r\n', 'name="artist"\r\nContent-Type: application/json\r\n'), 'latin1')
-      const response = await app.inject({ method: 'PUT', url: '/api/admin/artists/artist-1', payload: json, headers, cookies: await sessionCookies() })
-      expect(response.statusCode).toBe(200)
-      expect(rows[0]).toMatchObject({ bio: 'Une nouvelle bio.' })
-    })
-
-    it('replaces the photo when one is sent, and deletes the previous one', async () => {
-      const app = await buildApp()
-      await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)
-      expect(response.statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png', photoType: 'image/png' })
       expect([...stored.keys()]).toEqual(['artists/photo-2.png', sizeKey('artists/photo-2.png', 320), sizeKey('artists/photo-2.png', 1280)])
     })
@@ -712,110 +656,127 @@ describe('artists routes', () => {
     it('gives a photo to an artist who had none', async () => {
       const app = await buildApp()
       await create(app, profile(), null)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)
+      const response = await putPhoto(app, PHOTO)
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ hasPhoto: true })
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.png', photoType: 'image/png' })
       expect(photos.delete).not.toHaveBeenCalled()
     })
 
-    it('removes the photo when asked to, and deletes it', async () => {
+    it('ignores fields and files sent as anything but the photo, e.g. a profile', async () => {
       const app = await buildApp()
       await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), null, true)
+      const response = await putPhoto(app, PHOTO, { artist: JSON.stringify(profile({ bio: 'Ignorée.' })), other: Buffer.from('xyz'), photo: PNG })
       expect(response.statusCode).toBe(200)
-      expect(response.json().artist).toMatchObject({ hasPhoto: false, updatedBy: 'admin@example.com' })
-      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
-      expect(stored.size).toBe(0)
+      expect(rows[0]).toMatchObject({ bio: 'Une bio.', photoKey: 'artists/photo-2.png' })
     })
 
-    it('removes nothing from an artist who has no photo', async () => {
-      const app = await buildApp()
-      await create(app, profile(), null)
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), null, true)).statusCode).toBe(200)
-      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
-      expect(photos.delete).not.toHaveBeenCalled()
-    })
-
-    it('keeps the photo when it cannot be removed, e.g. for an email that is taken, or an artist who does not exist', async () => {
+    it('refuses a request without a photo, or with an empty one, as a form sends when no file was chosen', async () => {
       const app = await buildApp()
       await create(app)
-      await create(app, profile({ email: 'other@example.com' }), null)
-      const taken = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ email: 'other@example.com' }), null, true)
-      expect(taken.statusCode).toBe(409)
-      expect((await send(app, 'PUT', '/api/admin/artists/nobody', profile(), null, true)).statusCode).toBe(404)
-      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', photoType: 'image/jpeg' })
-      expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
-      expect(photos.delete).not.toHaveBeenCalled()
-    })
-
-    it('refuses both a photo and removing it, without storing anything', async () => {
-      const app = await buildApp()
-      await create(app)
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG, true)
-      expect(response.statusCode).toBe(400)
-      expect(response.json()).toEqual({ ok: false, error: 'Invalid request' })
-      expect(photos.store).toHaveBeenCalledTimes(1)
+      for (const parts of [{}, { photo: Buffer.alloc(0) }, { artist: JSON.stringify(profile()) }]) {
+        const response = await putPhoto(app, PHOTO, parts)
+        expect(response.statusCode).toBe(400)
+        expect(response.json()).toEqual({ ok: false, error: 'The request has no photo' })
+      }
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg', updatedBy: null })
     })
 
-    it("changes the email, unless it's another artist's", async () => {
+    it('refuses more than one photo, and malformed requests, without storing anything', async () => {
       const app = await buildApp()
       await create(app)
-      await create(app, profile({ email: 'other@example.com' }))
+      const cookies = await sessionCookies()
+      const refused = [
+        await putPhoto(app, PHOTO, [['photo', PNG], ['photo', JPEG]]),
+        await app.inject({ method: 'PUT', url: PHOTO, payload: PNG, headers: { 'content-type': 'image/png' }, cookies }),
+        await app.inject({ method: 'PUT', url: PHOTO, payload: 'x', headers: { 'content-type': 'multipart/form-data' }, cookies }),
+      ]
+      // The photo itself as the body is a type it doesn't take.
+      expect(refused.map((response) => response.statusCode)).toEqual([400, 415, 400])
+      for (const response of refused) expect(response.json()).toMatchObject({ ok: false })
+      expect(refused[0].json()).toEqual({ ok: false, error: 'Invalid request' })
+      expect(photos.store).toHaveBeenCalledTimes(1)
+    })
 
-      // The artist's own email, in another case, is fine.
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ email: 'ARTISTE@example.com' }), null)).statusCode).toBe(200)
-      const taken = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ email: 'Other@Example.com' }), PNG)
-      expect(taken.statusCode).toBe(409)
-      expect(rows[0].email).toBe('ARTISTE@example.com')
-      // The photo that came with it is forgotten, and the artist keeps theirs.
-      expect(photos.photos()).toEqual(['artists/photo-1.jpeg', 'artists/photo-2.jpeg'])
+    it('checks the photo like when adding an artist, in French, leaving the artist and their photo as they were', async () => {
+      const app = await buildApp()
+      await create(app)
+      const before = { ...rows[0] }
+      const invalid = [
+        [Buffer.from('%PDF-1.7'), 400, 'La photo doit être en JPEG, PNG ou WebP.'],
+        [UNREADABLE_JPEG, 400, 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'],
+        [Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]), 413, 'La photo dépasse 10 Mo.'],
+      ] as const
+      for (const [photo, status, error] of invalid) {
+        const response = await putPhoto(app, PHOTO, { photo })
+        expect(response.statusCode).toBe(status)
+        expect(response.json()).toEqual({ ok: false, error })
+      }
+      expect(rows[0]).toEqual(before)
+      expect(photos.store).toHaveBeenCalledTimes(1)
+      expect(photos.delete).not.toHaveBeenCalled()
+    })
+
+    it('responds 404 for an artist that does not exist, and forgets the photo', async () => {
+      const app = await buildApp()
+      const response = await putPhoto(app, '/api/admin/artists/nobody/photo')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such artist' })
+      expect(stored.size).toBe(0)
     })
 
     it('forgets the new photo when the artist cannot be saved, and keeps theirs', async () => {
       const app = await buildApp()
       await create(app)
       vi.mocked(store.update).mockRejectedValueOnce(new Error('database is down'))
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)).statusCode).toBe(500)
+      expect((await putPhoto(app, PHOTO)).statusCode).toBe(500)
       expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
     })
 
-    it('changes the artist even when their previous photo cannot be deleted', async () => {
+    it('replaces the photo even when the previous one cannot be deleted', async () => {
       const app = await buildApp()
       await create(app)
       photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), PNG)
-      expect(response.statusCode).toBe(200)
+      expect((await putPhoto(app, PHOTO)).statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png' })
     })
+  })
 
-    it('responds 404 for an artist that does not exist, and forgets the photo', async () => {
+  describe('DELETE /api/admin/artists/:id/photo', () => {
+    const PHOTO = '/api/admin/artists/artist-1/photo'
+
+    it('removes the photo, deletes it, keeps the profile, and says who changed it', async () => {
       const app = await buildApp()
-      const response = await send(app, 'PUT', '/api/admin/artists/nobody', profile(), JPEG)
-      expect(response.statusCode).toBe(404)
+      await create(app)
+      const response = await deletePhoto(app, PHOTO)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ name: 'DJ Test', bio: 'Une bio.', hasPhoto: false, updatedBy: 'admin@example.com' })
+      expect(rows[0]).toMatchObject({ photoKey: null, photoType: null })
       expect(stored.size).toBe(0)
     })
 
-    it('checks the profile and photo like when adding an artist', async () => {
+    it('removes nothing from an artist who has no photo, but still says who changed them', async () => {
       const app = await buildApp()
-      await create(app)
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ genres: ['polka' as never] }), null)).statusCode).toBe(400)
-      expect((await send(app, 'PUT', '/api/admin/artists/artist-1', profile(), Buffer.from('%PDF-1.7'))).statusCode).toBe(400)
-      expect(rows[0].updatedBy).toBeNull()
+      await create(app, profile(), null)
+      const response = await deletePhoto(app, PHOTO)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist).toMatchObject({ hasPhoto: false, updatedBy: 'admin@example.com' })
+      expect(photos.delete).not.toHaveBeenCalled()
     })
 
-    it("refuses a photo that can't be read, leaving the artist and their photo as they were", async () => {
+    it('removes the photo even when it cannot be deleted', async () => {
       const app = await buildApp()
       await create(app)
-      const before = { ...rows[0] }
-      const response = await send(app, 'PUT', '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.' }), UNREADABLE_JPEG)
-      expect(response.statusCode).toBe(400)
-      expect(response.json().error).toBe('La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.')
-      expect(rows[0]).toEqual(before)
-      expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg', sizeKey('artists/photo-1.jpeg', 320), sizeKey('artists/photo-1.jpeg', 1280)])
-      expect(photos.store).toHaveBeenCalledTimes(1)
-      expect(photos.delete).not.toHaveBeenCalled()
+      photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+      expect((await deletePhoto(app, PHOTO)).statusCode).toBe(200)
+      expect(rows[0]).toMatchObject({ photoKey: null })
+    })
+
+    it('responds 404 for an artist that does not exist', async () => {
+      const app = await buildApp()
+      const response = await deletePhoto(app, '/api/admin/artists/nobody/photo')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'No such artist' })
     })
   })
 
@@ -843,22 +804,32 @@ describe('artists routes', () => {
       expect(response.json().artist).toMatchObject({ name: 'DJ Test', ...LEFT_OUT })
     })
 
-    it('removes the photo when asked to, and deletes it, or keeps it', async () => {
+    it("changes every field, as the admin pages' form sends them, keeping the photo", async () => {
       const app = await buildApp()
       await create(app)
-      expect((await patch(app, '/api/admin/artists/artist-1', { removePhoto: false })).json().artist.hasPhoto).toBe(true)
-      expect(photos.photos()).toHaveLength(1)
-      const response = await patch(app, '/api/admin/artists/artist-1', { removePhoto: true })
+      const response = await patch(app, '/api/admin/artists/artist-1', profile({ bio: 'Une nouvelle bio.', city: 'Lévis' }))
       expect(response.statusCode).toBe(200)
-      expect(response.json().artist).toMatchObject({ name: 'DJ Test', bio: 'Une bio.', hasPhoto: false })
-      expect(stored.size).toBe(0)
+      expect(response.json().artist).toMatchObject({ bio: 'Une nouvelle bio.', city: 'Lévis', hasPhoto: true })
+      expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg' })
+      expect(photos.delete).not.toHaveBeenCalled()
+    })
+
+    it('frees the email it takes out for another artist', async () => {
+      const app = await buildApp()
+      await create(app, profile(), null)
+      expect((await patch(app, '/api/admin/artists/artist-1', { email: ' ' })).json().artist.email).toBeNull()
+      const response = await create(app, profile({ name: 'Autre DJ' }), null)
+      expect(response.statusCode).toBe(200)
+      expect(response.json().artist.email).toBe('artiste@example.com')
     })
 
     it("refuses an email that's another artist's, and an artist that doesn't exist, keeping the photo", async () => {
       const app = await buildApp()
       await create(app)
       await create(app, profile({ email: 'other@example.com' }), null)
-      const taken = await patch(app, '/api/admin/artists/artist-1', { email: 'Other@example.com', removePhoto: true })
+      // The artist's own email, in another case, is fine.
+      expect((await patch(app, '/api/admin/artists/artist-1', { email: 'ARTISTE@example.com' })).statusCode).toBe(200)
+      const taken = await patch(app, '/api/admin/artists/artist-1', { email: 'Other@example.com' })
       expect(taken.statusCode).toBe(409)
       expect(taken.json()).toEqual({ ok: false, error: 'Another artist has this email address' })
       expect((await patch(app, '/api/admin/artists/nobody', { name: 'X' })).statusCode).toBe(404)
@@ -873,7 +844,7 @@ describe('artists routes', () => {
         [{ genres: ['polka'] }, "Un des genres n'est pas dans la liste."],
         [{ name: 'X\u0000' }, "Le nom d'artiste contient un caractère invalide."],
         [{ name: 'X', hasPhoto: false }, 'Unknown field: `hasPhoto`'],
-        [{ removePhoto: 'true' }, '« removePhoto » doit être true ou false.'],
+        [{ removePhoto: true }, 'Unknown field: `removePhoto`'],
         [{}, 'There must be at least one field to change'],
         [null, 'The changes must be an object with the fields to change'],
       ] as const
@@ -885,7 +856,7 @@ describe('artists routes', () => {
       expect(rows[0].updatedBy).toBeNull()
     })
 
-    it('refuses a multipart request, which only PUT takes', async () => {
+    it('refuses a multipart request, which only adding an artist takes', async () => {
       const app = await buildApp()
       await create(app)
       const response = await app.inject({ method: 'PATCH', url: '/api/admin/artists/artist-1', ...multipart(profile(), PNG), cookies: await sessionCookies() })

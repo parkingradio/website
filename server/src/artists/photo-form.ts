@@ -2,7 +2,7 @@ import { Readable } from 'node:stream'
 import type { FastifyContextConfig, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { ApiError, ById, firstIssue, nulError } from '../api/schemas.js'
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from './profile.js'
+import { PHOTO_MAX_BYTES, PHOTO_TYPES, PhotoFile } from './profile.js'
 import { PHOTO_WIDTHS, SIZE_TYPE, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
 import { InvalidProfile, PHOTO_ERRORS, readPhoto, validateProfile } from './store.js'
@@ -93,19 +93,18 @@ export function jsonField(value: unknown): unknown {
 
 export const INVALID_REQUEST = { status: 400, error: 'Invalid request' } as const
 
-// Reads the profile, as JSON from the part `part`, and the photo from a request that adds or changes an artist or a
-// collective, and checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character
-// (see `refusingNul` in api/schemas.ts), along with the "removePhoto" field, which only changing one reads. Returns the
-// checked profile and photo, with its sizes (null when there's none), or the error to reply with when the request is
-// malformed or invalid, e.g. when the photo can't be read, with where in the profile, when it's about one of its fields.
-// A session's fields and flyer are read the same way, with `photoPart` naming the flyer's part, `remove` the field that
-// removes it, and `errors` what's wrong with it.
+// Reads the profile, as JSON from the part `part`, and the photo from a request that adds an artist or a collective, and
+// checks them, the profile against `schema`, then as Fastify checks a JSON body for the NUL character (see `refusingNul`
+// in api/schemas.ts). Returns the checked profile and photo, with its sizes (null when there's none), or the error to
+// reply with when the request is malformed or invalid, e.g. when the photo can't be read, with where in the profile, when
+// it's about one of its fields. A session's fields and flyer are read the same way, with `photoPart` naming the flyer's
+// part, and `errors` what's wrong with it.
 export async function readProfileForm<Schema extends z.ZodType>(
   request: FastifyRequest,
   part: string,
   schema: Schema,
-  { photoPart = 'photo', remove = 'removePhoto', errors = PHOTO_ERRORS }: { photoPart?: string; remove?: string; errors?: PhotoErrors } = {},
-): Promise<{ profile: z.output<Schema>; photo: SizedPhoto | null; removePhoto: boolean } | { status: 400 | 413; error: string; path?: PropertyKey[] }> {
+  { photoPart = 'photo', errors = PHOTO_ERRORS }: { photoPart?: string; errors?: PhotoErrors } = {},
+): Promise<{ profile: z.output<Schema>; photo: SizedPhoto | null } | { status: 400 | 413; error: string; path?: PropertyKey[] }> {
   const form = await readPhotoForm(request, { photoPart })
   if (form === 'malformed') return INVALID_REQUEST
   if ('tooLarge' in form) return { status: 413, error: errors.tooLarge }
@@ -115,10 +114,35 @@ export async function readProfileForm<Schema extends z.ZodType>(
     const profile = validateProfile(sent, schema)
     const nul = nulError(profile)
     if (nul) return { status: 400, ...nul }
-    return { profile, photo: await readPhoto(form.photo, errors), removePhoto: form.fields[remove] === 'true' }
+    return { profile, photo: await readPhoto(form.photo, errors) }
   } catch (error) {
     if (!(error instanceof InvalidProfile)) throw error
     return { status: 400, error: error.message, path: error.path }
+  }
+}
+
+// What giving an artist or a collective a photo, or replacing theirs, sends, as multipart/form-data, which the route reads
+// with `readImageForm`.
+export const PhotoForm = z.object({ photo: PhotoFile })
+
+// Reads the photo, or the flyer, from the part `part` of a request that only sends it, to give an artist or a collective
+// a photo, or a session a flyer, and checks it. Other fields and files are ignored, but not a second photo (see
+// `readPhotoForm`). Returns it, with its sizes, or the error to reply with when the request is malformed, has none, or
+// when it's invalid, which `errors` says.
+export async function readImageForm(
+  request: FastifyRequest,
+  part: 'photo' | 'flyer',
+  errors: PhotoErrors,
+): Promise<{ image: SizedPhoto } | { status: 400 | 413; error: string }> {
+  const form = await readPhotoForm(request, { photoPart: part })
+  if (form === 'malformed') return INVALID_REQUEST
+  if ('tooLarge' in form) return { status: 413, error: errors.tooLarge }
+  try {
+    const image = await readPhoto(form.photo, errors)
+    return image ? { image } : { status: 400, error: `The request has no ${part}` }
+  } catch (error) {
+    if (!(error instanceof InvalidProfile)) throw error
+    return { status: 400, error: error.message }
   }
 }
 

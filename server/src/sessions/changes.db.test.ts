@@ -33,23 +33,23 @@ async function request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url:
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
-async function sendForm(method: 'POST' | 'PUT', url: string, part: string, fields: object) {
-  return app.inject({ method, url, ...multipartBody({ [part]: JSON.stringify(fields) }), cookies: await sessionCookies() })
+async function sendForm(url: string, part: string, fields: object) {
+  return app.inject({ method: 'POST', url, ...multipartBody({ [part]: JSON.stringify(fields) }), cookies: await sessionCookies() })
 }
 
 async function createArtist(name: string): Promise<string> {
-  return (await sendForm('POST', '/api/admin/artists', 'artist', { name })).json().artist.id
+  return (await sendForm('/api/admin/artists', 'artist', { name })).json().artist.id
 }
 
 async function createCollective(name: string, members: object[]): Promise<string> {
-  const response = await sendForm('POST', '/api/admin/collectives', 'collective', { name, members })
+  const response = await sendForm('/api/admin/collectives', 'collective', { name, members })
   expect(response.statusCode).toBe(200)
   return response.json().collective.id
 }
 
 async function createSession(fields: object): Promise<string> {
   const session = { start: '2026-11-14T21:00-05:00', durationMinutes: 120, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '', ...fields }
-  const response = await sendForm('POST', '/api/admin/sessions', 'session', session)
+  const response = await sendForm('/api/admin/sessions', 'session', session)
   expect(response.statusCode).toBe(200)
   return response.json().session.id
 }
@@ -148,10 +148,7 @@ describe('PATCH /api/admin/sessions/:id', () => {
     expect((await request('PATCH', `/api/admin/sessions/${late}`, { durationMinutes: 30 })).statusCode).toBe(200)
 
     const fields = { start: '2999-12-31T18:00-05:00', durationMinutes: 61, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '' }
-    const put = await sendForm('PUT', `/api/admin/sessions/${late}`, 'session', fields)
-    expect(put.statusCode).toBe(400)
-    expect(put.json()).toEqual(ENDS_BY_3000)
-    const post = await sendForm('POST', '/api/admin/sessions', 'session', fields)
+    const post = await sendForm('/api/admin/sessions', 'session', fields)
     expect(post.statusCode).toBe(400)
     expect(post.json()).toEqual(ENDS_BY_3000)
   })

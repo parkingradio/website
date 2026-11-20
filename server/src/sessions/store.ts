@@ -37,6 +37,8 @@ export type StoredSession = SessionRow & { takeover: Reference | null; applicati
 // and a set's position, which the store gives it.
 export type SessionChanges = Pick<SessionRow, 'startAt' | 'durationMinutes' | 'type' | 'name' | 'takeoverId' | 'applicationId' | 'raEventId' | 'description'>
 export type StoredFlyer = { flyerKey: string; flyerType: string } | { flyerKey: null; flyerType: null }
+// What a session without a flyer stores, e.g. once it's removed.
+export const NO_FLYER: StoredFlyer = { flyerKey: null, flyerType: null }
 export type SetChanges = Pick<
   SetRow,
   | 'durationMinutes'
@@ -141,9 +143,9 @@ export type SessionsStore = {
   // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none. Throws
   // a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about one.
   create(session: SessionChanges & StoredFlyer & { createdBy: string }, sets: NewSet[]): Promise<StoredSession>
-  // Changes the session's fields that `changes` has, all of them when they're replaced, and its flyer when there's a new
-  // one, or nulls to remove it, but not its status, whether it's announced, or its sets. Returns the session as it was,
-  // so that a flyer that was replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a
+  // Changes the session's fields that `changes` has, and its flyer when there's a new one, or nulls to remove it, but not
+  // its status, whether it's announced, or its sets. Returns the session as it was, so that a flyer that was replaced or
+  // removed can be deleted, and as it is then. Throws a BrokenFields, a
   // NoSuchReference or a Conflict.
   update(
     id: string,

@@ -29,6 +29,11 @@ export function CountryField({ country, onChange, error, onLeave }: GroupProps<s
   )
 }
 
+// What a form changes of an item's photo or flyer: the one picked, which replaces it, 'remove' to remove it, or null to
+// leave it as it is. Pages that change an item save it after its fields, with an endpoint of its own (see "An artist's
+// page" in docs/design/client/admin/artistes.md).
+export type ImageChange = File | 'remove' | null
+
 // What the field says of the image it picks, a photo or a flyer, whose genders differ.
 const IMAGE_TEXTS = {
   photo: {

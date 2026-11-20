@@ -260,9 +260,9 @@ function sessionBody(context: Context, { start, durationMinutes, kind: { type, t
   }
 }
 
-// Adds or changes a session, which is sent as multipart/form-data, without a flyer.
-function sendSession({ app, cookies }: Context, method: 'POST' | 'PUT', url: string, session: object) {
-  return app.inject({ method, url, ...multipartBody({ session: JSON.stringify(session) }), cookies })
+// Adds a session, which is sent as multipart/form-data, without a flyer.
+function sendSession({ app, cookies }: Context, session: object) {
+  return app.inject({ method: 'POST', url: '/api/admin/sessions', ...multipartBody({ session: JSON.stringify(session) }), cookies })
 }
 
 // The SoundCloud tracks, by the links that lead to them, and one where SoundCloud shows none.
@@ -406,7 +406,7 @@ const OPERATIONS = {
     async run(context, { session, sets }) {
       const count = async () => (await context.database.db.execute<{ count: number }>(sql`select (select count(*) from sessions) + (select count(*) from sets) as count`)).rows[0].count
       const before = await count()
-      const response = await sendSession(context, 'POST', '/api/admin/sessions', { ...sessionBody(context, session), sets: sets.map((set) => setBody(context, set)) })
+      const response = await sendSession(context, { ...sessionBody(context, session), sets: sets.map((set) => setBody(context, set)) })
       if (response.statusCode === 200) {
         const added = response.json().session as Session
         expect(added.sets).toHaveLength(sets.length)
@@ -435,20 +435,15 @@ const OPERATIONS = {
     },
   } satisfies Operation<NewSessionArgs>,
 
-  updateSession: {
-    weight: 3,
-    args: fc.record({ session: fc.nat(), fields: SessionFields }),
-    run: (context, { session, fields }) => sendSession(context, 'PUT', `/api/admin/sessions/${pick(context.ids.sessions, session)}`, sessionBody(context, fields)),
-    conflicts: {
-      [SESSION_OVERLAPS]: (body, { session, fields }, context) =>
-        expectOverlappingSession(body.session, pick(context.ids.sessions, session), period(fields.start!, fields.durationMinutes)),
-    },
-  } satisfies Operation<{ session: number; fields: SessionArgs }>,
-
-  // Changes some of the session's fields: the rules are checked on the session as it would then be.
+  // Changes some of the session's fields, or every one of them, as the admin pages' form does: the rules are checked on
+  // the session as it would then be.
   patchSession: {
-    weight: 3,
-    args: fc.record({ session: fc.nat(), fields: SessionFields, sent: fc.subarray(SESSION_FIELD_NAMES, { minLength: 1 }) }),
+    weight: 6,
+    args: fc.record({
+      session: fc.nat(),
+      fields: SessionFields,
+      sent: fc.oneof(fc.constant(SESSION_FIELD_NAMES), fc.subarray(SESSION_FIELD_NAMES, { minLength: 1 })),
+    }),
     run: (context, { session, fields, sent }) =>
       send(context, 'PATCH', `/api/admin/sessions/${pick(context.ids.sessions, session)}`, only(sessionBody(context, fields), sent)),
     conflicts: {

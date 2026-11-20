@@ -79,10 +79,10 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
-- The endpoints of photos and flyers, which aren't JSON.
-- The `PUT` endpoints that replace an artist, a collective or a session: their `PATCH` endpoints are the tools that
-  change them, e.g. `update_artist`, which only send what they change, so that they can't erase what they leave out,
-  e.g. the email and the phone they never see.
+- The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
+  or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and
+  `PUT /api/admin/sessions/:id/flyer`, since tools can't send them (see [Arguments](#arguments)). Those that remove
+  them are tools, e.g. `delete_session_flyer`.
 
 There's also [`read_documentation`](#read_documentation).
 
@@ -109,7 +109,8 @@ new set's `soundcloudTrack`, or a new session's `start`, which makes a session w
 those of the objects in a list in it, e.g. the sets of a new session. The tools of `PATCH` endpoints take every field as
 optional, as their endpoints do, and their descriptions say that only what they're given changes, and that a list or an
 object they're given replaces the whole one (see [Changes, in Conventions](README.md#conventions)). So what's changed
-with a tool keeps its photo or its flyer, unless `removePhoto` or `removeFlyer` is `true`.
+with a tool keeps its photo or its flyer, which tools only remove with `delete_artist_photo`, `delete_collective_photo`
+and `delete_session_flyer`.
 
 ### Results
 

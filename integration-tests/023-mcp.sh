@@ -90,6 +90,14 @@ expect_body_lacks '\"phone\"'
 [ "$(sql "select coalesce(email, 'none') || ' ' || phone from artists where id = '${artist}'")" = "none 514 555 0123" ] \
     || fail "expected the email to be removed, and the phone to stay"
 
+echo "  the artist's photo, which tools can't send, is removed, which gives the artist without their phone"
+sql "update artists set photo_key = 'artists/mcp.png', photo_type = 'image/png' where id = '${artist}'" >/dev/null
+call delete_artist_photo "{\"id\":\"${artist}\"}"
+expect_body_lacks '"isError"'
+expect_body_contains '\"hasPhoto\":false'
+expect_body_lacks '\"phone\"'
+[ "$(sql "select coalesce(photo_key, 'none') from artists where id = '${artist}'")" = none ] || fail "expected the photo to be removed"
+
 echo "  read_documentation gives the instructions, then the rules from the image's design documents"
 call read_documentation '{"area":"sessions"}'
 expect_body_contains "\"text\":\"This is Parking Radio's development environment, not the production site"
@@ -163,12 +171,12 @@ expect_body_contains "\\\"sets\\\":[{\\\"id\\\":\\\"${other}\\\""
     || fail "expected the session to be done, as the admin who connected the app"
 call delete_set "{\"id\":\"${other}\"}"
 
-echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, unless it's removed"
+echo "  a session's description alone is changed, keeping the rest and its flyer, which tools can't send, but remove"
 sql "update sessions set flyer_key = 'sessions/mcp.png', flyer_type = 'image/png' where id = '${session}'" >/dev/null
 call update_session "{\"id\":\"${session}\",\"description\":\"Par MCP.\"}"
 expect_body_contains '\"start\":\"2026-11-14T21:00:00-05:00\"'
 expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":true'
-call update_session "{\"id\":\"${session}\",\"removeFlyer\":true}"
+call delete_session_flyer "{\"id\":\"${session}\"}"
 expect_body_contains '\"description\":\"Par MCP.\",\"effectiveDescription\":\"Par MCP.\",\"hasFlyer\":false'
 call delete_session "{\"id\":\"${session}\"}"
 

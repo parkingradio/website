@@ -12,7 +12,7 @@ import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 import { OrderedList } from './ordered-list'
 import { CountryField, LinksField, PhotoField } from './profile-fields'
-import type { GroupProps } from './profile-fields'
+import type { GroupProps, ImageChange } from './profile-fields'
 
 // A form for a collective's profile, members and photo, to add a collective or change one. Like the artist form (see
 // artist-form.tsx), each field is checked as the server checks it for admins (see `checkCollectiveProfile`), and says
@@ -32,15 +32,23 @@ function memberNamed(members: Member[], name: string): Member | undefined {
   return members.find((member) => normalize(member.name) === normalize(name))
 }
 
+// `members`, where those added by name that the collective now has, as it was `saved`, are its artists, by their id,
+// and the others are as they are, e.g. those changed while it was saved.
+function withSavedIds(members: Member[], saved: Member[]): Member[] {
+  const ids = new Set(members.flatMap((member) => ('id' in member ? [member.id] : [])))
+  const created = saved.filter((member) => 'id' in member && !ids.has(member.id))
+  return members.map((member) => ('id' in member ? member : (memberNamed(created, member.name) ?? member)))
+}
+
 export type CollectiveFormProps = {
   // The collective to change, or nothing for a new one.
   collective?: Collective
   // Every artist, of whom members are picked, or null when they couldn't be loaded, which leaves only adding new ones.
   artists: Artist[] | null
   submitLabel: string
-  // Sends the form, as `PUT /api/admin/collectives/:id` takes it, which `POST /api/admin/collectives` takes too, without
-  // `removePhoto`, and returns the error, if it failed.
-  onSubmit: (body: Body<'put', '/api/admin/collectives/{id}'>) => Promise<string | null>
+  // Sends the profile, as `POST /api/admin/collectives` takes it, and what changes of the photo, which is never 'remove'
+  // for a new collective, and returns the error, if it failed.
+  onSubmit: (collective: Body<'post', '/api/admin/collectives'>['collective'], photo: ImageChange) => Promise<string | null>
   onCancel?: () => void
 }
 
@@ -51,6 +59,13 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
   const [removePhoto, setRemovePhoto] = useState(false)
   // The name of a new artist being typed, before it's added.
   const [memberEntry, setMemberEntry] = useState('')
+  // Once the collective is saved, e.g. when its photo then can't be, the artists it added by name exist: they're sent by
+  // their id from then on, if it's sent again, rather than created twice.
+  const [savedMembers, setSavedMembers] = useState(initial?.members)
+  if (initial && initial.members !== savedMembers) {
+    setSavedMembers(initial.members)
+    setProfile((profile) => ({ ...profile, members: withSavedIds(profile.members, initial.members) }))
+  }
 
   const checked = checkCollectiveProfile(profile)
   const errors: Partial<Record<Field, string>> = { ...checked.errors }
@@ -66,7 +81,7 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
   if (photoProblem) errors.photo = photoProblem
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () =>
     // There's a profile, since there are no errors by then.
-    onSubmit({ collective: checked.profile!, photo: photo ?? undefined, removePhoto: !photo && removePhoto ? 'true' : undefined }),
+    onSubmit(checked.profile!, photo ?? (removePhoto ? 'remove' : null)),
   )
   const update = (changes: Partial<FormProfile>) => setProfile((profile) => ({ ...profile, ...changes }))
 

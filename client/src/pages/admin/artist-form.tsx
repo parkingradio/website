@@ -14,6 +14,7 @@ import { photoUrl, shownUrl } from './describe'
 import { useCheckedForm } from './checked-form'
 import { FormActions, Labeled } from './fields'
 import { CountryField, GenresField, LinksField, PhotoField } from './profile-fields'
+import type { ImageChange } from './profile-fields'
 
 // A form for an artist's profile and photo, to add an artist or change one. Each field is checked as the server checks it
 // for admins (see `checkProfile`), and says what's wrong once it's been left, or once the form is sent. The server's
@@ -37,9 +38,9 @@ type ArtistFormProps = {
   // The artist to change, or nothing for a new one.
   artist?: Artist
   submitLabel: string
-  // Sends the form, as `PUT /api/admin/artists/:id` takes it, which `POST /api/admin/artists` takes too, without
-  // `removePhoto`, and returns the error, if it failed.
-  onSubmit: (body: Body<'put', '/api/admin/artists/{id}'>) => Promise<string | null>
+  // Sends the profile, as `POST /api/admin/artists` takes it, and what changes of the photo, which is never 'remove' for
+  // a new artist, and returns the error, if it failed.
+  onSubmit: (artist: Body<'post', '/api/admin/artists'>['artist'], photo: ImageChange) => Promise<string | null>
   onCancel?: () => void
 }
 
@@ -57,8 +58,7 @@ export function ArtistForm({ artist: initial, submitLabel, onSubmit, onCancel }:
   if (photoProblem) errors.photo = photoProblem
   const { form, submit, busy, error, submitted, shown, leave } = useCheckedForm(errors, () => {
     // What's saved of the profile, which there is, since there are no errors by then.
-    const artist = checked.profile!
-    return onSubmit({ artist, photo: photo ?? undefined, removePhoto: !photo && removePhoto ? 'true' : undefined })
+    return onSubmit(checked.profile!, photo ?? (removePhoto ? 'remove' : null))
   })
   const update = (changes: Partial<Profile>) => setProfile((profile) => ({ ...profile, ...changes }))
 
