@@ -9,6 +9,7 @@ import { photoKey } from './keys.js'
 import type { PhotoFolder } from './keys.js'
 import { AdminArtistProfile } from './profile.js'
 import { artistsStore, validateProfile } from './store.js'
+import type { NewPhoto } from './store.js'
 
 // The photos and flyers whose missing sizes are made when the server starts (see artists/backfill.ts).
 
@@ -26,7 +27,7 @@ it("lists every photo and flyer the server keeps, sessions' flyers first, the la
   const artists = artistsStore(database.db)
   const createdBy = 'admin@example.com'
   // Photos that aren't stored, under the keys of made-up content: only their keys are listed.
-  const photo = (folder: PhotoFolder, content: string) => ({
+  const photo = (folder: PhotoFolder, content: string): NewPhoto => ({
     key: photoKey({ body: Buffer.from(content), type: 'image/jpeg' }, folder),
     type: 'image/jpeg',
     keep: async () => {},
