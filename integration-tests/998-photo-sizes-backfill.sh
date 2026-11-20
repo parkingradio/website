@@ -2,8 +2,8 @@
 #
 # When it starts, the server moves, in the background, the photos and flyers it keeps under random keys to the keys made
 # from their content, then makes the sizes that they don't have, and skips those it can't read, which it logs (see
-# "Private files" in docs/deployment.md, and server/src/artists/content-keys.ts and server/src/artists/backfill.ts, whose
-# tests cover the rest).
+# "Private files" in docs/deployment.md, and server/src/artists/content-keys.ts and server/src/artists/backfill.ts,
+# whose tests cover the rest). Moving them goes in step 3 of #200.
 #
 # Numbered in the 9xx range: this restarts the server, which then listens on another port. It waits for the server to
 # be up again, so that the checks after it can still stop it.
@@ -57,6 +57,7 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${artist}/ph
 expect_status 200
 expect_header Content-Type 'image/webp$'
 
+# Moving images to the keys made from their content goes in step 3 of #200, with this check.
 echo "  it moved the flyer, and logged that none is left to move"
 moved="$(sql "select flyer_key from sessions where id = '${session}'")"
 [[ "$moved" =~ ^sessions/[0-9a-f]{64}\.jpg$ ]] || fail "expected the flyer to be moved to a key made from its content, not ${moved}"

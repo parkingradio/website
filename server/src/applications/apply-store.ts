@@ -43,9 +43,8 @@ export function applyStore(db: typeof Database): ApplyStore {
     applyAsCollective(collective, members, application) {
       // Likewise, and the EmailTaken that creating the collective throws rolls its artists back too.
       return db.transaction(async (tx) => {
-        // Every photo's lock at once, in their order, before each artist and the collective take theirs again, which they
-        // then have (see `Photos` in artists/store.ts).
-        await lockPhotos(tx, [collective, ...members].flatMap(({ photo }) => (photo ? [photo.key] : [])))
+        // Before the first artist is added, rather than when their photo, or the collective's, is kept.
+        await lockPhotos(tx)
         const ids: { id: string }[] = []
         for (const member of members) ids.push({ id: (await artistsStore(tx).create({ ...member, createdBy: null })).id })
         const added = await collectivesStore(tx).create({ ...collective, members: ids, createdBy: null })

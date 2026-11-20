@@ -234,8 +234,8 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
 // declared with `photoRoute`, as it was sent, or its size at `width`, which the public always gets, or a 404 when they
 // have none, when it's missing, or when it has no such size (see artists/backfill.ts), once the route has checked that
 // whoever asks can see them. The ETag of a photo is its key, and that of a size the key it's kept under, which are only
-// ever that photo's, wherever it's used (see `photoKey` in store.ts): it changes exactly when the photo does. So a request that already has it gets a 304 without
-// anything being read, even when the photo is missing.
+// ever that photo's, wherever it's used (see `photoKey` in store.ts): it changes exactly when the photo does. So a
+// request that already has it gets a 304 without anything being read, even when the photo is missing.
 export async function sendPhoto(
   reply: FastifyReply,
   photos: Photos,

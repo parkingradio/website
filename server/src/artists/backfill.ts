@@ -12,7 +12,8 @@ import type { Photos } from './store.js'
 // the server starts, in the background, one photo at a time, so that it only takes the memory of one (see "Photos" in
 // docs/design/server/artists.md).
 
-// A photo or a flyer that the server keeps: what it's of, its id, its key and its MIME type.
+// A photo or a flyer that the server keeps: what it's of, its id, its key and its MIME type, which only moving it to
+// the key made from its content needs (see artists/content-keys.ts), and goes with it, in step 3 of #200.
 export type StoredImage = { of: 'artist' | 'collective' | 'session'; id: string; key: string; type: string }
 
 // Every photo and flyer the server keeps, sessions' flyers first, the latest first, since Programmation shows them.
@@ -41,8 +42,9 @@ export async function storedImages(db: Queryable): Promise<StoredImage[]> {
 }
 
 // Makes the sizes that the photos and flyers `list` gives don't have, once started, one after another, once `first` is
-// done, e.g. moving them to the keys they're kept under (see artists/content-keys.ts), unless it stopped. Every failure is
-// logged, rather than thrown, `first`'s too: the server goes on without them, and tries again the next time it starts.
+// done, unless it stopped. `first` moves them to the keys made from their content (see artists/content-keys.ts), and
+// goes with it, in step 3 of #200. Every failure is logged, rather than thrown, `first`'s too: the server goes on
+// without them, and tries again the next time it starts.
 export function sizesBackfill(
   list: () => Promise<StoredImage[]>,
   files: PrivateFiles,

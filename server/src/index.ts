@@ -40,7 +40,8 @@ const app = Fastify({ loggerInstance, frameworkErrors })
 const privateFiles = privateBucket(config.privateFiles)
 const photos = privatePhotos(privateFiles, db, app.log)
 // Started once the server listens, below, but its hooks can only be added before. It stops as soon as the server
-// starts closing, and the server waits for the photo it's moving or making, if any.
+// starts closing, and the server waits for the photo it's moving or making, if any. Moving them to the keys made from
+// their content (see artists/content-keys.ts) goes in step 3 of #200.
 const list = () => storedImages(db)
 const backfill = sizesBackfill(list, privateFiles, photos, app.log, contentKeysMigration(list, db, photos, app.log))
 app.addHook('preClose', async () => backfill.stop())

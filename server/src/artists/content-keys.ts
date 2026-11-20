@@ -7,16 +7,22 @@ import { lockSessions } from '../sessions/store.js'
 import type { StoredImage } from './backfill.js'
 import { PHOTO_WIDTHS } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
-import { forgetPhoto, isContentKey } from './store.js'
+import { forgetPhoto } from './store.js'
 import type { PhotoFolder, Photos } from './store.js'
 
-// Photos and flyers used to be stored under a random key each. When the server starts, before the missing sizes are made
-// (see backfill.ts), the photos and flyers it keeps under such a key are moved to the key made from their content (see
-// `photoKey` in store.ts), one at a time, so that those that are the same are kept once, e.g. the flyers of the synth
-// meetups, which were stored once per session (see "Private files" in docs/deployment.md). Once nothing is left to move
-// in every deployment, this goes.
+// Photos and flyers used to be stored under a random key each. When the server starts, before the missing sizes are
+// made (see backfill.ts), the photos and flyers it keeps under such a key are moved to the key made from their content
+// (see `photoKey` in store.ts), one at a time, so that those that are the same are kept once, e.g. the flyers of the
+// synth meetups, which were stored once per session (see "Private files" in docs/deployment.md). Once nothing is left
+// to move in every deployment, this goes.
 
 const FOLDERS: Record<StoredImage['of'], PhotoFolder> = { artist: 'artists', collective: 'collectives', session: 'sessions' }
+
+// Whether `key` is one that `photoKey` makes, rather than one from before (see store.ts). In step 3 of #200, the
+// database checks that every key is one.
+export function isContentKey(key: string): boolean {
+  return /^[a-z]+\/[0-9a-f]{64}\.[a-z]+$/.test(key)
+}
 
 // Moves the photos and flyers that `list` gives, those whose key isn't made from their content, once called, until
 // `stopping()`. Every failure is logged, rather than thrown: the server goes on without them, and tries again the next
@@ -41,7 +47,7 @@ export function contentKeysMigration(
         }
         const { of, id, key } = image
         try {
-          const outcome = await move(db, photos, log, image)
+          const outcome = await move(db, photos, log, image, list)
           counts[outcome]++
           if (outcome === 'missing') {
             log.warn({ of, id, key }, 'A photo or flyer to move to a key made from its content is missing')
@@ -60,10 +66,20 @@ export function contentKeysMigration(
 
 // Moves the image to the key made from its content, with the sizes it has, rather than making them again, unless its
 // row has another key by then, e.g. because an admin replaced it meanwhile, which it then keeps. Returns whether it was
-// moved, whether its row had changed, or whether it's missing.
-async function move(db: Queryable, photos: Photos, log: FastifyBaseLogger, image: StoredImage): Promise<'moved' | 'changed' | 'missing'> {
+// moved, whether its row had changed, or whether it's missing, which `list` tells from its row having changed, and its
+// file being deleted, meanwhile.
+async function move(
+  db: Queryable,
+  photos: Photos,
+  log: FastifyBaseLogger,
+  image: StoredImage,
+  list: () => Promise<StoredImage[]>,
+): Promise<'moved' | 'changed' | 'missing'> {
   const original = await photos.read(image.key)
-  if (!original) return 'missing'
+  if (!original) {
+    const still = (await list()).some(({ of, id, key }) => of === image.of && id === image.id && key === image.key)
+    return still ? 'missing' : 'changed'
+  }
   const sizes = new Map<PhotoWidth, Buffer>()
   for (const width of PHOTO_WIDTHS) {
     const size = await photos.readSize(image.key, width)
@@ -82,8 +98,8 @@ async function move(db: Queryable, photos: Photos, log: FastifyBaseLogger, image
     await forgetPhoto(photos, log, photo.key)
     throw error
   }
-  // Once the transaction is over, which held the lock of the new key (see `Photos` in store.ts). The old key is only
-  // deleted when the row was moved: otherwise, whoever changed it deleted it.
+  // Once the transaction is over, which held the photos' lock (see `Photos` in store.ts). The old key is only deleted
+  // when the row was moved: otherwise, whoever changed it deleted it.
   await forgetPhoto(photos, log, moved ? image.key : photo.key)
   return moved ? 'moved' : 'changed'
 }

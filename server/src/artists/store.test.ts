@@ -13,7 +13,7 @@ import type { Queryable } from '../db/connection.js'
 import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, linkSite, parseLink } from './profile.js'
 import type { LinkSiteId, Profile } from './profile.js'
 import { sizeKey } from './sizes.js'
-import { InvalidProfile, isContentKey, privatePhotos, validatePhoto, validateProfile, withSizes } from './store.js'
+import { InvalidProfile, privatePhotos, validatePhoto, validateProfile, withSizes } from './store.js'
 import { UNREADABLE_JPEG, testImage } from './test-photos.js'
 
 // The rules in artists/profile.ts, which every artist's profile has to follow. The server answers with the first error.
@@ -402,17 +402,5 @@ describe('privatePhotos', () => {
     await files.delete(sizeKey(key, 320))
     expect(await photos.readSize(key, 320)).toBeNull()
     expect(await photos.readSize('artists/missing.jpg', 1280)).toBeNull()
-  })
-})
-
-describe('isContentKey', () => {
-  it('tells the keys made from photos from the others', () => {
-    const hash = 'a'.repeat(64)
-    expect(isContentKey(`sessions/${hash}.jpg`)).toBe(true)
-    expect(isContentKey(`collectives/${hash}.webp`)).toBe(true)
-    expect(isContentKey('artists/2f1a1a9e-6f0b-4b8f-9d0a-1b2c3d4e5f60.png')).toBe(false)
-    expect(isContentKey(`${hash}.jpg`)).toBe(false)
-    expect(isContentKey(`artists/${hash.slice(1)}.jpg`)).toBe(false)
-    expect(isContentKey(`artists/${hash.toUpperCase()}.jpg`)).toBe(false)
   })
 })

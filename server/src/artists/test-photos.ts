@@ -7,10 +7,10 @@ import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
 import type { NewPhoto, PhotoFolder, Photos, SizedPhoto } from './store.js'
 
-// For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, with their sizes
-// under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg", counted from 1
-// again after `reset`, rather than made from their content, and deleted whether or not something uses them: what the
-// bucket and the database do with them is tested on them (see artists/photos.db.test.ts).
+// For the tests of the routes that store and serve photos and flyers: they're kept in `stored`, by key, with their
+// sizes under theirs, as the bucket would keep them, under keys named after `name`, e.g. "artists/photo-1.jpeg",
+// counted from 1 again after `reset`, rather than made from their content, and deleted whether or not something uses
+// them: what the bucket and the database do with them is tested on them (see artists/photos.db.test.ts).
 export function memoryPhotos(name = 'photo') {
   const stored = new Map<string, Buffer>()
   let next = 0

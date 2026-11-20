@@ -3,8 +3,9 @@
 # The admin routes for artists work against a real database. The server's unit tests mock the database and the photos,
 # so this is what covers the artists table, emails being unique whatever their case, artists listed by name, the
 # transaction that changes an artist, profiles read back from the database, and photos kept on disk, replaced on their
-# own, then deleted, or no photo at all, and photos kept once, however many artists have them. It also covers profiles that leave out what only admins can leave out, as the
-# database keeps them, including any number of artists without an email.
+# own, then deleted, or no photo at all, and photos kept once, however many artists have them. It also covers profiles
+# that leave out what only admins can leave out, as the database keeps them, including any number of artists without an
+# email.
 
 source "$(dirname "$0")/lib.sh"
 

@@ -102,8 +102,8 @@ async function sized(sent: Sent): Promise<{ photo: SizedPhoto | null; memberPhot
   }
 }
 
-// Stores the photos that were sent, one at a time, each in its folder, and returns them, or null for none. If one can't be
-// stored, those that were are deleted, unless something uses them, and the error is thrown: storing them all at once
+// Stores the photos that were sent, one at a time, each in its folder, and returns them, or null for none. If one can't
+// be stored, those that were are deleted, unless something uses them, and the error is thrown: storing them all at once
 // would leave those still being stored behind.
 async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, sent: { photo: SizedPhoto | null; folder: PhotoFolder }[]) {
   const stored: (NewPhoto | null)[] = []

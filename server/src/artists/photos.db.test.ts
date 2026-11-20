@@ -74,6 +74,13 @@ async function waitingForLock() {
   return rows[0].waiting
 }
 
+// A promise, `opened`, that `open` resolves.
+function gate() {
+  let open!: () => void
+  const opened = new Promise<void>((resolve) => (open = resolve))
+  return { open, opened }
+}
+
 async function until(condition: () => Promise<boolean>) {
   for (let tries = 0; !(await condition()); tries++) {
     if (tries > 500) throw new Error('Waited too long')
@@ -129,7 +136,8 @@ it('keeps a photo that is replaced with the same one, and deletes the one that i
 })
 
 it('checks every table, whatever folder the key is in', async () => {
-  // A collective whose photo is under `artists/`, from when it was an artist.
+  // A collective whose photo is under `artists/`, from when it was an artist, until it's moved: this goes in step 3 of
+  // #200 (see `isUsed` in store.ts).
   const stored = await photos().store(photo, 'artists')
   const ondes = await collectivesStore(database.db).create({
     ...validateProfile({ name: 'Les Ondes', members: [{ name: 'Une' }] }, AdminCollectiveProfile),
@@ -144,28 +152,54 @@ it('checks every table, whatever folder the key is in', async () => {
   expect(await kept()).toEqual([])
 })
 
-it("doesn't delete a photo that a row starts using while it's deleted, but once that row is saved", async () => {
+it("doesn't delete a photo that a row starts using while it's deleted, once that row is saved", async () => {
   const stored = await photos().store(photo, 'artists')
-  let release!: () => void
-  const released = new Promise<void>((resolve) => (release = resolve))
-  let locked!: () => void
-  const lockedIt = new Promise<void>((resolve) => (locked = resolve))
-  // The artist's transaction holds the photo's lock once `keep` is done, until it's released.
+  const [locked, released] = [gate(), gate()]
+  // The artist's transaction holds the photos' lock once `keep` is done, until it's released.
   const adding = artist('Ana', {
     ...stored,
     keep: async (tx) => {
       await stored.keep(tx)
-      locked()
-      await released
+      locked.open()
+      await released.opened
     },
   })
-  await lockedIt
-  const deleting = photos().deleteUnused(stored.key)
-  await until(waitingForLock)
-  release()
-  const ana = await adding
-  await deleting
-  expect(ana.photoKey).toBe(stored.key)
+  try {
+    await locked.opened
+    const deleting = photos().deleteUnused(stored.key)
+    await until(waitingForLock)
+    released.open()
+    expect((await adding).photoKey).toBe(stored.key)
+    await deleting
+  } finally {
+    released.open()
+  }
+  expect(await kept()).toEqual(filesOf(stored.key))
+})
+
+it('stores again a photo that a row starts using while it is deleted, once it is', async () => {
+  const stored = await photos().store(photo, 'artists')
+  const [locked, released] = [gate(), gate()]
+  // Deleting it holds the photos' lock, and waits to be released before it deletes anything.
+  const pausing: PrivateFiles = {
+    ...files,
+    delete: async (key) => {
+      locked.open()
+      await released.opened
+      return files.delete(key)
+    },
+  }
+  const deleting = photos(pausing).deleteUnused(stored.key)
+  try {
+    await locked.opened
+    const adding = artist('Ana', stored)
+    await until(waitingForLock)
+    released.open()
+    await deleting
+    expect((await adding).photoKey).toBe(stored.key)
+  } finally {
+    released.open()
+  }
   expect(await kept()).toEqual(filesOf(stored.key))
 })
 
@@ -206,7 +240,7 @@ it('rolls back a row whose photo it fails to keep, which can then be deleted, on
   expect(log.error).not.toHaveBeenCalled()
 })
 
-it('keeps the sizes it made of a photo that was deleted meanwhile, once a row uses it again', async () => {
+it('keeps the sizes it made of a photo that was deleted meanwhile, which a row still has', async () => {
   const stored = await photos().store(photo, 'artists')
   const ana = await artist('Ana', stored)
   await files.delete(sizeKey(stored.key, 320))

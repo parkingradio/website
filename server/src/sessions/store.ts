@@ -35,7 +35,7 @@ export type StoredSession = SessionRow & { takeover: Reference | null; applicati
 
 // What a session stores of `flyer`, a flyer that was stored, or null for none: where it's stored (see `Photos` in
 // artists/store.ts), and its MIME type, or nulls.
-export function flyerColumns(flyer: NewPhoto | null) {
+export function flyerColumns(flyer: Pick<NewPhoto, 'key' | 'type'> | null) {
   return { flyerKey: flyer?.key ?? null, flyerType: flyer?.type ?? null }
 }
 
@@ -143,14 +143,14 @@ export type SessionsStore = {
   // start at or after `from` and before `to`, which leaves out those without a start.
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
   get(id: string): Promise<StoredSession | null>
-  // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none. Throws
-  // a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about one.
-  // `flyer` is its flyer, once it's stored, or null for none.
+  // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none.
+  // Throws a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about
+  // one. `flyer` is its flyer, once it's stored, or null for none.
   create(session: SessionChanges & { flyer: NewPhoto | null; createdBy: string }, sets: NewSet[]): Promise<StoredSession>
-  // Changes the session's fields that `changes` has, and its flyer when it has one: a new one, once it's stored, or null
-  // to remove it, but not its status, whether it's announced, or its sets. Returns the session as it was, so that a flyer that was replaced or
-  // removed can be deleted, and as it is then. Throws a BrokenFields, a
-  // NoSuchReference or a Conflict.
+  // Changes the session's fields that `changes` has, and its flyer when it has one: a new one, once it's stored, or
+  // null to remove it, but not its status, whether it's announced, or its sets. Returns the session as it was, so that
+  // a flyer that was replaced or removed can be deleted, and as it is then. Throws a BrokenFields, a NoSuchReference or
+  // a Conflict.
   update(
     id: string,
     changes: Partial<SessionChanges> & { flyer?: NewPhoto | null; updatedBy: string; updatedAt: Date },

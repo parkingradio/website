@@ -165,24 +165,36 @@ it("leaves a row whose photo changed meanwhile as it is, and deletes the photo i
   const pngKey = contentKey('artists', png, 'image/png')
   await files.put(pngKey, png, 'image/png')
   await database.db.update(artists).set({ photoKey: pngKey, photoType: 'image/png' }).where(eq(artists.id, cleo))
+  // One that's removed, and deleted, before it's read.
+  const gone = await legacy('artists', jpeg, 'image/jpeg', [])
+  const dora = await artist('Dora', gone)
 
   // Each one is replaced, or removed, as it's read, as an admin would meanwhile.
+  const OTHER = contentKey('artists', Buffer.from('another photo'), 'image/jpeg')
   const changing: PrivateFiles = {
     ...files,
     read: async (key) => {
-      if (key === replaced.key) await database.db.update(artists).set({ photoKey: 'artists/other.jpg' }).where(eq(artists.id, ana))
+      if (key === replaced.key) await database.db.update(artists).set({ photoKey: OTHER }).where(eq(artists.id, ana))
       if (key === removed.key) await database.db.update(artists).set({ photoKey: null, photoType: null }).where(eq(artists.id, brume))
+      if (key === gone.key) {
+        await database.db.update(artists).set({ photoKey: null, photoType: null }).where(eq(artists.id, dora))
+        await files.delete(gone.key)
+      }
       return files.read(key)
     },
   }
   await migrate(changing)
 
-  expect(await keyOf(artists, ana)).toBe('artists/other.jpg')
+  expect(await keyOf(artists, ana)).toBe(OTHER)
   expect(await keyOf(artists, brume)).toBeNull()
   // The one it stored for Ana is deleted, but not Cléo's.
   expect(await files.exists(contentKey('artists', jpeg, 'image/jpeg'))).toBe(false)
   expect(await files.exists(pngKey)).toBe(true)
-  expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ moved: 0, changed: 2 }), 'Moved photos and flyers to keys made from their content')
+  expect(log.info).toHaveBeenLastCalledWith(
+    { moved: 0, changed: 3, missing: 0, failed: 0, left: 0 },
+    'Moved photos and flyers to keys made from their content',
+  )
+  expect(log.warn).not.toHaveBeenCalled()
 })
 
 it('logs the photos it fails to move, and goes on with the others', async () => {

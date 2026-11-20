@@ -31,13 +31,13 @@ export type CollectivesStore = {
   // The collective, only when it's public (see "Public profiles" in docs/design/server/collectives.md).
   getPublic(id: string): Promise<StoredCollective | null>
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
-  // sent by name are created, as artists whom `createdBy` adds. `photo` is its photo, once it's stored, or null for none.
-  // Throws an EmailTaken or an InvalidMember.
+  // sent by name are created, as artists whom `createdBy` adds. `photo` is its photo, once it's stored, or null for
+  // none. Throws an EmailTaken or an InvalidMember.
   create(collective: CollectiveProfile & { photo: NewPhoto | null; createdBy: string | null }): Promise<StoredCollective>
   // Changes the fields of the collective's profile that `changes` has, its members when it has them, and its photo when
-  // it has one: a new one, once it's stored, or null to remove it. The members sent by name are created, as artists whom `updatedBy` adds.
-  // Returns the collective as it was, so that a photo that was replaced or removed can be deleted, and as it is then.
-  // Throws an EmailTaken or an InvalidMember.
+  // it has one: a new one, once it's stored, or null to remove it. The members sent by name are created, as artists
+  // whom `updatedBy` adds. Returns the collective as it was, so that a photo that was replaced or removed can be
+  // deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
   update(
     id: string,
     changes: Partial<CollectiveProfile> & { photo?: NewPhoto | null; updatedBy: string; updatedAt: Date },

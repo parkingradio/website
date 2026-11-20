@@ -116,9 +116,9 @@ export type ArtistsStore = {
   // as one of a collective's artists. `photo` is their photo, once it's stored, or null for none.
   // Throws an EmailTaken.
   create(artist: Profile & { photo: NewPhoto | null; createdBy: string | null }): Promise<StoredArtist>
-  // Changes the fields of the artist's profile that `changes` has, and their photo when it has one: a new one, once it's
-  // stored, or null to remove it. Returns the artist as they were, so that a photo that was replaced or removed can be
-  // deleted, and as they are then. Throws an EmailTaken.
+  // Changes the fields of the artist's profile that `changes` has, and their photo when it has one: a new one, once
+  // it's stored, or null to remove it. Returns the artist as they were, so that a photo that was replaced or removed
+  // can be deleted, and as they are then. Throws an EmailTaken.
   update(
     id: string,
     changes: Partial<Profile> & { photo?: NewPhoto | null; updatedBy: string; updatedAt: Date },
@@ -241,69 +241,60 @@ export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
 const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
-// The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte, as
-// one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
+// The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte,
+// as one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
 // docs/deployment.md).
 export function photoKey({ body, type }: SentPhoto, folder: PhotoFolder): string {
   return `${folder}/${createHash('sha256').update(body).digest('hex')}.${EXTENSIONS[type] ?? 'bin'}`
 }
 
-// Whether `key` is one that `photoKey` makes, rather than one from before it (see artists/content-keys.ts).
-export function isContentKey(key: string): boolean {
-  return /^[a-z]+\/[0-9a-f]{64}\.[a-z]+$/.test(key)
-}
-
 // A photo or a flyer that was stored (see `Photos`): its key, its MIME type, and `keep`, which the transaction that
-// saves it in a row calls before anything else, except taking the sessions' lock.
+// saves it in a row calls before it takes any lock but the sessions' (see `lockPhotos`).
 export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise<void> }
 
 // Artists' and collectives' photos, and sessions' flyers, and their sizes. They're private files (see
-// core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until their
-// artist, collective or session is public, when the server serves their sizes to anyone (see
+// core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until
+// their artist, collective or session is public, when the server serves their sizes to anyone (see
 // docs/design/server/events.md).
 //
-// Each one is stored once, however many artists, collectives or sessions have it, and deleted once none has it anymore,
-// which takes its lock (see `lockPhotos`), so that it's never deleted from under a row that starts using it:
-// - A transaction that saves a photo in a row first calls its `keep`, which takes its lock, and stores again what was
+// Each one is stored once, however many artists, collectives or sessions have it, and deleted once none has it anymore.
+// So that it's never deleted from under a row that starts using it, both take the photos' lock (see `lockPhotos`):
+// - A transaction that saves a photo in a row first calls its `keep`, which takes the lock, and stores again what was
 //   deleted since `store` stored it, then saves the row: once the transaction ends, the row is committed, and the
 //   photo is there.
 // - `deleteUnused` takes the lock in a transaction of its own, then reads whether a row has the photo, as committed by
 //   then, and only deletes it when none has.
-// So `deleteUnused` is never called while a transaction holds a photo's lock, e.g. after `keep` and before the
+// Both call the bucket while they hold the lock, and `keep` while its transaction is open, e.g. while it holds the
+// sessions' lock, for a flyer: a request to S3 that stalls holds up the other photos' changes, and, for a flyer, the
+// writes of sessions and sets, for up to its 30 seconds (see core/private-bucket.ts).
+// `deleteUnused` must never be called while a transaction holds the photos' lock, e.g. after `keep` and before that
 // transaction ends, even when it fails: it would wait for that transaction, from another connection, while that
 // transaction waits for it, which Postgres can't tell, and the request would hang.
 export type Photos = Pick<PrivateFiles, 'read'> & {
-  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey`), unless they're there already, and
-  // returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged, and the error
-  // is thrown.
+  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey`), unless they're there already,
+  // and returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged, and the
+  // error is thrown.
   store(photo: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto>
   // The size at `width` of the photo with that key, or null when there's none, e.g. when the photo itself is missing.
   readSize(key: string, width: PhotoWidth): Promise<Readable | null>
-  // Deletes the photo with that key and its sizes, unless an artist, a collective or a session has it. Every table is
-  // checked, whatever folder the key is in: some collectives' photos are under `artists/`, from when they were artists
-  // (see drizzle/0004_collectives.sql).
+  // Deletes the photo with that key and its sizes, unless an artist, a collective or a session has it.
   deleteUnused(key: string): Promise<void>
 }
 
-// Every transaction that takes the lock of a photo takes it before any other lock, except the sessions' (see
-// `lockSessions` in sessions/store.ts), e.g. before the row of the artist whose photo it changes, and those of several
-// photos in the order of their ids, which several keys can share: so they can't be part of a deadlock.
-// The first of the two keys of the photos' advisory locks, which no other lock with two keys has. A lock with a single
-// key, e.g. the sessions', is never one of them.
+// Any key but the sessions' lock's (see `lockSessions` in sessions/store.ts).
 const PHOTOS_LOCK = 0x9407
 
-function lockId(key: string): number {
-  return createHash('sha256').update(key).digest().readInt32BE(0)
+// Takes the photos' lock (see `Photos`), until the transaction `tx` ends. Every transaction that takes it takes it
+// before any other lock but the sessions' (see `lockSessions` in sessions/store.ts), e.g. before the row of the artist
+// whose photo it changes, so that it can't be part of a deadlock.
+export async function lockPhotos(tx: Queryable) {
+  await tx.execute(sql`select pg_advisory_xact_lock(${PHOTOS_LOCK})`)
 }
 
-// Takes the lock of the photos with `keys` (see `Photos`), until the transaction `tx` ends.
-export async function lockPhotos(tx: Queryable, keys: string[]) {
-  for (const id of [...new Set(keys.map(lockId))].sort((a, b) => a - b)) {
-    await tx.execute(sql`select pg_advisory_xact_lock(${PHOTOS_LOCK}, ${id})`)
-  }
-}
-
-// Whether an artist, a collective or a session has the photo with `key`.
+// Whether an artist, a collective or a session has the photo with `key`. Every table is checked, whatever folder the
+// key is in, only because some collectives' photos are still under `artists/`, from when they were artists (see
+// drizzle/0004_collectives.sql), until they're moved (see artists/content-keys.ts): once they are, only the table of
+// the key's folder needs to be, in step 3 of #200.
 async function isUsed(tx: Queryable, key: string): Promise<boolean> {
   const used = or(
     exists(tx.select().from(artists).where(eq(artists.photoKey, key))),
@@ -328,9 +319,10 @@ export function privatePhotos(files: PrivateFiles, db: Queryable, log: FastifyBa
       return {
         key,
         type: photo.type,
-        // When it fails, the photo is deleted, unless it's used, once the transaction is rolled back, by whoever saves it.
+        // When it fails, the photo is deleted, unless it's used, once the transaction is rolled back, by whoever saves
+        // it.
         keep: async (tx) => {
-          await lockPhotos(tx, [key])
+          await lockPhotos(tx)
           await putMissing(files, key, photo)
         },
       }
@@ -339,7 +331,7 @@ export function privatePhotos(files: PrivateFiles, db: Queryable, log: FastifyBa
     readSize: (key, width) => files.read(sizeKey(key, width)),
     deleteUnused: (key) =>
       db.transaction(async (tx) => {
-        await lockPhotos(tx, [key])
+        await lockPhotos(tx)
         if (!(await isUsed(tx, key))) await deletePhoto(files, key)
       }),
   }
@@ -392,7 +384,8 @@ export async function completeSizes(
   return deleted ? 'missing' : 'made'
 }
 
-// Stores the photo that was sent, if there's one, in `folder`, with its sizes, and returns it, or null when there's none.
+// Stores the photo that was sent, if there's one, in `folder`, with its sizes, and returns it, or null when there's
+// none.
 export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SizedPhoto | null, folder: PhotoFolder): Promise<NewPhoto | null> {
   return photo && photos.store(photo, folder)
 }
