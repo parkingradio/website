@@ -83,7 +83,8 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   // Which has the description its type gives it, and a flyer.
   await meetup.getByRole('link').first().click()
   await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
-  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 64)
+  // At the server's 1280-pixel size, which doesn't enlarge it.
+  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 640)
   // Its event on RA has a lineup, though it has no sets.
   await value(page, 'Événement RA').getByRole('button', { name: 'créer' }).click()
   await expect(raValue(page, 'Line-up')).toHaveText(/^OPEN JAM/)
@@ -103,7 +104,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(value(page, 'Nom')).toHaveText('ONDE COMMUNE TAKEOVER')
   // With its own description, and its flyer.
   await expect(value(page, 'Description')).toContainText('Trois artistes, trois heures')
-  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de ONDE COMMUNE TAKEOVER' })).toHaveJSProperty('naturalWidth', 64)
+  await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de ONDE COMMUNE TAKEOVER' })).toHaveJSProperty('naturalWidth', 640)
   const sessionPage = new URL(page.url()).pathname
   await expect(durationOf(rowsOf(sets, 'Kwame Asante'))).toHaveText('1 h')
 

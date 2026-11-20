@@ -17,6 +17,7 @@ import { radioSettingsStore } from './radio/settings.js'
 import { youTubeCredentialsStore } from './video/credentials.js'
 import { youtube } from './video/youtube.js'
 import { artistsStore, privatePhotos } from './artists/store.js'
+import { sizesBackfill, storedImages } from './artists/backfill.js'
 import { collectivesStore } from './collectives/store.js'
 import { privateBucket } from './core/private-bucket.js'
 import { applicationsStore } from './applications/store.js'
@@ -35,7 +36,15 @@ const loggerInstance: FastifyBaseLogger = logger
 // Errors are sent as an `ApiError` even when Fastify raises them before routing a request, e.g. for a URL that isn't
 // valid: the error handler set by registerRoutes takes care of the others.
 const app = Fastify({ loggerInstance, frameworkErrors })
+const privateFiles = privateBucket(config.privateFiles)
+// Started once the server listens, below, but its hooks can only be added before. It stops as soon as the server
+// starts closing, and the server waits for the photo it's making, if any.
+const backfill = sizesBackfill(() => storedImages(db), privateFiles, app.log)
+app.addHook('preClose', async () => backfill.stop())
 app.addHook('onClose', () => db.$client.end())
+// After the database's hook, since Fastify runs the onClose hooks of the root instance from the last one added: the
+// backfill is done with the database before it's closed, e.g. when the server closes while it lists the photos.
+app.addHook('onClose', () => backfill.stopped())
 
 try {
   await migrateDatabase(db)
@@ -59,7 +68,7 @@ await registerRoutes(app, {
   youtubeCredentials: youTubeCredentialsStore(db),
   artists: artistsStore(db),
   collectives: collectivesStore(db),
-  photos: privatePhotos(privateBucket(config.privateFiles)),
+  photos: privatePhotos(privateFiles, app.log),
   applications: applicationsStore(db),
   applicationsSettings: applicationsSettingsStore(db),
   apply: applyStore(db),
@@ -87,6 +96,8 @@ try {
   app.log.error(error)
   process.exit(1)
 }
+
+backfill.start()
 
 // Shut down gracefully when asked to: closing the app lets in-flight requests finish first. This is
 // only set up once the server is listening, since closing the app while it's still starting would

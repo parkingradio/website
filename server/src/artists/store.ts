@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import type { Readable } from 'node:stream'
+import { buffer } from 'node:stream/consumers'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
-import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_WRONG_TYPE } from './profile.js'
+import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PHOTO_WRONG_TYPE } from './profile.js'
+import { PHOTO_WIDTHS, SIZE_TYPE, makeSizes, sizeKey } from './sizes.js'
+import type { PhotoWidth } from './sizes.js'
 import type { AdminArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
@@ -50,8 +54,8 @@ function photoType(body: Buffer): string | null {
 }
 
 // What's wrong with a photo, as an artist is told, or, e.g., what's wrong with a session's flyer.
-export type PhotoErrors = { wrongType: string; tooLarge: string }
-export const PHOTO_ERRORS: PhotoErrors = { wrongType: PHOTO_WRONG_TYPE, tooLarge: PHOTO_TOO_LARGE }
+export type PhotoErrors = { wrongType: string; tooLarge: string; unreadable: string }
+export const PHOTO_ERRORS: PhotoErrors = { wrongType: PHOTO_WRONG_TYPE, tooLarge: PHOTO_TOO_LARGE, unreadable: PHOTO_UNREADABLE }
 
 // Checks the photo, from its type as told from its contents, and returns it with that type, or null when there's none.
 // Throws an InvalidProfile otherwise, with the message of `errors` that says what's wrong.
@@ -61,6 +65,27 @@ export function validatePhoto(body: Buffer | undefined, errors = PHOTO_ERRORS): 
   if (!type) throw new InvalidProfile(errors.wrongType)
   if (body.length > PHOTO_MAX_BYTES) throw new InvalidProfile(errors.tooLarge)
   return { body, type }
+}
+
+// A photo that was sent and checked, with its sizes (see sizes.ts).
+export type SizedPhoto = SentPhoto & { sizes: Map<PhotoWidth, Buffer> }
+
+// Reads the photo, and returns it with its sizes. Throws an InvalidProfile, with the message of `errors` that says so,
+// when it can't be read.
+export async function withSizes(photo: SentPhoto, errors = PHOTO_ERRORS): Promise<SizedPhoto> {
+  try {
+    return { ...photo, sizes: await makeSizes(photo.body) }
+  } catch {
+    // An UnreadablePhoto, as makeSizes throws.
+    throw new InvalidProfile(errors.unreadable)
+  }
+}
+
+// Checks the photo, like `validatePhoto`, then reads it, like `withSizes`, and returns it with its sizes, or null when
+// there's none.
+export async function readPhoto(body: Buffer | undefined, errors = PHOTO_ERRORS): Promise<SizedPhoto | null> {
+  const photo = validatePhoto(body, errors)
+  return photo && withSizes(photo, errors)
 }
 
 // An artist, as the database keeps them, and with the collectives they're in, by name, whatever its case.
@@ -202,30 +227,85 @@ export function artistsStore(db: Queryable): ArtistsStore {
 // whatever folder it's in.
 export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 
-// Artists' and collectives' photos, and sessions' flyers. They're private files (see core/private-bucket.ts), rather
-// than public assets: photos are personal data, and both are only for admins until their artist, collective or session
-// is public, when the server serves them to anyone (see docs/design/server/events.md).
-export type Photos = Pick<PrivateFiles, 'read' | 'delete'> & {
-  // Stores the photo under a new key in `folder`, and returns that key.
-  store(photo: SentPhoto, folder: PhotoFolder): Promise<string>
+// Artists' and collectives' photos, and sessions' flyers, and their sizes. They're private files (see
+// core/private-bucket.ts), rather than public assets: photos are personal data, and both are only for admins until their
+// artist, collective or session is public, when the server serves their sizes to anyone (see
+// docs/design/server/events.md).
+export type Photos = Pick<PrivateFiles, 'read'> & {
+  // Stores the photo and its sizes under a new key in `folder`, and returns that key. If one can't be stored, those that
+  // were are deleted, or that failure is logged, and the error is thrown.
+  store(photo: SizedPhoto, folder: PhotoFolder): Promise<string>
+  // The size at `width` of the photo with that key, or null when there's none, e.g. when the photo itself is missing.
+  readSize(key: string, width: PhotoWidth): Promise<Readable | null>
+  // Deletes the photo and its sizes.
+  delete(key: string): Promise<void>
 }
 
 const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
-export function privatePhotos(files: PrivateFiles): Photos {
-  return {
-    async store({ body, type }, folder) {
+// The photos, kept in `files`. `log` gets what fails to be deleted.
+export function privatePhotos(files: PrivateFiles, log: FastifyBaseLogger): Photos {
+  const photos: Photos = {
+    async store({ body, type, sizes }, folder) {
       const key = `${folder}/${randomUUID()}.${EXTENSIONS[type] ?? 'bin'}`
-      await files.put(key, body, type)
+      try {
+        await files.put(key, body, type)
+        await putSizes(files, key, sizes)
+      } catch (error) {
+        await forgetPhoto(photos, log, key)
+        throw error
+      }
       return key
     },
     read: files.read,
-    delete: files.delete,
+    readSize: (key, width) => files.read(sizeKey(key, width)),
+    delete: (key) => deletePhoto(files, key),
   }
+  return photos
 }
 
-// Stores the photo that was sent, if there's one, in `folder`, and returns where, as an artist or a collective keeps it.
-export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SentPhoto | null, folder: PhotoFolder): Promise<StoredPhoto> {
+async function putSizes(files: PrivateFiles, key: string, sizes: Map<PhotoWidth, Buffer>) {
+  for (const [width, size] of sizes) await files.put(sizeKey(key, width), size, SIZE_TYPE)
+}
+
+// The photo first, then its sizes, so that a size made in the meantime (see `completeSizes`) is deleted either here or
+// where it's made.
+async function deletePhoto(files: PrivateFiles, key: string) {
+  await files.delete(key)
+  await Promise.all(PHOTO_WIDTHS.map((width) => files.delete(sizeKey(key, width))))
+}
+
+// Makes the sizes that the photo with `key` doesn't have, e.g. one stored before there were sizes (see
+// artists/backfill.ts), and returns whether it had them all, they were made, or the photo is missing, e.g. because it was
+// deleted or replaced. Throws an UnreadablePhoto when it can't be read.
+export async function completeSizes(files: PrivateFiles, key: string, log: FastifyBaseLogger): Promise<'complete' | 'made' | 'missing'> {
+  const kept = await Promise.all(PHOTO_WIDTHS.map((width) => files.exists(sizeKey(key, width))))
+  const missing = PHOTO_WIDTHS.filter((_, index) => !kept[index])
+  if (missing.length === 0) return 'complete'
+  const photo = await files.read(key)
+  if (!photo) return 'missing'
+  const sizes = await makeSizes(await buffer(photo), missing)
+  const failed = await putSizes(files, key, sizes).then(
+    () => null,
+    (error: unknown) => ({ error }),
+  )
+  // The photo may have been deleted while they were made, after the sizes it had were: then those that were stored are
+  // deleted too.
+  const deleted = !(await files.exists(key))
+  if (deleted) {
+    await deletePhoto(files, key).catch((error: unknown) => {
+      // They may be left behind, though their photo is deleted: they have to be deleted by hand, like the photos that
+      // `forgetPhoto` fails to delete.
+      log.error({ err: error, key }, 'Failed to delete the size of a photo that may have been deleted')
+    })
+  }
+  if (failed) throw failed.error
+  return deleted ? 'missing' : 'made'
+}
+
+// Stores the photo that was sent, if there's one, in `folder`, with its sizes, and returns where, as an artist or a
+// collective keeps it.
+export async function storePhoto(photos: Pick<Photos, 'store'>, photo: SizedPhoto | null, folder: PhotoFolder): Promise<StoredPhoto> {
   return photo ? { photoKey: await photos.store(photo, folder), photoType: photo.type } : NO_PHOTO
 }
 

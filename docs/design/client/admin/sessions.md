@@ -95,7 +95,9 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "Nom": its title, faded out when it's the name its type gives it.
   - "Description": its description, with its line breaks, faded out when it's the one its type gives it. "-" when it has
     none.
-  - "Flyer": its flyer. When it has none, "Pas de flyer" is shown instead, so that the team notices.
+  - "Flyer": its flyer, at its 1280-pixel size, linking to the flyer as it was sent, in a new tab, e.g. to download it
+    and add it to the session's event on RA (see [Publier sur RA](publier-sur-ra.md)). When it has none, "Pas de flyer"
+    is shown instead, so that the team notices.
   - "Événement RA": its event on RA, linking to it, or "-" when it has none. "créer" opens a panel under it that creates
     the event (see [Creating its event on RA](#creating-its-event-on-ra)).
 - "Sets": its sets, in their order (see [Sets' order](../../server/sessions.md#sets-order)). Each set is a row with:
@@ -380,7 +382,8 @@ its sets in the way is named without a link.
 - `GET /api/admin/sessions`, for the list.
 - `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status`,
   `PUT /api/admin/sessions/:id/announced` and `DELETE /api/admin/sessions/:id`, for a session's page.
-- `GET /api/admin/sessions/:id/flyer`, for its flyer, on its page and in its form.
+- `GET /api/admin/sessions/:id/flyer?width=1280`, for its flyer, on its page and in its form, which links to
+  `GET /api/admin/sessions/:id/flyer`, the flyer as it was sent (see [Flyers](../../server/sessions.md#flyers)).
 - `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
   `PATCH /api/admin/sessions/:id`, to save the event as the session's.
 - `POST /api/admin/sessions`, for "nouvelle session".

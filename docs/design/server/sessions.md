@@ -334,11 +334,12 @@ become its own, and stop following its type.
 
 A session can have a flyer, an image, which follows the same rules as an artist's photo (see
 [Photos](artists.md#photos)): it's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
-kept in the app's private files, and deleted when the session is deleted, or the flyer replaced or removed. It's sent
-along with the session's fields (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
+that can be read, kept in the app's private files, with the same sizes, and deleted, with its sizes, when the session is
+deleted, or the flyer replaced or removed. It's sent along with the session's fields (see
+[`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
 [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), and the MCP server's tools can't send one: a
-session added with a tool has none, and one changed with a tool keeps its own, unless `removeFlyer` is `true`. An
-announced session's flyer is public, as its event's (see [Events](events.md)).
+session added with a tool has none, and one changed with a tool keeps its own, unless `removeFlyer` is `true`. The sizes
+of an announced session's flyer are public, as its event's (see [Events](events.md)).
 
 ## Links
 
@@ -427,8 +428,9 @@ Fails with 404 when there's no such session.
 
 ## `GET /api/admin/sessions/:id/flyer` (admin)
 
-Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), with the flyer or a
-304. Otherwise, fails with 404 when there's no such session, when it has no flyer, or when its flyer is missing.
+Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin), which takes the same
+`width`, with the session's flyer, one of its sizes, or a 304, and fails like it, with 404 when there's no such session,
+when it has no flyer, or when its flyer is missing.
 
 ## `PUT /api/admin/sessions/:id/flyer` (admin)
 
@@ -442,8 +444,8 @@ part of it.
 | `ok` | `true` | |
 | `session` | session | As it is then, with its sets |
 
-Fails with 400 when the request is malformed, has no flyer, or the flyer isn't a JPEG, PNG or WebP image, 404 when
-there's no such session, and 413 when the flyer is larger than 10 MB.
+Fails with 400 when the request is malformed, has no flyer, or the flyer isn't a JPEG, PNG or WebP image that can be
+read (see [Flyers](#flyers)), 404 when there's no such session, and 413 when the flyer is larger than 10 MB.
 
 ## `POST /api/admin/sessions` (admin)
 
@@ -468,7 +470,7 @@ Fails with:
 
 | Status | When |
 |---|---|
-| 400 | The request is malformed, a field isn't valid, the session would end after the start of the year 3000 (see [Times](#times)), the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist, doesn't go with the session, or is rejected (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image, or one of the sets would fail with 400 |
+| 400 | The request is malformed, a field isn't valid, the session would end after the start of the year 3000 (see [Times](#times)), the session's `takeover` doesn't go with its `type`, a session of type `"other"` has no `name`, the takeover's collective doesn't exist, the application doesn't exist, doesn't go with the session, or is rejected (see [Applications](#applications)), `raEvent` isn't one of the links above, the flyer isn't a JPEG, PNG or WebP image that can be read (see [Flyers](#flyers)), or one of the sets would fail with 400 |
 | 409 | The session would overlap another one, which is in `session` (see [Rules](#rules)), or one of the sets would fail with 409, with what's in the way, or, when that's another set of the list, its place in `sets`, `otherSetIndex` |
 | 413 | The flyer is larger than 10 MB |
 | 502 | One of the sets' tracks has to be resolved, and SoundCloud can't be reached, or answers unexpectedly |

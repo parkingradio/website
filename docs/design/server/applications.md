@@ -190,10 +190,11 @@ sent the request that this email belongs to an artist, or to a collective. To ma
 only checks the email after Turnstile has accepted the token.
 
 **When the page needs a new token.** Cloudflare only accepts each token once. To let artists fix their mistakes, the
-server checks the profile, each artist's profile for a collective, the application and all the photos before it sends
-the token to Cloudflare. So if the request fails because one of those isn't valid, the page can send it again with the
-same token. After any other error, the token may already be used up, and the page needs to get a new one from the
-widget.
+server checks the profile, each artist's profile for a collective, the application, and that the photos are of the
+right type, and of at most 10 MB, before it sends the token to Cloudflare. So if the request fails because one of those isn't valid, the page can
+send it again with the same token. The photos are only read once Cloudflare has accepted the token, though, since that
+takes the most work: a photo that can't be read (see [Photos](artists.md#photos)) is refused after that. After that
+error, or any other one, the token may already be used up, and the page needs to get a new one from the widget.
 
 ## `POST /api/applications`
 
@@ -238,7 +239,7 @@ counting from 1 in their order, e.g. "Artiste 2 : Indiquez la ville.":
 
 | Status | When |
 |---|---|
-| 400 | A profile, the application or a photo isn't valid, the request is malformed (including a `memberPhoto` part too many), or Turnstile refused the token |
+| 400 | A profile, the application or a photo isn't valid, including a photo that can't be read, the request is malformed (including a `memberPhoto` part too many), or Turnstile refused the token |
 | 409 | An artist applying alone has the email of an artist who already exists, or a collective the contact email of a collective that already exists |
 | 413 | A photo is larger than 10 MB, which is answered while the request is read, before anything else, or the request isn't `multipart/form-data` and is too large (see [Conventions](README.md#conventions)) |
 | 429 | The client sent too many requests |

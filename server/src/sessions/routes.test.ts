@@ -1,11 +1,11 @@
-import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
-import type { PhotoFolder, SentPhoto } from '../artists/store.js'
+import { sizeKey } from '../artists/sizes.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { MAX_MINUTES } from './fields.js'
@@ -151,23 +151,8 @@ const store: SessionsStore = {
 }
 
 // Sessions' flyers, as the bucket would keep them.
-const stored = new Map<string, Buffer>()
-let nextFlyer = 0
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/flyer-${++nextFlyer}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
-  }),
-}
-
-// The smallest things that start like a JPEG and a PNG file.
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
+const photos = memoryPhotos('flyer')
+const stored = photos.stored
 
 // SoundCloud, through the SoundCloud app.
 const resolveTrack = vi.fn<(link: string) => Promise<string | null>>()
@@ -246,8 +231,7 @@ describe('sessions routes', () => {
     process.env.JWT_SECRET = 'test-secret'
     rows = []
     nextId = 0
-    nextFlyer = 0
-    stored.clear()
+    photos.reset()
     vi.clearAllMocks()
     resolveTrack.mockImplementation(async (link) => (link.startsWith('https://soundcloud.com/parkingdotradio/') ? '42' : null))
   })
@@ -724,7 +708,9 @@ describe('sessions routes', () => {
       const response = await createSession(app, {}, { flyer: PNG })
       expect(response.statusCode).toBe(200)
       expect(response.json().session.hasFlyer).toBe(true)
-      expect(photos.store).toHaveBeenCalledWith({ body: PNG, type: 'image/png' }, 'sessions')
+      expect(photos.store).toHaveBeenCalledWith({ body: PNG, type: 'image/png', sizes: expect.any(Map) }, 'sessions')
+      expect(stored.has(sizeKey('sessions/flyer-1.png', 320))).toBe(true)
+      expect(stored.has(sizeKey('sessions/flyer-1.png', 1280))).toBe(true)
       expect(rows[0]).toMatchObject({ flyerKey: 'sessions/flyer-1.png', flyerType: 'image/png' })
 
       const served = await get(app, '/api/admin/sessions/session-1/flyer')
@@ -734,6 +720,16 @@ describe('sessions routes', () => {
 
       const kept = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
       expect(kept.statusCode).toBe(304)
+    })
+
+    it('serves the sizes of the flyer, with `width`', async () => {
+      const app = await buildApp()
+      await createSession(app, {}, { flyer: PNG })
+      const served = await get(app, '/api/admin/sessions/session-1/flyer?width=320')
+      expect(served.statusCode).toBe(200)
+      expect(served.rawPayload).toEqual(photos.size('sessions/flyer-1.png', 320))
+      expect(served.headers).toMatchObject({ 'content-type': 'image/webp', 'cache-control': 'private, no-cache' })
+      expect((await get(app, '/api/admin/sessions/session-1/flyer?width=2')).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
     })
 
     it('adds the session without a flyer when its part is empty', async () => {
@@ -751,6 +747,10 @@ describe('sessions routes', () => {
       response = await createSession(app, {}, { flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]) })
       expect(response.statusCode).toBe(413)
       expect(response.json()).toEqual({ ok: false, error: 'The flyer is larger than 10 MB' })
+      response = await createSession(app, {}, { flyer: UNREADABLE_JPEG })
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error: "The flyer can't be read: it's damaged, or has more than 100 million pixels" })
+      expect(photos.store).not.toHaveBeenCalled()
       expect((await createSession(app, {}, { flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES - JPEG.length)]) })).statusCode).toBe(200)
       rows = []
       vi.clearAllMocks()
@@ -851,6 +851,11 @@ describe('sessions routes', () => {
       response = await get(app, '/api/admin/sessions/session-1/flyer')
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'The flyer of this session is missing' })
+      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
+      stored.delete(sizeKey(rows[0].flyerKey!, 1280))
+      response = await get(app, '/api/admin/sessions/session-1/flyer?width=1280')
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error: 'The flyer of this session has no size 1280 pixels wide' })
     })
 
     describe('PUT /api/admin/sessions/:id/flyer', () => {
@@ -870,7 +875,7 @@ describe('sessions routes', () => {
         // Its flyer is part of the session, so who changed it, and when, are the session's.
         expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: true, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
         expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.jpeg', 'image/jpeg'))
-        expect(photos.store).toHaveBeenCalledExactlyOnceWith({ body: JPEG, type: 'image/jpeg' }, 'sessions')
+        expect(photos.store).toHaveBeenCalledExactlyOnceWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'sessions')
         expect(photos.delete).not.toHaveBeenCalled()
         const served = await get(app, '/api/admin/sessions/session-1/flyer')
         expect(served.headers['content-type']).toBe('image/jpeg')
@@ -880,7 +885,7 @@ describe('sessions routes', () => {
         expect(response.statusCode).toBe(200)
         expect(store.update).toHaveBeenLastCalledWith('session-1', flyerChange('sessions/flyer-2.png', 'image/png'))
         expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
-        expect([...stored.keys()]).toEqual(['sessions/flyer-2.png'])
+        expect(photos.photos()).toEqual(['sessions/flyer-2.png'])
         // The new flyer has another ETag, so a browser that has the one it replaced gets it.
         const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
         expect(replaced.statusCode).toBe(200)
@@ -896,6 +901,7 @@ describe('sessions routes', () => {
         for (const [sent, status, error] of [
           [multipartBody({ flyer: Buffer.from('%PDF-1.7') }), 400, 'The flyer must be a JPEG, PNG or WebP image'],
           [multipartBody({ flyer: Buffer.concat([JPEG, Buffer.alloc(PHOTO_MAX_BYTES)]) }), 413, 'The flyer is larger than 10 MB'],
+          [multipartBody({ flyer: UNREADABLE_JPEG }), 400, "The flyer can't be read: it's damaged, or has more than 100 million pixels"],
           [multipartBody({ submit: 'envoyer' }), 400, 'The request has no flyer'],
           [multipartBody({ flyer: Buffer.alloc(0) }), 400, 'The request has no flyer'],
           [multipartBody([['flyer', JPEG], ['flyer', PNG]]), 400, 'Invalid request'],
@@ -908,6 +914,7 @@ describe('sessions routes', () => {
         expect(photos.store).not.toHaveBeenCalled()
         expect(photos.delete).not.toHaveBeenCalled()
         expect(store.update).not.toHaveBeenCalled()
+        expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
       })
 
       it("ignores other fields and files, even the session's fields and removeFlyer", async () => {
@@ -937,7 +944,7 @@ describe('sessions routes', () => {
         expect((await putFlyer(app, 'session-1', { flyer: PNG })).statusCode).toBe(500)
         expect(photos.store).toHaveBeenCalledTimes(2)
         expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
-        expect([...stored.keys()]).toEqual(['sessions/flyer-1.jpeg'])
+        expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
       })
     })
   })

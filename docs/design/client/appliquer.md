@@ -27,7 +27,8 @@ The fields of an artist applying alone are (* means mandatory):
 - "Photo de profil": a JPEG, PNG or WebP image of up to 10 MB. It's optional, but the form encourages it by asking for a
   good quality press photo of the artist. A photo that was picked can be removed. It's checked as soon as it's picked:
   one that isn't a JPEG, PNG or WebP image of up to 10 MB says why right away, which screen readers announce, and stays
-  picked until it's changed or removed.
+  picked until it's changed or removed. Only the server can tell that a photo can't be read, e.g. because it's cut short:
+  the form shows its error once it's sent, as for the server's other errors (see below).
 - "Bio" (*): free-form text, up to 1500 characters.
 - "Liens" (*, at least one): one field per site (SoundCloud, Instagram, website and Bandcamp are always shown;
   Mixcloud, Resident Advisor, YouTube, Spotify and TikTok can be added). Each field shows the site's address

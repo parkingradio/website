@@ -345,9 +345,11 @@ export function day(offset: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-// A photo: a square PNG of one colour, e.g. "#e4572e".
+// A photo: a square PNG of one colour, e.g. "#e4572e", between the widths of the sizes the server makes of it, 320 and
+// 1280 pixels, so that one is smaller than the photo, and the other isn't larger (see "Photos" in
+// docs/design/server/artists.md).
 function photo(colour: string): Blob {
-  const SIZE = 64
+  const SIZE = 640
   const pixel = Buffer.from(colour.slice(1), 'hex')
   // Each row of pixels starts with its filter type, 0 for none.
   const row = Buffer.concat([Buffer.from([0]), ...Array<Buffer>(SIZE).fill(pixel)])

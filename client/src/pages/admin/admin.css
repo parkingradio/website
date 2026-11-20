@@ -963,3 +963,13 @@ tr[data-dragging] > td {
     margin-bottom: 0.5rem;
   }
 }
+
+/* A photo or a flyer, which links to it as it was sent. */
+.admin-image {
+  display: block;
+  max-width: 100%;
+}
+
+.admin-image img {
+  display: block;
+}

@@ -14,11 +14,12 @@ readonly PROFILE='{"name":"DJ Test","country":"CA","city":"Québec","genres":["t
 "bio":"Une bio.","links":{"soundcloud":"https://soundcloud.com/parkingdotradio/wobbla"},
 "email":"artiste@integration.test","phone":"418 555-0123"}'
 
-# The smallest files that start like a JPEG and a PNG image.
+# Small images, and a JPEG cut short, which starts like one, but can't be read.
 readonly PHOTOS="$(mktemp -d)"
 trap 'rm -rf "$PHOTOS"' EXIT
-printf '\xff\xd8\xff\xe0JFIF' > "${PHOTOS}/photo.jpg"
-printf '\x89PNG\r\n\x1a\nIHDR' > "${PHOTOS}/photo.png"
+make_image jpeg 64 48 > "${PHOTOS}/photo.jpg"
+make_image png 48 64 > "${PHOTOS}/photo.png"
+cut_short "${PHOTOS}/photo.jpg" > "${PHOTOS}/cut.jpg"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
@@ -45,6 +46,12 @@ artist POST "${BASE_URL}/api/admin/artists" '{"name":"DJ Test","country":"XX"}' 
 expect_status 400
 expect_body_contains 'Choisissez le pays.'
 
+echo "  a photo that can't be read is refused, in French, and nothing is stored"
+artist POST "${BASE_URL}/api/admin/artists" "$PROFILE" "${PHOTOS}/cut.jpg"
+expect_status 400
+expect_body_contains 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'
+[ "$(photos_on_disk)" = 0 ] && [ "$(sizes_on_disk)" = 0 ] || fail "expected nothing to be stored"
+
 echo "  an artist is added, and read back as they were sent"
 artist POST "${BASE_URL}/api/admin/artists" "$PROFILE" "${PHOTOS}/photo.jpg"
 expect_status 200
@@ -64,6 +71,7 @@ expect_header Content-Type 'image/jpeg'
 curl --silent --header "Cookie: ${cookie}" --output "${PHOTOS}/served" "${BASE_URL}/api/admin/artists/${id}/photo"
 cmp --silent "${PHOTOS}/photo.jpg" "${PHOTOS}/served" || fail "expected the photo as it was sent"
 [ "$(photos_on_disk)" = 1 ] || fail "expected the artist's photo on disk"
+[ "$(sizes_on_disk)" = 2 ] || fail "expected the sizes of the artist's photo on disk, made as it was sent"
 
 echo "  another artist can't have the same email, whatever its case, and the photo sent with it is deleted"
 artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/ARTISTE@integration.test}" "${PHOTOS}/photo.png"
@@ -91,7 +99,15 @@ artist PUT "${BASE_URL}/api/admin/artists/${id}" "$PROFILE" "${PHOTOS}/photo.png
 expect_status 200
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_header Content-Type 'image/png'
-[ "$(photos_on_disk)" = 2 ] || fail "expected the replaced photo to be deleted"
+[ "$(photos_on_disk)" = 2 ] && [ "$(sizes_on_disk)" = 4 ] || fail "expected the replaced photo to be deleted, with its sizes"
+artist PUT "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/Une bio./Pas changée.}" "${PHOTOS}/cut.jpg"
+expect_status 400
+expect_body_contains 'La photo ne peut pas être lue'
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}"
+expect_body_contains '"bio":"Une bio."'
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${id}/photo"
+expect_header Content-Type 'image/png'
+[ "$(photos_on_disk)" = 2 ] && [ "$(sizes_on_disk)" = 4 ] || fail "expected the photo that can't be read not to be stored"
 
 echo "  some of an artist's fields are changed as JSON, keeping the others and their photo, or removing it"
 json PATCH "${BASE_URL}/api/admin/artists/${id}" '{"bio":"Une bio changée.","phone":null}'

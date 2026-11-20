@@ -111,10 +111,47 @@ expect_output() {
 }
 
 # photos_on_disk [<folder>] -- how many photos the server keeps in a folder, artists' unless it says collectives' or
-# sessions' (their flyers), in the directory that stands in for the private bucket.
+# sessions' (their flyers), in the directory that stands in for the private bucket, without their sizes (see
+# `sizes_on_disk`).
 photos_on_disk() {
-    local folder="/tmp/private-bucket/${1:-artists}"
-    docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi" | wc -l | tr -d ' '
+    _files_on_disk "${1:-artists}" | grep -cvE '\.w[0-9]+\.webp$' || true
+}
+
+# sizes_on_disk [<folder>] -- how many sizes of photos the server keeps in a folder, like `photos_on_disk`.
+sizes_on_disk() {
+    _files_on_disk "${1:-artists}" | grep -cE '\.w[0-9]+\.webp$' || true
+}
+
+_files_on_disk() {
+    local folder="/tmp/private-bucket/$1"
+    docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi"
+}
+
+# cut_short <file> -- print the first half of the file, e.g. an image that then starts like one, but can't be read.
+cut_short() {
+    head -c "$(($(wc -c < "$1") / 2))" "$1"
+}
+
+# make_image <jpeg|png|webp> <width> <height> -- print an image of one colour in that format, with EXIF that has
+# "PLANTED-MAKE" and "PLANTED-GPS" in it, so that a check can tell when it's gone, and the EXIF orientation 6, which says to
+# turn it a quarter clockwise, as phones do for portraits. It's made by sharp, in the server's container.
+make_image() {
+    docker exec --workdir /app/server "$CONTAINER" node --eval "
+        require('sharp')({ create: { width: $2, height: $3, channels: 3, background: '#2e86ab' } })
+            .withExif({ IFD0: { Make: 'PLANTED-MAKE' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '46/1 48/1 0/1', GPSMapDatum: 'PLANTED-GPS' } })
+            .withMetadata({ orientation: 6 })
+            .$1()
+            .toBuffer()
+            .then((image) => process.stdout.write(image))"
+}
+
+# image_format <file> -- the format and the size of an image, as sharp reads it in the server's container, e.g.
+# "webp 320x640".
+image_format() {
+    docker exec --interactive --workdir /app/server "$CONTAINER" node --eval "
+        require('node:stream/consumers').buffer(process.stdin)
+            .then((image) => require('sharp')(image).metadata())
+            .then(({ format, width, height }) => console.log(format + ' ' + width + 'x' + height))" < "$1"
 }
 
 # body_field <name> -- the string field with this name in the body of the last request (in compact JSON, the last one if
@@ -250,6 +287,12 @@ expect_header() {
         printf '%s\n' "$HEADERS" | sed 's/^/    /' >&2
         exit 1
     fi
+}
+
+# header_value <name> -- the value of the header with this name in the last response, matched case-insensitively, like
+# expect_header's.
+header_value() {
+    printf '%s\n' "$HEADERS" | grep -i "^$1:" | sed 's/^[^:]*: *//'
 }
 
 # expect_no_header <name> -- matched case-insensitively, like expect_header's.

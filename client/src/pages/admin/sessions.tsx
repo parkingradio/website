@@ -48,12 +48,13 @@ import {
   setInSentence,
   setName,
   setTitle,
+  shownUrl,
 } from './describe'
 import type { Announced } from './describe'
 import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
 import type { SortColumn, Sorting } from './list'
 import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
-import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure } from './profile-details'
+import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure, ShownImage } from './profile-details'
 import { RaEventPanel } from './ra-event'
 import { failure, newSessionPath, sessionPath } from './session-errors'
 import { SessionForm } from './session-form'
@@ -653,7 +654,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           initial={sessionFormValues(session)}
           announced={session.announced}
           cancelled={cancelled}
-          flyer={session.hasFlyer ? flyerUrl(session) : null}
+          flyer={session.hasFlyer ? shownUrl(flyerUrl(session)) : null}
           submitLabel="enregistrer"
           onCancel={close}
           onSubmit={async (body) => {
@@ -694,7 +695,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
             {/* Faded out when it's the one its type gives it. */}
             <dd className={session.description ? 'admin-text' : 'admin-text admin-generated'}>{session.effectiveDescription || MISSING}</dd>
             <dt>Flyer</dt>
-            <dd>{session.hasFlyer ? <img src={flyerUrl(session)} alt={`Flyer de ${session.title}`} /> : 'Pas de flyer'}</dd>
+            <dd>{session.hasFlyer ? <ShownImage url={flyerUrl(session)} alt={`Flyer de ${session.title}`} /> : 'Pas de flyer'}</dd>
             <dt>Événement RA</dt>
             <dd>
               {session.raEvent ? (

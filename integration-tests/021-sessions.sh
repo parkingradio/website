@@ -23,11 +23,12 @@ readonly IP=198.51.100.30
 readonly NOBODY=00000000-0000-4000-8000-000000000000
 
 readonly FILES="$(mktemp -d)"
-# The smallest files that start like a JPEG and a PNG image, and one that's neither.
-printf '\xff\xd8\xff\xe0JFIF' > "${FILES}/flyer.jpg"
-printf '\x89PNG\r\n\x1a\nIHDR' > "${FILES}/flyer.png"
-printf '%%PDF-1.7' > "${FILES}/flyer.pdf"
 trap 'rm -rf "$FILES"' EXIT
+# Small images, a JPEG cut short, which starts like one, but can't be read, and a file that's neither.
+make_image jpeg 64 48 > "${FILES}/flyer.jpg"
+make_image png 48 64 > "${FILES}/flyer.png"
+cut_short "${FILES}/flyer.jpg" > "${FILES}/cut.jpg"
+printf '%%PDF-1.7' > "${FILES}/flyer.pdf"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
@@ -261,12 +262,18 @@ echo "  a session's flyer is checked, kept, served, replaced, removed, and delet
 session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.pdf"
 expect_status 400
 expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
-[ "$(photos_on_disk sessions)" = 0 ] || fail "expected no flyer on disk"
+session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/cut.jpg"
+expect_status 400
+expect_body_contains '"error":"The flyer can'"'"'t be read: it'"'"'s damaged, or has more than 100 million pixels"'
+session_form POST "$SESSIONS" "$(session_json null 60)" --form "flyer=@${FILES}/cut.jpg"
+expect_status 400
+expect_body_contains '"error":"The flyer can'"'"'t be read'
+[ "$(photos_on_disk sessions)" = 0 ] && [ "$(sizes_on_disk sessions)" = 0 ] || fail "expected no flyer on disk"
 session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.jpg"
 expect_status 200
 expect_body_contains '"hasFlyer":true'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
-[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the session's flyer on disk"
+[ "$(photos_on_disk sessions)" = 1 ] && [ "$(sizes_on_disk sessions)" = 2 ] || fail "expected the session's flyer on disk, with its sizes"
 request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_status 200
 expect_header Content-Type 'image/jpeg'
@@ -274,12 +281,11 @@ expect_header X-Content-Type-Options 'nosniff'
 expect_header Cache-Control 'private, no-cache'
 expect_header ETag '"[^"]+"'
 # A browser that has the flyer gets a 304 without it, with the same ETag, compared as text rather than as a regex.
-etag_of_response() { printf '%s\n' "$HEADERS" | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p'; }
-etag="$(etag_of_response)"
+etag="$(header_value ETag)"
 request --header "Cookie: ${cookie}" --header "If-None-Match: ${etag}" "${SESSIONS}/${described}/flyer"
 expect_status 304
 [ -z "$BODY" ] || fail "expected no flyer with the 304"
-[ "$(etag_of_response)" = "$etag" ] || fail "expected the 304 to have the flyer's ETag"
+[ "$(header_value ETag)" = "$etag" ] || fail "expected the 304 to have the flyer's ETag"
 curl --silent --header "Cookie: ${cookie}" --output "${FILES}/served" "${SESSIONS}/${described}/flyer"
 cmp --silent "${FILES}/flyer.jpg" "${FILES}/served" || fail "expected the flyer as it was sent"
 # A flyer sent with a session that isn't saved is deleted: one that would overlap the first session, or a takeover of a
@@ -310,6 +316,9 @@ put_flyer() { request --header "Cookie: ${cookie}" --request PUT "$@"; }
 put_flyer --form "flyer=@${FILES}/flyer.pdf" "${SESSIONS}/${described}/flyer"
 expect_status 400
 expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
+put_flyer --form "flyer=@${FILES}/cut.jpg" "${SESSIONS}/${described}/flyer"
+expect_status 400
+expect_body_contains '"error":"The flyer can'"'"'t be read'
 put_flyer --form-string submit=envoyer "${SESSIONS}/${described}/flyer"
 expect_status 400
 expect_body_contains '"error":"The request has no flyer"'
@@ -329,7 +338,7 @@ request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_header Content-Type 'image/jpeg'
 json DELETE "${SESSIONS}/${described}"
 expect_status 200
-[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the deleted session's flyer to be deleted"
+[ "$(photos_on_disk sessions)" = 0 ] && [ "$(sizes_on_disk sessions)" = 0 ] || fail "expected the deleted session's flyer to be deleted, with its sizes"
 
 echo "  only takeovers have a collective, and they need one, a session of type other needs a name, and nothing is saved otherwise"
 for fields in '"type":"takeovers"' '"type":"takeover"' "\"takeover\":\"${ondes}\"" "\"type\":\"other\",\"takeover\":\"${ondes}\"" '"type":"other","name":" "'; do

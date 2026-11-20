@@ -97,6 +97,13 @@ export function flyerUrl({ id, updatedAt, createdAt }: { id: string; updatedAt: 
   return `/api/admin/sessions/${id}/flyer?v=${encodeURIComponent(updatedAt ?? createdAt)}`
 }
 
+// The address of the size that pages show of a photo or a flyer whose address is `url`, as `photoUrl` or `flyerUrl` give
+// it: it's never shown as it was sent, which can be much larger, but pages link to it (see "Photos" in
+// docs/design/server/artists.md).
+export function shownUrl(url: string): string {
+  return `${url}&width=1280`
+}
+
 // The name of an artist's country, or "" when it's left out.
 export function countryOf({ country }: { country: string }): string {
   return country && countryName(country)

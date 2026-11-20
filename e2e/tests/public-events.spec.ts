@@ -28,9 +28,10 @@ test('Programmation lists the announced sessions, with their lineups, their flye
   await expect(meetup.getByRole('link', { name: 'SYNTH MEETUPS sur RA' })).toHaveAttribute('href', 'https://ra.co/events/2403003')
   await expect(meetup.locator('.event-lineup')).toHaveText('OPEN JAM')
   const flyer = meetup.locator('.event-flyer img')
-  await expect(flyer).toHaveAttribute('src', /^\/api\/events\/[^/]+\/flyer$/)
+  await expect(flyer).toHaveAttribute('src', /^\/api\/events\/[^/]+\/flyer\?width=320$/)
   await flyer.scrollIntoViewIfNeeded()
-  await expect(flyer).toHaveJSProperty('naturalWidth', 64)
+  // The server's thumbnail of the 640-pixel flyer.
+  await expect(flyer).toHaveJSProperty('naturalWidth', 320)
 
   // The live performance, which has neither a flyer nor an event on RA, so nothing links.
   const live = rowOf(page, 'LIVE PERFORMANCE')

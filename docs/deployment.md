@@ -197,6 +197,31 @@ Each deployment gets a private S3 bucket for the files only the app reads and wr
 assets. The bucket is versioned and keeps the previous versions of files for as long as the database's backups
 are kept.
 
+Photos and flyers are kept there with their sizes, which the server makes when they're sent (see
+[Photos](design/server/artists.md#photos)): those of the one with key `<key>` are `<key>.w320.webp` and
+`<key>.w1280.webp`. Whenever the server starts, it makes, in the background, one photo at a time, the sizes that the
+photos and flyers it keeps don't have, e.g. those sent before there were sizes, the first time an image with them is
+deployed. Until it's done, pages show those photos and flyers as missing images. Its log, which is read as in
+[Database migrations](#database-migrations), says:
+
+- When it starts, `Making the missing sizes of photos and flyers`, and when it's done, `Made the missing sizes of photos
+  and flyers`, with how many it made, and how many it couldn't, or `Stopped making the missing sizes of photos and
+  flyers` when the server stops first. It goes on the next time the server starts.
+- For each photo or flyer that it couldn't make the sizes of, what it's of (`of`, e.g. `artist`, and `id`), and its
+  `key`, with one of these messages:
+  - `Can't make the sizes of a photo or flyer: it can't be read`. It has no sizes until it's replaced, on the admin
+    pages, which still have it as it was sent. It's read, and logged, again every time the server starts.
+  - `A photo or flyer whose sizes were missing is missing too, e.g. because it was deleted or replaced meanwhile`.
+    Unless it was, it's lost from the bucket: the public endpoints, which only ever read sizes, can't tell, so this is
+    where it shows.
+  - `Failed to make the sizes of a photo or flyer`, for any other reason, e.g. the bucket's. It's tried again the next
+    time the server starts.
+
+Two messages, from requests or from making sizes, say that files of a photo that was deleted, or never used, may be
+left in the bucket, with their `key`: `Failed to delete a photo that is not used anymore`, and `Failed to delete the
+size of a photo that may have been deleted`. Delete them by hand, the photo and both of its sizes, so that they're gone
+for good once the bucket's previous versions expire, like the photos that were deleted.
+
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

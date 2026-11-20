@@ -7,7 +7,7 @@ import { checkCollectiveProfile } from '../../collective-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import { Combobox } from '../../combobox'
 import { normalize } from '../../normalize'
-import { artistOption, photoUrl } from './describe'
+import { artistOption, photoUrl, shownUrl } from './describe'
 import { leaving, useCheckedForm } from './checked-form'
 import { FieldError, FormActions, Labeled } from './fields'
 import { OrderedList } from './ordered-list'
@@ -120,7 +120,7 @@ export function CollectiveForm({ collective: initial, artists, submitLabel, onSu
       </Labeled>
 
       <PhotoField
-        current={initial?.hasPhoto ? photoUrl('collectives', initial) : null}
+        current={initial?.hasPhoto ? shownUrl(photoUrl('collectives', initial)) : null}
         removed={removePhoto}
         onRemove={() => setRemovePhoto(true)}
         photo={photo}

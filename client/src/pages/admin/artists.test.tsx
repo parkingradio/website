@@ -489,7 +489,9 @@ describe('An artist’s page', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Aurore' })).toBeInTheDocument())
     expect(screen.getByText(/^artiste, ajouté par/)).toHaveTextContent(/^artiste, ajouté par admin@example.com le 1 octobre 2026/)
-    expect(screen.getByRole('img', { name: 'Photo de Aurore' }).getAttribute('src')).toMatch(/^\/api\/admin\/artists\/artist-1\/photo\?v=/)
+    // At the server's larger size, linking to the photo as it was sent.
+    expect(screen.getByRole('img', { name: 'Photo de Aurore' }).getAttribute('src')).toMatch(/^\/api\/admin\/artists\/artist-1\/photo\?v=[^&]+&width=1280$/)
+    expect(screen.getByRole('link', { name: 'Photo de Aurore' }).getAttribute('href')).toMatch(/^\/api\/admin\/artists\/artist-1\/photo\?v=[^&]+$/)
     expect(screen.getByRole('link', { name: 'aurore' })).toHaveAttribute('href', 'https://soundcloud.com/aurore')
     expect(screen.getByRole('link', { name: 'https://aurore.example' })).toHaveAttribute('href', 'https://aurore.example')
     expect(screen.getByRole('link', { name: 'aurore@example.com' })).toHaveAttribute('href', 'mailto:aurore@example.com')

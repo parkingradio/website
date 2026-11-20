@@ -169,22 +169,22 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`POST /api/admin/video/credentials/check`](video.md#post-apiadminvideocredentialscheck-admin) | admin | Whether YouTube accepts a key and finds a channel, without saving them |
 | [`GET /api/admin/artists`](artists.md#get-apiadminartistscollectiveid-admin) | admin | Every artist, or a collective's |
 | [`GET /api/admin/artists/:id`](artists.md#get-apiadminartistsid-admin) | admin | An artist |
-| [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo |
+| [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo, as it was sent, or one of its sizes |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
 | [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Replacing an artist's profile, and replacing or removing their photo |
 | [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent, or removing their photo |
 | [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, which their sets lose, and taking them out of their collectives and their sets |
 | [`GET /api/artists/:id`](artists.md#get-apiartistsid) | public | A public artist's profile |
-| [`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto) | public | A public artist's photo |
+| [`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto) | public | One of the sizes of a public artist's photo |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
-| [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo |
+| [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo, as it was sent, or one of its sizes |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
 | [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Replacing a collective's profile and members, and replacing or removing its photo |
 | [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent, or removing its photo |
 | [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo and its applications, but not its members |
 | [`GET /api/collectives/:id`](collectives.md#get-apicollectivesid) | public | A public collective's profile, with its members |
-| [`GET /api/collectives/:id/photo`](collectives.md#get-apicollectivesidphoto) | public | A public collective's photo |
+| [`GET /api/collectives/:id/photo`](collectives.md#get-apicollectivesidphoto) | public | One of the sizes of a public collective's photo |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
@@ -198,7 +198,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, with their sets |
 | [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
 | [`GET /api/admin/sessions/:id/ra-event`](sessions.md#get-apiadminsessionsidra-event-admin) | admin | The content of a session's event on Resident Advisor |
-| [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer |
+| [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer, as it was sent, or one of its sizes |
 | [`PUT /api/admin/sessions/:id/flyer`](sessions.md#put-apiadminsessionsidflyer-admin) | admin | Giving a session a flyer, or replacing its flyer |
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer, and its sets |
 | [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Replacing a session's fields, and replacing or removing its flyer |
@@ -214,7 +214,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sets/:id/session`](sessions.md#put-apiadminsetsidsession-admin) | admin | Moving a set to another session, which can change both sessions' statuses |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
-| [`GET /api/events/:id/flyer`](events.md#get-apieventsidflyer) | public | An event's flyer |
+| [`GET /api/events/:id/flyer`](events.md#get-apieventsidflyer) | public | One of the sizes of an event's flyer |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |

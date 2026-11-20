@@ -6,7 +6,7 @@ import type { Schema } from '../../api/client'
 import { LINK_SITES } from '../../artist-profile'
 import type { Artist, ArtistLinks } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
-import { KIND_LABELS, MISSING, collectiveGenreNames, entryPath, genreNames, photoUrl, place } from './describe'
+import { KIND_LABELS, MISSING, collectiveGenreNames, entryPath, genreNames, photoUrl, place, shownUrl } from './describe'
 
 // What the pages of artists and collectives share, and what applications' pages show of them.
 
@@ -88,7 +88,17 @@ function MembersList({ members }: { members: Schema<'Reference'>[] }) {
 
 // An artist's or a collective's photo, or that they have none, so that the team notices.
 function PhotoOrNone({ url, name }: { url: string | null; name: string }) {
-  return url ? <img src={url} alt={`Photo de ${name}`} /> : <div className="admin-no-photo">Pas de photo</div>
+  return url ? <ShownImage url={url} alt={`Photo de ${name}`} /> : <div className="admin-no-photo">Pas de photo</div>
+}
+
+// A photo or a flyer, whose address is `url`, as `photoUrl` or `flyerUrl` give it: shown at the size pages show, and
+// linking to it as it was sent, e.g. to download it.
+export function ShownImage({ url, alt }: { url: string; alt: string }) {
+  return (
+    <a className="admin-image" href={url} target="_blank" rel="noreferrer">
+      <img src={shownUrl(url)} alt={alt} />
+    </a>
+  )
 }
 
 // An artist's or a collective's links, rebuilt from their profile names, in the order of LINK_SITES.

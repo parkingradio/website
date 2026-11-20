@@ -13,11 +13,12 @@ source "$(dirname "$0")/lib.sh"
 readonly IP=198.51.100.19
 readonly NOBODY=00000000-0000-4000-8000-000000000000
 
-# The smallest files that start like a JPEG and a PNG image.
+# Small images, and a JPEG cut short, which starts like one, but can't be read.
 readonly FILES="$(mktemp -d)"
 trap 'rm -rf "$FILES"' EXIT
-printf '\xff\xd8\xff\xe0JFIF' > "${FILES}/photo.jpg"
-printf '\x89PNG\r\n\x1a\nIHDR' > "${FILES}/photo.png"
+make_image jpeg 64 48 > "${FILES}/photo.jpg"
+make_image png 48 64 > "${FILES}/photo.png"
+cut_short "${FILES}/photo.jpg" > "${FILES}/cut.jpg"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
@@ -95,6 +96,12 @@ expect_status 400
 expect_body_contains 'Indiquez au moins un artiste du collectif.'
 [ "$(photos_on_disk collectives)" = 0 ] || fail "expected no photo to be stored"
 
+echo "  a photo that can't be read is refused, in French, and nothing is stored"
+send collective POST "$COLLECTIVES" "$(profile "$brume" "$ana")" "${FILES}/cut.jpg"
+expect_status 400
+expect_body_contains 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'
+[ "$(photos_on_disk collectives)" = 0 ] && [ "$(sizes_on_disk collectives)" = 0 ] || fail "expected nothing to be stored"
+
 echo "  a collective is added with its photo and members, in order, and read back as it was sent"
 send collective POST "$COLLECTIVES" "$(profile "$brume" "$ana")" "${FILES}/photo.jpg"
 expect_status 200
@@ -109,6 +116,7 @@ admin GET "${COLLECTIVES}/${ondes}/photo"
 expect_status 200
 expect_header Content-Type 'image/jpeg'
 [ "$(photos_on_disk collectives)" = 1 ] || fail "expected the collective's photo on disk, apart from artists' photos"
+[ "$(sizes_on_disk collectives)" = 2 ] || fail "expected the sizes of the collective's photo on disk, made as it was sent"
 
 echo "  another collective can't have the same contact email, whatever its case, and nothing sent with it is kept"
 send collective POST "$COLLECTIVES" "$(profile_with CONTACT@collectives.test "$ana" name=Fantôme)" "${FILES}/photo.png"

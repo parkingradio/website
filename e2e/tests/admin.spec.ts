@@ -144,7 +144,8 @@ test('collectives are listed and searched with the artists, and lead to their ar
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill('')
   await onde.getByRole('link').click()
   await expect(page.getByRole('heading', { name: 'Onde Commune', exact: true })).toBeVisible()
-  await expect(page.getByRole('img', { name: 'Photo de Onde Commune', exact: true })).toHaveJSProperty('naturalWidth', 64)
+  // At the server's 1280-pixel size, which doesn't enlarge it.
+  await expect(page.getByRole('img', { name: 'Photo de Onde Commune', exact: true })).toHaveJSProperty('naturalWidth', 640)
   const members = page.locator('dt', { hasText: 'Artistes du collectif' }).locator('+ dd').getByRole('link')
   await expect(members).toHaveText(['Clémentine Brûlée', 'Fréquence Boréale', 'Kwame Asante'])
 

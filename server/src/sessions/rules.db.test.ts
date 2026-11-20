@@ -9,7 +9,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { TEST_ADMIN, acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { applicationsRoutes } from '../applications/routes.js'
@@ -659,15 +659,6 @@ const STEP: fc.Arbitrary<Step> = fc.oneof(
     weight: operation.weight,
   })),
 )
-
-// Photos and flyers aren't sent, so there are none to read or delete.
-const NO_PHOTOS: Photos = {
-  store: async () => {
-    throw new Error('No photos in these tests')
-  },
-  read: async () => null,
-  delete: async () => {},
-}
 
 async function buildApp(database: TestDatabase) {
   const app = Fastify()

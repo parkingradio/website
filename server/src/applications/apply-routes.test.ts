@@ -5,7 +5,8 @@ import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
 import { EmailTaken } from '../artists/store.js'
-import type { PhotoFolder, SentPhoto, StoredArtist } from '../artists/store.js'
+import type { StoredArtist } from '../artists/store.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
 import { EmailNotSent } from '../core/email.js'
 import type { SendEmail } from '../core/email.js'
@@ -21,9 +22,9 @@ import type { TurnstileVerifier } from './turnstile.js'
 let artists: StoredArtist[] = []
 let collectives: (CollectiveRow & { members: string[] })[] = []
 let applications: StoredApplication[] = []
-const stored = new Map<string, Buffer>()
+const photos = memoryPhotos()
+const stored = photos.stored
 let nextId = 0
-let nextPhoto = 0
 
 function addApplication(fields: ApplicationFields, owner: { artistId: string } | { collectiveId: string }): StoredApplication {
   const now = new Date()
@@ -68,17 +69,6 @@ const store: ApplyStore = {
   }),
 }
 
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
-  }),
-}
-
 // Vouches for every token but "refused".
 const verifyTurnstile = vi.fn<TurnstileVerifier>(async (token) =>
   token && token !== 'refused' ? { success: true } : { success: false, errorCodes: ['invalid-input-response'] },
@@ -90,10 +80,6 @@ const settings: Pick<ApplicationsSettingsStore, 'load'> = {
   load: vi.fn(async () => (recipients ? { recipients, updatedBy: 'admin@example.com', updatedAt: new Date() } : null)),
 }
 const sendEmail = vi.fn<SendEmail>(async () => {})
-
-// The smallest things that start like a JPEG and a PNG file.
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
 function profile(changes: Partial<ApplicantProfile> = {}): ApplicantProfile {
   return {
@@ -213,9 +199,8 @@ describe('POST /api/applications', () => {
     artists = []
     collectives = []
     applications = []
-    stored.clear()
+    photos.reset()
     nextId = 0
-    nextPhoto = 0
     recipients = null
     vi.clearAllMocks()
   })
@@ -240,7 +225,7 @@ describe('POST /api/applications', () => {
       // The dates are sorted.
       expect.objectContaining({ ...fields({ dates: ['2027-01-08', '2027-01-15'] }), artistId: artists[0].id, createdBy: null }),
     ])
-    expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
   })
 
   it('adds the artist without a photo, which is optional', async () => {
@@ -268,7 +253,7 @@ describe('POST /api/applications', () => {
     expect(artists).toHaveLength(1)
     expect(artists[0]).toMatchObject({ name: 'DJ Test', photoKey: 'artists/photo-1.jpeg' })
     expect(applications).toHaveLength(1)
-    expect([...stored.keys()]).toEqual(['artists/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['artists/photo-1.jpeg'])
   })
 
   it('adds the collective, which added itself, with its photo, its artists, with their profiles and photos, in order, and its application', async () => {
@@ -303,7 +288,7 @@ describe('POST /api/applications', () => {
     ])
     expect(collectives[0].members).toEqual(artists.map((artist) => artist.id))
     expect(applications).toEqual([expect.objectContaining({ artistId: null, collectiveId: collectives[0].id, createdBy: null })])
-    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg', 'artists/photo-2.png'])
   })
 
   it('takes any number of artists, but at least one', async () => {
@@ -328,7 +313,7 @@ describe('POST /api/applications', () => {
     expect(response.json()).toEqual({ ok: false, error: 'Un collectif est déjà inscrit avec cette adresse e-mail.' })
     expect(collectives).toHaveLength(1)
     expect(artists).toHaveLength(2)
-    expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+    expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
     expect(photos.delete).toHaveBeenCalledTimes(3)
 
     expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)
@@ -526,6 +511,25 @@ describe('POST /api/applications', () => {
     for (const response of refused) {
       expect(response.json()).toEqual({ ok: false, error: 'Candidature invalide.' })
     }
+  })
+
+  it("refuses, in French, a photo that can't be read, once Turnstile vouches for the token, saying which artist's it is, without storing anything", async () => {
+    const app = await buildApp()
+    const unreadable = 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'
+    for (const { parts, error } of [
+      { parts: { photo: UNREADABLE_JPEG }, error: unreadable },
+      { parts: { artist: asCollective(), photo: PNG, memberPhotos: [JPEG, UNREADABLE_JPEG] }, error: `Artiste 2 : ${unreadable}` },
+    ]) {
+      verifyTurnstile.mockClear()
+      const response = await apply(app, parts)
+      expect(response.statusCode).toBe(400)
+      expect(response.json()).toEqual({ ok: false, error })
+      // Reading photos takes work, which only requests that pass Turnstile get.
+      expect(verifyTurnstile).toHaveBeenCalledOnce()
+    }
+    expect(photos.store).not.toHaveBeenCalled()
+    expect(store.apply).not.toHaveBeenCalled()
+    expect(store.applyAsCollective).not.toHaveBeenCalled()
   })
 
   it('refuses an application without a token, or with one Turnstile does not vouch for, without storing anything', async () => {

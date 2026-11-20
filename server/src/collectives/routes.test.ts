@@ -1,11 +1,11 @@
-import { Readable } from 'node:stream'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
 import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
 import { EmailTaken } from '../artists/store.js'
-import type { PhotoFolder, SentPhoto } from '../artists/store.js'
+import { sizeKey } from '../artists/sizes.js'
+import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import { NO_SUCH_MEMBER } from './profile.js'
 import { collectivesRoutes } from './routes.js'
 import { Conflict } from '../sessions/store.js'
@@ -19,9 +19,9 @@ import { inQuebecTime } from '../api/formats.js'
 // artists/routes.test.ts).
 let rows: StoredCollective[] = []
 let artists: { id: string; name: string }[] = []
-const stored = new Map<string, Buffer>()
+const photos = memoryPhotos()
+const stored = photos.stored
 let nextId = 0
-let nextPhoto = 0
 
 // Like the database, where two collectives can't have the same email whatever its case, but any number can have none.
 function emailTaken(email: string | null, except?: string) {
@@ -76,22 +76,6 @@ const store: CollectivesStore = {
     return row ?? null
   }),
 }
-
-const photos = {
-  store: vi.fn(async ({ body, type }: SentPhoto, folder: PhotoFolder) => {
-    const key = `${folder}/photo-${++nextPhoto}.${type.split('/')[1]}`
-    stored.set(key, body)
-    return key
-  }),
-  read: vi.fn(async (key: string) => (stored.has(key) ? Readable.from([stored.get(key)!]) : null)),
-  delete: vi.fn(async (key: string) => {
-    stored.delete(key)
-  }),
-}
-
-// The smallest things that start like a JPEG and a PNG file.
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
 
 function profile(changes: Record<string, unknown> = {}) {
   return {
@@ -162,9 +146,8 @@ describe('collectives routes', () => {
       { id: 'artist-ana', name: 'Ana' },
       { id: 'artist-brume', name: 'Brume' },
     ]
-    stored.clear()
+    photos.reset()
     nextId = 0
-    nextPhoto = 0
     vi.clearAllMocks()
   })
 
@@ -216,7 +199,9 @@ describe('collectives routes', () => {
           updatedAt: null,
         },
       })
-      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg' }, 'collectives')
+      expect(photos.store).toHaveBeenCalledWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'collectives')
+      expect(stored.has(sizeKey('collectives/photo-1.jpeg', 320))).toBe(true)
+      expect(stored.has(sizeKey('collectives/photo-1.jpeg', 1280))).toBe(true)
       expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpeg', photoType: 'image/jpeg' })
     })
 
@@ -265,6 +250,9 @@ describe('collectives routes', () => {
       }
       const response = await create(app, profile(), Buffer.from('%PDF-1.7'))
       expect(response.json()).toEqual({ ok: false, error: 'La photo doit être en JPEG, PNG ou WebP.' })
+      const unreadable = await create(app, profile(), UNREADABLE_JPEG)
+      expect(unreadable.statusCode).toBe(400)
+      expect(unreadable.json()).toEqual({ ok: false, error: 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.' })
       expect(photos.store).not.toHaveBeenCalled()
       expect(rows).toHaveLength(0)
     })
@@ -275,7 +263,7 @@ describe('collectives routes', () => {
       const response = await create(app, profile({ email: 'Contact@Example.com' }), PNG)
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'Another collective has this email address' })
-      expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
     })
 
     it('refuses a member who is not an artist, in English, and forgets the photo', async () => {
@@ -335,6 +323,16 @@ describe('collectives routes', () => {
       expect(kept.statusCode).toBe(304)
     })
 
+    it('serves the sizes of the photo, with `width`', async () => {
+      const app = await buildApp()
+      await create(app, profile(), PNG)
+      const served = await request(app, 'GET', '/api/admin/collectives/collective-1/photo?width=1280')
+      expect(served.statusCode).toBe(200)
+      expect(served.rawPayload).toEqual(photos.size('collectives/photo-1.png', 1280))
+      expect(served.headers).toMatchObject({ 'content-type': 'image/webp', 'cache-control': 'private, no-cache' })
+      expect((await request(app, 'GET', '/api/admin/collectives/collective-1/photo?width=12')).json()).toEqual({ ok: false, error: '`width` must be 320 or 1280.' })
+    })
+
     it('responds 404 for a collective that does not exist, has no photo, or whose photo is missing', async () => {
       const app = await buildApp()
       expect((await request(app, 'GET', '/api/admin/collectives/nobody/photo')).json()).toEqual({ ok: false, error: 'No such collective' })
@@ -345,6 +343,11 @@ describe('collectives routes', () => {
       const missing = await request(app, 'GET', '/api/admin/collectives/collective-2/photo')
       expect(missing.statusCode).toBe(404)
       expect(missing.json()).toEqual({ ok: false, error: 'The photo of this collective is missing' })
+      await create(app, profile({ email: 'troisieme@example.com' }))
+      stored.delete(sizeKey('collectives/photo-2.jpeg', 320))
+      const noSize = await request(app, 'GET', '/api/admin/collectives/collective-3/photo?width=320')
+      expect(noSize.statusCode).toBe(404)
+      expect(noSize.json()).toEqual({ ok: false, error: 'The photo of this collective has no size 320 pixels wide' })
     })
   })
 
@@ -385,7 +388,7 @@ describe('collectives routes', () => {
       const app = await buildApp()
       await create(app)
       expect((await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), PNG)).statusCode).toBe(200)
-      expect([...stored.keys()]).toEqual(['collectives/photo-2.png'])
+      expect(photos.photos()).toEqual(['collectives/photo-2.png'])
       const removed = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), null, true)
       expect(removed.json().collective.hasPhoto).toBe(false)
       expect(stored.size).toBe(0)
@@ -410,8 +413,12 @@ describe('collectives routes', () => {
       const missing = await send(app, 'PUT', '/api/admin/collectives/nobody', profile(), PNG)
       expect(missing.statusCode).toBe(404)
       expect(missing.json()).toEqual({ ok: false, error: 'No such collective' })
-      expect([...stored.keys()]).toEqual(['collectives/photo-1.jpeg'])
+      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
       expect(rows[0]).toMatchObject({ email: 'contact@example.com', updatedBy: null })
+      const unreadable = await send(app, 'PUT', '/api/admin/collectives/collective-1', profile(), UNREADABLE_JPEG)
+      expect(unreadable.statusCode).toBe(400)
+      expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
+      expect(rows[0]).toMatchObject({ photoKey: 'collectives/photo-1.jpeg', updatedBy: null })
     })
 
     it("refuses the profile's fields it doesn't take, naming them, but ignores those of its members", async () => {
@@ -529,7 +536,7 @@ describe('collectives routes', () => {
         set: null,
       })
       expect(rows).toHaveLength(1)
-      expect(stored.size).toBe(1)
+      expect(photos.photos()).toHaveLength(1)
     })
   })
 })

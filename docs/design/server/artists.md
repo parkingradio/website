@@ -53,10 +53,19 @@ An artist, as the endpoints below return them, is their profile with:
 
 ## Photos
 
-An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents.
-It's kept in the app's private S3 bucket, or in a local directory in development, and only the server reads it. When
-the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the bucket's previous versions
-for as long as the database's backups are kept, like the artist's row, and is gone for good after that.
+An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
+and which the server can read in full, of at most 100 million pixels: one it can't, e.g. because it's cut short, or too
+damaged to be decoded, is refused. It's kept in the app's private S3 bucket, or in a local directory in development, and
+only the server reads it. When the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in
+the bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for
+good after that.
+
+The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
+its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
+than WebP allows. They're deleted with it. When it starts, the server makes, in the background, the sizes that the
+photos it keeps don't have: until then, and for good for a photo it can't read, the endpoints fail with 404 for a size
+that isn't there. The public endpoints only ever serve a size, so that the photo itself and its metadata stay
+private.
 
 ## Public profiles
 
@@ -67,8 +76,9 @@ public. Everyone else is private, e.g. the artists who only applied: there's no 
 endpoints fail with 404 for a private artist, as for one that doesn't exist.
 
 An artist's public profile has their `id`, `name`, `country`, `city`, `genres`, `bio` and `links`, as the admin
-endpoints give them, and `photo`, where their photo is, `/api/artists/<id>/photo`, or null when they have none. Never
-their email or phone, who added or changed them, or their collectives, which could name collectives that aren't public.
+endpoints give them, and `photo`, where their photo is, `/api/artists/<id>/photo`, which takes `width` (see
+[Photos](#photos)), or null when they have none. Never their email or phone, who added or changed them, or their
+collectives, which could name collectives that aren't public.
 
 ## `GET /api/admin/artists[?collective=<id>]` (admin)
 
@@ -91,12 +101,20 @@ Fails with 404 when there's no such artist.
 
 ## `GET /api/admin/artists/:id/photo` (admin)
 
-Responds with the photo itself, with the type it was checked to have, rather than JSON. Browsers are told not to
-guess another type (`X-Content-Type-Options: nosniff`), and that they can keep the photo, only in the browser that asked
-for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private,
-no-cache`). It has an `ETag` of its own, which changes whenever the photo does, and a request with it in `If-None-Match`
-gets a 304 without the photo, even when the photo is missing. Otherwise, fails with 404 when there's no such artist,
-when they have no photo, or when their photo is missing.
+| Query parameter | |
+|---|---|
+| `width` | `320` or `1280`: that size of the photo (see [Photos](#photos)). Without it, the photo as it was sent |
+
+Other query parameters are ignored.
+
+Responds with the photo itself, with the type it was checked to have, or with its size, as `image/webp`, rather than
+JSON. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only
+in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again
+(`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes
+whenever the photo does, and a request with it in `If-None-Match` gets a 304 without the photo, even when the photo is
+missing. Otherwise, fails with 400 when `width` is anything else, or is given more than once, and 404 when there's no
+such artist, when they have no photo, or when what's asked for is missing: the photo, or, with `width`, that size of it,
+e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still be had as it was sent, and replaced.
 
 ## `POST /api/admin/artists` (admin)
 
@@ -109,8 +127,8 @@ are ignored. A second photo isn't: the request fails.
 | `ok` | `true` | |
 | `artist` | artist | As they were added |
 
-Fails with 400 (an invalid profile or photo, or a malformed request), 409 (another artist has that email) or 413 (a
-photo larger than 10 MB).
+Fails with 400 (an invalid profile or photo, including one that can't be read, see [Photos](#photos), or a malformed
+request), 409 (another artist has that email) or 413 (a photo larger than 10 MB).
 
 ## `PUT /api/admin/artists/:id` (admin)
 
@@ -145,7 +163,15 @@ Fails with 404 when there's no such artist, or when they're private.
 
 ## `GET /api/artists/:id/photo`
 
-Responds with a public artist's photo, like [`GET /api/admin/artists/:id/photo`](#get-apiadminartistsidphoto-admin), or
-a 304. Browsers check with the server before showing it again, so it stops being shown once the artist is private.
-Otherwise, fails with 404 when there's no such artist, when they're private, when they have no photo, or when their
-photo is missing.
+| Query parameter | |
+|---|---|
+| `width` | `320` or `1280`, the size of the photo (see [Photos](#photos)). Without it, `1280` |
+
+Other query parameters are ignored.
+
+Responds with that size of a public artist's photo, never with the photo itself, like
+[`GET /api/admin/artists/:id/photo`](#get-apiadminartistsidphoto-admin) with `width`, or a 304, and fails like it, and
+with 404 when they're private too. But browsers can show it again for 5 minutes without checking with the server
+(`Cache-Control: private, max-age=300`), which saves pages a request for each photo they show again, and only check
+with it after that: so once the artist is private, or their photo changes, a browser that already has it can still show
+it for up to 5 minutes. It's still never kept in a shared cache, e.g. Cloudflare's, which would show it to everyone.

@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import type { Photos } from '../artists/store.js'
+import { NO_PHOTOS } from '../artists/test-photos.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from './routes.js'
@@ -19,15 +19,6 @@ import { checkSessionsInvariants } from './test-invariants.js'
 // order, and so does deleting one, or moving one to another session, after whose sets it goes, even with requests sent
 // at the same time (see "Sets' order" in docs/design/server/sessions.md). The property-based tests of rules.db.test.ts
 // move sets too.
-
-// Photos and flyers aren't sent, so there are none to read or delete.
-const NO_PHOTOS: Photos = {
-  store: async () => {
-    throw new Error('No photos in these tests')
-  },
-  read: async () => null,
-  delete: async () => {},
-}
 
 let database: TestDatabase
 let app: FastifyInstance
