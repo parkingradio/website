@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # When it starts, the server makes, in the background, the sizes that the photos and flyers it keeps don't have, and
-# skips those it can't read, which it logs (see "Photos" in docs/design/server/artists.md, and
-# server/src/artists/backfill.ts, whose tests cover the rest).
+# skips those it can't read, which it logs (see "Photos" in docs/design/server/artists.md, "Private files" in
+# docs/deployment.md, and server/src/artists/backfill.ts, whose tests cover the rest).
 #
 # Numbered in the 9xx range: this restarts the server, which then listens on another port. It waits for the server to
 # be up again, so that the checks after it can still stop it.

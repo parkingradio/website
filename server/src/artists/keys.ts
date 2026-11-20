@@ -16,8 +16,10 @@ export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 // The extension of the keys of photos of each MIME type.
 const EXTENSIONS: Record<PhotoType, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
+// Every extension a key can have, which the database checks (see `contentKey` in db/schema.ts).
 export const KEY_EXTENSIONS = Object.values(EXTENSIONS)
 
+// The extension of the keys of photos of that MIME type.
 export function extensionOf(type: PhotoType): string {
   return EXTENSIONS[type]
 }
