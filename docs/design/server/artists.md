@@ -54,11 +54,11 @@ An artist, as the endpoints below return them, is their profile with:
 ## Photos
 
 An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
-and which the server can read in full, of at most 100 million pixels: one it can't read, e.g. because it's damaged or
-cut short, is refused. It's kept in the app's private S3 bucket, or in a local directory in development, and only the
-server reads it. When the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in the
-bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for good
-after that.
+and which the server can read in full, of at most 100 million pixels: one it can't, e.g. because it's cut short, or too
+damaged to be decoded, is refused. It's kept in the app's private S3 bucket, or in a local directory in development, and
+only the server reads it. When the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in
+the bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for
+good after that.
 
 The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
 its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller

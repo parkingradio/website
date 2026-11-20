@@ -34,10 +34,13 @@ export class UnreadablePhoto extends Error {
 }
 
 // The photo at `width`, or narrower when it is, as WebP, upright as its EXIF orientation says, and without any of its
-// metadata, which sharp drops unless told to keep it. Throws when the photo can't be read in full: sharp's default
-// `failOn`, 'warning', is what refuses a photo that's cut short, which it would otherwise read, filling in what's missing.
+// metadata, which sharp drops unless told to keep it. Throws when the photo can't be read in full: `failOn: 'truncated'`
+// refuses one whose data ends early, which sharp would otherwise read, filling in what's missing, or that the decoder
+// can't get through, e.g. garbage after a JPEG's header, or a PNG's corrupt compressed data. It reads those that decode
+// in full with warnings, which browsers show too, e.g. JPEGs with corrupt scan data or quirks of their format, as some
+// phones make, or PNGs with a bad checksum, which sharp's default, 'warning', refuses.
 export async function resize(photo: Buffer, width: PhotoWidth): Promise<Buffer> {
-  return sharp(photo, { limitInputPixels: PHOTO_MAX_PIXELS })
+  return sharp(photo, { limitInputPixels: PHOTO_MAX_PIXELS, failOn: 'truncated' })
     .autoOrient()
     .resize({ width, height: WEBP_MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })

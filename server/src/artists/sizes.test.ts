@@ -56,8 +56,8 @@ describe('resize', () => {
   })
 
   it("fails for what can't be read in full, even though it starts like an image, or has too many pixels", async () => {
-    // Cut short anywhere: sharp would otherwise read what's there, and fill in the rest, unless told to fail on warnings,
-    // as it is by default.
+    // Cut short anywhere: sharp would otherwise read what's there, and fill in the rest, unless told to fail on a
+    // truncated image, as it is.
     for (const format of ['jpeg', 'png', 'webp'] as const) {
       const photo = await testImage(format, 2000, 1000)
       for (const kept of [0.05, 0.6, 0.95]) {
@@ -70,6 +70,18 @@ describe('resize', () => {
   it('reads a JPEG with bytes after its end, which browsers show', async () => {
     const photo = Buffer.concat([await testImage('jpeg', 640, 480), Buffer.alloc(1000, 7)])
     expect(await sharp(await resize(photo, 320)).metadata()).toMatchObject({ width: 320 })
+  })
+
+  it('reads images with flaws that their decoders only warn about, which browsers show', async () => {
+    // A JPEG whose scan says it ends at the 62nd coefficient rather than the 63rd: "Invalid SOS parameters for
+    // sequential JPEG".
+    const jpeg = Buffer.from(await testImage('jpeg', 640, 480))
+    const scan = jpeg.indexOf(Buffer.from([0xff, 0xda]))
+    jpeg[scan + 5 + 2 * jpeg[scan + 4] + 1] = 62
+    // A PNG whose header has the wrong checksum.
+    const png = Buffer.from(await testImage('png', 640, 480))
+    png[29] ^= 0xff
+    for (const photo of [jpeg, png]) expect(await sharp(await resize(photo, 320)).metadata()).toMatchObject({ width: 320 })
   })
 })
 
