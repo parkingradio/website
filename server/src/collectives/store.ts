@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
-import { EmailTaken, artistsStore, keyNamed, photoColumns } from '../artists/store.js'
+import { keyNamed } from '../artists/keys.js'
+import { EmailTaken, artistsStore, photoColumns } from '../artists/store.js'
 import type { ArtistsStore, NewPhoto } from '../artists/store.js'
 import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
@@ -30,7 +31,7 @@ export type CollectivesStore = {
   get(id: string): Promise<StoredCollective | null>
   // The collective, only when it's public (see "Public profiles" in docs/design/server/collectives.md).
   getPublic(id: string): Promise<StoredCollective | null>
-  // The key of the photo named `name` (see `photoName` in artists/store.ts) that a public collective has, or null when
+  // The key of the photo named `name` (see `photoName` in artists/keys.ts) that a public collective has, or null when
   // none has it.
   getPublicPhoto(name: string): Promise<string | null>
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members

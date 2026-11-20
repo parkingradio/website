@@ -1,9 +1,9 @@
 import { and, eq, exists, gte, lt, not, or, sql } from 'drizzle-orm'
 import type { AnyColumn, SQL } from 'drizzle-orm'
 import { RECENT_PAST_EVENTS } from '../api/formats.js'
+import { keyNamed } from '../artists/keys.js'
 import type { Queryable } from '../db/connection.js'
 import { collectiveMembers, sessions, setPerformers, sets } from '../db/schema.js'
-import { keyNamed } from '../artists/store.js'
 import { sessionsWhere } from '../sessions/store.js'
 import type { StoredSession } from '../sessions/store.js'
 
@@ -54,7 +54,7 @@ export type EventsStore = {
   // The events of the calendar feed, in any order: those that start at or after `since`, and those whose end hasn't passed
   // at `now`.
   feed(window: { since: Date; now: Date }): Promise<StoredSession[]>
-  // The key of the flyer named `name` (see `photoName` in artists/store.ts) that an event has, or null when none has it.
+  // The key of the flyer named `name` (see `photoName` in artists/keys.ts) that an event has, or null when none has it.
   getFlyer(name: string): Promise<string | null>
 }
 

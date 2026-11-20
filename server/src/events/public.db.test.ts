@@ -8,7 +8,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { artistsRoutes } from '../artists/routes.js'
 import { artistsStore } from '../artists/store.js'
-import { JPEG, memoryPhotos } from '../artists/test-photos.js'
+import { JPEG, PNG, memoryPhotos } from '../artists/test-photos.js'
 import { collectivesRoutes } from '../collectives/routes.js'
 import { collectivesStore } from '../collectives/store.js'
 import { artists, sessions } from '../db/schema.js'
@@ -561,8 +561,8 @@ describe('the photos and flyers of what is public', () => {
     const ondes = await createCollective('Les Ondes', [ana], JPEG)
     const takeover = await createSession(FUTURE(1), [], { type: 'takeover', takeover: ondes, flyer: JPEG })
     const [photo, collectivePhoto, [flyer]] = [await photoOf(`/api/artists/${ana}`), await photoOf(`/api/collectives/${ondes}`), await flyers()]
-    // The flyer is replaced: its URLs change, and the old ones aren't served anymore.
-    const replaced = await app.inject({ method: 'PUT', url: `/api/admin/sessions/${takeover.id}/flyer`, ...multipartBody({ flyer: JPEG }), cookies: await sessionCookies() })
+    // The flyer is replaced by another one: its URLs change, and the old ones aren't served anymore.
+    const replaced = await app.inject({ method: 'PUT', url: `/api/admin/sessions/${takeover.id}/flyer`, ...multipartBody({ flyer: PNG }), cookies: await sessionCookies() })
     expect(replaced.statusCode).toBe(200)
     const [replacement] = await flyers()
     expect(replacement).not.toEqual(flyer)

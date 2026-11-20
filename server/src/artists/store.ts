@@ -1,13 +1,12 @@
-import { createHash } from 'node:crypto'
 import type { Readable } from 'node:stream'
 import { buffer } from 'node:stream/consumers'
-import { and, asc, eq, exists, inArray, or, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
-import type { AnyPgColumn } from 'drizzle-orm/pg-core'
+import { and, asc, eq, exists, or, sql } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import type { z } from 'zod'
 import { PHOTO_MAX_BYTES, PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PHOTO_WRONG_TYPE } from './profile.js'
 import { PHOTO_WIDTHS, SIZE_TYPE, makeSizes, sizeKey } from './sizes.js'
+import { keyNamed, photoKey } from './keys.js'
+import type { PhotoFolder } from './keys.js'
 import type { PhotoWidth } from './sizes.js'
 import type { AdminArtistProfile, Profile } from './profile.js'
 import type { Queryable } from '../db/connection.js'
@@ -114,7 +113,7 @@ export type ArtistsStore = {
   // The artist, without their collectives, only when they're public (see "Public profiles" in
   // docs/design/server/artists.md).
   getPublic(id: string): Promise<ArtistRow | null>
-  // The key of the photo named `name` (see `photoName`) that a public artist has, or null when none has it.
+  // The key of the photo named `name` (see `photoName` in keys.ts) that a public artist has, or null when none has it.
   getPublicPhoto(name: string): Promise<string | null>
   // `createdBy` is the email of the admin who adds the artist, or null if they come through the form, applying alone or
   // as one of a collective's artists. `photo` is their photo, once it's stored, or null for none.
@@ -240,43 +239,6 @@ export function artistsStore(db: Queryable): ArtistsStore {
   }
 }
 
-// Where new photos are stored: artists' under `artists/`, collectives' under `collectives/`, and sessions' flyers under
-// `sessions/`, so that each kind only shares its photos with its own (see `photoKey`). Otherwise, what's stored is the
-// photo's key, which is read and deleted as it is, whatever folder it's in.
-export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
-
-const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
-
-// The extension of the keys of photos of that MIME type.
-export function extensionOf(type: string): string {
-  return EXTENSIONS[type] ?? 'bin'
-}
-
-// The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte,
-// as one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
-// docs/deployment.md).
-export function photoKey({ body, type }: SentPhoto, folder: PhotoFolder): string {
-  return `${folder}/${createHash('sha256').update(body).digest('hex')}.${extensionOf(type)}`
-}
-
-// The name of the photo with `key`, without its folder and its extension: the SHA-256 of its content, for a key that
-// `photoKey` made. Its public URLs are named after it (see `publicSizes` in photo-form.ts).
-export function photoName(key: string): string {
-  const file = key.slice(key.lastIndexOf('/') + 1)
-  const dot = file.lastIndexOf('.')
-  return dot === -1 ? file : file.slice(0, dot)
-}
-
-// The key of the photo named `name` (see `photoName`) in `folder`, whatever its type, that `column` has in a row of its
-// table where `where` holds, or null when there's none, e.g. the key that a public artist's `photoKey` has.
-export async function keyNamed(db: Queryable, column: AnyPgColumn, folder: PhotoFolder, name: string, where: SQL): Promise<string | null> {
-  const keys = Object.values(EXTENSIONS).map((extension) => `${folder}/${name}.${extension}`)
-  const { rows } = await db.execute<{ key: string }>(
-    sql`select ${column} as key from ${column.table} where ${and(inArray(column, keys), where)} limit 1`,
-  )
-  return rows[0]?.key ?? null
-}
-
 // A photo or a flyer that was stored (see `Photos`): its key, its MIME type, and `keep`, which the transaction that
 // saves it in a row calls before it takes any lock but the sessions' (see `lockPhotos`).
 export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise<void> }
@@ -300,7 +262,7 @@ export type NewPhoto = { key: string; type: string; keep(tx: Queryable): Promise
 // transaction ends, even when it fails: it would wait for that transaction, from another connection, while that
 // transaction waits for it, which Postgres can't tell, and the request would hang.
 export type Photos = Pick<PrivateFiles, 'read'> & {
-  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey`), unless they're there already,
+  // Stores the photo, and the sizes it has, under its key in `folder` (see `photoKey` in keys.ts), unless they're there already,
   // and returns it. If one can't be stored, the photo is deleted unless it's used, or that failure is logged, and the
   // error is thrown.
   store(photo: SizedPhoto, folder: PhotoFolder): Promise<NewPhoto>

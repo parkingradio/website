@@ -18,8 +18,9 @@ import { storedImages } from './backfill.js'
 import { contentKeysMigration } from './content-keys.js'
 import { AdminArtistProfile } from './profile.js'
 import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
-import { artistsStore, photoColumns, photoKey, privatePhotos, validateProfile } from './store.js'
-import type { PhotoFolder } from './store.js'
+import { photoKey } from './keys.js'
+import type { PhotoFolder } from './keys.js'
+import { artistsStore, photoColumns, privatePhotos, validateProfile } from './store.js'
 import { keptFiles, testImage } from './test-photos.js'
 
 // Moving the photos and flyers kept under random keys to the keys made from their content, when the server starts (see

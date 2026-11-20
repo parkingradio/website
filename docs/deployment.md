@@ -273,10 +273,20 @@ that isn't public anymore, say not to keep them.
 
 So a photo or a flyer that has to stop being public right away, e.g. at an artist's request, stays in Cloudflare's cache
 once it's private, or replaced or removed. To take it out, purge both of its sizes' URLs in Cloudflare's dashboard
-(Caching → Configuration → Purge Cache → Custom Purge, by URL): `/api/artists/photos/<sha256>/w320.webp` and
-`…/w1280.webp` for an artist's photo, or the same under `/api/collectives/photos/` or `/api/events/flyers/` for a
-collective's photo or a flyer, where `<sha256>` is the SHA-256 of the image as it was sent, e.g. `sha256sum` of the file
-its admin page links to. Browsers that already have it keep it.
+(Caching → Configuration → Purge Cache → Custom Purge, by URL), as full URLs, for every deployment that could have served
+it, since production and test share the zone, e.g. for a flyer:
+
+```
+https://parking.radio/api/events/flyers/<sha256>/w320.webp
+https://parking.radio/api/events/flyers/<sha256>/w1280.webp
+https://beta.parking.radio/api/events/flyers/<sha256>/w320.webp
+https://beta.parking.radio/api/events/flyers/<sha256>/w1280.webp
+```
+
+The same goes under `/api/artists/photos/` for an artist's photo, and `/api/collectives/photos/` for a collective's.
+`<sha256>` is the SHA-256 of the image as it was sent, e.g. `sha256sum` of the file its admin page links to. Copies
+fetched with a query string, e.g. `…/w320.webp?x`, are cached apart, and purging the plain URL leaves them. Browsers that
+already have it keep it.
 
 ## Email
 

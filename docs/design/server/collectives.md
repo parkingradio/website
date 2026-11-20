@@ -76,8 +76,8 @@ sent, replaced and removed the same way, with [`POST /api/admin/collectives`](#p
 [`DELETE /api/admin/collectives/:id/photo`](#delete-apiadmincollectivesidphoto-admin), served at the same sizes, and
 deleted the same way, with its sizes, once no collective has it anymore: removing or replacing a collective's photo, or
 deleting the collective, never removes it from another collective that has the same. The public gets its sizes while
-the collective is public, and can keep them for good, like an artist's, even once it's private again, or its photo is
-replaced or removed.
+a public collective has it, and can keep them for good, like an artist's: even once the collective is private again, or
+its photo is replaced or removed.
 
 ## Public profiles
 
