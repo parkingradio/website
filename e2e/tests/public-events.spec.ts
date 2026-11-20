@@ -28,7 +28,7 @@ test('Programmation lists the announced sessions, with their lineups, their flye
   await expect(meetup.getByRole('link', { name: 'SYNTH MEETUPS sur RA' })).toHaveAttribute('href', 'https://ra.co/events/2403003')
   await expect(meetup.locator('.event-lineup')).toHaveText('OPEN JAM')
   const flyer = meetup.locator('.event-flyer img')
-  await expect(flyer).toHaveAttribute('src', /^\/api\/events\/[^/]+\/flyer\?width=320$/)
+  await expect(flyer).toHaveAttribute('src', /^\/api\/events\/flyers\/[0-9a-f]{64}\/w320\.webp$/)
   await flyer.scrollIntoViewIfNeeded()
   // The server's thumbnail of the 640-pixel flyer.
   await expect(flyer).toHaveJSProperty('naturalWidth', 320)

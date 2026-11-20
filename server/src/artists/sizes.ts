@@ -17,12 +17,24 @@ const WEBP_MAX_DIMENSION = 16383
 // The type of every size.
 export const SIZE_TYPE = 'image/webp'
 
-// Where the size of a photo is kept: next to it, under its key with a suffix. The suffix names how the size is encoded,
-// and has to change when that does, since sizes are only made when they're missing: the server would otherwise keep
-// serving those already made. Those would then be left behind, so `deleteUnused` (see `privatePhotos` in store.ts)
-// would also have to delete the sizes under the old suffix, or they'd outlive their photo.
+// The name of the size at `width`, which ends both the key it's kept under (see `sizeKey`) and its public URL (see
+// `publicSizes` in photo-form.ts). It names how the size is encoded, and has to change when that does: sizes are only
+// made when they're missing, so the server would otherwise keep serving those already made, and their public URLs,
+// which browsers and Cloudflare keep for good, have to change with what they serve. The sizes under the old name would
+// then be left behind, so `deleteUnused` (see `privatePhotos` in store.ts) would also have to delete them, or they'd
+// outlive their photo.
+export function sizeName(width: PhotoWidth): string {
+  return `w${width}.webp`
+}
+
+// The width of the size named `name`, or undefined when no size has that name.
+export function widthNamed(name: string): PhotoWidth | undefined {
+  return PHOTO_WIDTHS.find((width) => sizeName(width) === name)
+}
+
+// Where the size of a photo is kept: next to it, under its key followed by the size's name.
 export function sizeKey(key: string, width: PhotoWidth): string {
-  return `${key}.w${width}.webp`
+  return `${key}.${sizeName(width)}`
 }
 
 // Thrown when a photo can't be read in full, e.g. when it's damaged or cut short, even though its type was checked, or

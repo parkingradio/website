@@ -25,6 +25,26 @@ expect_size() {
     if grep -q PLANTED "${FILES}/size"; then fail "expected $1 to be without the EXIF of the image it's made from"; fi
 }
 
+# new_session <day> <flyer> -- add an announced session on that day of March 2991, with that flyer, and print its id.
+new_session() {
+    request --header "Cookie: ${cookie}" --form "flyer=@$2" --form-string \
+        "session={\"start\":\"2991-03-$1T21:00-05:00\",\"durationMinutes\":120,\"type\":\"synth-meetup\",\"takeover\":null,\"application\":null,\"name\":\"\",\"raEvent\":null,\"description\":\"\"}" \
+        "${BASE_URL}/api/admin/sessions"
+    expect_status 200
+    local id
+    id="$(first_id)"
+    json PUT "${BASE_URL}/api/admin/sessions/${id}/announced" '{"announced":true}'
+    expect_status 200
+    printf '%s' "$id"
+}
+
+# expect_not_served <url> -- expect a 404 at the URL, which isn't kept, by browsers or by Cloudflare.
+expect_not_served() {
+    request "$1"
+    expect_status 404
+    expect_header Cache-Control 'no-store$'
+}
+
 echo "  a photo of each type is served to admins as it was sent, or at its sizes, as WebP, upright, without its EXIF"
 artists="$(photos_on_disk artists)"
 artist_sizes="$(sizes_on_disk artists)"
@@ -69,42 +89,45 @@ done
 json DELETE "${BASE_URL}/api/admin/artists/${id}"
 expect_status 200
 
-echo "  an announced session's flyer is only ever served to the public at its sizes, which browsers keep for 5 minutes"
+echo "  an announced session's flyer is only ever served to the public at its sizes, which anyone can keep for good"
 sessions="$(photos_on_disk sessions)"
 session_sizes="$(sizes_on_disk sessions)"
 make_image png 800 600 > "${FILES}/flyer.png"
-request --header "Cookie: ${cookie}" --form "flyer=@${FILES}/flyer.png" --form-string \
-    'session={"start":"2991-03-01T21:00-05:00","durationMinutes":120,"type":"synth-meetup","takeover":null,"application":null,"name":"","raEvent":null,"description":""}' \
-    "${BASE_URL}/api/admin/sessions"
-expect_status 200
-session="$(first_id)"
-json PUT "${BASE_URL}/api/admin/sessions/${session}/announced" '{"announced":true}'
-expect_status 200
-flyer="${BASE_URL}/api/events/${session}/flyer"
-request "$flyer"
+session="$(new_session 01 "${FILES}/flyer.png")"
+flyer="${BASE_URL}$(flyer_path "${FILES}/flyer.png")"
+request "${flyer}/w1280.webp"
 expect_status 200
 expect_header Content-Type 'image/webp$'
-expect_header Cache-Control 'private, max-age=300$'
-etag="$(header_value ETag)"
-expect_size "$flyer" 'webp 600x800'
-expect_size "${flyer}?width=1280" 'webp 600x800'
-expect_size "${flyer}?width=320" 'webp 320x427'
-request --header "If-None-Match: ${etag}" "$flyer"
-expect_status 304
-expect_header Cache-Control 'private, max-age=300$'
+expect_header Cache-Control 'public, max-age=31536000, immutable$'
+expect_no_header ETag
+expect_size "${flyer}/w1280.webp" 'webp 600x800'
+expect_size "${flyer}/w320.webp" 'webp 320x427'
+expect_not_served "${flyer}/w640.webp"
 [ "$(photos_on_disk sessions)" = $((sessions + 1)) ] && [ "$(sizes_on_disk sessions)" = $((session_sizes + 2)) ] ||
     fail "expected the flyer's two sizes to be kept"
 
-echo "  replacing the flyer deletes the one it replaces, with its sizes, and so does deleting the session"
+echo "  replacing the flyer deletes the one it replaces, with its sizes, whose URLs aren't served anymore"
 request --header "Cookie: ${cookie}" --request PUT --form "flyer=@${FILES}/photo.jpeg" \
     "${BASE_URL}/api/admin/sessions/${session}/flyer"
 expect_status 200
 [ "$(photos_on_disk sessions)" = $((sessions + 1)) ] && [ "$(sizes_on_disk sessions)" = $((session_sizes + 2)) ] ||
     fail "expected the replaced flyer's sizes to be deleted"
-request --header "If-None-Match: ${etag}" "$flyer"
+expect_not_served "${flyer}/w1280.webp"
+flyer="${BASE_URL}$(flyer_path "${FILES}/photo.jpeg")"
+expect_size "${flyer}/w1280.webp" 'webp 1000x2000'
+
+echo "  another session with the same flyer shares it, and its URLs, which are served while either is announced"
+other="$(new_session 02 "${FILES}/photo.jpeg")"
+[ "$(photos_on_disk sessions)" = $((sessions + 1)) ] && [ "$(sizes_on_disk sessions)" = $((session_sizes + 2)) ] ||
+    fail "expected the flyer to be kept once"
+json PUT "${BASE_URL}/api/admin/sessions/${session}/announced" '{"announced":false}'
 expect_status 200
-expect_size "$flyer" 'webp 1000x2000'
+expect_size "${flyer}/w320.webp" 'webp 320x640'
 json DELETE "${BASE_URL}/api/admin/sessions/${session}"
 expect_status 200
+expect_size "${flyer}/w320.webp" 'webp 320x640'
+json DELETE "${BASE_URL}/api/admin/sessions/${other}"
+expect_status 200
 [ "$(photos_on_disk sessions)" = "$sessions" ] && [ "$(sizes_on_disk sessions)" = "$session_sizes" ] ||
-    fail "expected the flyer's sizes to be deleted with the session"
+    fail "expected the flyer's sizes to be deleted with the last session that has it"
+expect_not_served "${flyer}/w320.webp"

@@ -786,7 +786,7 @@ describe('sessions routes', () => {
         const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', changes)
         expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
       }
-      expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpeg')
+      expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpg')
       expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
@@ -803,7 +803,7 @@ describe('sessions routes', () => {
       const app = await buildApp()
       await createSession(app, {}, { flyer: JPEG })
       expect((await send(app, 'DELETE', '/api/admin/sessions/session-1')).statusCode).toBe(200)
-      expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+      expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpg')
     })
 
     it('responds 404 for a session that does not exist, has no flyer, or whose flyer is missing', async () => {
@@ -843,7 +843,7 @@ describe('sessions routes', () => {
         expect(response.statusCode).toBe(200)
         // Its flyer is part of the session, so who changed it, and when, are the session's.
         expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: true, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
-        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.jpeg', 'image/jpeg'))
+        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', flyerChange('sessions/flyer-1.jpg', 'image/jpeg'))
         expect(photos.store).toHaveBeenCalledExactlyOnceWith({ body: JPEG, type: 'image/jpeg', sizes: expect.any(Map) }, 'sessions')
         expect(photos.deleteUnused).not.toHaveBeenCalled()
         const served = await get(app, '/api/admin/sessions/session-1/flyer')
@@ -853,7 +853,7 @@ describe('sessions routes', () => {
         response = await putFlyer(app, 'session-1', { flyer: PNG })
         expect(response.statusCode).toBe(200)
         expect(store.update).toHaveBeenLastCalledWith('session-1', flyerChange('sessions/flyer-2.png', 'image/png'))
-        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpg')
         expect(photos.photos()).toEqual(['sessions/flyer-2.png'])
         // The new flyer has another ETag, so a browser that has the one it replaced gets it.
         const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': served.headers.etag as string })
@@ -883,7 +883,7 @@ describe('sessions routes', () => {
         expect(photos.store).not.toHaveBeenCalled()
         expect(photos.deleteUnused).not.toHaveBeenCalled()
         expect(store.update).not.toHaveBeenCalled()
-        expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
+        expect(photos.photos()).toEqual(['sessions/flyer-1.jpg'])
       })
 
       it("ignores other fields and files, even the session's fields", async () => {
@@ -912,7 +912,7 @@ describe('sessions routes', () => {
         expect((await putFlyer(app, 'session-1', { flyer: PNG })).statusCode).toBe(500)
         expect(photos.store).toHaveBeenCalledTimes(2)
         expect(photos.deleteUnused.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
-        expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
+        expect(photos.photos()).toEqual(['sessions/flyer-1.jpg'])
       })
 
       it('deletes the new flyer when the store refuses the session', async () => {
@@ -939,7 +939,7 @@ describe('sessions routes', () => {
         expect(response.statusCode).toBe(200)
         expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: false, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
         expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', { flyer: null, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
-        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect(photos.deleteUnused).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpg')
         expect(stored.size).toBe(0)
         // A browser that has the flyer doesn't get it anymore.
         expect((await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': etag })).json()).toEqual({ ok: false, error: 'This session has no flyer' })

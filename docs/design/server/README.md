@@ -178,7 +178,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent |
 | [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, which their sets lose, and taking them out of their collectives and their sets |
 | [`GET /api/artists/:id`](artists.md#get-apiartistsid) | public | A public artist's profile |
-| [`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto) | public | One of the sizes of a public artist's photo |
+| [`GET /api/artists/photos/:image/:size`](artists.md#get-apiartistsphotosimagesize) | public | One of the sizes of a photo that a public artist has |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo, as it was sent, or one of its sizes |
@@ -188,7 +188,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent |
 | [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo and its applications, but not its members |
 | [`GET /api/collectives/:id`](collectives.md#get-apicollectivesid) | public | A public collective's profile, with its members |
-| [`GET /api/collectives/:id/photo`](collectives.md#get-apicollectivesidphoto) | public | One of the sizes of a public collective's photo |
+| [`GET /api/collectives/photos/:image/:size`](collectives.md#get-apicollectivesphotosimagesize) | public | One of the sizes of a photo that a public collective has |
 | [`GET /api/admin/applications`](applications.md#get-apiadminapplicationsartistidcollectiveid-admin) | admin | Every application, or an artist's or a collective's |
 | [`GET /api/admin/applications/:id`](applications.md#get-apiadminapplicationsid-admin) | admin | An application |
 | [`POST /api/admin/applications`](applications.md#post-apiadminapplications-admin) | admin | Creating an application for an artist or a collective |
@@ -216,7 +216,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PUT /api/admin/sets/:id/session`](sessions.md#put-apiadminsetsidsession-admin) | admin | Moving a set to another session, which can change both sessions' statuses |
 | [`DELETE /api/admin/sets/:id`](sessions.md#delete-apiadminsetsid-admin) | admin | Deleting a set, which can make its session done |
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
-| [`GET /api/events/:id/flyer`](events.md#get-apieventsidflyer) | public | One of the sizes of an event's flyer |
+| [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |

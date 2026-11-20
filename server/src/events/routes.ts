@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { RECENT_PAST_EVENTS, fromBeforeTo, startRange } from '../api/formats.js'
-import { ApiError, Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
-import { photoRoute, sendPhoto } from '../artists/photo-form.js'
+import { Reference, Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
+import { PublicSizes, publicSizeRoute, publicSizes, sendPublicSize } from '../artists/photo-form.js'
 import type { Photos } from '../artists/store.js'
 import { effectiveDescription } from '../sessions/descriptions.js'
 import { after, sessionTitle } from '../sessions/fields.js'
@@ -33,7 +33,7 @@ const Event = SessionBody.pick({ id: true, title: true, type: true, takeover: tr
     end: Timestamp.meta({ description: 'Its start plus its duration' }),
     cancelled: z.boolean().meta({ description: 'Whether the session is cancelled, which it stays public as' }),
     description: z.string().meta({ description: 'Its description, or else the one its type gives it, or empty when neither has one' }),
-    flyer: z.string().nullable().meta({ description: 'Where its flyer is, or null when it has none' }),
+    flyer: PublicSizes.nullable().meta({ description: 'Where the sizes of its flyer are, by width, or null when it has none' }),
     raEvent: z.string().nullable().meta({ description: 'The page of its event on RA, or null when it has none' }),
     sets: z.array(EventSet).meta({ description: 'In their order, cancelled ones included' }),
     lineup: z.array(Reference).meta({
@@ -53,7 +53,8 @@ const Events = z
   })
   .meta({ id: 'Events' })
 
-const NO_SUCH_EVENT: ApiError = { ok: false, error: 'No such event' }
+// Where the public gets the sizes of events' flyers.
+const FLYERS = '/api/events/flyers'
 
 // The fields are listed one by one, so that nothing the admin endpoints give ends up public unless it's added here.
 function eventSet(row: StoredSet): EventSet {
@@ -81,7 +82,7 @@ export function event(row: StoredSession): Event {
     end: after(row.startAt!, row.durationMinutes).toISOString(),
     cancelled: row.status === 'cancelled',
     description: effectiveDescription(row),
-    flyer: row.flyerKey === null ? null : `/api/events/${row.id}/flyer`,
+    flyer: publicSizes(FLYERS, row.flyerKey),
     raEvent: row.raEventId === null ? null : raEventUrl(row.raEventId),
     takeover: row.takeover,
     sets: row.sets.map(eventSet),
@@ -119,12 +120,8 @@ export async function eventsRoutes(app: FastifyInstance, { store, photos }: Even
   )
 
   api.get(
-    '/api/events/:id/flyer',
-    photoRoute('event', 'public', { summary: "One of the sizes of an event's flyer", tags: ['Events'] }),
-    async (request, reply) => {
-      const flyer = await store.getFlyer(request.params.id)
-      if (!flyer) return reply.status(404).send(NO_SUCH_EVENT)
-      return sendPhoto(reply, photos, flyer, 'event', request.query.width)
-    },
+    `${FLYERS}/:image/:size`,
+    publicSizeRoute('flyer', { summary: 'One of the sizes of a flyer that an event has', tags: ['Events'] }),
+    (request, reply) => sendPublicSize(reply, photos, 'flyer', request.params, store.getFlyer),
   )
 }

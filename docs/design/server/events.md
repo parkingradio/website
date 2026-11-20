@@ -24,7 +24,7 @@ An event has:
 | `start`, `end` | string | The session's `start` and `end`, which an event always has |
 | `cancelled` | boolean | Whether the session is cancelled |
 | `description` | string | The session's `effectiveDescription` (see [Descriptions](sessions.md#descriptions)) |
-| `flyer` | string or null | Where its flyer is, `/api/events/<id>/flyer`, which takes `width` (see [Photos](artists.md#photos)), or null when it has none |
+| `flyer` | object or null | Where the public gets the sizes of its flyer, by width, like an artist's photo (see [Public profiles, in Artists](artists.md#public-profiles)), e.g. `/api/events/flyers/<sha256>/w320.webp`, or null when it has none. Events that have the same flyer give the same URLs |
 | `raEvent` | string or null | The page of its event on RA, `https://ra.co/events/<id>`, or null when it has none |
 | `takeover` | object or null | The collective whose takeover it is, with its `id` and `name`, or null when it isn't a takeover |
 | `sets` | list of sets | Its sets, in their order, cancelled ones included (see [Sets' order](sessions.md#sets-order)) |
@@ -75,12 +75,14 @@ Every query parameter can be left out (see [Upcoming and past](#upcoming-and-pas
 Fails with 400 if a query parameter is given more than once, if `from` or `to` is empty or isn't an instant with
 Québec's offset then, from the year 2000 to 2999, in UTC, or if `from` isn't before `to`.
 
-## `GET /api/events/:id/flyer`
+## `GET /api/events/flyers/:image/:size`
 
-Responds with one of the sizes of an event's flyer (see [Flyers](sessions.md#flyers)), like
-[`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto), with the same `width` and caching, so that it can
-still be shown for up to 5 minutes once its session is un-announced, or a 304. Fails like it, with 404 when there's no
-such event, e.g. a session that isn't announced, when it has no flyer, or when its flyer is missing.
+Responds with a size of a flyer that an event has (see [Flyers](sessions.md#flyers)), at the URL that the event gives,
+like [`GET /api/artists/photos/:image/:size`](artists.md#get-apiartistsphotosimagesize), with the same caching: whoever
+already has it can still show it once its session is un-announced, or its flyer replaced or removed. It's served while
+any event has that flyer, even once another one that has it is un-announced. Fails like it, with 404 when no event has
+that flyer, e.g. a session that isn't announced, when `:size` isn't the name of one of its sizes, or when that size is
+missing.
 
 ## `GET /calendar.ics`
 
