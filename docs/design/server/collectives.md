@@ -14,8 +14,8 @@ and so are their messages, in French, except those about members' ids, which are
 
 Admins can leave out the same fields as for an artist, i.e. the country, city, description, links, email and phone,
 e.g. for collectives the team only knows by name, from their past takeovers. They're stored the same way, whether
-they're left out when a collective is added or its profile replaced, or removed when some of its fields are changed: an
-empty string or object, and null for the email, so that any number of collectives can be without one. A collective
+they're left out when a collective is added, or removed when some of its fields are changed: an empty string or object,
+and null for the email, so that any number of collectives can be without one. A collective
 applying with `POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
 
 A profile has:
@@ -66,14 +66,15 @@ Other fields are ignored, so that the members a collective returns can be sent b
 (`"No such artist"`).
 
 Deleting an artist takes them out of their collectives, which can leave a collective without members: it stays as it
-is, but replacing its profile, or changing its members, then takes at least one member again. Its other fields can still
-be changed on their own.
+is, but changing its members then takes at least one member again. Its other fields can still be changed on their own.
 
 ## Photos
 
 A collective's photo is optional, and follows the same rules as an artist's (see [Photos](artists.md#photos)): it's
-served at the same sizes, and deleted the same way, with its sizes, when the collective is deleted, or the photo is
-replaced or removed.
+sent, replaced and removed the same way, with [`POST /api/admin/collectives`](#post-apiadmincollectives-admin), and
+[`PUT /api/admin/collectives/:id/photo`](#put-apiadmincollectivesidphoto-admin) and
+[`DELETE /api/admin/collectives/:id/photo`](#delete-apiadmincollectivesidphoto-admin), served at the same sizes, and
+deleted the same way, with its sizes, when the collective is deleted, or the photo is replaced or removed.
 
 ## Public profiles
 
@@ -111,6 +112,19 @@ Responds like [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartist
 `width`, with the collective's photo, one of its sizes, or a 304, and fails like it, with 404 when there's no such
 collective, when it has no photo, or when its photo is missing.
 
+## `PUT /api/admin/collectives/:id/photo` (admin)
+
+Gives a collective a photo, or replaces its photo, like
+[`PUT /api/admin/artists/:id/photo`](artists.md#put-apiadminartistsidphoto-admin), and responds like it, with
+`collective`, as it is then, rather than `artist`. Fails like it, with 404 when there's no such collective.
+
+## `DELETE /api/admin/collectives/:id/photo` (admin)
+
+Removes a collective's photo, like
+[`DELETE /api/admin/artists/:id/photo`](artists.md#delete-apiadminartistsidphoto-admin), and responds like
+[`PUT /api/admin/collectives/:id/photo`](#put-apiadmincollectivesidphoto-admin). Fails with 404 when there's no such
+collective.
+
 ## `POST /api/admin/collectives` (admin)
 
 Adds a collective, and creates the members it sends by name. It takes a request like
@@ -125,21 +139,14 @@ Adds a collective, and creates the members it sends by name. It takes a request 
 Fails with 400 (an invalid profile or photo, a member who isn't an artist, or a malformed request), 409 (another collective
 has that email) or 413 (a photo larger than 10 MB). When it fails, nothing is created.
 
-## `PUT /api/admin/collectives/:id` (admin)
-
-Replaces a collective's profile and members, and creates the members it sends by name. It takes the same request as
-`POST /api/admin/collectives`, and replaces or removes the photo like
-[`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin). Responds like `POST /api/admin/collectives`,
-with the collective as it is then, and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404
-when there's no such collective.
-
 ## `PATCH /api/admin/collectives/:id` (admin)
 
-Changes the fields of a collective's profile it's sent, and leaves the others as they are (see
-[Changes, in Conventions](README.md#conventions)). It takes JSON, with any of the fields of a profile, and
-`removePhoto`, like [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin). `members`, when it's
-sent, replaces the collective's members, and creates those sent by name, like `PUT`. Responds like
-`PUT /api/admin/collectives/:id`, and fails like it, but with 400 when there's no field.
+Changes the fields of a collective's profile it's sent, and leaves the others as they are, its photo included (see
+[Changes, in Conventions](README.md#conventions), and [Photos](#photos)). It takes JSON, with any of the fields of a
+profile, as `POST /api/admin/collectives` takes them. `members`, when it's sent, replaces the collective's members, and
+creates those sent by name, as `POST` does. Responds like `POST /api/admin/collectives`, with the collective as it is
+then. Fails with 400 when a field isn't valid, a member isn't an artist, or there's no field, 404 when there's no such
+collective, and 409 when another collective has that email. When it fails, nothing is saved.
 
 ## `DELETE /api/admin/collectives/:id` (admin)
 

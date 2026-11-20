@@ -96,7 +96,8 @@ export type StoredArtist = ArtistRow & { collectives: Reference[] }
 // none: never one without the other, which the database checks too.
 export type StoredPhoto = { photoKey: string; photoType: string } | { photoKey: null; photoType: null }
 
-const NO_PHOTO: StoredPhoto = { photoKey: null, photoType: null }
+// What an artist or a collective without a photo stores, e.g. once it's removed.
+export const NO_PHOTO: StoredPhoto = { photoKey: null, photoType: null }
 
 // Thrown when saving an artist with the email of another one, whatever its case, and a collective with the email of
 // another collective.
@@ -116,9 +117,9 @@ export type ArtistsStore = {
   // as one of a collective's artists.
   // Throws an EmailTaken.
   create(artist: Profile & StoredPhoto & { createdBy: string | null }): Promise<StoredArtist>
-  // Changes the fields of the artist's profile that `changes` has, all of them when it's replaced, and their photo when
-  // there's a new one, or nulls to remove it. Returns the artist as they were, so that a photo that was replaced or
-  // removed can be deleted, and as they are then. Throws an EmailTaken.
+  // Changes the fields of the artist's profile that `changes` has, and their photo when there's a new one, or nulls to
+  // remove it. Returns the artist as they were, so that a photo that was replaced or removed can be deleted, and as they
+  // are then. Throws an EmailTaken.
   update(
     id: string,
     changes: Partial<Profile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },

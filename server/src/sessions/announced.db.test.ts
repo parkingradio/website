@@ -29,12 +29,8 @@ function sessionFields(fields: object) {
   return { start: START, durationMinutes: 120, type: 'guest-mixes', takeover: null, application: null, name: '', raEvent: null, description: '', ...fields }
 }
 
-async function sendSession(method: 'POST' | 'PUT', url: string, fields: object) {
-  return app.inject({ method, url, ...multipartBody({ session: JSON.stringify(sessionFields(fields)) }), cookies: await sessionCookies() })
-}
-
 async function createSession(fields: object = {}): Promise<string> {
-  const response = await sendSession('POST', '/api/admin/sessions', fields)
+  const response = await app.inject({ method: 'POST', url: '/api/admin/sessions', ...multipartBody({ session: JSON.stringify(sessionFields(fields)) }), cookies: await sessionCookies() })
   expect(response.statusCode).toBe(200)
   expect(response.json().session).toMatchObject({ announced: false, announcedUpdatedBy: null, announcedUpdatedAt: null })
   return response.json().session.id
@@ -105,18 +101,20 @@ describe('PUT /api/admin/sessions/:id/announced', () => {
   })
 })
 
-describe('PUT /api/admin/sessions/:id', () => {
-  it("refuses to remove an announced session's start, but moves it", async () => {
+describe('PATCH /api/admin/sessions/:id', () => {
+  it("refuses to remove an announced session's start, even with every other field, but moves it", async () => {
     const id = await createSession()
     await announce(id, true)
-    const response = await sendSession('PUT', `/api/admin/sessions/${id}`, { start: null })
+    // Every field, as the admin pages' form sends them.
+    const change = async (fields: object) => request('PATCH', `/api/admin/sessions/${id}`, sessionFields(fields))
+    const response = await change({ start: null })
     expect(response.statusCode).toBe(400)
     expect(response.json()).toEqual({ ok: false, error: 'An announced session has a start' })
 
-    const moved = await sendSession('PUT', `/api/admin/sessions/${id}`, { start: '2026-11-15T21:00-05:00' })
+    const moved = await change({ start: '2026-11-15T21:00-05:00' })
     expect(moved.json().session).toMatchObject({ start: '2026-11-15T21:00:00-05:00', announced: true })
     await announce(id, false)
-    expect((await sendSession('PUT', `/api/admin/sessions/${id}`, { start: null })).json().session).toMatchObject({ start: null, announced: false })
+    expect((await change({ start: null })).json().session).toMatchObject({ start: null, announced: false })
   })
 })
 

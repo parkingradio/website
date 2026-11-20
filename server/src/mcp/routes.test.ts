@@ -92,13 +92,13 @@ async function buildApp(logs?: string[], environment = 'test') {
           operationId: 'update_artist',
           summary: "Changes an artist's profile",
           params: ById,
-          body: changesTo({ ...Profile.shape, removePhoto: z.boolean() }),
+          body: changesTo({ ...Profile.shape, pinned: z.boolean() }),
         },
       },
       async (request) => {
-        const { removePhoto, ...changes } = request.body
+        const { pinned, ...changes } = request.body
         saved = { ...saved, ...changes }
-        return { ok: true, artist: { id: 'a', ...saved }, removePhoto: removePhoto ?? null }
+        return { ok: true, artist: { id: 'a', ...saved }, pinned: pinned ?? null }
       },
     )
     // Like a session, which has no contact details.
@@ -106,7 +106,7 @@ async function buildApp(logs?: string[], environment = 'test') {
       '/api/admin/sessions/:id',
       {
         config: { admin: true, tool: { title: 'Modifier une session' } },
-        schema: { operationId: 'update_session', summary: 'Changes a session', params: ById, body: changesTo({ name: z.string(), removeFlyer: z.boolean() }) },
+        schema: { operationId: 'update_session', summary: 'Changes a session', params: ById, body: changesTo({ name: z.string(), pinned: z.boolean() }) },
       },
       async (request) => ({ ok: true, session: request.body }),
     )
@@ -459,9 +459,9 @@ describe('the MCP server', () => {
     it('never give the emails and phone numbers of artists, and only change those they are given', async () => {
       const app = await buildApp()
       expect((await call(app, 'get_artist', { id: 'a' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore' } })
-      expect((await call(app, 'update_artist', { id: 'a', name: 'Aurore B.' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore B.' }, removePhoto: null })
+      expect((await call(app, 'update_artist', { id: 'a', name: 'Aurore B.' })).body).toEqual({ ok: true, artist: { id: 'a', name: 'Aurore B.' }, pinned: null })
       expect(saved).toEqual({ name: 'Aurore B.', email: 'aurore@example.com', phone: '555 0100' })
-      expect((await call(app, 'update_artist', { id: 'a', email: null, phone: '', removePhoto: true })).body.removePhoto).toBe(true)
+      expect((await call(app, 'update_artist', { id: 'a', email: null, phone: '', pinned: true })).body.pinned).toBe(true)
       expect(saved).toEqual({ name: 'Aurore B.', email: null, phone: '' })
     })
 

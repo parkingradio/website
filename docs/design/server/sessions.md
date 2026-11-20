@@ -9,8 +9,8 @@ public, as an event (see [Announced](#announced)). They have nothing to do with 
 logging in (see [Sessions, in Admins](admins.md#sessions)).
 
 Each session is a row of the `sessions` table (`server/src/db/schema.ts`), and each set a row of `sets`, with its
-performers in `set_performers`. The rules each of their fields follows are the schemas `SessionFields` and `SetFields`
-of `server/src/sessions/fields.ts`. The server checks the fields it's sent against them, then the rules that involve
+performers in `set_performers`. The rules each of their fields follows are `SESSION_FIELDS` and `SET_FIELDS` in
+`server/src/sessions/fields.ts`. The server checks the fields it's sent against them, then the rules that involve
 several fields on the session or the set as it will be once it's added or changed, with the fields a change doesn't send
 as they are, then the [rules](#rules) that involve other sessions and sets. Its errors are in English, since only admins
 see them.
@@ -334,11 +334,12 @@ become its own, and stop following its type.
 A session can have a flyer, an image, which follows the same rules as an artist's photo (see
 [Photos](artists.md#photos)): it's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
 that can be read, kept in the app's private files, with the same sizes, and deleted, with its sizes, when the session is
-deleted, or the flyer replaced or removed. It's sent along with the session's fields (see
+deleted, or the flyer replaced or removed. It's sent along with the session's fields when it's added (see
 [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
-[`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), and the MCP server's tools can't send one: a
-session added with a tool has none, and one changed with a tool keeps its own, unless `removeFlyer` is `true`. The sizes
-of an announced session's flyer are public, as its event's (see [Events](events.md)).
+[`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), which gives the session a flyer or replaces
+its own, and it's removed with [`DELETE /api/admin/sessions/:id/flyer`](#delete-apiadminsessionsidflyer-admin): changing
+the session's fields never changes it. The MCP server's tools can't send one, so a session added with a tool has none,
+but they can remove one. The sizes of an announced session's flyer are public, as its event's (see [Events](events.md)).
 
 ## Links
 
@@ -446,6 +447,13 @@ part of it.
 Fails with 400 when the request is malformed, has no flyer, or the flyer isn't a JPEG, PNG or WebP image that can be
 read (see [Flyers](#flyers)), 404 when there's no such session, and 413 when the flyer is larger than 10 MB.
 
+## `DELETE /api/admin/sessions/:id/flyer` (admin)
+
+Removes a session's flyer, which is deleted, and changes nothing else. It sets the session's `updatedBy` and `updatedAt`
+(see [Changes, in Conventions](README.md#conventions)). Responds like
+[`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), with the session as it is then. Fails with
+404 when there's no such session.
+
 ## `POST /api/admin/sessions` (admin)
 
 Adds a session, as `"planned"`, with the sets it's sent, if any. It's `multipart/form-data`, like
@@ -476,26 +484,17 @@ Fails with:
 
 Only an error about one of the sets has `setIndex`: that set's place in `sets`, from 0. When it fails, nothing is saved.
 
-## `PUT /api/admin/sessions/:id` (admin)
-
-Replaces a session's fields, but not its status, whether it's announced, or its sets, which stay as they are, even when
-they add up to more than the session (see [Sets' order](#sets-order)). It takes the same request as
-`POST /api/admin/sessions`, but without `sets`. With a flyer, it replaces the session's, which is deleted. Without one,
-the session keeps its own, unless there's also a `removeFlyer` field set to `true`, which removes it, and deletes it.
-Responds like `POST /api/admin/sessions`, with the session as it is then, and fails like it, but without the errors
-about its sets, and with 400 when there's both a flyer and `removeFlyer`, or when it would remove an announced session's
-start, and with 404 when there's no such session.
-
 ## `PATCH /api/admin/sessions/:id` (admin)
 
-Changes the fields of a session it's sent, like `PUT /api/admin/sessions/:id`, and leaves the others as they are (see
-[Changes, in Conventions](README.md#conventions)). It takes JSON, with any of its `start`, `durationMinutes`, `type`,
-`takeover`, `application`, `name`, `raEvent` and `description`, and `removeFlyer`, a boolean: `true` removes the
-session's flyer, and deletes it, and `false` keeps it, like leaving it out. A flyer is only given or replaced with
-`PUT /api/admin/sessions/:id` or [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin). Its
+Changes the fields of a session it's sent, and leaves the others as they are, its flyer included (see
+[Changes, in Conventions](README.md#conventions), and [Flyers](#flyers)). It doesn't change its status, whether it's
+announced, or its sets, which stay as they are, even when they add up to more than the session (see
+[Sets' order](#sets-order)). It takes JSON, with any of the fields that `POST /api/admin/sessions` takes but `sets`. Its
 `start` and `durationMinutes` are checked together, and so are its `type`, `takeover`, `application` and `name`, and
-it's checked against the other sessions, as the session would then be. Responds like `PUT /api/admin/sessions/:id`, and
-fails like it, but with 400 when there's no field.
+it's checked against the other sessions, as the session would then be. Responds like `POST /api/admin/sessions`, with
+the session as it is then, and fails like it, but without the errors about its sets or its flyer, with 400 when there's
+no field, or when it would remove an announced session's start (see [Announced](#announced)), and with 404 when there's
+no such session.
 
 ## `PUT /api/admin/sessions/:id/status` (admin)
 

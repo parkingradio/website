@@ -201,19 +201,19 @@ async function send(app: App, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE
   return app.inject({ method, url, payload, cookies: await sessionCookies() })
 }
 
-// The multipart/form-data body that adds or changes a session: its fields, as JSON (or as they're given, when they're a
-// string), its flyer, and whether to remove it.
-type Files = { flyer?: Buffer; removeFlyer?: string }
-function sessionForm(fields: object | string, { flyer, removeFlyer }: Files = {}) {
-  return multipartBody({ session: typeof fields === 'string' ? fields : JSON.stringify(fields), flyer, removeFlyer })
+// The multipart/form-data body that adds a session: its fields, as JSON (or as they're given, when they're a string),
+// and its flyer.
+type Files = { flyer?: Buffer }
+function sessionForm(fields: object | string, { flyer }: Files = {}) {
+  return multipartBody({ session: typeof fields === 'string' ? fields : JSON.stringify(fields), flyer })
 }
 
-async function sendSession(app: App, method: 'POST' | 'PUT', url: string, fields: object | string, files: Files = {}) {
-  return app.inject({ method, url, ...sessionForm(fields, files), cookies: await sessionCookies() })
+async function sendSession(app: App, fields: object | string, files: Files = {}) {
+  return app.inject({ method: 'POST', url: '/api/admin/sessions', ...sessionForm(fields, files), cookies: await sessionCookies() })
 }
 
 async function createSession(app: App, changes: object = {}, files: Files = {}) {
-  return sendSession(app, 'POST', '/api/admin/sessions', session(changes), files)
+  return sendSession(app, session(changes), files)
 }
 
 async function addSet(app: App, sessionId: string, changes: object = {}) {
@@ -249,9 +249,9 @@ describe('sessions routes', () => {
       app.inject({ method: 'GET', url: '/api/admin/sessions/session-1' }),
       app.inject({ method: 'GET', url: '/api/admin/sessions/session-1/ra-event' }),
       app.inject({ method: 'POST', url: '/api/admin/sessions', payload: { start: 'x' } }),
-      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()) }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { start: 'x' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/flyer', ...multipartBody({ flyer: JPEG }) }),
+      app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1/flyer' }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'maybe' } }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true } }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1' }),
@@ -274,9 +274,9 @@ describe('sessions routes', () => {
     const options = { headers: { 'sec-fetch-site': 'cross-site' }, cookies: await sessionCookies() }
     const requests = [
       app.inject({ method: 'POST', url: '/api/admin/sessions', ...sessionForm(session()), ...options }),
-      app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1', ...sessionForm(session()), ...options }),
       app.inject({ method: 'PATCH', url: '/api/admin/sessions/session-1', payload: { name: 'X' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/flyer', ...multipartBody({ flyer: JPEG }), ...options }),
+      app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1/flyer', ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/status', payload: { status: 'done' }, ...options }),
       app.inject({ method: 'PUT', url: '/api/admin/sessions/session-1/announced', payload: { announced: true }, ...options }),
       app.inject({ method: 'DELETE', url: '/api/admin/sessions/session-1', ...options }),
@@ -298,8 +298,8 @@ describe('sessions routes', () => {
     await sessionWithSet(app)
     vi.clearAllMocks()
     const responses = [
-      await sendSession(app, 'POST', '/api/admin/sessions', { ...session(), title: 'X' }),
-      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', { ...session(), title: 'X' }),
+      await sendSession(app, { ...session(), title: 'X' }),
+      await send(app, 'PATCH', '/api/admin/sessions/session-1', { ...session(), title: 'X' }),
       await send(app, 'POST', '/api/admin/sessions/session-1/sets', { ...set(), title: 'X' }),
       await send(app, 'PATCH', '/api/admin/sets/set-2', { ...set(), title: 'X' }),
     ]
@@ -312,7 +312,7 @@ describe('sessions routes', () => {
     expect(resolveTrack).not.toHaveBeenCalled()
     // Whether a session is announced is only changed with its own endpoint.
     for (const response of [
-      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', { ...session(), announced: true }),
+      await send(app, 'PATCH', '/api/admin/sessions/session-1', { ...session(), announced: true }),
       await send(app, 'PATCH', '/api/admin/sessions/session-1', { announced: true }),
     ]) {
       expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `announced`' })
@@ -333,13 +333,8 @@ describe('sessions routes', () => {
       { start: '2026-11-14T21:00-05:00\0' },
       { description: 'Une\0soirée' },
     ]) {
-      for (const [method, url] of [
-        ['POST', '/api/admin/sessions'],
-        ['PUT', '/api/admin/sessions/session-1'],
-      ] as const) {
-        const response = await sendSession(app, method, url, session(changes))
-        expect(response.statusCode, JSON.stringify(changes)).toBe(400)
-      }
+      expect((await sendSession(app, session(changes))).statusCode, JSON.stringify(changes)).toBe(400)
+      expect((await send(app, 'PATCH', '/api/admin/sessions/session-1', session(changes))).statusCode, JSON.stringify(changes)).toBe(400)
     }
     for (const changes of [
       { performers: [{ id: 'artist-1\0' }] },
@@ -478,7 +473,7 @@ describe('sessions routes', () => {
         set({ performers: [{ id: 'artist-3' }], durationMinutes: null, soundcloudTrack: 'https://soundcloud.com/parkingdotradio/a' }),
         set({ soundcloudTrack: 'https://soundcloud.com/parkingdotradio/b', youtubeVideo: null }),
       ]
-      const response = await sendSession(app, 'POST', '/api/admin/sessions', withSets(sets))
+      const response = await sendSession(app, withSets(sets))
 
       expect(response.statusCode).toBe(200)
       const added = response.json().session
@@ -496,10 +491,10 @@ describe('sessions routes', () => {
 
     it('adds the session without sets when they are left out, or none, and refuses sets that are not a list', async () => {
       const app = await buildApp()
-      expect((await sendSession(app, 'POST', '/api/admin/sessions', withSets([]))).json().session.sets).toEqual([])
+      expect((await sendSession(app, withSets([]))).json().session.sets).toEqual([])
       expect(store.create).toHaveBeenLastCalledWith(expect.anything(), [])
       for (const sets of [null, {}, 'set']) {
-        const response = await sendSession(app, 'POST', '/api/admin/sessions', withSets(sets, { start: null }))
+        const response = await sendSession(app, withSets(sets, { start: null }))
         expect(response.statusCode).toBe(400)
         // Not about one of the sets.
         expect(response.json()).toEqual({ ok: false, error: 'The sets must be a list of sets' })
@@ -517,11 +512,11 @@ describe('sessions routes', () => {
         ['set', 'A set must be an object with its fields'],
       ] as const
       for (const [sent, error] of invalid) {
-        const response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set(), sent]), { flyer: PNG })
+        const response = await sendSession(app, withSets([set(), sent]), { flyer: PNG })
         expect(response.statusCode).toBe(400)
         expect(response.json()).toEqual({ ok: false, error, setIndex: 1 })
       }
-      const response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set()], { durationMinutes: 0 }))
+      const response = await sendSession(app, withSets([set()], { durationMinutes: 0 }))
       expect(response.json()).toEqual({ ok: false, error: 'The duration must be a whole number of minutes, from 1 to 525949920' })
       expect(resolveTrack).not.toHaveBeenCalled()
       expect(photos.store).not.toHaveBeenCalled()
@@ -532,19 +527,19 @@ describe('sessions routes', () => {
       const logs: string[] = []
       const app = await buildApp(logs)
       const sets = [set(), set({ soundcloudTrack: 'https://soundcloud.com/someone/else' }), set()]
-      let response = await sendSession(app, 'POST', '/api/admin/sessions', withSets(sets), { flyer: PNG })
+      let response = await sendSession(app, withSets(sets), { flyer: PNG })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'SoundCloud shows no track at this link', setIndex: 1 })
       // Not the sets after it.
       expect(resolveTrack).toHaveBeenCalledTimes(2)
 
       resolveTrack.mockRejectedValue(new NoSoundCloudCredentials())
-      response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set({ soundcloudTrack: null }), set()]), { flyer: PNG })
+      response = await sendSession(app, withSets([set({ soundcloudTrack: null }), set()]), { flyer: PNG })
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'The credentials of the SoundCloud app have not been entered yet', session: null, set: null, setIndex: 1 })
 
       resolveTrack.mockRejectedValue(new Error('fetch failed'))
-      response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set()]), { flyer: PNG })
+      response = await sendSession(app, withSets([set()]), { flyer: PNG })
       expect(response.statusCode).toBe(502)
       expect(response.json()).toEqual({ ok: false, error: 'The track cannot be resolved through SoundCloud: fetch failed', setIndex: 0 })
       expect(logs.join('')).toContain('Failed to resolve a track through SoundCloud')
@@ -563,23 +558,23 @@ describe('sessions routes', () => {
       }
 
       refuse(new NoSuchReference('No such artist'), 1)
-      let response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set(), set()], { start: null }), { flyer: PNG })
+      let response = await sendSession(app, withSets([set(), set()], { start: null }), { flyer: PNG })
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'No such artist', setIndex: 1 })
 
       refuse(new Conflict("This YouTube video is another set's", rows[0], rows[0].sets[0]), 0)
-      response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set()], { start: null }), { flyer: PNG })
+      response = await sendSession(app, withSets([set()], { start: null }), { flyer: PNG })
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: "This YouTube video is another set's", session: other, set: other.sets[0], setIndex: 0 })
 
       refuse(new Conflict("This SoundCloud track is another set's", null, null, 0), 2)
-      response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set(), set(), set()], { start: null }), { flyer: PNG })
+      response = await sendSession(app, withSets([set(), set(), set()], { start: null }), { flyer: PNG })
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: "This SoundCloud track is another set's", session: null, set: null, setIndex: 2, otherSetIndex: 0 })
 
       // About the session itself.
       vi.mocked(store.create).mockRejectedValueOnce(new Conflict('Another session overlaps this one', rows[0]))
-      response = await sendSession(app, 'POST', '/api/admin/sessions', withSets([set()]), { flyer: PNG })
+      response = await sendSession(app, withSets([set()]), { flyer: PNG })
       expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: other, set: null })
 
       expect(photos.store).toHaveBeenCalledTimes(4)
@@ -587,10 +582,10 @@ describe('sessions routes', () => {
       expect(rows).toHaveLength(1)
     })
 
-    it('are not taken by PUT, which only changes the session', async () => {
+    it('are not taken by PATCH, which only changes the session', async () => {
       const app = await buildApp()
       await createSession(app)
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', withSets([]))
+      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', withSets([]))
       expect(response.statusCode).toBe(400)
       expect(response.json()).toEqual({ ok: false, error: 'Unknown field: `sets`' })
     })
@@ -619,15 +614,15 @@ describe('sessions routes', () => {
       expect(store.updateSet).toHaveBeenLastCalledWith('set-2', expect.objectContaining({ applicationId: null }))
     })
 
-    it('needs it, or null, to add a session or a set, or replace a session\'s fields, and refuses anything else in a change', async () => {
+    it('needs it, or null, to add a session or a set, and refuses anything else in a change', async () => {
       const app = await buildApp()
       await sessionWithSet(app)
       const error = { ok: false, error: "The application must be an application's id, or null" }
       const withoutApplication = { ...session(), application: undefined }
       const setWithoutApplication = { ...set(), application: undefined }
       for (const response of [
-        await sendSession(app, 'POST', '/api/admin/sessions', withoutApplication),
-        await sendSession(app, 'PUT', '/api/admin/sessions/session-1', withoutApplication),
+        await sendSession(app, withoutApplication),
+        await send(app, 'PATCH', '/api/admin/sessions/session-1', { application: 42 }),
         await send(app, 'POST', '/api/admin/sessions/session-1/sets', setWithoutApplication),
         await send(app, 'PATCH', '/api/admin/sets/set-2', { application: 42 }),
       ]) {
@@ -699,6 +694,8 @@ describe('sessions routes', () => {
   describe('flyers', () => {
     const get = async (app: App, url: string, headers: Record<string, string> = {}) =>
       app.inject({ method: 'GET', url, headers, cookies: await sessionCookies() })
+    const putFlyer = async (app: App, id: string, parts: Parameters<typeof multipartBody>[0]) =>
+      app.inject({ method: 'PUT', url: `/api/admin/sessions/${id}/flyer`, ...multipartBody(parts), cookies: await sessionCookies() })
 
     it('adds the session with its flyer, whose type is told from its contents, and serves it', async () => {
       const app = await buildApp()
@@ -781,52 +778,24 @@ describe('sessions routes', () => {
       expect(rows).toHaveLength(1)
     })
 
-    it("keeps the session's flyer when none is sent, replaces it, or removes it, deleting the one it had", async () => {
+    it("keeps the session's flyer when its fields change", async () => {
       const app = await buildApp()
       await createSession(app, {}, { flyer: JPEG })
-      let response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ description: 'Nouveau.' }))
-      expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
+      for (const changes of [{ description: 'Nouveau.' }, session({ description: 'Nouveau.' })]) {
+        const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', changes)
+        expect(response.json().session).toMatchObject({ hasFlyer: true, description: 'Nouveau.', updatedBy: 'admin@example.com' })
+      }
+      expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpeg')
       expect(photos.delete).not.toHaveBeenCalled()
-
-      const etag = (await get(app, '/api/admin/sessions/session-1/flyer')).headers.etag as string
-      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
-      expect(response.json().session.hasFlyer).toBe(true)
-      expect(rows[0].flyerKey).toBe('sessions/flyer-2.png')
-      expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
-      // The new flyer has another ETag, so a browser that has the one it replaced gets it.
-      const replaced = await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': etag })
-      expect(replaced.statusCode).toBe(200)
-      expect(replaced.rawPayload).toEqual(PNG)
-      expect(replaced.headers.etag).not.toBe(etag)
-
-      // Changing only its flyer changes the session.
-      rows[0].updatedBy = null
-      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { removeFlyer: 'true' })
-      expect(response.json().session).toMatchObject({ hasFlyer: false, updatedBy: 'admin@example.com' })
-      expect(rows[0]).toMatchObject({ flyerKey: null, flyerType: null })
-      expect(photos.delete).toHaveBeenLastCalledWith('sessions/flyer-2.png')
-      expect(stored.size).toBe(0)
     })
 
-    it('refuses both a flyer and removing it, and deletes the new flyer when the session is not saved', async () => {
+    it('deletes the new flyer when the session is not added', async () => {
       const app = await buildApp()
-      await createSession(app, {}, { flyer: JPEG })
-      vi.clearAllMocks()
-      let response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG, removeFlyer: 'true' })
-      expect(response.statusCode).toBe(400)
-      expect(photos.store).not.toHaveBeenCalled()
-
-      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-9', session(), { flyer: PNG })
-      expect(response.statusCode).toBe(404)
-      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
-      response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
-      expect(response.statusCode).toBe(409)
       vi.mocked(store.create).mockRejectedValueOnce(new NoSuchReference('No such collective'))
-      response = await createSession(app, {}, { flyer: PNG })
+      const response = await createSession(app, {}, { flyer: PNG })
       expect(response.statusCode).toBe(400)
-      expect(photos.store).toHaveBeenCalledTimes(3)
-      expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png'], ['sessions/flyer-4.png']])
-      expect(rows[0].flyerKey).toBe('sessions/flyer-1.jpeg')
+      expect(photos.delete.mock.calls).toEqual([['sessions/flyer-1.png']])
+      expect(rows).toEqual([])
     })
 
     it('deletes the flyer with its session', async () => {
@@ -843,12 +812,12 @@ describe('sessions routes', () => {
       let response = await get(app, '/api/admin/sessions/session-1/flyer')
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'This session has no flyer' })
-      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: JPEG })
+      await putFlyer(app, 'session-1', { flyer: JPEG })
       stored.clear()
       response = await get(app, '/api/admin/sessions/session-1/flyer')
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'The flyer of this session is missing' })
-      await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session(), { flyer: PNG })
+      await putFlyer(app, 'session-1', { flyer: PNG })
       stored.delete(sizeKey(rows[0].flyerKey!, 1280))
       response = await get(app, '/api/admin/sessions/session-1/flyer?width=1280')
       expect(response.statusCode).toBe(404)
@@ -856,8 +825,6 @@ describe('sessions routes', () => {
     })
 
     describe('PUT /api/admin/sessions/:id/flyer', () => {
-      const putFlyer = async (app: App, id: string, parts: Parameters<typeof multipartBody>[0]) =>
-        app.inject({ method: 'PUT', url: `/api/admin/sessions/${id}/flyer`, ...multipartBody(parts), cookies: await sessionCookies() })
       // What saving only a flyer changes of the session.
       const flyerChange = (flyerKey: string, flyerType: string) => ({ flyerKey, flyerType, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
 
@@ -914,13 +881,12 @@ describe('sessions routes', () => {
         expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
       })
 
-      it("ignores other fields and files, even the session's fields and removeFlyer", async () => {
+      it("ignores other fields and files, even the session's fields", async () => {
         const app = await buildApp()
         await createSession(app)
         vi.clearAllMocks()
         const response = await putFlyer(app, 'session-1', {
           session: JSON.stringify(session({ description: 'Ignorée.' })),
-          removeFlyer: 'true',
           flyer: PNG,
           other: JPEG,
           submit: 'envoyer',
@@ -942,6 +908,52 @@ describe('sessions routes', () => {
         expect(photos.store).toHaveBeenCalledTimes(2)
         expect(photos.delete.mock.calls).toEqual([['sessions/flyer-2.png'], ['sessions/flyer-3.png']])
         expect(photos.photos()).toEqual(['sessions/flyer-1.jpeg'])
+      })
+
+      it('deletes the new flyer when the store refuses the session', async () => {
+        const app = await buildApp()
+        await createSession(app)
+        vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', null))
+        await putFlyer(app, 'session-1', { flyer: PNG })
+        expect(photos.delete.mock.calls).toEqual([['sessions/flyer-1.png']])
+        expect(rows[0].flyerKey).toBeNull()
+      })
+    })
+
+    describe('DELETE /api/admin/sessions/:id/flyer', () => {
+      it('removes the flyer, deleting it, changes nothing else, and says who changed the session, even when it has none', async () => {
+        const app = await buildApp()
+        await sessionWithSet(app)
+        await putFlyer(app, 'session-1', { flyer: JPEG })
+        const before = (await send(app, 'GET', '/api/admin/sessions/session-1')).json().session
+        const etag = (await get(app, '/api/admin/sessions/session-1/flyer')).headers.etag as string
+        vi.clearAllMocks()
+        rows[0].updatedBy = null
+
+        let response = await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')
+        expect(response.statusCode).toBe(200)
+        expect(response.json()).toEqual({ ok: true, session: { ...before, hasFlyer: false, updatedBy: 'admin@example.com', updatedAt: expect.any(String) } })
+        expect(store.update).toHaveBeenCalledExactlyOnceWith('session-1', { flyerKey: null, flyerType: null, updatedBy: 'admin@example.com', updatedAt: expect.any(Date) })
+        expect(photos.delete).toHaveBeenCalledExactlyOnceWith('sessions/flyer-1.jpeg')
+        expect(stored.size).toBe(0)
+        // A browser that has the flyer doesn't get it anymore.
+        expect((await get(app, '/api/admin/sessions/session-1/flyer', { 'if-none-match': etag })).json()).toEqual({ ok: false, error: 'This session has no flyer' })
+
+        rows[0].updatedBy = null
+        response = await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')
+        expect(response.json().session).toMatchObject({ hasFlyer: false, updatedBy: 'admin@example.com' })
+        expect(photos.delete).toHaveBeenCalledTimes(1)
+      })
+
+      it("removes the flyer even when it can't be deleted, and responds 404 for a session that does not exist", async () => {
+        const app = await buildApp()
+        await createSession(app, {}, { flyer: JPEG })
+        photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+        expect((await send(app, 'DELETE', '/api/admin/sessions/session-1/flyer')).statusCode).toBe(200)
+        expect(rows[0]).toMatchObject({ flyerKey: null, flyerType: null })
+        const response = await send(app, 'DELETE', '/api/admin/sessions/session-9/flyer')
+        expect(response.statusCode).toBe(404)
+        expect(response.json()).toEqual({ ok: false, error: 'No such session' })
       })
     })
   })
@@ -1214,55 +1226,6 @@ describe('sessions routes', () => {
     })
   })
 
-  describe('PUT /api/admin/sessions/:id', () => {
-    it('replaces the session, but not its status or its sets, and says who changed it', async () => {
-      const app = await buildApp()
-      await sessionWithSet(app)
-      await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'done' })
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', type: 'live-performance', takeover: null, name: '' }))
-
-      expect(response.statusCode).toBe(200)
-      expect(response.json().session).toMatchObject({
-        start: '2026-11-21T20:00:00-05:00',
-        end: '2026-11-22T00:00:00-05:00',
-        type: 'live-performance',
-        takeover: null,
-        name: '',
-        title: 'LIVE PERFORMANCE',
-        status: 'done',
-        updatedBy: 'admin@example.com',
-        updatedAt: expect.any(String),
-        sets: [{ id: 'set-2', durationMinutes: 60, updatedBy: null }],
-      })
-      expect(store.update).toHaveBeenCalledWith('session-1', expect.objectContaining({ startAt: new Date('2026-11-22T01:00:00Z'), durationMinutes: 240 }))
-    })
-
-    it('can shorten the session so that its sets add up to more than it, which they stay as they are', async () => {
-      const app = await buildApp()
-      await sessionWithSet(app)
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 59 }))
-      expect(response.statusCode).toBe(200)
-      expect(response.json().session).toMatchObject({ durationMinutes: 59, sets: [{ id: 'set-2', durationMinutes: 60 }] })
-    })
-
-    it('responds 404 for a session that does not exist', async () => {
-      const app = await buildApp()
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-9', session())
-      expect(response.statusCode).toBe(404)
-      expect(response.json()).toEqual({ ok: false, error: 'No such session' })
-    })
-
-    it('responds 409 when it would overlap another session, with that one', async () => {
-      const app = await buildApp()
-      const { session: before } = (await sessionWithSet(app)).json()
-      vi.mocked(store.update).mockRejectedValueOnce(new Conflict('Another session overlaps this one', rows[0]))
-      const response = await sendSession(app, 'PUT', '/api/admin/sessions/session-1', session({ durationMinutes: 90 }))
-
-      expect(response.statusCode).toBe(409)
-      expect(response.json()).toEqual({ ok: false, error: 'Another session overlaps this one', session: before, set: null })
-    })
-  })
-
   describe('PATCH /api/admin/sessions/:id', () => {
     it('changes only the fields it is sent, keeps its flyer and its sets, and says who changed it', async () => {
       const app = await buildApp()
@@ -1291,13 +1254,25 @@ describe('sessions routes', () => {
       })
     })
 
-    it('removes its flyer when asked to, and deletes it', async () => {
+    it("changes every field, as the admin pages' form sends them, but not its status or its sets, which can then add up to more than it", async () => {
       const app = await buildApp()
-      await createSession(app, {}, { flyer: PNG })
-      expect((await send(app, 'PATCH', '/api/admin/sessions/session-1', { removeFlyer: false })).json().session.hasFlyer).toBe(true)
-      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', { removeFlyer: true })
-      expect(response.json().session).toMatchObject({ hasFlyer: false, name: 'HAUTE RIVE TAKEOVER' })
-      expect(stored.size).toBe(0)
+      await sessionWithSet(app)
+      await send(app, 'PUT', '/api/admin/sessions/session-1/status', { status: 'done' })
+      const response = await send(app, 'PATCH', '/api/admin/sessions/session-1', session({ start: '2026-11-21T20:00-05:00', durationMinutes: 59, type: 'live-performance', takeover: null, name: '' }))
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json().session).toMatchObject({
+        start: '2026-11-21T20:00:00-05:00',
+        end: '2026-11-21T20:59:00-05:00',
+        type: 'live-performance',
+        takeover: null,
+        name: '',
+        title: 'LIVE PERFORMANCE',
+        status: 'done',
+        updatedBy: 'admin@example.com',
+        updatedAt: expect.any(String),
+        sets: [{ id: 'set-2', durationMinutes: 60, updatedBy: null }],
+      })
     })
 
     it('explains what is wrong with what it is sent, and with the session it would make, without changing it', async () => {
@@ -1306,7 +1281,7 @@ describe('sessions routes', () => {
       const invalid = [
         [{ durationMinutes: 0 }, 'The duration must be a whole number of minutes, from 1 to 525949920'],
         [{ title: 'X' }, 'Unknown field: `title`'],
-        [{ removeFlyer: 'true' }, 'removeFlyer must be true or false'],
+        [{ removeFlyer: true }, 'Unknown field: `removeFlyer`'],
         [{}, 'There must be at least one field to change'],
         [[], 'The changes must be an object with the fields to change'],
       ] as const

@@ -26,6 +26,9 @@ function CollectiveById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/collectives/{id}', { params: { path: { id } } })
   // Its artists, for its genres, loaded again whenever the collective is saved, which can change them.
   const [membersVersion, setMembersVersion] = useState(0)
+  // Every artist, to pick its artists in its form, loaded again when the form stays open once the collective is saved,
+  // which can have created some, so that the form tells their names apart from new ones.
+  const [artistsVersion, setArtistsVersion] = useState(0)
   const members = useApi('/api/admin/artists', { params: { query: { collective: id } }, version: membersVersion })
   const applications = useApi('/api/admin/applications', { params: { query: { collective: id } } })
   const sessions = useApi('/api/admin/sessions', { params: { query: { takeover: id } } })
@@ -46,15 +49,31 @@ function CollectiveById({ id }: { id: string }) {
         <BackToArtists />
         <h1>{collective.name}</h1>
         <CollectiveFormWithArtists
+          artistsVersion={artistsVersion}
           collective={collective}
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
-          onSubmit={async (body) => {
-            const result = await api.PUT('/api/admin/collectives/{id}', { params: { path: { id } }, body, bodySerializer: formData })
+          onSubmit={async (body, photo) => {
+            const params = { path: { id } }
+            // The profile first, so that a photo is only saved with a profile that's accepted.
+            const result = await api.PATCH('/api/admin/collectives/{id}', { params, body })
             if (!result.ok) return `Le collectif n'a pas pu être enregistré : ${result.error}`
             setChanged(result.collective)
-            setEditing(false)
             setMembersVersion((version) => version + 1)
+            if (photo) {
+              const saved =
+                photo === 'remove'
+                  ? await api.DELETE('/api/admin/collectives/{id}/photo', { params })
+                  : await api.PUT('/api/admin/collectives/{id}/photo', { params, body: { photo }, bodySerializer: formData })
+              // The form stays open, with the artists it added by name by their id (see CollectiveForm), and sending it
+              // again sends both again.
+              if (!saved.ok) {
+                setArtistsVersion((version) => version + 1)
+                return `Le profil a été enregistré, mais pas la photo : ${saved.error}`
+              }
+              setChanged(saved.collective)
+            }
+            setEditing(false)
             return null
           }}
         />
@@ -116,10 +135,10 @@ function CollectiveById({ id }: { id: string }) {
 }
 
 // The collective form, to change a collective or add one, with every artist to pick its artists from, loaded each time
-// it opens, so that they're current, and nothing until then. When they can't be loaded, it says so, and the form only
-// adds new artists.
-function CollectiveFormWithArtists(props: Omit<CollectiveFormProps, 'artists'>) {
-  const artists = useApi('/api/admin/artists')
+// it opens, so that they're current, and nothing until then, and again whenever `artistsVersion` changes. When they
+// can't be loaded, it says so, and the form only adds new artists.
+function CollectiveFormWithArtists({ artistsVersion, ...props }: Omit<CollectiveFormProps, 'artists'> & { artistsVersion?: number }) {
+  const artists = useApi('/api/admin/artists', { version: artistsVersion })
   if (artists.kind === 'loading') return null
   return (
     <>
@@ -137,7 +156,8 @@ export function NewCollectivePage() {
       <h1>Nouveau collectif</h1>
       <CollectiveFormWithArtists
         submitLabel="ajouter le collectif"
-        onSubmit={async (body) => {
+        onSubmit={async (collective, photo) => {
+          const body = { collective, photo: photo instanceof File ? photo : undefined }
           const result = await api.POST('/api/admin/collectives', { body, bodySerializer: formData })
           if (!result.ok) return `Le collectif n'a pas pu être ajouté : ${result.error}`
           navigate(entryPath('collective', result.collective.id))

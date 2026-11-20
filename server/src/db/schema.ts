@@ -215,7 +215,7 @@ export const applications = pgTable(
 )
 
 // Sessions: the occasions at the studio, e.g. an evening of three artists, or a collective's takeover. See
-// `SessionFields` in sessions/fields.ts for what each field can contain.
+// `SESSION_FIELDS` in sessions/fields.ts for what each field can contain.
 //
 // Sessions with a start can't overlap, unless one of them is cancelled. That's the exclusion constraint
 // `sessions_no_overlap`, which drizzle can't declare, so it's only in the migration that adds it (0005_sessions.sql),

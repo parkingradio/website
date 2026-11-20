@@ -792,7 +792,7 @@ describe("A session's page", () => {
     expect(screen.getByRole('alert')).toHaveTextContent("Une session annoncée a une date : retirez d'abord son annonce.")
     expect(undated).toHaveAttribute('aria-invalid', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
     fireEvent.click(undated)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -882,7 +882,7 @@ describe("A session's page", () => {
 
   it('changes the session in a form in its place, sending its start back as it was', async () => {
     const changed = { ...SESSION, name: 'AUTRE', title: 'AUTRE', updatedBy: 'admin@example.com', updatedAt: '2026-10-02T16:00:00.000Z' }
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: changed } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PATCH /api/admin/sessions/session-1': { ok: true, session: changed } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -913,7 +913,7 @@ describe("A session's page", () => {
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'AUTRE' })).toBeInTheDocument()
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toEqual({
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 240,
       type: 'takeover',
@@ -955,7 +955,7 @@ describe("A session's page", () => {
       ...RA_EVENTS,
       '/api/admin/collectives': { ok: true, collectives: [ONDES, VAGUES] },
       '/api/admin/applications': { ok: true, total: 5, applications: [vagues, ...APPLICATIONS_LIST] },
-      'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION },
+      'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION },
     })
     renderAt('/admin/sessions/session-1')
 
@@ -982,8 +982,8 @@ describe("A session's page", () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Takeover' }))
     expect(picker()).toHaveValue('Reçue le 10 septembre 2026')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-2', application: 'application-5' })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'takeover', takeover: 'collective-2', application: 'application-5' })
   })
 
   it("keeps the takeover's application when the applications could not be loaded, which it says, and lets it be removed", async () => {
@@ -998,15 +998,15 @@ describe("A session's page", () => {
   })
 
   it('sends no application for another type than a takeover', async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
     expect(await screen.findByRole('combobox', { name: 'Candidature' })).toHaveValue('Reçue le 1 septembre 2026')
     fireEvent.click(screen.getByRole('radio', { name: 'Guest mixes' }))
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'guest-mixes', takeover: null, application: null })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ type: 'guest-mixes', takeover: null, application: null })
   })
 
   it("shows « - » for a takeover's application when it has none", async () => {
@@ -1018,7 +1018,15 @@ describe("A session's page", () => {
 
   it('changes its description and its flyer, which it can also remove, in the form', async () => {
     const withFlyer = { ...SESSION, hasFlyer: true }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: withFlyer }, 'PUT /api/admin/sessions/session-1': { ok: true, session: withFlyer } })
+    mockFetch({
+      ...LOGGED_IN,
+      ...COLLECTIVES,
+      ...RA_EVENTS,
+      '/api/admin/sessions/session-1': { ok: true, session: withFlyer },
+      'PATCH /api/admin/sessions/session-1': { ok: true, session: withFlyer },
+      'DELETE /api/admin/sessions/session-1/flyer': { ok: true, session: SESSION },
+      'PUT /api/admin/sessions/session-1/flyer': { ok: true, session: withFlyer },
+    })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1043,11 +1051,10 @@ describe("A session's page", () => {
     fireEvent.click(screen.getByRole('button', { name: 'retirer le flyer' }))
     expect(screen.getByText(/Le flyer actuel sera retiré à l'enregistrement\./)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    const sent = requestsTo('PUT', '/api/admin/sessions/session-1')[0].body as FormData
-    expect(JSON.parse(sent.get('session') as string)).toMatchObject({ description: 'LIVE STREAMING FROM QUÉBEC CITY.\n\nSPECIAL  NIGHT' })
-    expect(sent.get('removeFlyer')).toBe('true')
-    expect(sent.get('flyer')).toBeNull()
+    // Its fields first, then the flyer.
+    await waitFor(() => expect(requestsTo('DELETE', '/api/admin/sessions/session-1/flyer')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ description: 'LIVE STREAMING FROM QUÉBEC CITY.\n\nSPECIAL  NIGHT' })
+    expect(await screen.findByText('Pas de flyer')).toBeInTheDocument()
 
     // Another flyer replaces it, and is checked as soon as it's chosen.
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1058,16 +1065,91 @@ describe("A session's page", () => {
     fireEvent.change(input, { target: { files: [flyer] } })
     expect(screen.getByText(/^Facultatif\./)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(2))
-    const replaced = requestsTo('PUT', '/api/admin/sessions/session-1')[1].body as FormData
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1/flyer')).toHaveLength(1))
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(2)
+    const replaced = requestsTo('PUT', '/api/admin/sessions/session-1/flyer')[0].body as FormData
     expect(replaced.get('flyer')).toBeInstanceOf(File)
     expect((replaced.get('flyer') as File).name).toBe('flyer.png')
-    expect(replaced.get('removeFlyer')).toBeNull()
+    expect(requestsTo('DELETE', '/api/admin/sessions/session-1/flyer')).toHaveLength(1)
+  })
+
+  it('keeps the form open when only the flyer is refused, showing the session as it was saved, and sends both again', async () => {
+    const changed = { ...SESSION, name: 'NUIT SPÉCIALE', title: 'NUIT SPÉCIALE' }
+    mockFetch({
+      ...PAGE,
+      ...COLLECTIVES,
+      ...RA_EVENTS,
+      'PATCH /api/admin/sessions/session-1': { ok: true, session: changed },
+      'PUT /api/admin/sessions/session-1/flyer': { ok: false, error: 'The flyer is larger than 10 MB' },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(await screen.findByLabelText('Nom'), { target: { value: 'NUIT SPÉCIALE' } })
+    fireEvent.change(screen.getByLabelText('Flyer'), { target: { files: [new File(['flyer'], 'flyer.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('La session a été enregistrée, mais pas le flyer : The flyer is larger than 10 MB'))
+    // The page shows the session as it was saved, under the form, which stays open.
+    expect(screen.getByRole('heading', { level: 1, name: 'NUIT SPÉCIALE' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Nom')).toHaveValue('NUIT SPÉCIALE')
+
+    mockFetch({
+      ...PAGE,
+      ...COLLECTIVES,
+      ...RA_EVENTS,
+      'PATCH /api/admin/sessions/session-1': { ok: true, session: changed },
+      'PUT /api/admin/sessions/session-1/flyer': { ok: true, session: { ...changed, hasFlyer: true } },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument())
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1)
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/flyer')).toHaveLength(1)
+    expect(screen.getByRole('img', { name: 'Flyer de NUIT SPÉCIALE' })).toBeInTheDocument()
+  })
+
+  it("doesn't send the flyer when the session's fields are refused", async () => {
+    mockFetch({
+      ...PAGE,
+      ...COLLECTIVES,
+      ...RA_EVENTS,
+      'PATCH /api/admin/sessions/session-1': { ok: false, error: 'Another session overlaps this one', session: null, set: null },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(await screen.findByLabelText('Flyer'), { target: { files: [new File(['flyer'], 'flyer.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("La session n'a pas pu être enregistrée : Another session overlaps this one"))
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/flyer')).toHaveLength(0)
+  })
+
+  it('says so when its flyer could not be removed, keeping it and the form', async () => {
+    const withFlyer = { ...SESSION, hasFlyer: true }
+    mockFetch({
+      ...PAGE,
+      ...COLLECTIVES,
+      ...RA_EVENTS,
+      '/api/admin/sessions/session-1': { ok: true, session: withFlyer },
+      'PATCH /api/admin/sessions/session-1': { ok: true, session: withFlyer },
+      'DELETE /api/admin/sessions/session-1/flyer': { ok: false, error: 'Internal server error' },
+    })
+    renderAt('/admin/sessions/session-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'retirer le flyer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('La session a été enregistrée, mais pas le flyer : Internal server error'))
+    expect(screen.getByText(/Le flyer actuel sera retiré à l'enregistrement\./)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    expect(screen.getByRole('img', { name: 'Flyer de ONDES TAKEOVER' })).toBeInTheDocument()
   })
 
   it("keeps the session's event on RA when it isn't among those read from RA, and offers it until the form closes", async () => {
     const other = { ...SESSION, raEvent: { id: '1000000', url: 'https://ra.co/events/1000000' } }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: other }, 'PUT /api/admin/sessions/session-1': { ok: true, session: other } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: other }, 'PATCH /api/admin/sessions/session-1': { ok: true, session: other } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1102,12 +1184,12 @@ describe("A session's page", () => {
     expect(picker).toHaveValue('Événement RA n° 1000000')
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '1000000' })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: '1000000' })
   })
 
   it("keeps the session's event on RA while RA's events can't be read, which it says, and only lets it be removed", async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, [RA_EVENTS_URL]: { ok: false, error: 'The events cannot be read from RA.' }, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, [RA_EVENTS_URL]: { ok: false, error: 'The events cannot be read from RA.' }, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1121,14 +1203,14 @@ describe("A session's page", () => {
     fireEvent.mouseDown(screen.getByRole('option', { name: 'Aucun événement RA' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: null })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ raEvent: null })
   })
 
   it('keeps a session that starts at the second 1:30 of the night clocks fall back where it is when its name changes', async () => {
     // 1:30 in winter time, an hour after the first 1:30, for 2 hours.
     const second = { ...SESSION, start: '2026-11-01T06:30:00.000Z', end: '2026-11-01T08:30:00.000Z', durationMinutes: 120, sets: [] }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PATCH /api/admin/sessions/session-1': { ok: true, session: second } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1136,14 +1218,14 @@ describe("A session's page", () => {
     expect(timeInput('Début', 'heure')).toHaveValue('01:30')
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'AUTRE' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T01:30-05:00', durationMinutes: 120 })
   })
 
   it('keeps a session that ends at the second 1:30 of the night clocks fall back where it ends while its end is unchanged', async () => {
     // From midnight, in summer time, to 1:30 in winter time.
     const second = { ...SESSION, start: '2026-11-01T04:00:00.000Z', end: '2026-11-01T06:30:00.000Z', durationMinutes: 150, sets: [] }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PUT /api/admin/sessions/session-1': { ok: true, session: second } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-1': { ok: true, session: second }, 'PATCH /api/admin/sessions/session-1': { ok: true, session: second } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1161,8 +1243,8 @@ describe("A session's page", () => {
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-01' } })
     expect(lasts()).toHaveTextContent(/^Dure 2 h 30\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 150 })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-01T00:00-04:00', durationMinutes: 150 })
   })
 
   it('goes through the years a date field gives as a year is typed, saying what is wrong', async () => {
@@ -1178,11 +1260,11 @@ describe("A session's page", () => {
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '0002-11-14' } })
     expect(await screen.findByText('Une session a lieu entre les années 2000 et 2999.')).toBeInTheDocument()
     expect(timeInput('Fin', 'date')).toHaveValue('0002-11-15')
-    expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
   })
 
   it('moves an overnight session to another day, its end with it, and back', async () => {
-    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PUT /api/admin/sessions/session-1': { ok: true, session: SESSION } })
+    mockFetch({ ...PAGE, ...COLLECTIVES, ...RA_EVENTS, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/session-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1194,8 +1276,8 @@ describe("A session's page", () => {
     expect(lasts()).toHaveTextContent(/^Dure 4 h\.$/)
     fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-11-21' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-21T21:00-05:00', durationMinutes: 240 })
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toMatchObject({ start: '2026-11-21T21:00-05:00', durationMinutes: 240 })
   })
 
   it('says when its sets add up to more than the session, cancelled ones included, and no longer once one is deleted', async () => {
@@ -1370,7 +1452,7 @@ describe("A session's page", () => {
 
   it("gives a session without a date a day and a start, its end filled in from its duration", async () => {
     const dated = { ...UNDATED, start: '2026-11-15T02:00:00.000Z', end: '2026-11-15T05:00:00.000Z' }
-    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'PUT /api/admin/sessions/session-2': { ok: true, session: dated } })
+    mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...RA_EVENTS, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, 'PATCH /api/admin/sessions/session-2': { ok: true, session: dated } })
     renderAt('/admin/sessions/session-2')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -1386,8 +1468,8 @@ describe("A session's page", () => {
     expect(timeInput('Fin', 'heure')).toHaveValue('00:00')
     expect(lasts()).toHaveTextContent(/^Dure 3 h\.$/)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-2')).toHaveLength(1))
-    expect(sentSession(requestsTo('PUT', '/api/admin/sessions/session-2')[0])).toEqual({
+    await waitFor(() => expect(requestsTo('PATCH', '/api/admin/sessions/session-2')).toHaveLength(1))
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-2')[0])).toEqual({
       start: '2026-11-14T21:00-05:00',
       durationMinutes: 180,
       type: 'guest-mixes',
@@ -2310,7 +2392,6 @@ describe('Adding a session', () => {
     const sent = requestsTo('POST', '/api/admin/sessions')[0].body as FormData
     expect(JSON.parse(sent.get('session') as string)).toMatchObject({ description: 'Une soirée.\n\nDeux salles.' })
     expect((sent.get('flyer') as File).name).toBe('flyer.jpg')
-    expect(sent.get('removeFlyer')).toBeNull()
   })
 
   it('needs a type, picked among them in order, a collective for a takeover only, and a name for another kind of session', async () => {

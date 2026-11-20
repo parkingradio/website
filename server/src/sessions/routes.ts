@@ -4,9 +4,9 @@ import { z } from 'zod'
 import { errorMessage } from '../api/errors.js'
 import { fromBeforeTo, startRange } from '../api/formats.js'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, objectError, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, photoRoute, readPhotoForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { photoRoute, readImageForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { PHOTO_MAX_BYTES, PHOTO_MAX_PIXELS, PHOTO_RULES } from '../artists/profile.js'
-import { InvalidProfile, forgetPhoto, readPhoto } from '../artists/store.js'
+import { forgetPhoto } from '../artists/store.js'
 import type { PhotoErrors, Photos, SizedPhoto } from '../artists/store.js'
 import { NoSoundCloudCredentials } from '../radio/soundcloud-app.js'
 import { effectiveDescription } from './descriptions.js'
@@ -18,7 +18,6 @@ import {
   PerformanceType,
   SESSION_FIELDS,
   SET_FIELDS,
-  SessionFields,
   SessionType,
   SetFields,
   SetPosition,
@@ -27,9 +26,10 @@ import {
   after,
   sessionTitle,
 } from './fields.js'
+import type { SessionFields } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
 import { raEventContent } from './ra-event.js'
-import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
+import { BrokenFields, Conflict, NO_FLYER, NoSuchReference, SESSION_CANCELLED } from './store.js'
 import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StatusChangedBy, StoredFlyer, StoredSession, StoredSet } from './store.js'
 
 // Admin routes for sessions and their sets: add, view, change, mark as planned, done or cancelled, and delete them (see
@@ -141,26 +141,14 @@ const FLYER_ERRORS: PhotoErrors = {
 }
 const FlyerFile = z.file().meta({ description: `${PHOTO_RULES}. An empty file is no flyer` })
 
-// What adding a session sends, as multipart/form-data, with its sets, and changing one, without them, with
-// `removeFlyer`. The route reads it itself (see `readSessionForm`): only the session's fields are checked against their
-// schema here.
+// What adding a session sends, as multipart/form-data, with its sets. The route reads it itself (see `readSessionForm`):
+// only the session's fields are checked against their schema here.
 const NewSessionForm = z.object({ session: NewSessionFields, flyer: FlyerFile.optional() })
-const SessionForm = z.object({
-  session: SessionFields,
-  flyer: FlyerFile.optional(),
-  removeFlyer: z
-    .string()
-    .optional()
-    .meta({ description: '"true" removes the session\'s flyer, when there\'s no new one. Anything else keeps it' }),
-})
 // What giving a session a flyer, or replacing its flyer, sends, as multipart/form-data, which the route reads itself.
 const FlyerForm = z.object({ flyer: FlyerFile })
 
 // What changing some of a session's fields sends, as JSON, and some of a set's.
-const SessionChangesBody = changesTo({
-  ...SESSION_FIELDS,
-  removeFlyer: z.boolean({ error: 'removeFlyer must be true or false' }).meta({ description: "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out" }),
-})
+const SessionChangesBody = changesTo(SESSION_FIELDS)
 const SetChangesBody = changesTo(SET_FIELDS)
 
 // What's saved of a session's fields that were sent, all of them, or some of them for a change, whose others are then
@@ -171,16 +159,13 @@ function sessionChanges({ start, durationMinutes, type, takeover, application, n
   return { startAt: start, durationMinutes, type, takeoverId: takeover, applicationId: application, name, raEventId: raEvent, description }
 }
 
-// Reads the session's fields, as JSON from the "session" part, and the flyer from a request that adds or changes a
-// session, and checks them against `schema`, like an artist's profile and photo (see `readProfileForm`), along with the
-// "removeFlyer" field, which only changing one reads. Returns them, or the error to reply with when the request is
-// malformed or invalid, with the `setIndex` of the set it's about, if it's about one of those added with the session.
-async function readSessionForm<Schema extends z.ZodType>(
-  request: FastifyRequest,
-  schema: Schema,
-): Promise<{ fields: z.output<Schema>; flyer: SizedPhoto | null; removeFlyer: boolean } | Failure> {
-  const sent = await readProfileForm(request, 'session', schema, { photoPart: 'flyer', remove: 'removeFlyer', errors: FLYER_ERRORS })
-  if (!('error' in sent)) return { fields: sent.profile, flyer: sent.photo, removeFlyer: sent.removePhoto }
+// Reads the session's fields, as JSON from the "session" part, and the flyer from a request that adds a session, and
+// checks them, like an artist's profile and photo (see `readProfileForm`). Returns them, or the error to reply with when
+// the request is malformed or invalid, with the `setIndex` of the set it's about, if it's about one of those added with
+// the session.
+async function readSessionForm(request: FastifyRequest): Promise<{ fields: NewSessionFields; flyer: SizedPhoto | null } | Failure> {
+  const sent = await readProfileForm(request, 'session', NewSessionFields, { photoPart: 'flyer', errors: FLYER_ERRORS })
+  if (!('error' in sent)) return { fields: sent.profile, flyer: sent.photo }
   const [field, setIndex] = sent.path ?? []
   return { status: sent.status, error: sent.error, ...(field === 'sets' && typeof setIndex === 'number' && { setIndex }) }
 }
@@ -390,7 +375,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
 
   // Stores the flyer that was sent, if there's one, with its sizes, and returns where, as a session keeps it.
   async function storeFlyer(flyer: SizedPhoto | null): Promise<StoredFlyer> {
-    return flyer ? { flyerKey: await photos.store(flyer, 'sessions'), flyerType: flyer.type } : { flyerKey: null, flyerType: null }
+    return flyer ? { flyerKey: await photos.store(flyer, 'sessions'), flyerType: flyer.type } : NO_FLYER
   }
 
   // The id of the track `link` leads to: the track of the set as it was, `before`, when that's its link, or else the one
@@ -525,7 +510,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       },
     },
     async (request, reply) => {
-      const sent = await readSessionForm(request, NewSessionFields)
+      const sent = await readSessionForm(request)
       if ('error' in sent) return fail(reply, sent)
       const { sets: sentSets = [], ...fields } = sent.fields
       const createdBy = request.user!.email
@@ -543,17 +528,14 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     },
   )
 
-  // Saves `fields` to the session with the id of `request`, all of them or some of them, with `sentFlyer`, which replaces
-  // its own, or none when `removeFlyer`, and responds with the session as it is then.
+  // Saves `fields` to the session with the id of `request`, some of them, or its flyer, `flyer`, a new one or none, and
+  // responds with the session as it is then.
   async function updateSession(
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     fields: Partial<SessionFields>,
-    sentFlyer: SizedPhoto | null,
-    removeFlyer: boolean,
+    flyer: StoredFlyer | null = null,
   ) {
-    // The session's new flyer, or none if it's removed. Otherwise, the session keeps its own.
-    const flyer = sentFlyer || removeFlyer ? await storeFlyer(sentFlyer) : null
     const changes = { ...sessionChanges(fields), ...flyer, updatedBy: request.user!.email, updatedAt: new Date() }
     const update = async () => {
       const changed = await store.update(request.params.id, changes)
@@ -564,44 +546,20 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
     return saving(reply, NO_SUCH_SESSION_ERROR, update, flyer?.flyerKey)
   }
 
-  // Not a tool: tools change sessions with PATCH, which only sends what it changes (see docs/design/server/mcp.md).
-  api.put(
-    '/api/admin/sessions/:id',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
-        tags: ['Sessions'],
-        params: ById,
-        multipart: SessionForm,
-        response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError, 413: ApiError },
-      },
-    },
-    async (request, reply) => {
-      const sent = await readSessionForm(request, SessionFields)
-      if ('error' in sent) return fail(reply, sent)
-      if (sent.flyer && sent.removeFlyer) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
-      return updateSession(request, reply, sent.fields, sent.flyer, sent.removeFlyer)
-    },
-  )
-
   api.patch(
     '/api/admin/sessions/:id',
     {
       config: { admin: true, tool: { title: 'Modifier une session' } },
       schema: {
         operationId: 'update_session',
-        summary: "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
+        summary: "Changes a session, only the fields it's given, but not its flyer, its status, whether it's announced, or its sets, which keep their order",
         tags: ['Sessions'],
         params: ById,
         body: SessionChangesBody,
         response: { 200: SessionResponse, 400: ApiError, 404: ApiError, 409: ConflictError },
       },
     },
-    async (request, reply) => {
-      const { removeFlyer, ...fields } = request.body
-      return updateSession(request, reply, fields, null, removeFlyer === true)
-    },
+    async (request, reply) => updateSession(request, reply, request.body),
   )
 
   // Not a tool: tools can't send files (see docs/design/server/mcp.md).
@@ -618,20 +576,25 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       },
     },
     async (request, reply) => {
-      // Other fields and files are ignored, but not a second flyer (see `readPhotoForm`).
-      const form = await readPhotoForm(request, { photoPart: 'flyer' })
-      if (form === 'malformed') return fail(reply, INVALID_REQUEST)
-      if ('tooLarge' in form) return fail(reply, { status: 413, error: FLYER_ERRORS.tooLarge })
-      let flyer: SizedPhoto | null
-      try {
-        flyer = await readPhoto(form.photo, FLYER_ERRORS)
-      } catch (error) {
-        if (!(error instanceof InvalidProfile)) throw error
-        return fail(reply, { status: 400, error: error.message })
-      }
-      if (!flyer) return fail(reply, { status: 400, error: 'The request has no flyer' })
-      return updateSession(request, reply, {}, flyer, false)
+      const sent = await readImageForm(request, 'flyer', FLYER_ERRORS)
+      if ('error' in sent) return fail(reply, sent)
+      return updateSession(request, reply, {}, await storeFlyer(sent.image))
     },
+  )
+
+  api.delete(
+    '/api/admin/sessions/:id/flyer',
+    {
+      config: { admin: true, tool: { title: "Retirer le flyer d'une session" } },
+      schema: {
+        operationId: 'delete_session_flyer',
+        summary: "Removes a session's flyer, which is deleted, and changes nothing else",
+        tags: ['Sessions'],
+        params: ById,
+        response: { 200: SessionResponse, 404: ApiError },
+      },
+    },
+    async (request, reply) => updateSession(request, reply, {}, NO_FLYER),
   )
 
   api.put(

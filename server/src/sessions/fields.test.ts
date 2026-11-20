@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_MINUTES, SESSION_TYPES, SessionFields, SetFields, SetPosition, brokenSessionRule, sessionTitle } from './fields.js'
+import { MAX_MINUTES, NewSessionFields, SESSION_TYPES, SetFields, SetPosition, brokenSessionRule, sessionTitle } from './fields.js'
 
 // The rules in sessions/fields.ts, which every session and set has to follow. The server answers with the first error.
 
@@ -31,7 +31,7 @@ function setFields(changes: Record<string, unknown> = {}) {
   }
 }
 
-function error(schema: typeof SessionFields | typeof SetFields, sent: unknown) {
+function error(schema: typeof NewSessionFields | typeof SetFields, sent: unknown) {
   const result = schema.safeParse(sent)
   return result.success ? null : result.error.issues[0].message
 }
@@ -62,16 +62,16 @@ describe('sessionTitle', () => {
   it('is never empty for a session that follows the rules', () => {
     const named = (type: (typeof SESSION_TYPES)[number]) => (type === 'other' ? 'X' : '')
     for (const type of SESSION_TYPES) {
-      const fields = SessionFields.parse(sessionFields({ type, takeover: type === 'takeover' ? 'collective-1' : null, name: named(type) }))
+      const fields = NewSessionFields.parse(sessionFields({ type, takeover: type === 'takeover' ? 'collective-1' : null, name: named(type) }))
       // A collective's name isn't empty (see collectives/profile.ts).
       expect(sessionTitle({ ...fields, takeover: fields.takeover === null ? null : { name: 'A' } }), type).not.toBe('')
     }
   })
 })
 
-describe('SessionFields', () => {
-  const parse = (changes: Record<string, unknown> = {}) => SessionFields.parse(sessionFields(changes))
-  const sessionError = (sent: unknown) => error(SessionFields, sent)
+describe('NewSessionFields', () => {
+  const parse = (changes: Record<string, unknown> = {}) => NewSessionFields.parse(sessionFields(changes))
+  const sessionError = (sent: unknown) => error(NewSessionFields, sent)
 
   it('keeps what was sent, with its start as a date and its links reduced', () => {
     const sent = { type: 'takeover', takeover: ' Collective-1 ', application: ' Application-1 ', name: 'VKT TAKEOVER', raEvent: ' https://ra.co/events/6683745 ' }
@@ -352,11 +352,11 @@ describe('the rules that involve several fields', () => {
   })
 
   it('are checked by the schemas too, after the fields', () => {
-    expect(SessionFields.safeParse(sessionFields({ type: 'takeover' })).error?.issues[0]).toMatchObject({ message: 'A takeover has a collective', path: ['takeover'] })
+    expect(NewSessionFields.safeParse(sessionFields({ type: 'takeover' })).error?.issues[0]).toMatchObject({ message: 'A takeover has a collective', path: ['takeover'] })
   })
 
   it("refuse the fields they don't take, naming them", () => {
-    expect(SessionFields.safeParse({ ...sessionFields(), title: 'X' }).error?.issues[0].message).toBe('Unknown field: `title`')
+    expect(NewSessionFields.safeParse({ ...sessionFields(), title: 'X' }).error?.issues[0].message).toBe('Unknown field: `title`')
     expect(SetFields.safeParse({ ...setFields(), id: 'set-1' }).error?.issues[0].message).toBe('Unknown field: `id`')
   })
 })

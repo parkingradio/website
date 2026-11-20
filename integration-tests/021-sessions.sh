@@ -59,8 +59,8 @@ session_json() {
         "$1" "$2" "${3:+,$3}"
 }
 
-# session_form <method> <url> <session JSON> [<curl args>...] -- add or change a session, as the admin, as
-# multipart/form-data, with its fields as JSON in the "session" part, and the other parts given, e.g. its flyer.
+# session_form <method> <url> <session JSON> [<curl args>...] -- add a session, as the admin, as multipart/form-data, with
+# its fields as JSON in the "session" part, and the other parts given, e.g. its flyer.
 session_form() {
     local method="$1" url="$2" fields="$3"
     shift 3
@@ -141,8 +141,8 @@ release_sessions_lock() {
 # ${FILES}/body, or ${FILES}/status-<suffix> and ${FILES}/body-<suffix> with a suffix.
 send_in_background() {
     local body=(--header 'Content-Type: application/json' --data "$3")
-    # Sessions are added and changed as multipart/form-data, with their fields as JSON (see session_form).
-    if [[ "$2" =~ /api/admin/sessions(/[^/]+)?$ ]]; then body=(--form-string "session=$3"); fi
+    # Sessions are added as multipart/form-data, with their fields as JSON (see session_form).
+    if [ "$1" = POST ] && [[ "$2" =~ /api/admin/sessions$ ]]; then body=(--form-string "session=$3"); fi
     curl --silent --output "${FILES}/body${4:+-$4}" --write-out '%{http_code}' --header "Cookie: ${cookie}" --request "$1" \
         "${body[@]}" "$2" > "${FILES}/status${4:+-$4}" &
 }
@@ -223,19 +223,19 @@ session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"t
 expect_status 200
 named="$(first_id)"
 expect_body_contains "\"type\":\"takeover\",\"takeover\":{\"id\":\"${ondes}\",\"name\":\"Les Ondes\"},\"application\":null,\"name\":\"\",\"title\":\"LES ONDES TAKEOVER\""
-request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes Côtières')" "${COLLECTIVES}/${ondes}"
+json PATCH "${COLLECTIVES}/${ondes}" '{"name":"Les Ondes Côtières"}'
 expect_status 200
 json GET "${SESSIONS}/${named}"
 expect_body_contains '"name":"","title":"LES ONDES CÔTIÈRES TAKEOVER"'
 expect_body_contains '"updatedBy":null,"updatedAt":null'
-request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(collective_json 'Les Ondes')" "${COLLECTIVES}/${ondes}"
+json PATCH "${COLLECTIVES}/${ondes}" '{"name":"Les Ondes"}'
 expect_status 200
 for type in guest-mixes:GUEST\ MIXES live-performance:LIVE\ PERFORMANCE synth-meetup:SYNTH\ MEETUPS; do
-    session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
+    json PATCH "${SESSIONS}/${named}" "$(session_json null 60 "\"type\":\"${type%%:*}\",\"name\":\"\"")"
     expect_status 200
     expect_body_contains "\"type\":\"${type%%:*}\",\"takeover\":null,\"application\":null,\"name\":\"\",\"title\":\"${type#*:}\""
 done
-session_form PUT "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
+json PATCH "${SESSIONS}/${named}" "$(session_json null 60 '"type":"other","name":"ATELIER DE DJing POUR FEMMES"')"
 expect_status 200
 expect_body_contains '"type":"other","takeover":null,"application":null,"name":"ATELIER DE DJing POUR FEMMES","title":"ATELIER DE DJing POUR FEMMES"'
 json DELETE "${SESSIONS}/${named}"
@@ -247,30 +247,40 @@ expect_status 200
 described="$(first_id)"
 expect_body_contains '"description":"Une  soirée.\n\nSPÉCIALE","effectiveDescription":"Une  soirée.\n\nSPÉCIALE"'
 [ "$(sql "select description from sessions where id = '${described}'" | head -1)" = 'Une  soirée.' ] || fail "expected the description to be kept"
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"type":"synth-meetup"')"
+json PATCH "${SESSIONS}/${described}" "$(session_json null 60 '"type":"synth-meetup"')"
 expect_body_contains '"description":"","effectiveDescription":"SYNTH MEETUPS\n\nRencontres hebdomadaires de création sonore et audiovisuelle'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"type":"other"')"
+json PATCH "${SESSIONS}/${described}" "$(session_json null 60 '"type":"other"')"
 expect_body_contains '"description":"","effectiveDescription":"","hasFlyer":false'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 "\"description\":\"$(printf 'x%.0s' $(seq 1 5001))\"")"
+json PATCH "${SESSIONS}/${described}" "$(session_json null 60 "\"description\":\"$(printf 'x%.0s' $(seq 1 5001))\"")"
 expect_status 400
 expect_body_contains '"error":"The description must be text, up to 5000 characters"'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60 '"description":"Une\u0000soirée"')"
+json PATCH "${SESSIONS}/${described}" "$(session_json null 60 '"description":"Une\u0000soirée"')"
 expect_status 400
 expect_body_contains '"error":"Text can'"'"'t contain the NUL character"'
 
 echo "  a session's flyer is checked, kept, served, replaced, removed, and deleted with it"
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.pdf"
+# put_flyer <curl args>... -- give a session a flyer, or replace its own.
+put_flyer() { request --header "Cookie: ${cookie}" --request PUT "$@"; }
+put_flyer --form "flyer=@${FILES}/flyer.pdf" "${SESSIONS}/${described}/flyer"
 expect_status 400
 expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/cut.jpg"
+put_flyer --form "flyer=@${FILES}/cut.jpg" "${SESSIONS}/${described}/flyer"
 expect_status 400
 expect_body_contains '"error":"The flyer can'"'"'t be read: it'"'"'s damaged, or has more than 100 million pixels"'
 session_form POST "$SESSIONS" "$(session_json null 60)" --form "flyer=@${FILES}/cut.jpg"
 expect_status 400
 expect_body_contains '"error":"The flyer can'"'"'t be read'
+put_flyer --form-string submit=envoyer "${SESSIONS}/${described}/flyer"
+expect_status 400
+expect_body_contains '"error":"The request has no flyer"'
+put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${NOBODY}/flyer"
+expect_status 404
 [ "$(photos_on_disk sessions)" = 0 ] && [ "$(sizes_on_disk sessions)" = 0 ] || fail "expected no flyer on disk"
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.jpg"
+# A flyer is given on its own, which keeps the session's fields as they are, and changes the session.
+sql "update sessions set updated_by = null where id = '${described}'" >/dev/null
+put_flyer --form "flyer=@${FILES}/flyer.jpg" "${SESSIONS}/${described}/flyer"
 expect_status 200
+expect_body_contains '"start":null,"end":null,"durationMinutes":60,"type":"other"'
 expect_body_contains '"hasFlyer":true'
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(photos_on_disk sessions)" = 1 ] && [ "$(sizes_on_disk sessions)" = 2 ] || fail "expected the session's flyer on disk, with its sizes"
@@ -295,47 +305,29 @@ expect_status 409
 session_form POST "$SESSIONS" "$(session_json null 60 "\"type\":\"takeover\",\"takeover\":\"${NOBODY}\"")" --form "flyer=@${FILES}/flyer.png"
 expect_status 400
 [ "$(photos_on_disk sessions)" = 1 ] || fail "expected the flyers of the sessions that weren't saved to be deleted"
-# Without a flyer, the session keeps its own.
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)"
+# Changing its fields keeps its flyer.
+json PATCH "${SESSIONS}/${described}" "$(session_json null 60)"
+expect_status 200
 expect_body_contains '"hasFlyer":true'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png" --form-string removeFlyer=true
-expect_status 400
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form "flyer=@${FILES}/flyer.png"
+put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${described}/flyer"
 expect_status 200
 [ "$(photos_on_disk sessions)" = 1 ] || fail "expected the replaced flyer to be deleted"
 request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_header Content-Type 'image/png'
-session_form PUT "${SESSIONS}/${described}" "$(session_json null 60)" --form-string removeFlyer=true
+json DELETE "${SESSIONS}/${described}/flyer"
+expect_status 200
+expect_body_contains '"name":"HAUTE RIVE TAKEOVER"'
 expect_body_contains '"hasFlyer":false'
-[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the removed flyer to be deleted"
+[ "$(photos_on_disk sessions)" = 0 ] && [ "$(sizes_on_disk sessions)" = 0 ] || fail "expected the removed flyer to be deleted, with its sizes"
 request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
 expect_status 404
 expect_body_contains '"error":"This session has no flyer"'
-# A flyer can be given on its own, which keeps the session's fields as they are.
-put_flyer() { request --header "Cookie: ${cookie}" --request PUT "$@"; }
-put_flyer --form "flyer=@${FILES}/flyer.pdf" "${SESSIONS}/${described}/flyer"
-expect_status 400
-expect_body_contains '"error":"The flyer must be a JPEG, PNG or WebP image"'
-put_flyer --form "flyer=@${FILES}/cut.jpg" "${SESSIONS}/${described}/flyer"
-expect_status 400
-expect_body_contains '"error":"The flyer can'"'"'t be read'
-put_flyer --form-string submit=envoyer "${SESSIONS}/${described}/flyer"
-expect_status 400
-expect_body_contains '"error":"The request has no flyer"'
-put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${NOBODY}/flyer"
-expect_status 404
-[ "$(photos_on_disk sessions)" = 0 ] || fail "expected the flyers that weren't saved to be deleted"
-put_flyer --form "flyer=@${FILES}/flyer.png" "${SESSIONS}/${described}/flyer"
+json DELETE "${SESSIONS}/${described}/flyer"
 expect_status 200
-expect_body_contains '"start":null,"end":null,"durationMinutes":60,"type":"guest-mixes"'
-expect_body_contains '"name":"HAUTE RIVE TAKEOVER"'
-expect_body_contains '"hasFlyer":true'
-[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the session's flyer on disk"
+json DELETE "${SESSIONS}/${NOBODY}/flyer"
+expect_status 404
 put_flyer --form "flyer=@${FILES}/flyer.jpg" "${SESSIONS}/${described}/flyer"
 expect_status 200
-[ "$(photos_on_disk sessions)" = 1 ] || fail "expected the replaced flyer to be deleted"
-request --header "Cookie: ${cookie}" "${SESSIONS}/${described}/flyer"
-expect_header Content-Type 'image/jpeg'
 json DELETE "${SESSIONS}/${described}"
 expect_status 200
 [ "$(photos_on_disk sessions)" = 0 ] && [ "$(sizes_on_disk sessions)" = 0 ] || fail "expected the deleted session's flyer to be deleted, with its sizes"
@@ -367,7 +359,7 @@ expect_conflict 'Another session overlaps this one' "$first"
 session_form POST "$SESSIONS" "$(session_json '"2026-11-15T01:00-05:00"' 60)"
 expect_status 200
 next="$(first_id)"
-session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"' 60)"
+json PATCH "${SESSIONS}/${next}" "$(session_json '"2026-11-15T00:30-05:00"' 60)"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${next}"
 expect_body_contains '"start":"2026-11-15T01:00:00-05:00","end":"2026-11-15T02:00:00-05:00"'
@@ -376,11 +368,16 @@ json PATCH "${SESSIONS}/${first}" '{"durationMinutes":300}'
 expect_conflict 'Another session overlaps this one' "$next"
 
 echo "  a session's fields are taken as JSON in their own part, which can't have other fields, unlike the request"
-session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 '"title":"X"')"
+session_form POST "$SESSIONS" "$(session_json null 60 '"title":"X"')"
 expect_status 400
 expect_body_contains '"error":"Unknown field: `title`"'
-session_form PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60)" --form-string 'submit=enregistrer'
+session_form POST "$SESSIONS" "$(session_json null 60)" --form-string 'submit=enregistrer'
 expect_status 200
+json DELETE "${SESSIONS}/$(first_id)"
+expect_status 200
+json PATCH "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 '"title":"X"')"
+expect_status 400
+expect_body_contains '"error":"Unknown field: `title`"'
 
 echo "  a session lasts the minutes that actually pass, for the database too, e.g. the night the clocks go back"
 # From midnight, for 4 hours: the clocks then say 3:00, an hour behind.
@@ -407,7 +404,7 @@ session_form POST "$SESSIONS" "$(session_json '""' 240)"
 expect_status 200
 other_canned="$(first_id)"
 expect_body_contains '"start":null,"end":null'
-session_form PUT "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
+json PATCH "${SESSIONS}/${canned}" "$(session_json '"2026-11-14T20:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_conflict 'Another session overlaps this one' "$first"
 json GET "${SESSIONS}/${canned}"
 expect_body_contains '"start":null'
@@ -491,7 +488,7 @@ expect_status 200
 echo "  a session can be shortened so that its sets add up to more than it, a cancelled set keeping its place"
 json PUT "${SETS}/${second}/status" '{"status":"cancelled"}'
 expect_status 200
-session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
+json PATCH "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 119 "\"type\":\"takeover\",\"takeover\":\"${ondes}\"")"
 expect_status 200
 expect_body_contains '"durationMinutes":119'
 [ "$(set_ids)" = "${opening} ${second} ${unplaced} ${whenever} " ] || { _show_body; fail "expected the sets in their order"; }
@@ -501,16 +498,16 @@ json DELETE "${SETS}/${whenever}"
 expect_status 200
 
 echo "  moving a session leaves its sets as they are, which doesn't count as changing them, and so does taking its start away"
-session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PATCH "${SESSIONS}/${first}" "$(session_json '"2026-11-21T21:00-05:00"' 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 expect_body_contains "\"start\":\"2026-11-21T21:00:00-05:00\",\"end\":\"2026-11-21T23:00:00-05:00\",\"durationMinutes\":120"
 expect_body_contains "{\"id\":\"${second}\",\"performers\":[{\"id\":\"${ana}\",\"name\":\"Ana\"}],\"durationMinutes\":60,"
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 [ "$(sql "select count(*) from sets where session_id = '${first}' and updated_by is not null")" = 0 ] || fail "expected the sets not to be changed"
-session_form PUT "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PATCH "${SESSIONS}/${first}" "$(session_json null 120 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 [ "$(set_ids)" = "${opening} ${second} ${unplaced} " ] || { _show_body; fail "expected the sets in their order"; }
-session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
+json PATCH "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"6683745\"")"
 expect_status 200
 
 echo "  cancelling a session cancels its sets, done ones included, but not the other way around"
@@ -865,7 +862,7 @@ passage="$(first_id)"
 hold_row collectives "$passage"
 delete_in_background "${COLLECTIVES}/${passage}" delete
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"collectives\"%')"
-send_in_background PUT "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${passage}\"")"
+send_in_background PATCH "${SESSIONS}/${next}" "$(session_json '"2026-11-15T01:00-05:00"' 60 "\"type\":\"takeover\",\"takeover\":\"${passage}\"")"
 wait_for_sessions_lock
 release_row
 wait_for_background
@@ -1075,7 +1072,7 @@ json DELETE "${COLLECTIVES}/${ondes}"
 expect_conflict "$HAS_TAKEOVERS" "$first"
 json GET "${COLLECTIVES}/${ondes}"
 expect_status 200
-session_form PUT "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"type":"other"')"
+json PATCH "${SESSIONS}/${first}" "$(session_json '"2026-11-14T21:00-05:00"' 240 '"type":"other"')"
 expect_status 200
 json DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
@@ -1106,7 +1103,7 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
     json GET "${SESSIONS}/${id}/ra-event"
     expect_status 404
-    session_form PUT "${SESSIONS}/${id}" "$(session_json null 60)"
+    json PATCH "${SESSIONS}/${id}" "$(session_json null 60)"
     expect_status 404
     json PUT "${SESSIONS}/${id}/status" '{"status":"done"}'
     expect_status 404

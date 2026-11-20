@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifySchema } from 'fastify'
 import { z } from 'zod'
+import { Ok } from '../api/schemas.js'
 import type { ToolConfig } from '../api/schemas.js'
 import { signSessionToken } from '../admins/auth.js'
 import { config } from '../core/config.js'
@@ -177,7 +178,10 @@ function descriptionOf(route: ToolRoute, name: string): string {
   // The tools that change some of an item's fields (see "Changes" in docs/design/server/README.md).
   if (route.method === 'PATCH') sentences.push("What it isn't given stays as it is, and a list or an object it's given replaces the whole one.")
   if (route.schema.multipart) sentences.push(`Tools can't send a ${multipartParts(route.schema.multipart).file}.`)
-  if (hasContactDetails(route) && route.method !== 'DELETE') sentences.push('Emails and phone numbers are never shown.')
+  // Not for the tools that only answer `{"ok": true}`, e.g. `delete_artist`.
+  if (hasContactDetails(route) && (route.schema.response as Record<number, unknown> | undefined)?.[200] !== Ok) {
+    sentences.push('Emails and phone numbers are never shown.')
+  }
   if (hasContactDetails(route) && route.method === 'PATCH') sentences.push('Given as null or "", the email or phone is removed.')
   return sentences.join(' ')
 }

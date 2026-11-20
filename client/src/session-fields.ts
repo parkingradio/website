@@ -21,7 +21,8 @@ export type Session = Schema<'Session'>
 export type StudioSet = Schema<'Set'>
 export type SessionStatus = Schema<'SessionStatus'>
 export type SessionType = Schema<'SessionType'>
-export type SessionFields = Schema<'SessionFields'>
+// A session's fields, as adding one sends them without its sets, and as changing one sends them.
+export type SessionFields = Omit<Schema<'NewSessionFields'>, 'sets'>
 export type SetFields = Schema<'SetFields'>
 // An artist or a collective, by their id and name, as sessions and sets name them.
 export type Reference = Schema<'Reference'>

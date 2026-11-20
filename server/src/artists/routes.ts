@@ -2,11 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { INVALID_REQUEST, photoRoute, readProfileForm, sendPhoto } from './photo-form.js'
+import { PhotoForm, photoRoute, readImageForm, readProfileForm, sendPhoto } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
-import { EmailTaken, forgetPhoto, storePhoto } from './store.js'
-import type { ArtistRow, ArtistsStore, Photos, SizedPhoto, StoredArtist } from './store.js'
+import { EmailTaken, NO_PHOTO, PHOTO_ERRORS, forgetPhoto, storePhoto } from './store.js'
+import type { ArtistRow, ArtistsStore, Photos, StoredArtist, StoredPhoto } from './store.js'
 
 // The admin pages' side of artists: adding, viewing, changing and deleting them, and the public profiles of the artists
 // who are public (see docs/design/server/artists.md).
@@ -41,21 +41,12 @@ const PublicArtist = Artist.pick({ id: true, name: true, country: true, city: tr
   .meta({ id: 'PublicArtist' })
 type PublicArtist = z.infer<typeof PublicArtist>
 
-// What adding an artist sends, as multipart/form-data, and changing one with `removePhoto`. The route reads it itself
-// (see `readProfileForm`): only the profile is checked against its schema here.
+// What adding an artist sends, as multipart/form-data. The route reads it itself (see `readProfileForm`): only the
+// profile is checked against its schema here.
 const NewArtistForm = z.object({ artist: AdminArtistProfile, photo: PhotoFile.optional() })
-const ArtistForm = NewArtistForm.extend({
-  removePhoto: z
-    .string()
-    .optional()
-    .meta({ description: '"true" removes the artist\'s photo, when there\'s no new one. Anything else keeps it' }),
-})
 
 // What changing some of an artist's fields sends, as JSON.
-const ArtistChanges = changesTo({
-  ...AdminArtistProfile.shape,
-  removePhoto: z.boolean({ error: '« removePhoto » doit être true ou false.' }).meta({ description: "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out" }),
-})
+const ArtistChanges = changesTo(AdminArtistProfile.shape)
 
 const NO_SUCH_ARTIST: z.infer<typeof ApiError> = { ok: false, error: 'No such artist' }
 const EMAIL_TAKEN: z.infer<typeof ApiError> = { ok: false, error: 'Another artist has this email address' }
@@ -187,17 +178,14 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     },
   )
 
-  // Saves `changes` to the artist with the id of `request`, the whole profile or some of its fields, with `photo`, which
-  // replaces theirs, or none when `removePhoto`, and responds with the artist as they are then.
+  // Saves `changes` to the artist with the id of `request`, some of their profile's fields, or their photo, `photo`, a new
+  // one or none, and responds with the artist as they are then.
   async function update(
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     changes: Partial<Profile>,
-    sentPhoto: SizedPhoto | null,
-    removePhoto: boolean,
+    photo: StoredPhoto | null = null,
   ) {
-    // The artist's new photo, or none if it's removed. Otherwise, the artist keeps theirs.
-    const photo = sentPhoto || removePhoto ? await storePhoto(photos, sentPhoto, 'artists') : null
     let changed: Awaited<ReturnType<ArtistsStore['update']>>
     try {
       changed = await store.update(request.params.id, { ...changes, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
@@ -216,36 +204,13 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
     return { ok: true as const, artist: artist(changed.after) }
   }
 
-  // Not a tool: tools change artists with PATCH, which only sends what it changes, and so keeps the email and phone they
-  // never see (see docs/design/server/mcp.md).
-  api.put(
-    '/api/admin/artists/:id',
-    {
-      config: { admin: true, tool: null },
-      schema: {
-        summary: "Replaces an artist's profile, and replaces or removes their photo",
-        tags: ['Artists'],
-        params: ById,
-        multipart: ArtistForm,
-        response: { 200: ArtistResponse, 400: ApiError, 404: ApiError, 409: ApiError, 413: ApiError },
-      },
-    },
-    async (request, reply) => {
-      // Only admins add and change artists here, so the profile is an admin's.
-      const sent = await readProfileForm(request, 'artist', AdminArtistProfile)
-      if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
-      if (sent.photo && sent.removePhoto) return reply.status(400).send({ ok: false, error: INVALID_REQUEST.error })
-      return update(request, reply, sent.profile, sent.photo, sent.removePhoto)
-    },
-  )
-
   api.patch(
     '/api/admin/artists/:id',
     {
       config: { admin: true, tool: { title: 'Modifier un artiste' } },
       schema: {
         operationId: 'update_artist',
-        summary: "Changes an artist's profile, only the fields it's given, or removes their photo",
+        summary: "Changes an artist's profile, only the fields it's given, but not their photo",
         tags: ['Artists'],
         params: ById,
         body: ArtistChanges,
@@ -254,10 +219,42 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
       // The profile's errors are whole sentences, in French, like those of `readProfileForm`.
       schemaErrorFormatter: firstIssue,
     },
-    async (request, reply) => {
-      const { removePhoto, ...changes } = request.body
-      return update(request, reply, changes, null, removePhoto === true)
+    async (request, reply) => update(request, reply, request.body),
+  )
+
+  // Not a tool: tools can't send files (see docs/design/server/mcp.md).
+  api.put(
+    '/api/admin/artists/:id/photo',
+    {
+      config: { admin: true, tool: null },
+      schema: {
+        summary: "Gives an artist a photo, or replaces their photo, which is deleted, and changes nothing else",
+        tags: ['Artists'],
+        params: ById,
+        multipart: PhotoForm,
+        response: { 200: ArtistResponse, 400: ApiError, 404: ApiError, 413: ApiError },
+      },
     },
+    async (request, reply) => {
+      const sent = await readImageForm(request, 'photo', PHOTO_ERRORS)
+      if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
+      return update(request, reply, {}, await storePhoto(photos, sent.image, 'artists'))
+    },
+  )
+
+  api.delete(
+    '/api/admin/artists/:id/photo',
+    {
+      config: { admin: true, tool: { title: "Retirer la photo d'un artiste" } },
+      schema: {
+        operationId: 'delete_artist_photo',
+        summary: "Removes an artist's photo, which is deleted, and changes nothing else",
+        tags: ['Artists'],
+        params: ById,
+        response: { 200: ArtistResponse, 404: ApiError },
+      },
+    },
+    async (request, reply) => update(request, reply, {}, NO_PHOTO),
   )
 
   api.delete(

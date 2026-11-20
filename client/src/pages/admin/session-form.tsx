@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Loaded } from '../../api/use-api'
-import type { Body, Schema } from '../../api/client'
+import type { Schema } from '../../api/client'
 import type { Application } from '../../application-fields'
 import { pickedPhotoError } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
@@ -15,12 +15,11 @@ import {
   checkSession,
   durationOf,
   isCollectivesApplication,
-  listedSetFields,
   sessionTimes,
   startChanges,
   typeName,
 } from '../../session-fields'
-import type { ListedSet, RaEventLink, Reference, SessionFormValues, SessionType, SetFields } from '../../session-fields'
+import type { ListedSet, RaEventLink, Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
@@ -30,7 +29,7 @@ import { ListedSets } from './listed-sets'
 import type { OpenListedSet } from './listed-sets'
 import { compareText, search } from './list'
 import { PhotoField } from './profile-fields'
-import type { GroupProps } from './profile-fields'
+import type { GroupProps, ImageChange } from './profile-fields'
 
 // A form for a session and its flyer, to add a session, with the sets listed to be added with it, or change one, but not
 // its sets. Like the artist form (see artist-form.tsx), each field is checked as the server checks it (see
@@ -58,9 +57,10 @@ export type SessionFormProps = {
   // with it.
   sets?: ListedSet[]
   submitLabel: string
-  // Sends the form, as `PUT /api/admin/sessions/:id` takes it, which `POST /api/admin/sessions` takes too, without
-  // `removeFlyer`, but with the listed sets, which are given as they're listed too, and returns the error, if it failed.
-  onSubmit: (body: Body<'put', '/api/admin/sessions/{id}'> & { session: { sets?: SetFields[] } }, sets: ListedSet[]) => Promise<ReactNode | null>
+  // Sends the session's fields, as `PATCH /api/admin/sessions/:id` takes them, and `POST /api/admin/sessions` too, with
+  // the listed sets for a new session, and what changes of its flyer, which is never 'remove'
+  // for a new session, and returns the error, if it failed.
+  onSubmit: (session: SessionFields, flyer: ImageChange, sets: ListedSet[]) => Promise<ReactNode | null>
   onCancel?: () => void
 }
 
@@ -95,8 +95,7 @@ export function SessionForm({
   const takeover = (form.type === 'takeover' && collectives?.find((collective) => collective.id === form.takeover?.id)) || null
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(errors, () => {
     // There are fields, since there are no errors by then.
-    const session = sets ? { ...checked.fields!, sets: sets.map(listedSetFields) } : checked.fields!
-    return onSubmit({ session, flyer: flyer ?? undefined, removeFlyer: !flyer && removeFlyer ? 'true' : undefined }, sets ?? [])
+    return onSubmit(checked.fields!, flyer ?? (removeFlyer ? 'remove' : null), sets ?? [])
   })
 
   return (

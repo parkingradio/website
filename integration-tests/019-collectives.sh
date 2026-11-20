@@ -3,10 +3,10 @@
 # The admin routes for collectives work against a real database. The server's unit tests mock the database and the
 # photos, so this is what covers the collectives and collective_members tables: contact emails being unique among
 # collectives whatever their case, but any number of collectives without one, collectives listed by name, members kept
-# in order, members created by name, the check on members that takes the database (artists who exist), artists
-# returning their collectives, what deleting an artist or a collective does to the other, a collective's photo kept on
-# disk, then deleted, changing a collective while one of its members is deleted, and listing a collective's members as
-# artists, in its order.
+# in order, members created by name, the check on members that takes the database (artists who exist), artists returning
+# their collectives, what deleting an artist or a collective does to the other, a collective's photo kept on disk,
+# replaced on its own, then deleted, changing a collective while one of its members is deleted, and listing a
+# collective's members as artists, in its order.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -24,11 +24,16 @@ login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
 cookie="$(session_cookie)"
 
-# send <part> <method> <url> <JSON> [<photo file>] -- add or change an artist or a collective, as <part> says.
+# send <part> <method> <url> <JSON> [<photo file>] -- add an artist or a collective, as <part> says.
 send() {
     local photo=()
     if [ -n "${5:-}" ]; then photo=(--form "photo=@$5"); fi
     request --header "Cookie: ${cookie}" --request "$2" --form-string "$1=$4" ${photo[@]+"${photo[@]}"} "$3"
+}
+
+# photo <url> <photo file> -- give a collective a photo, or replace its own.
+photo() {
+    request --header "Cookie: ${cookie}" --request PUT --form "photo=@$2" "$1"
 }
 
 # admin <method> <url> -- any other request, as the admin.
@@ -143,18 +148,17 @@ expect_body_contains "\"name\":\"Les Ondes\",\"members\":[{\"id\":\"${brume}\",\
 
 echo "  a member has to be an artist who exists, and nothing sent with them is kept"
 for member in "$NOBODY" not-a-uuid; do
-    send collective PUT "${COLLECTIVES}/${ondes}" "$(profile name=Fantôme "$ana" "$member")" "${FILES}/photo.png"
+    json PATCH "${COLLECTIVES}/${ondes}" "$(profile name=Fantôme "$ana" "$member")"
     expect_status 400
     expect_body_contains '"error":"No such artist"'
 done
-[ "$(photos_on_disk collectives)" = 1 ] || fail "expected the refused photos to be deleted"
 expect_no_artist Fantôme
 admin GET "${COLLECTIVES}/${ondes}"
 expect_body_contains "\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"},{\"id\":\"${ana}\",\"name\":\"Ana\"}]"
 
 echo "  a member is added by name, which creates them as an artist, and the members are reordered"
 # The name that comes with Brume's id is ignored.
-send collective PUT "${COLLECTIVES}/${ondes}" "$(profile name=Cyan "$brume" | sed "s/\"id\":\"${brume}\"/&,\"name\":\"ignoré\"/")"
+json PATCH "${COLLECTIVES}/${ondes}" "$(profile name=Cyan "$brume" | sed "s/\"id\":\"${brume}\"/&,\"name\":\"ignoré\"/")"
 expect_status 200
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 cyan="$(printf '%s' "$BODY" | grep -o '"id":"[^"]*","name":"Cyan"' | cut -d'"' -f4)"
@@ -179,14 +183,20 @@ done
 admin GET "${ARTISTS}?collective=${ondes}&collective=${aube}"
 expect_status 400
 
-echo "  the photo is replaced, then removed, and deleted each time"
-send collective PUT "${COLLECTIVES}/${ondes}" "$(profile "$brume")" "${FILES}/photo.png"
+echo "  the photo is replaced on its own, keeping the profile, then removed, and deleted each time"
+json PATCH "${COLLECTIVES}/${ondes}" "$(profile "$brume")"
 expect_status 200
+photo "${COLLECTIVES}/${ondes}/photo" "${FILES}/photo.png"
+expect_status 200
+expect_body_contains "\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"}]"
 admin GET "${COLLECTIVES}/${ondes}/photo"
 expect_header Content-Type 'image/png'
 [ "$(photos_on_disk collectives)" = 1 ] || fail "expected the replaced photo to be deleted"
-request --header "Cookie: ${cookie}" --request PUT --form-string "collective=$(profile "$brume")" \
-    --form-string 'removePhoto=true' "${COLLECTIVES}/${ondes}"
+photo "${COLLECTIVES}/${ondes}/photo" "${FILES}/cut.jpg"
+expect_status 400
+expect_body_contains 'La photo ne peut pas être lue'
+[ "$(photos_on_disk collectives)" = 1 ] || fail "expected the photo that can't be read not to be stored"
+admin DELETE "${COLLECTIVES}/${ondes}/photo"
 expect_status 200
 expect_body_contains '"hasPhoto":false'
 [ "$(photos_on_disk collectives)" = 0 ] || fail "expected the removed photo to be deleted"
@@ -218,7 +228,7 @@ expect_body_contains '"city":"Lévis","description":"Une description."'
 echo "  changing a collective while one of its members is deleted doesn't deadlock"
 send artist POST "$ARTISTS" '{"name":"Éphémère"}'
 passing="$(first_id)"
-send collective PUT "${COLLECTIVES}/${ondes}" "$(profile "$passing" "$brume")"
+json PATCH "${COLLECTIVES}/${ondes}" "$(profile "$passing" "$brume")"
 expect_status 200
 # Another transaction holds the artist's row while the artist is deleted, then while the collective is changed to keep
 # them, so that both wait for it, the deletion first, which then takes the row first. Had changing the collective taken
@@ -229,18 +239,18 @@ hold_row artists "$passing"
 curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: ${cookie}" --request DELETE \
     "${ARTISTS}/${passing}" > "${FILES}/delete" &
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'delete from \"artists\"%')"
-curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: ${cookie}" --request PUT \
-    --form-string "collective=$(profile "$brume" "$passing")" "${COLLECTIVES}/${ondes}" > "${FILES}/put" &
+curl --silent --output /dev/null --write-out '%{http_code}' --header "Cookie: ${cookie}" --request PATCH \
+    --header 'Content-Type: application/json' --data "$(profile "$brume" "$passing")" "${COLLECTIVES}/${ondes}" > "${FILES}/patch" &
 wait_for_sql "select exists (select from pg_stat_activity where wait_event_type = 'Lock' and query ilike 'select %for share')"
 release_row
 wait
 [ "$(cat "${FILES}/delete")" = 200 ] || fail "expected the artist to be deleted, got $(cat "${FILES}/delete")"
-[ "$(cat "${FILES}/put")" = 400 ] || fail "expected the collective's member not to exist anymore, got $(cat "${FILES}/put")"
+[ "$(cat "${FILES}/patch")" = 400 ] || fail "expected the collective's member not to exist anymore, got $(cat "${FILES}/patch")"
 admin GET "${COLLECTIVES}/${ondes}"
 expect_body_contains "\"members\":[{\"id\":\"${brume}\",\"name\":\"Brume\"}]"
 
 echo "  deleting a collective keeps its members, and deletes its photo"
-send collective PUT "${COLLECTIVES}/${ondes}" "$(profile "$brume")" "${FILES}/photo.jpg"
+photo "${COLLECTIVES}/${ondes}/photo" "${FILES}/photo.jpg"
 expect_status 200
 admin DELETE "${COLLECTIVES}/${ondes}"
 expect_status 200
@@ -270,7 +280,7 @@ echo "  a collective's email is taken out, which frees it for another collective
 send collective POST "$COLLECTIVES" "$(profile_with libre@collectives.test "$brume")"
 expect_status 200
 freed="$(first_id)"
-send collective PUT "${COLLECTIVES}/${freed}" "$(profile_with "" "$brume")"
+json PATCH "${COLLECTIVES}/${freed}" '{"email":""}'
 expect_status 200
 expect_body_contains '"email":null'
 send collective POST "$COLLECTIVES" "$(profile_with LIBRE@collectives.test "$brume")"
@@ -288,7 +298,11 @@ for id in "$NOBODY" not-a-uuid; do
     expect_status 404
     admin GET "${COLLECTIVES}/${id}/photo"
     expect_status 404
-    send collective PUT "${COLLECTIVES}/${id}" "$(profile "$brume")"
+    json PATCH "${COLLECTIVES}/${id}" "$(profile "$brume")"
+    expect_status 404
+    photo "${COLLECTIVES}/${id}/photo" "${FILES}/photo.png"
+    expect_status 404
+    admin DELETE "${COLLECTIVES}/${id}/photo"
     expect_status 404
     admin DELETE "${COLLECTIVES}/${id}"
     expect_status 404

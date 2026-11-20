@@ -1130,115 +1130,13 @@ export interface paths {
         };
         /** An artist */
         get: operations["get_artist"];
-        /** Replaces an artist's profile, and replaces or removes their photo */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        artist: components["schemas"]["AdminArtistProfile"];
-                        /**
-                         * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
-                         */
-                        photo?: Blob;
-                        /** @description "true" removes the artist's photo, when there's no new one. Anything else keeps it */
-                        removePhoto?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @enum {boolean} */
-                            ok: true;
-                            artist: components["schemas"]["Artist"];
-                        };
-                    };
-                };
-                /** @description Default Response */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                413: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
+        put?: never;
         post?: never;
         /** Deletes an artist, their photo and their applications, and takes them out of their collectives and their sets */
         delete: operations["delete_artist"];
         options?: never;
         head?: never;
-        /** Changes an artist's profile, only the fields it's given, or removes their photo */
+        /** Changes an artist's profile, only the fields it's given, but not their photo */
         patch: operations["update_artist"];
         trace?: never;
     };
@@ -1320,9 +1218,100 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        /** Gives an artist a photo, or replaces their photo, which is deleted, and changes nothing else */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
+                         */
+                        photo: Blob;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            artist: components["schemas"]["Artist"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         post?: never;
-        delete?: never;
+        /** Removes an artist's photo, which is deleted, and changes nothing else */
+        delete: operations["delete_artist_photo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1447,115 +1436,13 @@ export interface paths {
         };
         /** A collective */
         get: operations["get_collective"];
-        /** Replaces a collective's profile and members, and replaces or removes its photo */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        collective: components["schemas"]["AdminCollectiveProfile"];
-                        /**
-                         * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
-                         */
-                        photo?: Blob;
-                        /** @description "true" removes the collective's photo, when there's no new one. Anything else keeps it */
-                        removePhoto?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @enum {boolean} */
-                            ok: true;
-                            collective: components["schemas"]["Collective"];
-                        };
-                    };
-                };
-                /** @description Default Response */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                413: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
+        put?: never;
         post?: never;
         /** Deletes a collective, its photo and its applications, but not its members. Fails while it has takeovers, one of which the error names: give them another collective, or another type, first */
         delete: operations["delete_collective"];
         options?: never;
         head?: never;
-        /** Changes a collective's profile and members, only the fields it's given, or removes its photo */
+        /** Changes a collective's profile and members, only the fields it's given, but not its photo */
         patch: operations["update_collective"];
         trace?: never;
     };
@@ -1637,9 +1524,100 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        /** Gives a collective a photo, or replaces its photo, which is deleted, and changes nothing else */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo
+                         */
+                        photo: Blob;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            collective: components["schemas"]["Collective"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         post?: never;
-        delete?: never;
+        /** Removes a collective's photo, which is deleted, and changes nothing else */
+        delete: operations["delete_collective_photo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2004,115 +1982,13 @@ export interface paths {
         };
         /** A session, with its sets */
         get: operations["get_session"];
-        /** Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        session: components["schemas"]["SessionFields"];
-                        /**
-                         * Format: binary
-                         * @description A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer
-                         */
-                        flyer?: Blob;
-                        /** @description "true" removes the session's flyer, when there's no new one. Anything else keeps it */
-                        removeFlyer?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @enum {boolean} */
-                            ok: true;
-                            session: components["schemas"]["Session"];
-                        };
-                    };
-                };
-                /** @description Default Response */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ConflictError"];
-                    };
-                };
-                /** @description Default Response */
-                413: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Default Response */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
+        put?: never;
         post?: never;
         /** Deletes a session, its flyer and its sets, but not their performers */
         delete: operations["delete_session"];
         options?: never;
         head?: never;
-        /** Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order */
+        /** Changes a session, only the fields it's given, but not its flyer, its status, whether it's announced, or its sets, which keep their order */
         patch: operations["update_session"];
         trace?: never;
     };
@@ -2303,7 +2179,8 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        /** Removes a session's flyer, which is deleted, and changes nothing else */
+        delete: operations["delete_session_flyer"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3575,23 +3452,6 @@ export interface components {
             announcedUpdatedBy: string | null;
             announcedUpdatedAt: string | null;
         };
-        SessionFields: {
-            /** @description A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none */
-            start: string | null;
-            /** @description Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC */
-            durationMinutes: number;
-            type: components["schemas"]["SessionType"];
-            /** @description The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none */
-            takeover: string | null;
-            /** @description The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none */
-            application: string | null;
-            /** @description Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none */
-            name: string;
-            /** @description The event's id on RA, or a link to it. Null, or blank, for none */
-            raEvent: string | null;
-            /** @description Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \r\n or \r becomes \n, and it is trimmed, then up to 5000 characters. Empty for none */
-            description: string;
-        };
         SessionLink: {
             id: string;
             url: string;
@@ -4412,8 +4272,6 @@ export interface operations {
                     } | null;
                     email?: string | null;
                     phone?: string | null;
-                    /** @description `true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out */
-                    removePhoto?: boolean;
                 };
             };
         };
@@ -4469,6 +4327,77 @@ export interface operations {
             };
             /** @description Default Response */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_artist_photo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        artist: components["schemas"]["Artist"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4848,8 +4777,6 @@ export interface operations {
                     } | null;
                     email?: string | null;
                     phone?: string | null;
-                    /** @description `true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out */
-                    removePhoto?: boolean;
                 };
             };
         };
@@ -4905,6 +4832,77 @@ export interface operations {
             };
             /** @description Default Response */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_collective_photo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        collective: components["schemas"]["Collective"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5772,8 +5770,6 @@ export interface operations {
                     raEvent?: string | null;
                     /** @description Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \r\n or \r becomes \n, and it is trimmed, then up to 5000 characters. Empty for none */
                     description?: string;
-                    /** @description `true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out */
-                    removeFlyer?: boolean;
                 };
             };
         };
@@ -5882,6 +5878,77 @@ export interface operations {
             };
             /** @description Default Response */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    delete_session_flyer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        session: components["schemas"]["Session"];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

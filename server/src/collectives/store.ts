@@ -33,10 +33,10 @@ export type CollectivesStore = {
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
   // sent by name are created, as artists whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
   create(collective: CollectiveProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredCollective>
-  // Changes the fields of the collective's profile that `changes` has, all of them when it's replaced, its members when
-  // it has them, and its photo when there's a new one, or nulls to remove it. The members sent by name are created, as
-  // artists whom `updatedBy` adds. Returns the collective as it was, so that a photo that was replaced or removed can be
-  // deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
+  // Changes the fields of the collective's profile that `changes` has, its members when it has them, and its photo when
+  // there's a new one, or nulls to remove it. The members sent by name are created, as artists whom `updatedBy` adds.
+  // Returns the collective as it was, so that a photo that was replaced or removed can be deleted, and as it is then.
+  // Throws an EmailTaken or an InvalidMember.
   update(
     id: string,
     changes: Partial<CollectiveProfile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },

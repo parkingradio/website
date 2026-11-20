@@ -6,7 +6,7 @@ import App from '../../app'
 import type { Artist, Profile } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
 
 // Logged in, and without collectives, unless a test says otherwise.
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' }, '/api/admin/collectives': { ok: true, collectives: [] } }
@@ -166,11 +166,14 @@ function renderAt(path: string) {
   )
 }
 
-// What was sent as the artist's profile and photo in a request to save one, and whether to remove their photo.
+// What was sent as the artist's profile and photo in a request to add one.
 function sent(request: RequestInit) {
   const form = request.body as FormData
-  return { profile: JSON.parse(form.get('artist') as string) as Profile, photo: form.get('photo'), removePhoto: form.get('removePhoto') }
+  return { profile: JSON.parse(form.get('artist') as string) as Profile, photo: form.get('photo') }
 }
+
+// The photo sent to give an artist a photo, or replace theirs.
+const sentPhoto = (request: RequestInit) => (request.body as FormData).get('photo') as File
 
 const rows = () =>
   screen
@@ -641,7 +644,7 @@ describe('An artist’s page', () => {
 
   it('changes the artist, keeping their photo unless another one is chosen', async () => {
     const changed: Artist = { ...AURORE, bio: 'Une bio corrigée.', updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: changed } })
+    mockFetch({ ...AURORE_PAGE, 'PATCH /api/admin/artists/artist-1': { ok: true, artist: changed } })
     renderAt('/admin/artistes/artist-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -653,9 +656,9 @@ describe('An artist’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Une bio corrigée.')).toBeInTheDocument())
-    const [request] = requestsTo('PUT', '/api/admin/artists/artist-1')
-    const { profile, photo, removePhoto } = sent(request)
-    expect(profile).toEqual({
+    // Every field, as JSON, and nothing about the photo, which stays as it is.
+    const [request] = requestsTo('PATCH', '/api/admin/artists/artist-1')
+    expect(jsonBody(request)).toEqual({
       name: 'Aurore',
       country: 'CA',
       city: 'Montréal',
@@ -665,14 +668,14 @@ describe('An artist’s page', () => {
       email: 'aurore@example.com',
       phone: '514 555 0101',
     })
-    expect(photo).toBeNull()
-    expect(removePhoto).toBeNull()
+    expect(requestsTo('PUT', '/api/admin/artists/artist-1/photo')).toHaveLength(0)
+    expect(requestsTo('DELETE', '/api/admin/artists/artist-1/photo')).toHaveLength(0)
     expect(screen.getByText(/^Modifié par/)).toHaveTextContent(/^Modifié par other@example.com le 6 octobre 2026/)
   })
 
   it("takes out the artist's bio and email, which are then sent empty and null", async () => {
     const changed: Artist = { ...AURORE, bio: '', email: null, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: changed } })
+    mockFetch({ ...AURORE_PAGE, 'PATCH /api/admin/artists/artist-1': { ok: true, artist: changed } })
     renderAt('/admin/artistes/artist-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -681,7 +684,7 @@ describe('An artist’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText(/^Modifié par/)).toBeInTheDocument())
-    expect(sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0]).profile).toMatchObject({ bio: '', email: null })
+    expect(jsonBody(requestsTo('PATCH', '/api/admin/artists/artist-1')[0])).toMatchObject({ bio: '', email: null })
     expect(screen.getByText('Adresse e-mail', { selector: 'dt' }).nextElementSibling).toHaveTextContent(/^-$/)
     // An artist without an email is changed with the field empty.
     fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
@@ -702,12 +705,16 @@ describe('An artist’s page', () => {
     fireEvent.change(photo, { target: { files: [new File(['gif'], 'autre.gif', { type: 'image/gif' })] } })
     expect(screen.getByRole('alert')).not.toBe(alert)
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/artists/artist-1')).toHaveLength(0)
   })
 
   it('removes the photo with its ×, once the artist is saved', async () => {
     const changed: Artist = { ...AURORE, hasPhoto: false, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: changed } })
+    mockFetch({
+      ...AURORE_PAGE,
+      'PATCH /api/admin/artists/artist-1': { ok: true, artist: AURORE },
+      'DELETE /api/admin/artists/artist-1/photo': { ok: true, artist: changed },
+    })
     renderAt('/admin/artistes/artist-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -719,9 +726,9 @@ describe('An artist’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Pas de photo')).toBeInTheDocument())
-    const { photo, removePhoto } = sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0])
-    expect(photo).toBeNull()
-    expect(removePhoto).toBe('true')
+    expect(requestsTo('PATCH', '/api/admin/artists/artist-1')).toHaveLength(1)
+    expect(requestsTo('DELETE', '/api/admin/artists/artist-1/photo')).toHaveLength(1)
+    expect(requestsTo('PUT', '/api/admin/artists/artist-1/photo')).toHaveLength(0)
     expect(screen.queryByRole('img', { name: 'Photo de Aurore' })).not.toBeInTheDocument()
   })
 
@@ -744,7 +751,11 @@ describe('An artist’s page', () => {
   })
 
   it('sends a photo picked after removing the current one, rather than removing it', async () => {
-    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: true, artist: AURORE } })
+    mockFetch({
+      ...AURORE_PAGE,
+      'PATCH /api/admin/artists/artist-1': { ok: true, artist: AURORE },
+      'PUT /api/admin/artists/artist-1/photo': { ok: true, artist: AURORE },
+    })
     renderAt('/admin/artistes/artist-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
@@ -752,10 +763,74 @@ describe('An artist’s page', () => {
     fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'aurore.png', { type: 'image/png' })] } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
-    await waitFor(() => expect(requestsTo('PUT', '/api/admin/artists/artist-1')).toHaveLength(1))
-    const { photo, removePhoto } = sent(requestsTo('PUT', '/api/admin/artists/artist-1')[0])
-    expect((photo as File).name).toBe('aurore.png')
-    expect(removePhoto).toBeNull()
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/artists/artist-1/photo')).toHaveLength(1))
+    expect(sentPhoto(requestsTo('PUT', '/api/admin/artists/artist-1/photo')[0]).name).toBe('aurore.png')
+    expect(requestsTo('DELETE', '/api/admin/artists/artist-1/photo')).toHaveLength(0)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument())
+  })
+
+  it("saves the photo after the profile, and only when the profile is saved", async () => {
+    mockFetch({ ...AURORE_PAGE, 'PATCH /api/admin/artists/artist-1': { ok: false, error: 'Another artist has this email address' } })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'aurore.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("L'artiste n'a pas pu être enregistré : Another artist has this email address"))
+    expect(requestsTo('PUT', '/api/admin/artists/artist-1/photo')).toHaveLength(0)
+  })
+
+  it('keeps the form open when only the photo is refused, showing the profile as it was saved, and sends both again', async () => {
+    const changed: Artist = { ...AURORE, bio: 'Une bio corrigée.', updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
+    const unreadable = 'La photo ne peut pas être lue : elle est endommagée, ou dépasse 100 millions de pixels.'
+    mockFetch({
+      ...AURORE_PAGE,
+      'PATCH /api/admin/artists/artist-1': { ok: true, artist: changed },
+      'PUT /api/admin/artists/artist-1/photo': { ok: false, error: unreadable },
+    })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Une bio corrigée.' } })
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'aurore.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(`Le profil a été enregistré, mais pas la photo : ${unreadable}`))
+    expect(screen.getByLabelText('Bio')).toHaveValue('Une bio corrigée.')
+    expect(screen.getByRole('img', { name: 'Photo choisie' })).toBeInTheDocument()
+
+    const withPhoto: Artist = { ...changed, updatedAt: '2026-10-06T16:01:00.000Z' }
+    mockFetch({
+      ...AURORE_PAGE,
+      'PATCH /api/admin/artists/artist-1': { ok: true, artist: changed },
+      'PUT /api/admin/artists/artist-1/photo': { ok: true, artist: withPhoto },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument())
+    expect(requestsTo('PATCH', '/api/admin/artists/artist-1')).toHaveLength(1)
+    expect(sentPhoto(requestsTo('PUT', '/api/admin/artists/artist-1/photo')[0]).name).toBe('aurore.png')
+    expect(screen.getByText('Une bio corrigée.')).toBeInTheDocument()
+  })
+
+  it('shows the profile as it was saved once the form is closed, when only the photo was refused', async () => {
+    const changed: Artist = { ...AURORE, bio: 'Une bio corrigée.' }
+    mockFetch({
+      ...AURORE_PAGE,
+      'PATCH /api/admin/artists/artist-1': { ok: true, artist: changed },
+      'DELETE /api/admin/artists/artist-1/photo': { ok: false, error: 'Internal server error' },
+    })
+    renderAt('/admin/artistes/artist-1')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
+    fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Une bio corrigée.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'retirer la photo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Le profil a été enregistré, mais pas la photo : Internal server error'))
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    expect(screen.getByText('Une bio corrigée.')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Photo de Aurore' })).toBeInTheDocument()
   })
 
   it("shows that an artist has no photo, and doesn't offer to remove it", async () => {
@@ -777,7 +852,7 @@ describe('An artist’s page', () => {
   })
 
   it('shows why the artist could not be changed, and keeps the form', async () => {
-    mockFetch({ ...AURORE_PAGE, 'PUT /api/admin/artists/artist-1': { ok: false, error: 'Another artist has this email address' } })
+    mockFetch({ ...AURORE_PAGE, 'PATCH /api/admin/artists/artist-1': { ok: false, error: 'Another artist has this email address' } })
     renderAt('/admin/artistes/artist-1')
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))

@@ -35,12 +35,12 @@ describe('the tools of the API', () => {
       [
         ...['list_ra_events', 'get_on_air', 'get_radio_playlist', 'preview_playlist', 'choose_playlist', 'get_soundcloud_app'],
         'get_youtube_credentials',
-        ...['list_artists', 'get_artist', 'create_artist', 'update_artist', 'delete_artist'],
-        ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective'],
+        ...['list_artists', 'get_artist', 'create_artist', 'update_artist', 'delete_artist_photo', 'delete_artist'],
+        ...['list_collectives', 'get_collective', 'create_collective', 'update_collective', 'delete_collective_photo', 'delete_collective'],
         ...['list_applications', 'get_application', 'create_application', 'update_application', 'update_application_decision'],
         ...['delete_application', 'get_application_recipients'],
         ...['list_sessions', 'get_session', 'get_session_ra_event', 'create_session', 'update_session', 'update_session_status', 'update_session_announced'],
-        'delete_session',
+        ...['delete_session_flyer', 'delete_session'],
         ...['create_set', 'update_set', 'update_set_status', 'update_set_position', 'update_set_session', 'delete_set'],
         ...['list_events', 'get_public_artist', 'get_public_collective'],
       ].sort(),
@@ -70,15 +70,25 @@ describe('the tools of the API', () => {
     })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
-      expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone', 'removePhoto']),
+      expect.arrayContaining(['id', 'name', 'country', 'genres', 'email', 'phone']),
     )
+    expect(update.inputSchema.properties).not.toHaveProperty('removePhoto')
     expect(update.description).toContain("What it isn't given stays as it is")
     expect(update.description).toContain('Given as null or "", the email or phone is removed.')
     expect(tools.find(({ name }) => name === 'create_artist')!.description).toContain("Tools can't send a photo.")
     const updateSession = tools.find(({ name }) => name === 'update_session')!
-    expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description', 'removeFlyer']))
+    expect(Object.keys(updateSession.inputSchema.properties as object)).toEqual(expect.arrayContaining(['id', 'name', 'description']))
+    expect(updateSession.inputSchema.properties).not.toHaveProperty('removeFlyer')
     expect(tools.find(({ name }) => name === 'create_session')!.description).toContain("Tools can't send a flyer.")
-    expect(updateSession.description).not.toMatch(/email|photo/)
+    expect(updateSession.description).not.toMatch(/email/)
+    // Removing a photo gives the artist, without their email and phone, but deleting the artist gives nothing of them.
+    const description = (name: string) => tools.find((tool) => tool.name === name)!.description
+    expect(description('delete_artist_photo')).toContain('Emails and phone numbers are never shown.')
+    expect(description('delete_collective_photo')).toContain('Emails and phone numbers are never shown.')
+    expect(description('delete_artist')).not.toContain('Emails and phone numbers')
+    for (const name of ['delete_artist_photo', 'delete_collective_photo', 'delete_session_flyer']) {
+      expect(tools.find((tool) => tool.name === name)!.inputSchema.required, name).toEqual(['id'])
+    }
     // Only what admins decide: sets and sessions make applications planned or done.
     const decide = tools.find(({ name }) => name === 'update_application_decision')!
     expect(decide.inputSchema.properties).toMatchObject({ decision: { enum: ['new', 'accepted', 'rejected'] } })
@@ -110,14 +120,12 @@ describe('the tools of the API', () => {
     for (const name of ['update_artist', 'update_collective', 'update_application', 'update_session', 'update_set']) expect(required(name), name).toEqual(['id'])
   })
 
-  it('change artists, collectives, applications, sessions and sets with PATCH, never with a PUT that replaces them', async () => {
+  it('change artists, collectives, applications, sessions and sets with PATCH', async () => {
     const { routes } = await apiTools()
     const updates = routes.filter((route) => /^update_[a-z]+$/.test(route.schema.operationId!))
     expect(updates.map(({ method, url }) => `${method} ${url}`).sort()).toEqual(
       ['artists', 'collectives', 'applications', 'sessions', 'sets'].map((items) => `PATCH /api/admin/${items}/:id`).sort(),
     )
-    // No tool replaces what it acts on with PUT: the tools of PUT endpoints only change one of its values, e.g. a status.
-    expect(routes.filter(({ method, url }) => method === 'PUT' && url.endsWith('/:id'))).toEqual([])
   })
 
   // So that a new endpoint can't give them without the tools leaving them out.

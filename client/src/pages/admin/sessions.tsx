@@ -11,6 +11,7 @@ import {
   STATUSES,
   applicationLink,
   findApplication,
+  listedSetFields,
   listedSetFromApplication,
   newSetFormValues,
   sessionFormValues,
@@ -657,10 +658,21 @@ function LoadedSession({ loaded }: { loaded: Session }) {
           flyer={session.hasFlyer ? shownUrl(flyerUrl(session)) : null}
           submitLabel="enregistrer"
           onCancel={close}
-          onSubmit={async (body) => {
-            const result = await api.PUT('/api/admin/sessions/{id}', { params, body, bodySerializer: formData })
+          onSubmit={async (fields, flyer) => {
+            // The fields first, so that a flyer is only saved with fields that are accepted.
+            const result = await api.PATCH('/api/admin/sessions/{id}', { params, body: fields })
             if (!result.ok) return failure("La session n'a pas pu être enregistrée", result, session.id)
-            changed(result.session)
+            setSession(result.session)
+            if (flyer) {
+              const saved =
+                flyer === 'remove'
+                  ? await api.DELETE('/api/admin/sessions/{id}/flyer', { params })
+                  : await api.PUT('/api/admin/sessions/{id}/flyer', { params, body: { flyer }, bodySerializer: formData })
+              // The form stays open, and sending it again sends both again.
+              if (!saved.ok) return `La session a été enregistrée, mais pas le flyer : ${saved.error}`
+              setSession(saved.session)
+            }
+            openForm(null)
             return null
           }}
         />
@@ -1073,7 +1085,8 @@ export function NewSessionPage() {
     initial: EMPTY_SESSION_FORM,
     sets: [],
     submitLabel: 'ajouter la session',
-    onSubmit: async (body, sets) => {
+    onSubmit: async (fields, flyer, sets) => {
+      const body = { session: { ...fields, sets: sets.map(listedSetFields) }, flyer: flyer instanceof File ? flyer : undefined }
       const result = await api.POST('/api/admin/sessions', { body, bodySerializer: formData })
       if (!result.ok) return newSessionFailure(result, sets)
       navigate(sessionPath(result.session))

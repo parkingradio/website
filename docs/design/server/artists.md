@@ -15,11 +15,11 @@ when they apply.
 
 Admins can leave out more than artists: the admin endpoints take profiles without a country, city, genres, bio, links,
 email or phone, since admins bring in artists who applied elsewhere, e.g. through the original Google Form, which didn't
-always ask for them, or whom they only know by name. When an artist is added, or their profile replaced, what's left
-out, or sent as null, is stored as an empty string, or an empty list or object, except the email, which is null, so that
-any number of artists can be without one. When some of their fields are changed, what's left out stays as it is, and
-what's sent as null, or empty, is removed, and stored the same way. An artist applying alone with
-`POST /api/applications` has to send all of them (see [Applying](applications.md#applying)).
+always ask for them, or whom they only know by name. When an artist is added, what's left out, or sent as null, is
+stored as an empty string, or an empty list or object, except the email, which is null, so that any number of artists
+can be without one. When some of their fields are changed, what's left out stays as it is, and what's sent as null, or
+empty, is removed, and stored the same way. An artist applying alone with `POST /api/applications` has to send all of
+them (see [Applying](applications.md#applying)).
 
 A profile has:
 
@@ -55,10 +55,14 @@ An artist, as the endpoints below return them, is their profile with:
 
 An artist's photo is optional. It's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
 and which the server can read in full, of at most 100 million pixels: one it can't, e.g. because it's cut short, or too
-damaged to be decoded, is refused. It's kept in the app's private S3 bucket, or in a local directory in development, and
-only the server reads it. When the artist is deleted, or the photo is replaced or removed, it's deleted too: it stays in
-the bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is gone for
-good after that.
+damaged to be decoded, is refused. It's sent with the artist's profile when they're added (see
+[`POST /api/admin/artists`](#post-apiadminartists-admin)), or on its own, with
+[`PUT /api/admin/artists/:id/photo`](#put-apiadminartistsidphoto-admin), which replaces theirs, and it's removed with
+[`DELETE /api/admin/artists/:id/photo`](#delete-apiadminartistsidphoto-admin): changing their profile never changes it.
+The MCP server's tools can't send a photo, but they can remove one. It's kept in the app's private S3 bucket, or in a
+local directory in development, and only the server reads it. When the artist is deleted, or the photo is replaced or
+removed, it's deleted too: it stays in the bucket's previous versions for as long as the database's backups are kept,
+like the artist's row, and is gone for good after that.
 
 The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
 its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
@@ -116,6 +120,28 @@ missing. Otherwise, fails with 400 when `width` is anything else, or is given mo
 such artist, when they have no photo, or when what's asked for is missing: the photo, or, with `width`, that size of it,
 e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still be had as it was sent, and replaced.
 
+## `PUT /api/admin/artists/:id/photo` (admin)
+
+Gives an artist a photo, or replaces their photo, and changes nothing else. It's `multipart/form-data`, with one part,
+`photo`, the photo (see [Photos](#photos)). A few other fields or files are ignored, but a second photo isn't: the
+request fails. The photo it replaces is deleted. It sets the artist's `updatedBy` and `updatedAt` (see
+[Changes, in Conventions](README.md#conventions)), since their photo is part of them.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `artist` | artist | As they are then |
+
+Fails with 400 when the request is malformed, has no photo, or the photo isn't a JPEG, PNG or WebP image that can be
+read, 404 when there's no such artist, and 413 when the photo is larger than 10 MB.
+
+## `DELETE /api/admin/artists/:id/photo` (admin)
+
+Removes an artist's photo, which is deleted, and changes nothing else. It sets the artist's `updatedBy` and `updatedAt`
+(see [Changes, in Conventions](README.md#conventions)). Responds like
+[`PUT /api/admin/artists/:id/photo`](#put-apiadminartistsidphoto-admin), with the artist as they are then. Fails with 404
+when there's no such artist.
+
 ## `POST /api/admin/artists` (admin)
 
 Adds an artist. It's `multipart/form-data`, with two parts: `artist`, the profile as JSON, in a field rather than a
@@ -130,20 +156,13 @@ are ignored. A second photo isn't: the request fails.
 Fails with 400 (an invalid profile or photo, including one that can't be read, see [Photos](#photos), or a malformed
 request), 409 (another artist has that email) or 413 (a photo larger than 10 MB).
 
-## `PUT /api/admin/artists/:id` (admin)
-
-Replaces an artist's profile. It takes the same request as `POST /api/admin/artists`. With a photo, it replaces the
-artist's, which is deleted. Without one, the artist keeps theirs, unless there's also a `removePhoto` field set to
-`true`, which removes it, and deletes it. Responds like `POST /api/admin/artists`, with the artist as they are then,
-and fails like it, with 400 when there's both a photo and `removePhoto`, and with 404 when there's no such artist.
-
 ## `PATCH /api/admin/artists/:id` (admin)
 
-Changes the fields of an artist's profile it's sent, and leaves the others as they are (see
-[Changes, in Conventions](README.md#conventions)). It takes JSON, with any of the fields of a profile, and
-`removePhoto`, a boolean: `true` removes the artist's photo, and deletes it, and `false` keeps it, like leaving it out. A
-photo is only replaced with `PUT`. Responds like `PUT /api/admin/artists/:id`, and fails like it, but with 400 when
-there's no field.
+Changes the fields of an artist's profile it's sent, and leaves the others as they are, their photo included (see
+[Changes, in Conventions](README.md#conventions), and [Photos](#photos)). It takes JSON, with any of the fields of a
+profile, as `POST /api/admin/artists` takes them. Responds like `POST /api/admin/artists`, with the artist as they are
+then. Fails with 400 when a field isn't valid, or when there's no field, 404 when there's no such artist, and 409 when
+another artist has that email.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 

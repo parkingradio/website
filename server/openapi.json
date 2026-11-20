@@ -2941,69 +2941,6 @@
         ],
         "additionalProperties": false
       },
-      "SessionFields": {
-        "type": "object",
-        "properties": {
-          "start": {
-            "description": "A date and time, which can be left without seconds, in Québec time, with the offset from UTC in effect then, from 2000 to 2999 in UTC. Null, or blank, for none",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "durationMinutes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 525949920,
-            "description": "Minutes that actually pass, whatever the clocks say. A session ends by the start of the year 3000, in UTC"
-          },
-          "type": {
-            "$ref": "#/components/schemas/SessionType"
-          },
-          "takeover": {
-            "description": "The id of the collective whose takeover the session is: a takeover has one, and the other types none. Null, or blank, for none",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "application": {
-            "description": "The id of the application the session comes from: a collective's, whose takeover the session is. Null, or blank, for none",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "description": "Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's `name`, not its `title`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to 100 characters. Empty for none"
-          },
-          "raEvent": {
-            "description": "The event's id on RA, or a link to it. Null, or blank, for none",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 5000,
-            "description": "Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to 5000 characters. Empty for none"
-          }
-        },
-        "required": [
-          "start",
-          "durationMinutes",
-          "type",
-          "takeover",
-          "application",
-          "name",
-          "raEvent",
-          "description"
-        ],
-        "additionalProperties": false
-      },
       "SessionLink": {
         "type": "object",
         "properties": {
@@ -5332,155 +5269,9 @@
           }
         }
       },
-      "put": {
-        "summary": "Replaces an artist's profile, and replaces or removes their photo",
-        "tags": [
-          "Artists"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "artist": {
-                    "$ref": "#/components/schemas/AdminArtistProfile"
-                  },
-                  "photo": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
-                  },
-                  "removePhoto": {
-                    "description": "\"true\" removes the artist's photo, when there's no new one. Anything else keeps it",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "artist"
-                ]
-              },
-              "encoding": {
-                "artist": {
-                  "contentType": "application/json"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "artist": {
-                      "$ref": "#/components/schemas/Artist"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "artist"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      },
       "patch": {
         "operationId": "update_artist",
-        "summary": "Changes an artist's profile, only the fields it's given, or removes their photo",
+        "summary": "Changes an artist's profile, only the fields it's given, but not their photo",
         "tags": [
           "Artists"
         ],
@@ -5616,10 +5407,6 @@
                         "type": "null"
                       }
                     ]
-                  },
-                  "removePhoto": {
-                    "type": "boolean",
-                    "description": "`true` removes the artist's photo, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
                 "additionalProperties": false,
@@ -5874,6 +5661,225 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Gives an artist a photo, or replaces their photo, which is deleted, and changes nothing else",
+        "tags": [
+          "Artists"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
+                  }
+                },
+                "required": [
+                  "photo"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_artist_photo",
+        "summary": "Removes an artist's photo, which is deleted, and changes nothing else",
+        "tags": [
+          "Artists"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "artist": {
+                      "$ref": "#/components/schemas/Artist"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "artist"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -6337,155 +6343,9 @@
           }
         }
       },
-      "put": {
-        "summary": "Replaces a collective's profile and members, and replaces or removes its photo",
-        "tags": [
-          "Collectives"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "collective": {
-                    "$ref": "#/components/schemas/AdminCollectiveProfile"
-                  },
-                  "photo": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
-                  },
-                  "removePhoto": {
-                    "description": "\"true\" removes the collective's photo, when there's no new one. Anything else keeps it",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "collective"
-                ]
-              },
-              "encoding": {
-                "collective": {
-                  "contentType": "application/json"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "collective": {
-                      "$ref": "#/components/schemas/Collective"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "collective"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      },
       "patch": {
         "operationId": "update_collective",
-        "summary": "Changes a collective's profile and members, only the fields it's given, or removes its photo",
+        "summary": "Changes a collective's profile and members, only the fields it's given, but not its photo",
         "tags": [
           "Collectives"
         ],
@@ -6642,10 +6502,6 @@
                         "type": "null"
                       }
                     ]
-                  },
-                  "removePhoto": {
-                    "type": "boolean",
-                    "description": "`true` removes the collective's photo, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
                 "additionalProperties": false,
@@ -6910,6 +6766,225 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Gives a collective a photo, or replaces its photo, which is deleted, and changes nothing else",
+        "tags": [
+          "Collectives"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no photo"
+                  }
+                },
+                "required": [
+                  "photo"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_collective_photo",
+        "summary": "Removes a collective's photo, which is deleted, and changes nothing else",
+        "tags": [
+          "Collectives"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "collective": {
+                      "$ref": "#/components/schemas/Collective"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "collective"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -8357,155 +8432,9 @@
           }
         }
       },
-      "put": {
-        "summary": "Replaces a session's fields, and replaces or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
-        "tags": [
-          "Sessions"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "session": {
-                    "$ref": "#/components/schemas/SessionFields"
-                  },
-                  "flyer": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "A JPEG, PNG or WebP image of up to 10 MB, whose type is told from its contents, that can be read, of at most 100 million pixels. An empty file is no flyer"
-                  },
-                  "removeFlyer": {
-                    "description": "\"true\" removes the session's flyer, when there's no new one. Anything else keeps it",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "session"
-                ]
-              },
-              "encoding": {
-                "session": {
-                  "contentType": "application/json"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "session": {
-                      "$ref": "#/components/schemas/Session"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "session"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConflictError"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      },
       "patch": {
         "operationId": "update_session",
-        "summary": "Changes a session, only the fields it's given, or removes its flyer, but not its status, whether it's announced, or its sets, which keep their order",
+        "summary": "Changes a session, only the fields it's given, but not its flyer, its status, whether it's announced, or its sets, which keep their order",
         "tags": [
           "Sessions"
         ],
@@ -8562,10 +8491,6 @@
                     "type": "string",
                     "maxLength": 5000,
                     "description": "Its own description, as plain text, which replaces the one its type gives it: send back the session's `description`, not its `effectiveDescription`. Each \\r\\n or \\r becomes \\n, and it is trimmed, then up to 5000 characters. Empty for none"
-                  },
-                  "removeFlyer": {
-                    "type": "boolean",
-                    "description": "`true` removes the session's flyer, and deletes it. `false` keeps it, like leaving it out"
                   }
                 },
                 "additionalProperties": false,
@@ -9041,6 +8966,101 @@
             }
           },
           "413": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_session_flyer",
+        "summary": "Removes a session's flyer, which is deleted, and changes nothing else",
+        "tags": [
+          "Sessions"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Session"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "Default Response",
             "content": {
               "application/json": {

@@ -138,10 +138,21 @@ function ArtistById({ id }: { id: string }) {
           artist={artist}
           submitLabel="enregistrer"
           onCancel={() => setEditing(false)}
-          onSubmit={async (body) => {
-            const result = await api.PUT('/api/admin/artists/{id}', { params: { path: { id } }, body, bodySerializer: formData })
+          onSubmit={async (body, photo) => {
+            const params = { path: { id } }
+            // The profile first, so that a photo is only saved with a profile that's accepted.
+            const result = await api.PATCH('/api/admin/artists/{id}', { params, body })
             if (!result.ok) return `L'artiste n'a pas pu être enregistré : ${result.error}`
             setChanged(result.artist)
+            if (photo) {
+              const saved =
+                photo === 'remove'
+                  ? await api.DELETE('/api/admin/artists/{id}/photo', { params })
+                  : await api.PUT('/api/admin/artists/{id}/photo', { params, body: { photo }, bodySerializer: formData })
+              // The form stays open, and sending it again sends both again.
+              if (!saved.ok) return `Le profil a été enregistré, mais pas la photo : ${saved.error}`
+              setChanged(saved.artist)
+            }
             setEditing(false)
             return null
           }}
@@ -214,7 +225,8 @@ export function NewArtistPage() {
       <h1>Nouvel artiste</h1>
       <ArtistForm
         submitLabel="ajouter l'artiste"
-        onSubmit={async (body) => {
+        onSubmit={async (artist, photo) => {
+          const body = { artist, photo: photo instanceof File ? photo : undefined }
           const result = await api.POST('/api/admin/artists', { body, bodySerializer: formData })
           if (!result.ok) return `L'artiste n'a pas pu être ajouté : ${result.error}`
           navigate(`/admin/artistes/${result.artist.id}`)

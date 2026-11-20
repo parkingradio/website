@@ -30,14 +30,15 @@ describe('api', () => {
   })
 
   it('sends a multipart/form-data body with `formData`: files as they are, objects as JSON, and nothing for undefined', async () => {
-    mockFetch({ 'PUT /api/admin/artists/artist-1': { ok: false, error: 'Stop' } })
+    mockFetch({ 'POST /api/admin/artists': { ok: false, error: 'Stop' } })
     const photo = new File(['photo'], 'photo.png', { type: 'image/png' })
-    const artist = { kind: 'artist' as const, name: 'Aurore', bio: 'Une bio.', email: 'aurore@example.com' }
-    await api.PUT('/api/admin/artists/{id}', { params: { path: { id: 'artist-1' } }, body: { artist, photo, removePhoto: undefined }, bodySerializer: formData })
-    const form = requestsTo('PUT', '/api/admin/artists/artist-1')[0].body as FormData
-    expect(form.get('artist')).toBe(JSON.stringify(artist))
-    expect(form.get('photo')).toBe(photo)
-    expect(form.has('removePhoto')).toBe(false)
+    const artist = { name: 'Aurore', bio: 'Une bio.', email: 'aurore@example.com' }
+    await api.POST('/api/admin/artists', { body: { artist, photo }, bodySerializer: formData })
+    await api.POST('/api/admin/artists', { body: { artist, photo: undefined }, bodySerializer: formData })
+    const [withPhoto, without] = requestsTo('POST', '/api/admin/artists').map((request) => request.body as FormData)
+    expect(withPhoto.get('artist')).toBe(JSON.stringify(artist))
+    expect(withPhoto.get('photo')).toBe(photo)
+    expect(without.has('photo')).toBe(false)
   })
 
   it('sends a list of files with `formData` as a part for each, in order', async () => {

@@ -222,7 +222,9 @@ bottom, the form has:
   that a few words of it can be changed, which makes it the session's own.
 - "Flyer": the session's flyer, like an artist's photo (see [An artist's page](artistes.md#an-artists-page)): an ×
   removes it once the session is saved, and a flyer that's chosen replaces it. It's checked as soon as it's chosen, as
-  the server checks it (see [Flyers](../../server/sessions.md#flyers)).
+  the server checks it (see [Flyers](../../server/sessions.md#flyers)). A session's page saves it after the session's
+  fields, like an artist's photo, saying « La session a été enregistrée, mais pas le flyer : … » when only the flyer
+  can't be saved.
 - "Événement RA": picked from every one of Parking Radio's events, past ones included, read from RA (see
   [RA events](../../server/ra-events.md)), or "Aucun événement RA", which leaves it out. Each event is shown by its
   title and the day it starts on in Québec, e.g. "GUEST MIXES, sam. 14 nov. 2026", with its number on RA, e.g.
@@ -380,12 +382,13 @@ its sets in the way is named without a link.
 ## Endpoints
 
 - `GET /api/admin/sessions`, for the list.
-- `GET /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/status`,
-  `PUT /api/admin/sessions/:id/announced` and `DELETE /api/admin/sessions/:id`, for a session's page.
+- `GET /api/admin/sessions/:id`, `PATCH /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/flyer`,
+  `DELETE /api/admin/sessions/:id/flyer`, `PUT /api/admin/sessions/:id/status`, `PUT /api/admin/sessions/:id/announced`
+  and `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer?width=1280`, for its flyer, on its page and in its form, which links to
   `GET /api/admin/sessions/:id/flyer`, the flyer as it was sent (see [Flyers](../../server/sessions.md#flyers)).
 - `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
-  `PATCH /api/admin/sessions/:id`, to save the event as the session's.
+  `PATCH /api/admin/sessions/:id`, to save the event as the session's too.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PATCH /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,
   `PUT /api/admin/sets/:id/position`, `PUT /api/admin/sets/:id/session` and `DELETE /api/admin/sets/:id`, for its sets,

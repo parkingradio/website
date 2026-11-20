@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { mockFetch, mockListLayout, moveWithKeyboard, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, mockListLayout, moveWithKeyboard, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
@@ -110,15 +110,14 @@ function renderAt(path: string) {
   )
 }
 
-// What was sent as the collective's profile and photo in a request to save one, and whether to remove its photo.
+// What was sent as the collective's profile and photo in a request to add one.
 function sent(request: RequestInit) {
   const form = request.body as FormData
-  return {
-    profile: JSON.parse(form.get('collective') as string) as CollectiveProfile,
-    photo: form.get('photo'),
-    removePhoto: form.get('removePhoto'),
-  }
+  return { profile: JSON.parse(form.get('collective') as string) as CollectiveProfile, photo: form.get('photo') }
 }
+
+// What was sent to change the collective.
+const changes = () => requestsTo('PATCH', '/api/admin/collectives/collective-1').map((request) => jsonBody(request) as CollectiveProfile)
 
 // Opens the collective's form, once its page is shown, and waits for it, once it has loaded the artists.
 async function edit() {
@@ -259,7 +258,7 @@ describe('A collective’s page', () => {
     mockFetch({
       ...ONDES_PAGE,
       '/api/admin/artists': { ok: false, error: 'Boom' },
-      'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
     })
     renderAt('/admin/artistes/collectifs/collective-1')
 
@@ -271,7 +270,7 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByRole('link', { name: 'Élise' })).toBeInTheDocument())
-    expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).profile.members).toEqual([
+    expect(changes()[0].members).toEqual([
       { id: 'artist-1' },
       { id: 'artist-3' },
       { name: 'Élise' },
@@ -287,7 +286,7 @@ describe('A collective’s page', () => {
     mockFetch({
       ...ONDES_PAGE,
       '/api/admin/artists?collective=collective-1': { ok: false, error: 'Boom' },
-      'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
     })
     addNew('Élise')
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -299,7 +298,7 @@ describe('A collective’s page', () => {
 
   it('loads its artists again whenever it is saved, and every artist whenever its form opens', async () => {
     const changed: Collective = { ...ONDES, name: 'Ondes 2', members: [...ONDES.members, { id: 'artist-4', name: 'Dora' }] }
-    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
+    mockFetch({ ...ONDES_PAGE, 'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await screen.findByRole('button', { name: 'modifier' })
@@ -309,7 +308,7 @@ describe('A collective’s page', () => {
     mockFetch({
       ...ONDES_PAGE,
       '/api/admin/artists?collective=collective-1': { ok: true, artists: [AURORE, CYAN, { ...DORA, genres: ['jazz'] }] },
-      'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
     })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
@@ -331,7 +330,7 @@ describe('A collective’s page', () => {
 
   it('changes the collective, its artists picked or added by name, in order', async () => {
     const changed: Collective = { ...ONDES, name: 'Ondes 2', updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
+    mockFetch({ ...ONDES_PAGE, 'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
@@ -353,8 +352,7 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Ondes 2' })).toBeInTheDocument())
-    const { profile, photo, removePhoto } = sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0])
-    expect(profile).toEqual({
+    expect(changes()).toEqual([{
       name: 'Ondes 2',
       members: [{ id: 'artist-3' }, { id: 'artist-1' }, { id: 'artist-4' }, { name: 'Fé' }],
       country: 'CA',
@@ -363,9 +361,9 @@ describe('A collective’s page', () => {
       links: { instagram: 'ondes.qc' },
       email: 'ondes@example.com',
       phone: '418 555 0101',
-    })
-    expect(photo).toBeNull()
-    expect(removePhoto).toBeNull()
+    }])
+    expect(requestsTo('PUT', '/api/admin/collectives/collective-1/photo')).toHaveLength(0)
+    expect(requestsTo('DELETE', '/api/admin/collectives/collective-1/photo')).toHaveLength(0)
     expect(screen.getByText(/^Modifié par/)).toHaveTextContent(/^Modifié par other@example.com le 6 octobre 2026/)
   })
 
@@ -485,7 +483,7 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(errorOf(membersField())).toBe('« ELISE » est déjà parmi les artistes du collectif : effacez ce nom.')
     expect(screen.getAllByText(/est déjà parmi/)).toHaveLength(1)
-    expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/collectives/collective-1')).toHaveLength(0)
   })
 
   it('reorders the members by their handles with the keyboard, keeping the focus, and says so to screen readers', async () => {
@@ -569,12 +567,12 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(errorOf(membersField())).toBe("« Élise » n'est pas ajouté : appuyer sur + pour l'ajouter.")
     await waitFor(() => expect(newArtist()).toHaveFocus())
-    expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/collectives/collective-1')).toHaveLength(0)
   })
 
   it("takes out the contact's email, which is then sent null", async () => {
     const changed: Collective = { ...ONDES, email: null, updatedBy: 'other@example.com', updatedAt: '2026-10-06T16:00:00.000Z' }
-    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: changed } })
+    mockFetch({ ...ONDES_PAGE, 'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
@@ -582,7 +580,7 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText(/^Modifié par/)).toBeInTheDocument())
-    expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).profile.email).toBeNull()
+    expect(changes()[0].email).toBeNull()
     expect(described('Adresse e-mail du contact')).toHaveTextContent(/^-$/)
     // A collective without an email is changed with the field empty.
     await edit()
@@ -592,7 +590,7 @@ describe('A collective’s page', () => {
   it("checks the contact's email, when there's one, and shows why the server refused the collective", async () => {
     mockFetch({
       ...ONDES_PAGE,
-      'PUT /api/admin/collectives/collective-1': { ok: false, error: 'Another collective has this email address' },
+      'PATCH /api/admin/collectives/collective-1': { ok: false, error: 'Another collective has this email address' },
     })
     renderAt('/admin/artistes/collectifs/collective-1')
 
@@ -601,7 +599,7 @@ describe('A collective’s page', () => {
     fireEvent.change(email, { target: { value: 'brise@' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
     expect(errorOf(email)).toBe('Indiquez une adresse e-mail valide.')
-    expect(requestsTo('PUT', '/api/admin/collectives/collective-1')).toHaveLength(0)
+    expect(requestsTo('PATCH', '/api/admin/collectives/collective-1')).toHaveLength(0)
 
     fireEvent.change(email, { target: { value: 'brise@example.com' } })
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
@@ -613,7 +611,11 @@ describe('A collective’s page', () => {
   })
 
   it('removes the photo with its ×, once the collective is saved', async () => {
-    mockFetch({ ...ONDES_PAGE, 'PUT /api/admin/collectives/collective-1': { ok: true, collective: { ...ONDES, hasPhoto: false } } })
+    mockFetch({
+      ...ONDES_PAGE,
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: ONDES },
+      'DELETE /api/admin/collectives/collective-1/photo': { ok: true, collective: { ...ONDES, hasPhoto: false } },
+    })
     renderAt('/admin/artistes/collectifs/collective-1')
 
     await edit()
@@ -621,7 +623,63 @@ describe('A collective’s page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
 
     await waitFor(() => expect(screen.getByText('Pas de photo')).toBeInTheDocument())
-    expect(sent(requestsTo('PUT', '/api/admin/collectives/collective-1')[0]).removePhoto).toBe('true')
+    expect(changes()).toHaveLength(1)
+    expect(requestsTo('DELETE', '/api/admin/collectives/collective-1/photo')).toHaveLength(1)
+  })
+
+  it('replaces the photo after the profile, and sends both again when only the photo is refused, its new artists then by id', async () => {
+    // The artist added by name exists once the profile is saved.
+    const changed: Collective = { ...ONDES, members: [...ONDES.members, { id: 'artist-5', name: 'Élise' }] }
+    mockFetch({
+      ...ONDES_PAGE,
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PUT /api/admin/collectives/collective-1/photo': { ok: false, error: 'La photo dépasse 10 Mo.' },
+    })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await edit()
+    addNew('Élise')
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'ondes.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Le profil a été enregistré, mais pas la photo : La photo dépasse 10 Mo.'))
+    expect(changes()[0].members).toEqual([{ id: 'artist-1' }, { id: 'artist-3' }, { name: 'Élise' }])
+    expect(chosen()).toEqual(['1Aurore×', '2Cyan×', '3Élise×'])
+
+    mockFetch({
+      ...ONDES_PAGE,
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PUT /api/admin/collectives/collective-1/photo': { ok: true, collective: changed },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'modifier' })).toBeInTheDocument())
+    expect(changes()[0].members).toEqual([{ id: 'artist-1' }, { id: 'artist-3' }, { id: 'artist-5' }])
+    expect(((requestsTo('PUT', '/api/admin/collectives/collective-1/photo')[0].body as FormData).get('photo') as File).name).toBe('ondes.png')
+    expect(screen.getByRole('link', { name: 'Élise' })).toBeInTheDocument()
+  })
+
+  it('shows the collective as it was saved once its form is cancelled, when only its photo was refused', async () => {
+    const changed: Collective = { ...ONDES, name: 'Ondes 2', members: [...ONDES.members, { id: 'artist-5', name: 'Élise' }] }
+    mockFetch({
+      ...ONDES_PAGE,
+      'PATCH /api/admin/collectives/collective-1': { ok: true, collective: changed },
+      'PUT /api/admin/collectives/collective-1/photo': { ok: false, error: 'Internal server error' },
+    })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    await edit()
+    fireEvent.change(screen.getByLabelText('Nom du collectif'), { target: { value: 'Ondes 2' } })
+    addNew('Élise')
+    fireEvent.change(screen.getByLabelText('Photo'), { target: { files: [new File(['photo'], 'ondes.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Le profil a été enregistré, mais pas la photo : Internal server error'))
+    // Every artist is loaded again, which now has the one added by name.
+    await waitFor(() => expect(requestsTo('GET', '/api/admin/artists')).toHaveLength(2))
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Ondes 2' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Élise' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Photo de Ondes 2' })).toBeInTheDocument()
   })
 
   it('says when it has no sessions, with a link to add one as its takeover', async () => {

@@ -82,10 +82,10 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   it, and null, or a blank string, where adding the item takes one for none, removes it the same way. The rules that
   involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are checked on the
   item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field fails with 400.
-  It sets `updatedBy` and `updatedAt`, even when nothing actually changes. Artists, collectives and sessions can also be
-  changed with `PUT`, which replaces their fields, all of them sent, replaces or removes their photo or flyer, and also
-  sets `updatedBy` and `updatedAt`. Likewise, the endpoints that change a status, or whether a session is announced, say
-  who changed it and when even when it doesn't change.
+  It sets `updatedBy` and `updatedAt`, even when nothing actually changes. Likewise, the endpoints of an item's photo or
+  flyer that give, replace or remove it, `PUT` and `DELETE` on `…/photo` and `…/flyer`, set them, even when there's no
+  photo or flyer to remove, and the endpoints that change a status, or whether a session is announced, say who changed
+  it and when even when it doesn't change.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.
@@ -172,18 +172,20 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/artists`](artists.md#get-apiadminartistscollectiveid-admin) | admin | Every artist, or a collective's |
 | [`GET /api/admin/artists/:id`](artists.md#get-apiadminartistsid-admin) | admin | An artist |
 | [`GET /api/admin/artists/:id/photo`](artists.md#get-apiadminartistsidphoto-admin) | admin | An artist's photo, as it was sent, or one of its sizes |
+| [`PUT /api/admin/artists/:id/photo`](artists.md#put-apiadminartistsidphoto-admin) | admin | Giving an artist a photo, or replacing their photo |
+| [`DELETE /api/admin/artists/:id/photo`](artists.md#delete-apiadminartistsidphoto-admin) | admin | Removing an artist's photo |
 | [`POST /api/admin/artists`](artists.md#post-apiadminartists-admin) | admin | Adding an artist, with or without a photo |
-| [`PUT /api/admin/artists/:id`](artists.md#put-apiadminartistsid-admin) | admin | Replacing an artist's profile, and replacing or removing their photo |
-| [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent, or removing their photo |
+| [`PATCH /api/admin/artists/:id`](artists.md#patch-apiadminartistsid-admin) | admin | Changing an artist's profile, only the fields it's sent |
 | [`DELETE /api/admin/artists/:id`](artists.md#delete-apiadminartistsid-admin) | admin | Deleting an artist, their photo and their applications, which their sets lose, and taking them out of their collectives and their sets |
 | [`GET /api/artists/:id`](artists.md#get-apiartistsid) | public | A public artist's profile |
 | [`GET /api/artists/:id/photo`](artists.md#get-apiartistsidphoto) | public | One of the sizes of a public artist's photo |
 | [`GET /api/admin/collectives`](collectives.md#get-apiadmincollectives-admin) | admin | Every collective |
 | [`GET /api/admin/collectives/:id`](collectives.md#get-apiadmincollectivesid-admin) | admin | A collective |
 | [`GET /api/admin/collectives/:id/photo`](collectives.md#get-apiadmincollectivesidphoto-admin) | admin | A collective's photo, as it was sent, or one of its sizes |
+| [`PUT /api/admin/collectives/:id/photo`](collectives.md#put-apiadmincollectivesidphoto-admin) | admin | Giving a collective a photo, or replacing its photo |
+| [`DELETE /api/admin/collectives/:id/photo`](collectives.md#delete-apiadmincollectivesidphoto-admin) | admin | Removing a collective's photo |
 | [`POST /api/admin/collectives`](collectives.md#post-apiadmincollectives-admin) | admin | Adding a collective, with or without a photo, and the members it names |
-| [`PUT /api/admin/collectives/:id`](collectives.md#put-apiadmincollectivesid-admin) | admin | Replacing a collective's profile and members, and replacing or removing its photo |
-| [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent, or removing its photo |
+| [`PATCH /api/admin/collectives/:id`](collectives.md#patch-apiadmincollectivesid-admin) | admin | Changing a collective's profile or members, only the fields it's sent |
 | [`DELETE /api/admin/collectives/:id`](collectives.md#delete-apiadmincollectivesid-admin) | admin | Deleting a collective without takeovers, its photo and its applications, but not its members |
 | [`GET /api/collectives/:id`](collectives.md#get-apicollectivesid) | public | A public collective's profile, with its members |
 | [`GET /api/collectives/:id/photo`](collectives.md#get-apicollectivesidphoto) | public | One of the sizes of a public collective's photo |
@@ -201,9 +203,9 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/admin/sessions/:id/ra-event`](sessions.md#get-apiadminsessionsidra-event-admin) | admin | The content of a session's event on Resident Advisor |
 | [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer, as it was sent, or one of its sizes |
 | [`PUT /api/admin/sessions/:id/flyer`](sessions.md#put-apiadminsessionsidflyer-admin) | admin | Giving a session a flyer, or replacing its flyer |
+| [`DELETE /api/admin/sessions/:id/flyer`](sessions.md#delete-apiadminsessionsidflyer-admin) | admin | Removing a session's flyer |
 | [`POST /api/admin/sessions`](sessions.md#post-apiadminsessions-admin) | admin | Adding a session, with or without a flyer, and its sets |
-| [`PUT /api/admin/sessions/:id`](sessions.md#put-apiadminsessionsid-admin) | admin | Replacing a session's fields, and replacing or removing its flyer |
-| [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent, or removing its flyer |
+| [`PATCH /api/admin/sessions/:id`](sessions.md#patch-apiadminsessionsid-admin) | admin | Changing a session, only the fields it's sent |
 | [`PUT /api/admin/sessions/:id/status`](sessions.md#put-apiadminsessionsidstatus-admin) | admin | Marking a session as planned, done or cancelled, which can mark its sets too |
 | [`PUT /api/admin/sessions/:id/announced`](sessions.md#put-apiadminsessionsidannounced-admin) | admin | Announcing a session, or un-announcing it |
 | [`DELETE /api/admin/sessions/:id`](sessions.md#delete-apiadminsessionsid-admin) | admin | Deleting a session, its flyer and its sets |
