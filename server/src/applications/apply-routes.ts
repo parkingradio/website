@@ -9,7 +9,7 @@ import { jsonField, readPhotoForm } from '../artists/photo-form.js'
 import type { FormLimits, PhotoForm } from '../artists/photo-form.js'
 import { PHOTO_TOO_LARGE, PHOTO_UNREADABLE, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, InvalidProfile, PHOTO_ERRORS, forgetPhoto, storePhoto, validatePhoto, withSizes } from '../artists/store.js'
-import type { PhotoFolder, Photos, SentPhoto, SizedPhoto, StoredPhoto } from '../artists/store.js'
+import type { NewPhoto, PhotoFolder, Photos, SentPhoto, SizedPhoto } from '../artists/store.js'
 import type { Email, SendEmail } from '../core/email.js'
 import { Applicant, applied, memberError, validateApplicant } from './applicant.js'
 import type { Applied } from './applicant.js'
@@ -102,11 +102,11 @@ async function sized(sent: Sent): Promise<{ photo: SizedPhoto | null; memberPhot
   }
 }
 
-// Stores the photos that were sent, one at a time, each in its folder, and returns where, as artists and collectives keep
-// them. If one can't be stored, those that were are deleted, and the error is thrown: storing them all at once would
-// leave those still being stored behind.
+// Stores the photos that were sent, one at a time, each in its folder, and returns them, or null for none. If one can't
+// be stored, those that were are deleted, unless something uses them, and the error is thrown: storing them all at once
+// would leave those still being stored behind.
 async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, sent: { photo: SizedPhoto | null; folder: PhotoFolder }[]) {
-  const stored: StoredPhoto[] = []
+  const stored: (NewPhoto | null)[] = []
   try {
     for (const { photo, folder } of sent) stored.push(await storePhoto(photos, photo, folder))
   } catch (error) {
@@ -116,8 +116,8 @@ async function storePhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogge
   return stored
 }
 
-async function forgetPhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, stored: StoredPhoto[]) {
-  await Promise.all(stored.map(({ photoKey }) => forgetPhoto(photos, log, photoKey)))
+async function forgetPhotos(photos: ApplyOptions['photos'], log: FastifyBaseLogger, stored: (NewPhoto | null)[]) {
+  await Promise.all(stored.map((photo) => forgetPhoto(photos, log, photo?.key)))
 }
 
 type EmailOptions = {
@@ -164,7 +164,7 @@ async function emailApplication(
 
 type ApplyOptions = EmailOptions & {
   store: ApplyStore
-  photos: Pick<Photos, 'store' | 'delete'>
+  photos: Pick<Photos, 'store' | 'deleteUnused'>
   verifyTurnstile: TurnstileVerifier
 }
 
@@ -237,17 +237,17 @@ export async function applyRoutes(app: FastifyInstance, { store, photos, verifyT
         'artist' in applied
           ? {
               folder: 'artists' as const,
-              save: ([photo]: StoredPhoto[]) => store.apply({ ...applied.artist, ...photo }, application),
+              save: ([photo]: (NewPhoto | null)[]) => store.apply({ ...applied.artist, photo }, application),
               taken: EMAIL_TAKEN,
               done: 'An artist applied',
             }
           : {
               folder: 'collectives' as const,
               // Its artists' photos become theirs.
-              save: ([photo, ...memberPhotos]: StoredPhoto[]) =>
+              save: ([photo, ...memberPhotos]: (NewPhoto | null)[]) =>
                 store.applyAsCollective(
-                  { ...applied.collective, ...photo },
-                  applied.members.map((member, index) => ({ ...member, ...memberPhotos[index] })),
+                  { ...applied.collective, photo },
+                  applied.members.map((member, index) => ({ ...member, photo: memberPhotos[index] })),
                   application,
                 ),
               taken: COLLECTIVE_EMAIL_TAKEN,

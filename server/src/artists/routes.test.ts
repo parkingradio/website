@@ -9,7 +9,7 @@ import { multipartBody } from '../api/test-multipart.js'
 import { PHOTO_MAX_BYTES } from './profile.js'
 import type { Profile } from './profile.js'
 import { artistsRoutes } from './routes.js'
-import { EmailTaken } from './store.js'
+import { EmailTaken, photoColumns } from './store.js'
 import type { ArtistsStore, StoredArtist } from './store.js'
 import { sizeKey } from './sizes.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from './test-photos.js'
@@ -38,17 +38,21 @@ const store: ArtistsStore = {
   // Who's public is worked out by the database, which the public routes are tested against (see
   // events/public.db.test.ts).
   getPublic: async (id) => (publicIds.has(id) ? (rows.find((row) => row.id === id) ?? null) : null),
-  create: vi.fn<ArtistsStore['create']>(async (artist) => {
+  create: vi.fn<ArtistsStore['create']>(async ({ photo, ...artist }) => {
     if (emailTaken(artist.email)) throw new EmailTaken()
-    const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist }
+    const row: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), updatedBy: null, updatedAt: null, collectives: [], ...artist, ...photoColumns(photo) }
     rows.push(row)
     return row
   }),
-  update: vi.fn<ArtistsStore['update']>(async (id, changes) => {
+  update: vi.fn<ArtistsStore['update']>(async (id, { photo, ...changes }) => {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
     if (emailTaken(changes.email ?? null, id)) throw new EmailTaken()
-    const after = { ...before, ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) }
+    const after = {
+      ...before,
+      ...Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)),
+      ...(photo === undefined ? {} : photoColumns(photo)),
+    }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
   }),
@@ -660,7 +664,7 @@ describe('artists routes', () => {
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ hasPhoto: true })
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.png', photoType: 'image/png' })
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('ignores fields and files sent as anything but the photo, e.g. a profile', async () => {
@@ -714,7 +718,7 @@ describe('artists routes', () => {
       }
       expect(rows[0]).toEqual(before)
       expect(photos.store).toHaveBeenCalledTimes(1)
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('responds 404 for an artist that does not exist, and forgets the photo', async () => {
@@ -736,7 +740,7 @@ describe('artists routes', () => {
     it('replaces the photo even when the previous one cannot be deleted', async () => {
       const app = await buildApp()
       await create(app)
-      photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+      photos.deleteUnused.mockRejectedValueOnce(new Error('S3 is down'))
       expect((await putPhoto(app, PHOTO)).statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-2.png' })
     })
@@ -761,13 +765,13 @@ describe('artists routes', () => {
       const response = await deletePhoto(app, PHOTO)
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ hasPhoto: false, updatedBy: 'admin@example.com' })
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('removes the photo even when it cannot be deleted', async () => {
       const app = await buildApp()
       await create(app)
-      photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+      photos.deleteUnused.mockRejectedValueOnce(new Error('S3 is down'))
       expect((await deletePhoto(app, PHOTO)).statusCode).toBe(200)
       expect(rows[0]).toMatchObject({ photoKey: null })
     })
@@ -811,7 +815,7 @@ describe('artists routes', () => {
       expect(response.statusCode).toBe(200)
       expect(response.json().artist).toMatchObject({ bio: 'Une nouvelle bio.', city: 'Lévis', hasPhoto: true })
       expect(rows[0]).toMatchObject({ photoKey: 'artists/photo-1.jpeg' })
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('frees the email it takes out for another artist', async () => {
@@ -883,11 +887,11 @@ describe('artists routes', () => {
       const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await sessionCookies() })
       expect(response.statusCode).toBe(200)
       expect(rows).toHaveLength(0)
-      expect(photos.delete).not.toHaveBeenCalled()
+      expect(photos.deleteUnused).not.toHaveBeenCalled()
     })
 
     it('deletes the artist even when their photo cannot be deleted', async () => {
-      photos.delete.mockRejectedValueOnce(new Error('S3 is down'))
+      photos.deleteUnused.mockRejectedValueOnce(new Error('S3 is down'))
       const app = await buildApp()
       await create(app)
       const response = await app.inject({ method: 'DELETE', url: '/api/admin/artists/artist-1', cookies: await sessionCookies() })

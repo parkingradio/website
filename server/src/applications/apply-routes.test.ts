@@ -4,7 +4,7 @@ import { DrizzleQueryError } from 'drizzle-orm'
 import { useZodSchemas } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES } from '../artists/profile.js'
 import type { ApplicantProfile } from '../artists/profile.js'
-import { EmailTaken } from '../artists/store.js'
+import { EmailTaken, photoColumns } from '../artists/store.js'
 import type { StoredArtist } from '../artists/store.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import type { CollectiveRow } from '../collectives/store.js'
@@ -47,8 +47,17 @@ function addApplication(fields: ApplicationFields, owner: { artistId: string } |
   return application
 }
 
-function addArtist(artist: Parameters<ApplyStore['applyAsCollective']>[1][number]): StoredArtist {
-  const added: StoredArtist = { id: `artist-${++nextId}`, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, collectives: [], ...artist }
+function addArtist({ photo, ...artist }: Parameters<ApplyStore['applyAsCollective']>[1][number]): StoredArtist {
+  const added: StoredArtist = {
+    id: `artist-${++nextId}`,
+    createdAt: new Date(),
+    createdBy: null,
+    updatedBy: null,
+    updatedAt: null,
+    collectives: [],
+    ...artist,
+    ...photoColumns(photo),
+  }
   artists.push(added)
   return added
 }
@@ -60,11 +69,11 @@ const store: ApplyStore = {
     const applicant = addArtist(artist)
     return { artistId: applicant.id, applicationId: addApplication(fields, { artistId: applicant.id }).id }
   }),
-  applyAsCollective: vi.fn<ApplyStore['applyAsCollective']>(async (collective, members, fields) => {
+  applyAsCollective: vi.fn<ApplyStore['applyAsCollective']>(async ({ photo, ...collective }, members, fields) => {
     if (collectives.some((other) => other.email?.toLowerCase() === collective.email.toLowerCase())) throw new EmailTaken()
     const id = `collective-${++nextId}`
     const added = members.map(addArtist).map((artist) => artist.id)
-    collectives.push({ id, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...collective, members: added })
+    collectives.push({ id, createdAt: new Date(), createdBy: null, updatedBy: null, updatedAt: null, ...collective, ...photoColumns(photo), members: added })
     return { collectiveId: id, applicationId: addApplication(fields, { collectiveId: id }).id }
   }),
 }
@@ -314,7 +323,7 @@ describe('POST /api/applications', () => {
     expect(collectives).toHaveLength(1)
     expect(artists).toHaveLength(2)
     expect(photos.photos()).toEqual(['collectives/photo-1.jpeg'])
-    expect(photos.delete).toHaveBeenCalledTimes(3)
+    expect(photos.deleteUnused).toHaveBeenCalledTimes(3)
 
     expect((await apply(app, { artist: asArtist({ email: 'collectif@example.com' }) })).statusCode).toBe(200)
     expect((await apply(app, { artist: asCollective({ email: 'artiste@example.com' }) })).statusCode).toBe(200)

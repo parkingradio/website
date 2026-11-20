@@ -23,8 +23,14 @@ readonly TOKEN='XXXX.DUMMY.TOKEN.XXXX'
 readonly PHOTO="$(mktemp)"
 readonly EMPTY="$(mktemp)"
 readonly CUT="$(mktemp)"
-trap 'rm -f "$PHOTO" "$EMPTY" "$CUT"' EXIT
+# Other photos, unlike any that another check keeps, since one that's the same as a photo that's kept is kept once (see
+# "Photos" in docs/design/server/artists.md).
+readonly OTHER="$(mktemp)"
+readonly THIRD="$(mktemp)"
+trap 'rm -f "$PHOTO" "$EMPTY" "$CUT" "$OTHER" "$THIRD"' EXIT
 make_image jpeg 64 48 > "$PHOTO"
+make_image jpeg 45 60 > "$OTHER"
+make_image png 52 39 > "$THIRD"
 # A JPEG cut short, which starts like one, but can't be read.
 cut_short "$PHOTO" > "$CUT"
 
@@ -107,7 +113,7 @@ expect_body '"name":"Photoless"[^{]*\{[^}]*\}[^}]*"hasPhoto":false'
 
 echo "  an artist who already exists, whatever the case of their email, can't apply again"
 photos="$(photos_on_disk)"
-apply 198.51.100.15 "$(profile 'Someone Else' Applicant@Integration.Test)"
+apply 198.51.100.15 "$(profile 'Someone Else' Applicant@Integration.Test)" "$TOKEN" "$OTHER"
 expect_status 409
 expect_body_contains 'Un artiste est déjà inscrit avec cette adresse e-mail.'
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected the photo sent with the refused application to be deleted"
@@ -119,7 +125,7 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/applications?artist=
 echo "  a collective applies, and is added, with its artists, their profiles and photos, as having added itself"
 photos="$(photos_on_disk)"
 # Only the second artist has a photo.
-apply 198.51.100.23 "$(collective 'Le Collectif' collectif@integration.test "$(member Une),$(member Deux)")" "$TOKEN" "$PHOTO" '' "$PHOTO"
+apply 198.51.100.23 "$(collective 'Le Collectif' collectif@integration.test "$(member Une),$(member Deux)")" "$TOKEN" "$PHOTO" '' "$OTHER"
 expect_status 200
 [ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected the photo of the collective's second artist to be stored"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/collectives"
@@ -151,7 +157,7 @@ expect_body_contains '"error":"Artiste 2 : Indiquez la ville."'
 echo "  a collective that already exists, whatever the case of its email, can't apply again, and nothing it sent is kept"
 artist_photos="$(photos_on_disk)"
 photos="$(photos_on_disk collectives)"
-apply 198.51.100.24 "$(collective 'Un Autre' Collectif@Integration.Test "$(member Trois)")" "$TOKEN" "$PHOTO" "$PHOTO"
+apply 198.51.100.24 "$(collective 'Un Autre' Collectif@Integration.Test "$(member Trois)")" "$TOKEN" "$OTHER" "$THIRD"
 expect_status 409
 expect_body_contains 'Un collectif est déjà inscrit avec cette adresse e-mail.'
 [ "$(photos_on_disk collectives)" = "$photos" ] && [ "$(photos_on_disk)" = "$artist_photos" ] ||
@@ -176,7 +182,7 @@ photos="$(photos_on_disk)"
 statuses="$(for address in 198.51.100.18 198.51.100.19; do
     curl --silent --output /dev/null --write-out '%{http_code}\n' --header "CF-Connecting-IP: ${address}" \
         --form-string "artist=$(profile Simultaneous simultaneous@integration.test)" --form-string "application=${APPLICATION}" \
-        --form-string "turnstileToken=${TOKEN}" --form "photo=@${PHOTO}" "${BASE_URL}/api/applications" &
+        --form-string "turnstileToken=${TOKEN}" --form "photo=@${THIRD}" "${BASE_URL}/api/applications" &
 done | sort | tr '\n' ' ')"
 [ "$statuses" = '200 409 ' ] || fail "expected one application to be accepted and the other refused, got: ${statuses}"
 [ "$(photos_on_disk)" = "$((photos + 1))" ] || fail "expected only the photo of the artist who was added to be kept"

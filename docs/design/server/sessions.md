@@ -333,9 +333,10 @@ become its own, and stop following its type.
 
 A session can have a flyer, an image, which follows the same rules as an artist's photo (see
 [Photos](artists.md#photos)): it's a JPEG, PNG or WebP image of up to 10 MB, whose type is checked from its contents,
-that can be read, kept in the app's private files, with the same sizes, and deleted, with its sizes, when the session is
-deleted, or the flyer replaced or removed. It's sent along with the session's fields when it's added (see
-[`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
+that can be read, and kept in the app's private files, with the same sizes. It's deleted, with its sizes, once no
+session has it anymore: removing or replacing a session's flyer, or deleting the session, never removes it from another
+session that has the same, e.g. the same flyer for every session of a month. It's sent along with the session's fields
+when it's added (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)), or on its own, with
 [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), which gives the session a flyer or replaces
 its own, and it's removed with [`DELETE /api/admin/sessions/:id/flyer`](#delete-apiadminsessionsidflyer-admin): changing
 the session's fields never changes it. The MCP server's tools can't send one, so a session added with a tool has none,
@@ -436,8 +437,8 @@ when it has no flyer, or when its flyer is missing.
 
 Gives a session a flyer, or replaces its flyer, and changes nothing else. It's `multipart/form-data`, with one part,
 `flyer`, the flyer (see [Flyers](#flyers)). A few other fields or files are ignored, but a second flyer isn't: the
-request fails. The flyer it replaces is deleted. It sets the session's `updatedBy` and `updatedAt`, since its flyer is
-part of it.
+request fails. The flyer it replaces is deleted unless another session has it (see [Flyers](#flyers)). It sets the
+session's `updatedBy` and `updatedAt`, since its flyer is part of it.
 
 | Response field | Type | |
 |---|---|---|
@@ -449,8 +450,8 @@ read (see [Flyers](#flyers)), 404 when there's no such session, and 413 when the
 
 ## `DELETE /api/admin/sessions/:id/flyer` (admin)
 
-Removes a session's flyer, which is deleted, and changes nothing else. It sets the session's `updatedBy` and `updatedAt`
-(see [Changes, in Conventions](README.md#conventions)). Responds like
+Removes a session's flyer, which is deleted unless another session has it, and changes nothing else. It sets the
+session's `updatedBy` and `updatedAt` (see [Changes, in Conventions](README.md#conventions)). Responds like
 [`PUT /api/admin/sessions/:id/flyer`](#put-apiadminsessionsidflyer-admin), with the session as it is then. Fails with
 404 when there's no such session.
 
@@ -520,9 +521,8 @@ session.
 
 ## `DELETE /api/admin/sessions/:id` (admin)
 
-Deletes a session, its flyer if it has one, and its sets, and responds `{"ok": true}`. Their performers stay, and so do
-their applications. Fails with
-404 when there's no such session.
+Deletes a session, its flyer if no other session has it, and its sets, and responds `{"ok": true}`. Their performers
+stay, and so do their applications. Fails with 404 when there's no such session.
 
 ## `POST /api/admin/sessions/:id/sets` (admin)
 
