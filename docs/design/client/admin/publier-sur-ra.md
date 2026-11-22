@@ -35,7 +35,7 @@ session de TEST. ».
 
 ## The bookmarklet
 
-Configuration gives it (see [Configuration](configuration.md#publier-sur-ra)): a link to drag into the browser's
+Intégrations gives it (see [Intégrations](integrations.md#publier-sur-ra)): a link to drag into the browser's
 bookmarks, whose code adds a script to RA's page, `<site>/ra-bookmarklet.js`, from the site it was installed from, with
 a query that changes each time, so that no cache gives an old one. The script is what does everything below: fixing the
 bookmarklet changes that script, and never requires reinstalling it. The script is public, and holds no secrets (see

@@ -167,7 +167,7 @@ export function RaEventPanel({
       )}
       <p>
         «&nbsp;Publier sur RA&nbsp;» ouvre RA, où le favori «&nbsp;Parking Radio → RA&nbsp;» (voir{' '}
-        <Link to="/admin/configuration">Configuration</Link>) crée l'événement. Ou créez-le{' '}
+        <Link to="/admin/integrations">Intégrations</Link>) crée l'événement. Ou créez-le{' '}
         <a href={RA_CREATE_EVENT} target="_blank" rel="noreferrer">
           sur RA
         </a>{' '}

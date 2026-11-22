@@ -52,6 +52,7 @@ describe('Admin pages', () => {
       ['candidatures', '/admin/candidatures'],
       ['sessions', '/admin/sessions'],
       ['artistes', '/admin/artistes'],
+      ['intégrations', '/admin/integrations'],
       ['admins', '/admin/admins'],
       ['configuration', '/admin/configuration'],
     ])

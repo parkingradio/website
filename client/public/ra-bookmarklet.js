@@ -1,5 +1,5 @@
 // Parking Radio → RA: creates a session's event on Resident Advisor, from RA's own site, as the admin logged in to RA
-// there (see docs/design/client/admin/publier-sur-ra.md). The bookmarklet that Configuration gives admins loads this
+// there (see docs/design/client/admin/publier-sur-ra.md). The bookmarklet that Intégrations gives admins loads this
 // file from Parking Radio's site each time it's clicked, so that fixing it never requires reinstalling it. It's public,
 // and holds no secrets.
 //

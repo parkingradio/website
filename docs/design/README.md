@@ -66,8 +66,9 @@ design: when they disagree, these documents still win.
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
 | [Publier sur RA](client/admin/publier-sur-ra.md) | Creating a session's event on Resident Advisor, with a bookmarklet |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
-| [Admins](client/admin/admins.md) | Who can access the admin pages, and connecting Claude to them |
+| [Intégrations](client/admin/integrations.md) | Connecting Claude, the admin's connected apps, and the RA bookmarklet |
 | [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin |
+| [Admins](client/admin/admins.md) | Who can access the admin pages |
 | [Configuration](client/admin/configuration.md) | The settings that change what the site does |
 
 The deployment is described in [deployment.md](../deployment.md).

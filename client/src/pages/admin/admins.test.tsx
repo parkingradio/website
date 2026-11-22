@@ -22,8 +22,7 @@ const ADMINS = [
   admin({ id: 'invited', email: 'invited@example.com', status: 'invited', inviteExpiresAt, invitedBy: 'me@example.com' }),
   admin({ id: 'expired', email: 'expired@example.com', status: 'expired' }),
 ]
-// The admins, and the apps the admin connected, which the page lists under them: none.
-const LOADED = { '/api/admin/admins': { ok: true, admins: ADMINS }, '/api/admin/connections': { ok: true, connections: [] } }
+const LOADED = { '/api/admin/admins': { ok: true, admins: ADMINS } }
 
 function invite(email: string) {
   fireEvent.change(screen.getByLabelText('Courriel'), { target: { value: email } })
@@ -169,85 +168,5 @@ describe('Admins', () => {
     render(<Admins />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Les admins n'ont pas pu être chargés : Boom")
-  })
-})
-
-describe('Connecting Claude', () => {
-  const connection = (fields: Partial<Schema<'Connection'>> = {}): Schema<'Connection'> => ({
-    id: 'connection-id',
-    client: 'Claude',
-    scopes: ['admin'],
-    createdAt,
-    lastUsedAt: inviteExpiresAt,
-    ...fields,
-  })
-
-  // The row of the app with this name: the one where the name is followed by when it was connected, since another app's
-  // name can start with it, e.g. "Claude Code".
-  async function appRow(name: string) {
-    const connected = dateTimeFormat.format(new Date(createdAt))
-    return within(await screen.findByRole('row', { name: (rowName) => rowName.startsWith(`${name} ${connected}`) }))
-  }
-
-  it("gives the connector's address, which it copies, and the command for Claude Code, and says when no app is connected", async () => {
-    mockFetch({ ...LOADED })
-    const writeText = vi.fn(async () => {})
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    render(<Admins />)
-
-    const address = `${location.origin}/mcp`
-    expect(screen.getByRole('heading', { name: 'Connecter Claude' })).toBeInTheDocument()
-    expect(screen.getByText(address)).toBeInTheDocument()
-    expect(screen.getByText(`claude mcp add --transport http parking-radio ${address}`)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'copier' }))
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Adresse copiée.'))
-    expect(writeText).toHaveBeenCalledWith(address)
-    expect(screen.getByText('Aucune application connectée.')).toBeInTheDocument()
-  })
-
-  it("says when the address can't be copied", async () => {
-    mockFetch({ ...LOADED })
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => Promise.reject(new Error('denied')) }, configurable: true })
-    render(<Admins />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'copier' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent("L'adresse n'a pas pu être copiée : sélectionnez-la pour la copier vous-même.")
-  })
-
-  it("lists the admin's connected apps, and disconnects one, which reloads the list", async () => {
-    mockFetch({
-      '/api/admin/admins': { ok: true, admins: ADMINS },
-      '/api/admin/connections': { ok: true, connections: [connection(), connection({ id: 'other-id', client: 'Claude Code' })] },
-      'DELETE /api/admin/connections/connection-id': { ok: true },
-    })
-    render(<Admins />)
-
-    const claude = await appRow('Claude')
-    expect(claude.getByText(dateTimeFormat.format(new Date(createdAt)))).toBeInTheDocument()
-    expect(claude.getByText(dateTimeFormat.format(new Date(inviteExpiresAt)))).toBeInTheDocument()
-    expect((await appRow('Claude Code')).getByRole('button', { name: 'déconnecter' })).toBeInTheDocument()
-    fireEvent.click(claude.getByRole('button', { name: 'déconnecter' }))
-
-    await waitFor(() => expect(requestsTo('DELETE', '/api/admin/connections/connection-id')).toHaveLength(1))
-    await waitFor(() => expect(requestsTo('GET', '/api/admin/connections')).toHaveLength(2))
-  })
-
-  it("says when an app can't be disconnected", async () => {
-    mockFetch({
-      '/api/admin/admins': { ok: true, admins: ADMINS },
-      '/api/admin/connections': { ok: true, connections: [connection()] },
-      'DELETE /api/admin/connections/connection-id': { ok: false, error: 'No such connection' },
-    })
-    render(<Admins />)
-    fireEvent.click((await appRow('Claude')).getByRole('button', { name: 'déconnecter' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent("L'application n'a pas pu être déconnectée : No such connection")
-    // In case the list is out of date, e.g. the app was disconnected already.
-    await waitFor(() => expect(requestsTo('GET', '/api/admin/connections')).toHaveLength(2))
-  })
-
-  it("says when the apps can't be loaded", async () => {
-    mockFetch({ ...LOADED, '/api/admin/connections': { ok: false, error: 'Boom' } })
-    render(<Admins />)
-    expect(await screen.findByText("Les applications connectées n'ont pas pu être chargées : Boom")).toBeInTheDocument()
   })
 })

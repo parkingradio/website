@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { api } from '../../api/client'
-import type { Schema } from '../../api/client'
-import { useApi } from '../../api/use-api'
-import { dateTimeFormat } from './describe'
+import { api } from '../../../api/client'
+import type { Schema } from '../../../api/client'
+import { useApi } from '../../../api/use-api'
+import { dateTimeFormat } from '../describe'
 
-// The Admins page's sections about apps: connecting Claude to the admin pages, and the apps the admin connected (see
-// docs/design/client/admin/admins.md).
+// Connecting Claude to the admin pages, and the apps the admin connected, in the integrations section (see
+// docs/design/client/admin/integrations.md).
 
 export function ConnectClaude() {
   const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -23,7 +23,6 @@ export function ConnectClaude() {
 
   return (
     <>
-      <h2>Connecter Claude</h2>
       <p>
         Claude peut faire pour vous presque tout ce que vous faites dans ces pages, par exemple ajouter un artiste, planifier
         une session ou trier les candidatures. Il agit en votre nom.
@@ -93,40 +92,30 @@ export function ConnectedApps() {
   const [version, setVersion] = useState(0)
   const connections = useApi('/api/admin/connections', { version })
 
-  let list
-  if (connections.kind === 'loading') list = null
-  else if (connections.kind === 'error') {
-    list = (
+  if (connections.kind === 'loading') return null
+  if (connections.kind === 'error') {
+    return (
       <p className="admin-error" role="alert">
         Les applications connectées n'ont pas pu être chargées&nbsp;: {connections.message}
       </p>
     )
-  } else if (connections.value.connections.length === 0) {
-    list = <p className="admin-placeholder">Aucune application connectée.</p>
-  } else {
-    list = (
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>Connectée le</th>
-            <th>Dernière utilisation</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {connections.value.connections.map((connection) => (
-            <ConnectionRow key={connection.id} connection={connection} onChange={() => setVersion((version) => version + 1)} />
-          ))}
-        </tbody>
-      </table>
-    )
   }
-
+  if (connections.value.connections.length === 0) return <p className="admin-placeholder">Aucune application connectée.</p>
   return (
-    <>
-      <h2>Vos applications connectées</h2>
-      {list}
-    </>
+    <table className="admin-table">
+      <thead>
+        <tr>
+          <th>Application</th>
+          <th>Connectée le</th>
+          <th>Dernière utilisation</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>
+        {connections.value.connections.map((connection) => (
+          <ConnectionRow key={connection.id} connection={connection} onChange={() => setVersion((version) => version + 1)} />
+        ))}
+      </tbody>
+    </table>
   )
 }

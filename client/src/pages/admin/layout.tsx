@@ -29,6 +29,7 @@ function AdminMenu({ email, loggedOut }: { email: string; loggedOut: () => void 
           <NavLink to="/admin/candidatures">candidatures</NavLink>
           <NavLink to="/admin/sessions">sessions</NavLink>
           <NavLink to="/admin/artistes">artistes</NavLink>
+          <NavLink to="/admin/integrations">intégrations</NavLink>
           <NavLink to="/admin/admins">admins</NavLink>
           <NavLink to="/admin/configuration">configuration</NavLink>
         </div>
