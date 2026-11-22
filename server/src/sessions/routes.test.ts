@@ -152,7 +152,7 @@ const store: SessionsStore = {
 }
 
 // Sessions' flyers, as the bucket would keep them.
-const photos = memoryPhotos('flyer')
+const photos = memoryPhotos((count) => `flyer-${count}`)
 const stored = photos.stored
 
 // SoundCloud, through the SoundCloud app.

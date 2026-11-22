@@ -102,6 +102,7 @@ export const PHOTO_MAX_BYTES = 10 * 1024 * 1024
 // about 120 MB.
 export const PHOTO_MAX_PIXELS = 100_000_000
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+export type PhotoType = (typeof PHOTO_TYPES)[number]
 export const PHOTO_WRONG_TYPE = 'La photo doit être en JPEG, PNG ou WebP.'
 export const PHOTO_TOO_LARGE = `La photo dépasse ${PHOTO_MAX_BYTES / 1024 / 1024} Mo.`
 export const PHOTO_UNREADABLE = `La photo ne peut pas être lue : elle est endommagée, ou dépasse ${PHOTO_MAX_PIXELS / 1_000_000} millions de pixels.`

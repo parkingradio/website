@@ -216,37 +216,6 @@ read as in [Database migrations](#database-migrations), says:
   - `Failed to make the sizes of a photo or flyer`, for any other reason, e.g. the bucket's. It's tried again the next
     time the server starts.
 
-### Moving images to keys made from their content
-
-Images used to be kept under random keys, `<folder>/<uuid>.<extension>`. Until the server has moved them all, in every
-deployment, production and test, which this part, and the job, go with (step 3 of #200), it moves them first, before
-making the missing sizes, to the keys made from their content, with the sizes they have, and merges those that are the
-same, e.g. the flyers of the synth meetups backfilled from RA, which were kept once per session. A row whose image an
-admin changes meanwhile keeps the new one. Until they're moved, some collectives' photos are under `artists/`, from when
-they were artists. Its log says:
-
-- When it starts, `Moving photos and flyers to keys made from their content`, with how many it has to move, and when
-  it's done, `Moved photos and flyers to keys made from their content`, with how many it moved, how many had changed
-  meanwhile, how many are missing, how many it failed to move, and how many are `left` to move, or
-  `Stopped moving photos and flyers to keys made from their content` when the server stops first. It goes on the next
-  time the server starts.
-- For each photo or flyer that it couldn't move, what it's of (`of`, e.g. `artist`, and `id`), and its `key`, with one
-  of these messages:
-  - `A photo or flyer to move to a key made from its content is missing`: it's lost from the bucket. It's left as it
-    is, and counted as left, until it's replaced or removed on the admin pages.
-  - `Failed to move a photo or flyer to a key made from its content`, for any other reason, e.g. the bucket's. It's
-    tried again the next time the server starts.
-
-If the server crashes while it moves an image, files may be left in the bucket, unused, without a log: those under the
-new key, when it crashes before the image's row is moved there and an admin replaces or removes the image before the
-server starts again, or those under the old key, when it crashes once the row is moved, but before they're deleted.
-
-An older version deletes an image as soon as one artist, collective or session stops having it, even when others still
-have it: after rolling back, such an image has to be restored from the bucket's previous versions.
-
-Until an image is moved, the URLs where the public gets its sizes are named after its old key, rather than its content,
-and those of a collective's photo still under `artists/` aren't served (see [Photos](design/server/artists.md#photos)).
-
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

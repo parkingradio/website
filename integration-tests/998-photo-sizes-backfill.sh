@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# When it starts, the server moves, in the background, the photos and flyers it keeps under random keys to the keys made
-# from their content, then makes the sizes that they don't have, and skips those it can't read, which it logs (see
-# "Private files" in docs/deployment.md, and server/src/artists/content-keys.ts and server/src/artists/backfill.ts,
-# whose tests cover the rest). Moving them goes in step 3 of #200.
+# When it starts, the server makes, in the background, the sizes that the photos and flyers it keeps don't have, and
+# skips those it can't read, which it logs (see "Photos" in docs/design/server/artists.md, "Private files" in
+# docs/deployment.md, and server/src/artists/backfill.ts, whose tests cover the rest).
 #
 # Numbered in the 9xx range: this restarts the server, which then listens on another port. It waits for the server to
 # be up again, so that the checks after it can still stop it.
@@ -31,18 +30,19 @@ request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${artist}/ph
 expect_status 404
 expect_body_contains '"error":"The photo of this artist has no size 320 pixels wide"'
 
-# A session's flyer that can't be read, as one sent before photos were read could be, under a random key, as flyers were
-# kept before their keys were made from their content.
+# A session's flyer that can't be read, as one sent before photos were read could be, under the key made from its
+# content.
 request --header "Cookie: ${cookie}" --form-string \
     'session={"start":null,"durationMinutes":60,"type":"synth-meetup","takeover":null,"application":null,"name":"","raEvent":null,"description":""}' \
     "${BASE_URL}/api/admin/sessions"
 expect_status 200
 session="$(first_id)"
 cut_short "${FILES}/photo.jpg" > "${FILES}/cut.jpg"
-docker exec --interactive "$CONTAINER" sh -c 'mkdir -p /tmp/private-bucket/sessions && cat > /tmp/private-bucket/sessions/cut.jpg' < "${FILES}/cut.jpg"
-sql "update sessions set flyer_key = 'sessions/cut.jpg', flyer_type = 'image/jpeg' where id = '${session}'" > /dev/null
+flyer="sessions/$(content_name "${FILES}/cut.jpg").jpg"
+docker exec --interactive "$CONTAINER" sh -c "mkdir -p /tmp/private-bucket/sessions && cat > /tmp/private-bucket/${flyer}" < "${FILES}/cut.jpg"
+sql "update sessions set flyer_key = '${flyer}', flyer_type = 'image/jpeg' where id = '${session}'" > /dev/null
 
-echo "  once the server restarts, it moves the flyer to the key made from its content, and makes the sizes that are missing"
+echo "  once the server restarts, it makes the sizes that are missing"
 since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 docker restart "$CONTAINER" > /dev/null
 BASE_URL="http://$(docker port "$CONTAINER" 3000/tcp)"
@@ -56,15 +56,6 @@ cookie="$(session_cookie)"
 request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${artist}/photo?width=320"
 expect_status 200
 expect_header Content-Type 'image/webp$'
-
-# Moving images to the keys made from their content goes in step 3 of #200, with this check.
-echo "  it moved the flyer, and logged that none is left to move"
-moved="$(sql "select flyer_key from sessions where id = '${session}'")"
-[[ "$moved" =~ ^sessions/[0-9a-f]{64}\.jpg$ ]] || fail "expected the flyer to be moved to a key made from its content, not ${moved}"
-docker exec "$CONTAINER" test ! -e /tmp/private-bucket/sessions/cut.jpg || fail "expected the flyer's old file to be deleted"
-docker exec "$CONTAINER" test -e "/tmp/private-bucket/${moved}" || fail "expected the flyer to be under its new key"
-printf '%s' "$logs" | grep 'Moved photos and flyers to keys made from their content' |
-    grep -q '"moved":1,.*"left":0' || { printf '%s\n' "$logs" >&2; fail "expected the flyer to be moved, and none to be left"; }
 
 echo "  it skips a flyer it can't read, and logs it, with what it's of"
 printf '%s' "$logs" | grep "Can't make the sizes of a photo or flyer: it can't be read" |

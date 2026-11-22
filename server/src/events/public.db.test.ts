@@ -27,8 +27,10 @@ import type { EventsStore } from './store.js'
 // and collectives.md). Sessions, artists and collectives are added and changed through the admin routes, and the public
 // ones are asked without a session.
 
-// The photos and flyers, as the bucket would keep them, by key.
-const photos = memoryPhotos()
+// The photos and flyers, as the bucket would keep them, by key, named with 64 hex digits, which the database takes as
+// keys made from their content (see `contentKey` in db/schema.ts).
+const named = (count: number) => count.toString(16).padStart(64, '0')
+const photos = memoryPhotos(named)
 const stored = photos.stored
 
 const NOBODY = '00000000-0000-4000-8000-000000000000'
@@ -83,7 +85,7 @@ function get(url: string, headers: Record<string, string> = {}) {
   return app.inject({ method: 'GET', url, headers })
 }
 
-// The URLs of the sizes of the photo or flyer at `url`, e.g. `/api/events/flyers/photo-1`, as the public gets them.
+// The URLs of the sizes of the photo or flyer at `url`, e.g. `/api/events/flyers/<name>`, as the public gets them.
 const sizes = (url: string) => ({ 320: `${url}/w320.webp`, 1280: `${url}/w1280.webp` })
 
 const artistStatus = async (id: string) => (await get(`/api/artists/${id}`)).statusCode
@@ -178,7 +180,7 @@ describe('GET /api/events', () => {
           end: '2990-01-10T23:00:00-05:00',
           cancelled: false,
           description: 'Une soirée',
-          flyer: sizes('/api/events/flyers/photo-1'),
+          flyer: sizes(`/api/events/flyers/${named(1)}`),
           raEvent: 'https://ra.co/events/6683745',
           takeover: { id: ondes, name: 'Les Ondes' },
           sets: [
@@ -381,7 +383,7 @@ describe('GET /api/artists/:id', () => {
         genres: ['techno', 'house'],
         bio: 'Une bio',
         links: { soundcloud: 'someone' },
-        photo: sizes('/api/artists/photos/photo-1'),
+        photo: sizes(`/api/artists/photos/${named(1)}`),
       },
     })
     expect((await get(`/api/artists/${brume}`)).json().artist.photo).toBeNull()
@@ -455,7 +457,7 @@ describe('GET /api/collectives/:id', () => {
           { id: brume, name: 'Brume' },
           { id: ana, name: 'Ana' },
         ],
-        photo: sizes('/api/collectives/photos/photo-1'),
+        photo: sizes(`/api/collectives/photos/${named(1)}`),
       },
     })
   })
@@ -535,7 +537,7 @@ describe('the photos and flyers of what is public', () => {
     // Stored in that order.
     const [anaPhoto, ondesPhoto, flyer] = photos.photos()
     const [eventFlyer] = await flyers()
-    expect(eventFlyer).toEqual(sizes('/api/events/flyers/photo-3'))
+    expect(eventFlyer).toEqual(sizes(`/api/events/flyers/${named(3)}`))
     for (const [urls, key] of [
       [await photoOf(`/api/artists/${ana}`), anaPhoto],
       [await photoOf(`/api/collectives/${ondes}`), ondesPhoto],
