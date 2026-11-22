@@ -225,12 +225,13 @@ follow a channel of their own, e.g. on a test server, so that their guests never
 create a bot:
 
 1. On Discord's developer portal (`https://discord.com/developers/applications`), create an application, e.g.
-   "parking.radio (test)". Under "Bot", turn off "Public Bot", so that only its owner can add it to a server, and turn on
-   the Message Content intent, which lets it read the messages' text. "Reset Token" shows its token, once.
+   "parking.radio (test)". Under "Installation", set "Install Link" to "None", which Discord requires before the next
+   step. Under "Bot", turn off "Public Bot", so that only its owner can add it to a server, and turn on the Message
+   Content intent, which lets it read the messages' text. "Reset Token" shows its token, once.
 2. Under "OAuth2", generate a link with the `bot` scope, open it, and add the bot to the server.
-3. In the channel's permissions, give the bot "View Channel" and "Read Message History", which it needs to follow the
-   channel, and "Manage Webhooks", which it needs for guests to write: it posts their messages through a webhook it
-   creates.
+3. In the channel's permissions, give the bot "View Channel" and "Read Message History", to follow the channel, and
+   "Manage Webhooks", to post guests' messages through a webhook it creates. The server checks all three, and the
+   intent, before it saves the credentials.
 4. In Discord, with developer mode on (under "Advanced" in the settings), copy the channel's id, and parking.relay's
    account's, with a right click on them, then enter them with the token on the admin pages.
 

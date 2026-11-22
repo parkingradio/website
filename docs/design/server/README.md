@@ -63,7 +63,9 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
 - **Rate limits.** A few endpoints limit how many requests each client makes. Clients are told apart by their
   address: `CF-Connecting-IP` when it's there, or else the connection's. That header can be trusted since, in
   production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by
-  their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error.
+  their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error. The
+  chat also limits what all clients do together: over those limits, they get a 429 or a 503, as its endpoints say (see
+  [Chat](chat.md)).
   The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
   their requests from their own servers, which share a few addresses.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,

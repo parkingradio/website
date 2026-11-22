@@ -27,9 +27,9 @@ requests and responses with, and the client's types are generated from it (`npm 
 and CI checks that they're up to date. The document shows the API, i.e. every endpoint under `/api` but the two that
 apps call for OAuth, which take forms (see [OAuth](server/oauth.md)), as it's implemented, while these documents are its
 design: when they disagree, these documents still win. The chat's stream of server-sent events
-([`GET /api/chat/stream`](server/chat.md#get-apichatstream)) is in it as `text/event-stream`, with the schema of a single
-event, its `event` and its `data`, as OpenAPI 3.2's `itemSchema` would give it, so that the client gets the events'
-types too.
+([`GET /api/chat/stream`](server/chat.md#get-apichatstream)) is in it as `text/event-stream`, whose `schema` is that of a
+single event rather than of the whole stream: one of the three events, each with its `event` and its `data`. So the
+client gets the events' types too.
 
 ## Server
 

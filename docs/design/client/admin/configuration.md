@@ -54,11 +54,12 @@ The Discord bot the server follows the home page's chat through, the channel it 
 application's "Bot" page on Discord's developer portal, linking to it (`https://discord.com/developers/applications`),
 and that the ids are copied in Discord, with its developer mode on. It shows which admin last changed them, and when,
 or, until they're entered, that the home page's chat is offline. When the server can't follow the channel, or the last
-guest's message failed on its side, it says why.
+guest's message failed on its side, it says why. When the server uses the stand-in for Discord, e.g. in development, it
+says so instead of whether the chat is offline.
 
 Under that, a form replaces them, like the YouTube credentials: the channel's id and parking.relay's id, filled in with
 the current ones, the latter optional, and the token, whose field only shows dots in its place, since it's never sent
-back, and has to be typed. "vérifier" asks Discord whether it accepts the token and the bot can read the channel, without
+back, and has to be typed. "vérifier" asks Discord whether the bot can follow the channel with them, without
 saving them, and "enregistrer" saves them, which it only allows once they've been verified, each with a check mark like
 the SoundCloud app's.
 
