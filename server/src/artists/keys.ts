@@ -20,8 +20,7 @@ export function extensionOf(type: string): string {
 }
 
 // The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte,
-// as one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
-// docs/deployment.md).
+// as one that's stored in that folder is stored once, with its sizes, however many have it (see `Photos` in store.ts).
 export function photoKey({ body, type }: { body: Buffer; type: string }, folder: PhotoFolder): string {
   return `${folder}/${createHash('sha256').update(body).digest('hex')}.${extensionOf(type)}`
 }
