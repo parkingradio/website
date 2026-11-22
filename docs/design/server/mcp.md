@@ -79,6 +79,7 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
+- The admin endpoints of the [chat](chat.md), which aren't needed either, and some of which take its bot's token.
 - The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
   or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and
   `PUT /api/admin/sessions/:id/flyer`, since tools can't send them (see [Arguments](#arguments)). Those that remove

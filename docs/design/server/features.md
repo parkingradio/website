@@ -15,6 +15,7 @@ The flags, in the order `GET /api/admin/features` returns them, are (`FEATURES` 
 | Id | What it switches on |
 |---|---|
 | `evenements-publics` | [Programmation](../client/programmation.md) and [Synth Meetups](../client/synth-meetups.md) read the public events (see [Events](events.md)) rather than Parking Radio's events on RA (see [RA events](ra-events.md)) |
+| `nouveau-chat` | [Home](../client/home.md) shows the chat in a box of its own, which reads it through the server (see [Chat](chat.md)), rather than WidgetBot's |
 
 Retiring a flag takes moving it from this list to the retired flags below, and removing it from `FEATURES` and from the
 admin pages (see [Configuration](../client/admin/configuration.md#features)). The server ignores what it saved for flags

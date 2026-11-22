@@ -216,6 +216,24 @@ read as in [Database migrations](#database-migrations), says:
   - `Failed to make the sizes of a photo or flyer`, for any other reason, e.g. the bucket's. It's tried again the next
     time the server starts.
 
+## Discord
+
+The chat on the home page follows a channel of Parking Radio's Discord server through a Discord bot of the site's own
+(see [Chat](design/server/chat.md)), whose token and channel are entered on the admin pages (see
+[Configuration](design/client/admin/configuration.md#chat)). Each deployment has its own bot, and test deployments
+follow a channel of their own, e.g. on a test server, so that their guests never post in Parking Radio's #chat. To
+create a bot:
+
+1. On Discord's developer portal (`https://discord.com/developers/applications`), create an application, e.g.
+   "parking.radio (test)". Under "Bot", turn off "Public Bot", so that only its owner can add it to a server, and turn on
+   the Message Content intent, which lets it read the messages' text. "Reset Token" shows its token, once.
+2. Under "OAuth2", generate a link with the `bot` scope, open it, and add the bot to the server.
+3. In the channel's permissions, give the bot "View Channel" and "Read Message History", which it needs to follow the
+   channel, and "Manage Webhooks", which it needs for guests to write: it posts their messages through a webhook it
+   creates.
+4. In Discord, with developer mode on (under "Advanced" in the settings), copy the channel's id, and parking.relay's
+   account's, with a right click on them, then enter them with the token on the admin pages.
+
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

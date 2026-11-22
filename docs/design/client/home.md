@@ -1,6 +1,6 @@
 # Home
 
-This page is the radio's home page. From top to bottom, it shows the pieces below. Apart from the rotation banner, they
+This page is the radio's home page. From top to bottom, it shows the pieces below. The video widget and WidgetBot's chat
 used to be a single custom-built widget (a static HTML/JS page hosted externally, on Cloudflare R2, embedded as an
 iframe), and still look as they did then.
 
@@ -13,13 +13,55 @@ iframe), and still look as they did then.
   another video, or none, the widget shows that instead, even if that stops the one being watched, so that it always
   shows what loading the page again would. When the server can't say, it keeps what it shows, or shows "Hors direct" if
   it has nothing to show yet: visitors never see an error.
-- **Discord chat**: an embedded WidgetBot widget showing a specific text channel from Parking Radio's Discord
-  server, letting visitors follow and join the conversation without leaving the site.
+- **Chat**: the #chat channel of Parking Radio's Discord server, where visitors follow the conversation, and join it as
+  guests (see [Chat](#chat)), when the `nouveau-chat` feature flag is on. While it's off, an embedded WidgetBot widget
+  shows the channel instead, and until the page knows, the chat's place stays empty (see
+  [Feature flags](architecture.md#feature-flags)).
 
 The radio (see [Player](player.md)) and the video widget never play at once: playing the video pauses the radio, and
 the radio starting to play stops the video, which goes back to its cover.
+
+## Chat
+
+The chat takes WidgetBot's place, at its size, under a black bar that says "#chat". It shows the messages the server
+sends (see [Chat](../server/chat.md)), the oldest at the top:
+
+- Each one under its author's name, in bold, in one of nine colors, always the same for the same name, followed by an
+  "invité·e" tag for a guest, "youtube" for a YouTube viewer, and "bot" for a bot. A message right after another one by
+  the same author doesn't repeat it.
+- Its time, in Québec time, e.g. "21 h 30", after its date when it isn't today in Québec, e.g. "14 nov., 21 h 30".
+- Its text, from its runs (see [Text](../server/chat.md#text)), in its styles, with links that show their address and
+  open in a new tab, and custom emojis as images the size of the text, or `:name:` when they don't load. Long words and
+  addresses wrap.
+- After its text, when it has attachments, "1 pièce jointe" or "N pièces jointes", in grey, which are only on Discord.
+
+The list opens at its bottom, and new messages scroll it down to them, unless the visitor scrolled up to read older
+ones: a "nouveaux messages ↓" button then takes them down. Until it has the messages, the chat says "connexion…", and
+without any, "aucun message pour l'instant". When the messages can't be read, e.g. when the chat isn't set up, the bar
+says "hors ligne", and the page tries again every 30 seconds, keeping what it shows. When the connection is lost once
+it's open, the browser opens it again on its own.
+
+### Writing
+
+Under the messages, visitors write as guests (see [Guests](../server/chat.md#guests)). When it shows the chat, the page
+asks who the visitor is, and whether guests can write:
+
+- A wide "envoyer un message" button asks for "votre pseudo", with "ok", and ✕ to cancel. Cloudflare Turnstile checks
+  that the visitor is a person, as on [Appliquer](appliquer.md), with its checkbox only shown when Cloudflare needs them
+  to click it. The page only loads Turnstile then, and gets a new token after an error other than the name's.
+- Once the visitor has entered the chat, "invité·e : <name>" and a "changer" link, which asks for a name again the same
+  way, sit above the message field and its "envoyer" button.
+- The field takes up to 140 characters. It doesn't stop the visitor from typing or pasting more: once 20 or fewer are
+  left, a counter says how many, in red once it's over, and "envoyer" can't be used until the text is shortened.
+- Sending a message empties the field and scrolls the list down: the message shows once the server sends it back.
+- The page checks the name and the message as the server does, and shows the server's error under the field otherwise,
+  e.g. when too many messages were sent, keeping the text. When the server says the visitor has to enter the chat again,
+  it asks for their name.
+- While guests can't write, the chat only says "Les invité·e·s ne peuvent pas écrire pour le moment.".
 
 ## Endpoints
 
 - `GET /api/radio`, for the rotation banner.
 - `GET /api/video`, for the video widget.
+- `GET /api/chat/stream`, for the chat's messages, and `GET /api/chat/guest`, `POST /api/chat/guest` and
+  `POST /api/chat/messages`, for writing in it.

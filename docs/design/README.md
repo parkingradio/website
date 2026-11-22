@@ -26,7 +26,10 @@ The API's OpenAPI document, `server/openapi.json`, is generated from the schemas
 requests and responses with, and the client's types are generated from it (`npm run generate:api`). Both are checked in,
 and CI checks that they're up to date. The document shows the API, i.e. every endpoint under `/api` but the two that
 apps call for OAuth, which take forms (see [OAuth](server/oauth.md)), as it's implemented, while these documents are its
-design: when they disagree, these documents still win.
+design: when they disagree, these documents still win. The chat's stream of server-sent events
+([`GET /api/chat/stream`](server/chat.md#get-apichatstream)) is in it as `text/event-stream`, with the schema of a single
+event, its `event` and its `data`, as OpenAPI 3.2's `itemSchema` would give it, so that the client gets the events'
+types too.
 
 ## Server
 
@@ -44,6 +47,7 @@ design: when they disagree, these documents still win.
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |
 | [RA events](server/ra-events.md) | Parking Radio's events, read from Resident Advisor |
+| [Chat](server/chat.md) | The chat of Parking Radio's Discord server, which Home shows, guests who write in it, and the Discord bot it's followed through |
 | [Features](server/features.md) | Feature flags |
 
 ## Client

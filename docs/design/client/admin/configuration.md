@@ -5,6 +5,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
+- "Chat": the Discord bot the server follows the home page's chat through, and whether guests can write in it.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -46,6 +47,25 @@ one, and the key, whose field only shows dots in its place, since it's never sen
 asks YouTube whether it accepts the key and finds the channel, without saving them, and "enregistrer" saves them, which
 it only allows once they've been verified, each with a check mark like the SoundCloud app's.
 
+## Chat
+
+The Discord bot the server follows the home page's chat through, the channel it follows, and parking.relay's account
+(see [The Discord credentials](../../server/chat.md#the-discord-credentials)). It says that the bot's token is in its
+application's "Bot" page on Discord's developer portal, linking to it (`https://discord.com/developers/applications`),
+and that the ids are copied in Discord, with its developer mode on. It shows which admin last changed them, and when,
+or, until they're entered, that the home page's chat is offline. When the server can't follow the channel, or the last
+guest's message failed on its side, it says why.
+
+Under that, a form replaces them, like the YouTube credentials: the channel's id and parking.relay's id, filled in with
+the current ones, the latter optional, and the token, whose field only shows dots in its place, since it's never sent
+back, and has to be typed. "vérifier" asks Discord whether it accepts the token and the bot can read the channel, without
+saving them, and "enregistrer" saves them, which it only allows once they've been verified, each with a check mark like
+the SoundCloud app's.
+
+Under the form, a switch, "Les invité·e·s peuvent écrire", lets guests write in the chat, or stops them (see
+[Guests](../../server/chat.md#guests)). It's saved right away, and says which admin last switched it, and when. While
+it's off, it says that visitors can only read the chat.
+
 ## Features
 
 The feature flags (see [Features](../../server/features.md)). It lists every flag, each with a switch, its name, what it
@@ -62,4 +82,6 @@ retired flag is removed too.
   `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
 - `GET /api/admin/video/credentials`, `POST /api/admin/video/credentials/check` and
   `PUT /api/admin/video/credentials`, for "Connexion YouTube".
+- `GET /api/admin/chat/credentials`, `POST /api/admin/chat/credentials/check`, `PUT /api/admin/chat/credentials`,
+  `GET /api/admin/chat/guests` and `PUT /api/admin/chat/guests`, for "Chat".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".

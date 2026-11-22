@@ -7,7 +7,8 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
-  is JSON, except for photos, flyers and the calendar feed ([`GET /calendar.ics`](events.md#get-calendarics)). A body of
+  is JSON, except for photos, flyers, the calendar feed ([`GET /calendar.ics`](events.md#get-calendarics)) and the
+  chat's stream of server-sent events ([`GET /api/chat/stream`](chat.md#get-apichatstream)). A body of
   a type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
   are larger than any endpoint needs, with a 413. One exception: in
   production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
@@ -46,7 +47,8 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   JSON-RPC (see [OAuth](oauth.md) and [MCP server](mcp.md)).
 - **Logs.** Every request is logged with its method, its path, its status and how long it took, but not the values of
   its query string, which can be secrets. Those to `/mcp`, whose path is always the same, are logged with their
-  JSON-RPC method, the name of the tool they call, and the connection and user they come from. Unless a request failed
+  JSON-RPC method, the name of the tool they call, and the connection and user they come from. The chat's streams are
+  logged when they close, with how long they were open. Unless a request failed
   unexpectedly (see Errors above), why it failed is logged too: its error's message, and for a tool that fails, whose
   request still gets a 200, the tool's status too. So the server's messages never include personal data, or values the
   request sent, though they can name things, e.g. a field. Bodies, tokens, and tools' arguments other than the ids in
@@ -124,7 +126,7 @@ a session.
 | Response field | Type | |
 |---|---|---|
 | `assetsDomain` | string | The domain serving the static assets, e.g. `"assets.parking.radio"` |
-| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` asks for (see [Applying](applications.md#applying)) |
+| `turnstileSiteKey` | string | The site key of the Cloudflare Turnstile widget, which gives pages the token `POST /api/applications` and `POST /api/chat/guest` ask for (see [Applying](applications.md#applying) and [Guests](chat.md#guests)) |
 | `environment` | string | The server's environment: the deployment it's part of, e.g. `production` or `test`, or `development` when it isn't told one (see [deployment.md](../../deployment.md#deploying-the-web-app)) |
 | `features` | object | Whether each feature flag is on (`true`) or off (`false`), by id, e.g. `{"some-flag": true}`. A flag that isn't there is off (see [Features](features.md)) |
 
@@ -219,5 +221,14 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
+| [`GET /api/chat/stream`](chat.md#get-apichatstream) | public | The chat's messages as they're written, edited and deleted, as server-sent events |
+| [`GET /api/chat/guest`](chat.md#get-apichatguest) | public | Who the visitor is in the chat, and whether guests can write |
+| [`POST /api/chat/guest`](chat.md#post-apichatguest) | public | A visitor entering the chat as a guest, or choosing another name |
+| [`POST /api/chat/messages`](chat.md#post-apichatmessages) | public | A guest writing in the chat |
+| [`GET /api/admin/chat/credentials`](chat.md#get-apiadminchatcredentials-admin) | admin | The Discord bot and channel the server follows the chat through, and why it can't, if it can't |
+| [`PUT /api/admin/chat/credentials`](chat.md#put-apiadminchatcredentials-admin) | admin | Entering the bot's token, the channel and parking.relay's account |
+| [`POST /api/admin/chat/credentials/check`](chat.md#post-apiadminchatcredentialscheck-admin) | admin | Whether Discord accepts a token and the bot can read a channel, without saving them |
+| [`GET /api/admin/chat/guests`](chat.md#get-apiadminchatguests-admin) | admin | Whether guests can write in the chat |
+| [`PUT /api/admin/chat/guests`](chat.md#put-apiadminchatguests-admin) | admin | Letting guests write in the chat, or stopping them |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |
