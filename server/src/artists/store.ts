@@ -242,8 +242,7 @@ export type PhotoFolder = 'artists' | 'collectives' | 'sessions'
 const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 // The key of `photo` in `folder`: the SHA-256 of its content, in hex, so that a photo that's the same, byte for byte,
-// as one that's stored in that folder is stored once, with its sizes, however many have it (see "Private files" in
-// docs/deployment.md).
+// as one that's stored in that folder is stored once, with its sizes, however many have it (see `Photos`).
 export function photoKey({ body, type }: SentPhoto, folder: PhotoFolder): string {
   return `${folder}/${createHash('sha256').update(body).digest('hex')}.${EXTENSIONS[type] ?? 'bin'}`
 }
