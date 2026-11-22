@@ -60,16 +60,16 @@ damaged to be decoded, is refused. It's sent with the artist's profile when they
 [`PUT /api/admin/artists/:id/photo`](#put-apiadminartistsidphoto-admin), which replaces theirs, and it's removed with
 [`DELETE /api/admin/artists/:id/photo`](#delete-apiadminartistsidphoto-admin): changing their profile never changes it.
 The MCP server's tools can't send a photo, but they can remove one. It's kept in the app's private S3 bucket, or in a
-local directory in development, and only the server reads it. When the artist is deleted, or the photo is replaced or
-removed, it's deleted too: it stays in the bucket's previous versions for as long as the database's backups are kept,
-like the artist's row, and is gone for good after that.
+local directory in development, and only the server reads it. It's deleted once no artist has it anymore: removing or
+replacing an artist's photo, or deleting the artist, never removes it from another artist who has the same. It then
+stays in the bucket's previous versions for as long as the database's backups are kept, like the artist's row, and is
+gone for good after that.
 
 The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
 its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
 than WebP allows. They're deleted with it. When it starts, the server makes, in the background, the sizes that the
 photos it keeps don't have: until then, and for good for a photo it can't read, the endpoints fail with 404 for a size
-that isn't there. The public endpoints only ever serve a size, so that the photo itself and its metadata stay
-private.
+that isn't there. The public endpoints only ever serve a size, so that the photo itself and its metadata stay private.
 
 ## Public profiles
 
@@ -124,8 +124,9 @@ e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still
 
 Gives an artist a photo, or replaces their photo, and changes nothing else. It's `multipart/form-data`, with one part,
 `photo`, the photo (see [Photos](#photos)). A few other fields or files are ignored, but a second photo isn't: the
-request fails. The photo it replaces is deleted. It sets the artist's `updatedBy` and `updatedAt` (see
-[Changes, in Conventions](README.md#conventions)), since their photo is part of them.
+request fails. The photo it replaces is deleted unless another artist has it (see [Photos](#photos)). It sets the
+artist's `updatedBy` and `updatedAt` (see [Changes, in Conventions](README.md#conventions)), since their photo is part
+of them.
 
 | Response field | Type | |
 |---|---|---|
@@ -137,10 +138,10 @@ read, 404 when there's no such artist, and 413 when the photo is larger than 10 
 
 ## `DELETE /api/admin/artists/:id/photo` (admin)
 
-Removes an artist's photo, which is deleted, and changes nothing else. It sets the artist's `updatedBy` and `updatedAt`
-(see [Changes, in Conventions](README.md#conventions)). Responds like
-[`PUT /api/admin/artists/:id/photo`](#put-apiadminartistsidphoto-admin), with the artist as they are then. Fails with 404
-when there's no such artist.
+Removes an artist's photo, which is deleted unless another artist has it, and changes nothing else. It sets the artist's
+`updatedBy` and `updatedAt` (see [Changes, in Conventions](README.md#conventions)). Responds like
+[`PUT /api/admin/artists/:id/photo`](#put-apiadminartistsidphoto-admin), with the artist as they are then. Fails with
+404 when there's no such artist.
 
 ## `POST /api/admin/artists` (admin)
 
@@ -166,10 +167,10 @@ another artist has that email.
 
 ## `DELETE /api/admin/artists/:id` (admin)
 
-Deletes an artist, their photo if they have one and their own applications, but not those of their collectives, takes
-them out of their collectives and their [sets](sessions.md#performers), and their applications out of the sets that come
-from them (see [Applications, in Sessions](sessions.md#applications)), and responds `{"ok": true}`. Fails with 404
-when there's no such artist.
+Deletes an artist, their photo if no other artist has it, and their own applications, but not those of their
+collectives, takes them out of their collectives and their [sets](sessions.md#performers), and their applications out of
+the sets that come from them (see [Applications, in Sessions](sessions.md#applications)), and responds `{"ok": true}`.
+Fails with 404 when there's no such artist.
 
 ## `GET /api/artists/:id`
 

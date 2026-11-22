@@ -18,6 +18,7 @@ import { youTubeCredentialsStore } from './video/credentials.js'
 import { youtube } from './video/youtube.js'
 import { artistsStore, privatePhotos } from './artists/store.js'
 import { sizesBackfill, storedImages } from './artists/backfill.js'
+import { contentKeysMigration } from './artists/content-keys.js'
 import { collectivesStore } from './collectives/store.js'
 import { privateBucket } from './core/private-bucket.js'
 import { applicationsStore } from './applications/store.js'
@@ -37,9 +38,12 @@ const loggerInstance: FastifyBaseLogger = logger
 // valid: the error handler set by registerRoutes takes care of the others.
 const app = Fastify({ loggerInstance, frameworkErrors })
 const privateFiles = privateBucket(config.privateFiles)
+const photos = privatePhotos(privateFiles, db, app.log)
 // Started once the server listens, below, but its hooks can only be added before. It stops as soon as the server
-// starts closing, and the server waits for the photo it's making, if any.
-const backfill = sizesBackfill(() => storedImages(db), privateFiles, app.log)
+// starts closing, and the server waits for the photo it's moving or making, if any. Moving them to the keys made from
+// their content (see artists/content-keys.ts) goes in step 3 of #200.
+const list = () => storedImages(db)
+const backfill = sizesBackfill(list, privateFiles, photos, app.log, contentKeysMigration(list, db, photos, app.log))
 app.addHook('preClose', async () => backfill.stop())
 app.addHook('onClose', () => db.$client.end())
 // After the database's hook, since Fastify runs the onClose hooks of the root instance from the last one added: the
@@ -68,7 +72,7 @@ await registerRoutes(app, {
   youtubeCredentials: youTubeCredentialsStore(db),
   artists: artistsStore(db),
   collectives: collectivesStore(db),
-  photos: privatePhotos(privateFiles, app.log),
+  photos,
   applications: applicationsStore(db),
   applicationsSettings: applicationsSettingsStore(db),
   apply: applyStore(db),

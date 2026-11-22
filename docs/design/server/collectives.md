@@ -74,7 +74,8 @@ A collective's photo is optional, and follows the same rules as an artist's (see
 sent, replaced and removed the same way, with [`POST /api/admin/collectives`](#post-apiadmincollectives-admin), and
 [`PUT /api/admin/collectives/:id/photo`](#put-apiadmincollectivesidphoto-admin) and
 [`DELETE /api/admin/collectives/:id/photo`](#delete-apiadmincollectivesidphoto-admin), served at the same sizes, and
-deleted the same way, with its sizes, when the collective is deleted, or the photo is replaced or removed.
+deleted the same way, with its sizes, once no collective has it anymore: removing or replacing a collective's photo, or
+deleting the collective, never removes it from another collective that has the same.
 
 ## Public profiles
 
@@ -150,11 +151,11 @@ collective, and 409 when another collective has that email. When it fails, nothi
 
 ## `DELETE /api/admin/collectives/:id` (admin)
 
-Deletes a collective, its photo if it has one and its [applications](applications.md), but not its members, and responds
-`{"ok": true}`. Fails with 404 when there's no such collective, or with 409 while it has takeovers, which need it (see
-[Types and names](sessions.md#types-and-names)), with one of them in `session`, and `set` null, like the 409s of sessions
-(see [Rules](sessions.md#rules)). Its takeovers are listed with `GET /api/admin/sessions?takeover=<id>`, and are given
-another collective, or another type, first.
+Deletes a collective, its photo if no other collective has it, and its [applications](applications.md), but not its
+members, and responds `{"ok": true}`. Fails with 404 when there's no such collective, or with 409 while it has
+takeovers, which need it (see [Types and names](sessions.md#types-and-names)), with one of them in `session`, and `set`
+null, like the 409s of sessions (see [Rules](sessions.md#rules)). Its takeovers are listed with
+`GET /api/admin/sessions?takeover=<id>`, and are given another collective, or another type, first.
 
 ## `GET /api/collectives/:id`
 

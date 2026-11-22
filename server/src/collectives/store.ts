@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
-import { EmailTaken, artistsStore } from '../artists/store.js'
-import type { ArtistsStore, StoredPhoto } from '../artists/store.js'
+import { EmailTaken, artistsStore, photoColumns } from '../artists/store.js'
+import type { ArtistsStore, NewPhoto } from '../artists/store.js'
 import type { Reference } from '../api/schemas.js'
 import type { Queryable } from '../db/connection.js'
 import { artists, collectiveMembers, collectives } from '../db/schema.js'
@@ -31,15 +31,16 @@ export type CollectivesStore = {
   // The collective, only when it's public (see "Public profiles" in docs/design/server/collectives.md).
   getPublic(id: string): Promise<StoredCollective | null>
   // `createdBy` is the email of the admin who adds the collective, or null if it adds itself by applying. The members
-  // sent by name are created, as artists whom `createdBy` adds. Throws an EmailTaken or an InvalidMember.
-  create(collective: CollectiveProfile & StoredPhoto & { createdBy: string | null }): Promise<StoredCollective>
+  // sent by name are created, as artists whom `createdBy` adds. `photo` is its photo, once it's stored, or null for
+  // none. Throws an EmailTaken or an InvalidMember.
+  create(collective: CollectiveProfile & { photo: NewPhoto | null; createdBy: string | null }): Promise<StoredCollective>
   // Changes the fields of the collective's profile that `changes` has, its members when it has them, and its photo when
-  // there's a new one, or nulls to remove it. The members sent by name are created, as artists whom `updatedBy` adds.
-  // Returns the collective as it was, so that a photo that was replaced or removed can be deleted, and as it is then.
-  // Throws an EmailTaken or an InvalidMember.
+  // it has one: a new one, once it's stored, or null to remove it. The members sent by name are created, as artists
+  // whom `updatedBy` adds. Returns the collective as it was, so that a photo that was replaced or removed can be
+  // deleted, and as it is then. Throws an EmailTaken or an InvalidMember.
   update(
     id: string,
-    changes: Partial<CollectiveProfile> & (StoredPhoto | Record<never, never>) & { updatedBy: string; updatedAt: Date },
+    changes: Partial<CollectiveProfile> & { photo?: NewPhoto | null; updatedBy: string; updatedAt: Date },
   ): Promise<{ before: CollectiveRow; after: StoredCollective } | null>
   // Returns the collective as it was, so that its photo can be deleted too. Its members stay. Throws a Conflict, with one
   // of its takeovers in the way, when it has some, which need it (see "Rules" in docs/design/server/sessions.md).
@@ -89,8 +90,7 @@ function newMember(name: string, createdBy: string | null): Parameters<ArtistsSt
     links: {},
     email: null,
     phone: '',
-    photoKey: null,
-    photoType: null,
+    photo: null,
     createdBy,
   }
 }
@@ -138,21 +138,25 @@ export function collectivesStore(db: Queryable): CollectivesStore {
       return row ? withMembers(db, row) : null
     },
 
-    create({ members, ...collective }) {
+    create({ members, photo, ...collective }) {
       return checkingEmail(() =>
         db.transaction(async (tx) => {
+          // Before its members are locked (see `Photos` in artists/store.ts).
+          await photo?.keep(tx)
           await lockMembers(tx, members)
-          const [row] = await tx.insert(collectives).values(collective).returning()
+          const [row] = await tx.insert(collectives).values({ ...collective, ...photoColumns(photo) }).returning()
           await addMembers(tx, row.id, members, collective.createdBy)
           return withMembers(tx, row)
         }),
       )
     },
 
-    async update(id, { members, ...changes }) {
+    async update(id, { members, photo, ...changes }) {
       if (!isUuid(id)) return null
       return checkingEmail(() =>
         db.transaction(async (tx) => {
+          // Before the collective is locked (see `Photos` in artists/store.ts).
+          await photo?.keep(tx)
           // The collective is locked first, then its new members, and only then are its memberships replaced. Deleting
           // an artist locks the artist, then their memberships, so taking the memberships before the artists could
           // deadlock with it. Like the update itself, which doesn't change a key, so that it doesn't wait for sessions
@@ -161,7 +165,11 @@ export function collectivesStore(db: Queryable): CollectivesStore {
           if (!before) return null
           // Its members stay as they are when they're left out.
           if (members) await lockMembers(tx, members)
-          const [after] = await tx.update(collectives).set(changes).where(eq(collectives.id, id)).returning()
+          const [after] = await tx
+            .update(collectives)
+            .set({ ...changes, ...(photo === undefined ? {} : photoColumns(photo)) })
+            .where(eq(collectives.id, id))
+            .returning()
           if (members) {
             await tx.delete(collectiveMembers).where(eq(collectiveMembers.collectiveId, id))
             await addMembers(tx, id, members, changes.updatedBy)

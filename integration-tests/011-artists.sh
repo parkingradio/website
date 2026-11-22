@@ -3,8 +3,9 @@
 # The admin routes for artists work against a real database. The server's unit tests mock the database and the photos,
 # so this is what covers the artists table, emails being unique whatever their case, artists listed by name, the
 # transaction that changes an artist, profiles read back from the database, and photos kept on disk, replaced on their
-# own, then deleted, or no photo at all. It also covers profiles that leave out what only admins can leave out, as the
-# database keeps them, including any number of artists without an email.
+# own, then deleted, or no photo at all, and photos kept once, however many artists have them. It also covers profiles
+# that leave out what only admins can leave out, as the database keeps them, including any number of artists without an
+# email.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -19,6 +20,7 @@ readonly PHOTOS="$(mktemp -d)"
 trap 'rm -rf "$PHOTOS"' EXIT
 make_image jpeg 64 48 > "${PHOTOS}/photo.jpg"
 make_image png 48 64 > "${PHOTOS}/photo.png"
+make_image png 60 45 > "${PHOTOS}/other.png"
 cut_short "${PHOTOS}/photo.jpg" > "${PHOTOS}/cut.jpg"
 
 login "$IP" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
@@ -83,8 +85,9 @@ artist POST "${BASE_URL}/api/admin/artists" "${PROFILE/artiste@integration.test/
 expect_status 409
 [ "$(photos_on_disk)" = 1 ] || fail "expected the refused photo to be deleted"
 other="${PROFILE/artiste@integration.test/other@integration.test}"
-artist POST "${BASE_URL}/api/admin/artists" "${other/DJ Test/ana}" "${PHOTOS}/photo.png"
+artist POST "${BASE_URL}/api/admin/artists" "${other/DJ Test/ana}" "${PHOTOS}/other.png"
 expect_status 200
+ana="$(body_id)"
 json PATCH "${BASE_URL}/api/admin/artists/${id}" "${PROFILE/artiste@integration.test/Other@integration.test}"
 expect_status 409
 
@@ -162,6 +165,17 @@ json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"
 expect_status 200
 expect_body_contains '"hasPhoto":false'
 [ "$(photos_on_disk)" = "$photos" ] || fail "expected the removed photo to be deleted"
+
+echo "  an artist given the same photo as another shares it, which the other keeps when it's removed"
+photo "${BASE_URL}/api/admin/artists/${id}/photo" "${PHOTOS}/other.png"
+expect_status 200
+expect_body_contains '"hasPhoto":true'
+[ "$(photos_on_disk)" = "$photos" ] || fail "expected the photo to be kept once"
+json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"
+expect_status 200
+[ "$(photos_on_disk)" = "$photos" ] && [ "$(sizes_on_disk)" = "$((photos * 2))" ] || fail "expected the other artist's photo to stay"
+request --header "Cookie: ${cookie}" "${BASE_URL}/api/admin/artists/${ana}/photo?width=320"
+expect_status 200
 # Removing it again changes nothing, but still says who changed the artist.
 sql "update artists set updated_by = null where id = '${id}'" >/dev/null
 json DELETE "${BASE_URL}/api/admin/artists/${id}/photo"

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { buffer } from 'node:stream/consumers'
@@ -9,8 +9,9 @@ import { privateBucket } from '../core/private-bucket.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
 import { sizesBackfill } from './backfill.js'
 import type { StoredImage } from './backfill.js'
-import { sizeKey } from './sizes.js'
-import { testImage } from './test-photos.js'
+import { PHOTO_WIDTHS, sizeKey } from './sizes.js'
+import type { Photos } from './store.js'
+import { keptFiles, testImage } from './test-photos.js'
 
 // Making the sizes that the photos and flyers the server keeps don't have, when it starts (see "Photos" in
 // docs/design/server/artists.md).
@@ -31,15 +32,19 @@ describe('sizesBackfill', () => {
     await rm(directory, { recursive: true, force: true })
   })
 
-  const kept = async () =>
-    (await readdir(directory, { recursive: true, withFileTypes: true }))
-      .filter((entry) => entry.isFile())
-      .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name)))
-      .sort()
+  const kept = () => keptFiles(directory)
+
+  // Deletes photos as if nothing used them, through `files` unless it's given others: whether something does is tested
+  // on the database (see artists/photos.db.test.ts).
+  const unused = (through = files): Pick<Photos, 'deleteUnused'> => ({
+    deleteUnused: async (key) => {
+      for (const file of [key, ...PHOTO_WIDTHS.map((width) => sizeKey(key, width))]) await through.delete(file)
+    },
+  })
 
   // Runs it, as the server does, through `files` unless it's given others, until it's done.
   async function backfill(images: StoredImage[], through = files) {
-    const run = sizesBackfill(async () => images, through, logger)
+    const run = sizesBackfill(async () => images, through, unused(through), logger)
     run.start()
     await run.stopped()
   }
@@ -68,9 +73,9 @@ describe('sizesBackfill', () => {
     const put = vi.spyOn(files, 'put')
 
     await backfill([
-      { of: 'session', id: 's', key: 'sessions/s.png' },
-      { of: 'artist', id: 'a', key: 'artists/a.jpg' },
-      { of: 'collective', id: 'c', key: 'collectives/c.webp' },
+      { of: 'session', id: 's', key: 'sessions/s.png', type: 'image/png' },
+      { of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' },
+      { of: 'collective', id: 'c', key: 'collectives/c.webp', type: 'image/webp' },
     ])
 
     expect(await width(sizeKey('artists/a.jpg', 320))).toBe(320)
@@ -98,10 +103,10 @@ describe('sizesBackfill', () => {
 
     await backfill(
       [
-        { of: 'artist', id: 'cut', key: 'artists/cut.jpg' },
-        { of: 'collective', id: 'gone', key: 'collectives/gone.jpg' },
-        { of: 'artist', id: 'failing', key: 'artists/failing.jpg' },
-        { of: 'artist', id: 'fine', key: 'artists/fine.jpg' },
+        { of: 'artist', id: 'cut', key: 'artists/cut.jpg', type: 'image/jpeg' },
+        { of: 'collective', id: 'gone', key: 'collectives/gone.jpg', type: 'image/jpeg' },
+        { of: 'artist', id: 'failing', key: 'artists/failing.jpg', type: 'image/jpeg' },
+        { of: 'artist', id: 'fine', key: 'artists/fine.jpg', type: 'image/jpeg' },
       ],
       failing,
     )
@@ -123,7 +128,7 @@ describe('sizesBackfill', () => {
 
   it('deletes the sizes it made of a photo that was deleted meanwhile', async () => {
     await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
-    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg' }], deletingOnRead())
+    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }], deletingOnRead())
     expect(await kept()).toEqual([])
     expect(log.error).not.toHaveBeenCalled()
     expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: 0, missing: 1 }), 'Made the missing sizes of photos and flyers')
@@ -131,15 +136,12 @@ describe('sizesBackfill', () => {
 
   it('logs a size of a deleted photo that it fails to delete', async () => {
     await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
-    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg' }], deletingOnRead({ delete: async () => Promise.reject(new Error('S3 is down')) }))
-    expect(log.error).toHaveBeenCalledExactlyOnceWith(
-      { err: expect.any(Error), key: 'artists/a.jpg' },
-      'Failed to delete the size of a photo that may have been deleted',
-    )
+    await backfill([{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }], deletingOnRead({ delete: async () => Promise.reject(new Error('S3 is down')) }))
+    expect(log.error).toHaveBeenCalledExactlyOnceWith({ err: expect.any(Error), key: 'artists/a.jpg' }, 'Failed to delete a photo that is not used anymore')
   })
 
   it('logs, rather than throws, when it fails to list the photos', async () => {
-    const run = sizesBackfill(async () => Promise.reject(new Error('The database is down')), files, logger)
+    const run = sizesBackfill(async () => Promise.reject(new Error('The database is down')), files, unused(), logger)
     run.start()
     await run.stopped()
     expect(log.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'Failed to make the missing sizes of photos and flyers')
@@ -148,7 +150,7 @@ describe('sizesBackfill', () => {
   it('stops before the next photo once it is asked to, after the one it is making', async () => {
     for (const name of ['a', 'b', 'c']) await files.put(`artists/${name}.jpg`, await testImage('jpeg', 640, 480), 'image/jpeg')
     const run = sizesBackfill(
-      async () => ['a', 'b', 'c'].map((id) => ({ of: 'artist' as const, id, key: `artists/${id}.jpg` })),
+      async () => ['a', 'b', 'c'].map((id) => ({ of: 'artist' as const, id, key: `artists/${id}.jpg`, type: 'image/jpeg' })),
       {
         ...files,
         // Asked to stop while it makes the sizes of the first one.
@@ -157,11 +159,45 @@ describe('sizesBackfill', () => {
           return files.read(key)
         },
       },
+      unused(),
       logger,
     )
     run.start()
     await run.stopped()
     expect(await kept()).toEqual(['artists/a.jpg', sizeKey('artists/a.jpg', 1280), sizeKey('artists/a.jpg', 320), 'artists/b.jpg', 'artists/c.jpg'])
     expect(log.info).toHaveBeenLastCalledWith(expect.objectContaining({ made: 1 }), 'Stopped making the missing sizes of photos and flyers')
+  })
+
+  it('runs `first` before it makes the sizes, which it lists once `first` is done', async () => {
+    await files.put('artists/a.jpg', await testImage('jpeg', 640, 480), 'image/jpeg')
+    const done: string[] = []
+    const run = sizesBackfill(
+      async () => {
+        done.push('list')
+        return [{ of: 'artist', id: 'a', key: 'artists/a.jpg', type: 'image/jpeg' }]
+      },
+      files,
+      unused(),
+      logger,
+      async () => {
+        done.push('first')
+      },
+    )
+    run.start()
+    await run.stopped()
+    expect(done).toEqual(['first', 'list'])
+    expect(await kept()).toContain(sizeKey('artists/a.jpg', 320))
+  })
+
+  it("doesn't make the sizes when it's asked to stop while `first` runs", async () => {
+    const list = vi.fn(async (): Promise<StoredImage[]> => [])
+    const run = sizesBackfill(list, files, unused(), logger, async (stopping) => {
+      run.stop()
+      expect(stopping()).toBe(true)
+    })
+    run.start()
+    await run.stopped()
+    expect(list).not.toHaveBeenCalled()
+    expect(log.info).not.toHaveBeenCalled()
   })
 })

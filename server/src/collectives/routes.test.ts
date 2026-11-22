@@ -4,7 +4,7 @@ import fastifyCookie from '@fastify/cookie'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { useZodSchemas } from '../api/schemas.js'
 import { multipartBody } from '../api/test-multipart.js'
-import { EmailTaken } from '../artists/store.js'
+import { EmailTaken, photoColumns } from '../artists/store.js'
 import { sizeKey } from '../artists/sizes.js'
 import { JPEG, PNG, UNREADABLE_JPEG, memoryPhotos } from '../artists/test-photos.js'
 import { NO_SUCH_MEMBER } from './profile.js'
@@ -49,7 +49,7 @@ const store: CollectivesStore = {
   // Who's public is worked out by the database, which the public routes are tested against (see
   // events/public.db.test.ts).
   getPublic: async () => null,
-  create: vi.fn<CollectivesStore['create']>(async (collective) => {
+  create: vi.fn<CollectivesStore['create']>(async ({ photo, ...collective }) => {
     if (emailTaken(collective.email)) throw new EmailTaken()
     const row: StoredCollective = {
       id: `collective-${++nextId}`,
@@ -57,17 +57,23 @@ const store: CollectivesStore = {
       updatedBy: null,
       updatedAt: null,
       ...collective,
+      ...photoColumns(photo),
       members: members(collective.members),
     }
     rows.push(row)
     return row
   }),
-  update: vi.fn<CollectivesStore['update']>(async (id, changes) => {
+  update: vi.fn<CollectivesStore['update']>(async (id, { photo, ...changes }) => {
     const before = rows.find((row) => row.id === id)
     if (!before) return null
     if (emailTaken(changes.email ?? null, id)) throw new EmailTaken()
     // Its members stay as they are when they're left out.
-    const after = { ...before, ...changes, members: changes.members ? members(changes.members) : before.members }
+    const after = {
+      ...before,
+      ...changes,
+      ...(photo === undefined ? {} : photoColumns(photo)),
+      members: changes.members ? members(changes.members) : before.members,
+    }
     rows = rows.map((row) => (row.id === id ? after : row))
     return { before, after }
   }),

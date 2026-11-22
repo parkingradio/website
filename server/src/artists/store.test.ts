@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import type { FastifyBaseLogger } from 'fastify'
 import sharp from 'sharp'
 import { privateBucket } from '../core/private-bucket.js'
 import type { PrivateFiles } from '../core/private-bucket.js'
+import type { Queryable } from '../db/connection.js'
 import { AdminArtistProfile, ArtistProfile, PHOTO_MAX_BYTES, linkSite, parseLink } from './profile.js'
 import type { LinkSiteId, Profile } from './profile.js'
 import { sizeKey } from './sizes.js'
@@ -328,6 +330,9 @@ describe('withSizes', () => {
 
 describe('privatePhotos', () => {
   const log = { error: vi.fn() } as unknown as FastifyBaseLogger & { error: Mock }
+  // Storing and reading photos doesn't use the database, unless storing one fails, which is tested on it, as deleting
+  // them is (see artists/photos.db.test.ts).
+  const noDatabase = {} as Queryable
   let directory: string
   let files: PrivateFiles
 
@@ -342,64 +347,60 @@ describe('privatePhotos', () => {
   })
 
   const kept = async () => (await readdir(directory, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).length
-  const sized = async (format: 'jpeg' | 'png' | 'webp' = 'jpeg') => withSizes({ body: await testImage(format, 2000, 1000), type: `image/${format}` })
+  const sized = async (format: 'jpeg' | 'png' | 'webp' = 'jpeg', width = 2000) =>
+    withSizes({ body: await testImage(format, width, 1000), type: `image/${format}` })
+  const sha256 = (body: Buffer) => createHash('sha256').update(body).digest('hex')
 
-  it('stores each photo under a new key in its folder, with its type, and its sizes next to it', async () => {
+  it('stores each photo under the SHA-256 of its content in its folder, with its type, and its sizes next to it', async () => {
     const put = vi.spyOn(files, 'put')
-    const photos = privatePhotos(files, log)
+    const photos = privatePhotos(files, noDatabase, log)
     const png = await sized('png')
     const webp = await sized('webp')
     const first = await photos.store(png, 'artists')
     const second = await photos.store(webp, 'collectives')
-    expect(first).toMatch(/^artists\/[0-9a-f-]{36}\.png$/)
-    expect(second).toMatch(/^collectives\/[0-9a-f-]{36}\.webp$/)
-    expect(put).toHaveBeenCalledWith(first, png.body, 'image/png')
-    expect(put).toHaveBeenCalledWith(second, webp.body, 'image/webp')
-    expect(put).toHaveBeenCalledWith(sizeKey(first, 320), png.sizes.get(320), 'image/webp')
-    expect(put).toHaveBeenCalledWith(sizeKey(first, 1280), png.sizes.get(1280), 'image/webp')
+    expect(first).toEqual({ key: `artists/${sha256(png.body)}.png`, type: 'image/png', keep: expect.any(Function) })
+    expect(second).toEqual({ key: `collectives/${sha256(webp.body)}.webp`, type: 'image/webp', keep: expect.any(Function) })
+    expect(put).toHaveBeenCalledWith(first.key, png.body, 'image/png')
+    expect(put).toHaveBeenCalledWith(second.key, webp.body, 'image/webp')
+    expect(put).toHaveBeenCalledWith(sizeKey(first.key, 320), png.sizes.get(320), 'image/webp')
+    expect(put).toHaveBeenCalledWith(sizeKey(first.key, 1280), png.sizes.get(1280), 'image/webp')
     expect(await kept()).toBe(6)
 
-    expect(await buffer((await photos.read(first))!)).toEqual(png.body)
-    expect(await buffer((await photos.readSize(first, 320))!)).toEqual(png.sizes.get(320))
-    expect(await buffer((await photos.readSize(second, 1280))!)).toEqual(webp.sizes.get(1280))
+    expect(await buffer((await photos.read(first.key))!)).toEqual(png.body)
+    expect(await buffer((await photos.readSize(first.key, 320))!)).toEqual(png.sizes.get(320))
+    expect(await buffer((await photos.readSize(second.key, 1280))!)).toEqual(webp.sizes.get(1280))
+  })
+
+  it('stores a photo that is already there once, with its sizes, in each folder', async () => {
+    const photos = privatePhotos(files, noDatabase, log)
+    const photo = await sized()
+    const first = await photos.store(photo, 'sessions')
+    const put = vi.spyOn(files, 'put')
+    expect((await photos.store(photo, 'sessions')).key).toBe(first.key)
+    expect(put).not.toHaveBeenCalled()
+    expect(await kept()).toBe(3)
+    // Only the files that aren't there anymore are stored again.
+    await files.delete(sizeKey(first.key, 1280))
+    await photos.store(photo, 'sessions')
+    expect(put).toHaveBeenCalledExactlyOnceWith(sizeKey(first.key, 1280), photo.sizes.get(1280), 'image/webp')
+    // Each kind has its own.
+    expect((await photos.store(photo, 'artists')).key).toBe(`artists/${sha256(photo.body)}.jpg`)
+    expect(await kept()).toBe(6)
+  })
+
+  it('stores only the sizes it is given', async () => {
+    const photos = privatePhotos(files, noDatabase, log)
+    const photo = await sized()
+    const { key } = await photos.store({ ...photo, sizes: new Map([[320, photo.sizes.get(320)!]]) }, 'artists')
+    expect(await files.exists(sizeKey(key, 320))).toBe(true)
+    expect(await files.exists(sizeKey(key, 1280))).toBe(false)
   })
 
   it('reads a size that is missing as null', async () => {
-    const photos = privatePhotos(files, log)
-    const key = await photos.store(await sized(), 'artists')
+    const photos = privatePhotos(files, noDatabase, log)
+    const { key } = await photos.store(await sized(), 'artists')
     await files.delete(sizeKey(key, 320))
     expect(await photos.readSize(key, 320)).toBeNull()
     expect(await photos.readSize('artists/missing.jpg', 1280)).toBeNull()
-  })
-
-  it('deletes what it stored when it fails to store a size, and throws', async () => {
-    let puts = 0
-    const photos = privatePhotos({ ...files, put: async (...put) => (++puts === 3 ? Promise.reject(new Error('S3 is down')) : files.put(...put)) }, log)
-    await expect(photos.store(await sized(), 'artists')).rejects.toThrow('S3 is down')
-    expect(await kept()).toBe(0)
-    expect(log.error).not.toHaveBeenCalled()
-  })
-
-  it('logs what it failed to delete once it failed to store a size', async () => {
-    const photos = privatePhotos({
-      ...files,
-      put: async (key, ...rest) => (key.endsWith('.w1280.webp') ? Promise.reject(new Error('S3 is down')) : files.put(key, ...rest)),
-      delete: async () => Promise.reject(new Error('S3 is still down')),
-    }, log)
-    await expect(photos.store(await sized(), 'artists')).rejects.toThrow('S3 is down')
-    expect(log.error).toHaveBeenCalledWith(expect.objectContaining({ key: expect.stringMatching(/^artists\//) }), 'Failed to delete a photo that is not used anymore')
-  })
-
-  it('deletes a photo with its sizes', async () => {
-    const photos = privatePhotos(files, log)
-    const key = await photos.store(await sized(), 'artists')
-    const other = await photos.store(await sized(), 'artists')
-    expect(await kept()).toBe(6)
-    await photos.delete(key)
-    expect(await kept()).toBe(3)
-    // Whatever sizes it has.
-    await files.delete(sizeKey(other, 1280))
-    await photos.delete(other)
-    expect(await kept()).toBe(0)
   })
 })

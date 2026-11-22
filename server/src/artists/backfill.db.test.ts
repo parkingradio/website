@@ -23,12 +23,13 @@ afterAll(async () => {
 it("lists every photo and flyer the server keeps, sessions' flyers first, the latest first", async () => {
   const artists = artistsStore(database.db)
   const createdBy = 'admin@example.com'
-  const photo = (photoKey: string) => ({ photoKey, photoType: 'image/jpeg' })
-  const ana = await artists.create({ ...validateProfile({ name: 'Ana' }, AdminArtistProfile), ...photo('artists/ana.jpg'), createdBy })
-  await artists.create({ ...validateProfile({ name: 'Brume' }, AdminArtistProfile), photoKey: null, photoType: null, createdBy })
+  // Photos that aren't stored: only their keys are listed.
+  const photo = (key: string, type: string) => ({ key, type, keep: async () => {} })
+  const ana = await artists.create({ ...validateProfile({ name: 'Ana' }, AdminArtistProfile), photo: photo('artists/ana.jpg', 'image/jpeg'), createdBy })
+  await artists.create({ ...validateProfile({ name: 'Brume' }, AdminArtistProfile), photo: null, createdBy })
   const ondes = await collectivesStore(database.db).create({
     ...validateProfile({ name: 'Les Ondes', members: [{ id: ana.id }] }, AdminCollectiveProfile),
-    ...photo('collectives/ondes.png'),
+    photo: photo('collectives/ondes.png', 'image/png'),
     createdBy,
   })
   const sessions = sessionsStore(database.db)
@@ -43,7 +44,7 @@ it("lists every photo and flyer the server keeps, sessions' flyers first, the la
         name: '',
         raEventId: null,
         description: '',
-        ...(flyerKey ? { flyerKey, flyerType: 'image/png' } : { flyerKey: null, flyerType: null }),
+        flyer: flyerKey ? photo(flyerKey, 'image/png') : null,
         createdBy,
       },
       [],
@@ -53,9 +54,9 @@ it("lists every photo and flyer the server keeps, sessions' flyers first, the la
   const later = await session('2026-01-12T21:00-05:00', 'sessions/later.png')
 
   expect(await storedImages(database.db)).toEqual([
-    { of: 'session', id: later.id, key: 'sessions/later.png' },
-    { of: 'session', id: earlier.id, key: 'sessions/earlier.png' },
-    { of: 'artist', id: ana.id, key: 'artists/ana.jpg' },
-    { of: 'collective', id: ondes.id, key: 'collectives/ondes.png' },
+    { of: 'session', id: later.id, key: 'sessions/later.png', type: 'image/png' },
+    { of: 'session', id: earlier.id, key: 'sessions/earlier.png', type: 'image/png' },
+    { of: 'artist', id: ana.id, key: 'artists/ana.jpg', type: 'image/jpeg' },
+    { of: 'collective', id: ondes.id, key: 'collectives/ondes.png', type: 'image/png' },
   ])
 })

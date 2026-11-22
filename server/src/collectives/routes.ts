@@ -4,8 +4,8 @@ import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
 import { PhotoForm, photoRoute, readImageForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
-import { EmailTaken, NO_PHOTO, PHOTO_ERRORS, forgetPhoto, storePhoto } from '../artists/store.js'
-import type { Photos, StoredPhoto } from '../artists/store.js'
+import { EmailTaken, PHOTO_ERRORS, forgetPhoto, storePhoto } from '../artists/store.js'
+import type { NewPhoto, Photos } from '../artists/store.js'
 import { AdminCollectiveProfile } from './profile.js'
 import type { CollectiveProfile } from './profile.js'
 import { ConflictError, conflictBody } from '../sessions/routes.js'
@@ -163,10 +163,10 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
 
       const photo = await storePhoto(photos, sent.photo, 'collectives')
       try {
-        const row = await store.create({ ...sent.profile, ...photo, createdBy: request.user!.email })
+        const row = await store.create({ ...sent.profile, photo, createdBy: request.user!.email })
         return { ok: true as const, collective: collective(row) }
       } catch (error) {
-        await forgetPhoto(photos, request.log, photo.photoKey)
+        await forgetPhoto(photos, request.log, photo?.key)
         if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
         if (error instanceof InvalidMember) return reply.status(400).send({ ok: false, error: error.message })
         throw error
@@ -180,24 +180,24 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply,
     changes: Partial<CollectiveProfile>,
-    photo: StoredPhoto | null = null,
+    photo?: NewPhoto | null,
   ) {
     let changed: Awaited<ReturnType<CollectivesStore['update']>>
     try {
-      changed = await store.update(request.params.id, { ...changes, ...photo, updatedBy: request.user!.email, updatedAt: new Date() })
+      changed = await store.update(request.params.id, { ...changes, photo, updatedBy: request.user!.email, updatedAt: new Date() })
     } catch (error) {
-      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      await forgetPhoto(photos, request.log, photo?.key)
       if (error instanceof EmailTaken) return reply.status(409).send(EMAIL_TAKEN)
       if (error instanceof InvalidMember) return reply.status(400).send({ ok: false, error: error.message })
       throw error
     }
     if (!changed) {
-      await forgetPhoto(photos, request.log, photo?.photoKey ?? null)
+      await forgetPhoto(photos, request.log, photo?.key)
       return reply.status(404).send(NO_SUCH_COLLECTIVE)
     }
 
     // The photo the collective had, which was replaced or removed.
-    if (photo) await forgetPhoto(photos, request.log, changed.before.photoKey)
+    if (photo !== undefined) await forgetPhoto(photos, request.log, changed.before.photoKey)
     return { ok: true as const, collective: collective(changed.after) }
   }
 
@@ -235,7 +235,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
     async (request, reply) => {
       const sent = await readImageForm(request, 'photo', PHOTO_ERRORS)
       if ('error' in sent) return reply.status(sent.status).send({ ok: false, error: sent.error })
-      return update(request, reply, {}, await storePhoto(photos, sent.image, 'collectives'))
+      return update(request, reply, {}, await photos.store(sent.image, 'collectives'))
     },
   )
 
@@ -251,7 +251,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
         response: { 200: CollectiveResponse, 404: ApiError },
       },
     },
-    async (request, reply) => update(request, reply, {}, NO_PHOTO),
+    async (request, reply) => update(request, reply, {}, null),
   )
 
   api.delete(
