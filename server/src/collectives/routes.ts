@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { PhotoForm, photoRoute, readImageForm, readProfileForm, sendPhoto } from '../artists/photo-form.js'
+import { PhotoForm, PublicSizes, photoRoute, publicSizeRoute, publicSizes, readImageForm, readProfileForm, sendPhoto, sendPublicSize } from '../artists/photo-form.js'
 import { ArtistLinks, Country, PhotoFile } from '../artists/profile.js'
 import { EmailTaken, PHOTO_ERRORS, forgetPhoto, storePhoto } from '../artists/store.js'
 import type { NewPhoto, Photos } from '../artists/store.js'
@@ -41,7 +41,7 @@ const CollectiveResponse = z.object({ ok: z.literal(true), collective: Collectiv
 
 // A public collective's profile, as the public sees it, with its members, who are public through it.
 const PublicCollective = Collective.pick({ id: true, name: true, country: true, city: true, description: true, links: true, members: true })
-  .extend({ photo: z.string().nullable().meta({ description: 'Where its photo is, or null when it has none' }) })
+  .extend({ photo: PublicSizes.nullable().meta({ description: 'Where the sizes of its photo are, by width, or null when it has none' }) })
   .meta({ id: 'PublicCollective' })
 type PublicCollective = z.infer<typeof PublicCollective>
 
@@ -74,6 +74,9 @@ function collective(row: StoredCollective): Collective {
   }
 }
 
+// Where the public gets the sizes of collectives' photos.
+const PHOTOS = '/api/collectives/photos'
+
 // The fields are listed one by one, so that nothing else the admin endpoints give ends up public unless it's added here.
 function publicCollective(row: StoredCollective): PublicCollective {
   return {
@@ -84,7 +87,7 @@ function publicCollective(row: StoredCollective): PublicCollective {
     description: row.description,
     links: row.links,
     members: row.members,
-    photo: row.photoKey === null ? null : `/api/collectives/${row.id}/photo`,
+    photo: publicSizes(PHOTOS, row.photoKey),
   }
 }
 
@@ -137,7 +140,7 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
 
   api.get(
     '/api/admin/collectives/:id/photo',
-    photoRoute('collective', 'admin', { summary: "A collective's photo, as it was sent, or one of its sizes", tags: ['Collectives'] }),
+    photoRoute('collective', { summary: "A collective's photo, as it was sent, or one of its sizes", tags: ['Collectives'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
@@ -303,12 +306,8 @@ export async function collectivesRoutes(app: FastifyInstance, { store, photos }:
   )
 
   api.get(
-    '/api/collectives/:id/photo',
-    photoRoute('collective', 'public', { summary: "One of the sizes of a public collective's photo", tags: ['Collectives'] }),
-    async (request, reply) => {
-      const row = await store.getPublic(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_COLLECTIVE)
-      return sendPhoto(reply, photos, row, 'collective', request.query.width)
-    },
+    `${PHOTOS}/:image/:size`,
+    publicSizeRoute('photo', { summary: 'One of the sizes of a photo that a public collective has', tags: ['Collectives'] }),
+    (request, reply) => sendPublicSize(reply, photos, 'photo', request.params, store.getPublicPhoto),
   )
 }

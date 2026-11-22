@@ -484,7 +484,7 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
 
   api.get(
     '/api/admin/sessions/:id/flyer',
-    photoRoute('session', 'admin', { summary: "A session's flyer, as it was sent, or one of its sizes", tags: ['Sessions'] }),
+    photoRoute('session', { summary: "A session's flyer, as it was sent, or one of its sizes", tags: ['Sessions'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)

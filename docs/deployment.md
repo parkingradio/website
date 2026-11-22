@@ -244,6 +244,9 @@ server starts again, or those under the old key, when it crashes once the row is
 An older version deletes an image as soon as one artist, collective or session stops having it, even when others still
 have it: after rolling back, such an image has to be restored from the bucket's previous versions.
 
+Until an image is moved, the URLs where the public gets its sizes are named after its old key, rather than its content,
+and those of a collective's photo still under `artists/` aren't served (see [Photos](design/server/artists.md#photos)).
+
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

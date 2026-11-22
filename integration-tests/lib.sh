@@ -127,6 +127,12 @@ _files_on_disk() {
     docker exec "$CONTAINER" sh -c "if [ -d '${folder}' ]; then find '${folder}' -type f; fi"
 }
 
+# flyer_path <file> -- the path under which the public gets the sizes of a flyer that's this file, e.g.
+# `<path>/w320.webp`: it's named after its content.
+flyer_path() {
+    printf '/api/events/flyers/%s' "$(sha256sum "$1" | cut -d' ' -f1)"
+}
+
 # cut_short <file> -- print the first half of the file, e.g. an image that then starts like one, but can't be read.
 cut_short() {
     head -c "$(($(wc -c < "$1") / 2))" "$1"

@@ -3,8 +3,9 @@ import type { FastifyContextConfig, FastifyReply, FastifyRequest } from 'fastify
 import { z } from 'zod'
 import { ApiError, ById, firstIssue, nulError } from '../api/schemas.js'
 import { PHOTO_MAX_BYTES, PHOTO_TYPES, PhotoFile } from './profile.js'
-import { PHOTO_WIDTHS, SIZE_TYPE, sizeKey } from './sizes.js'
+import { PHOTO_WIDTHS, SIZE_TYPE, sizeKey, sizeName, widthNamed } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
+import { photoName } from './keys.js'
 import { InvalidProfile, PHOTO_ERRORS, readPhoto, validateProfile } from './store.js'
 import type { PhotoErrors, Photos, SizedPhoto } from './store.js'
 
@@ -150,66 +151,42 @@ export async function readImageForm(
 // against this schema, which only says it's a file.
 const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
 
-// Who an endpoint that serves a photo or a flyer is for: admins, who can get it as it was sent, or the public, who only
-// ever get its sizes (see "Photos" in docs/design/server/artists.md).
-type Access = 'admin' | 'public'
+// What a photo is of, for the admin endpoints: an artist's or a collective's photo, or a session's flyer.
+type PhotoOf = 'artist' | 'collective' | 'session'
+const imageOf = (what: PhotoOf) => (what === 'session' ? 'flyer' : 'photo')
 
-declare module 'fastify' {
-  interface FastifyContextConfig {
-    // Who the route serves photos or flyers to, for those declared with `photoRoute`.
-    photos?: Access
-  }
-}
+const nosniff = 'Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)'
 
-// What a photo is of: an artist's or a collective's photo, or a session's or an event's flyer.
-type PhotoOf = 'artist' | 'collective' | 'session' | 'event'
-const imageOf = (what: PhotoOf) => (what === 'session' || what === 'event' ? 'flyer' : 'photo')
+// Admins' photos can be kept, only in the browser that asked, never in a shared cache, e.g. Cloudflare's, after checking
+// with the server.
+const ADMIN_CACHE_CONTROL = 'private, no-cache'
 
-// The width the public gets a photo at, when the request doesn't say.
-const DEFAULT_PUBLIC_WIDTH: PhotoWidth = 1280
-
-// Browsers can keep photos, only in the browser that asked, never in a shared cache, e.g. Cloudflare's: admins' after
-// checking with the server, and the public's for 5 minutes without checking.
-const CACHE_CONTROL: Record<Access, string> = { admin: 'private, no-cache', public: 'private, max-age=300' }
-
-// What openapi.json says an endpoint that serves a photo or a flyer responds.
-function description(access: Access, image: 'photo' | 'flyer'): string {
-  const nosniff = 'Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)'
-  return access === 'admin'
-    ? `The ${image}, with the type it was checked to have, or, with \`width\`, its size at that width, as WebP. ${nosniff}, ` +
-        'and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with ' +
-        `the server before showing it again (\`Cache-Control: ${CACHE_CONTROL.admin}\`). The ${image} and each of its sizes ` +
-        `have an \`ETag\` of their own, which changes whenever the ${image} does`
-    : `The ${image}'s size at \`width\`, as WebP. ${nosniff}, and that they can show it again for 5 minutes without ` +
-        'checking with the server, only in the browser that asked for it, never in a shared cache ' +
-        `(\`Cache-Control: ${CACHE_CONTROL.public}\`). Each size has an \`ETag\` of its own, which changes whenever the ${image} does`
-}
-
-// The options of a route that serves a photo or a flyer with `sendPhoto`, to whoever `access` says, along with its
-// summary and tags.
-export function photoRoute(what: PhotoOf, access: Access, { summary, tags }: { summary: string; tags: string[] }) {
+// The options of an admin route that serves a photo or a flyer with `sendPhoto`, along with its summary and tags.
+export function photoRoute(what: PhotoOf, { summary, tags }: { summary: string; tags: string[] }) {
   const image = imageOf(what)
-  const config: FastifyContextConfig = access === 'admin' ? { admin: true, tool: null, photos: access } : { photos: access }
-  const width = z
-    .enum(PHOTO_WIDTHS.map(String) as [`${PhotoWidth}`, ...`${PhotoWidth}`[]], { error: `\`width\` must be ${PHOTO_WIDTHS.join(' or ')}.` })
-    .transform((width) => Number(width) as PhotoWidth)
   return {
-    config,
+    config: { admin: true, tool: null } satisfies FastifyContextConfig,
     schema: {
       summary,
       tags,
       params: ById,
       querystring: z.object({
-        width: (access === 'admin' ? width.optional() : width.prefault(`${DEFAULT_PUBLIC_WIDTH}`)).meta({
-          description:
-            `The width to serve it at, in pixels: ${PHOTO_WIDTHS.join(' or ')}, or narrower when it is, as WebP. Without it, ` +
-            (access === 'admin' ? 'it is served as it was sent' : `${DEFAULT_PUBLIC_WIDTH}`),
-        }),
+        width: z
+          .enum(PHOTO_WIDTHS.map(String) as [`${PhotoWidth}`, ...`${PhotoWidth}`[]], { error: `\`width\` must be ${PHOTO_WIDTHS.join(' or ')}.` })
+          .transform((width) => Number(width) as PhotoWidth)
+          .optional()
+          .meta({
+            description: `The width to serve it at, in pixels: ${PHOTO_WIDTHS.join(' or ')}, or narrower when it is, as WebP. Without it, it is served as it was sent`,
+          }),
       }),
       response: {
         200: {
-          description: description(access, image),
-          content: Object.fromEntries((access === 'admin' ? PHOTO_TYPES : [SIZE_TYPE]).map((type) => [type, { schema: Photo }])),
+          description:
+            `The ${image}, with the type it was checked to have, or, with \`width\`, its size at that width, as WebP. ${nosniff}, ` +
+            'and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with ' +
+            `the server before showing it again (\`Cache-Control: ${ADMIN_CACHE_CONTROL}\`). The ${image} and each of its sizes ` +
+            `have an \`ETag\` of their own, which changes whenever the ${image} does`,
+          content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
         },
         // Without a body, which @fastify/swagger documents for a schema of type null.
         304: z.null().meta({
@@ -230,12 +207,12 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
   return ifNoneMatch?.split(',').some((tag) => tag.trim().replace(/^W\//, '') === etag) ?? false
 }
 
-// Sends the photo of an artist or a collective, or the flyer of a session or an event (as `what` says), on a route
-// declared with `photoRoute`, as it was sent, or its size at `width`, which the public always gets, or a 404 when they
-// have none, when it's missing, or when it has no such size (see artists/backfill.ts), once the route has checked that
-// whoever asks can see them. The ETag of a photo is its key, and that of a size the key it's kept under, which are only
-// ever that photo's, wherever it's used (see `photoKey` in store.ts): it changes exactly when the photo does. So a
-// request that already has it gets a 304 without anything being read, even when the photo is missing.
+// Sends the photo of an artist or a collective, or the flyer of a session (as `what` says), to an admin, on a route
+// declared with `photoRoute`, as it was sent, or its size at `width`, or a 404 when they have none, when it's missing,
+// or when it has no such size (see artists/backfill.ts). The ETag of a photo is its key, and that of a size the key it's
+// kept under, which are only ever that photo's, wherever it's used (see `photoKey` in keys.ts): it changes exactly when
+// the photo does. So a request that already has it gets a 304 without anything being read, even when the photo is
+// missing.
 export async function sendPhoto(
   reply: FastifyReply,
   photos: Photos,
@@ -243,15 +220,13 @@ export async function sendPhoto(
   what: PhotoOf,
   width: PhotoWidth | undefined,
 ) {
-  const access = reply.request.routeOptions.config.photos
-  // The public never gets a photo as it was sent, whatever the route's schema lets through.
-  if (!access || (access === 'public' && !width)) throw new Error('Photos are only served as photoRoute says')
+  // Only admins ever get a photo as it was sent: the public gets its sizes from `sendPublicSize`.
+  if (reply.request.routeOptions.config.admin !== true) throw new Error('Photos are only served to admins as they were sent')
   const image = imageOf(what)
   if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
   const etag = `"${width ? sizeKey(row.photoKey, width) : row.photoKey}"`
-  const cacheControl = CACHE_CONTROL[access]
   if (hasEtag(reply.request.headers['if-none-match'], etag)) {
-    return reply.status(304).header('ETag', etag).header('Cache-Control', cacheControl).send()
+    return reply.status(304).header('ETag', etag).header('Cache-Control', ADMIN_CACHE_CONTROL).send()
   }
   const photo = width ? await photos.readSize(row.photoKey, width) : await photos.read(row.photoKey)
   if (!photo && width) {
@@ -269,7 +244,81 @@ export async function sendPhoto(
   return reply
     .header('Content-Type', width ? SIZE_TYPE : row.photoType!)
     .header('X-Content-Type-Options', 'nosniff')
-    .header('Cache-Control', cacheControl)
+    .header('Cache-Control', ADMIN_CACHE_CONTROL)
     .header('ETag', etag)
     .send(photo)
+}
+
+// The public's sizes are named by their URL, which changes whenever what it serves does (see `publicSizes`), so anyone,
+// browsers and Cloudflare included, can keep them for good, without checking with the server again.
+const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+// Where the public gets the sizes of a photo, by width, as public profiles and events give them.
+export const PublicSizes = z.object(
+  Object.fromEntries(PHOTO_WIDTHS.map((width) => [width, z.string()])) as { [Width in `${PhotoWidth}`]: z.ZodString },
+)
+export type PublicSizes = z.infer<typeof PublicSizes>
+
+// The URLs of the sizes of the photo with `key`, or null when there's none, under `path`, the route of
+// `publicSizeRoute`, e.g. `/api/artists/photos`: named after the photo, i.e. its content (see `photoName` in
+// keys.ts), and the size (see `sizeName` in sizes.ts), so that they're the same for everything that has the photo, and
+// change whenever what they serve does.
+export function publicSizes(path: string, key: string | null): PublicSizes | null {
+  if (key === null) return null
+  return Object.fromEntries(PHOTO_WIDTHS.map((width) => [width, `${path}/${photoName(key)}/${sizeName(width)}`])) as PublicSizes
+}
+
+// The options of a public route that serves the sizes of photos or flyers with `sendPublicSize`, at
+// `<path>/:image/:size` (see `publicSizes`), along with its summary and tags.
+export function publicSizeRoute(image: 'photo' | 'flyer', { summary, tags }: { summary: string; tags: string[] }) {
+  return {
+    schema: {
+      summary,
+      tags,
+      params: z.object({
+        image: z.string().meta({ description: `The ${image}'s name, as the URL of its size gives it` }),
+        size: z.string().meta({ description: `The size's name, as its URL gives it, e.g. \`${sizeName(PHOTO_WIDTHS[0])}\`` }),
+      }),
+      response: {
+        200: {
+          description:
+            `That size of the ${image}, as WebP. ${nosniff}, and that anyone, shared caches included, can keep it for good, ` +
+            `without checking with the server again (\`Cache-Control: ${PUBLIC_CACHE_CONTROL}\`): its URL changes whenever ` +
+            'what it serves does',
+          content: { [SIZE_TYPE]: { schema: Photo } },
+        },
+        404: ApiError,
+      },
+    },
+    // Errors, e.g. for a flyer that's no longer public, must not be kept, by browsers or by Cloudflare, which would
+    // otherwise keep the 404 of a URL ending in `.webp`. Here, rather than where they're sent, so that it's also the case of
+    // those that the error handler sends, which removes the headers already given.
+    onSend: async (_request: FastifyRequest, reply: FastifyReply, payload: unknown) => {
+      if (reply.statusCode >= 400) reply.header('Cache-Control', 'no-store')
+      return payload
+    },
+  }
+}
+
+// Sends the size that a request to a route declared with `publicSizeRoute` asks for, of the photo named `image` that
+// `find` finds, i.e. that something public has, or a 404 when there's no such size, nothing public has it, or it has no
+// such size (see artists/backfill.ts).
+export async function sendPublicSize(
+  reply: FastifyReply,
+  photos: Photos,
+  image: 'photo' | 'flyer',
+  params: { image: string; size: string },
+  find: (name: string) => Promise<string | null>,
+) {
+  const width = widthNamed(params.size)
+  const key = width && (await find(params.image))
+  if (!width || !key) return reply.status(404).send({ ok: false, error: `No such ${image}` })
+  const size = await photos.readSize(key, width)
+  // As for admins (see `sendPhoto`).
+  if (!size) return reply.status(404).send({ ok: false, error: `This ${image} has no size ${width} pixels wide` })
+  return reply
+    .header('Content-Type', SIZE_TYPE)
+    .header('X-Content-Type-Options', 'nosniff')
+    .header('Cache-Control', PUBLIC_CACHE_CONTROL)
+    .send(size)
 }

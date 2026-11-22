@@ -69,7 +69,13 @@ The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made wh
 its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
 than WebP allows. They're deleted with it. When it starts, the server makes, in the background, the sizes that the
 photos it keeps don't have: until then, and for good for a photo it can't read, the endpoints fail with 404 for a size
-that isn't there. The public endpoints only ever serve a size, so that the photo itself and its metadata stay private.
+that isn't there.
+
+The public only ever gets the sizes of a public artist's photo, never the photo itself, so that it and its metadata stay
+private. Anyone can keep those sizes for good, browsers and Cloudflare's cache included: so a size that was already
+fetched can still be shown to whoever has its URL once the artist is private again, or once their photo is replaced or
+removed, though public profiles stop giving it right away. If that matters for a photo, its sizes can be purged from
+Cloudflare's cache, but not from the browsers that have them.
 
 ## Public profiles
 
@@ -80,9 +86,14 @@ public. Everyone else is private, e.g. the artists who only applied: there's no 
 endpoints fail with 404 for a private artist, as for one that doesn't exist.
 
 An artist's public profile has their `id`, `name`, `country`, `city`, `genres`, `bio` and `links`, as the admin
-endpoints give them, and `photo`, where their photo is, `/api/artists/<id>/photo`, which takes `width` (see
-[Photos](#photos)), or null when they have none. Never their email or phone, who added or changed them, or their
-collectives, which could name collectives that aren't public.
+endpoints give them, and `photo`, where the public gets the sizes of their photo (see [Photos](#photos)), by width,
+`{"320": "<url>", "1280": "<url>"}`, or null when they have none. Never their email or phone, who added or changed them,
+or their collectives, which could name collectives that aren't public.
+
+Clients take the URLs of sizes from the responses that give them, and never build them. Each one names the photo, by its
+content, and the size, e.g. `/api/artists/photos/<sha256>/w320.webp` (see
+[`GET /api/artists/photos/:image/:size`](#get-apiartistsphotosimagesize)): so it's the same for every artist who has the
+same photo, and it changes whenever what it serves would, when the photo changes, or how its sizes are made.
 
 ## `GET /api/admin/artists[?collective=<id>]` (admin)
 
@@ -181,17 +192,16 @@ Fails with 404 when there's no such artist.
 
 Fails with 404 when there's no such artist, or when they're private.
 
-## `GET /api/artists/:id/photo`
+## `GET /api/artists/photos/:image/:size`
 
-| Query parameter | |
-|---|---|
-| `width` | `320` or `1280`, the size of the photo (see [Photos](#photos)). Without it, `1280` |
+Responds with a size of a photo that a public artist has, at the URL that their public profile gives (see
+[Public profiles](#public-profiles)), as `image/webp`, never with the photo itself. Browsers are told not to guess another
+type (`X-Content-Type-Options: nosniff`), and anyone can keep it for good, shared caches included, without checking with
+the server again (`Cache-Control: public, max-age=31536000, immutable`), since what's at that URL never changes: it has no
+`ETag`. It's served while any public artist has that photo, even when private artists have it too, but only as an
+artist's photo: not because a collective or an event has the same image, whose sizes are at their own URLs.
 
-Other query parameters are ignored.
-
-Responds with that size of a public artist's photo, never with the photo itself, like
-[`GET /api/admin/artists/:id/photo`](#get-apiadminartistsidphoto-admin) with `width`, or a 304, and fails like it, and
-with 404 when they're private too. But browsers can show it again for 5 minutes without checking with the server
-(`Cache-Control: private, max-age=300`), which saves pages a request for each photo they show again, and only check
-with it after that: so once the artist is private, or their photo changes, a browser that already has it can still show
-it for up to 5 minutes. It's still never kept in a shared cache, e.g. Cloudflare's, which would show it to everyone.
+Fails with 404 when no public artist has that photo, e.g. once the artist is private, or once their photo is replaced,
+when `:size` isn't the name of one of its sizes, e.g. one of another width, or when that size is missing (see
+[Photos](#photos)). Its errors are never kept (`Cache-Control: no-store`), so that the size is served as soon as it's
+there, or public again.

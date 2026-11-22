@@ -8,11 +8,12 @@ import type { StoredImage } from './backfill.js'
 import { PHOTO_WIDTHS } from './sizes.js'
 import type { PhotoWidth } from './sizes.js'
 import { forgetPhoto } from './store.js'
-import type { PhotoFolder, Photos } from './store.js'
+import type { PhotoFolder } from './keys.js'
+import type { Photos } from './store.js'
 
 // Photos and flyers used to be stored under a random key each. When the server starts, before the missing sizes are
 // made (see backfill.ts), the photos and flyers it keeps under such a key are moved to the key made from their content
-// (see `photoKey` in store.ts), one at a time, so that those that are the same are kept once, e.g. the flyers of the
+// (see `photoKey` in keys.ts), one at a time, so that those that are the same are kept once, e.g. the flyers of the
 // synth meetups, which were stored once per session (see "Private files" in docs/deployment.md). Once nothing is left
 // to move in every deployment, this goes.
 

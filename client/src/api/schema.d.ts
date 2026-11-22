@@ -1334,29 +1334,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/artists/{id}/photo": {
+    "/api/artists/photos/{image}/{size}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** One of the sizes of a public artist's photo */
+        /** One of the sizes of a photo that a public artist has */
         get: {
             parameters: {
-                query?: {
-                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
-                    width?: "320" | "1280";
-                };
+                query?: never;
                 header?: never;
                 path: {
-                    id: string;
+                    /** @description The photo's name, as the URL of its size gives it */
+                    image: string;
+                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    size: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does */
+                /** @description That size of the photo, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1364,13 +1364,6 @@ export interface paths {
                     content: {
                         "image/webp": Blob;
                     };
-                };
-                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
-                304: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
                 /** @description Default Response */
                 400: {
@@ -1640,29 +1633,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/collectives/{id}/photo": {
+    "/api/collectives/photos/{image}/{size}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** One of the sizes of a public collective's photo */
+        /** One of the sizes of a photo that a public collective has */
         get: {
             parameters: {
-                query?: {
-                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
-                    width?: "320" | "1280";
-                };
+                query?: never;
                 header?: never;
                 path: {
-                    id: string;
+                    /** @description The photo's name, as the URL of its size gives it */
+                    image: string;
+                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    size: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description The photo's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the photo does */
+                /** @description That size of the photo, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1670,13 +1663,6 @@ export interface paths {
                     content: {
                         "image/webp": Blob;
                     };
-                };
-                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
-                304: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
                 /** @description Default Response */
                 400: {
@@ -2323,29 +2309,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/events/{id}/flyer": {
+    "/api/events/flyers/{image}/{size}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** One of the sizes of an event's flyer */
+        /** One of the sizes of a flyer that an event has */
         get: {
             parameters: {
-                query?: {
-                    /** @description The width to serve it at, in pixels: 320 or 1280, or narrower when it is, as WebP. Without it, 1280 */
-                    width?: "320" | "1280";
-                };
+                query?: never;
                 header?: never;
                 path: {
-                    id: string;
+                    /** @description The flyer's name, as the URL of its size gives it */
+                    image: string;
+                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    size: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer's size at `width`, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can show it again for 5 minutes without checking with the server, only in the browser that asked for it, never in a shared cache (`Cache-Control: private, max-age=300`). Each size has an `ETag` of its own, which changes whenever the flyer does */
+                /** @description That size of the flyer, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that anyone, shared caches included, can keep it for good, without checking with the server again (`Cache-Control: public, max-age=31536000, immutable`): its URL changes whenever what it serves does */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2353,13 +2339,6 @@ export interface paths {
                     content: {
                         "image/webp": Blob;
                     };
-                };
-                /** @description The request's `If-None-Match` has the `ETag` of what it asks for, so the browser already has it: it isn't sent again */
-                304: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
                 /** @description Default Response */
                 400: {
@@ -3193,8 +3172,11 @@ export interface components {
             cancelled: boolean;
             /** @description Its description, or else the one its type gives it, or empty when neither has one */
             description: string;
-            /** @description Where its flyer is, or null when it has none */
-            flyer: string | null;
+            /** @description Where the sizes of its flyer are, by width, or null when it has none */
+            flyer: {
+                320: string;
+                1280: string;
+            } | null;
             /** @description The page of its event on RA, or null when it has none */
             raEvent: string | null;
             /** @description In their order, cancelled ones included */
@@ -3310,8 +3292,11 @@ export interface components {
             genres: components["schemas"]["GenreId"][];
             bio: string;
             links: components["schemas"]["ArtistLinks"];
-            /** @description Where their photo is, or null when they have none */
-            photo: string | null;
+            /** @description Where the sizes of their photo are, by width, or null when they have none */
+            photo: {
+                320: string;
+                1280: string;
+            } | null;
         };
         PublicCollective: {
             id: string;
@@ -3322,8 +3307,11 @@ export interface components {
             links: components["schemas"]["ArtistLinks"];
             /** @description In order */
             members: components["schemas"]["Reference"][];
-            /** @description Where its photo is, or null when it has none */
-            photo: string | null;
+            /** @description Where the sizes of its photo are, by width, or null when it has none */
+            photo: {
+                320: string;
+                1280: string;
+            } | null;
         };
         Radio: {
             current: {

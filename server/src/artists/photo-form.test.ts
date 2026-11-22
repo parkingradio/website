@@ -5,8 +5,8 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 import multipart from '@fastify/multipart'
 
-import { useZodSchemas, zodRoutes } from '../api/schemas.js'
-import { photoRoute, readPhotoForm, sendPhoto } from './photo-form.js'
+import { ById, useZodSchemas, zodRoutes } from '../api/schemas.js'
+import { readPhotoForm, sendPhoto } from './photo-form.js'
 import { withSizes } from './store.js'
 import { JPEG, memoryPhotos } from './test-photos.js'
 
@@ -73,22 +73,19 @@ describe('readPhotoForm', () => {
 })
 
 describe('sendPhoto', () => {
-  it('never serves the public a photo as it was sent, nor serves a photo on a route that does not say who it is for', async () => {
+  it('only serves photos on admin routes, never to the public, whether as they were sent or at a size', async () => {
     const app = Fastify()
     useZodSchemas(app)
     const photos = memoryPhotos()
     const { key } = await photos.store(await withSizes({ body: JPEG, type: 'image/jpeg' }), 'artists')
     const row = { photoKey: key, photoType: 'image/jpeg' }
     const api = zodRoutes(app)
-    // As if its schema let a request without `width` through.
-    api.get('/public/:id', photoRoute('artist', 'public', { summary: 'A photo', tags: [] }), (_, reply) => sendPhoto(reply, photos, row, 'artist', undefined))
-    api.get('/sized/:id', photoRoute('artist', 'public', { summary: 'A photo', tags: [] }), (request, reply) => sendPhoto(reply, photos, row, 'artist', request.query.width))
-    app.get('/other/:id', { schema: { summary: 'A photo' } }, (_, reply) => sendPhoto(reply, photos, row, 'artist', 320))
+    api.get('/public/:id', { schema: { summary: 'A photo', params: ById } }, (_, reply) => sendPhoto(reply, photos, row, 'artist', undefined))
+    api.get('/sized/:id', { schema: { summary: 'A photo', params: ById } }, (_, reply) => sendPhoto(reply, photos, row, 'artist', 320))
     expect((await app.inject('/public/1')).statusCode).toBe(500)
-    expect((await app.inject('/other/1')).statusCode).toBe(500)
+    expect((await app.inject('/sized/1')).statusCode).toBe(500)
     expect(photos.read).not.toHaveBeenCalled()
     expect(photos.readSize).not.toHaveBeenCalled()
-    expect((await app.inject('/sized/1')).statusCode).toBe(200)
     await app.close()
   })
 })

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import multipart from '@fastify/multipart'
 import { z } from 'zod'
 import { ApiError, ById, Ok, Reference, Timestamp, Total, changesTo, firstIssue, zodRoutes } from '../api/schemas.js'
-import { PhotoForm, photoRoute, readImageForm, readProfileForm, sendPhoto } from './photo-form.js'
+import { PhotoForm, PublicSizes, photoRoute, publicSizeRoute, publicSizes, readImageForm, readProfileForm, sendPhoto, sendPublicSize } from './photo-form.js'
 import { AdminArtistProfile, ArtistLinks, Country, GenreId, PhotoFile } from './profile.js'
 import type { Profile } from './profile.js'
 import { EmailTaken, PHOTO_ERRORS, forgetPhoto, storePhoto } from './store.js'
@@ -37,7 +37,7 @@ const ArtistResponse = z.object({ ok: z.literal(true), artist: Artist })
 
 // A public artist's profile, as the public sees it.
 const PublicArtist = Artist.pick({ id: true, name: true, country: true, city: true, genres: true, bio: true, links: true })
-  .extend({ photo: z.string().nullable().meta({ description: 'Where their photo is, or null when they have none' }) })
+  .extend({ photo: PublicSizes.nullable().meta({ description: 'Where the sizes of their photo are, by width, or null when they have none' }) })
   .meta({ id: 'PublicArtist' })
 type PublicArtist = z.infer<typeof PublicArtist>
 
@@ -71,6 +71,9 @@ function artist(row: StoredArtist): Artist {
   }
 }
 
+// Where the public gets the sizes of artists' photos.
+const PHOTOS = '/api/artists/photos'
+
 // The fields are listed one by one, so that nothing else the admin endpoints give ends up public unless it's added here.
 function publicArtist(row: ArtistRow): PublicArtist {
   return {
@@ -81,7 +84,7 @@ function publicArtist(row: ArtistRow): PublicArtist {
     genres: row.genres,
     bio: row.bio,
     links: row.links,
-    photo: row.photoKey === null ? null : `/api/artists/${row.id}/photo`,
+    photo: publicSizes(PHOTOS, row.photoKey),
   }
 }
 
@@ -141,7 +144,7 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
 
   api.get(
     '/api/admin/artists/:id/photo',
-    photoRoute('artist', 'admin', { summary: "An artist's photo, as it was sent, or one of its sizes", tags: ['Artists'] }),
+    photoRoute('artist', { summary: "An artist's photo, as it was sent, or one of its sizes", tags: ['Artists'] }),
     async (request, reply) => {
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
@@ -299,12 +302,8 @@ export async function artistsRoutes(app: FastifyInstance, { store, photos }: Art
   )
 
   api.get(
-    '/api/artists/:id/photo',
-    photoRoute('artist', 'public', { summary: "One of the sizes of a public artist's photo", tags: ['Artists'] }),
-    async (request, reply) => {
-      const row = await store.getPublic(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_ARTIST)
-      return sendPhoto(reply, photos, row, 'artist', request.query.width)
-    },
+    `${PHOTOS}/:image/:size`,
+    publicSizeRoute('photo', { summary: 'One of the sizes of a photo that a public artist has', tags: ['Artists'] }),
+    (request, reply) => sendPublicSize(reply, photos, 'photo', request.params, store.getPublicPhoto),
   )
 }
