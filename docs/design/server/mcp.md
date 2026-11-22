@@ -3,7 +3,7 @@
 The server is an MCP ([Model Context Protocol](https://modelcontextprotocol.io)) server at `/mcp`, so that apps like
 Claude can do what admins do on the admin pages, on behalf of an admin who connected them (see [OAuth](oauth.md)). Its
 tools are the endpoints of the API, with a few exceptions (see [Tools](#tools)). Its address, `<site>/mcp`, is what
-admins give Claude to connect it (see [Admins](../client/admin/admins.md)).
+admins give Claude to connect it (see [Intégrations](../client/admin/integrations.md#connecter-claude)).
 
 ## The endpoint
 

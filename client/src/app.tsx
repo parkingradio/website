@@ -19,6 +19,7 @@ import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/a
 import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
 import { CollectivePage, NewCollectivePage } from './pages/admin/collectives'
 import { NewSessionPage, SessionPage, SessionsPage } from './pages/admin/sessions'
+import { Integrations } from './pages/admin/integrations'
 import { Configuration } from './pages/admin/configuration'
 
 function App() {
@@ -56,6 +57,7 @@ function App() {
               <Route path="artistes/collectifs" element={<Navigate to="/admin/artistes" replace />} />
               <Route path="artistes/collectifs/nouveau" element={<NewCollectivePage />} />
               <Route path="artistes/collectifs/:id" element={<CollectivePage />} />
+              <Route path="integrations" element={<Integrations />} />
               <Route path="configuration" element={<Configuration />} />
               {/* The feature flags moved to the configuration section. This keeps older links working. */}
               <Route path="features" element={<Navigate to="/admin/configuration" replace />} />

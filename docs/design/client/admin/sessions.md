@@ -159,7 +159,7 @@ the event on RA, with the bookmarklet or by hand, from the content the server gi
   environment to be known. Outside production, a warning in red follows it: « Attention : l'événement sera vraiment créé
   sur RA, à partir d'une session de TEST. », with the environment's stamp (see
   [Environment](../architecture.md#environment)).
-- A sentence says that « Publier sur RA » opens RA, where the bookmarklet creates the event, linking to Configuration
+- A sentence says that « Publier sur RA » opens RA, where the bookmarklet creates the event, linking to Intégrations
   for it, or to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields, then
   to paste its link below.
 - The event's title ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer

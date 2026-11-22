@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react'
 import { useEnvironmentStamp } from '../../../config-context'
 
-// The bookmarklet that publishes a session's event on RA, in the configuration section (see
+// The bookmarklet that publishes a session's event on RA, in the integrations section (see
 // docs/design/client/admin/publier-sur-ra.md). It loads its code from this site each time it's clicked, so that fixing it
 // never requires reinstalling it.
 

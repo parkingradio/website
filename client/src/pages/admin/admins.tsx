@@ -4,12 +4,10 @@ import { api } from '../../api/client'
 import type { ApiError, Schema } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import { EMAIL_MAX_LENGTH, isEmailAddress } from '../../artist-profile'
-import { ConnectClaude, ConnectedApps } from './connections'
 import { dateFormat, dateTimeFormat } from './describe'
 import { Labeled } from './fields'
 
-// The admins section: inviting admins, and the admins there are, who can be invited again until they accept, and revoked,
-// then connecting Claude, and the apps the admin connected.
+// The admins section: inviting admins, and the admins there are, who can be invited again until they accept, and revoked.
 
 type Status = { kind: 'idle' | 'sending' | 'success' } | { kind: 'error'; message: string }
 
@@ -173,9 +171,6 @@ export function Admins() {
 
       <h2>Admins existants</h2>
       <AdminsList version={version} onChange={reload} />
-
-      <ConnectClaude />
-      <ConnectedApps />
     </>
   )
 }

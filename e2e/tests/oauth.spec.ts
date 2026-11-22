@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { test, expect, logIn } from './fixtures.ts'
 
 // Connecting an app through OAuth, as Claude does: the admin allows it on the authorization page, it exchanges its code for
-// tokens, and the admin disconnects it from the Admins page, which ends its tokens.
+// tokens, and the admin disconnects it from the Intégrations page, which ends its tokens.
 
 const CLIENTS = {
   'Claude Code': { id: 'https://claude.ai/oauth/claude-code-client-metadata', redirectUri: 'http://127.0.0.1:3118/callback' },
@@ -40,7 +40,7 @@ test('an admin allows an app, which gets tokens, then disconnects it', async ({ 
   expect(tokens.status()).toBe(200)
   const { refresh_token: refreshToken } = await tokens.json()
 
-  await page.goto('/admin/admins')
+  await page.goto('/admin/integrations')
   // The most recently used first: this test's connection, which was just made.
   const rows = page.getByRole('row', { name: new RegExp(`^${name} \\d`) })
   await expect(rows.first()).toBeVisible()

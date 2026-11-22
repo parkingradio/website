@@ -20,6 +20,7 @@ logged-in admin's email and a "se déconnecter" button:
 - [Candidatures](candidatures.md)
 - [Sessions](sessions.md)
 - [Artistes](artistes.md)
+- [Intégrations](integrations.md)
 - [Admins](admins.md)
 - [Configuration](configuration.md)
 

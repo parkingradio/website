@@ -1535,6 +1535,8 @@ describe("A session's event on RA", () => {
     await openPanel()
 
     expect(within(value('Événement RA')).getByRole('link', { name: 'sur RA' })).toHaveAttribute('href', 'https://ra.co/pro/event/create')
+    // Where the bookmarklet is.
+    expect(within(value('Événement RA')).getByRole('link', { name: 'Intégrations' })).toHaveAttribute('href', '/admin/integrations')
     expect(raValue('Titre')).toHaveTextContent(/^ONDES TAKEOVERcopier$/)
     expect(raValue('Quand')).toHaveTextContent('samedi 14 novembre 2026, de 21 h à 1 h le lendemain')
     expect(within(raValue('Line-up')).getByText(/^Aurore/)).toHaveTextContent('Aurore Brume Cyan', { normalizeWhitespace: true })
