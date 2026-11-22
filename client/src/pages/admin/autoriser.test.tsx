@@ -57,10 +57,11 @@ describe('Autoriser une application', () => {
     expect(screen.getByText('Il pourra faire tout ce que vous faites dans les pages admin, sauf :')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'gérer les admins et les applications connectées',
-      'voir ou ajouter des photos',
-      'changer la connexion SoundCloud',
-      'voir ou changer les features de la page Configuration',
       "choisir les destinataires de l'envoi des candidatures par e-mail",
+      'changer la connexion SoundCloud',
+      'changer la connexion YouTube',
+      'voir ou changer les features de la page Configuration',
+      'voir, ajouter ou remplacer les photos et les flyers',
     ])
     expect(screen.getByText(/N'autorisez Claude que si vous venez vous-même de lancer sa connexion/)).toBeInTheDocument()
     expect(screen.getByText('Ensuite, votre navigateur retournera vers claude.ai.')).toBeInTheDocument()

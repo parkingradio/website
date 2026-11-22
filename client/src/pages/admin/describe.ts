@@ -57,16 +57,17 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
 
 // What an app that's allowed a scope can do, as the page where admins allow it says it, in plain words (see
 // docs/design/server/oauth.md): a sentence, then what's left out of it, listed under it. For `admin`, that's what the MCP
-// server's tools leave out (see docs/design/server/mcp.md).
+// server's tools leave out, in the same order (see "Tools" in docs/design/server/mcp.md).
 export const SCOPE_DESCRIPTIONS: Record<string, { text: string; except: string[] }> = {
   admin: {
     text: 'Il pourra faire tout ce que vous faites dans les pages admin, sauf\u00a0:',
     except: [
       'gérer les admins et les applications connectées',
-      'voir ou ajouter des photos',
-      'changer la connexion SoundCloud',
-      'voir ou changer les features de la page Configuration',
       "choisir les destinataires de l'envoi des candidatures par e-mail",
+      'changer la connexion SoundCloud',
+      'changer la connexion YouTube',
+      'voir ou changer les features de la page Configuration',
+      'voir, ajouter ou remplacer les photos et les flyers',
     ],
   },
 }
