@@ -175,7 +175,7 @@ describe('the days of the month', () => {
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
-  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), '2026-11', '2026-11-19')
+  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), '2026-11')
 
   it('have what takes them, by start, then end, with their names', () => {
     expect(days.get('2026-11-21')!.things.map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
@@ -202,7 +202,7 @@ describe('the days of the month', () => {
       { start: late.start!, end: late.end!, things: [stays[0], sessionThing(late)] },
       { start: late.start!, end: late.end!, things: [stays[1], sessionThing(late)] },
     ]
-    const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), '2026-11', '2026-11-19')
+    const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), '2026-11')
     const lines = shown.get('2026-11-21')!.things.map(({ conflictsWith }) => conflictsWith.map(inSentence))
     expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
   })
@@ -214,7 +214,7 @@ describe('the days of the month', () => {
     expect(free('2026-11-19')).toEqual(['toute la journée'])
     // In the month after too, as in its own month's grid.
     expect(free('2026-12-01')).toEqual(['toute la journée'])
-    expect(calendarDays(calendar({}), '2026-12', '2026-11-19').get('2026-12-01')!.free).toEqual(['toute la journée'])
+    expect(calendarDays(calendar({}), '2026-12').get('2026-12-01')!.free).toEqual(['toute la journée'])
     // The stay starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // A session starts.
@@ -229,21 +229,21 @@ describe('the days of the month', () => {
 
   it('have free time around an occupation that starts on them', () => {
     const repairs = [{ feedId: 'o', start: '2026-11-24T10:00:00-05:00', end: '2026-11-24T16:00:00-05:00', wholeDay: false, title: '' }]
-    const shown = calendarDays(calendar({ occupations: repairs }), '2026-11', '2026-11-19')
+    const shown = calendarDays(calendar({ occupations: repairs }), '2026-11')
     expect(shown.get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
     // Today's stretches count from 00:00 too.
-    expect(calendarDays(calendar({ occupations: repairs }), '2026-11', '2026-11-24').get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    expect(calendarDays(calendar({ occupations: repairs, today: '2026-11-24' }), '2026-11').get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
   })
 
   it("don't count cancelled sessions", () => {
     const cancelled = session('off', '2026-11-23T20:00:00-05:00', '2026-11-23T23:00:00-05:00', 'cancelled')
-    const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11', '2026-11-19')
+    const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11')
     expect(shown.get('2026-11-23')!.free).toEqual(['toute la journée'])
     expect(shown.get('2026-11-23')!.things).toHaveLength(1)
   })
 
-  it('have free time only in the 365 days from today', () => {
-    expect(calendarDays(calendar({}), '2027-11', '2026-11-19').get('2027-11-18')!.free).toEqual(['toute la journée'])
-    expect(calendarDays(calendar({}), '2027-11', '2026-11-19').get('2027-11-19')!.free).toEqual([])
+  it("have free time only in the 365 days from the server's today", () => {
+    expect(calendarDays(calendar({}), '2027-11').get('2027-11-18')!.free).toEqual(['toute la journée'])
+    expect(calendarDays(calendar({}), '2027-11').get('2027-11-19')!.free).toEqual([])
   })
 })

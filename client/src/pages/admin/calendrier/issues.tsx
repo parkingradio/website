@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { Fragment, useId } from 'react'
 import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
 import { THING_KIND_LABELS, conflictCount, formatDuration, formatQuebecDay, sessionPerformers } from '../describe'
@@ -36,11 +36,12 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
       {counts.length === 0 ? (
         <p>Rien à régler.</p>
       ) : (
-        <button type="button" className="calendar-issues-toggle" aria-expanded={open} aria-controls={contentId} onClick={onToggle}>
-          {counts.map(({ text, className }) => (
-            <span key={text} className={className}>
-              {text}
-            </span>
+        <button type="button" className="calendar-issues-toggle" aria-expanded={open} aria-controls={open ? contentId : undefined} onClick={onToggle}>
+          {counts.map(({ text, className }, i) => (
+            <Fragment key={text}>
+              {i > 0 && ' '}
+              <span className={className}>{text}</span>
+            </Fragment>
           ))}
           <span aria-hidden="true">{open ? '▴' : '▾'}</span>
         </button>
@@ -78,7 +79,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
                 {undatedSessions.map((session) => {
                   const performers = sessionPerformers(session)
                   return (
-                    <li key={session.id}>
+                    <li key={session.id} className={session.status !== 'planned' ? `admin-status-${session.status}` : undefined}>
                       <Link to={sessionPath(session)}>{session.title}</Link>
                       {performers && <span> {performers}</span>}
                       <span className="admin-meta"> {formatDuration(session.durationMinutes)}</span>
@@ -97,7 +98,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
 // One of a conflict's things, with its kind.
 function ConflictingThing({ thing }: { thing: NamedThing }) {
   return (
-    <span className="calendar-issue-thing">
+    <span className={thing.kind === 'session' && thing.status !== 'planned' ? `calendar-issue-thing admin-status-${thing.status}` : 'calendar-issue-thing'}>
       {THING_KIND_LABELS[thing.kind]}&nbsp;:{' '}
       {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} /> : <OccupationLabel title={thing.title} calendar={thing.calendar} />}
     </span>

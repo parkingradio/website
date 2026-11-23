@@ -62,8 +62,9 @@ export function ChosenDay({ day, today, shown, onClose }: ChosenDayProps) {
 // A thing on the chosen day: its kind, its times in full, what it is, and its conflicts on that day.
 function ThingRow({ day, dayThing: { thing, conflictsWith } }: { day: string; dayThing: DayThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
+  const status = thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`
   return (
-    <li className="calendar-row">
+    <li className={status ? `calendar-row ${status}` : 'calendar-row'}>
       <span className={`calendar-row-kind calendar-${thing.kind}${conflictsWith.length > 0 ? ' calendar-conflict' : ''}`}>{THING_KIND_LABELS[thing.kind]}</span>
       <span>{fullTimes(thing, day)}</span>
       <span>

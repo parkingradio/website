@@ -57,7 +57,7 @@ export function Calendrier() {
   const { last, error } = useCalendar(from, to)
   // Only a calendar read for the month's days is shown in it.
   const current = last && last.from === from && last.to === to ? last.calendar : null
-  const days = useMemo(() => current && calendarDays(current, month, today), [current, month, today])
+  const days = useMemo(() => current && calendarDays(current, month), [current, month])
   const monthNameId = useId()
 
   // The day in the month that gets the focus once the page shows it, e.g. once the chosen day is closed.

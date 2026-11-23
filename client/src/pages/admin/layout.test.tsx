@@ -196,19 +196,38 @@ describe('Admin pages', () => {
 })
 
 describe("The menu's badge on calendrier", () => {
+  const FEED = {
+    name: "Calendrier de l'équipe",
+    link: 'https://example.com/team.ics',
+    privateTitles: false,
+    createdBy: 'admin@example.com',
+    createdAt: '2026-11-01T12:00:00Z',
+    updatedBy: null,
+    updatedAt: null,
+    readAt: '2026-11-19T11:50:00-05:00',
+    error: null,
+  }
   // Today is November 19, 2026, in Québec.
   const NOW = new Date('2026-11-19T12:00:00-05:00')
   const TODAY = '/api/admin/calendar?from=2026-11-19&to=2026-11-19'
   const NOVEMBER = '/api/admin/calendar?from=2026-11-01&to=2026-12-05'
   const ADMINS = { '/api/admin/admins': { ok: true, admins: [] } }
+  // Occupations, each in conflict with a session, in June, outside the days asked for, but in the 365 days from today.
   const calendar = (conflicts: number) => ({
     ok: true,
     today: '2026-11-19',
-    feeds: [],
+    feeds: [{ ...FEED, id: 'team' }],
     sessions: [],
     occupations: [],
     undatedSessions: [],
-    conflicts: Array.from({ length: conflicts }, () => ({ start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T23:00:00-05:00', things: [] })),
+    conflicts: Array.from({ length: conflicts }, (_, i) => ({
+      start: '2027-06-05T21:00:00-04:00',
+      end: '2027-06-05T23:00:00-04:00',
+      things: [
+        { kind: 'occupation', feedId: 'team', start: '2027-06-05T20:00:00-04:00', end: '2027-06-06T00:00:00-04:00', wholeDay: false, title: `RÉPARATION ${i + 1}` },
+        { kind: 'session', id: 'session-1', title: 'SOIRÉE', start: '2027-06-05T21:00:00-04:00', end: '2027-06-05T23:00:00-04:00', status: 'planned' },
+      ],
+    })),
   })
   const link = () => within(adminMenu()).getByRole('link', { name: /^calendrier/ })
 

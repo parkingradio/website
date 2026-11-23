@@ -1,8 +1,8 @@
 # Calendrier
 
 At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, and what needs settling (see
-[Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)), and weeks start on
-Sunday. From top to bottom, the page has "À régler", the toolbar, a legend, the month, the chosen day and "Sources".
+[Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From top to bottom,
+the page has "À régler", the toolbar, a legend, the month, the chosen day and "Sources".
 
 "Today" is the day it is in Québec, by the browser's clock.
 
@@ -16,10 +16,9 @@ something else that tells them apart:
   that one that wasn't marked "jouée" stands out.
 - Occupations have a dashed border. An occupation is named by its title, then the name of its feed, its calendar, e.g.
   « RÉPARATION », « Calendrier de l'équipe », or by its calendar's name alone, as it's written, when it has no title or
-  its feed's titles are private, e.g. « Séjours ». Its title is cut short in the month, after two lines. Screen readers
-  read « , calendrier » between the two.
+  its feed's titles are private, e.g. « Séjours ». Its title is cut short in the month, after two lines.
 - Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
-- Conflicts have a red outline, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
+- Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 
 Occupations can't be changed on the site, only in their calendars, which their names give.
 
@@ -38,9 +37,8 @@ starts is written like a session's times in short (see [Times, in Sessions](sess
 ## The address
 
 - `month=YYYY-MM`: the month shown, among those the server takes. Without it, or with a value the page doesn't know, it's
-  today's month.
-- `day=YYYY-MM-DD`: the chosen day. Without `month`, the month shown is the day's. A day that isn't in the month's grid,
-  or isn't a day, is ignored.
+  the chosen day's month, or else today's.
+- `day=YYYY-MM-DD`: the chosen day. A day that isn't in the month's grid, or isn't a day, is ignored.
 - `issues=open`: "À régler" is open.
 
 Changing the month adds a step to the browser's history, and unchooses the day, unless it chooses one too, e.g.
@@ -82,7 +80,8 @@ before and after are faded out, with what's on them. Today stands out.
 Each day lists what takes some of it, in order of start, then end, each with its part of the day and its name (see
 [What's shown](#whats-shown)). A session also has its sets' performers, cut short when they don't fit. A thing that's in
 a conflict has "conflit" on the days the time it overlaps the other thing takes some of. Screen readers read each thing's
-kind before it, e.g. « occupation : RÉPARATION, calendrier Calendrier de l'équipe ».
+kind before it, and « , calendrier » or « , avec » between its title and its calendar or performers, e.g. « occupation :
+RÉPARATION, calendrier Calendrier de l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
 
 Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
 day.
@@ -95,8 +94,8 @@ keyboard's way, since the chosen day has them.
 
 ### Free time
 
-A day has free time when it's in the 365 days from today, those conflicts are found in, and no session that isn't
-cancelled starts on it. Its free time is the parts of the day, from 00:00 to 00:00, that nothing takes, cancelled
+A day has free time when it's in the 365 days that conflicts are found in (see
+[Conflicts](../../server/calendar.md#conflicts)), and no session that isn't cancelled starts on it. Its free time is the parts of the day, from 00:00 to 00:00, that nothing takes, cancelled
 sessions aside. Today's stretches count from 00:00 too, even those that are over.
 
 The month shows the free time of its own days, not that of the months before and after. A day that nothing takes is
@@ -138,4 +137,4 @@ heading and "nouvelle session ce jour →".
 ## Endpoints
 
 - `GET /api/admin/calendar`, for the days of the month's grid, within those the server takes. It's read when the page
-  opens, when the month changes, and when the browser's tab is shown again.
+  opens, when the month changes, and when the browser's tab is shown again, at most once a minute.

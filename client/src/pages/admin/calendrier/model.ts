@@ -32,7 +32,7 @@ const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
-// How many days from today conflicts are found in, and free time shown in.
+// How many days from the server's today conflicts are found in, and free time shown in.
 const HORIZON_DAYS = 365
 
 // `value` if it's a month the page shows, from 2000-01 to 2999-12, or else null.
@@ -196,8 +196,8 @@ export type DayThing = { thing: Thing; part: string; conflictsWith: NamedThing[]
 // time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
 export type CalendarDay = { things: DayThing[]; free: string[] }
 
-// The days of the grid of `month`, as they're shown with `calendar`, read for them, on `today`.
-export function calendarDays(calendar: Calendar, month: string, today: string): Map<string, CalendarDay> {
+// The days of the grid of `month`, as they're shown with `calendar`, read for them.
+export function calendarDays(calendar: Calendar, month: string): Map<string, CalendarDay> {
   const days = gridDays(month)
   const byDay = new Map(days.map((day): [string, CalendarDay] => [day, { things: [], free: [] }]))
   // Each thing's conflicts, by its key, with their two things' keys and names.
@@ -220,6 +220,8 @@ export function calendarDays(calendar: Calendar, month: string, today: string): 
       byDay.get(day)!.things.push({ thing, part: partOfDay(thing, day), conflictsWith: [...others.values()] })
     }
   }
+  // The days conflicts are found in, from the server's today.
+  const { today } = calendar
   const horizon = addDays(today, HORIZON_DAYS)
   for (const [day, shown] of byDay) {
     if (day < today || day >= horizon) continue

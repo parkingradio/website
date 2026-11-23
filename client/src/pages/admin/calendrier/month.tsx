@@ -125,8 +125,15 @@ function DayCell({ id, things, free }: { id: string; things: DayThing[]; free: s
 // when one of its conflicts is on that day.
 function MonthThing({ dayThing: { thing, part, conflictsWith } }: { dayThing: DayThing }) {
   const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`, conflictsWith.length > 0 && 'calendar-conflict']
-  // A session's performers, or an occupation's calendar, after its title.
-  const detail = thing.kind === 'session' ? sessionPerformers(thing) : thing.title !== null && <OccupationCalendar calendar={thing.calendar} />
+  // A session's performers, which screen readers read after ", avec", or an occupation's calendar, after its title.
+  const performers = thing.kind === 'session' && sessionPerformers(thing)
+  const detail = performers ? (
+    <>
+      <span className="visually-hidden">, avec</span> {performers}
+    </>
+  ) : (
+    thing.kind === 'occupation' && thing.title !== null && <OccupationCalendar calendar={thing.calendar} />
+  )
   return (
     <li className={classes.filter(Boolean).join(' ')}>
       <span className="calendar-part">{part}</span>

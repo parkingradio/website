@@ -170,9 +170,9 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      expect(cellText('2026-11-21')).toBe('21toute la journéeoccupation : Séjoursconflit21 h – 1 hsession : HAUTE RIVE TAKEOVERAurore, Brume · Cyanconflit')
+      expect(cellText('2026-11-21')).toBe('21toute la journéeoccupation : Séjoursconflit21 h – 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflit')
       expect(within(cell('2026-11-21')).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(cellText('2026-11-22')).toBe("22jusqu'à 11 hoccupation : Séjoursconflitjusqu'à 1 hsession : HAUTE RIVE TAKEOVERAurore, Brume · Cyanconflitdispo dès 11 h")
+      expect(cellText('2026-11-22')).toBe("22jusqu'à 11 hoccupation : Séjoursconflitjusqu'à 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflitdispo dès 11 h")
       expect(cellText('2026-11-07')).toBe('720 h – 23 hsession : SOIRÉE jouée')
       expect(cell('2026-11-07').querySelector('li')).toHaveClass('admin-status-done')
       expect(cellText('2026-11-24')).toContain('session : LIVE PERFORMANCE annulée')
@@ -343,7 +343,7 @@ describe('Calendrier', () => {
     })
 
     it('names the other thing of a conflict between two occupations', async () => {
-      // A cleaning, during the stay, whose feed's titles are private.
+      // A cleaning, during the stay, whose feed's titles are private, unlike the cleaning's.
       const cleaning = { feedId: 'team', start: '2026-11-21T10:00:00-05:00', end: '2026-11-21T12:00:00-05:00', wholeDay: false, title: 'MÉNAGE' }
       const conflict = { start: cleaning.start, end: cleaning.end, things: [{ kind: 'occupation', ...STAY }, { kind: 'occupation', ...cleaning }] } as Calendar['conflicts'][number]
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, occupations: [STAY, cleaning], sessions: [], conflicts: [conflict] } })
@@ -379,7 +379,7 @@ describe('Calendrier', () => {
 
       const box = screen.getByRole('region', { name: 'À régler' })
       const toggle = within(box).getByRole('button', { name: /conflit/ })
-      expect(toggle).toHaveTextContent('1 conflit1 sans date')
+      expect(toggle).toHaveTextContent('1 conflit 1 sans date')
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(within(box).queryByRole('link', { name: 'LES SŒURS ONDES TAKEOVER' })).not.toBeInTheDocument()
       fireEvent.click(toggle)
@@ -408,6 +408,34 @@ describe('Calendrier', () => {
       expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
     })
 
+    it('shows a session that is done or cancelled in its status colors, on the chosen day and in its conflicts', async () => {
+      // A session today, already played, during a repair.
+      const morning = session('session-5', 'MATINALE', '2026-11-19T09:00:00-05:00', '2026-11-19T11:00:00-05:00', { status: 'done' })
+      const repair = { feedId: 'team', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉPARATION' }
+      const conflict = {
+        start: repair.start,
+        end: morning.end!,
+        things: [
+          { kind: 'session', id: morning.id, title: morning.title, start: morning.start!, end: morning.end!, status: 'done' },
+          { kind: 'occupation', ...repair },
+        ],
+      } as Calendar['conflicts'][number]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [morning, CANCELLED], occupations: [repair], conflicts: [conflict] } })
+      const first = renderAt('/admin/calendrier?day=2026-11-19&issues=open')
+      await loaded()
+
+      const [played] = within(chosenDay()!).getAllByRole('listitem')
+      expect(played).toHaveClass('calendar-row', 'admin-status-done')
+      expect(played).toHaveTextContent('MATINALE jouée')
+      const box = screen.getByRole('region', { name: 'À régler' })
+      expect(within(box).getByText(/^session/)).toHaveClass('admin-status-done')
+      first.unmount()
+
+      renderAt('/admin/calendrier?day=2026-11-24')
+      await loaded()
+      expect(within(chosenDay()!).getAllByRole('listitem')[0]).toHaveClass('admin-status-cancelled')
+    })
+
     it('says when there is nothing to settle, and warns of the feeds that were not read', async () => {
       const notRead = { ...TEAM, id: 'new', name: 'Nouveau', readAt: null }
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [TEAM, STAYS, notRead], conflicts: [], undatedSessions: [] } })
@@ -423,7 +451,8 @@ describe('Calendrier', () => {
     })
 
     it('says when there are no feeds', async () => {
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [] } })
+      // Without feeds, there are no occupations, and no conflicts.
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [] } })
       renderAt('/admin/calendrier')
       await loaded()
 
@@ -445,7 +474,7 @@ describe('Calendrier', () => {
     )
     first.unmount()
 
-    mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [] } })
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [] } })
     renderAt('/admin/calendrier')
     await loaded()
     sources = screen.getByRole('region', { name: 'Sources' })
