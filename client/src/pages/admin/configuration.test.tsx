@@ -4,9 +4,9 @@ import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import { mockFetch } from '../../test-utils'
 
-// Who applications are emailed to, the SoundCloud app, the YouTube channel and the feature flags have their own tests, in
-// configuration/recipients.test.tsx, configuration/soundcloud.test.tsx, configuration/youtube.test.tsx and
-// configuration/features.test.tsx: these are for the section that gathers them.
+// Who applications are emailed to, the SoundCloud app, the YouTube channel, the calendar feeds and the feature flags have
+// their own tests, in configuration/recipients.test.tsx, configuration/soundcloud.test.tsx, configuration/youtube.test.tsx,
+// configuration/calendar-feeds.test.tsx and configuration/features.test.tsx: these are for the section that gathers them.
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 // No flags, so that these tests don't depend on flags that are bound to be retired.
@@ -18,7 +18,9 @@ const NO_CREDENTIALS = {
   '/api/admin/radio/credentials': { ok: true, credentials: null },
   '/api/admin/video/credentials': { ok: true, credentials: null },
 }
-const PAGE = { ...LOGGED_IN, ...NO_FEATURES, ...NO_RECIPIENTS, ...NO_CREDENTIALS }
+// No calendar feeds either.
+const NO_FEEDS = { '/api/admin/calendar/feeds': { ok: true, total: 0, feeds: [] } }
+const PAGE = { ...LOGGED_IN, ...NO_FEATURES, ...NO_RECIPIENTS, ...NO_CREDENTIALS, ...NO_FEEDS }
 
 function CurrentPath() {
   return <div data-testid="path">{useLocation().pathname}</div>
@@ -34,7 +36,7 @@ function renderAt(path: string) {
 }
 
 describe('The configuration section', () => {
-  it('shows who applications are emailed to, then the SoundCloud app, then the YouTube channel, then the feature flags', async () => {
+  it('shows who applications are emailed to, then the SoundCloud app, the YouTube channel, the calendar feeds and the feature flags', async () => {
     mockFetch(PAGE)
     renderAt('/admin/configuration')
 
@@ -43,12 +45,14 @@ describe('The configuration section', () => {
       'Envoi des candidatures par e-mail',
       'Connexion SoundCloud',
       'Connexion YouTube',
+      'Calendriers externes',
       'Features',
     ])
     await screen.findByText('Aucune feature pour le moment.')
     await screen.findByRole('textbox', { name: "Adresse e-mail d'un destinataire" })
     await screen.findByRole('textbox', { name: 'Client ID' })
     await screen.findByRole('textbox', { name: 'ID de la chaîne' })
+    await screen.findByText('Aucun calendrier externe pour le moment.')
   })
 
   it('is where /admin/features leads, since the feature flags moved there', async () => {

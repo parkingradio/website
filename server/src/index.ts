@@ -29,6 +29,8 @@ import { adminsStore } from './admins/store.js'
 import { featuresStore } from './features/store.js'
 import { sessionsStore } from './sessions/store.js'
 import { eventsStore } from './events/store.js'
+import { calendarFeedsStore } from './calendar/feeds.js'
+import { calendarReads } from './calendar/reads.js'
 import { oauthStore } from './oauth/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
@@ -41,11 +43,19 @@ const photos = privatePhotos(privateFiles, db, app.log)
 // Started once the server listens, below, but its hooks can only be added before. It stops as soon as the server
 // starts closing, and the server waits for the photo it's making, if any.
 const backfill = sizesBackfill(() => storedImages(db), privateFiles, photos, app.log)
-app.addHook('preClose', async () => backfill.stop())
+// Likewise for the reads of the calendar feeds, whose stopping also cuts short those of the feeds being added, so that
+// their requests end.
+const calendarFeeds = calendarFeedsStore(db)
+const calendarFeedReads = calendarReads({ feeds: calendarFeeds, log: app.log })
+const backgroundTasks = [backfill, calendarFeedReads]
+app.addHook('preClose', async () => backgroundTasks.forEach((task) => task.stop()))
 app.addHook('onClose', () => db.$client.end())
 // After the database's hook, since Fastify runs the onClose hooks of the root instance from the last one added: the
-// backfill is done with the database before it's closed, e.g. when the server closes while it lists the photos.
-app.addHook('onClose', () => backfill.stopped())
+// backfill and the reads are done with the database before it's closed, e.g. when the server closes while they list
+// the photos or the feeds.
+app.addHook('onClose', async () => {
+  await Promise.all(backgroundTasks.map((task) => task.stopped()))
+})
 
 try {
   await migrateDatabase(db)
@@ -76,6 +86,8 @@ await registerRoutes(app, {
   verifyTurnstile: turnstileVerifier(config.turnstileSecretKey),
   sessions: sessionsStore(db),
   events: eventsStore(db),
+  calendarFeeds,
+  calendarReads: calendarFeedReads,
   oauth: oauthStore(db),
 })
 
@@ -98,7 +110,7 @@ try {
   process.exit(1)
 }
 
-backfill.start()
+for (const task of backgroundTasks) task.start()
 
 // Shut down gracefully when asked to: closing the app lets in-flight requests finish first. This is
 // only set up once the server is listening, since closing the app while it's still starting would

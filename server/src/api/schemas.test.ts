@@ -5,7 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
-import { inQuebecTime, instantIn } from './formats.js'
+import { inQuebecTime, instantIn, isTimeZone } from './formats.js'
 import { ApiError, Day, Ok, Timestamp, changesTo, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
@@ -236,6 +236,13 @@ describe('instantIn', () => {
   it("reads the time in Québec's time zone when Intl doesn't know the one it's given", () => {
     expect(at('Mars/Olympus_Mons', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
     expect(at('', '2026-09-25T18:00')).toBe('2026-09-25T22:00:00.000Z')
+    expect(isTimeZone('Mars/Olympus_Mons')).toBe(false)
+    expect(isTimeZone('Europe/Paris')).toBe(true)
+  })
+
+  it('takes seconds too', () => {
+    expect(at('America/Toronto', '2026-11-14T21:00:30')).toBe('2026-11-15T02:00:30.000Z')
+    expect(at('America/Toronto', '2027-03-14T02:30:15')).toBe('2027-03-14T07:30:15.000Z')
   })
 })
 

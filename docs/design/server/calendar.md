@@ -1,0 +1,116 @@
+# Calendar
+
+Parking Radio has one studio, which holds one thing at a time. Three kinds of things take it:
+
+- **Sessions**, which are entered on the site (see [Sessions](sessions.md)).
+- **Occupations**: anything else that takes the studio, e.g. repairs, private meetings or private workshops. They're
+  read from calendars, in practice a Google Calendar the team shares.
+- **Quiet time** ("silence" on the admin pages): when guests stay at the studio, so that there can't be sessions, or
+  noise. It's read from calendars too, in practice a private one that gives the guests' stays, with their arrival and
+  departure times. The server knows nothing of where the stays come from, e.g. a rental site.
+
+Occupations and quiet time can't be changed on the site, or with the tools: only in their own calendars. The feeds
+they're read from are added and removed on the admin pages, not with the tools, since adding one takes its link, which
+is a secret.
+
+## Feeds
+
+A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
+the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", and a kind:
+`occupation`, for a calendar of occupations, or `quiet-time`, for one of quiet time. There can be several feeds of each
+kind, and several with the same name.
+
+A feed's link is a secret, since anyone who has it can read the calendar: it's never sent back once the feed is added,
+and never appears in the logs, or in any error. So the errors of reading a feed are the server's own, never what the
+link's server answered, which could quote the link. A feed can't be changed: it's removed, then added again. Two feeds
+can't have the same link, where a `webcal` link is the same as the `https` link it stands for, and what comes after `#`
+isn't part of a link.
+
+## Reading the feeds
+
+The server reads every feed when it starts, then every 15 minutes, one feed after another, and reads a feed when it's
+added: adding it waits for that read, so that a link that doesn't give a calendar is refused. Nothing else waits for a
+read: the server keeps what it read in memory, and gives what it read last.
+
+A read follows at most 5 redirects, each to an `https` link, and fails when it takes more than 20 seconds in all, or
+when the calendar is over 10 MB. It also fails when the link's server answers with an error, or with something that
+isn't valid iCalendar, or isn't a calendar: e.g. an `RRULE` that isn't valid fails the whole read, not only its event.
+A read that fails keeps what was read before, if anything was, and the feed says why it failed (`error`), until a read
+succeeds. What was read is only kept in memory: after the server restarts, a feed has neither `readAt` nor `error` until
+it's read again.
+
+## Events
+
+What a read keeps of a feed is its events, each of which takes the studio from its start, included, to its end,
+excluded, so that an event that ends when another starts doesn't overlap it:
+
+- A timed event takes the time from its `DTSTART` to its `DTEND`, or for its `DURATION`. Its times are in UTC when they
+  say so (`Z`), and otherwise in their time zone (`TZID`): the IANA time zone of that name, e.g. `America/Toronto`, or
+  else the feed's own definition of it (`VTIMEZONE`), e.g. for Outlook's "Eastern Standard Time". They're in Québec time
+  when they have no time zone, or one that's neither. A local time that the clocks show twice, as they go back, is the
+  first of the two instants, and one that they skip, as they go forward, is moved forward by as much as they skip, e.g.
+  2:30 becomes 3:30.
+- A whole-day event (`VALUE=DATE`) takes its whole days in Québec time: from 00:00 on its first day to 00:00 on the day
+  its `DTEND` names, or after its `DURATION`, or after one day without either.
+- A recurring event (`RRULE`, `RDATE`, `EXDATE`) takes each of its occurrences, at the same local time in its time zone
+  on both sides of a change of daylight saving time, e.g. 19:00 every Tuesday, in winter as in summer. An occurrence
+  that was changed on its own, which is a `VEVENT` with the same `UID` and a `RECURRENCE-ID`, takes its own times
+  instead. One whose recurring event isn't in the feed, e.g. a single occurrence of someone else's event that the
+  calendar was invited to, is an event of its own.
+- An event or an occurrence that's cancelled (`STATUS:CANCELLED`), or that takes no time, e.g. one with a `DTSTART` but
+  neither a `DTEND` nor a `DURATION`, is left out. Whether an event says it's busy or free (`TRANSP`) doesn't matter:
+  e.g. Google makes whole-day events free unless told otherwise, and they still take the studio.
+
+A read keeps the events and the occurrences that take some of the time from a year before it to two years after it.
+An event that can't be read, e.g. one without a `DTSTART`, is left out, without failing the read, and so is a recurring
+event with more than 20,000 occurrences until then, e.g. one every minute. But a read that would go through more than
+50,000 events and occurrences in all fails, rather than leave out some of them without anyone knowing.
+
+An occupation keeps its title (`SUMMARY`), or none. Quiet time doesn't: the stays of guests can have their names, so the
+server never keeps, gives or logs the titles, descriptions or locations of quiet time's events. They're only quiet
+time, from the feed's name.
+
+A feed has these fields:
+
+| Field | Type | |
+|---|---|---|
+| `id` | string | |
+| `name` | string | |
+| `kind` | `"occupation"` or `"quiet-time"` | |
+| `createdBy` | string | The email of the admin who added it |
+| `createdAt` | string | When it was added |
+| `readAt` | string or null | When it was last read successfully, or null until then (see [Reading the feeds](#reading-the-feeds)) |
+| `error` | string or null | Why its last read failed, or null when it succeeded, or until it's read |
+
+## `GET /api/admin/calendar/feeds` (admin)
+
+Every feed, in the order they were added.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `total` | number | How many feeds there are |
+| `feeds` | list of feeds | |
+
+## `POST /api/admin/calendar/feeds` (admin)
+
+| Request field | Type | |
+|---|---|---|
+| `name` | string | Trimmed, then between 1 and 100 characters |
+| `kind` | `"occupation"` or `"quiet-time"` | |
+| `link` | string | Trimmed: an `https` or `webcal` link, without a user name or a password, of at most 2,000 characters once its characters that links can't have are encoded, e.g. `é` as `%C3%A9` |
+
+Reads the link (see [Reading the feeds](#reading-the-feeds)), and only if that gives a calendar, adds the feed, with
+that read as its first, and responds `{"ok": true, "feed": <the feed>}`. Fails with:
+
+- 409 when a feed already has that link, with an error that names it.
+- 400 when a field doesn't follow its rules, or when the link's server refuses it (it answers with a 4xx status other
+  than 408 and 429, e.g. 404), or answers with something that isn't valid iCalendar, isn't a calendar, is over 10 MB,
+  or has too many events and occurrences, or when it redirects more than 5 times, or to a link that isn't `https`.
+- 502 when the link's server can't be reached, doesn't answer within 20 seconds, fails, or refuses requests for now (a
+  5xx, 408 or 429 status).
+
+## `DELETE /api/admin/calendar/feeds/:id` (admin)
+
+Removes a feed, and forgets what was read from it. Responds `{"ok": true}`, or fails with 404 when there's no such
+feed.
