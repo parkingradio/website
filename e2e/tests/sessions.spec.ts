@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto'
-import type { Locator, Page, Request, TestInfo } from '@playwright/test'
+import type { Locator, Page, Request } from '@playwright/test'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
 import { drag, moveWithKeyboard, pickUp } from './drag.ts'
-import { test, expect, adminMenu, logIn } from './fixtures.ts'
+import { test, expect, adminMenu, logIn, longDay, own } from './fixtures.ts'
 
 // The sessions and their sets: the seeded ones (see seed-data.ts), searched and listed on their artists' and collectives'
 // pages, and sessions that tests add, change and delete, in Québec time, whatever the browser's time zone.
@@ -402,16 +401,6 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await deleteOwn(page, mine)
 })
 
-// What a test's own entities are named after, two days for its sessions, from 2100 to 2899, in July, when clocks don't
-// change, and a YouTube video id of 11 characters. They're derived from its unique name, so that other tests' sessions,
-// even those left from a run that failed, are very unlikely to have them.
-function own(testInfo: TestInfo) {
-  const unique = `${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`
-  const hash = createHash('sha256').update(unique).digest()
-  const day = (offset: number) => `${2100 + (hash.readUInt32BE(offset) % 800)}-07-${String(1 + (hash.readUInt32BE(offset + 4) % 28)).padStart(2, '0')}`
-  return { unique, day: day(0), otherDay: day(8), youtubeVideo: hash.toString('base64url').slice(0, 11) }
-}
-
 // Adds a collective of the test's own, with an artist of its own whom the server creates with it, through the API, with
 // the session, once there's one, and returns their names and ids.
 async function addOwnCollective(page: Page, unique: string) {
@@ -456,11 +445,6 @@ async function mockRaEvents(page: Page) {
   })
   const events = { promoterUrl: 'https://ra.co/promoters/183980', upcoming: [], past: [event('1234568', '2026-10-17T21:00:00-04:00'), event('1234567', '2026-10-10T21:00:00-04:00')] }
   await page.route((url) => url.pathname === '/api/ra-events', (route) => route.fulfill({ json: events }))
-}
-
-// E.g. "samedi 14 novembre 2026", for a day as "YYYY-MM-DD".
-function longDay(day: string): string {
-  return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 }
 
 test("a collective's takeover is added from its page, overnight, with its sets, then moved, one of its sets deleted, cancelled and deleted", async ({ page, isMobile, hasTouch }, testInfo) => {

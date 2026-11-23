@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import { api } from '../../api/client'
-import { UNAUTHORIZED, mockFetch, requestsTo } from '../../test-utils'
+import { UNAUTHORIZED, held, mockFetch, requestsTo } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 const LOGGED_OUT = { '/api/admin/me': UNAUTHORIZED }
@@ -192,5 +192,122 @@ describe('Admin pages', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Connexion' })).toBeInTheDocument())
     expect(screen.getByTestId('path')).toHaveTextContent('/admin')
+  })
+})
+
+describe("The menu's badge on calendrier", () => {
+  const FEED = {
+    name: "Calendrier de l'équipe",
+    link: 'https://example.com/team.ics',
+    privateTitles: false,
+    createdBy: 'admin@example.com',
+    createdAt: '2026-11-01T12:00:00Z',
+    updatedBy: null,
+    updatedAt: null,
+    readAt: '2026-11-19T11:50:00-05:00',
+    error: null,
+  }
+  // Today is November 19, 2026, in Québec.
+  const NOW = new Date('2026-11-19T12:00:00-05:00')
+  const TODAY = '/api/admin/calendar?from=2026-11-19&to=2026-11-19'
+  const NOVEMBER = '/api/admin/calendar?from=2026-11-01&to=2026-12-05'
+  const ADMINS = { '/api/admin/admins': { ok: true, admins: [] } }
+  // Occupations, each in conflict with a session, in June, outside the days asked for, but in the 365 days from today.
+  const calendar = (conflicts: number) => ({
+    ok: true,
+    today: '2026-11-19',
+    feeds: [{ ...FEED, id: 'team' }],
+    sessions: [],
+    occupations: [],
+    undatedSessions: [],
+    conflicts: Array.from({ length: conflicts }, (_, i) => ({
+      start: '2027-06-05T21:00:00-04:00',
+      end: '2027-06-05T23:00:00-04:00',
+      things: [
+        { kind: 'occupation', feedId: 'team', start: '2027-06-05T20:00:00-04:00', end: '2027-06-06T00:00:00-04:00', wholeDay: false, title: `RÉPARATION ${i + 1}` },
+        { kind: 'session', id: 'session-1', title: 'SOIRÉE', start: '2027-06-05T21:00:00-04:00', end: '2027-06-05T23:00:00-04:00', status: 'planned' },
+      ],
+    })),
+  })
+  const link = () => within(adminMenu()).getByRole('link', { name: /^calendrier/ })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('gives how many conflicts there are, and opens on them', async () => {
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(2) })
+    const first = renderAt('/admin/admins')
+
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 2 conflits'))
+    expect(link()).toHaveAttribute('href', '/admin/calendrier?issues=open')
+    expect(link().querySelector('.admin-badge')).toHaveTextContent('2')
+    first.unmount()
+
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(1) })
+    const second = renderAt('/admin/admins')
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 1 conflit'))
+    second.unmount()
+
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(0) })
+    renderAt('/admin/admins')
+    await waitFor(() => expect(requestsTo('GET', TODAY)).toHaveLength(1))
+    await screen.findByRole('heading', { level: 1, name: 'Admins' })
+    expect(link()).toHaveAccessibleName('calendrier')
+    expect(link()).toHaveAttribute('href', '/admin/calendrier')
+  })
+
+  it("is read again each time another page opens, and stays as it was when it can't be", async () => {
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: { ok: false, error: 'Internal server error' } })
+    renderAt('/admin/admins')
+    await waitFor(() => expect(requestsTo('GET', TODAY)).toHaveLength(1))
+    expect(link()).toHaveAccessibleName('calendrier')
+
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(3) })
+    fireEvent.click(within(adminMenu()).getByRole('link', { name: 'rotation radio' }))
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 3 conflits'))
+
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: { ok: false, error: 'Internal server error' } })
+    fireEvent.click(within(adminMenu()).getByRole('link', { name: 'admins' }))
+    await waitFor(() => expect(requestsTo('GET', TODAY)).toHaveLength(1))
+    await screen.findByRole('heading', { level: 1, name: 'Admins' })
+    expect(link()).toHaveAccessibleName('calendrier, 3 conflits')
+  })
+
+  it("isn't read on Calendrier, or on /admin, which leads to it, but follows what the page reads", async () => {
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: calendar(2) })
+    renderAt('/admin')
+
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 2 conflits'))
+    expect(requestsTo('GET', TODAY)).toHaveLength(0)
+    expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+  })
+
+  it("doesn't take an answer that comes once Calendrier is open", async () => {
+    const late = held()
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: late.body, [NOVEMBER]: calendar(1) })
+    renderAt('/admin/admins')
+    await waitFor(() => expect(requestsTo('GET', TODAY)).toHaveLength(1))
+
+    fireEvent.click(link())
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 1 conflit'))
+    await late.answer(calendar(5))
+    expect(link()).toHaveAccessibleName('calendrier, 1 conflit')
+  })
+
+  it('is read again when the tab is shown, at most once a minute', async () => {
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(1) })
+    renderAt('/admin/admins')
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 1 conflit'))
+
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(2) })
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.setSystemTime(NOW.getTime() + 61 * 1000)
+    document.dispatchEvent(new Event('visibilitychange'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 2 conflits'))
+    expect(requestsTo('GET', TODAY)).toHaveLength(1)
   })
 })

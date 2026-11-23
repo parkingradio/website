@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto'
 import { test as base, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, TestInfo } from '@playwright/test'
 import type { components } from '../../client/src/api/schema.d.ts'
+import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
 import { admin } from '../env.ts'
 
 // What every test is written with: Playwright's `test`, where the browser only reaches the server under test, under an
@@ -64,6 +66,22 @@ function clientAddress(worker: number, nth: number): string {
   return `198.${18 + (index >> 16)}.${(index >> 8) & 255}.${index & 255}`
 }
 
+// What a test's own entities are named after, two days for its sessions, from 2100 to 2899, in July, when clocks don't
+// change, and a YouTube video id of 11 characters. They're derived from its unique name, so that other tests' sessions,
+// even those left from a run that failed, are very unlikely to have them.
+export function own(testInfo: TestInfo) {
+  const unique = `${testInfo.project.name}-${testInfo.workerIndex}-${Date.now()}`
+  const hash = createHash('sha256').update(unique).digest()
+  const day = (offset: number) => `${2100 + (hash.readUInt32BE(offset) % 800)}-07-${String(1 + (hash.readUInt32BE(offset + 4) % 28)).padStart(2, '0')}`
+  return { unique, day: day(0), otherDay: day(8), youtubeVideo: hash.toString('base64url').slice(0, 11) }
+}
+
+// E.g. "samedi 14 novembre 2026", for a day as "YYYY-MM-DD", as the admin pages write it, e.g. naming a day of
+// Calendrier's month.
+export function longDay(day: string): string {
+  return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
+}
+
 // Goes to a page of the admin pages, `/admin` unless told otherwise, and sends the login form shown in its place, as the
 // admin unless told otherwise.
 export async function logIn(page: Page, { at = '/admin', email = admin.email, password = admin.password } = {}) {
@@ -81,6 +99,41 @@ export async function submitLogin(page: Page, { email = admin.email, password = 
 // The admin menu, which the admin pages show once logged in.
 export function adminMenu(page: Page) {
   return page.getByRole('navigation', { name: 'admin' })
+}
+
+type Schemas = components['schemas']
+
+// What `withCalendar` adds to the studio's calendar.
+export type CalendarExtra = {
+  feeds: Schemas['CalendarFeed'][]
+  occupations: Schemas['CalendarOccupation'][]
+  conflicts: Schemas['CalendarConflict'][]
+}
+
+// Has the page see the studio's calendar (GET /api/admin/calendar) with `extra` added to what the server answers, as if
+// it had read them from feeds, which the server under test has none of: it only reads https links, and couldn't reach a
+// feed of the tests' own. Like the server, it gives only the occupations that take some of the days asked for, but every
+// conflict, whatever the days. `extra` has to follow the server's other rules (see docs/design/server/calendar.md), e.g.
+// its order, since it's added after what the server answers, which has no occupations and no conflicts.
+export async function withCalendar(page: Page, extra: CalendarExtra) {
+  await page.route(
+    (url) => url.pathname === '/api/admin/calendar',
+    async (route) => {
+      const calendar = await (await route.fetch()).json()
+      const query = new URL(route.request().url()).searchParams
+      const from = quebecInstant(query.get('from')!, '00:00')!.getTime()
+      const to = quebecInstant(addDays(query.get('to')!, 1), '00:00')!.getTime()
+      const within = ({ start, end }: { start: string; end: string }) => Date.parse(start) < to && Date.parse(end) > from
+      await route.fulfill({
+        json: {
+          ...calendar,
+          feeds: [...calendar.feeds, ...extra.feeds],
+          occupations: [...calendar.occupations, ...extra.occupations.filter(within)],
+          conflicts: [...calendar.conflicts, ...extra.conflicts],
+        },
+      })
+    },
+  )
 }
 
 // Has the page see the feature flag `id` as on, from the next page it loads, by answering `/api/config` with what the

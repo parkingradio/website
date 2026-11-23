@@ -1,0 +1,444 @@
+/* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color and its shape, the
+   same in the legend, the month and the chosen day: sessions light blue with a dark blue bar on their left, occupations
+   light violet with a dashed violet border, free time green, and conflicts a red frame, inside the bar and the
+   border, so that the shapes stay seen. */
+
+.calendar-session {
+  border-left: 3px solid #1d4fa3;
+  background: #e4eefb;
+  color: #12305f;
+}
+
+.calendar-occupation {
+  border: 1px dashed #6a3fb5;
+  background: #f1eafb;
+  color: #4b2a85;
+}
+
+.calendar-free {
+  background: #dcf1e0;
+  color: #1b5e2a;
+}
+
+/* Within the border, so that the day's cell, which cuts what overflows, doesn't cut it on phones. */
+.calendar-conflict {
+  box-shadow: inset 0 0 0 2px #c62828;
+}
+
+/* The page's headings other than the sections', without their lines and margins. */
+.admin .calendar-heading {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* "À régler": one box under the title, whose first row, the toggle, has its title, its counts and a chevron. */
+.calendar-issues {
+  margin-top: 1.5rem;
+  border: 1px solid #000;
+}
+
+/* The heading is the box's first row, written like the rest of the page, but for its title. */
+.admin .calendar-issues h2 {
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Its first row, a button that looks like the text around it, however it's hovered. */
+.admin .calendar-issues-header,
+.admin .calendar-issues-header:hover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.calendar-issues-title {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendar-issues-chevron {
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.admin .calendar-issues-header:not([aria-disabled]):hover .calendar-issues-title {
+  text-decoration: underline;
+}
+
+.calendar-issues > .admin-notice {
+  margin: 0 1rem 0.75rem;
+}
+
+/* A count, or a group's kind, in a tag: conflicts in their red, sessions without a date in a border. */
+.calendar-tag {
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  font-weight: 300;
+}
+
+.calendar-tag.calendar-conflict-tag {
+  margin: 0;
+  border-color: #c62828;
+}
+
+/* The groups, opened: conflicts, then the sessions without a date, each under a divider. */
+.calendar-issue-group {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #000;
+}
+
+.admin .calendar-issue-group h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.calendar-issue-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-issue-list li {
+  border-top: 1px dotted #999;
+}
+
+/* A row, which is what's done about it, a button or a link: when, then what, on one line, as text. */
+.admin .calendar-issue-row {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem 0.25rem;
+  border: none;
+  background: none;
+  color: inherit;
+  line-height: 1.6;
+  text-align: left;
+  text-decoration: none;
+}
+
+.admin .calendar-issue-row:hover {
+  background: #f2f2f2;
+  color: inherit;
+}
+
+.admin .calendar-issue-row:hover strong {
+  text-decoration: underline;
+}
+
+.admin .calendar-issue-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.calendar-issue-when {
+  color: #666;
+}
+
+/* What a row is about, its things' names or a session's title, in bold. */
+.calendar-issue-what strong {
+  font-weight: 700;
+}
+
+/* The toolbar, with the month's name between its arrows. */
+.calendar-toolbar {
+  align-items: center;
+}
+
+.admin .calendar-month-name {
+  min-width: 11rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: #666;
+  font-size: 12px;
+}
+
+.calendar-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.calendar-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+}
+
+.calendar-swatch.calendar-conflict {
+  background: #fff;
+}
+
+/* The month: seven columns as wide as each other, whatever their days have. */
+.calendar-month {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.calendar-month th {
+  padding: 0.25rem;
+  color: #666;
+  font-weight: 300;
+  text-align: left;
+}
+
+.calendar-month td {
+  height: 6.5rem;
+  padding: 3px;
+  border: 1px solid #ddd;
+  vertical-align: top;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.calendar-month td.calendar-available {
+  background: #eef8f0;
+}
+
+/* The days of the months before and after are faded out, with what's on them: more than what's done, which is grey. */
+.calendar-month td.calendar-other-month > * {
+  opacity: 0.4;
+}
+
+.calendar-month td.calendar-chosen {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+
+/* The day's number, and its "+", at the cell's top right. */
+.calendar-day-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+/* The day's number, which chooses it, and today's in a black square. */
+.admin .calendar-number {
+  min-width: 1.6rem;
+  padding: 1px 4px;
+  border: none;
+  font-size: 12px;
+}
+
+/* Pressed when the day is chosen, which its outline shows, rather than black like other pressed buttons. */
+.admin .calendar-number:hover,
+.admin .calendar-number[aria-pressed='true'] {
+  background: none;
+  color: #1c1c1c;
+}
+
+.admin .calendar-month td:hover .calendar-number {
+  text-decoration: underline;
+}
+
+.admin .calendar-number.calendar-today {
+  background: #000;
+  color: #fff;
+}
+
+/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler". */
+.admin :is(.calendar-number, .calendar-add, .calendar-issue-row):focus-visible {
+  outline: 2px solid #1d4fa3;
+}
+
+.calendar-things {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.35;
+}
+
+.calendar-things li {
+  padding: 1px 4px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.calendar-things .calendar-part {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-things .calendar-title {
+  display: block;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendar-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.calendar-title a:hover {
+  text-decoration: underline;
+}
+
+/* An occupation's title, from someone else's calendar, which can be long, is cut short after two lines. */
+.calendar-things .calendar-occupation .calendar-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* A calendar's name, in place of an occupation's title, which isn't one: as it's written. */
+.calendar-feed-name {
+  text-transform: none;
+}
+
+/* Cut short when they don't fit, on one line: a session's performers, or an occupation's calendar. */
+.calendar-things .calendar-detail {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.calendar-conflict-tag {
+  display: inline-block;
+  margin-top: 1px;
+  padding: 0 4px;
+  background: #c62828;
+  color: #fff;
+}
+
+/* Done and cancelled sessions take their status's colors (see admin.css), with a bar in the same color. */
+.calendar-session.admin-status-done {
+  border-left-color: #999;
+  background: #f0f0f0;
+  color: #666;
+}
+
+.calendar-session.admin-status-cancelled {
+  border-left-color: #c9a400;
+  background: #fff8db;
+  color: #8a6d00;
+}
+
+/* A session's status, after its title. */
+.calendar-title .calendar-status {
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+  text-transform: none;
+}
+
+.calendar-things .calendar-status {
+  display: block;
+}
+
+/* A day's "+", small and always shown, since phones have no hover, but as large a target as a finger needs. */
+.admin .calendar-add {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* The chosen day. */
+.calendar-day-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.calendar-day-today {
+  color: #666;
+  font-weight: 300;
+  text-transform: none;
+}
+
+.calendar-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-row {
+  display: grid;
+  grid-template-columns: 7rem 12rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #ddd;
+  line-height: 1.5;
+}
+
+.calendar-row-kind {
+  align-self: start;
+  justify-self: start;
+  padding: 0 6px;
+}
+
+.calendar-conflict-line {
+  display: block;
+  color: #b3261e;
+}
+
+/* On phones, the month is squeezed into seven narrow columns. */
+@media (max-width: 700px) {
+  .calendar-month {
+    font-size: 10px;
+  }
+
+  .calendar-month td {
+    height: 4rem;
+    padding: 1px;
+  }
+
+  .calendar-things li {
+    padding: 1px 2px;
+  }
+
+  /* The number and the "+" fit side by side in the narrowest columns, about 44px. */
+  .admin .calendar-number {
+    min-width: 0;
+  }
+
+  .admin .calendar-add {
+    width: 20px;
+    height: 20px;
+  }
+
+  .calendar-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+
+  .admin .calendar-issue-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+}

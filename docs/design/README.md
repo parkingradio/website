@@ -61,7 +61,7 @@ design: when they disagree, these documents still win.
 | [Contribuer](client/contribuer.md) | Donations |
 | [Page introuvable](client/not-found.md) | Any URL that isn't one of the site's pages |
 | [Admin](client/admin/layout.md) | What every admin page shares: logging in, the menu |
-| [Calendrier](client/admin/calendrier.md) | The calendar of bookings |
+| [Calendrier](client/admin/calendrier.md) | The studio's calendar: sessions and occupations, their conflicts, and the sessions without a date |
 | [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Candidatures](client/admin/candidatures.md) | Going through applications |
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |

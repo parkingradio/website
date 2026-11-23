@@ -24,6 +24,12 @@ logged-in admin's email and a "se déconnecter" button:
 - [Admins](admins.md)
 - [Configuration](configuration.md)
 
+While there are conflicts (see [Conflicts](../../server/calendar.md#conflicts)), "calendrier" has a red badge with how
+many there are, which screen readers read along with it, e.g. « calendrier, 2 conflits », and it opens Calendrier with
+"À régler" open (`?issues=open`, see [Calendrier](calendrier.md#the-address)). The number is read again each time an
+admin page opens, and when the browser's tab is shown again, at most once a minute; on Calendrier, it's the number
+"À régler" shows. When it can't be read, the badge stays as it was, and there's none until it's been read once.
+
 When logging out fails, the admin stays logged in, and the menu says so under "se déconnecter". The section itself is
 shown to the right of the menu. On narrow screens like phones, the menu becomes a row above the section instead.
 `/admin` shows the first section, Calendrier. `/login`, where logging in used to be, leads to `/admin`.
@@ -67,10 +73,10 @@ otherwise.
 
 ## Status colors
 
-Wherever the admin pages list applications, sessions or sets, the rows of those that are done are greyed out, text, links
-and background, and those of rejected applications and of cancelled sessions and sets are faded out the same way, in a
-color of their own, yellow, so that the two are told apart at a glance. Each row also writes its status, so that it isn't
-told by color alone.
+Wherever the admin pages list applications, sessions or sets, or show them, e.g. in [Calendrier](calendrier.md), those
+that are done, their rows or their blocks, are greyed out, text, links and background, and rejected applications and
+cancelled sessions and sets are faded out the same way, in a color of their own, yellow, so that the two are told apart
+at a glance. Each one also has its status written, so that it isn't told by color alone.
 
 Buttons that change a status, e.g. on a session's page, show the status the entry has in black, even when it can't be
 picked (see [Controls that can't be used](#controls-that-cant-be-used)), e.g. an application's that its sets give it,
@@ -126,3 +132,4 @@ While a list can't be changed for a moment, e.g. while it's sent, or while a mov
 - `GET /api/admin/me`, to know whether there's a session, and the admin's email.
 - `POST /api/auth/login`, from the login form.
 - `POST /api/auth/logout`, from "se déconnecter".
+- `GET /api/admin/calendar`, for the badge on "calendrier".
