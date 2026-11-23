@@ -1,5 +1,4 @@
 import type { Status } from '../sessions/fields.js'
-import type { FeedKind } from './fields.js'
 
 // The calendar's conflicts: the things that take the studio, two by two, when they overlap (see "Conflicts" in
 // docs/design/server/calendar.md).
@@ -14,17 +13,16 @@ import type { FeedKind } from './fields.js'
 // A session, as the calendar counts it: one without a start, or that's cancelled, doesn't count.
 export type CalendarSession = { id: string; title: string; start: Date | null; end: Date | null; status: Status }
 
-// The things that take the studio, as conflicts give them. Quiet time's title is always null, and never given.
+// The things that take the studio, as conflicts give them. An occupation's title is null when its feed's titles are
+// private.
 export type SessionThing = { kind: 'session'; id: string; title: string; start: Date; end: Date; status: Status }
-export type EventThing = { kind: FeedKind; feed: string; start: Date; end: Date; wholeDay: boolean; title: string | null }
-export type Thing = SessionThing | EventThing
+export type OccupationThing = { kind: 'occupation'; feedId: string; start: Date; end: Date; wholeDay: boolean; title: string | null }
+export type Thing = SessionThing | OccupationThing
 
 // Two things that overlap, from `start` to `end`, in their order.
 export type Conflict = { start: Date; end: Date; things: [Thing, Thing] }
 
 export type Period = { from: Date; to: Date }
-
-const KINDS: Thing['kind'][] = ['session', 'occupation', 'quiet-time']
 
 export const compareStrings = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -34,41 +32,41 @@ export const takesSomeOf =
   ({ start, end }: { start: Date | null; end: Date | null }) =>
     start !== null && end !== null && start < end && end > from && start < to
 
-// The order of things, whose events are those of `feeds`, the feeds' ids in the order they were added: by start, end,
-// kind, then a session's id, or an event's feed's place, title, and timed before whole-day. Two things in the same place
-// are the same in all that the calendar gives of them.
-export function thingOrder(feeds: string[]): (a: Thing, b: Thing) => number {
-  const place = new Map(feeds.map((id, index) => [id, index]))
-  return (a, b) => {
-    const order = a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime() || KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind)
-    if (order !== 0) return order
-    // Both are of the same kind.
-    if (a.kind === 'session') return compareStrings(a.id, (b as SessionThing).id)
-    const other = b as EventThing
-    return place.get(a.feed)! - place.get(other.feed)! || compareStrings(a.title ?? '', other.title ?? '') || Number(a.wholeDay) - Number(other.wholeDay)
-  }
+// The order of things: by start, then end, then sessions before occupations, and sessions by id. Occupations that are
+// tied stay in the order they're given in, so that sorting them is stable as long as they're given in a stable order,
+// e.g. by feed, then as they were read.
+export function thingOrder(a: Thing, b: Thing): number {
+  return (
+    a.start.getTime() - b.start.getTime() ||
+    a.end.getTime() - b.end.getTime() ||
+    Number(a.kind === 'occupation') - Number(b.kind === 'occupation') ||
+    (a.kind === 'session' && b.kind === 'session' ? compareStrings(a.id, b.id) : 0)
+  )
 }
 
-// The conflicts of `sessions` and `events` whose overlap takes some of `window`, in order: by start, end, first thing,
-// then second thing, where things are in `order` (see `thingOrder`).
-export function conflicts(sessions: CalendarSession[], events: EventThing[], window: Period, order: (a: Thing, b: Thing) => number): Conflict[] {
+// The conflicts of `sessions` and `occupations` whose overlap takes some of `window`: by start, then end, then the places
+// of their two things in the order of things (see `thingOrder`), each conflict's things in that order too.
+export function conflicts(sessions: CalendarSession[], occupations: OccupationThing[], window: Period): Conflict[] {
   const inWindow = takesSomeOf(window)
   const counted: Thing[] = sessions.flatMap(({ id, title, start, end, status }) =>
     start && end && status !== 'cancelled' ? [{ kind: 'session' as const, id, title, start, end, status }] : [],
   )
   // The overlap of two things takes some of the window exactly when they overlap, and each one takes some of it.
-  const things = [...counted, ...events].filter(inWindow).sort(order)
+  const things = [...counted, ...occupations].filter(inWindow).sort(thingOrder)
 
-  // Going through the things by start, each one overlaps the things before it that haven't ended yet, which started at
+  // Going through the things in order, each one overlaps the things before it that haven't ended yet, which started at
   // the same time as it, or before.
-  const found: Conflict[] = []
-  let going: Thing[] = []
-  for (const thing of things) {
-    going = going.filter(({ end }) => end > thing.start)
-    for (const before of going) found.push({ start: thing.start, end: before.end < thing.end ? before.end : thing.end, things: [before, thing] })
-    going.push(thing)
-  }
-  return found.sort(
-    (a, b) => a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime() || order(a.things[0], b.things[0]) || order(a.things[1], b.things[1]),
-  )
+  const found: (Conflict & { places: [number, number] })[] = []
+  let going: number[] = []
+  things.forEach((thing, place) => {
+    going = going.filter((before) => things[before].end > thing.start)
+    for (const before of going) {
+      const end = things[before].end < thing.end ? things[before].end : thing.end
+      found.push({ start: thing.start, end, things: [things[before], thing], places: [before, place] })
+    }
+    going.push(place)
+  })
+  return found
+    .sort((a, b) => a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime() || a.places[0] - b.places[0] || a.places[1] - b.places[1])
+    .map(({ start, end, things }) => ({ start, end, things }))
 }

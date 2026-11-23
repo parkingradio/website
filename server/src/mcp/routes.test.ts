@@ -161,14 +161,15 @@ async function buildApp(logs?: string[], environment = 'test') {
       { config: { admin: true, tool: { title: 'Lister les artistes' } }, schema: { operationId: 'list_artists', summary: 'Every artist' } },
       async () => ({ ok: true, total: 1, artists: [{ id: 'a', name: 'Aurore', bio: 'Long', email: 'a@example.com', phone: '555', genres: [], collectives: [] }] }),
     )
-    // Like the calendar, whose sessions are summarized without their sets.
+    // Like the calendar, whose sessions are summarized without their sets, and whose feeds' links tools don't give.
     api.get(
       '/api/admin/calendar',
       { config: { admin: true, tool: { title: 'Voir le calendrier' } }, schema: { operationId: 'get_calendar', summary: 'The calendar' } },
       async () => {
         const session = { id: 's', start: null, end: null, durationMinutes: 60, type: 'other', title: 'Atelier', takeover: null, application: null }
         const full = { ...session, status: 'planned', announced: false, name: 'Atelier', description: 'Long', sets: [{ id: 'set' }] }
-        return { ok: true, today: '2026-11-23', sessions: [full], undatedSessions: [full], conflicts: [{ things: [{ kind: 'session', id: 's' }] }] }
+        const feeds = [{ id: 'f', name: 'Séjours', link: FEED_LINK, privateTitles: true }]
+        return { ok: true, today: '2026-11-23', feeds, sessions: [full], undatedSessions: [full], conflicts: [{ things: [{ kind: 'session', id: 's' }] }] }
       },
     )
   })
@@ -557,12 +558,13 @@ describe('the MCP server', () => {
       expect((await call(app, 'list_artists')).body).toEqual({ ok: true, total: 1, artists: [{ id: 'a', name: 'Aurore', genres: [], collectives: [] }] })
     })
 
-    it("summarize the calendar's sessions without their sets, and give the rest as it is", async () => {
+    it("summarize the calendar's sessions without their sets, and give the rest as it is, but the feeds' links", async () => {
       const app = await buildApp()
       const session = { id: 's', start: null, end: null, durationMinutes: 60, type: 'other', title: 'Atelier', takeover: null, application: null, status: 'planned', announced: false }
       expect((await call(app, 'get_calendar')).body).toEqual({
         ok: true,
         today: '2026-11-23',
+        feeds: [{ id: 'f', name: 'Séjours', privateTitles: true }],
         sessions: [session],
         undatedSessions: [session],
         conflicts: [{ things: [{ kind: 'session', id: 's' }] }],

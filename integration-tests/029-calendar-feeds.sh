@@ -111,7 +111,7 @@ request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2031-03-10"
 expect_status 200
 expect_body_contains '"feeds":[],"sessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445566"'
 expect_body_contains '"start":"2031-03-10T23:00:00-04:00","end":"2031-03-11T00:00:00-04:00"'
-expect_body_contains '"occupations":[],"quietTimes":[]'
+expect_body_contains '"occupations":[],"conflicts":'
 expect_body_contains '"undatedSessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445567"'
 request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2032-04-13"
 expect_status 400

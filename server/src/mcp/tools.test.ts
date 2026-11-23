@@ -150,6 +150,7 @@ describe('the tools of the API', () => {
       }
     }
     expect(hiddenFields({ url: '/api/admin/calendar/feeds' })).toEqual(['link'])
+    expect(hiddenFields({ url: '/api/admin/calendar' })).toEqual(['link'])
     expect(hiddenFields({ url: '/api/admin/artists/:id' })).toEqual(['email', 'phone'])
     expect(hiddenFields({ url: '/api/admin/sessions' })).toEqual([])
   })
@@ -159,6 +160,7 @@ describe('the tools of the API', () => {
     expect(tools.find(({ name }) => name === 'list_calendar_feeds')!.description).toBe(
       "Once per conversation, before using it, read the rules with `read_documentation`, area `calendar`. Every calendar feed that the studio's occupations are read from, in the order they were added. Calendar feeds' links are never shown.",
     )
+    expect(tools.find(({ name }) => name === 'get_calendar')!.description).toMatch(/ Calendar feeds' links are never shown\.$/)
   })
 })
 

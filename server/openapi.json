@@ -1277,9 +1277,9 @@
       "CalendarOccupation": {
         "type": "object",
         "properties": {
-          "feed": {
+          "feedId": {
             "type": "string",
-            "description": "The id of the feed it's read from"
+            "description": "The id of the feed it's read from, one of `feeds`"
           },
           "start": {
             "type": "string",
@@ -1294,44 +1294,19 @@
             "description": "Whether it takes whole days"
           },
           "title": {
-            "type": "string",
-            "description": "Its title, or empty for none"
+            "description": "Its title, empty for none, or null when its feed's titles are private",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
-          "feed",
+          "feedId",
           "start",
           "end",
           "wholeDay",
           "title"
-        ],
-        "additionalProperties": false
-      },
-      "CalendarQuietTime": {
-        "type": "object",
-        "properties": {
-          "feed": {
-            "type": "string",
-            "description": "The id of the feed it's read from"
-          },
-          "start": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "end": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "wholeDay": {
-            "type": "boolean",
-            "description": "Whether it takes whole days"
-          }
-        },
-        "required": [
-          "feed",
-          "start",
-          "end",
-          "wholeDay"
         ],
         "additionalProperties": false
       },
@@ -1380,9 +1355,9 @@
                 "type": "string",
                 "const": "occupation"
               },
-              "feed": {
+              "feedId": {
                 "type": "string",
-                "description": "The id of the feed it's read from"
+                "description": "The id of the feed it's read from, one of `feeds`"
               },
               "start": {
                 "type": "string",
@@ -1397,50 +1372,20 @@
                 "description": "Whether it takes whole days"
               },
               "title": {
-                "type": "string",
-                "description": "Its title, or empty for none"
+                "description": "Its title, empty for none, or null when its feed's titles are private",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "kind",
-              "feed",
+              "feedId",
               "start",
               "end",
               "wholeDay",
               "title"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "const": "quiet-time"
-              },
-              "feed": {
-                "type": "string",
-                "description": "The id of the feed it's read from"
-              },
-              "start": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "end": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "wholeDay": {
-                "type": "boolean",
-                "description": "Whether it takes whole days"
-              }
-            },
-            "required": [
-              "kind",
-              "feed",
-              "start",
-              "end",
-              "wholeDay"
             ],
             "additionalProperties": false
           }
@@ -10999,7 +10944,7 @@
     "/api/admin/calendar": {
       "get": {
         "operationId": "get_calendar",
-        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, and the calendar feeds that occupations and quiet time are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date",
+        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date",
         "tags": [
           "Calendar"
         ],
@@ -11063,14 +11008,7 @@
                       "items": {
                         "$ref": "#/components/schemas/CalendarOccupation"
                       },
-                      "description": "The occupations that take some of the days, in the order of things"
-                    },
-                    "quietTimes": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CalendarQuietTime"
-                      },
-                      "description": "The quiet times that take some of the days, in the order of things"
+                      "description": "The occupations that take some of the days, by start, then end"
                     },
                     "conflicts": {
                       "type": "array",
@@ -11093,7 +11031,6 @@
                     "feeds",
                     "sessions",
                     "occupations",
-                    "quietTimes",
                     "conflicts",
                     "undatedSessions"
                   ],

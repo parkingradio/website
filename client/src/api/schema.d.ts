@@ -2673,7 +2673,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, and the calendar feeds that occupations and quiet time are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
         get: operations["get_calendar"];
         put?: never;
         post?: never;
@@ -3440,26 +3440,16 @@ export interface components {
             error: string | null;
         };
         CalendarOccupation: {
-            /** @description The id of the feed it's read from */
-            feed: string;
+            /** @description The id of the feed it's read from, one of `feeds` */
+            feedId: string;
             /** Format: date-time */
             start: string;
             /** Format: date-time */
             end: string;
             /** @description Whether it takes whole days */
             wholeDay: boolean;
-            /** @description Its title, or empty for none */
-            title: string;
-        };
-        CalendarQuietTime: {
-            /** @description The id of the feed it's read from */
-            feed: string;
-            /** Format: date-time */
-            start: string;
-            /** Format: date-time */
-            end: string;
-            /** @description Whether it takes whole days */
-            wholeDay: boolean;
+            /** @description Its title, empty for none, or null when its feed's titles are private */
+            title: string | null;
         };
         CalendarThing: {
             /** @constant */
@@ -3475,27 +3465,16 @@ export interface components {
         } | {
             /** @constant */
             kind: "occupation";
-            /** @description The id of the feed it's read from */
-            feed: string;
+            /** @description The id of the feed it's read from, one of `feeds` */
+            feedId: string;
             /** Format: date-time */
             start: string;
             /** Format: date-time */
             end: string;
             /** @description Whether it takes whole days */
             wholeDay: boolean;
-            /** @description Its title, or empty for none */
-            title: string;
-        } | {
-            /** @constant */
-            kind: "quiet-time";
-            /** @description The id of the feed it's read from */
-            feed: string;
-            /** Format: date-time */
-            start: string;
-            /** Format: date-time */
-            end: string;
-            /** @description Whether it takes whole days */
-            wholeDay: boolean;
+            /** @description Its title, empty for none, or null when its feed's titles are private */
+            title: string | null;
         };
         ChosenPlaylist: {
             url: string;
@@ -7162,10 +7141,8 @@ export interface operations {
                         feeds: components["schemas"]["CalendarFeed"][];
                         /** @description The sessions with a start that take some of the days, whatever their status, by start, then createdAt, then id */
                         sessions: components["schemas"]["Session"][];
-                        /** @description The occupations that take some of the days, in the order of things */
+                        /** @description The occupations that take some of the days, by start, then end */
                         occupations: components["schemas"]["CalendarOccupation"][];
-                        /** @description The quiet times that take some of the days, in the order of things */
-                        quietTimes: components["schemas"]["CalendarQuietTime"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
                         conflicts: components["schemas"]["CalendarConflict"][];
                         /** @description The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for */

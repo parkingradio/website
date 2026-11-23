@@ -20,12 +20,23 @@ const TEAM = '6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f'
 const STAYS = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d'
 const UNREAD = '1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e'
 
+const feed = (id: string, name: string, link: string, privateTitles: boolean, createdAt: string): StoredFeed => ({
+  ...{ id, name, link, privateTitles, createdBy: 'someone@example.com', createdAt: new Date(createdAt), updatedBy: null, updatedAt: null },
+})
+// The guests' stays, whose titles are private.
 const FEEDS: StoredFeed[] = [
-  { id: TEAM, name: "Calendrier de l'équipe", kind: 'occupation', link: 'https://example.com/team.ics', createdBy: 'someone@example.com', createdAt: new Date('2026-11-01T12:00:00Z') },
-  { id: STAYS, name: 'Séjours', kind: 'quiet-time', link: 'https://example.com/stays.ics', createdBy: 'someone@example.com', createdAt: new Date('2026-11-02T12:00:00Z') },
-  { id: UNREAD, name: 'Autre', kind: 'occupation', link: 'https://example.com/other.ics', createdBy: 'someone@example.com', createdAt: new Date('2026-11-03T12:00:00Z') },
+  feed(TEAM, "Calendrier de l'équipe", 'https://example.com/team.ics', false, '2026-11-01T12:00:00Z'),
+  feed(STAYS, 'Séjours', 'https://example.com/stays.ics', true, '2026-11-02T12:00:00Z'),
+  feed(UNREAD, 'Autre', 'https://example.com/other.ics', false, '2026-11-03T12:00:00Z'),
 ]
-const feeds = { list: vi.fn(async () => FEEDS), withLink: vi.fn(), add: vi.fn(), remove: vi.fn() } satisfies CalendarFeedsStore
+let listed: StoredFeed[]
+const feeds = { list: vi.fn(async () => listed), withLink: vi.fn(), get: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() } satisfies CalendarFeedsStore
+
+// The feed as it's listed, with the link and titles it was read with.
+const settingsOf = (id: string) => {
+  const { link, privateTitles } = FEEDS.find((feed) => feed.id === id)!
+  return { link, privateTitles }
+}
 
 const event = (start: string, end: string, title: string | null, wholeDay = false) => ({ start: new Date(start), end: new Date(end), wholeDay, title })
 
@@ -34,6 +45,7 @@ const reads: CalendarReads = {
   of: vi.fn((id: string) => kept.get(id)),
   read: vi.fn(),
   added: vi.fn(),
+  changed: vi.fn(),
   removed: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
@@ -104,6 +116,7 @@ describe('GET /api/admin/calendar', () => {
     vi.clearAllMocks()
     rows = []
     kept = new Map()
+    listed = FEEDS
   })
 
   afterEach(() => {
@@ -135,9 +148,15 @@ describe('GET /api/admin/calendar', () => {
       ],
       readAt: new Date('2026-11-23T16:50:00Z'),
       error: null,
+      settings: settingsOf(TEAM),
     })
     // Its last read failed: it gives what it read before.
-    kept.set(STAYS, { events: [event('2026-11-20T21:00:00Z', '2026-11-22T16:00:00Z', null)], readAt: new Date('2026-11-23T16:35:00Z'), error: "The link can't be read: its server fails (503)" })
+    kept.set(STAYS, {
+      events: [event('2026-11-20T21:00:00Z', '2026-11-22T16:00:00Z', null)],
+      readAt: new Date('2026-11-23T16:35:00Z'),
+      error: "The link can't be read: its server fails (503)",
+      settings: settingsOf(STAYS),
+    })
     const app = await buildApp()
     const response = await calendar(app, 'from=2026-11-01&to=2026-11-30')
     expect(response.statusCode).toBe(200)
@@ -150,23 +169,30 @@ describe('GET /api/admin/calendar', () => {
     const body = response.json()
     expect(body.ok).toBe(true)
     expect(body.today).toBe('2026-11-23')
+    // With their links, which tools leave out (see mcp/tools.ts).
+    const given = (id: string, createdAt: string) => {
+      const { name, link, privateTitles } = FEEDS.find((feed) => feed.id === id)!
+      return { id, name, link, privateTitles, createdBy: 'someone@example.com', createdAt, updatedBy: null, updatedAt: null }
+    }
     expect(body.feeds).toEqual([
-      { id: TEAM, name: "Calendrier de l'équipe", kind: 'occupation', createdBy: 'someone@example.com', createdAt: '2026-11-01T07:00:00-05:00', readAt: '2026-11-23T11:50:00-05:00', error: null },
-      { id: STAYS, name: 'Séjours', kind: 'quiet-time', createdBy: 'someone@example.com', createdAt: '2026-11-02T07:00:00-05:00', readAt: '2026-11-23T11:35:00-05:00', error: "The link can't be read: its server fails (503)" },
-      { id: UNREAD, name: 'Autre', kind: 'occupation', createdBy: 'someone@example.com', createdAt: '2026-11-03T07:00:00-05:00', readAt: null, error: null },
+      { ...given(TEAM, '2026-11-01T07:00:00-05:00'), readAt: '2026-11-23T11:50:00-05:00', error: null },
+      { ...given(STAYS, '2026-11-02T07:00:00-05:00'), readAt: '2026-11-23T11:35:00-05:00', error: "The link can't be read: its server fails (503)" },
+      { ...given(UNREAD, '2026-11-03T07:00:00-05:00'), readAt: null, error: null },
     ])
     expect(body.sessions.map(({ id }: { id: string }) => id)).toEqual(['overnight', 'done', 'cancelled'])
     expect(body.sessions[0]).toMatchObject({ id: 'overnight', start: '2026-10-31T23:00:00-04:00', end: '2026-11-01T01:00:00-05:00', title: 'GUEST MIXES', sets: [] })
     // Not the one that ends when the first day starts.
-    expect(body.occupations).toEqual([{ feed: TEAM, start: '2026-11-09T20:00:00-05:00', end: '2026-11-09T22:00:00-05:00', wholeDay: false, title: 'Réparation' }])
-    expect(body.quietTimes).toEqual([{ feed: STAYS, start: '2026-11-20T16:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false }])
+    expect(body.occupations).toEqual([
+      { feedId: TEAM, start: '2026-11-09T20:00:00-05:00', end: '2026-11-09T22:00:00-05:00', wholeDay: false, title: 'Réparation' },
+      { feedId: STAYS, start: '2026-11-20T16:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: null },
+    ])
     // Only those of the next 365 days: not the done session's, which is before today.
     expect(body.conflicts).toEqual([
       {
         start: '2026-12-09T19:00:00-05:00',
         end: '2026-12-09T21:00:00-05:00',
         things: [
-          { kind: 'occupation', feed: TEAM, start: '2026-12-09T00:00:00-05:00', end: '2026-12-10T00:00:00-05:00', wholeDay: true, title: 'Anniversaire' },
+          { kind: 'occupation', feedId: TEAM, start: '2026-12-09T00:00:00-05:00', end: '2026-12-10T00:00:00-05:00', wholeDay: true, title: 'Anniversaire' },
           { kind: 'session', id: 'upcoming', title: 'GUEST MIXES', start: '2026-12-09T19:00:00-05:00', end: '2026-12-09T21:00:00-05:00', status: 'planned' },
         ],
       },
@@ -175,30 +201,49 @@ describe('GET /api/admin/calendar', () => {
 
     // Whatever the days asked for, the conflicts and the sessions without a date are the same.
     const other = (await calendar(app, 'from=2030-01-01&to=2030-01-01')).json()
-    expect(other).toMatchObject({ today: '2026-11-23', sessions: [], occupations: [], quietTimes: [], conflicts: body.conflicts, undatedSessions: body.undatedSessions })
+    expect(other).toMatchObject({ today: '2026-11-23', sessions: [], occupations: [], conflicts: body.conflicts, undatedSessions: body.undatedSessions })
     expect(reads.of).toHaveBeenCalledTimes(2 * FEEDS.length)
   })
 
-  it('gives the sessions by start, then by when they were added, then by id, and quiet time without a title', async () => {
+  it('gives the sessions by start, then by when they were added, then by id, and private titles as null', async () => {
     rows = [
       session('b', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-02T12:00:00Z'),
       session('c', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-01T12:00:00Z'),
       session('a', '2026-11-23T20:00:00Z', 60, 'planned', '2026-10-02T12:00:00Z'),
       session('z', '2026-11-23T18:00:00Z', 60),
     ]
-    kept.set(STAYS, { events: [event('2026-11-23T05:00:00Z', '2026-11-24T05:00:00Z', null, true)], readAt: NOW, error: null })
+    kept.set(STAYS, { events: [event('2026-11-23T05:00:00Z', '2026-11-24T05:00:00Z', null, true)], readAt: NOW, error: null, settings: settingsOf(STAYS) })
     const body = (await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json()
     expect(body.sessions.map(({ id }: { id: string }) => id)).toEqual(['z', 'c', 'a', 'b'])
-    expect(body.quietTimes).toEqual([{ feed: STAYS, start: '2026-11-23T00:00:00-05:00', end: '2026-11-24T00:00:00-05:00', wholeDay: true }])
-    expect(body.conflicts.map(({ things }: { things: { kind: string; id?: string }[] }) => things.map(({ kind, id }) => id ?? kind))).toEqual([['quiet-time', 'z'], ['quiet-time', 'a']])
-    expect(body.conflicts[0].things[0]).toEqual({ kind: 'quiet-time', feed: STAYS, start: '2026-11-23T00:00:00-05:00', end: '2026-11-24T00:00:00-05:00', wholeDay: true })
+    const stay = { feedId: STAYS, start: '2026-11-23T00:00:00-05:00', end: '2026-11-24T00:00:00-05:00', wholeDay: true, title: null }
+    expect(body.occupations).toEqual([stay])
+    expect(body.conflicts.map(({ things }: { things: { kind: string; id?: string }[] }) => things.map(({ kind, id }) => id ?? kind))).toEqual([['occupation', 'z'], ['occupation', 'a']])
+    expect(body.conflicts[0].things[0]).toEqual({ kind: 'occupation', ...stay })
+  })
+
+  it("only gives what was read from a feed as it is now: nothing read from another link, and no titles once they're private", async () => {
+    rows = [session('a', '2026-11-23T20:00:00Z', 60)]
+    // E.g. on a server that hasn't taken in the feeds' changes yet.
+    const read = { events: [event('2026-11-23T19:00:00Z', '2026-11-23T22:00:00Z', 'Séjour de Jane Doe')], readAt: NOW, error: "The link can't be read: its server fails (503)" }
+    kept.set(TEAM, { ...read, settings: { link: 'https://example.com/former.ics', privateTitles: false } })
+    kept.set(STAYS, { ...read, settings: { link: 'https://example.com/stays.ics', privateTitles: false } })
+    const body = (await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json()
+    expect(body.feeds.map(({ id, readAt, error }: { id: string; readAt: string | null; error: string | null }) => ({ id, readAt, error }))).toEqual([
+      { id: TEAM, readAt: null, error: null },
+      { id: STAYS, readAt: '2026-11-23T12:00:00-05:00', error: "The link can't be read: its server fails (503)" },
+      { id: UNREAD, readAt: null, error: null },
+    ])
+    const stay = { feedId: STAYS, start: '2026-11-23T14:00:00-05:00', end: '2026-11-23T17:00:00-05:00', wholeDay: false, title: null }
+    expect(body.occupations).toEqual([stay])
+    expect(body.conflicts).toEqual([{ start: '2026-11-23T15:00:00-05:00', end: '2026-11-23T16:00:00-05:00', things: [{ kind: 'occupation', ...stay }, expect.objectContaining({ id: 'a' })] }])
+    expect(JSON.stringify(body)).not.toContain('Jane Doe')
   })
 
   it('counts the conflicts from today in Québec, from 00:00', async () => {
     // 23:30 on November 23 in Québec, which is already the 24th in UTC.
     vi.setSystemTime(new Date('2026-11-24T04:30:00Z'))
     rows = [session('this-morning', '2026-11-23T14:00:00Z', 60), session('yesterday', '2026-11-22T14:00:00Z', 60)]
-    kept.set(TEAM, { events: [event('2026-11-22T05:00:00Z', '2026-11-24T05:00:00Z', 'Fermé', true)], readAt: NOW, error: null })
+    kept.set(TEAM, { events: [event('2026-11-22T05:00:00Z', '2026-11-24T05:00:00Z', 'Fermé', true)], readAt: NOW, error: null, settings: settingsOf(TEAM) })
     const body = (await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json()
     expect(body.today).toBe('2026-11-23')
     expect(forCalendar.mock.calls[0][1]).toEqual({ from: new Date('2026-11-23T05:00:00Z'), to: new Date('2027-11-23T05:00:00Z') })

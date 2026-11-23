@@ -226,7 +226,7 @@ describe('calendarReads', () => {
     answers.set('a', () => a.promise)
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
     reads.changed('a', { link: linkOf('a'), privateTitles: true })
-    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), title: null }], readAt: NOW, error: null, settings: settingsOf('a', true) })
+    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: null }], readAt: NOW, error: null, settings: settingsOf('a', true) })
     a.resolve(calendar(1))
     await settle()
     expect(reads.of('a')).toMatchObject({ events: [{ title: null }], readAt: NOW })

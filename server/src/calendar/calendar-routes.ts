@@ -6,10 +6,10 @@ import { Status, after, sessionTitle } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
 import type { SessionWithoutSets, SessionsStore, StoredSession } from '../sessions/store.js'
 import { compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.js'
-import type { CalendarSession, EventThing, Thing } from './conflicts.js'
+import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
 import type { CalendarFeedsStore } from './feeds.js'
 import type { CalendarReads } from './reads.js'
-import { Feed, feedBody } from './routes.js'
+import { Feed, currentRead, feedBody } from './routes.js'
 
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
@@ -38,20 +38,20 @@ const CalendarQuery = z
   .refine(({ from, to }) => to >= from, "`to` can't be before `from`")
   .refine(({ from, to }) => daysBetween(from, to) < MAX_DAYS, `The calendar has at most ${MAX_DAYS} days, \`from\` and \`to\` included`)
 
-const EventFields = {
-  feed: z.string().meta({ description: "The id of the feed it's read from" }),
-  start: Timestamp,
-  end: Timestamp,
-  wholeDay: z.boolean().meta({ description: 'Whether it takes whole days' }),
-}
-const Occupation = z.object({ ...EventFields, title: z.string().meta({ description: 'Its title, or empty for none' }) }).meta({ id: 'CalendarOccupation' })
-const QuietTime = z.object(EventFields).meta({ id: 'CalendarQuietTime' })
+const Occupation = z
+  .object({
+    feedId: z.string().meta({ description: "The id of the feed it's read from, one of `feeds`" }),
+    start: Timestamp,
+    end: Timestamp,
+    wholeDay: z.boolean().meta({ description: 'Whether it takes whole days' }),
+    title: z.string().nullable().meta({ description: "Its title, empty for none, or null when its feed's titles are private" }),
+  })
+  .meta({ id: 'CalendarOccupation' })
 
 const Thing = z
   .discriminatedUnion('kind', [
     z.object({ kind: z.literal('session'), ...SessionBody.pick({ id: true, title: true }).shape, start: Timestamp, end: Timestamp, status: Status }),
     z.object({ kind: z.literal('occupation'), ...Occupation.shape }),
-    z.object({ kind: z.literal('quiet-time'), ...QuietTime.shape }),
   ])
   .meta({ id: 'CalendarThing' })
 
@@ -68,23 +68,19 @@ const CalendarResponse = z.object({
   today: Day.meta({ description: 'The day the conflicts are counted from: today, in Québec' }),
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
   sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start, then createdAt, then id' }),
-  occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, in the order of things' }),
-  quietTimes: z.array(QuietTime).meta({ description: 'The quiet times that take some of the days, in the order of things' }),
+  occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),
   conflicts: z.array(Conflict).meta({ description: 'The conflicts of the next 365 days, from today, whatever the days asked for' }),
   undatedSessions: z
     .array(SessionBody)
     .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for" }),
 })
 
-const eventBody = ({ feed, start, end, wholeDay }: EventThing) => ({ feed, start: start.toISOString(), end: end.toISOString(), wholeDay })
-const occupationBody = (event: EventThing) => ({ ...eventBody(event), title: event.title ?? '' })
+const occupationBody = ({ feedId, start, end, wholeDay, title }: OccupationThing) => ({ feedId, start: start.toISOString(), end: end.toISOString(), wholeDay, title })
 
 function thingBody(thing: Thing): z.infer<typeof Thing> {
-  if (thing.kind === 'session') {
-    const { kind, id, title, start, end, status } = thing
-    return { kind, id, title, start: start.toISOString(), end: end.toISOString(), status }
-  }
-  return thing.kind === 'occupation' ? { kind: thing.kind, ...occupationBody(thing) } : { kind: thing.kind, ...eventBody(thing) }
+  if (thing.kind === 'occupation') return { kind: thing.kind, ...occupationBody(thing) }
+  const { kind, id, title, start, end, status } = thing
+  return { kind, id, title, start: start.toISOString(), end: end.toISOString(), status }
 }
 
 // A session, as the calendar counts it.
@@ -107,7 +103,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       schema: {
         operationId: 'get_calendar',
         summary:
-          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, and the calendar feeds that occupations and quiet time are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date',
+          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date',
         tags: ['Calendar'],
         querystring: CalendarQuery,
         response: { 200: CalendarResponse },
@@ -121,17 +117,13 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
 
       const [listed, stored] = await Promise.all([feeds.list(), sessions.forCalendar(range, window)])
       const inRange = takesSomeOf(range)
-      const inWindow = takesSomeOf(window)
-      // What was read from each feed is taken once, so that its status and its events are from the same read. Only the
-      // events of the days asked for, or of the 365 days, are needed: a read keeps three years.
-      const withReads = listed.map((feed) => ({ feed, read: reads.of(feed.id) }))
-      const events: EventThing[] = withReads.flatMap(({ feed, read }) =>
-        (read?.events ?? [])
-          .filter((event) => inRange(event) || inWindow(event))
-          .map(({ start, end, wholeDay, title }) => ({ kind: feed.kind, feed: feed.id, start, end, wholeDay, title })),
+      // What was read from each feed is taken once, so that its status and its occupations are from the same read, that
+      // of the feed as it is now. The occupations are in the order of the feeds, then as they were read, which ties keep
+      // (see `thingOrder`).
+      const withReads = listed.map((feed) => ({ feed, read: currentRead(feed, reads) }))
+      const occupations: OccupationThing[] = withReads.flatMap(({ feed, read }) =>
+        (read?.events ?? []).map(({ start, end, wholeDay, title }) => ({ kind: 'occupation' as const, feedId: feed.id, start, end, wholeDay, title })),
       )
-      const order = thingOrder(listed.map(({ id }) => id))
-      const eventsInRange = events.filter(inRange).sort(order)
 
       // The sessions given in full, those of the days asked for and those without a start, are those with their sets.
       const given = stored.filter((row): row is StoredSession => row.sets !== null)
@@ -141,15 +133,14 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const undated = given
         .filter((row) => row.startAt === null)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || compareStrings(a.id, b.id))
-      const found = conflicts(stored.map(calendarSession), events, window, order)
+      const found = conflicts(stored.map(calendarSession), occupations, window)
 
       return {
         ok: true as const,
         today,
         feeds: withReads.map(({ feed, read }) => feedBody(feed, read)),
         sessions: sessionsInRange.map(sessionBody),
-        occupations: eventsInRange.filter(({ kind }) => kind === 'occupation').map(occupationBody),
-        quietTimes: eventsInRange.filter(({ kind }) => kind === 'quiet-time').map(eventBody),
+        occupations: occupations.filter(inRange).sort(thingOrder).map(occupationBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({
           start: start.toISOString(),
           end: end.toISOString(),

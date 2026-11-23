@@ -51,6 +51,14 @@ export type CalendarReads = {
 
 const sameSettings = (a: ReadSettings | undefined, b: ReadSettings) => a?.link === b.link && a.privateTitles === b.privateTitles
 
+// What `read` gives of a feed that has `settings`: nothing when it was read from another link, and no titles when they
+// became private since.
+export function readAsOf(read: FeedRead | undefined, { link, privateTitles }: ReadSettings): FeedRead | undefined {
+  if (!read || read.settings.link !== link) return undefined
+  if (!privateTitles || read.settings.privateTitles) return read
+  return { ...read, events: read.events.map((event) => ({ ...event, title: null })), settings: { link, privateTitles } }
+}
+
 type Options = {
   feeds: CalendarFeedsStore
   log: FastifyBaseLogger
@@ -155,11 +163,9 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
   function reconcile(id: string) {
     const read = reads.get(id)
     const settings = known.get(id)
-    if (!read) return
-    if (!settings || settings.link !== read.settings.link) reads.delete(id)
-    else if (settings.privateTitles && !read.settings.privateTitles) {
-      reads.set(id, { ...read, events: read.events.map((event) => ({ ...event, title: null })), settings })
-    }
+    const current = settings && readAsOf(read, settings)
+    if (!current) reads.delete(id)
+    else if (current !== read) reads.set(id, current)
   }
 
   // Takes in a feed's settings, which a listing under way may not have seen.

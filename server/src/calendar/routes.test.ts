@@ -113,6 +113,9 @@ describe('calendar feeds routes', () => {
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
       kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: LINK, privateTitles: false } })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" }] })
+      // What was read from another link isn't the feed's, e.g. on a server that hasn't taken in a change of link yet.
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: 'https://example.com/former.ics', privateTitles: false } })
+      expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
     })
 
     it('requires a session', async () => {

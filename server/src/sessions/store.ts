@@ -145,7 +145,7 @@ export type SessionsStore = {
   // that collective's takeovers: none when there's no such artist or collective. With `from` or `to`, only those that
   // start at or after `from` and before `to`, which leaves out those without a start.
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
-  // What the calendar needs, from one query, in the order of `list` (see "The calendar" in
+  // What the calendar needs, with one query for the sessions, in the order of `list` (see "The calendar" in
   // docs/design/server/calendar.md): the sessions with a start that take some of the time from `range.from` to
   // `range.to`, whatever their status, and those without a start that aren't cancelled, with their sets, and those with a
   // start that aren't cancelled that take some of `window`, without them, unless they're among the others.
