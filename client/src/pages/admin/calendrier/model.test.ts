@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
+import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, nameOf, namedThing, overlapTimes, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
@@ -92,6 +92,22 @@ describe("a thing's part of a day", () => {
     expect(partOfDay(times('2026-10-31T23:00:00-04:00', '2026-11-01T01:30:00-05:00'), '2026-10-31')).toBe('23 h – 1 h 30')
     // On 2027-03-14, 3 h comes right after 1 h 59.
     expect(partOfDay(times('2027-03-14T01:00:00-05:00', '2027-03-14T04:00:00-04:00'), '2027-03-14')).toBe('1 h – 4 h')
+  })
+})
+
+describe("a conflict's overlap, in \"À régler\"", () => {
+  it('is in full, unless it starts with its day', () => {
+    expect(overlapTimes(times('2026-11-28T18:00:00-05:00', '2026-11-28T19:00:00-05:00'), '2026-11-28')).toBe('18 h – 19 h')
+    expect(overlapTimes(times('2026-11-28T18:00:00-05:00', '2026-11-29T11:00:00-05:00'), '2026-11-28')).toBe('18 h – 11 h')
+    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
+    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-29T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'au dim. 29 nov., 11 h")
+    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-30T00:00:00-05:00'), '2026-11-28')).toBe('du sam. 28 nov. au dim. 29 nov.')
+  })
+
+  it('is between things named by their names alone', () => {
+    expect(nameOf({ kind: 'session', id: 's', title: 'GUEST MIXES', status: 'planned' })).toBe('GUEST MIXES')
+    expect(nameOf({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe('RÉPARATION')
+    expect(nameOf({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe('Séjours')
   })
 })
 

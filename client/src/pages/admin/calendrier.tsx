@@ -103,6 +103,7 @@ export function Calendrier() {
       {reads.last && (
         <Issues
           calendar={reads.last}
+          today={today}
           open={issuesOpen}
           onToggle={() => change({ issues: issuesOpen ? null : 'open' }, { replace: true })}
           onShowDay={(shown) => {

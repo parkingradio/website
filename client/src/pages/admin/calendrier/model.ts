@@ -120,6 +120,19 @@ export function fullTimes(times: Times, day: string): string {
   return from.day === day ? shortTimes(times) : `${formatQuebecDayInYear(times.start)}, ${shortTimes(times)}`
 }
 
+// When a conflict's two things overlap, on `day`, the day it starts, as "À régler" writes it: in full (see `fullTimes`),
+// unless it starts with the day, e.g. "jusqu'à 11 h", or "jusqu'au dim. 29 nov., 11 h" when it runs past it.
+export function overlapTimes(conflict: Times, day: string): string {
+  const from = quebecDayAndTime(new Date(conflict.start))
+  const to = quebecDayAndTime(new Date(conflict.end))
+  if (from.time !== '00:00' || to.time === '00:00') return fullTimes(conflict, day)
+  return to.day === day ? `jusqu'à ${formatTime(to.time)}` : `jusqu'au ${formatDayInYear(to.day)}, ${formatTime(to.time)}`
+}
+
+// A thing's name alone, without its calendar's: a session's title, or an occupation's, or its calendar's name when it
+// has none.
+export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar))
+
 // A stretch of free time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h", "dès 11 h" or
 // "11 h – 15 h", and whether it's the whole day.
 export type FreeStretch = { part: string; wholeDay: boolean }

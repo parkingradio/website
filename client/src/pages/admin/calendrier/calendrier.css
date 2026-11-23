@@ -113,38 +113,45 @@
   list-style: none;
 }
 
-/* A row: when, what, and what to do about it, on the right. */
 .calendar-issue-list li {
-  display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr) auto;
-  gap: 1rem;
-  align-items: start;
-  padding: 0.5rem 0;
   border-top: 1px dotted #999;
-  line-height: 1.6;
 }
 
-/* What a row is about, a session's or an occupation's title, in bold. */
-.calendar-issue-what :is(a, .calendar-occupation-title) {
-  font-weight: 700;
+/* A row, which is what's done about it, a button or a link: when, then what, on one line, as text. */
+.admin .calendar-issue-row {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem 0.25rem;
+  border: none;
+  background: none;
+  color: inherit;
+  line-height: 1.6;
+  text-align: left;
+  text-decoration: none;
+}
+
+.admin .calendar-issue-row:hover {
+  background: #f2f2f2;
+  color: inherit;
+}
+
+.admin .calendar-issue-row:hover strong {
+  text-decoration: underline;
+}
+
+.admin .calendar-issue-row:focus-visible {
+  outline-offset: -2px;
 }
 
 .calendar-issue-when {
   color: #666;
 }
 
-/* Its actions, a button or a link, as pills of the same size, which a long title doesn't wrap. */
-.calendar-issue-action {
-  white-space: nowrap;
-}
-
-.admin .calendar-issue-action :is(button, a.admin-button) {
-  padding: 0 6px;
-}
-
-/* Each of a conflict's two things, on a line of its own, after the time they overlap. */
-.calendar-issue-thing {
-  display: block;
+/* What a row is about, its things' names or a session's title, in bold. */
+.calendar-issue-what strong {
+  font-weight: 700;
 }
 
 /* The toolbar, with the month's name between its arrows. */
@@ -255,7 +262,8 @@
   color: #fff;
 }
 
-.admin .calendar-number:focus-visible {
+/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler". */
+.admin :is(.calendar-number, .calendar-add, .calendar-issue-row):focus-visible {
   outline: 2px solid #1d4fa3;
 }
 
@@ -360,10 +368,6 @@
   line-height: 1;
 }
 
-.admin .calendar-add:focus-visible {
-  outline: 2px solid #1d4fa3;
-}
-
 /* The chosen day. */
 .calendar-day-heading {
   display: flex;
@@ -437,8 +441,8 @@
     gap: 0.25rem;
   }
 
-  .calendar-issue-list li {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.25rem;
+  .admin .calendar-issue-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.5rem;
   }
 }

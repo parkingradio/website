@@ -59,18 +59,21 @@ hasn't been read yet, naming it, and saying that conflicts can be missing. While
 conflicts with occupations can't be found, and links to Configuration.
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag, a heading and a sentence
-about them, then a row for each one: when it is, what it is, and what to do, on the right, which screen readers read
-with what it's about, e.g. « voir le jour, sam. 21 nov. 2026 ».
+about them, then a row for each one, on one line: when it is, then what it is. The whole row is what's done about it,
+by clicking it, or with the keyboard, as one control, which its text names, and which shows when it's hovered or has the
+focus. Its text has no links of its own.
 
 - The conflicts: "conflits", "chevauchements à résoudre", « Le studio n'accueille qu'une chose à la fois : déplacez,
   raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier. », then each one, in the
-  server's order. Its row has the day it starts, the time its two things overlap, in full on that day, and the two
-  things, each with its kind: a session by its title, which links to its page, and an occupation by its name. "voir le
-  jour →" shows that day, chosen, in the month, with the focus on it.
+  server's order. Its row has the day it starts, without its year unless it's another year than today's, then the time
+  its two things overlap, in full on that day, or "jusqu'à 11 h", or "jusqu'au dim. 29 nov., 11 h", when it starts
+  with the day, then "·" and the two things' names, joined by "et": a session's title, and an occupation's, or its
+  calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER ». It shows that
+  day, chosen, in the month, with the focus on it.
 - The sessions without a date: "sans date", "sessions à placer", « Donnez-leur une date pour les voir dans le mois, et
-  dans les conflits. », then each one, the most recently added first. Its row has "à déterminer" as when it is, its
-  title, linking to its page, its sets' performers, set by set, the sets separated by "·", then its duration, and "lui
-  donner une date →", which opens its page too.
+  dans les conflits. », then each one, the most recently added first. Its row has "à déterminer" as when it is, then its
+  title, "·", its sets' performers, set by set, the sets separated by "·", and its duration, e.g. « à déterminer LES
+  SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h ». It opens the session's page.
 
 ## The toolbar
 

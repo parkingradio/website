@@ -12,14 +12,19 @@ export function SessionTitle({ id, title, status, inMonth = false }: { id: strin
       <Link to={sessionPath({ id })} tabIndex={inMonth ? -1 : undefined}>
         {title}
       </Link>
-      {status !== 'planned' && <span className="calendar-status"> {SESSION_STATUS_LABELS[status]}</span>}
+      <SessionStatus status={status} />
     </>
   )
 }
 
+// A session's status, after its title, unless it's planned.
+export function SessionStatus({ status }: { status: SessionStatus }) {
+  return status !== 'planned' && <span className="calendar-status"> {SESSION_STATUS_LABELS[status]}</span>
+}
+
 // An occupation's title, or its calendar's name in its place, as it's written.
 export function OccupationTitle({ title, calendar }: OccupationName) {
-  return <span className={title === null ? 'calendar-occupation-title calendar-feed-name' : 'calendar-occupation-title'}>{title ?? calendar}</span>
+  return <span className={title === null ? 'calendar-feed-name' : undefined}>{title ?? calendar}</span>
 }
 
 // An occupation's calendar, after its title, which screen readers read after ", calendrier".

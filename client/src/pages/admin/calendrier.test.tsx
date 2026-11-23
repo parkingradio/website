@@ -368,9 +368,8 @@ describe('Calendrier', () => {
         "occupation10 h – 12 hMÉNAGE, calendrier Calendrier de l'équipeconflit avec l'occupation Séjours",
       ])
       const box = screen.getByRole('region', { name: 'À régler' })
-      expect(visibleText(within(box).getAllByRole('listitem')[0])).toBe(
-        "sam. 21 nov. 202610 h – 12 hoccupation : Séjoursoccupation : MÉNAGE, calendrier Calendrier de l'équipevoir le jour, sam. 21 nov. 2026 →",
-      )
+      // By their names alone: an occupation's title, or its calendar's name when it has none.
+      expect(visibleText(within(box).getAllByRole('listitem')[0])).toBe('sam. 21 nov. 10 h – 12 h · Séjours et MÉNAGE')
     })
 
     it("has its free time, even when it's a day of the month after, which the month doesn't show", async () => {
@@ -615,32 +614,43 @@ describe('Calendrier', () => {
       expect(path()).toBe('/admin/calendrier')
     })
 
-    it('lists the conflicts and the sessions without a date', async () => {
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY })
+    it('lists the conflicts and the sessions without a date, each row of which is what is done about it', async () => {
+      // A conflict next year, which says its year, between a stay and a repair that starts with its day.
+      const nextYear = {
+        start: '2027-01-09T00:00:00-05:00',
+        end: '2027-01-10T11:00:00-05:00',
+        things: [
+          { kind: 'occupation', ...STAY, start: '2027-01-08T15:00:00-05:00', end: '2027-01-10T11:00:00-05:00' },
+          { kind: 'occupation', ...REPAIR, start: '2027-01-09T00:00:00-05:00', end: '2027-01-11T00:00:00-05:00' },
+        ],
+      } as Calendar['conflicts'][number]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: { ...EMPTY, conflicts: [CONFLICT, nextYear] } })
       renderAt('/admin/calendrier?month=2026-12&issues=open')
       const box = await screen.findByRole('region', { name: 'À régler' })
 
       // A group for each kind, with its tag, its heading, and what to do.
       expect([...box.querySelectorAll('h3')].map(visibleText)).toEqual(['conflits chevauchements à résoudre', 'sans date sessions à placer'])
       expect(box).toHaveTextContent("déplacez, raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier.")
-      const [conflict, undated] = within(box).getAllByRole('listitem')
-      expect(visibleText(conflict)).toBe('sam. 21 nov. 202621 h – 1 hoccupation : Séjourssession : HAUTE RIVE TAKEOVERvoir le jour, sam. 21 nov. 2026 →')
-      expect(within(conflict).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
+      const [conflict, later, undated] = within(box).getAllByRole('listitem')
+      // One line each, a single control, without links of its own.
+      expect(visibleText(conflict)).toBe('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
+      const showDay = within(conflict).getByRole('button')
+      expect(showDay).toHaveAccessibleName('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
+      expect(within(conflict).queryByRole('link')).not.toBeInTheDocument()
+      expect(visibleText(later)).toBe("sam. 9 janv. 2027 jusqu'au dim. 10 janv., 11 h · Séjours et RÉPARATION")
       // Its duration after its sets' performers, which "·" separates.
-      expect(visibleText(undated)).toBe('à déterminerLES SŒURS ONDES TAKEOVER Ondine · Écume, 3 hlui donner une date, LES SŒURS ONDES TAKEOVER →')
-      // Its action, a pill like the conflicts', which screen readers read with what it's about, without the arrow.
-      const action = within(undated).getByRole('link', { name: 'lui donner une date, LES SŒURS ONDES TAKEOVER' })
-      expect(action).toHaveAttribute('href', '/admin/sessions/session-4')
-      expect(action).toHaveClass('admin-button')
+      expect(visibleText(undated)).toBe('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
+      expect(within(undated).getByRole('link')).toHaveAccessibleName('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
+      expect(within(undated).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-4')
 
-      // Its day shows it, chosen, in its month, with the focus on it.
-      fireEvent.click(within(conflict).getByRole('button', { name: 'voir le jour, sam. 21 nov. 2026' }))
+      // A conflict shows its day, chosen, in its month, with the focus on it.
+      fireEvent.click(showDay)
       expect(path()).toBe('/admin/calendrier?month=2026-11&issues=open&day=2026-11-21')
       await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
       expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
     })
 
-    it('shows a session that is done or cancelled in its status colors, on the chosen day and in its conflicts', async () => {
+    it('shows a session that is done or cancelled in its status colors on the chosen day, and its title alone in its conflicts', async () => {
       // A session today, already played, during a repair.
       const morning = session('session-5', 'MATINALE', '2026-11-19T09:00:00-05:00', '2026-11-19T11:00:00-05:00', { status: 'done' })
       const repair = { feedId: 'team', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉPARATION' }
@@ -660,7 +670,7 @@ describe('Calendrier', () => {
       expect(played).toHaveClass('calendar-row', 'admin-status-done')
       expect(played).toHaveTextContent('MATINALE jouée')
       const box = screen.getByRole('region', { name: 'À régler' })
-      expect(box.querySelector('.calendar-issue-thing')).toHaveClass('admin-status-done')
+      expect(visibleText(within(box).getAllByRole('listitem')[0])).toBe('jeu. 19 nov. 10 h – 11 h · MATINALE et RÉPARATION')
       first.unmount()
 
       renderAt('/admin/calendrier?day=2026-11-24')

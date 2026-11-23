@@ -81,7 +81,10 @@ test('a session is in its month, and on its day, where a new session is added', 
   // The seeded session without a date needs settling, and leads to its page.
   const issues = page.getByRole('region', { name: 'À régler' })
   await issues.getByRole('button', { name: /sans date/ }).click()
-  await expect(issues.getByRole('link', { name: /^lui donner une date\s?, LES SŒURS ONDES TAKEOVER$/ })).toHaveAttribute('href', /^\/admin\/sessions\//)
+  const undated = issues.getByRole('link', { name: /^à déterminer\s?LES SŒURS ONDES TAKEOVER · / })
+  await expect(undated).toHaveAttribute('href', /^\/admin\/sessions\//)
+  await undated.click()
+  await expect(page.getByRole('heading', { level: 1, name: 'LES SŒURS ONDES TAKEOVER' })).toBeVisible()
 
   for (const added of [id, newId]) expect((await page.request.delete(`/api/admin/sessions/${added}`)).ok()).toBe(true)
 })
@@ -144,9 +147,11 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await expect(issues.getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
   await issues.getByRole('button', { name: /1 conflit/ }).click()
   await expect(page).toHaveURL(/[?&]issues=open/)
-  await expect(issues.getByRole('listitem').first()).toContainText(`occupation : RÉPARATION ${unique}, calendrier ${team}occupation : ${stays}`)
-  // Which shows its day, chosen.
-  await issues.getByRole('button', { name: /^voir le jour\s?, / }).click()
+  // A row of its own, by the things' names alone, which shows its day, chosen.
+  const row = issues.getByRole('listitem').first().getByRole('button')
+  await expect(row).toContainText(`RÉPARATION ${unique} et ${stays}`)
+  await expect(row).not.toContainText(team)
+  await row.click()
   await expect(dayButton(page, day)).toBeFocused()
 
   // The menu's badge, on another page, which leads back to the conflicts.

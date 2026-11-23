@@ -2,11 +2,11 @@ import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
-import { THING_KIND_LABELS, conflictCount, formatDuration, formatQuebecDay, sessionPerformers } from '../describe'
+import { conflictCount, formatDuration, formatQuebecDay, formatQuebecDayInYear, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { fullTimes, namedThing } from './model'
-import type { Calendar, Feed, NamedThing } from './model'
-import { OccupationLabel, SessionTitle } from './things'
+import { nameOf, namedThing, overlapTimes } from './model'
+import type { Calendar, Feed } from './model'
+import { SessionStatus } from './things'
 
 // "À régler": one box, whose first row opens it, with how many conflicts and sessions without a date there are, then
 // what the feeds' reads say, and, opened, the conflicts and the sessions without a date (see "À régler" in
@@ -14,13 +14,15 @@ import { OccupationLabel, SessionTitle } from './things'
 
 type IssuesProps = {
   calendar: Calendar
+  // Today, whose year the days of the conflicts don't say.
+  today: string
   open: boolean
   onToggle: () => void
   // Shows a day, chosen, in the month.
   onShowDay: (day: string) => void
 }
 
-export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, onToggle, onShowDay }: IssuesProps) {
+export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today, open, onToggle, onShowDay }: IssuesProps) {
   const titleId = useId()
   const contentId = useId()
   const nothing = conflicts.length === 0 && undatedSessions.length === 0
@@ -79,22 +81,17 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
             >
               {conflicts.map((conflict, i) => {
                 const day = quebecDayAndTime(new Date(conflict.start)).day
-                const when = formatQuebecDay(conflict.start)
+                // Without its year, unless it's another one than today's.
+                const when = day.slice(0, 4) === today.slice(0, 4) ? formatQuebecDayInYear(conflict.start) : formatQuebecDay(conflict.start)
+                const [a, b] = conflict.things.map((thing) => nameOf(namedThing(thing, feeds)))
                 return (
-                  <IssueRow
-                    key={i}
-                    when={when}
-                    action={
-                      <button type="button" onClick={() => onShowDay(day)}>
-                        <ActionText text="voir le jour" about={when} />
-                      </button>
-                    }
-                  >
-                    <span className="admin-meta">{fullTimes(conflict, day)}</span>
-                    {conflict.things.map((thing, j) => (
-                      <ConflictingThing key={j} thing={namedThing(thing, feeds)} />
-                    ))}
-                  </IssueRow>
+                  <li key={i}>
+                    <button type="button" className="calendar-issue-row" onClick={() => onShowDay(day)}>
+                      <IssueText when={when}>
+                        {overlapTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
+                      </IssueText>
+                    </button>
+                  </li>
                 )
               })}
             </IssueGroup>
@@ -106,19 +103,15 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
               explanation="Donnez-leur une date pour les voir dans le mois, et dans les conflits."
             >
               {undatedSessions.map((session) => (
-                <IssueRow
-                  key={session.id}
-                  className={`admin-status-${session.status}`}
-                  when="à déterminer"
-                  action={
-                    <Link to={sessionPath(session)} className="admin-button">
-                      <ActionText text="lui donner une date" about={session.title} />
-                    </Link>
-                  }
-                >
-                  <SessionTitle id={session.id} title={session.title} status={session.status} />
-                  <span className="admin-meta"> {[sessionPerformers(session), formatDuration(session.durationMinutes)].filter(Boolean).join(', ')}</span>
-                </IssueRow>
+                <li key={session.id} className={`admin-status-${session.status}`}>
+                  <Link to={sessionPath(session)} className="calendar-issue-row">
+                    <IssueText when="à déterminer">
+                      <strong>{session.title}</strong>
+                      <SessionStatus status={session.status} /> ·{' '}
+                      {[sessionPerformers(session), formatDuration(session.durationMinutes)].filter(Boolean).join(', ')}
+                    </IssueText>
+                  </Link>
+                </li>
               ))}
             </IssueGroup>
           )}
@@ -131,18 +124,6 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
 // A count, or a group's kind, in a tag: conflicts' in their red.
 function Tag({ conflict = false, children }: { conflict?: boolean; children: ReactNode }) {
   return <span className={conflict ? 'calendar-tag calendar-conflict-tag' : 'calendar-tag'}>{children}</span>
-}
-
-// What an action of a row says, e.g. "voir le jour →", and what it's about, which only screen readers read, without the
-// arrow, e.g. "voir le jour, sam. 21 nov. 2026".
-function ActionText({ text, about }: { text: string; about: string }) {
-  return (
-    <>
-      {text}
-      <span className="visually-hidden">, {about}</span>
-      <span aria-hidden="true"> →</span>
-    </>
-  )
 }
 
 // A kind of thing to settle: its tag and its heading, what to do about it, then a row for each one.
@@ -158,24 +139,13 @@ function IssueGroup({ tag, heading, explanation, children }: { tag: ReactNode; h
   )
 }
 
-// A thing to settle: when, what it is, and what to do about it.
-function IssueRow({ when, action, className, children }: { when: string; action: ReactNode; className?: string; children: ReactNode }) {
+// What a row to settle says, on one line: when, then what it is. The whole row is what's done about it, so its text,
+// which names it, has no links of its own.
+function IssueText({ when, children }: { when: string; children: ReactNode }) {
   return (
-    <li className={className}>
-      <span className="calendar-issue-when">{when}</span>
-      <span className="calendar-issue-what">{children}</span>
-      <span className="calendar-issue-action">{action}</span>
-    </li>
-  )
-}
-
-// One of a conflict's things, with its kind.
-function ConflictingThing({ thing }: { thing: NamedThing }) {
-  return (
-    <span className={thing.kind === 'session' ? `calendar-issue-thing admin-status-${thing.status}` : 'calendar-issue-thing'}>
-      {THING_KIND_LABELS[thing.kind]}&nbsp;:{' '}
-      {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} /> : <OccupationLabel title={thing.title} calendar={thing.calendar} />}
-    </span>
+    <>
+      <span className="calendar-issue-when">{when}</span> <span className="calendar-issue-what">{children}</span>
+    </>
   )
 }
 
