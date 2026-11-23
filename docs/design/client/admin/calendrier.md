@@ -43,7 +43,8 @@ starts is written like a session's times in short (see [Times, in Sessions](sess
 
 Changing the month adds a step to the browser's history, and unchooses the day, unless it chooses one too, e.g.
 "aujourd'hui". Choosing a day, or opening or closing "À régler", doesn't add one. So going back from a session's page
-finds the page as it was.
+finds the page as it was, with the form for a new session closed, since it isn't in the address (see
+[A new session](#a-new-session)).
 
 ## À régler
 
@@ -75,8 +76,8 @@ with what it's about, e.g. « voir le jour, sam. 21 nov. 2026 ».
 ## The toolbar
 
 "←" and "→" ("mois précédent" and "mois suivant" for screen readers), which can't go beyond the months the server takes,
-the month, e.g. "novembre 2026", which screen readers announce when it changes, "aujourd'hui", which shows today's month
-and chooses today, and "nouvelle session", which opens the session form (see [Sessions](sessions.md#the-session-form)).
+the month, e.g. "novembre 2026", which screen readers announce when it changes, and "aujourd'hui", which shows today's
+month and chooses today.
 
 ## The month
 
@@ -94,11 +95,16 @@ l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
 Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
 day.
 
+From today on, each day of the grid has a "+" next to its number, always shown ("nouvelle session le jeudi 19 novembre
+2026" for screen readers), which chooses the day, without unchoosing it, and opens the form for a new session on it (see
+[A new session](#a-new-session)).
+
 With the keyboard, the month is one stop: Tab goes to the chosen day, or else to today, when it's in the month's grid,
 or else to the month's first day. The arrows move between days, within the grid, and Enter or Space chooses the day, or
-unchooses it. Screen readers name the table by its month, and each day by its date, e.g. "jeudi 19 novembre 2026", say
-which one is today, and which one is chosen, and read what's on it. The sessions' links in the month are left out of the
-keyboard's way, since the chosen day has them.
+unchooses it. Tab from a day goes to its "+", if it has one, which the arrows move from as from its day, but never to.
+Screen readers name the table by its month, and each day by its date, e.g. "jeudi 19 novembre 2026", say which one is
+today, and which one is chosen, and read what's on it. The sessions' links in the month are left out of the keyboard's
+way, since the chosen day has them.
 
 ### Free time
 
@@ -125,17 +131,40 @@ A thing's row has:
   session HAUTE RIVE TAKEOVER », « conflit avec l'occupation RÉPARATION (Calendrier de l'équipe) ».
 
 A stretch's row has "disponible", and the stretch, "toute la journée", or e.g. "jusqu'à 15 h". On a day without
-anything, « Rien ce jour-là. ». From today on, "nouvelle session ce jour →" opens the session form on that day (see [The
-session form](sessions.md#the-session-form)).
+anything, « Rien ce jour-là. ».
+
+### A new session
+
+A day's "+" opens a short form for a new session on the chosen day, "Nouvelle session", under the day's things, and puts
+the focus on its heading. It adds the session with only what's needed to add one, without sets, and with its other fields empty
+(see [`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)), then goes to its page, where
+the rest is added. Its fields are:
+
+- "Début" and "Fin", each a time of day, in Québec time. The session starts on the chosen day, and ends on that day when
+  the end's time is after the start's, or else the next day, e.g. "21 h – 1 h". An end at the start's time is refused,
+  « La fin doit être après le début. ». A time the clocks skip is refused, and one they show twice is the first one, or
+  for the end, the first one after the start, as in the session form (see [Times, in Sessions](sessions.md#times)).
+  Once they're valid, the form says how long the session lasts, e.g. « Dure 4 h. », or « Dure 4 h, jusqu'au
+  lendemain. ».
+- "Type", as in the session form (see [The session form](sessions.md#the-session-form)).
+- "Collectif", only for a takeover, as in the session form. When the collectives can't be loaded, the form says so, and
+  none can be picked.
+- "Nom", only for "Autre", which needs one (see [Types and names](../../server/sessions.md#types-and-names)).
+
+It says what's wrong as the session form does (see [Errors, in Sessions](sessions.md#errors)), e.g. naming the session
+the new one would overlap, and linking to it. "créer" adds the session, and "annuler" closes the form, which puts the
+focus back on the day's "+". Choosing another day, or none, closes it too, and what was typed in it is lost.
 
 ## Loading and errors
 
 When the calendar can't be read, the page says why at its top, until it's read again. "À régler" shows the last calendar
 read, whatever its days, and nothing before the first. The month and the chosen day only show what a calendar read for
-the month's days has: until then, its days show only their numbers, and the chosen day only its heading and "nouvelle
-session ce jour →".
+the month's days has: until then, its days show only their numbers, and their "+", and the chosen day only its heading,
+and the form for a new session, which doesn't wait for the calendar.
 
 ## Endpoints
 
 - `GET /api/admin/calendar`, for the days of the month's grid, within those the server takes. It's read when the page
   opens, when the month changes, and when the browser's tab is shown again, at most once a minute.
+- `GET /api/admin/collectives`, to pick a takeover's collective, each time the form for a new session opens, and
+  `POST /api/admin/sessions`, to add the session.

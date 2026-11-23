@@ -1,7 +1,6 @@
 import { useId } from 'react'
-import { Link } from 'react-router'
+import type { ReactNode } from 'react'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { newSessionPath } from '../session-errors'
 import { fullTimes, inSentence, isFree } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationLabel, SessionTitle } from './things'
@@ -14,9 +13,11 @@ type ChosenDayProps = {
   // What's on it, once the calendar is read for the month's days, or else null.
   shown: CalendarDay | null
   onClose: () => void
+  // Under what's on it, e.g. the form for a new session.
+  children?: ReactNode
 }
 
-export function ChosenDay({ day, today, shown, onClose }: ChosenDayProps) {
+export function ChosenDay({ day, today, shown, onClose, children }: ChosenDayProps) {
   const headingId = useId()
   return (
     <section className="calendar-day" aria-labelledby={headingId}>
@@ -51,11 +52,7 @@ export function ChosenDay({ day, today, shown, onClose }: ChosenDayProps) {
             )}
           </ul>
         ))}
-      {day >= today && (
-        <p>
-          <Link to={newSessionPath({ day })}>nouvelle session ce jour →</Link>
-        </p>
-      )}
+      {children}
     </section>
   )
 }

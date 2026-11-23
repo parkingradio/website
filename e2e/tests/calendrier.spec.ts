@@ -14,7 +14,7 @@ const dayButton = (page: Page, day: string) => page.getByRole('button', { name: 
 const dayCell = (page: Page, day: string) => page.locator('.calendar-month td').filter({ has: dayButton(page, day) })
 const chosenDay = (page: Page, day: string) => page.getByRole('region', { name: longDay(day) })
 
-test("a session is in its month, and on its day, which leads to a new session's form on that day", async ({ page }, testInfo) => {
+test('a session is in its month, and on its day, where a new session is added', async ({ page }, testInfo) => {
   const { unique, day } = own(testInfo)
   await logIn(page)
   await expect(adminMenu(page)).toBeVisible()
@@ -44,20 +44,42 @@ test("a session is in its month, and on its day, which leads to a new session's 
   const chosen = chosenDay(page, day)
   await expect(chosen.getByRole('listitem')).toHaveText([`session21 h – 1 hE2E ${unique}`])
 
-  await chosen.getByRole('link', { name: 'nouvelle session ce jour →' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Nouvelle session' })).toBeVisible()
-  for (const when of ['Début', 'Fin']) await expect(page.getByRole('group', { name: when, exact: true }).getByLabel('date', { exact: true })).toHaveValue(day)
-  // Back to the month, with its day chosen.
+  // Its "+", after it, opens the form for a new session on it, with the focus on its heading, then its start.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: `nouvelle session le ${longDay(day)}` })).toBeFocused()
+  await page.keyboard.press('Enter')
+  const form = chosen.getByRole('form', { name: 'Nouvelle session' })
+  await expect(form.getByRole('heading', { name: 'Nouvelle session' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(form.getByLabel('Début')).toBeFocused()
+  await form.getByLabel('Début').fill('18:00')
+  await form.getByLabel('Fin').fill('22:00')
+  await form.getByRole('radio', { name: 'Autre' }).check()
+  await form.getByLabel('Nom').fill(`E2E NEW ${unique}`)
+  // The server refuses it while it overlaps the other session, which it names.
+  await form.getByRole('button', { name: 'créer' }).click()
+  const alert = form.getByRole('alert')
+  await expect(alert).toContainText("La session n'a pas pu être ajoutée")
+  await expect(alert.getByRole('link', { name: new RegExp(`^E2E ${unique}, `) })).toHaveAttribute('href', `/admin/sessions/${id}`)
+  // Up to when the other starts.
+  await form.getByLabel('Fin').fill('21:00')
+  await form.getByRole('button', { name: 'créer' }).click()
+  await expect(page).toHaveURL(/^[^?]*\/admin\/sessions\/(?!nouvelle)[^/?]+$/)
+  const newId = new URL(page.url()).pathname.split('/').at(-1)!
+  await expect(page.getByRole('heading', { level: 1, name: `E2E NEW ${unique}` })).toBeVisible()
+  await expect(page.getByLabel('Session', { exact: true })).toContainText(`${longDay(day)}, de 18 h à 21 h`)
+  // Back to the month, with its day chosen, the form closed, and the new session on the day.
   await page.goBack()
-  await expect(chosenDay(page, day)).toBeVisible()
+  await expect(chosenDay(page, day).getByRole('listitem')).toHaveText([`session18 h – 21 hE2E NEW ${unique}`, `session21 h – 1 hE2E ${unique}`])
   await expect(dayButton(page, day)).toHaveAttribute('aria-pressed', 'true')
+  await expect(chosenDay(page, day).getByRole('form')).toHaveCount(0)
 
   // The seeded session without a date needs settling, and leads to its page.
   const issues = page.getByRole('region', { name: 'À régler' })
   await issues.getByRole('button', { name: /sans date/ }).click()
   await expect(issues.getByRole('link', { name: /^lui donner une date\s?, LES SŒURS ONDES TAKEOVER$/ })).toHaveAttribute('href', /^\/admin\/sessions\//)
 
-  expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
+  for (const added of [id, newId]) expect((await page.request.delete(`/api/admin/sessions/${added}`)).ok()).toBe(true)
 })
 
 test('occupations and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page }, testInfo) => {

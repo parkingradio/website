@@ -158,10 +158,6 @@
   text-align: center;
 }
 
-.calendar-toolbar .admin-button {
-  margin-left: auto;
-}
-
 .calendar-legend {
   display: flex;
   flex-wrap: wrap;
@@ -226,6 +222,13 @@
 .calendar-month td.calendar-chosen {
   outline: 2px solid #000;
   outline-offset: -2px;
+}
+
+/* The day's number, and its "+", at the cell's top right. */
+.calendar-day-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 
 /* The day's number, which chooses it, and today's in a black square. */
@@ -346,6 +349,21 @@
   display: block;
 }
 
+/* A day's "+", small and always shown, since phones have no hover, but as large a target as a finger needs. */
+.admin .calendar-add {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.admin .calendar-add:focus-visible {
+  outline: 2px solid #1d4fa3;
+}
+
 /* The chosen day. */
 .calendar-day-heading {
   display: flex;
@@ -404,13 +422,19 @@
     padding: 1px 2px;
   }
 
+  /* The number and the "+" fit side by side in the narrowest columns, about 44px. */
+  .admin .calendar-number {
+    min-width: 0;
+  }
+
+  .admin .calendar-add {
+    width: 20px;
+    height: 20px;
+  }
+
   .calendar-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.25rem;
-  }
-
-  .calendar-toolbar .admin-button {
-    margin-left: 0;
   }
 
   .calendar-issue-list li {

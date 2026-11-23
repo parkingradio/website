@@ -306,7 +306,7 @@ function DayAndTime({
 }
 
 // The session's type, one of which is picked.
-function TypeField({ type, onChange, error, onLeave }: GroupProps<SessionType> & { type: SessionType | null }) {
+export function TypeField({ type, onChange, error, onLeave }: GroupProps<SessionType> & { type: SessionType | null }) {
   const name = useId()
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
@@ -326,7 +326,7 @@ function TypeField({ type, onChange, error, onLeave }: GroupProps<SessionType> &
 
 // The collective whose takeover the session is, which a takeover has to have. When the collectives couldn't be loaded,
 // the session's stays.
-function TakeoverField({
+export function TakeoverField({
   takeover,
   collectives,
   onChange,
@@ -358,7 +358,7 @@ function TakeoverField({
 
 // The session's own name, which a session of type "other" needs, and which replaces the one the other types give it,
 // which the empty field shows.
-function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { form: SessionFormValues }) {
+export function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { form: SessionFormValues }) {
   const placeholder = (form.type && typeName(form.type, form.takeover)) ?? (form.type === 'takeover' ? 'NOM DU COLLECTIF TAKEOVER' : 'p. ex. LISTENING PARTY')
   return (
     <Labeled label="Nom" error={error}>

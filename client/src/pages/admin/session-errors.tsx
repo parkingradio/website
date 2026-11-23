@@ -10,9 +10,9 @@ export function sessionPath(session: Pick<Session, 'id'>): string {
   return `/admin/sessions/${session.id}`
 }
 
-// The address of "nouvelle session", as the takeover of a collective, or from an application, by their ids, or on a day
-// (see "The session form" and "From an application" in docs/design/client/admin/sessions.md).
-export function newSessionPath(from: { takeover?: string; application?: string; day?: string } = {}): string {
+// The address of "nouvelle session", as the takeover of a collective, or from an application, by their ids (see "The
+// session form" and "From an application" in docs/design/client/admin/sessions.md).
+export function newSessionPath(from: { takeover?: string; application?: string } = {}): string {
   const query = new URLSearchParams(Object.entries(from).filter((entry): entry is [string, string] => entry[1] !== undefined))
   return `/admin/sessions/nouvelle${query.size > 0 ? `?${query}` : ''}`
 }

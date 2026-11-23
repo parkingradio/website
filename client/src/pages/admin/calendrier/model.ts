@@ -1,7 +1,8 @@
 import type { Data, Schema } from '../../../api/client'
-import { isDay } from '../../../application-fields'
+import { isDay, isTime } from '../../../application-fields'
 import { addDays, daysBetween, quebecDayAndTime, quebecInstant } from '../../../quebec-time'
-import type { Session } from '../../../session-fields'
+import { EMPTY_SESSION_FORM } from '../../../session-fields'
+import type { Reference, Session, SessionFormValues, SessionType } from '../../../session-fields'
 import { endsByItsTime, formatDayInYear, formatQuebecDayInYear, formatTime, shortTimes } from '../describe'
 
 // What the Calendrier page shows of the calendar, worked out from what the server gives (see
@@ -28,7 +29,7 @@ export type NamedThing = { kind: 'session'; id: string; title: string; status: S
 
 // The days the server takes (see docs/design/server/calendar.md).
 const FIRST_DAY = '2000-01-01'
-const LAST_DAY = '2999-12-31'
+export const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
@@ -242,4 +243,17 @@ export function calendarDays(calendar: Calendar, month: string): Map<string, Cal
       return [day, [...dayThings, ...freeTime(day, taking)].sort((a, b) => when(a) - when(b))]
     }),
   )
+}
+
+// A new session as the short form under the chosen day has it (see "A new session" in
+// docs/design/client/admin/calendrier.md): its times of day, its type, its takeover's collective, which it keeps while
+// another type is picked, like the session form, and its name, likewise.
+export type NewSessionOnDay = { start: string; end: string; type: SessionType | null; takeover: Reference | null; name: string }
+
+// The new session on `day` as the session form has it, to check it as that form does. It ends on `day` when its end's
+// time is after its start's, and otherwise the next day, so that equal times are refused, as the end isn't after the
+// start. Only "Autre" has a name, since the form only shows it for "Autre".
+export function sessionOnDay(day: string, { start, end, type, takeover, name }: NewSessionOnDay): SessionFormValues {
+  const endDay = isTime(start) && isTime(end) && end < start ? addDays(day, 1) : day
+  return { ...EMPTY_SESSION_FORM, day, lastDay: day, start, endDay, end, type, takeover, name: type === 'other' ? name : '' }
 }

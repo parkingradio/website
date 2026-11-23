@@ -1,12 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
 import { api } from '../../api/client'
 import { quebecDayAndTime } from '../../quebec-time'
 import { Button } from './button'
 import { useReportConflicts, useTabShownCount } from './conflict-count'
 import { useQueryParams } from './list'
-import { newSessionPath } from './session-errors'
 import { ChosenDay } from './calendrier/day'
+import { NewSessionForm } from './calendrier/new-session'
 import { Issues } from './calendrier/issues'
 import { Month } from './calendrier/month'
 import { FIRST_MONTH, LAST_MONTH, addMonths, calendarDays, gridDays, gridRange, monthOf, readDay, readMonth } from './calendrier/model'
@@ -59,12 +58,25 @@ export function Calendrier() {
   const days = useMemo(() => current && calendarDays(current, month), [current, month])
   const monthNameId = useId()
 
-  // The day in the month that gets the focus once the page shows it, e.g. once the chosen day is closed.
+  // The day the form for a new session was opened on, which shows while it's the chosen day. Choosing another day, or
+  // none, in any way, e.g. going back in the history, closes it.
+  const [adding, setAdding] = useState<string | null>(null)
+  const [lastChosen, setLastChosen] = useState(chosen)
+  if (chosen !== lastChosen) {
+    setLastChosen(chosen)
+    if (adding !== chosen) setAdding(null)
+  }
+
+  // How many times a "+" was used, each of which puts the focus on the form, even when it's open already.
+  const [addings, setAddings] = useState(0)
+
+  // What gets the focus once the page shows it, by its selector, e.g. the day in the month once the chosen day is
+  // closed.
   const focusNext = useRef<string | null>(null)
   useEffect(() => {
     const next = focusNext.current
     focusNext.current = null
-    if (next) document.querySelector<HTMLButtonElement>(`.calendar-month [data-day="${next}"]`)?.focus()
+    if (next) document.querySelector<HTMLElement>(next)?.focus()
   })
 
   // Changing the month adds a step to the history, but choosing a day in it doesn't.
@@ -87,7 +99,7 @@ export function Calendrier() {
           open={issuesOpen}
           onToggle={() => change({ issues: issuesOpen ? null : 'open' }, { replace: true })}
           onShowDay={(shown) => {
-            focusNext.current = shown
+            focusNext.current = `.calendar-month [data-day="${shown}"]`
             showDay(shown)
           }}
         />
@@ -113,22 +125,44 @@ export function Calendrier() {
         <button type="button" onClick={() => showDay(today)}>
           aujourd'hui
         </button>
-        <Link to={newSessionPath()} className="admin-button">
-          nouvelle session
-        </Link>
       </div>
       <Legend />
-      <Month key={month} month={month} nameId={monthNameId} today={today} chosen={chosen} days={days} onChoose={(shown) => choose(shown === chosen ? null : shown)} />
+      <Month
+        key={month}
+        month={month}
+        nameId={monthNameId}
+        today={today}
+        chosen={chosen}
+        days={days}
+        onChoose={(shown) => choose(shown === chosen ? null : shown)}
+        onAdd={(shown) => {
+          if (shown !== chosen) choose(shown)
+          setAdding(shown)
+          setAddings((addings) => addings + 1)
+        }}
+      />
       {chosen && (
         <ChosenDay
           day={chosen}
           today={today}
           shown={days?.get(chosen) ?? null}
           onClose={() => {
-            focusNext.current = chosen
+            focusNext.current = `.calendar-month [data-day="${chosen}"]`
             choose(null)
           }}
-        />
+        >
+          {adding === chosen && (
+            <NewSessionForm
+              key={chosen}
+              day={chosen}
+              focusRequests={addings}
+              onCancel={() => {
+                focusNext.current = `.calendar-month [data-add="${chosen}"]`
+                setAdding(null)
+              }}
+            />
+          )}
+        </ChosenDay>
       )}
     </>
   )

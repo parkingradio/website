@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import App from '../../app'
+import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
 import { held, mockFetch, requestsTo, visibleText as shownText } from '../../test-utils'
 import type { Calendar } from './calendrier/model'
@@ -61,6 +62,10 @@ const CALENDAR: Calendar = {
 }
 const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [] }
 
+// The collectives a new session's form picks a takeover's from.
+const HAUTE_RIVE = { id: 'collective-1', name: 'Haute Rive', members: [] } as unknown as Collective
+const COLLECTIVES = { '/api/admin/collectives': { ok: true, collectives: [HAUTE_RIVE] } }
+
 // Where the page is, and a way back.
 function CurrentPath() {
   const location = useLocation()
@@ -89,6 +94,9 @@ const back = () => fireEvent.click(screen.getByTestId('back'))
 const dayButton = (day: string) => document.querySelector<HTMLButtonElement>(`.calendar-month [data-day="${day}"]`)!
 const cell = (day: string) => dayButton(day).closest('td')!
 const cellText = (day: string) => visibleText(cell(day))
+// A day's "+", which opens the form for a new session on it.
+const addButton = (day: string) => within(cell(day)).getByRole('button', { name: /^nouvelle session le / })
+const newSession = () => screen.queryByRole('form', { name: 'Nouvelle session' })
 const chosenDay = () => screen.queryByRole('region', { name: /2026/ })
 const loaded = () => screen.findByRole('region', { name: 'À régler' })
 
@@ -146,7 +154,6 @@ describe('Calendrier', () => {
       fireEvent.click(screen.getByRole('button', { name: "aujourd'hui" }))
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-19')
       expect(dayButton('2026-11-19')).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle')
     })
   })
 
@@ -170,17 +177,17 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      expect(cellText('2026-11-21')).toBe('21toute la journéeoccupation : Séjoursconflit21 h – 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflit')
+      expect(cellText('2026-11-21')).toBe('21+toute la journéeoccupation : Séjoursconflit21 h – 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflit')
       expect(within(cell('2026-11-21')).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(cellText('2026-11-22')).toBe("22jusqu'à 11 hoccupation : Séjoursconflitjusqu'à 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflitdispo dès 11 h")
+      expect(cellText('2026-11-22')).toBe("22+jusqu'à 11 hoccupation : Séjoursconflitjusqu'à 1 hsession : HAUTE RIVE TAKEOVER, avec Aurore, Brume · Cyanconflitdispo dès 11 h")
       expect(cellText('2026-11-07')).toBe('720 h – 23 hsession : SOIRÉE jouée')
       expect(cell('2026-11-07').querySelector('li')).toHaveClass('admin-status-done')
       expect(cellText('2026-11-24')).toContain('session : LIVE PERFORMANCE annulée')
       // An occupation's title, then its calendar, or its calendar alone.
-      expect(cellText('2026-11-26')).toBe("26dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
+      expect(cellText('2026-11-26')).toBe("26+dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(cell('2026-11-26').querySelector('.calendar-title')).toHaveTextContent(/^occupation : RÉPARATION$/)
       // Things of the other months too.
-      expect(cellText('2026-12-02')).toBe("2toute la journéeoccupation : Calendrier de l'équipe")
+      expect(cellText('2026-12-02')).toBe("2+toute la journéeoccupation : Calendrier de l'équipe")
     })
 
     it("describes each day's button with what's on the day", async () => {
@@ -201,7 +208,7 @@ describe('Calendrier', () => {
       await loaded()
 
       // Free time and things in order of time.
-      expect(cellText('2026-11-20')).toBe("20dispo jusqu'à 15 hdès 15 hoccupation : Séjours")
+      expect(cellText('2026-11-20')).toBe("20+dispo jusqu'à 15 hdès 15 hoccupation : Séjours")
       expect(cell('2026-11-21').querySelectorAll('.calendar-conflict')).toHaveLength(2)
       expect(cell('2026-11-22').querySelectorAll('.calendar-conflict')).toHaveLength(2)
     })
@@ -277,7 +284,7 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      const stops = () => [...document.querySelectorAll('.calendar-month [tabindex="0"]')].map((element) => element.getAttribute('data-day'))
+      const stops = () => [...document.querySelectorAll('.calendar-month [data-day][tabindex="0"]')].map((element) => element.getAttribute('data-day'))
       // Today.
       expect(stops()).toEqual(['2026-11-19'])
       dayButton('2026-11-19').focus()
@@ -318,16 +325,14 @@ describe('Calendrier', () => {
         "sessionsam. 21 nov., 21 h – 1 hHAUTE RIVE TAKEOVER Aurore, Brume · Cyanconflit avec l'occupation Séjours",
         'disponibledès 11 h',
       ])
-      expect(within(chosenDay()!).getByRole('link', { name: 'nouvelle session ce jour →' })).toHaveAttribute('href', '/admin/sessions/nouvelle?day=2026-11-22')
     })
 
-    it('says when nothing takes it, and has no new session on a past day', async () => {
+    it('says when nothing takes it', async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
       renderAt('/admin/calendrier?day=2026-11-18')
       await loaded()
 
       expect(within(chosenDay()!).getByText('Rien ce jour-là.')).toBeInTheDocument()
-      expect(within(chosenDay()!).queryByRole('link', { name: 'nouvelle session ce jour →' })).not.toBeInTheDocument()
     })
 
     it("names an occupation by its title, then its calendar, and today", async () => {
@@ -369,6 +374,204 @@ describe('Calendrier', () => {
       expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(['disponibletoute la journée'])
       expect(cell('2026-12-01').querySelector('.calendar-free')).toBeNull()
       expect(cell('2026-12-01')).not.toHaveClass('calendar-available')
+    })
+  })
+
+  describe('a new session', () => {
+    // What it sent to add the session.
+    const sentSession = () => JSON.parse((requestsTo('POST', '/api/admin/sessions')[0].body as FormData).get('session') as string)
+    const time = (label: 'Début' | 'Fin', value: string) => fireEvent.change(within(newSession()!).getByLabelText(label), { target: { value } })
+    const create = () => fireEvent.click(within(newSession()!).getByRole('button', { name: 'créer' }))
+
+    it('is added from the "+" of each day from today on, named by its day', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      expect(screen.queryByRole('link', { name: /nouvelle session/ })).not.toBeInTheDocument()
+      expect(addButton('2026-11-19')).toHaveAccessibleName('nouvelle session le jeudi 19 novembre 2026')
+      expect(addButton('2026-11-19')).toHaveTextContent('+')
+      // The days of the month after too, which can be chosen.
+      expect(addButton('2026-12-05')).toHaveAccessibleName('nouvelle session le samedi 5 décembre 2026')
+      expect(within(cell('2026-11-18')).queryByRole('button', { name: /^nouvelle session/ })).not.toBeInTheDocument()
+    })
+
+    it('is reached with Tab from the day that is the grid\'s stop, whose arrows move from its "+" as from the day', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      const tabbable = () => [...document.querySelectorAll('.calendar-month [tabindex="0"]')]
+      expect(tabbable()).toEqual([dayButton('2026-11-19'), addButton('2026-11-19')])
+      act(() => addButton('2026-11-19').focus())
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' })
+      expect(document.activeElement).toBe(dayButton('2026-11-20'))
+      expect(tabbable()).toEqual([dayButton('2026-11-20'), addButton('2026-11-20')])
+      // A day before today has no "+".
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' })
+      expect(tabbable()).toEqual([dayButton('2026-11-13')])
+    })
+
+    it('opens its form under the chosen day, which only the chosen day has', async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      fireEvent.click(addButton('2026-11-22'))
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-22')
+      expect(chosenDay()).toHaveAccessibleName('dimanche 22 novembre 2026')
+      // Under the day's things, with the focus on its heading.
+      const form = newSession()!
+      expect(chosenDay()!.lastElementChild).toBe(form)
+      await waitFor(() => expect(document.activeElement).toBe(within(form).getByRole('heading', { name: 'Nouvelle session' })))
+      expect(requestsTo('GET', '/api/admin/collectives')).toHaveLength(1)
+
+      // Its "+" again keeps the day chosen, and what's typed.
+      time('Début', '21:00')
+      act(() => screen.getByRole('button', { name: "aujourd'hui" }).focus())
+      fireEvent.click(addButton('2026-11-22'))
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-22')
+      expect(document.activeElement).toBe(within(newSession()!).getByRole('heading', { name: 'Nouvelle session' }))
+      expect(within(newSession()!).getByLabelText('Début')).toHaveValue('21:00')
+
+      // Another day's "+" opens it there, empty.
+      fireEvent.click(addButton('2026-11-25'))
+      expect(chosenDay()).toHaveAccessibleName('mercredi 25 novembre 2026')
+      expect(within(newSession()!).getByLabelText('Début')).toHaveValue('')
+
+      // "annuler" closes it, and puts the focus back on the "+".
+      fireEvent.click(within(newSession()!).getByRole('button', { name: 'annuler' }))
+      expect(newSession()).not.toBeInTheDocument()
+      expect(chosenDay()).toHaveAccessibleName('mercredi 25 novembre 2026')
+      expect(document.activeElement).toBe(addButton('2026-11-25'))
+
+      // Choosing another day closes it, and so does unchoosing it.
+      fireEvent.click(addButton('2026-11-25'))
+      fireEvent.click(cell('2026-11-26'))
+      expect(newSession()).not.toBeInTheDocument()
+      fireEvent.click(cell('2026-11-25'))
+      expect(newSession()).not.toBeInTheDocument()
+      fireEvent.click(addButton('2026-11-25'))
+      fireEvent.click(screen.getByRole('button', { name: 'fermer le jour' }))
+      expect(newSession()).not.toBeInTheDocument()
+
+      // So does changing the month, and it stays closed when going back.
+      fireEvent.click(addButton('2026-11-25'))
+      fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
+      back()
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-25')
+      expect(chosenDay()).toBeInTheDocument()
+      expect(newSession()).not.toBeInTheDocument()
+    })
+
+    it('says what is wrong with its fields, as the session form does, and only shows those its type has', async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-25'))
+      const form = newSession()!
+
+      create()
+      expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()
+      expect(within(form).getByText("Indiquez l'heure de fin.")).toBeInTheDocument()
+      expect(within(form).getByText('Choisissez le type de la session.')).toBeInTheDocument()
+      await waitFor(() => expect(document.activeElement).toBe(within(form).getByLabelText('Début')))
+
+      // The end the next day, when it's before the start, but not at the start.
+      time('Début', '21:00')
+      time('Fin', '21:00')
+      expect(within(form).getByText('La fin doit être après le début.')).toBeInTheDocument()
+      time('Fin', '23:00')
+      expect(within(form).getByRole('status')).toHaveTextContent('Dure 2 h.')
+      time('Fin', '01:00')
+      expect(within(form).getByRole('status')).toHaveTextContent("Dure 4 h, jusqu'au lendemain.")
+
+      // A takeover's collective, and "Autre"'s name.
+      const types = within(within(form).getByRole('group', { name: 'Type' }))
+      expect(types.getAllByRole('radio').map((radio) => radio.parentElement!.textContent)).toEqual(['Guest mixes', 'Live performance', 'Takeover', 'Synth meetup', 'Autre'])
+      expect(within(form).queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+      expect(within(form).queryByLabelText('Nom')).not.toBeInTheDocument()
+      fireEvent.click(types.getByRole('radio', { name: 'Takeover' }))
+      expect(within(form).getByText('Choisissez le collectif du takeover.')).toBeInTheDocument()
+      expect(within(form).queryByLabelText('Nom')).not.toBeInTheDocument()
+      fireEvent.click(types.getByRole('radio', { name: 'Autre' }))
+      expect(within(form).queryByRole('combobox', { name: 'Collectif' })).not.toBeInTheDocument()
+      expect(within(form).getByLabelText('Nom')).toHaveAttribute('placeholder', 'p. ex. LISTENING PARTY')
+      expect(within(form).getByText('Indiquez le nom de la session.')).toBeInTheDocument()
+      expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+    })
+
+    it('adds the session, without sets, and with its other fields empty, then goes to its page', async () => {
+      const added = session('session-9', 'HAUTE RIVE TAKEOVER', '2026-11-25T21:00:00-05:00', '2026-11-26T01:00:00-05:00')
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, 'POST /api/admin/sessions': { ok: true, session: added } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-25'))
+      const form = newSession()!
+
+      time('Début', '21:00')
+      time('Fin', '01:00')
+      // A name typed for "Autre" isn't another type's.
+      fireEvent.click(within(form).getByRole('radio', { name: 'Autre' }))
+      fireEvent.change(within(form).getByLabelText('Nom'), { target: { value: 'ATELIER' } })
+      fireEvent.click(within(form).getByRole('radio', { name: 'Takeover' }))
+      const collective = await waitFor(() => {
+        const picker = within(form).getByRole('combobox', { name: 'Collectif' })
+        expect(picker).toBeEnabled()
+        return picker
+      })
+      fireEvent.click(collective)
+      fireEvent.mouseDown(screen.getByRole('option', { name: /^Haute Rive/ }))
+      create()
+
+      await waitFor(() => expect(path()).toBe('/admin/sessions/session-9'))
+      expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1)
+      expect(sentSession()).toEqual({
+        start: '2026-11-25T21:00-05:00',
+        durationMinutes: 240,
+        type: 'takeover',
+        takeover: 'collective-1',
+        application: null,
+        name: '',
+        raEvent: null,
+        description: '',
+      })
+      expect((requestsTo('POST', '/api/admin/sessions')[0].body as FormData).has('flyer')).toBe(false)
+    })
+
+    it("shows the server's error, naming the session it would overlap", async () => {
+      mockFetch({
+        ...LOGGED_IN,
+        ...COLLECTIVES,
+        [NOVEMBER]: CALENDAR,
+        'POST /api/admin/sessions': { ok: false, error: 'The session overlaps another one', session: TAKEOVER, set: null },
+      })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-21'))
+      const form = newSession()!
+
+      time('Début', '20:00')
+      time('Fin', '22:00')
+      fireEvent.click(within(form).getByRole('radio', { name: 'Guest mixes' }))
+      create()
+
+      const alert = await within(form).findByRole('alert')
+      expect(visibleText(alert)).toBe("La session n'a pas pu être ajoutée : The session overlaps another one (HAUTE RIVE TAKEOVER, sam. 21 nov. 2026)")
+      expect(within(alert).getByRole('link', { name: 'HAUTE RIVE TAKEOVER, sam. 21 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-21')
+    })
+
+    it('says when the collectives cannot be loaded', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, '/api/admin/collectives': { ok: false, error: 'Boom' } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-25'))
+      const form = newSession()!
+
+      expect(await within(form).findByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
+      fireEvent.click(within(form).getByRole('radio', { name: 'Takeover' }))
+      expect(within(form).getByRole('combobox', { name: 'Collectif' })).toBeDisabled()
     })
   })
 
@@ -480,11 +683,12 @@ describe('Calendrier', () => {
 
       expect(await screen.findByRole('alert')).toHaveTextContent("Le calendrier n'a pas pu être chargé : Internal server error")
       expect(screen.queryByRole('region', { name: 'À régler' })).not.toBeInTheDocument()
-      expect(cellText('2026-11-21')).toBe('21')
-      // The chosen day only has its heading, and its new session.
+      expect(cellText('2026-11-21')).toBe('21+')
+      // The chosen day only has its heading, and the form for a new session, which doesn't wait for the calendar.
       expect(within(chosenDay()!).queryByRole('listitem')).not.toBeInTheDocument()
       expect(within(chosenDay()!).queryByText('Rien ce jour-là.')).not.toBeInTheDocument()
-      expect(within(chosenDay()!).getByRole('link', { name: 'nouvelle session ce jour →' })).toBeInTheDocument()
+      fireEvent.click(addButton('2026-11-21'))
+      expect(within(chosenDay()!).getByRole('form', { name: 'Nouvelle session' })).toBeInTheDocument()
     })
 
     it("shows none of the month's things before its calendar is read, but keeps what needs settling", async () => {
@@ -495,10 +699,10 @@ describe('Calendrier', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       // December 2, whose occupation November's calendar has.
-      expect(cellText('2026-12-02')).toBe('2')
+      expect(cellText('2026-12-02')).toBe('2+')
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
       await december.answer(CALENDAR)
-      expect(cellText('2026-12-02')).toBe("2toute la journéeoccupation : Calendrier de l'équipe")
+      expect(cellText('2026-12-02')).toBe("2+toute la journéeoccupation : Calendrier de l'équipe")
     })
 
     it('shows only the last month asked for, whatever order the answers come in', async () => {
@@ -544,7 +748,7 @@ describe('Calendrier', () => {
       await shown()
 
       expect(await screen.findByRole('alert')).toHaveTextContent("Le calendrier n'a pas pu être chargé : Internal server error")
-      expect(cellText('2026-11-26')).toBe("26dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
+      expect(cellText('2026-11-26')).toBe("26+dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
     })
   })

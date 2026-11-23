@@ -7,12 +7,12 @@ import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
 import { raEventId } from '../../session-links'
 import {
+  EMPTY_SESSION_FORM,
   STATUSES,
   applicationLink,
   findApplication,
   listedSetFields,
   listedSetFromApplication,
-  newSessionOn,
   newSetFormValues,
   sessionFormValues,
   setFormValues,
@@ -1075,15 +1075,14 @@ function newSessionFailure(
 }
 
 // Adding a session, as the takeover of the collective in the `takeover` query parameter, unless it isn't known, or from
-// the application in the `application` query parameter, with the sets listed in its form, on the day in the `day` query
-// parameter, if it's one.
+// the application in the `application` query parameter, with the sets listed in its form.
 export function NewSessionPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const applicationId = searchParams.get('application')
   const props: SessionFormWithChoicesProps = {
     takeoverId: searchParams.get('takeover'),
-    initial: newSessionOn(searchParams.get('day')),
+    initial: EMPTY_SESSION_FORM,
     sets: [],
     submitLabel: 'ajouter la session',
     onSubmit: async (fields, flyer, sets) => {

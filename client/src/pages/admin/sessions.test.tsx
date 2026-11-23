@@ -2378,37 +2378,6 @@ describe('Adding a session', () => {
     })
   })
 
-  it('starts on the day it is added on from Calendrier, as if it had been typed, unless it is not a day', async () => {
-    mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
-    const first = renderAt('/admin/sessions/nouvelle?day=2026-12-01')
-
-    await screen.findByRole('group', { name: 'Début' })
-    expect([timeInput('Début', 'date'), timeInput('Début', 'heure'), timeInput('Fin', 'date'), timeInput('Fin', 'heure')].map((input) => (input as HTMLInputElement).value)).toEqual([
-      '2026-12-01',
-      '',
-      '2026-12-01',
-      '',
-    ])
-    // The end's date keeps its distance from the start's.
-    fireEvent.change(timeInput('Début', 'date'), { target: { value: '2026-12-02' } })
-    expect(timeInput('Fin', 'date')).toHaveValue('2026-12-02')
-    first.unmount()
-
-    renderAt('/admin/sessions/nouvelle?day=2026-02-30')
-    await screen.findByRole('group', { name: 'Début' })
-    expect(timeInput('Début', 'date')).toHaveValue('')
-    expect(timeInput('Fin', 'date')).toHaveValue('')
-  })
-
-  it("starts on the day along with a collective's takeover", async () => {
-    mockFetch(NEW)
-    renderAt('/admin/sessions/nouvelle?takeover=collective-1&day=2026-12-01')
-
-    await screen.findByRole('group', { name: 'Début' })
-    expect(timeInput('Début', 'date')).toHaveValue('2026-12-01')
-    expect(screen.getByRole('radio', { name: 'Takeover' })).toBeChecked()
-  })
-
   it('adds a session with its own description, of at most 5000 characters, and a flyer', async () => {
     mockFetch({ ...NEW, 'POST /api/admin/sessions': { ok: true, session: SESSION } })
     renderAt('/admin/sessions/nouvelle')

@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { WHOLE_DAY, gridDays, isFree, monthOf } from './model'
+import { LAST_DAY, WHOLE_DAY, gridDays, isFree, monthOf } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationCalendar, OccupationTitle, SessionTitle } from './things'
 
@@ -24,11 +24,13 @@ type MonthProps = {
   // What's on each day, once the calendar is read for the grid's days, or else null.
   days: Map<string, CalendarDay> | null
   onChoose: (day: string) => void
+  // Opens the form for a new session on a day, from today on, which chooses it.
+  onAdd: (day: string) => void
 }
 
 // The grid is one stop for the keyboard, its days' buttons: the one with the focus, or else the chosen day, or else today,
-// or else the month's first day.
-export function Month({ month, nameId, today, chosen, days, onChoose }: MonthProps) {
+// or else the month's first day. Tab from it goes to its "+", if it has one, which the arrows move from as from its day.
+export function Month({ month, nameId, today, chosen, days, onChoose, onAdd }: MonthProps) {
   const grid = gridDays(month)
   const id = useId()
   const [focused, setFocused] = useState<string | null>(null)
@@ -76,22 +78,41 @@ export function Month({ month, nameId, today, chosen, days, onChoose }: MonthPro
                 day === chosen && 'calendar-chosen',
                 entries.some((entry) => isFree(entry) && entry.part === WHOLE_DAY) && 'calendar-available',
               ]
+              // The day's button and its "+", which are both its stop, and move with the arrows.
+              const stopProps = { tabIndex: day === stop ? 0 : -1, onFocus: () => setFocused(day), onKeyDown: (event: KeyboardEvent) => onKeyDown(event, day) }
               return (
                 <td key={day} className={classes.filter(Boolean).join(' ') || undefined} onClick={(event) => onClick(event, day)}>
-                  <button
-                    type="button"
-                    className={day === today ? 'calendar-number calendar-today' : 'calendar-number'}
-                    data-day={day}
-                    tabIndex={day === stop ? 0 : -1}
-                    aria-label={formatDay(day)}
-                    aria-describedby={entriesId}
-                    aria-pressed={day === chosen}
-                    aria-current={day === today ? 'date' : undefined}
-                    onFocus={() => setFocused(day)}
-                    onKeyDown={(event) => onKeyDown(event, day)}
-                  >
-                    {Number(day.slice(8))}
-                  </button>
+                  <div className="calendar-day-top">
+                    <button
+                      type="button"
+                      className={day === today ? 'calendar-number calendar-today' : 'calendar-number'}
+                      data-day={day}
+                      aria-label={formatDay(day)}
+                      aria-describedby={entriesId}
+                      aria-pressed={day === chosen}
+                      aria-current={day === today ? 'date' : undefined}
+                      {...stopProps}
+                    >
+                      {Number(day.slice(8))}
+                    </button>
+                    {day >= today && day <= LAST_DAY && (
+                      <button
+                        type="button"
+                        className="calendar-add"
+                        data-add={day}
+                        aria-label={`nouvelle session le ${formatDay(day)}`}
+                        title="nouvelle session"
+                        {...stopProps}
+                        onClick={(event) => {
+                          // Rather than choosing the day, or unchoosing it, as its cell does.
+                          event.stopPropagation()
+                          onAdd(day)
+                        }}
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
                   {entriesId && <DayCell id={entriesId} entries={entries} />}
                 </td>
               )
