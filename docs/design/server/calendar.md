@@ -50,7 +50,11 @@ error, with a redirect without a link, or with something that isn't valid iCalen
 `RRULE` that isn't valid fails the whole read, not only its event. The server then goes through the calendar for its
 events (see [Events](#events)) apart from the rest of what it does, which never waits for it, and the read fails when
 that takes more than 10 seconds, or more than 384 MB of memory: e.g. for a recurring event whose rule never gives an
-occurrence, such as every February 30, which an iCalendar library can look for without end.
+occurrence, such as every February 30, which an iCalendar library can look for without end. The server goes through one
+calendar at a time, whatever it's read for: a read whose calendar is downloaded while the server goes through another
+one waits until that one is done, which takes up to 10 seconds, and only then has its own 10 seconds. So adding a feed
+takes at most 30 seconds, plus up to 10 seconds for each calendar the server goes through before its own: usually none,
+or one, since the reads every 15 minutes go one feed after another.
 
 A read that fails keeps what was read before, if anything was, and the feed says why it failed (`error`), until a read
 succeeds. What was read is only kept in memory: after the server restarts, a feed has neither `readAt` nor `error` until

@@ -52,6 +52,21 @@ describe('parseFeed', () => {
     expect(process.memoryUsage().heapUsed - heap).toBeLessThan(20 * 1024 * 1024)
   }, 15_000)
 
+  it('goes through one feed at a time, and stops waiting its turn when the read is stopped', async () => {
+    const started = performance.now()
+    const elapsed = (promise: Promise<unknown>) => failure(promise).then(() => performance.now() - started)
+    const first = elapsed(parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { timeoutMs: 1000 }))
+    const second = elapsed(parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { timeoutMs: 1000 }))
+    const stopping = new AbortController()
+    const third = parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { signal: stopping.signal })
+    setTimeout(() => stopping.abort(), 200)
+    expect(await failure(third)).toBeInstanceOf(ReadAborted)
+    expect(performance.now() - started).toBeLessThan(1000)
+    // The second only starts once the first's process has ended, and then has its own time.
+    expect(await first).toBeGreaterThanOrEqual(1000)
+    expect(await second).toBeGreaterThanOrEqual(2000)
+  }, 15_000)
+
   it('stops when the read is stopped', async () => {
     const stopping = new AbortController()
     const parsing = parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { signal: stopping.signal })

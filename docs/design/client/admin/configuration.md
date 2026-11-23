@@ -61,9 +61,10 @@ it was last read, or that it hasn't been read yet, and, when its last read faile
 
 Under that, a form adds a feed: its name ("Nom"), its kind ("Type", "occupations" or "silence") and its link ("Lien"),
 whose field shows dots, like the other secrets of the page. "ajouter" adds it, once all three are filled in: the server
-reads the link first, which can take up to 30 seconds, during which "ajouter" can't be used again. Once it's added, the
-form is cleared, and the list shows it. When it can't be added, the form says why, e.g. that another feed has that
-link, naming it.
+reads the link first, which can take up to 30 seconds, plus up to 10 seconds for each other calendar the server goes
+through first (see [Reading the feeds](../../server/calendar.md#reading-the-feeds)), during which "ajouter" can't be
+used again. Once it's added, the form is cleared, and the list shows it. When it can't be added, the form says why, e.g.
+that another feed has that link, naming it.
 
 ## Features
 
