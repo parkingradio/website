@@ -1160,6 +1160,42 @@
         ],
         "additionalProperties": false
       },
+      "CalendarConflict": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its two things start to overlap"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its two things stop overlapping"
+          },
+          "things": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/CalendarThing"
+              },
+              {
+                "$ref": "#/components/schemas/CalendarThing"
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "The two things that overlap, in their order"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "things"
+        ],
+        "additionalProperties": false
+      },
       "CalendarFeed": {
         "type": "object",
         "properties": {
@@ -1237,6 +1273,178 @@
           "error"
         ],
         "additionalProperties": false
+      },
+      "CalendarOccupation": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "type": "string",
+            "description": "The id of the feed it's read from"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wholeDay": {
+            "type": "boolean",
+            "description": "Whether it takes whole days"
+          },
+          "title": {
+            "type": "string",
+            "description": "Its title, or empty for none"
+          }
+        },
+        "required": [
+          "feed",
+          "start",
+          "end",
+          "wholeDay",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarQuietTime": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "type": "string",
+            "description": "The id of the feed it's read from"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wholeDay": {
+            "type": "boolean",
+            "description": "Whether it takes whole days"
+          }
+        },
+        "required": [
+          "feed",
+          "start",
+          "end",
+          "wholeDay"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarThing": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "session"
+              },
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string",
+                "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "$ref": "#/components/schemas/SessionStatus"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "title",
+              "start",
+              "end",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "occupation"
+              },
+              "feed": {
+                "type": "string",
+                "description": "The id of the feed it's read from"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "wholeDay": {
+                "type": "boolean",
+                "description": "Whether it takes whole days"
+              },
+              "title": {
+                "type": "string",
+                "description": "Its title, or empty for none"
+              }
+            },
+            "required": [
+              "kind",
+              "feed",
+              "start",
+              "end",
+              "wholeDay",
+              "title"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "quiet-time"
+              },
+              "feed": {
+                "type": "string",
+                "description": "The id of the feed it's read from"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "wholeDay": {
+                "type": "boolean",
+                "description": "Whether it takes whole days"
+              }
+            },
+            "required": [
+              "kind",
+              "feed",
+              "start",
+              "end",
+              "wholeDay"
+            ],
+            "additionalProperties": false
+          }
+        ]
       },
       "ChosenPlaylist": {
         "type": "object",
@@ -10766,6 +10974,145 @@
             }
           },
           "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/calendar": {
+      "get": {
+        "operationId": "get_calendar",
+        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, with the calendar feeds they are read from, and, whatever the days, the conflicts of the next 365 days and the sessions without a date",
+        "tags": [
+          "Calendar"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "description": "The first day, in Québec, e.g. \"2026-11-01\""
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "description": "The last day, in Québec, included, e.g. \"2026-11-30\""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "today": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "The day the conflicts are counted from: today, in Québec"
+                    },
+                    "feeds": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarFeed"
+                      },
+                      "description": "Every feed, in the order they were added, with when each was last read, and why that failed"
+                    },
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Session"
+                      },
+                      "description": "The sessions with a start that take some of the days, whatever their status, by start, then createdAt, then id"
+                    },
+                    "occupations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarOccupation"
+                      },
+                      "description": "The occupations that take some of the days, in the order of things"
+                    },
+                    "quietTimes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarQuietTime"
+                      },
+                      "description": "The quiet times that take some of the days, in the order of things"
+                    },
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarConflict"
+                      },
+                      "description": "The conflicts of the next 365 days, from today, whatever the days asked for"
+                    },
+                    "undatedSessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Session"
+                      },
+                      "description": "The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "today",
+                    "feeds",
+                    "sessions",
+                    "occupations",
+                    "quietTimes",
+                    "conflicts",
+                    "undatedSessions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
             "description": "Default Response",
             "content": {
               "application/json": {

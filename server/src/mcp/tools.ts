@@ -174,7 +174,7 @@ export function readFirst(area: Area | undefined): string {
 function descriptionOf(route: ToolRoute, name: string): string {
   const summary = route.schema.summary ?? ''
   const sentences = [readFirst(areaOf(route.url)), /[.!?]$/.test(summary) ? summary : `${summary}.`]
-  if (name in SUMMARIES) sentences.push(`Gives a summary of each one: \`get_${name.slice('list_'.length, -1)}\` gives all of it.`)
+  if (name in SUMMARIES) sentences.push(SUMMARIES[name].says ?? `Gives a summary of each one: \`get_${name.slice('list_'.length, -1)}\` gives all of it.`)
   // The tools that change some of an item's fields (see "Changes" in docs/design/server/README.md).
   if (route.method === 'PATCH') sentences.push("What it isn't given stays as it is, and a list or an object it's given replaces the whole one.")
   if (route.schema.multipart) sentences.push(`Tools can't send a ${multipartParts(route.schema.multipart).file}.`)
@@ -221,31 +221,53 @@ type Payload = { body: string | Buffer; contentType: string }
 // Sends a request as the user a tool acts as.
 type Send = (method: string, url: string, payload?: Payload) => Promise<Answer>
 
-// What the tools that list artists, collectives, applications and sessions give of each one, so that their lists fit in
-// what apps take as they grow: these fields of the full item, as they are.
-const SUMMARIES: Record<string, (body: JsonObject, send: Send) => Promise<JsonObject>> = {
-  list_artists: async ({ artists, ...rest }) => ({ ...rest, artists: pick(artists, ['id', 'name', 'country', 'city', 'genres', 'collectives']) }),
-  list_collectives: async ({ collectives, ...rest }) => ({ ...rest, collectives: pick(collectives, ['id', 'name', 'country', 'city', 'members']) }),
-  list_applications: async ({ applications, ...rest }, send) => {
-    // With the name of their artist or collective, which the route doesn't give.
-    const names = new Map<string, string>()
-    const owners = await Promise.all([send('GET', '/api/admin/artists'), send('GET', '/api/admin/collectives')])
-    for (const [field, { body }] of [['artists', owners[0]], ['collectives', owners[1]]] as const) {
-      for (const { id, name } of ((body as JsonObject)[field] ?? []) as { id: string; name: string }[]) names.set(id, name)
-    }
-    const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates', 'sets', 'sessions']).map((summary) => ({
-      ...summary,
-      name: names.get((summary.artistId ?? summary.collectiveId) as string) ?? null,
-    }))
-    return { ...rest, applications: summaries }
+// The fields of a session's summary, but its sets.
+const SESSION_SUMMARY = ['id', 'start', 'end', 'durationMinutes', 'type', 'title', 'takeover', 'application', 'status', 'announced']
+
+// What the tools that list artists, collectives, applications and sessions give of each one, and `get_calendar` of each
+// of its sessions, so that their lists fit in what apps take as they grow: these fields of the full item, as they are.
+// Their descriptions say so, and which tool gives all of one: for `list_<items>`, `get_<item>`, unless it `says` otherwise.
+type Summary = { says?: string; summarize: (body: JsonObject, send: Send) => Promise<JsonObject> }
+const SUMMARIES: Record<string, Summary> = {
+  list_artists: {
+    summarize: async ({ artists, ...rest }) => ({ ...rest, artists: pick(artists, ['id', 'name', 'country', 'city', 'genres', 'collectives']) }),
   },
-  list_sessions: async ({ sessions, ...rest }) => ({
-    ...rest,
-    sessions: (sessions as JsonObject[]).map((session) => ({
-      ...pickOne(session, ['id', 'start', 'end', 'durationMinutes', 'type', 'title', 'takeover', 'application', 'status', 'announced']),
-      sets: pick(session.sets, ['id', 'durationMinutes', 'status', 'performers', 'application']),
-    })),
-  }),
+  list_collectives: {
+    summarize: async ({ collectives, ...rest }) => ({ ...rest, collectives: pick(collectives, ['id', 'name', 'country', 'city', 'members']) }),
+  },
+  list_applications: { summarize: summarizeApplications },
+  list_sessions: {
+    summarize: async ({ sessions, ...rest }) => ({
+      ...rest,
+      sessions: (sessions as JsonObject[]).map((session) => ({
+        ...pickOne(session, SESSION_SUMMARY),
+        sets: pick(session.sets, ['id', 'durationMinutes', 'status', 'performers', 'application']),
+      })),
+    }),
+  },
+  get_calendar: {
+    says:
+      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, with `from` and `to`, the sets of a period. Ask for a month at a time.',
+    summarize: async ({ sessions, undatedSessions, ...rest }) => ({
+      ...rest,
+      sessions: pick(sessions, SESSION_SUMMARY),
+      undatedSessions: pick(undatedSessions, SESSION_SUMMARY),
+    }),
+  },
+}
+
+// The applications' summaries, with the name of their artist or collective, which the route doesn't give.
+async function summarizeApplications({ applications, ...rest }: JsonObject, send: Send): Promise<JsonObject> {
+  const names = new Map<string, string>()
+  const owners = await Promise.all([send('GET', '/api/admin/artists'), send('GET', '/api/admin/collectives')])
+  for (const [field, { body }] of [['artists', owners[0]], ['collectives', owners[1]]] as const) {
+    for (const { id, name } of ((body as JsonObject)[field] ?? []) as { id: string; name: string }[]) names.set(id, name)
+  }
+  const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates', 'sets', 'sessions']).map((summary) => ({
+    ...summary,
+    name: names.get((summary.artistId ?? summary.collectiveId) as string) ?? null,
+  }))
+  return { ...rest, applications: summaries }
 }
 
 function pickOne(item: JsonObject, fields: string[]): JsonObject {
@@ -357,7 +379,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       const response = await send(route.method, url, payload)
       if (response.status >= 400) return failure(response.status, withoutFields(response.body, hidden))
       let result = response.body
-      if (SUMMARIES[name]) result = await SUMMARIES[name](result as JsonObject, send)
+      if (SUMMARIES[name]) result = await SUMMARIES[name].summarize(result as JsonObject, send)
       return { result: { content: [{ type: 'text', text: text(withoutFields(result, hidden)) }] } }
     }
 

@@ -81,9 +81,9 @@ describe('calendarReads', () => {
     expect(reads.of('a')).toBeUndefined()
     reads.start()
     await settle()
-    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), title: 'Réparation' }], readAt: NOW, error: null, settings: settingsOf('a') })
+    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, settings: settingsOf('a') })
     // Private titles are never kept.
-    expect(reads.of('b')!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), title: null }])
+    expect(reads.of('b')!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), wholeDay: false, title: null }])
     expect(readText).toHaveBeenCalledTimes(2)
 
     // A feed added meanwhile, e.g. by another server, is read with the others.

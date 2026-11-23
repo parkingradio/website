@@ -1,5 +1,5 @@
 import ICAL from 'ical.js'
-import { instantIn, isTimeZone } from '../api/formats.js'
+import { dayStart, instantIn, isTimeZone } from '../api/formats.js'
 import { FeedReadError, refused } from './fetch.js'
 
 // What a read keeps of a feed: its events, from the iCalendar text its link gave (see "Events" in
@@ -10,9 +10,10 @@ import { FeedReadError, refused } from './fetch.js'
 // time zone that the feed doesn't define, and doesn't resolve the times that the clocks skip or show twice as RFC 5545
 // says. ical.js is only trusted with the time zones the feed defines whose names aren't IANA's.
 
-// An event, or an occurrence of a recurring event: from `start`, included, to `end`, excluded. Its title is "" when it
-// has none, and null when its feed's titles are private, which are never read.
-export type CalendarEvent = { start: Date; end: Date; title: string | null }
+// An event, or an occurrence of a recurring event: from `start`, included, to `end`, excluded, which is whole-day when it
+// takes whole days (`VALUE=DATE`). Its title is "" when it has none, and null when its feed's titles are private, which
+// are never read.
+export type CalendarEvent = { start: Date; end: Date; wholeDay: boolean; title: string | null }
 
 // How many occurrences a recurring event can have until the end of the time a read keeps before it's left out, e.g. one
 // every minute, and how many events and occurrences a read can go through in all, before it fails. ical.js can only go
@@ -39,7 +40,7 @@ function instantOf(time: ICAL.Time, tzid: string | null): number {
   const day = `${pad(time.year, 4)}-${pad(time.month)}-${pad(time.day)}`
   const local = `${day}T${pad(time.hour)}:${pad(time.minute)}:${pad(time.second)}`
   let ms: number
-  if (time.isDate) ms = instantIn(null, `${day}T00:00`).getTime()
+  if (time.isDate) ms = dayStart(day).getTime()
   else if (time.zone === ICAL.Timezone.utcTimezone) ms = Date.parse(`${local}Z`)
   else if (tzid && isTimeZone(tzid)) ms = instantIn(tzid, local).getTime()
   // The feed's own definition of a time zone whose name isn't IANA's (a `VTIMEZONE`), which ical.js reads it in.
@@ -184,7 +185,7 @@ export function calendarEvents(text: string, privateTitles: boolean, { from, to 
       if (startDate.isDate) end = instantOf(details!.endDate, null)
       else end = endOf(startDate, start, itemTzid, item === event ? (length ??= lengthOf(event)) : lengthOf(item))
       if (end <= start || end <= fromMs || start >= toMs) continue
-      found.push({ start: new Date(start), end: new Date(end), title: item === event ? title : titleOf(item) })
+      found.push({ start: new Date(start), end: new Date(end), wholeDay: startDate.isDate, title: item === event ? title : titleOf(item) })
     }
   }
 

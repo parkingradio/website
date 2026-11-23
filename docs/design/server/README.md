@@ -218,6 +218,7 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
+| [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) | admin | What takes the studio over a range of days, sessions and occupations, with the feeds occupations are read from, and, whatever the range, the conflicts of the next 365 days and the sessions without a date |
 | [`GET /api/admin/calendar/feeds`](calendar.md#get-apiadmincalendarfeeds-admin) | admin | The calendar feeds that the studio's occupations are read from, with their links, and when each was last read, or why that failed |
 | [`POST /api/admin/calendar/feeds`](calendar.md#post-apiadmincalendarfeeds-admin) | admin | Adding a calendar feed, once its link gives a calendar |
 | [`PATCH /api/admin/calendar/feeds/:id`](calendar.md#patch-apiadmincalendarfeedsid-admin) | admin | Changing a calendar feed's name, link or whether its titles are private, once a new link gives a calendar |

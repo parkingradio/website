@@ -14,6 +14,7 @@ import { artistsRoutes } from './artists/routes.js'
 import type { ArtistsStore, Photos } from './artists/store.js'
 import type { CalendarFeedsStore } from './calendar/feeds.js'
 import type { CalendarReads } from './calendar/reads.js'
+import { adminCalendarRoutes } from './calendar/calendar-routes.js'
 import { calendarFeedsRoutes } from './calendar/routes.js'
 import { collectivesRoutes } from './collectives/routes.js'
 import type { CollectivesStore } from './collectives/store.js'
@@ -111,6 +112,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })
+  await app.register(adminCalendarRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads, sessions: deps.sessions })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })

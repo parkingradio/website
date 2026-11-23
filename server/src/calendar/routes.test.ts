@@ -53,7 +53,7 @@ const reads: CalendarReads = {
   stopped: async () => {},
 }
 
-const EVENTS = [{ start: new Date('2026-11-23T15:00:00Z'), end: new Date('2026-11-23T16:00:00Z'), title: 'Réparation' }]
+const EVENTS = [{ start: new Date('2026-11-23T15:00:00Z'), end: new Date('2026-11-23T16:00:00Z'), wholeDay: false, title: 'Réparation' }]
 
 async function buildApp(logs?: string[]) {
   const app = Fastify({ logger: logs ? { level: 'info', stream: { write: (line: string) => logs.push(line) } } : false })

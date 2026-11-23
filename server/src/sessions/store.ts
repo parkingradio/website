@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gt, gte, inArray, lt, ne, not, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, gt, gte, inArray, isNull, lt, ne, not, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { violatesConstraint } from '../api/errors.js'
 import type { Reference } from '../api/schemas.js'
@@ -142,6 +142,10 @@ export type SessionsStore = {
   // that collective's takeovers: none when there's no such artist or collective. With `from` or `to`, only those that
   // start at or after `from` and before `to`, which leaves out those without a start.
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
+  // What the calendar needs, in one query, in the order of `list` (see "The calendar" in docs/design/server/calendar.md):
+  // the sessions with a start that take some of the time from `range.from` to `range.to`, whatever their status, those
+  // with a start that aren't cancelled that take some of `window`, and those without a start that aren't cancelled.
+  forCalendar(range: { from: Date; to: Date }, window: { from: Date; to: Date }): Promise<StoredSession[]>
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none.
   // Throws a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about
@@ -545,6 +549,13 @@ export function sessionsStore(db: Queryable): SessionsStore {
       if (from !== undefined) conditions.push(gte(sessions.startAt, from))
       if (to !== undefined) conditions.push(lt(sessions.startAt, to))
       return sessionsWhere(db, and(...conditions))
+    },
+
+    forCalendar(range, window) {
+      const takesSomeOf = ({ from, to }: { from: Date; to: Date }) =>
+        sql`(${sessions.startAt} is not null and session_period(${sessions.startAt}, ${sessions.durationMinutes}) && tstzrange(${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz))`
+      const notCancelled = ne(sessions.status, 'cancelled')
+      return sessionsWhere(db, or(takesSomeOf(range), and(notCancelled, or(takesSomeOf(window), isNull(sessions.startAt)))))
     },
 
     async get(id) {

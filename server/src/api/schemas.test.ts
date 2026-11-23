@@ -5,7 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { z } from 'zod'
 import { requireAuth } from '../admins/auth.js'
 import { acceptSessions } from '../admins/test-sessions.js'
-import { inQuebecTime, instantIn, isTimeZone } from './formats.js'
+import { addDays, dayStart, daysBetween, inQuebecTime, instantIn, isTimeZone, quebecDay } from './formats.js'
 import { ApiError, Day, Ok, Timestamp, changesTo, firstIssue, useZodSchemas, zodRoutes } from './schemas.js'
 
 const handler = async () => ({ ok: true as const })
@@ -205,6 +205,37 @@ describe('inQuebecTime', () => {
   it('writes the years from 2000 to 2999, in UTC, with 4 digits', () => {
     expect(inQuebecTime('2000-01-01T00:00:00.000Z')).toBe('1999-12-31T19:00:00-05:00')
     expect(inQuebecTime('2999-12-31T23:59:59.999Z')).toBe('2999-12-31T18:59:59-05:00')
+  })
+})
+
+describe("Québec's days", () => {
+  it('are those of Québec time, whatever the day in UTC', () => {
+    expect(quebecDay(new Date('2026-11-24T04:30:00Z'))).toBe('2026-11-23')
+    expect(quebecDay(new Date('2026-11-24T05:00:00Z'))).toBe('2026-11-24')
+    expect(quebecDay(new Date('2026-07-01T03:59:59Z'))).toBe('2026-06-30')
+  })
+
+  it('start at 00:00 in Québec, even on the days of 23 or 25 hours', () => {
+    expect(dayStart('2026-11-23').toISOString()).toBe('2026-11-23T05:00:00.000Z')
+    expect(dayStart('2026-11-01').toISOString()).toBe('2026-11-01T04:00:00.000Z')
+    expect(dayStart('2026-11-02').toISOString()).toBe('2026-11-02T05:00:00.000Z')
+    expect(dayStart('2027-03-14').toISOString()).toBe('2027-03-14T05:00:00.000Z')
+    expect(dayStart('2027-03-15').toISOString()).toBe('2027-03-15T04:00:00.000Z')
+  })
+
+  it('follow each other by the calendar, across changes of time, months, years and leap days', () => {
+    expect(addDays('2026-11-01', 1)).toBe('2026-11-02')
+    expect(addDays('2027-03-14', 1)).toBe('2027-03-15')
+    expect(addDays('2026-11-30', 1)).toBe('2026-12-01')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29')
+    expect(addDays('2027-02-28', 1)).toBe('2027-03-01')
+    expect(addDays('2026-11-23', 365)).toBe('2027-11-23')
+    expect(addDays('2028-01-01', 365)).toBe('2028-12-31')
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
+    expect(addDays('2999-12-31', 1)).toBe('3000-01-01')
+    expect(daysBetween('2026-11-01', '2026-11-01')).toBe(0)
+    expect(daysBetween('2026-11-01', '2027-03-15')).toBe(134)
   })
 })
 

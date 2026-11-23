@@ -139,6 +139,11 @@ in the way, or that set's session. In particular:
   set in the way is another one of the same request, which `otherSetIndex` gives instead, by its place in the list of
   sets sent, from 0 (see [`POST /api/admin/sessions`](#post-apiadminsessions-admin)).
 
+Occupations and quiet time take the studio too (see [Calendar](calendar.md)), but the server doesn't refuse a session
+that overlaps them, since they're read from calendars it doesn't control: that's a conflict. Apps that add a session
+with a start, give a session a start, change its start or its duration, or un-cancel it, should look at the calendar
+over its time first, and tell the admin when it would overlap something.
+
 ## Sets' order
 
 Each set is streamed as its own YouTube live, so a session's sets take place one at a time, one after the other, in the

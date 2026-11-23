@@ -43,7 +43,7 @@ describe('the tools of the API', () => {
         ...['delete_session_flyer', 'delete_session'],
         ...['create_set', 'update_set', 'update_set_status', 'update_set_position', 'update_set_session', 'delete_set'],
         ...['list_events', 'get_public_artist', 'get_public_collective'],
-        'list_calendar_feeds',
+        ...['get_calendar', 'list_calendar_feeds'],
       ].sort(),
     )
   })
@@ -67,7 +67,7 @@ describe('the tools of the API', () => {
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
     expect(areas).toMatchObject({
       ...{ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
-      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar' },
+      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar', get_calendar: 'calendar' },
     })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
@@ -90,6 +90,10 @@ describe('the tools of the API', () => {
     for (const name of ['delete_artist_photo', 'delete_collective_photo', 'delete_session_flyer']) {
       expect(tools.find((tool) => tool.name === name)!.inputSchema.required, name).toEqual(['id'])
     }
+    // The tools that summarize what they give say which tool gives all of it.
+    expect(description('list_sessions')).toContain('Gives a summary of each one: `get_session` gives all of it.')
+    expect(description('get_calendar')).toContain('Gives a summary of each session, without its sets: `get_session` gives all of a session')
+    expect(tools.find(({ name }) => name === 'get_calendar')!.inputSchema.required).toEqual(['from', 'to'])
     // Only what admins decide: sets and sessions make applications planned or done.
     const decide = tools.find(({ name }) => name === 'update_application_decision')!
     expect(decide.inputSchema.properties).toMatchObject({ decision: { enum: ['new', 'accepted', 'rejected'] } })
@@ -164,6 +168,13 @@ describe('rules', () => {
     expect(rules(document)).toBe(
       'See Takeovers, Profiles (read_documentation, area `artists`), Applications (read_documentation, area `applications`) and admins.',
     )
+  })
+
+  it("give the calendar's conflicts, and tell apps to look at the calendar before placing a session", async () => {
+    const { sessions, calendar } = await loadRules()
+    expect(sessions).toContain('see Calendar (read_documentation, area `calendar`)')
+    expect(calendar).toContain('## Conflicts')
+    expect(calendar).not.toContain('## `')
   })
 
   it('leave no link in what the areas give', async () => {
