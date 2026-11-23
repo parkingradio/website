@@ -1,0 +1,367 @@
+/* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color, the same in the
+   legend, the month and the chosen day: sessions light blue with a dark blue bar, occupations the same with a dashed
+   border, quiet time a hatched violet band, free time green, and conflicts a red border. */
+
+.calendar-session,
+.calendar-occupation {
+  background: #e4eefb;
+  color: #12305f;
+}
+
+.calendar-session {
+  border-left: 3px solid #1d4fa3;
+}
+
+.calendar-occupation {
+  border: 1px dashed #1d4fa3;
+}
+
+.calendar-quiet-time {
+  background: repeating-linear-gradient(135deg, #efe7fb 0 5px, #e0d2f5 5px 10px);
+  color: #4b2a85;
+}
+
+.calendar-free {
+  background: #dcf1e0;
+  color: #1b5e2a;
+}
+
+.calendar-conflict {
+  outline: 2px solid #c62828;
+  outline-offset: -2px;
+}
+
+/* The page's headings other than the sections', without their lines and margins. */
+.admin .calendar-heading {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* "À régler", boxed under the title. */
+.calendar-issues {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #000;
+}
+
+.admin .calendar-issues h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.calendar-issues > p {
+  margin: 0.5rem 0;
+}
+
+.admin .calendar-issues-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-count {
+  padding: 0 6px;
+  border: 1px solid currentColor;
+}
+
+.calendar-count.calendar-conflict-tag {
+  margin: 0;
+  border-color: #c62828;
+}
+
+.calendar-issues h3 {
+  margin: 1rem 0 0.25rem;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.calendar-issue-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-issue-list li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #ddd;
+  line-height: 1.6;
+}
+
+.admin .calendar-issue-list button {
+  padding: 0 6px;
+}
+
+.calendar-issue-times {
+  margin-right: 0.5rem;
+}
+
+/* Each of a conflict's two things, on a line of its own. */
+.calendar-issue-thing {
+  display: block;
+  padding-left: 1rem;
+}
+
+/* The toolbar, with the month's name between its arrows. */
+.calendar-toolbar {
+  align-items: center;
+}
+
+.admin .calendar-month-name {
+  min-width: 11rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.calendar-toolbar .admin-button {
+  margin-left: auto;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: #666;
+  font-size: 12px;
+}
+
+.calendar-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.calendar-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+}
+
+.calendar-swatch.calendar-conflict {
+  background: #fff;
+}
+
+/* The month: seven columns as wide as each other, whatever their days have. */
+.calendar-month {
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.calendar-month th {
+  padding: 0.25rem;
+  color: #666;
+  font-weight: 300;
+  text-align: left;
+}
+
+.calendar-month td {
+  height: 6.5rem;
+  padding: 3px;
+  border: 1px solid #ddd;
+  vertical-align: top;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.calendar-month td.calendar-available {
+  background: #eef8f0;
+}
+
+/* The days of the months before and after are faded out, with what's on them: more than what's done, which is grey. */
+.calendar-month td.calendar-other-month > * {
+  opacity: 0.4;
+}
+
+.calendar-month td.calendar-chosen {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+
+/* The day's number, which chooses it, and today's in a black square. */
+.admin .calendar-number {
+  min-width: 1.6rem;
+  padding: 1px 4px;
+  border: none;
+  font-size: 12px;
+}
+
+/* Pressed when the day is chosen, which its outline shows, rather than black like other pressed buttons. */
+.admin .calendar-number:hover,
+.admin .calendar-number[aria-pressed='true'] {
+  background: none;
+  color: #1c1c1c;
+}
+
+.admin .calendar-month td:hover .calendar-number {
+  text-decoration: underline;
+}
+
+.admin .calendar-number.calendar-today {
+  background: #000;
+  color: #fff;
+}
+
+.admin .calendar-number:focus-visible {
+  outline: 2px solid #1d4fa3;
+}
+
+.calendar-things {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+  line-height: 1.35;
+}
+
+.calendar-things li {
+  padding: 1px 4px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.calendar-things .calendar-part {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-things .calendar-title {
+  display: block;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendar-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.calendar-title a:hover {
+  text-decoration: underline;
+}
+
+/* Cut short when they don't fit, on one line. */
+.calendar-things .calendar-performers {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.calendar-conflict-tag {
+  display: inline-block;
+  margin-top: 1px;
+  padding: 0 4px;
+  background: #c62828;
+  color: #fff;
+}
+
+/* Done and cancelled sessions take their status's colors (see admin.css), with a bar in the same color. */
+.calendar-session.admin-status-done {
+  border-left-color: #999;
+  background: #f0f0f0;
+  color: #666;
+}
+
+.calendar-session.admin-status-cancelled {
+  border-left-color: #c9a400;
+  background: #fff8db;
+  color: #8a6d00;
+}
+
+/* A session's status, after its title. */
+.calendar-title .calendar-status {
+  font-family: 'Overpass Mono', ui-monospace, monospace;
+  font-weight: 300;
+  text-transform: none;
+}
+
+.calendar-things .calendar-status {
+  display: block;
+}
+
+/* The chosen day. */
+.calendar-day-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.calendar-day-today {
+  color: #666;
+  font-weight: 300;
+  text-transform: none;
+}
+
+.calendar-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-row {
+  display: grid;
+  grid-template-columns: 7rem 12rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #ddd;
+  line-height: 1.5;
+}
+
+.calendar-row-kind {
+  align-self: start;
+  justify-self: start;
+  padding: 0 6px;
+}
+
+.calendar-conflict-line {
+  display: block;
+  color: #b3261e;
+}
+
+/* Sources: each feed, with when it was last read. */
+.calendar-source p,
+p.calendar-source {
+  margin: 0;
+}
+
+.calendar-source + .calendar-source {
+  margin-top: 0.5rem;
+}
+
+/* On phones, the month is squeezed into seven narrow columns. */
+@media (max-width: 700px) {
+  .calendar-month {
+    font-size: 10px;
+  }
+
+  .calendar-month td {
+    height: 4rem;
+    padding: 1px;
+  }
+
+  .calendar-things li {
+    padding: 1px 2px;
+  }
+
+  .calendar-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+
+  .calendar-toolbar .admin-button {
+    margin-left: 0;
+  }
+}

@@ -55,6 +55,9 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
   },
 }
 
+// What each thing that takes the studio is, in the calendar (see docs/design/client/admin/calendrier.md).
+export const THING_KIND_LABELS: Record<'session' | 'occupation', string> = { session: 'session', occupation: 'occupation' }
+
 // What an app that's allowed a scope can do, as the page where admins allow it says it, in plain words (see
 // docs/design/server/oauth.md): a sentence, then what's left out of it, listed under it. For `admin`, that's what the MCP
 // server's tools leave out, in the same order (see "Tools" in docs/design/server/mcp.md).
@@ -237,6 +240,16 @@ export function formatShortDay(day: string): string {
   return shortDayFormat.format(new Date(day))
 }
 
+const dayInYearFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+// E.g. "mer. 7 oct.", like `formatQuebecDayInYear`, but for a day.
+export function formatDayInYear(day: string): string {
+  return dayInYearFormat.format(new Date(day))
+}
+
+// E.g. "1 conflit" or "2 conflits".
+export const conflictCount = (count: number) => `${count} ${count === 1 ? 'conflit' : 'conflits'}`
+
 // The address of an application's page.
 export function applicationPath({ id }: { id: string }): string {
   return `/admin/candidatures/${id}`
@@ -277,6 +290,11 @@ export function byWhom(verb: string, who: string | null, when: string | null): s
   return `${verb} par ${who} le ${dateTimeFormat.format(new Date(when))}.`
 }
 
+// When a calendar feed was last read, or that it hasn't been yet, e.g. "Lu le 19 novembre 2026, 14 h 05.".
+export function lastRead({ readAt }: { readAt: string | null }): string {
+  return readAt ? `Lu le ${dateTimeFormat.format(new Date(readAt))}.` : 'Pas encore lu.'
+}
+
 // Who added an artist or a collective, or that they applied by themselves, e.g. "collectif, ajouté par …".
 export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: string | null; createdAt: string }): string {
   return `${kind}, ${byWhom('ajouté', createdBy, createdAt) ?? `inscrit par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(createdAt))}.`}`
@@ -301,7 +319,7 @@ function hoursAndMinutes(minutes: number): string {
 }
 
 // E.g. "21 h", or "21 h 30", for a time of day, "HH:MM".
-function formatTime(time: string): string {
+export function formatTime(time: string): string {
   const [hours, minutes] = time.split(':').map(Number)
   return hoursAndMinutes(hours * 60 + minutes)
 }
@@ -330,14 +348,30 @@ function startAndEnd(start: string, end: string) {
   return { from, to, days: daysBetween(from.day, to.day) }
 }
 
-// E.g. "21 h – 1 h", when the times alone say when it ends: the day it starts, or the next one at an earlier time. Or else
-// with the day it ends, without its year, e.g. "18 h – dim. 15 nov., 2 h", or "21 h – dim. 15 nov., 21 h". Or how long a
-// session without a date lasts, e.g. "4 h".
+// E.g. "dim. 15 nov.", the day of `instant` (ISO 8601) in Québec, without its year.
+export function formatQuebecDayInYear(instant: string): string {
+  return quebecDayInYearFormat.format(new Date(instant))
+}
+
+// Whether the times alone say when something ends, as `startAndEnd` gives them: the day it starts, or the next one at an
+// earlier time.
+const timesSayEnd = ({ from, to, days }: ReturnType<typeof startAndEnd>) => days === 0 || (days === 1 && to.time < from.time)
+
+// Whether the times alone say when something that starts at `start` ends at `end` (ISO 8601).
+export const endsByItsTime = (start: string, end: string) => timesSayEnd(startAndEnd(start, end))
+
+// E.g. "21 h – 1 h", when the times alone say when it ends (see `endsByItsTime`), or else with the day it ends, without its
+// year, e.g. "18 h – dim. 15 nov., 2 h", or "21 h – dim. 15 nov., 21 h": a session's times in short, or those of anything
+// else that takes the studio (see docs/design/client/admin/calendrier.md).
+export function shortTimes({ start, end }: { start: string; end: string }): string {
+  const times = startAndEnd(start, end)
+  const endDay = timesSayEnd(times) ? '' : `${formatQuebecDayInYear(end)}, `
+  return `${formatTime(times.from.time)} – ${endDay}${formatTime(times.to.time)}`
+}
+
+// A session's times in short (see `shortTimes`), or how long a session without a date lasts, e.g. "4 h".
 export function sessionHours({ start, end, durationMinutes }: SessionTimes): string {
-  if (start === null || end === null) return formatDuration(durationMinutes)
-  const { from, to, days } = startAndEnd(start, end)
-  const endDay = days === 0 || (days === 1 && to.time < from.time) ? '' : `${quebecDayInYearFormat.format(new Date(end))}, `
-  return `${formatTime(from.time)} – ${endDay}${formatTime(to.time)}`
+  return start === null || end === null ? formatDuration(durationMinutes) : shortTimes({ start, end })
 }
 
 // E.g. "samedi 14 novembre 2026, de 21 h à 23 h", "samedi 14 novembre 2026, de 21 h à 1 h le lendemain", or "du vendredi
@@ -377,6 +411,14 @@ export function sessionName(session: Pick<Session, 'title' | 'start'>): string {
 // How long a set lasts, e.g. "1 h 30", or "à déterminer" when that isn't known.
 export function setDuration({ durationMinutes }: Pick<StudioSet, 'durationMinutes'>): string {
   return durationMinutes === null ? 'à déterminer' : formatDuration(durationMinutes)
+}
+
+// A session's sets' performers, as text, set by set, the sets separated by "·", e.g. "Aurore, Brume · Écume".
+export function sessionPerformers(session: Pick<Session, 'sets'>): string {
+  return session.sets
+    .filter((set) => set.performers.length > 0)
+    .map((set) => set.performers.map((performer) => performer.name).join(', '))
+    .join(' · ')
 }
 
 // What a set is called: e.g. "Set de Aurore, Brume et Écume", or "Set" once its performers are all deleted.

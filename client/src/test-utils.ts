@@ -45,9 +45,11 @@ export const UNAUTHORIZED: Body = { ok: false, error: 'Unauthorized' }
  *
  * Requests can be made with a URL and options, or with a `Request`, like the typed client of api/client.ts
  * makes them, whose URL is then the part after the origin. The body of a request made with a FormData is that FormData.
+ *
+ * A body can be a promise, which holds back the answers until it resolves, e.g. one from `held`.
  */
-export function mockFetch(bodies: Record<string, Body> = {}) {
-  const all: Record<string, Body> = {
+export function mockFetch(bodies: Record<string, Body | Promise<Body>> = {}) {
+  const all: Record<string, Body | Promise<Body>> = {
     '/api/config': CONFIG,
     '/api/radio?upcoming=0': { ok: false, error: 'No playlist has been chosen for the radio yet' },
     ...bodies,
@@ -66,11 +68,23 @@ export function mockFetch(bodies: Record<string, Body> = {}) {
     vi.fn(async (input: string | Request, options?: RequestInit) => {
       if (input instanceof NodeRequest && !requestBodies.has(input)) requestBodies.set(input, await input.text())
       const request = described(input, options)
-      const body = all[`${request.method} ${request.url}`] ?? all[request.url]
-      if (!body) throw new Error(`Unexpected fetch to ${request.method} ${request.url}`)
+      const given = all[`${request.method} ${request.url}`] ?? all[request.url]
+      if (!given) throw new Error(`Unexpected fetch to ${request.method} ${request.url}`)
+      const body = await given
       return Response.json(body, { status: body === UNAUTHORIZED ? 401 : body.ok === false ? 500 : 200 })
     }),
   )
+}
+
+/** A body for `mockFetch` that holds back the answers until `answer` is called with what they are. */
+export function held(): { body: Promise<Body>; answer: (body: Body) => Promise<void> } {
+  let resolve!: (body: Body) => void
+  const body = new Promise<Body>((settle) => (resolve = settle))
+  return {
+    body,
+    // Within act, so that what the answer changes is rendered once it returns.
+    answer: (answered) => act(async () => resolve(answered)),
+  }
 }
 
 /** The JSON body of a request, e.g. one from `requestsTo`. */

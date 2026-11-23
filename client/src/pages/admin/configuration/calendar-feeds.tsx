@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
-import { byWhom, dateTimeFormat } from '../describe'
+import { byWhom, lastRead } from '../describe'
 
 // The calendar feeds that the studio's occupations are read from, in the configuration section (see
 // docs/design/client/admin/configuration.md).
@@ -63,6 +63,11 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
       />
     </>
   )
+}
+
+// Why a feed's last read failed, if it did, as this section and Calendrier's "Sources" say it.
+export function ReadFailure({ feed }: { feed: Feed }) {
+  return feed.error && <p className="admin-error">La dernière lecture a échoué&nbsp;: {feed.error}</p>
 }
 
 // What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed
@@ -137,9 +142,9 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
       </p>
       <p className="admin-feed-link">{feed.link}</p>
       <p className="admin-meta">
-        {byWhom('Ajouté', feed.createdBy, feed.createdAt)} {feed.readAt ? `Lu le ${dateTimeFormat.format(new Date(feed.readAt))}.` : 'Pas encore lu.'}
+        {byWhom('Ajouté', feed.createdBy, feed.createdAt)} {lastRead(feed)}
       </p>
-      {feed.error && <p className="admin-error">La dernière lecture a échoué&nbsp;: {feed.error}</p>}
+      <ReadFailure feed={feed} />
       {error && (
         <p className="admin-error" role="alert">
           Le calendrier n'a pas pu être retiré&nbsp;: {error}

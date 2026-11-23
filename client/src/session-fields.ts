@@ -278,6 +278,12 @@ export function startChanges(form: SessionFormValues, changes: Partial<Pick<Sess
   return result
 }
 
+// A new session's form, on `day` if it's a day, as if it had been typed as the start's date, e.g. from Calendrier (see
+// "The session form" in docs/design/client/admin/sessions.md).
+export function newSessionOn(day: string | null): SessionFormValues {
+  return day !== null && isDay(day) ? { ...EMPTY_SESSION_FORM, ...startChanges(EMPTY_SESSION_FORM, { day }) } : EMPTY_SESSION_FORM
+}
+
 // Checks a session as it's being filled in the form, with its `times` if they're worked out already, who the
 // `applications` it can come from belong to, and whether it's `announced`, which it has to have a date for, and returns
 // what the server would be sent, or what's wrong with each field instead. The start is sent with Québec's offset from
