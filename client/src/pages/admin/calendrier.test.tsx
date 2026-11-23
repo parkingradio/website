@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, useLocation } from 'react-router'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import App from '../../app'
 import type { Session } from '../../session-fields'
 import { held, mockFetch, requestsTo, visibleText as shownText } from '../../test-utils'
@@ -19,7 +19,7 @@ function session(id: string, title: string, start: string | null, end: string | 
 
 const performers = (...names: string[]) => ({ performers: names.map((name) => ({ id: name, name })) })
 const TEAM = { id: 'team', name: "Calendrier de l'équipe", kind: 'occupation', createdBy: 'admin@example.com', createdAt: '2026-11-01T12:00:00Z', readAt: '2026-11-19T11:50:00-05:00', error: null } as const
-const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', kind: 'quiet-time', error: "The link's server answered with 503" } as const
+const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', kind: 'quiet-time', error: "The link can't be read: its server fails (503)" } as const
 
 const TAKEOVER = session('session-1', 'HAUTE RIVE TAKEOVER', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00', { sets: [performers('Aurore', 'Brume'), performers('Cyan')] as Session['sets'] })
 const PLAYED = session('session-2', 'SOIRÉE', '2026-11-07T20:00:00-05:00', '2026-11-07T23:00:00-05:00', { status: 'done' })
@@ -50,9 +50,16 @@ const CALENDAR: Calendar = {
 }
 const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [], quietTimes: [] }
 
+// Where the page is, and a way back.
 function CurrentPath() {
   const location = useLocation()
-  return <div data-testid="path">{location.pathname + location.search}</div>
+  const navigate = useNavigate()
+  return (
+    <>
+      <div data-testid="path">{location.pathname + location.search}</div>
+      <button type="button" data-testid="back" onClick={() => navigate(-1)} />
+    </>
+  )
 }
 
 function renderAt(path: string) {
@@ -67,6 +74,7 @@ function renderAt(path: string) {
 // What an element shows, with its non-breaking spaces as spaces.
 const visibleText = (element: Element) => shownText(element).replace(/\u00a0/g, ' ')
 const path = () => screen.getByTestId('path').textContent
+const back = () => fireEvent.click(screen.getByTestId('back'))
 const dayButton = (day: string) => document.querySelector<HTMLButtonElement>(`.calendar-month [data-day="${day}"]`)!
 const cell = (day: string) => dayButton(day).closest('td')!
 const cellText = (day: string) => visibleText(cell(day))
@@ -137,12 +145,13 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      const table = document.querySelector('.calendar-month')!
-      expect(within(table as HTMLElement).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'])
+      const table = screen.getByRole('table', { name: 'novembre 2026' })
+      expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'])
       expect(table.querySelectorAll('tbody tr')).toHaveLength(5)
       expect(cell('2026-12-01')).toHaveClass('calendar-other-month')
       expect(cell('2026-11-30')).not.toHaveClass('calendar-other-month')
-      expect(screen.getByRole('button', { name: "jeudi 19 novembre 2026, aujourd'hui" })).toHaveAttribute('aria-current', 'date')
+      expect(screen.getByRole('button', { name: 'jeudi 19 novembre 2026' })).toHaveAttribute('aria-current', 'date')
+      expect(dayButton('2026-11-18')).not.toHaveAttribute('aria-current')
     })
 
     it('shows what takes each day, with its kind, its part of the day, and its status', async () => {
@@ -159,6 +168,18 @@ describe('Calendrier', () => {
       expect(cellText('2026-11-26')).toBe('2610 h – 16 hoccupation : RÉPARATION')
       // Things of the other months too.
       expect(cellText('2026-12-02')).toBe('2toute la journéeoccupation : sans titre')
+    })
+
+    it("describes each day's button with what's on the day", async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      // Its list, whose text jsdom puts together without the spaces that its lines have in a browser.
+      const description = (day: string) => document.getElementById(dayButton(day).getAttribute('aria-describedby')!)
+      expect(description('2026-11-26')).toBe(cell('2026-11-26').querySelector('ul'))
+      expect(dayButton('2026-11-19')).toHaveAccessibleDescription('disponible')
+      expect(dayButton('2026-11-18')).not.toHaveAttribute('aria-describedby')
     })
 
     it('says "conflit" on the days the overlap takes some of', async () => {
@@ -219,6 +240,9 @@ describe('Calendrier', () => {
       expect(link).toHaveAttribute('tabindex', '-1')
       fireEvent.click(link)
       expect(path()).toBe('/admin/sessions/session-1')
+      // The day wasn't chosen before.
+      back()
+      expect(path()).toBe('/admin/calendrier')
     })
 
     it('from the address, unless it is not in the grid, and in its own month without one', async () => {
@@ -303,6 +327,16 @@ describe('Calendrier', () => {
       expect(chosenDay()).toHaveAccessibleName("jeudi 19 novembre 2026 · aujourd'hui")
       expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(['disponibletoute la journée'])
     })
+
+    it("has its free time, even when it's a day of the month after, which the month doesn't show", async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier?month=2026-11&day=2026-12-01')
+      await loaded()
+
+      expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(['disponibletoute la journée'])
+      expect(cell('2026-12-01').querySelector('.calendar-free')).toBeNull()
+      expect(cell('2026-12-01')).not.toHaveClass('calendar-available')
+    })
   })
 
   describe('À régler', () => {
@@ -350,7 +384,7 @@ describe('Calendrier', () => {
       const box = screen.getByRole('region', { name: 'À régler' })
       expect(within(box).getByText('Rien à régler.')).toBeInTheDocument()
       expect([...box.querySelectorAll('.admin-warning')].map(visibleText)).toEqual([
-        "⚠ La dernière lecture du calendrier « Séjours » a échoué : The link's server answered with 503. Des conflits peuvent manquer, ou ne plus être à jour.",
+        "⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : The link can't be read: its server fails (503)",
         "⚠ Le calendrier « Nouveau » n'a pas encore été lu : des conflits peuvent manquer.",
       ])
     })
@@ -374,7 +408,7 @@ describe('Calendrier', () => {
     const sources = screen.getByRole('region', { name: 'Sources' })
     expect(within(sources).getByRole('link', { name: 'Sessions' })).toHaveAttribute('href', '/admin/sessions')
     expect(sources).toHaveTextContent("OccupationsAucun calendrier pour le moment : ils s'ajoutent dans Configuration, « Calendriers externes ».")
-    expect(sources).toHaveTextContent("SilenceSéjours Lu le 19 novembre 2026 à 11 h 50.La dernière lecture a échoué : The link's server answered with 503")
+    expect(sources).toHaveTextContent("SilenceSéjours Lu le 19 novembre 2026 à 11 h 50.La dernière lecture a échoué : The link can't be read: its server fails (503)")
   })
 
   describe('while loading, and when it fails', () => {

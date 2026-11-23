@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { WHOLE_DAY, calendarOf, gridDays, monthOf, occupationTitle } from './model'
-import type { CalendarDay, DayThing, Feed } from './model'
+import { WHOLE_DAY, gridDays, monthOf, occupationTitle } from './model'
+import type { CalendarDay, DayThing } from './model'
 import { SessionTitle } from './things'
 
 // The month's grid, from Sunday to Saturday, with what takes each day, and its free time (see "The month" in
@@ -16,19 +16,21 @@ const MOVES: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -
 
 type MonthProps = {
   month: string
+  // The id of the month's name, which names the table.
+  nameId: string
   today: string
   // The chosen day, which is in the grid, if any.
   chosen: string | null
   // What's on each day, once the calendar is read for the grid's days, or else null.
   days: Map<string, CalendarDay> | null
-  feeds: Feed[]
   onChoose: (day: string) => void
 }
 
 // The grid is one stop for the keyboard, its days' buttons: the one with the focus, or else the chosen day, or else today,
 // or else the month's first day.
-export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProps) {
+export function Month({ month, nameId, today, chosen, days, onChoose }: MonthProps) {
   const grid = gridDays(month)
+  const id = useId()
   const [focused, setFocused] = useState<string | null>(null)
   const stop = focused ?? chosen ?? (grid.includes(today) ? today : `${month}-01`)
   const table = useRef<HTMLTableElement>(null)
@@ -50,7 +52,7 @@ export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProp
   }
 
   return (
-    <table className="calendar-month" ref={table} onBlur={onBlur}>
+    <table className="calendar-month" aria-labelledby={nameId} ref={table} onBlur={onBlur}>
       <thead>
         <tr>
           {WEEKDAYS.map((weekday) => (
@@ -65,10 +67,16 @@ export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProp
           <tr key={grid[week * 7]}>
             {grid.slice(week * 7, week * 7 + 7).map((day) => {
               const shown = days?.get(day)
+              const things = shown?.things ?? []
+              const inMonth = monthOf(day) === month
+              // Only the month's own days show their free time.
+              const free = shown && inMonth ? shown.free : []
+              // What's on the day, which describes its button.
+              const thingsId = things.length > 0 || free.length > 0 ? `${id}${day}` : undefined
               const classes = [
-                monthOf(day) !== month && 'calendar-other-month',
+                !inMonth && 'calendar-other-month',
                 day === chosen && 'calendar-chosen',
-                shown?.free[0] === WHOLE_DAY && 'calendar-available',
+                free[0] === WHOLE_DAY && 'calendar-available',
               ]
               return (
                 <td key={day} className={classes.filter(Boolean).join(' ') || undefined} onClick={(event) => onClick(event, day)}>
@@ -77,7 +85,8 @@ export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProp
                     className={day === today ? 'calendar-number calendar-today' : 'calendar-number'}
                     data-day={day}
                     tabIndex={day === stop ? 0 : -1}
-                    aria-label={`${formatDay(day)}${day === today ? ", aujourd'hui" : ''}`}
+                    aria-label={formatDay(day)}
+                    aria-describedby={thingsId}
                     aria-pressed={day === chosen}
                     aria-current={day === today ? 'date' : undefined}
                     onFocus={() => setFocused(day)}
@@ -85,7 +94,7 @@ export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProp
                   >
                     {Number(day.slice(8))}
                   </button>
-                  {shown && <DayCell shown={shown} feeds={feeds} />}
+                  {thingsId && <DayCell id={thingsId} things={things} free={free} />}
                 </td>
               )
             })}
@@ -97,16 +106,15 @@ export function Month({ month, today, chosen, days, feeds, onChoose }: MonthProp
 }
 
 // What's on a day: its things, then its free time.
-function DayCell({ shown, feeds }: { shown: CalendarDay; feeds: Feed[] }) {
-  if (shown.things.length === 0 && shown.free.length === 0) return null
+function DayCell({ id, things, free }: { id: string; things: DayThing[]; free: string[] }) {
   return (
-    <ul className="calendar-things">
-      {shown.things.map((dayThing, i) => (
-        <MonthThing key={i} dayThing={dayThing} feeds={feeds} />
+    <ul id={id} className="calendar-things">
+      {things.map((dayThing, i) => (
+        <MonthThing key={i} dayThing={dayThing} />
       ))}
-      {shown.free.map((free) => (
-        <li key={free} className="calendar-free">
-          {free === WHOLE_DAY ? 'disponible' : `dispo ${free}`}
+      {free.map((stretch) => (
+        <li key={stretch} className="calendar-free">
+          {stretch === WHOLE_DAY ? 'disponible' : `dispo ${stretch}`}
         </li>
       ))}
     </ul>
@@ -115,12 +123,12 @@ function DayCell({ shown, feeds }: { shown: CalendarDay; feeds: Feed[] }) {
 
 // A thing, in a day of the month: its part of the day, and what it is, after its kind for screen readers, or "silence",
 // and "conflit" when one of its conflicts is on that day.
-function MonthThing({ dayThing: { thing, part, conflictsWith }, feeds }: { dayThing: DayThing; feeds: Feed[] }) {
+function MonthThing({ dayThing: { thing, part, conflictsWith } }: { dayThing: DayThing }) {
   const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`, conflictsWith.length > 0 && 'calendar-conflict']
   const kind = <span className="visually-hidden">{THING_KIND_LABELS[thing.kind]}&nbsp;: </span>
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
-    <li className={classes.filter(Boolean).join(' ')} title={thing.kind === 'session' ? undefined : calendarOf(feeds, thing.feed)}>
+    <li className={classes.filter(Boolean).join(' ')}>
       <span className="calendar-part">{part}</span>
       <span className="calendar-title">
         {thing.kind === 'session' && (

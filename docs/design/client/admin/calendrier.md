@@ -20,16 +20,16 @@ words that say what it is:
 - Free time: green, with "disponible" or "dispo …" (see [Free time](#free-time)).
 - Conflicts: a red border, with "conflit".
 
-Occupations and quiet time can't be changed on the site: where the page names one, it names the calendar it's changed
-in, by its feed's name. A legend, under the toolbar, gives each kind with its color.
+Occupations and quiet time can't be changed on the site: the chosen day and "À régler" name the calendar each one is
+changed in, by its feed's name. A legend, under the toolbar, gives each kind with its color.
 
 A thing's times are written in two ways:
 
 - **Its part of a day**, in the month: of the time the thing takes, the part from 00:00 on the day to 00:00 on the next.
   When that's the whole day, "toute la journée", whole-day or not. Else, when the thing started on an earlier day,
-  "jusqu'à 1 h". Else, when it ends within the day, or at 00:00 on the next, "21 h – 23 h". Else, when it lasts less
-  than a day and ends the next day at an earlier time than it starts, "21 h – 1 h", like a session's times in short
-  (see [Times, in Sessions](sessions.md#times)), and "jusqu'à 1 h" on the next day. Else "dès 18 h".
+  "jusqu'à 1 h". Else, when it ends within the day, or at 00:00 on the next, "21 h – 23 h". Else, when it ends the
+  next day at an earlier time than it starts, "21 h – 1 h", like a session's times in short (see
+  [Times, in Sessions](sessions.md#times)), and "jusqu'à 1 h" on the next day. Else "dès 18 h".
 - **In full**, on a day, e.g. the chosen day: when it takes whole days, from 00:00 to 00:00, whole-day or not,
   "toute la journée" for one day, or "du ven. 13 nov. au dim. 15 nov." from its first day to its last. Else, when it
   starts on that day, as a session's times in short: "21 h – 23 h", "21 h – 1 h", or "18 h – dim. 15 nov., 2 h". Else
@@ -68,8 +68,8 @@ Opened, it lists:
 - The sessions without a date, the most recently added first, under "Sans date". Each one has its title, linking to its
   page, its sets' performers, set by set, the sets separated by "·", and its duration.
 
-Conflicts are those of the next 365 days (see [Conflicts](../../server/calendar.md#conflicts)): in the month, things
-show "conflit" only in those days.
+Conflicts are those of the next 365 days (see [Conflicts](../../server/calendar.md#conflicts)): things that only
+overlap outside them, e.g. in a month more than a year away, or before today, don't show "conflit".
 
 ## The toolbar
 
@@ -94,17 +94,21 @@ without choosing its day.
 
 With the keyboard, the month is one stop: Tab goes to the chosen day, or else to today, when it's in the month's grid,
 or else to the month's first day. The arrows go to the day before or after, or to the same day of the week before or
-after, and stop at the grid's edges. Enter or Space chooses the day, or unchooses it. Screen readers name each day,
-e.g. "jeudi 19 novembre 2026", say which one is today, and which one is chosen. The sessions' links in the month are
-left out of the keyboard's way, since the chosen day has them.
+after, and stop at the grid's edges. Enter or Space chooses the day, or unchooses it. Screen readers name the table by
+its month, e.g. "novembre 2026", and each day, e.g. "jeudi 19 novembre 2026", say which one is today, and which one is
+chosen, and read what's on it, as its description. The sessions' links in the month are left out of the keyboard's way,
+since the chosen day has them.
 
 ### Free time
 
-Free time is shown on the days of the month shown, from today to the 365th day, the days where conflicts are found, on
-which no session that isn't cancelled starts, and no occupation. Its stretches are the day's time, from 00:00 to 00:00,
-outside what takes some of it: quiet time, and things that started on an earlier day. A day with nothing on it at all
-is green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or
-"dispo 11 h – 15 h". Today's count from 00:00 too, even once they're over.
+A day has free time when it's in the 365 days from today, those conflicts are found in, and no session that isn't
+cancelled, and no occupation, starts on it. The stretches of its free time are the day's time, from 00:00 to 00:00,
+outside what takes some of it: quiet time, and things that started on an earlier day. Today's stretches count from
+00:00 too, even those that are over.
+
+The month shows the free time of its own days, not that of the months before and after. A day that nothing takes,
+cancelled sessions aside, is green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à
+15 h", "dispo dès 11 h" or "dispo 11 h – 15 h".
 
 ## The chosen day
 

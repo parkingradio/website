@@ -159,7 +159,7 @@ describe('the days of the month', () => {
   const repair = { feed: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = {
     start: late.start!,
-    end: stay.end,
+    end: late.end!,
     things: [{ kind: 'quiet-time', ...stay }, { kind: 'session', id: 'late', title: 'LATE', start: late.start!, end: late.end!, status: 'planned' }] as ConflictThing[],
   }
   const days = calendarDays(calendar({ sessions: [late], occupations: [repair], quietTimes: [stay], conflicts: [conflict] }), '2026-11', '2026-11-19')
@@ -179,12 +179,14 @@ describe('the days of the month', () => {
     expect(conflicts('2026-11-22')).toEqual([['session'], ['quiet-time']])
   })
 
-  it('have free time from today on, in the month, where nothing but quiet time starts', () => {
+  it('have free time from today on, where nothing but quiet time starts', () => {
     const free = (day: string) => days.get(day)!.free
-    // Before today, and in another month.
+    // Before today.
     expect(free('2026-11-18')).toEqual([])
-    expect(free('2026-12-01')).toEqual([])
     expect(free('2026-11-19')).toEqual(['toute la journée'])
+    // In the month after too, as in its own month's grid.
+    expect(free('2026-12-01')).toEqual(['toute la journée'])
+    expect(calendarDays(calendar({}), '2026-12', '2026-11-19').get('2026-12-01')!.free).toEqual(['toute la journée'])
     // Quiet time starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // A session starts.

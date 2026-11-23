@@ -125,7 +125,7 @@ function FeedWarnings({ feeds }: { feeds: Feed[] }) {
       <p key={feed.id} className="admin-notice admin-warning">
         ⚠{' '}
         {feed.error !== null
-          ? `La dernière lecture du calendrier «\u00a0${feed.name}\u00a0» a échoué\u00a0: ${feed.error}. Des conflits peuvent manquer, ou ne plus être à jour.`
+          ? `Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier «\u00a0${feed.name}\u00a0» a échoué\u00a0: ${feed.error}`
           : `Le calendrier «\u00a0${feed.name}\u00a0» n'a pas encore été lu\u00a0: des conflits peuvent manquer.`}
       </p>
     ))

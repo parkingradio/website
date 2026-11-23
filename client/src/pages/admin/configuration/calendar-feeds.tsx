@@ -4,6 +4,7 @@ import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { byWhom, lastRead } from '../describe'
+import { ReadFailure } from '../feeds'
 
 // The calendar feeds that the studio's occupations are read from, in the configuration section (see
 // docs/design/client/admin/configuration.md).
@@ -63,11 +64,6 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
       />
     </>
   )
-}
-
-// Why a feed's last read failed, if it did, as this section and Calendrier's "Sources" say it.
-export function ReadFailure({ feed }: { feed: Feed }) {
-  return feed.error && <p className="admin-error">La dernière lecture a échoué&nbsp;: {feed.error}</p>
 }
 
 // What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed

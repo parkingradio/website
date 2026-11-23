@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../../api/client'
 import { quebecDayAndTime } from '../../quebec-time'
@@ -58,6 +58,7 @@ export function Calendrier() {
   // Only a calendar read for the month's days is shown in it.
   const current = last && last.from === from && last.to === to ? last.calendar : null
   const days = useMemo(() => current && calendarDays(current, month, today), [current, month, today])
+  const monthNameId = useId()
 
   // The day in the month that gets the focus once the page shows it, e.g. once the chosen day is closed.
   const focusNext = useRef<string | null>(null)
@@ -100,7 +101,7 @@ export function Calendrier() {
         >
           ←
         </Button>
-        <h2 className="calendar-heading calendar-month-name" aria-live="polite">
+        <h2 id={monthNameId} className="calendar-heading calendar-month-name" aria-live="polite">
           {monthFormat.format(new Date(`${month}-01`))}
         </h2>
         <Button
@@ -118,7 +119,7 @@ export function Calendrier() {
         </Link>
       </div>
       <Legend />
-      <Month key={month} month={month} today={today} chosen={chosen} days={days} feeds={current?.feeds ?? []} onChoose={(shown) => choose(shown === chosen ? null : shown)} />
+      <Month key={month} month={month} nameId={monthNameId} today={today} chosen={chosen} days={days} onChoose={(shown) => choose(shown === chosen ? null : shown)} />
       {chosen && (
         <ChosenDay
           day={chosen}

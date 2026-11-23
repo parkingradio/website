@@ -177,8 +177,8 @@ function thingsOf(calendar: Calendar): Thing[] {
 // A thing on a day: its part of the day, and the other things of its conflicts whose overlap takes some of the day.
 export type DayThing = { thing: Thing; part: string; conflictsWith: ConflictThing[] }
 
-// A day of the grid: what takes some of it, quiet time first, then in order of start and end, and its free time, if it's
-// shown (see "Free time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
+// A day of the grid: what takes some of it, quiet time first, then in order of start and end, and its free time, if it
+// has any (see "Free time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
 export type CalendarDay = { things: DayThing[]; free: string[] }
 
 // The days of the grid of `month`, as they're shown with `calendar`, read for them, on `today`.
@@ -203,7 +203,7 @@ export function calendarDays(calendar: Calendar, month: string, today: string): 
   }
   const horizon = addDays(today, HORIZON_DAYS)
   for (const [day, shown] of byDay) {
-    if (monthOf(day) !== month || day < today || day >= horizon) continue
+    if (day < today || day >= horizon) continue
     // Cancelled sessions don't take the studio.
     const taking = shown.things.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
     if (taking.some((thing) => thing.kind !== 'quiet-time' && Date.parse(thing.start) >= dayStart(day))) continue

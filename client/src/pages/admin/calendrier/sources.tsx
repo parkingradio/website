@@ -1,8 +1,8 @@
 import { useId } from 'react'
 import { Link } from 'react-router'
 import type { Schema } from '../../../api/client'
-import { ReadFailure } from '../configuration/calendar-feeds'
 import { FEED_KIND_LABELS, capitalized, lastRead } from '../describe'
+import { ReadFailure } from '../feeds'
 import type { Feed } from './model'
 
 // Where each kind of thing comes from (see "Sources" in docs/design/client/admin/calendrier.md).
