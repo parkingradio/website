@@ -17,9 +17,9 @@ A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its li
 the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", which its
 occupations are known by, and there can be several with the same name.
 
-A feed's titles can be private (`privateTitles`): the server then never keeps, gives or logs its events' titles,
-descriptions or locations, so that they never reach the site or the apps connected to it (see [Events](#events)), e.g.
-for a calendar of guests' stays, which can have their names. Its occupations are then only known by its name.
+A feed's titles can be private (`privateTitles`): the server then never keeps, gives or logs its events' titles, so
+that they never reach the site or the apps connected to it (see [Events](#events)), e.g. for a calendar of guests'
+stays, which can have their names.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. So the errors of reading a feed are the
@@ -65,10 +65,11 @@ A read that fails keeps what was read before, if anything was, and the feed says
 succeeds. What was read is only kept in memory: after the server restarts, a feed has neither `readAt` nor `error` until
 it's read again.
 
-What's read is always that of the feed as it is: a read that ends after the feed's link or `privateTitles` changed,
-whether it succeeded or failed, is ignored, and a feed whose link changed only has what was read from its new link. A feed
-whose titles become private loses the titles read before right away, while one whose titles stop being private isn't
-read for them: they come with its next read.
+What's read is always that of the feed as it is: a read, whether it succeeded or failed, is only kept while the feed
+still has the link and `privateTitles` it was made with, and a feed whose link changed only has what was read from its
+new link. A feed whose titles become private loses the titles read before right away, while one whose titles stop being
+private isn't read for them: they come with its next read. When a feed is changed through another server, if there are
+several, this one only knows it when it next lists the feeds, before its next round of reads.
 
 ## Events
 
@@ -105,8 +106,8 @@ leave out some of them without anyone knowing.
 An occupation is known by its feed's name, and has a title, from its event's `SUMMARY`, on one line, or `""` when it has
 none: one that's longer than 200 characters is cut to at most 200, "…" included, after its last whole word that fits,
 or within its first word when none does. The occupations of a feed whose titles are private have none, `null` in place
-of their title, and are only known by their feed's name: the server never keeps, gives or logs their events' titles,
-descriptions or locations.
+of their title, and are only known by their feed's name: the server never keeps, gives or logs their events' titles.
+No event's description or location is ever kept.
 
 ## `GET /api/admin/calendar/feeds` (admin)
 
@@ -142,10 +143,10 @@ that read as its first, and responds `{"ok": true, "feed": <the feed>}`. Fails w
 Changes the fields of a feed it's sent, and leaves the others as they are (see
 [Changes, in Conventions](README.md#conventions)). It takes any of the fields `POST /api/admin/calendar/feeds` takes.
 
-When the link changes, i.e. it isn't the feed's own once the server keeps it as it does (see [Feeds](#feeds)), unlike
-e.g. the feed's own link as a `webcal` link, it reads it first, as `POST /api/admin/calendar/feeds` does, and only changes the feed if that gives a
-calendar: that read is then the feed's, in place of what was read from its former link. Otherwise, it doesn't read the
-feed (see [Reading the feeds](#reading-the-feeds) for what changing `privateTitles` does).
+When it's sent a link that isn't the feed's own as the server keeps it (see [Feeds](#feeds)), e.g. not the feed's own
+link as a `webcal` link, it reads that link first, as `POST /api/admin/calendar/feeds` does, and only changes the feed
+if that gives a calendar: that read is then the feed's, in place of what was read from its former link. Otherwise it
+doesn't read the feed (see [Reading the feeds](#reading-the-feeds) for what changing `privateTitles` does).
 
 Responds `{"ok": true, "feed": <the feed as it is then>}`. Fails with 400 when there's no field, or a field doesn't
 follow its rules, 404 when there's no such feed, or it's removed while its link is read, 409 when another feed has the

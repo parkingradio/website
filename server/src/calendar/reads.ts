@@ -14,13 +14,13 @@ import { parseFeed } from './parse.js'
 
 export const READ_INTERVAL_MS = 15 * 60 * 1000
 
-// What was read from a feed: its events and when, as of the last read that succeeded, or none and null until one does,
-// and why the last read failed, or null when it succeeded.
-export type FeedRead = { events: CalendarEvent[]; readAt: Date | null; error: string | null }
-
 // What a feed is read with. A read is only kept while its feed still has them, so that what's kept is always that of the
 // feed as it is (see "Reading the feeds" in docs/design/server/calendar.md).
 export type ReadSettings = Pick<StoredFeed, 'link' | 'privateTitles'>
+
+// What was read from a feed: its events and when, as of the last read that succeeded, or none and null until one does,
+// why the last read failed, or null when it succeeded, and what its events were read with.
+export type FeedRead = { events: CalendarEvent[]; readAt: Date | null; error: string | null; settings: ReadSettings }
 
 // A feed to read, which has no id yet while it's being added.
 export type FeedToRead = Pick<StoredFeed, 'name' | 'link' | 'privateTitles'> & { id?: string }
@@ -37,8 +37,7 @@ export type CalendarReads = {
   // Keeps what was read from a feed that was just added, which is read again with the others from then on.
   added(id: string, read: SuccessfulRead): void
   // Takes in a feed that was just changed, with `settings` as it has them then, and keeps `read`, the read of its new
-  // link, if it was made with them. A feed whose link changed forgets what was read from its former one, and a feed whose
-  // titles are private forgets those it read before.
+  // link, if it was made with them.
   changed(id: string, settings: ReadSettings, read?: SuccessfulRead): void
   // Forgets a feed that was just removed, even if a read of it ends after this.
   removed(id: string): void
@@ -76,10 +75,11 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 export function calendarReads({ feeds, log, readText = (link, signal) => readLink(link, { signal }), parse = parseFeed }: Options): CalendarReads {
+  // What was read from the feeds, which always goes with what `known` has of them (see `reconcile`).
   const reads = new Map<string, FeedRead>()
-  // The feeds whose reads are kept, with what they're read with: those that the latest listing gave, and those added
-  // since, as they are since, but not those removed since. A read that ends is only kept if its feed is still one of
-  // them, with what it was made with, so that a removed feed's isn't kept again, and one of a link that changed isn't kept.
+  // The feeds whose reads are kept, with what they're read with: those that the latest listing gave, and those added or
+  // changed since, as they are since, but not those removed since. A read that ends is only kept if its feed is still one
+  // of them, with what it was made with, so that a removed feed's isn't kept again, and one of a link that changed isn't.
   const known = new Map<string, ReadSettings>()
   // The feeds added or changed (as they are then) and removed (null) while a listing is under way, which it may not have
   // seen.
@@ -115,7 +115,7 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
         if (settings) known.set(id, settings)
         else known.delete(id)
       }
-      for (const id of reads.keys()) if (!known.has(id)) reads.delete(id)
+      for (const id of reads.keys()) reconcile(id)
       return listed.filter(({ id }) => known.has(id))
     } finally {
       listing = null
@@ -125,14 +125,15 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
   async function refresh(feed: StoredFeed) {
     const settings = { link: feed.link, privateTitles: feed.privateTitles }
     try {
-      const { events, readAt } = await read(feed)
-      if (sameSettings(known.get(feed.id), settings)) reads.set(feed.id, { events, readAt, error: null })
+      const done = await read(feed)
+      if (sameSettings(known.get(feed.id), done.settings)) reads.set(feed.id, { ...done, error: null })
     } catch (error) {
       if (error instanceof ReadAborted) return
       const message = error instanceof FeedReadError ? error.message : "The link can't be read: something went wrong"
       log.warn({ feed: feed.id, name: feed.name, error: message }, 'Failed to read a calendar feed')
+      // What was read before, which goes with the feed as it is (see `reconcile`).
       const before = reads.get(feed.id)
-      if (sameSettings(known.get(feed.id), settings)) reads.set(feed.id, { events: before?.events ?? [], readAt: before?.readAt ?? null, error: message })
+      if (sameSettings(known.get(feed.id), settings)) reads.set(feed.id, before ? { ...before, error: message } : { events: [], readAt: null, error: message, settings })
     }
   }
 
@@ -149,37 +150,42 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
     }
   }
 
+  // Makes what was read from the feed `id` go with what `known` has of it, however that changed, e.g. through another
+  // server: it's forgotten when the feed was removed, or its link changed, and loses its titles when they became private.
+  function reconcile(id: string) {
+    const read = reads.get(id)
+    const settings = known.get(id)
+    if (!read) return
+    if (!settings || settings.link !== read.settings.link) reads.delete(id)
+    else if (settings.privateTitles && !read.settings.privateTitles) {
+      reads.set(id, { ...read, events: read.events.map((event) => ({ ...event, title: null })), settings })
+    }
+  }
+
   // Takes in a feed's settings, which a listing under way may not have seen.
   function know(id: string, settings: ReadSettings | null) {
     if (settings) known.set(id, settings)
     else known.delete(id)
     listing?.set(id, settings)
+    reconcile(id)
   }
 
   return {
     of: (id) => reads.get(id),
     read,
 
-    added(id, { events, readAt, settings }) {
-      know(id, settings)
-      reads.set(id, { events, readAt, error: null })
+    added(id, read) {
+      know(id, read.settings)
+      reads.set(id, { ...read, error: null })
     },
 
     changed(id, settings, read) {
-      const before = known.get(id)
       know(id, settings)
-      if (before && before.link !== settings.link) reads.delete(id)
-      if (read && sameSettings(read.settings, settings)) {
-        reads.set(id, { events: read.events, readAt: read.readAt, error: null })
-      } else if (settings.privateTitles && before?.privateTitles === false) {
-        const kept = reads.get(id)
-        if (kept) reads.set(id, { ...kept, events: kept.events.map((event) => ({ ...event, title: null })) })
-      }
+      if (read && sameSettings(read.settings, settings)) reads.set(id, { ...read, error: null })
     },
 
     removed(id) {
       know(id, null)
-      reads.delete(id)
     },
 
     start() {

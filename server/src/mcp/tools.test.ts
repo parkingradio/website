@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { registerRoutes } from '../app.js'
 import type { Dependencies } from '../app.js'
 import { AREAS, loadRules, rules } from './documentation.js'
-import { HIDDEN_FIELDS, buildTools, collectToolRoutes, hiddenFields } from './tools.js'
+import { HIDDEN, buildTools, collectToolRoutes, hiddenFields } from './tools.js'
 
 // The tools of the API's routes, against docs/design/server/mcp.md. Registering the routes only needs their
 // dependencies to handle requests, which these tests don't send.
@@ -129,15 +129,19 @@ describe('the tools of the API', () => {
     )
   })
 
-  // So that a new endpoint can't give emails, phone numbers or calendar feeds' links, e.g. a feed of its own, without the
-  // tools leaving them out.
-  it('leave out of what they give every email, phone number and link that their endpoint could give', async () => {
+  // So that a new endpoint can't give emails, phone numbers or calendar feeds, with their links, without the tools leaving
+  // them out.
+  it('leave out of what they give every email, phone number and calendar feed link that their endpoint could give', async () => {
     const { routes } = await apiTools()
     for (const route of routes) {
       for (const [status, response] of Object.entries((route.schema.response ?? {}) as Record<string, z.ZodType>)) {
-        const names = propertyNames(z.toJSONSchema(response, { io: 'output', unrepresentable: 'any' }))
-        for (const field of HIDDEN_FIELDS.filter((field) => names.has(field))) {
-          expect(hiddenFields(route), `${route.method} ${route.url} (${status}): ${field}`).toContain(field)
+        const json = z.toJSONSchema(response, { io: 'output', unrepresentable: 'any' }) as { $defs?: Record<string, unknown> }
+        const names = propertyNames(json)
+        const where = `${route.method} ${route.url} (${status})`
+        for (const { fields, of } of HIDDEN) {
+          // Fields of a schema of their own are only checked where it is, since others can have the same names.
+          const given = of ? fields.filter(() => json.$defs !== undefined && of in json.$defs) : fields.filter((field) => names.has(field))
+          for (const field of given) expect(hiddenFields(route), `${where}: ${field}`).toContain(field)
         }
       }
     }

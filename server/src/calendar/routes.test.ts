@@ -43,9 +43,9 @@ const read = vi.fn<CalendarReads['read']>()
 const reads: CalendarReads = {
   of: (id) => kept.get(id),
   read,
-  added: vi.fn((id: string, { events, readAt }: SuccessfulRead) => kept.set(id, { events, readAt, error: null })),
+  added: vi.fn((id: string, done: SuccessfulRead) => kept.set(id, { ...done, error: null })),
   changed: vi.fn((id: string, _settings: ReadSettings, done?: SuccessfulRead) => {
-    if (done) kept.set(id, { events: done.events, readAt: done.readAt, error: null })
+    if (done) kept.set(id, { ...done, error: null })
   }),
   removed: vi.fn((id: string) => kept.delete(id)),
   start: vi.fn(),
@@ -111,7 +111,7 @@ describe('calendar feeds routes', () => {
       }
 
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
-      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)" })
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: LINK, privateTitles: false } })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" }] })
     })
 

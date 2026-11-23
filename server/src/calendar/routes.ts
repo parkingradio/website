@@ -138,7 +138,7 @@ export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }
       let read: SuccessfulRead | undefined
       if (newLink !== null) {
         const taken = await feeds.withLink(newLink)
-        if (taken && taken.id !== current.id) return reply.status(409).send(linkTaken(taken))
+        if (taken) return reply.status(409).send(linkTaken(taken))
         const result = await readFeed({ id: current.id, name: changes.name ?? current.name, link: newLink, privateTitles: changes.privateTitles ?? current.privateTitles })
         if ('status' in result) return reply.status(result.status).send(result.error)
         read = result

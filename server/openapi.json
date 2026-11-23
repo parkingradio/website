@@ -1175,7 +1175,7 @@
           },
           "privateTitles": {
             "type": "boolean",
-            "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
+            "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
           },
           "createdBy": {
             "type": "string",
@@ -10463,7 +10463,7 @@
                   },
                   "privateTitles": {
                     "type": "boolean",
-                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
+                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
                   }
                 },
                 "required": [
@@ -10591,7 +10591,7 @@
                   },
                   "privateTitles": {
                     "type": "boolean",
-                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
+                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
                   }
                 },
                 "additionalProperties": false,

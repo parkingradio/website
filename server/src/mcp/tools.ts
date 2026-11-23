@@ -188,12 +188,14 @@ function descriptionOf(route: ToolRoute, name: string): string {
 // What tools never give, whether they succeed or fail, wherever it is in what the routes under `path` answer, since what a
 // tool gives is sent to the model's provider (see "Results" in docs/design/server/mcp.md), and what their descriptions say
 // about it.
-type Hidden = { path: RegExp; fields: string[]; said: string }
+// `of` is the id of the schema whose fields they are, e.g. CalendarFeed, when their names alone don't tell, which a test
+// relies on to check that every route that gives them is under `path`.
+type Hidden = { path: RegExp; fields: string[]; of?: string; said: string }
 // The emails and phone numbers of artists and collectives.
 const CONTACT_DETAILS: Hidden = { path: /^\/api\/admin\/(artists|collectives)(\/|$)/, fields: ['email', 'phone'], said: 'Emails and phone numbers are never shown.' }
 // The links of calendar feeds, which are secrets. Any other `link` in the calendar's responses would be left out too.
-const FEED_LINKS: Hidden = { path: /^\/api\/admin\/calendar(\/|$)/, fields: ['link'], said: "Calendar feeds' links are never shown." }
-const HIDDEN = [CONTACT_DETAILS, FEED_LINKS]
+const FEED_LINKS: Hidden = { path: /^\/api\/admin\/calendar(\/|$)/, fields: ['link'], of: 'CalendarFeed', said: "Calendar feeds' links are never shown." }
+export const HIDDEN = [CONTACT_DETAILS, FEED_LINKS]
 
 const hiddenBy = (route: Pick<ToolRoute, 'url'>) => HIDDEN.filter(({ path }) => path.test(route.url))
 
@@ -201,9 +203,6 @@ const hiddenBy = (route: Pick<ToolRoute, 'url'>) => HIDDEN.filter(({ path }) => 
 export function hiddenFields(route: Pick<ToolRoute, 'url'>): string[] {
   return hiddenBy(route).flatMap(({ fields }) => fields)
 }
-
-// Every field that some tool never gives.
-export const HIDDEN_FIELDS = HIDDEN.flatMap(({ fields }) => fields)
 
 // `value`, without its `fields`, wherever they are.
 export function withoutFields(value: unknown, fields: string[]): unknown {
@@ -274,7 +273,8 @@ function text(value: unknown): string {
   return JSON.stringify(value).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
 }
 
-// A tool that fails gives the status and the error, with all its fields.
+// A tool that fails gives the status and the error, with all the fields it's given: a route's error, without those that
+// tools never give (see `withoutFields`).
 export function failure(status: number, body: unknown): ToolCall {
   const error = typeof body === 'object' && body !== null ? body : { error: body }
   const message = 'error' in error && typeof error.error === 'string' ? error.error : undefined

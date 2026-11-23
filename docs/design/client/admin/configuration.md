@@ -54,19 +54,21 @@ what takes the studio outside sessions is read from these calendars, in iCal, ea
 name, e.g. from the team's Google Calendar, whose link is its "adresse secrète au format iCal", in its settings. It says
 that the server reads them every 15 minutes, that their links are secret, since anyone who has one can read its
 calendar, and are never given to connected apps, and what private titles ("titres privés") are: the server never keeps
-the titles, descriptions or locations of the calendar's events, e.g. for a calendar of guests' stays, which can have
-their names, so that its occupations are only known by its name.
+the titles of the calendar's events, e.g. for a calendar of guests' stays, which can have their names, so that its
+occupations are only known by its name.
 
 It lists the feeds, in the order they were added, each with its name, "titres privés" when its titles are private, its
 link, as text rather than as a link, which admin added it, and when, and when it was last read, or that it hasn't been
 read yet, and, when its last read failed, why. Each one is removed with "retirer", once the admin confirms, and changed
 with "modifier". While there are none, it says so.
 
-"modifier" replaces the feed's details with a form, filled in with them: its name ("Nom"), its link ("Lien") and a
-checkbox, "Titres privés". "enregistrer" saves them, once the name and the link are filled in: when the link changed, the
-server reads it first, which takes as long as when a feed is added (see below), during which "enregistrer" can't be used
-again. Once it's saved, the form closes, and the feed shows its new details. "annuler" closes the form without saving.
-When it can't be saved, the form says why, e.g. that another feed has that link, naming it.
+"modifier" replaces the feed's details with a form, filled in with them: its name ("Nom"), which gets the focus, its
+link ("Lien") and a checkbox, "Titres privés". "enregistrer" saves what was changed, and only that, so that a form
+opened before another admin changed the feed doesn't undo their changes, once the name and the link are filled in: when
+the link changed, the server reads it first, which takes as long as when a feed is added (see below), during which
+"enregistrer" can't be used again. Once it's saved, or when nothing was changed, the form closes, and the feed shows its
+details as they are then. "annuler" closes the form without saving. Once the form closes, the focus goes back to the
+feed's "modifier". When it can't be saved, the form says why, e.g. that another feed has that link, naming it.
 
 Under the list, a form adds a feed: its name ("Nom"), its link ("Lien") and "Titres privés", which is checked to start
 with. "ajouter" adds it, once the name and the link are filled in: the server reads the link first, which can take up

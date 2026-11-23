@@ -2402,7 +2402,7 @@ export interface paths {
                         name: string;
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link: string;
-                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
                         privateTitles: boolean;
                     };
                 };
@@ -2580,7 +2580,7 @@ export interface paths {
                         name?: string;
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link?: string;
-                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
                         privateTitles?: boolean;
                     };
                 };
@@ -3390,7 +3390,7 @@ export interface components {
             name: string;
             /** @description Its link, as the server keeps it */
             link: string;
-            /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+            /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
             privateTitles: boolean;
             /** @description The email of the admin who added it */
             createdBy: string;

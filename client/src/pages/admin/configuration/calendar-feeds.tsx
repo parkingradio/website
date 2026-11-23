@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
@@ -30,9 +30,8 @@ export function CalendarFeeds() {
         calendrier peut le lire&nbsp;: ils ne sont jamais donnés aux applications connectées.
       </p>
       <p>
-        Avec <b>titres privés</b>, le serveur ne garde jamais les titres, descriptions et lieux des événements du
-        calendrier, qui n'apparaissent que sous son nom&nbsp;: par exemple pour un calendrier des séjours d'invités, qui
-        peut donner leurs noms.
+        Avec <b>titres privés</b>, le serveur ne garde jamais les titres des événements du calendrier, qui n'apparaissent
+        que sous son nom&nbsp;: par exemple pour un calendrier des séjours d'invités, qui peut donner leurs noms.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -75,8 +74,29 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
   )
 }
 
+// What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed
+// the feed doesn't undo their changes, e.g. make its titles stop being private. The server trims the name and the link.
+function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
+  const changes: Partial<FeedFields> = {}
+  if (fields.name.trim() !== feed.name) changes.name = fields.name
+  if (fields.link.trim() !== feed.link) changes.link = fields.link
+  if (fields.privateTitles !== feed.privateTitles) changes.privateTitles = fields.privateTitles
+  return changes
+}
+
 function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed: Feed) => void; onRemoved: () => void }) {
   const [editing, setEditing] = useState(false)
+  // Whether the form was closed, which then gives the focus back to "modifier".
+  const closed = useRef(false)
+  const edit = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!editing && closed.current) edit.current?.focus()
+    closed.current = false
+  }, [editing])
+  const close = () => {
+    closed.current = true
+    setEditing(false)
+  }
   const [busy, setBusy] = useState(false)
   // Why it couldn't be removed, if it couldn't.
   const [error, setError] = useState<string | null>(null)
@@ -97,12 +117,16 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
           initial={feed}
           action="enregistrer"
           failure="Le calendrier n'a pas pu être enregistré"
-          save={(fields) => api.PATCH('/api/admin/calendar/feeds/{id}', { params: { path: { id: feed.id } }, body: fields })}
+          save={async (fields) => {
+            const changes = changesOf(feed, fields)
+            if (Object.keys(changes).length === 0) return { ok: true, feed }
+            return api.PATCH('/api/admin/calendar/feeds/{id}', { params: { path: { id: feed.id } }, body: changes })
+          }}
           onSaved={(changed) => {
-            setEditing(false)
+            close()
             onChanged(changed)
           }}
-          onCancel={() => setEditing(false)}
+          onCancel={close}
         />
       </li>
     )
@@ -113,7 +137,7 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
       <p>
         <b>{feed.name}</b>
         {feed.privateTitles && ' (titres privés)'}{' '}
-        <button type="button" disabled={busy} onClick={() => setEditing(true)}>
+        <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}
         <button type="button" disabled={busy} onClick={remove}>
@@ -136,7 +160,8 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
 
 type Saved = { ok: true; feed: Feed } | { ok: false; error: string }
 
-// The form that adds a feed, cleared once it's added, or changes one, which closes once it's changed.
+// The form that adds a feed, cleared once it's added, or changes one, which closes once it's changed, and whose name gets
+// the focus when it opens.
 function FeedForm({
   initial,
   action,
@@ -185,7 +210,7 @@ function FeedForm({
       <form className="admin-form" onSubmit={submit}>
         <label>
           Nom
-          <input value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
+          <input autoFocus={onCancel !== undefined} value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
         </label>
         <label>
           Lien

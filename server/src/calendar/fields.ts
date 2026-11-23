@@ -56,5 +56,5 @@ export const Link = z
   })
 
 export const PrivateTitles = z.boolean().meta({
-  description: "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations",
+  description: "Whether its titles are private: the server then never keeps, gives or logs its events' titles",
 })

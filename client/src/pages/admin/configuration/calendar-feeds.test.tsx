@@ -145,6 +145,34 @@ describe('The calendar feeds', () => {
     expect(nameField()).toHaveValue('')
   })
 
+  it('only sends what was changed, and nothing when nothing was, and gives the focus to the name, then back to "modifier"', async () => {
+    mockFetch({ ...list(TEAM), [`PATCH ${URL}/feed-1`]: { ok: true, feed: { ...TEAM, name: 'Équipe' } } })
+    render(<CalendarFeeds />)
+
+    await waitFor(() => expect(items()).toHaveLength(1))
+    const modifier = () => within(items()[0]).getByRole('button', { name: 'modifier' })
+    fireEvent.click(modifier())
+    let form = within(items()[0]).getByRole('button', { name: 'enregistrer' }).closest('form')!
+    expect(nameField(form)).toHaveFocus()
+    // The link as it was typed, with spaces around it, isn't a change.
+    fireEvent.change(linkField(form), { target: { value: ` ${TEAM_LINK} ` } })
+    fireEvent.click(within(form).getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(modifier()).toHaveFocus())
+    expect(requestsTo('PATCH', `${URL}/feed-1`)).toHaveLength(0)
+
+    fireEvent.click(modifier())
+    form = within(items()[0]).getByRole('button', { name: 'enregistrer' }).closest('form')!
+    fireEvent.change(nameField(form), { target: { value: 'Équipe' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'enregistrer' }))
+    await waitFor(() => expect(modifier()).toHaveFocus())
+    expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe' }])
+    expect(items()[0]).toHaveTextContent('Équipe')
+
+    fireEvent.click(modifier())
+    fireEvent.click(within(items()[0]).getByRole('button', { name: 'annuler' }))
+    expect(modifier()).toHaveFocus()
+  })
+
   it("says why a feed couldn't be changed, and keeps its form open, until it's cancelled", async () => {
     mockFetch({ ...list(TEAM, STAYS), [`PATCH ${URL}/feed-1`]: { ok: false, error: 'The feed "Séjours" already has this link' } })
     render(<CalendarFeeds />)
