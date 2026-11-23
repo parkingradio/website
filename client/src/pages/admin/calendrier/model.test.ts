@@ -199,6 +199,14 @@ describe('the days of the month', () => {
     expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
   })
 
+  it('list what started on an earlier day first, by start, then end, then the free time', () => {
+    expect(days.get('2026-11-22')!.map(({ part }) => part)).toEqual(["jusqu'à 11 h", "jusqu'à 1 h", 'dès 11 h'])
+    // A thing before a stretch that starts when it does: a cancelled session, which doesn't take the studio.
+    const cancelled = session('off', '2026-11-23T22:00:00-05:00', '2026-11-24T02:00:00-05:00', 'cancelled')
+    const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11')
+    expect(shown.get('2026-11-24')!.map(({ part }) => part)).toEqual(["jusqu'à 2 h", 'toute la journée'])
+  })
+
   it('name each other thing once, for things that are the same', () => {
     // Two stays with the same dates, in a feed whose titles are private, each in conflict with the session and the other.
     const stays: ConflictThing[] = [{ kind: 'occupation', ...stay }, { kind: 'occupation', ...stay }]

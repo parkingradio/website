@@ -50,24 +50,27 @@ finds the page as it was.
 One box under the title, about what needs settling (see [The calendar](../../server/calendar.md#the-calendar)). Its
 first row has "À régler", then how many conflicts and sessions without a date there are, each in a tag, e.g. "2
 conflits", in red, and "1 sans date", and a chevron: the row is a button that opens the box and closes it. While there's
-nothing to settle, the row says "Rien à régler." instead, and doesn't open. It's closed by default.
+nothing to settle, the row says "rien" instead, and can't be used (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)). It's closed by default.
 
 Under that row, the box warns about each feed whose last read failed, or that hasn't been read yet (see
 [Warnings](layout.md#warnings)), naming it, and saying why the read failed, if it did, linking to Configuration, and that
 conflicts can be missing or out of date. While there are no feeds at all, it says that conflicts with occupations can't
 be found, and links to Configuration.
 
-Opened, it has a group for each kind of thing to settle, each under a divider, with its tag, a heading, what to do about
-it, and a row for each one: when it is, what it is, and what to do, on the right.
+Opened, it has a group for each kind of thing to settle, each under a divider, with its tag, a heading and a sentence
+about them, then a row for each one: when it is, what it is, and what to do, on the right, which screen readers read
+with what it's about, e.g. « voir le jour, sam. 21 nov. 2026 ».
 
-- The conflicts, "conflits", in the server's order, with « Le studio n'accueille qu'une chose à la fois : déplacez,
-  raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier. ». Each one has the day it
-  starts, the time its two things overlap, in full on that day, and the two things, each with its kind: a session by
-  its title, which links to its page, and an occupation by its name. "voir le jour →" shows that day, chosen, in the
-  month, with the focus on it.
-- The sessions without a date, "sans date", the most recently added first, "à déterminer". Each one has its title,
-  linking to its page, its sets' performers, set by set, the sets separated by "·", and its duration. "lui donner une
-  date →" opens its page too.
+- The conflicts: "conflits", "chevauchements à résoudre", « Le studio n'accueille qu'une chose à la fois : déplacez,
+  raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier. », then each one, in the
+  server's order. Its row has the day it starts, the time its two things overlap, in full on that day, and the two
+  things, each with its kind: a session by its title, which links to its page, and an occupation by its name. "voir le
+  jour →" shows that day, chosen, in the month, with the focus on it.
+- The sessions without a date: "sans date", "sessions à placer", « Donnez-leur une date pour les voir dans le mois, et
+  dans les conflits. », then each one, the most recently added first. Its row has "à déterminer" as when it is, its
+  title, linking to its page, its sets' performers, set by set, the sets separated by "·", then its duration, and "lui
+  donner une date →", which opens its page too.
 
 ## The toolbar
 
@@ -80,12 +83,13 @@ and chooses today, and "nouvelle session", which opens the session form (see [Se
 A table with the days of the week, "dim" to "sam", then the weeks that have the month's days. The days of the months
 before and after are faded out, with what's on them. Today stands out.
 
-Each day lists what takes some of it, in order of start, then end, each with its part of the day and its name (see
-[What's shown](#whats-shown)), and the stretches of its free time among them, in order of time (see
-[Free time](#free-time)). A session also has its sets' performers, cut short when they don't fit. A thing that's in
-a conflict has "conflit" on the days the time it overlaps the other thing takes some of. Screen readers read each thing's
-kind before it, and « , calendrier » or « , avec » between its title and its calendar or performers, e.g. « occupation :
-RÉPARATION, calendrier Calendrier de l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
+Each day lists what takes some of it, each with its part of the day and its name (see [What's shown](#whats-shown)), and
+the stretches of its free time (see [Free time](#free-time)), in order of when each starts on the day, what started on
+an earlier day first: things by start, then end, and before a stretch that starts when they do. A session also has its
+sets' performers, cut short when they don't fit. A thing that's in a conflict has "conflit" on the days the time it
+overlaps the other thing takes some of. Screen readers read each thing's kind before it, and « , calendrier » or
+« , avec » between its title and its calendar or performers, e.g. « occupation : RÉPARATION, calendrier Calendrier de
+l'équipe », « session : HAUTE RIVE TAKEOVER, avec Aurore, Brume ».
 
 Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
 day.

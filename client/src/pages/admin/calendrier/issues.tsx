@@ -33,14 +33,23 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
   return (
     <section className="calendar-issues" aria-labelledby={titleId}>
       <h2 className="calendar-heading">
-        {nothing ? (
-          <span className="calendar-issues-header">
-            {title} Rien à régler.
-          </span>
-        ) : (
-          <button type="button" className="calendar-issues-header" aria-expanded={open} aria-controls={open ? contentId : undefined} onClick={onToggle}>
-            {title}
-            {conflicts.length > 0 && (
+        {/* The same button whether there's something to settle or not, so that it keeps the focus when that changes. */}
+        <button
+          type="button"
+          className="calendar-issues-header"
+          aria-disabled={nothing || undefined}
+          aria-expanded={nothing ? undefined : open}
+          aria-controls={open && !nothing ? contentId : undefined}
+          onClick={nothing ? undefined : onToggle}
+        >
+          {title}
+          {nothing && (
+            <>
+              {' '}
+              <span className="admin-meta">rien</span>
+            </>
+          )}
+          {conflicts.length > 0 && (
               <>
                 {' '}
                 <Tag conflict>{conflictCount(conflicts.length)}</Tag>
@@ -52,11 +61,12 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
                 <Tag>{undatedSessions.length} sans date</Tag>
               </>
             )}
+          {!nothing && (
             <span aria-hidden="true" className="calendar-issues-chevron">
               {open ? '⌄' : '›'}
             </span>
-          </button>
-        )}
+          )}
+        </button>
       </h2>
       <FeedWarnings feeds={feeds} />
       {open && !nothing && (
@@ -75,8 +85,8 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
                     key={i}
                     when={when}
                     action={
-                      <button type="button" aria-label={`voir le jour, ${when}`} onClick={() => onShowDay(day)}>
-                        voir le jour →
+                      <button type="button" onClick={() => onShowDay(day)}>
+                        <ActionText text="voir le jour" about={when} />
                       </button>
                     }
                   >
@@ -93,7 +103,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
             <IssueGroup
               tag={<Tag>sans date</Tag>}
               heading="sessions à placer"
-              explanation={"Elles n'ont pas encore de date\u00a0: elles ne sont ni dans le mois, ni dans les conflits."}
+              explanation="Donnez-leur une date pour les voir dans le mois, et dans les conflits."
             >
               {undatedSessions.map((session) => (
                 <IssueRow
@@ -101,16 +111,13 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
                   className={session.status !== 'planned' ? `admin-status-${session.status}` : undefined}
                   when="à déterminer"
                   action={
-                    <Link to={sessionPath(session)}>
-                      lui donner une date<span className="visually-hidden"> : {session.title}</span> →
+                    <Link to={sessionPath(session)} className="admin-button">
+                      <ActionText text="lui donner une date" about={session.title} />
                     </Link>
                   }
                 >
                   <SessionTitle id={session.id} title={session.title} status={session.status} />
-                  <span className="admin-meta">
-                    {' '}
-                    {[sessionPerformers(session), formatDuration(session.durationMinutes)].filter(Boolean).join(' · ')}
-                  </span>
+                  <span className="admin-meta"> {[sessionPerformers(session), formatDuration(session.durationMinutes)].filter(Boolean).join(', ')}</span>
                 </IssueRow>
               ))}
             </IssueGroup>
@@ -124,6 +131,18 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
 // A count, or a group's kind, in a tag: conflicts' in their red.
 function Tag({ conflict = false, children }: { conflict?: boolean; children: ReactNode }) {
   return <span className={conflict ? 'calendar-tag calendar-conflict-tag' : 'calendar-tag'}>{children}</span>
+}
+
+// What an action of a row says, e.g. "voir le jour →", and what it's about, which only screen readers read, without the
+// arrow, e.g. "voir le jour, sam. 21 nov. 2026".
+function ActionText({ text, about }: { text: string; about: string }) {
+  return (
+    <>
+      {text}
+      <span className="visually-hidden">, {about}</span>
+      <span aria-hidden="true"> →</span>
+    </>
+  )
 }
 
 // A kind of thing to settle: its tag and its heading, what to do about it, then a row for each one.
@@ -180,7 +199,7 @@ function FeedWarnings({ feeds }: { feeds: Feed[] }) {
         {feed.error !== null ? (
           <>
             Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier «&nbsp;{feed.name}&nbsp;» a
-            échoué&nbsp;: {feed.error} (voir {configuration})
+            échoué&nbsp;: {feed.error}. Voir {configuration}.
           </>
         ) : (
           `Le calendrier «\u00a0${feed.name}\u00a0» n'a pas encore été lu\u00a0: des conflits peuvent manquer.`

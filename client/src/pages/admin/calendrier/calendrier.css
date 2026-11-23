@@ -45,13 +45,19 @@
   letter-spacing: normal;
 }
 
-.admin .calendar-issues .calendar-issues-header {
+/* Its first row, a button that looks like the text around it, however it's hovered. */
+.admin .calendar-issues-header,
+.admin .calendar-issues-header:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   width: 100%;
   padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
 }
 
 .calendar-issues-title {
@@ -66,7 +72,7 @@
   font-size: 1.1rem;
 }
 
-.admin button.calendar-issues-header:hover .calendar-issues-title {
+.admin .calendar-issues-header:not([aria-disabled]):hover .calendar-issues-title {
   text-decoration: underline;
 }
 
@@ -127,7 +133,12 @@
   color: #666;
 }
 
-.admin .calendar-issue-action button {
+/* Its actions, a button or a link, as pills of the same size, which a long title doesn't wrap. */
+.calendar-issue-action {
+  white-space: nowrap;
+}
+
+.admin .calendar-issue-action :is(button, a.admin-button) {
   padding: 0 6px;
 }
 

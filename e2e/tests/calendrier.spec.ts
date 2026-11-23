@@ -55,7 +55,7 @@ test("a session is in its month, and on its day, which leads to a new session's 
   // The seeded session without a date needs settling, and leads to its page.
   const issues = page.getByRole('region', { name: 'À régler' })
   await issues.getByRole('button', { name: /sans date/ }).click()
-  await expect(issues.getByRole('link', { name: /^lui donner une date\s?: LES SŒURS ONDES TAKEOVER →$/ })).toHaveAttribute('href', /^\/admin\/sessions\//)
+  await expect(issues.getByRole('link', { name: /^lui donner une date\s?, LES SŒURS ONDES TAKEOVER$/ })).toHaveAttribute('href', /^\/admin\/sessions\//)
 
   expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
 })
@@ -114,13 +114,13 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   ])
 
   const issues = page.getByRole('region', { name: 'À régler' })
-  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503) (voir Configuration)`)
+  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503). Voir Configuration.`)
   await expect(issues.getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
   await issues.getByRole('button', { name: /1 conflit/ }).click()
   await expect(page).toHaveURL(/[?&]issues=open/)
   await expect(issues.getByRole('listitem').first()).toContainText(`occupation : RÉPARATION ${unique}, calendrier ${team}occupation : ${stays}`)
   // Which shows its day, chosen.
-  await issues.getByRole('button', { name: /^voir le jour, / }).click()
+  await issues.getByRole('button', { name: /^voir le jour\s?, / }).click()
   await expect(dayButton(page, day)).toBeFocused()
 
   // The menu's badge, on another page, which leads back to the conflicts.

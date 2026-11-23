@@ -357,7 +357,7 @@ describe('Calendrier', () => {
       ])
       const box = screen.getByRole('region', { name: 'À régler' })
       expect(visibleText(within(box).getAllByRole('listitem')[0])).toBe(
-        "sam. 21 nov. 202610 h – 12 hoccupation : Séjoursoccupation : MÉNAGE, calendrier Calendrier de l'équipevoir le jour →",
+        "sam. 21 nov. 202610 h – 12 hoccupation : Séjoursoccupation : MÉNAGE, calendrier Calendrier de l'équipevoir le jour, sam. 21 nov. 2026 →",
       )
     })
 
@@ -379,9 +379,9 @@ describe('Calendrier', () => {
       await loaded()
 
       const box = screen.getByRole('region', { name: 'À régler' })
-      const toggle = within(box).getByRole('button', { name: /conflit/ })
-      expect(toggle).toHaveTextContent('1 conflit 1 sans date')
-      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      // Its first row, a button in its heading, whose chevron screen readers don't read.
+      const toggle = within(within(box).getByRole('heading', { level: 2, name: /^À régler/ })).getByRole('button', { expanded: false })
+      expect(toggle).toHaveAccessibleName('À régler 1 conflit 1 sans date')
       expect(within(box).queryByRole('link', { name: 'LES SŒURS ONDES TAKEOVER' })).not.toBeInTheDocument()
       fireEvent.click(toggle)
       expect(path()).toBe('/admin/calendrier?issues=open')
@@ -399,10 +399,14 @@ describe('Calendrier', () => {
       expect([...box.querySelectorAll('h3')].map(visibleText)).toEqual(['conflits chevauchements à résoudre', 'sans date sessions à placer'])
       expect(box).toHaveTextContent("déplacez, raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier.")
       const [conflict, undated] = within(box).getAllByRole('listitem')
-      expect(visibleText(conflict)).toBe('sam. 21 nov. 202621 h – 1 hoccupation : Séjourssession : HAUTE RIVE TAKEOVERvoir le jour →')
+      expect(visibleText(conflict)).toBe('sam. 21 nov. 202621 h – 1 hoccupation : Séjourssession : HAUTE RIVE TAKEOVERvoir le jour, sam. 21 nov. 2026 →')
       expect(within(conflict).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(visibleText(undated)).toBe('à déterminerLES SŒURS ONDES TAKEOVER Ondine · Écume · 3 hlui donner une date : LES SŒURS ONDES TAKEOVER →')
-      expect(within(undated).getByRole('link', { name: /^lui donner une date\s?: LES SŒURS ONDES TAKEOVER →$/ })).toHaveAttribute('href', '/admin/sessions/session-4')
+      // Its duration after its sets' performers, which "·" separates.
+      expect(visibleText(undated)).toBe('à déterminerLES SŒURS ONDES TAKEOVER Ondine · Écume, 3 hlui donner une date, LES SŒURS ONDES TAKEOVER →')
+      // Its action, a pill like the conflicts', which screen readers read with what it's about, without the arrow.
+      const action = within(undated).getByRole('link', { name: 'lui donner une date, LES SŒURS ONDES TAKEOVER' })
+      expect(action).toHaveAttribute('href', '/admin/sessions/session-4')
+      expect(action).toHaveClass('admin-button')
 
       // Its day shows it, chosen, in its month, with the focus on it.
       fireEvent.click(within(conflict).getByRole('button', { name: 'voir le jour, sam. 21 nov. 2026' }))
@@ -447,10 +451,11 @@ describe('Calendrier', () => {
       await loaded()
 
       const box = screen.getByRole('region', { name: 'À régler' })
-      expect(within(box).getByText('Rien à régler.')).toBeInTheDocument()
-      expect(within(box).queryByRole('button')).not.toBeInTheDocument()
+      // The same row, which can't be used.
+      expect(within(box).getByRole('button', { name: 'À régler rien' })).toHaveAttribute('aria-disabled', 'true')
+      expect(within(box).getByRole('button')).not.toHaveAttribute('aria-expanded')
       expect([...box.querySelectorAll('.admin-warning')].map(visibleText)).toEqual([
-        "⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : The link can't be read: its server fails (503) (voir Configuration)",
+        "⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : The link can't be read: its server fails (503). Voir Configuration.",
         "⚠ Le calendrier « Nouveau » n'a pas encore été lu : des conflits peuvent manquer.",
       ])
       expect(within(box.querySelector('.admin-warning')!).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
@@ -510,6 +515,20 @@ describe('Calendrier', () => {
       expect(screen.getByRole('heading', { name: 'janvier 2027' })).toBeInTheDocument()
       // January's: December's answer came too late.
       expect(screen.getByRole('region', { name: 'À régler' })).toHaveTextContent('1 sans date')
+    })
+
+    it('keeps the focus on "À régler"\'s row when there\'s nothing left to settle', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+      const toggle = screen.getByRole('button', { name: /^À régler/ })
+      act(() => toggle.focus())
+
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, conflicts: [], undatedSessions: [] } })
+      vi.setSystemTime(NOW.getTime() + 61 * 1000)
+      await act(() => document.dispatchEvent(new Event('visibilitychange')))
+      await waitFor(() => expect(toggle).toHaveAccessibleName('À régler rien'))
+      expect(document.activeElement).toBe(toggle)
     })
 
     it('keeps what it shows when reading it again fails, and reads it again when the tab is shown, at most once a minute', async () => {
