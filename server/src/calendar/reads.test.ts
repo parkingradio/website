@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FastifyBaseLogger } from 'fastify'
 import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
+import { calendarEvents } from './events.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
+import type { parseFeed } from './parse.js'
 import { calendarReads, READ_INTERVAL_MS } from './reads.js'
 
 // Reading the feeds every 15 minutes, and keeping what was read in memory (see "Reading the feeds" in
@@ -44,7 +46,10 @@ const readText = vi.fn(async (link: string, signal: AbortSignal) => {
 const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() }
 
 function reader() {
-  return calendarReads({ feeds: store, log: log as unknown as FastifyBaseLogger, readText })
+  // The text is gone through in the tests' own process, without the time passing that a process of its own would take
+  // (see parse.test.ts).
+  const parse: typeof parseFeed = async ({ text, kind, from, to }) => calendarEvents(text, kind, { from, to })
+  return calendarReads({ feeds: store, log: log as unknown as FastifyBaseLogger, readText, parse })
 }
 
 // Lets the reads under way go on, as far as they can without time passing.

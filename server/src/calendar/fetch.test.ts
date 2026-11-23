@@ -60,17 +60,23 @@ describe('readLink', () => {
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([LINK, 'https://a.example/1', 'https://a.example/2', 'https://b.example/3', 'https://b.example/4', 'https://c.example/5'])
   })
 
-  it('refuses a link that redirects more than 5 times, or to a link that is not https', async () => {
+  it('refuses a link that redirects more than 5 times, to a link that is not https, or without a link', async () => {
     const six = fakeFetch(...Array.from({ length: 6 }, (_, index) => redirect(`https://a.example/${index}`)))
     expect(await failure(readLink(LINK, { fetch: six }))).toMatchObject({ status: 400, message: "The link can't be read: it redirects more than 5 times" })
     for (const location of ['http://a.example/', 'webcal://a.example/', 'https://[not a host']) {
       const fetch = fakeFetch(redirect(location))
       expect(await failure(readLink(LINK, { fetch }))).toMatchObject({ status: 400, message: "The link can't be read: it redirects to a link that isn't https" })
     }
+    for (const status of [302, 304]) {
+      expect(await failure(readLink(LINK, { fetch: fakeFetch(new Response(null, { status })) }))).toMatchObject({
+        status: 400,
+        message: `The link can't be read: its server redirects without a link (${status})`,
+      })
+    }
   })
 
   it('refuses a link that its server refuses, and fails with 502 when its server fails, or refuses requests for now', async () => {
-    const statuses = { 401: 400, 403: 400, 404: 400, 410: 400, 408: 502, 429: 502, 500: 502, 503: 502, 304: 502 }
+    const statuses = { 401: 400, 403: 400, 404: 400, 410: 400, 408: 502, 429: 502, 500: 502, 503: 502 }
     for (const [status, expected] of Object.entries(statuses)) {
       const error = await failure(readLink(LINK, { fetch: fakeFetch(new Response(null, { status: Number(status) })) }))
       expect(error.status, status).toBe(expected)

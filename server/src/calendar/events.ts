@@ -18,7 +18,7 @@ export type CalendarEvent = { start: Date; end: Date; title: string | null }
 // How many occurrences a recurring event can have until the end of the time a read keeps before it's left out, e.g. one
 // every minute, and how many events and occurrences a read can go through in all, before it fails. ical.js can only go
 // through an event's occurrences from its first one, so the events that started long ago count all of theirs. The
-// limits keep a read from holding the server for too long: it doesn't wait for anything while it goes through them.
+// limits keep most reads that go through too many from taking until they're stopped (see parse.ts), and say why.
 export const MAX_OCCURRENCES_PER_EVENT = 20_000
 export const MAX_OCCURRENCES_PER_READ = 50_000
 
@@ -57,13 +57,25 @@ function tzidOf(event: ICAL.Event, property: string): string | null {
   return typeof tzid === 'string' ? tzid : null
 }
 
-// How long the occurrences of a timed event last, in ms: the time from its DTSTART to its DTEND, or its DURATION.
-function durationOf(event: ICAL.Event): number {
+// How long the occurrences of a timed event last: the time from its DTSTART to its DTEND, which is the same for all of
+// them, or its DURATION, whose days are in its local time, as RFC 5545 says, and its hours, minutes and seconds aren't,
+// e.g. P1D ends at the same time on the next day, even when the clocks change in between.
+type Length = { days: number; ms: number }
+
+function lengthOf(event: ICAL.Event): Length {
   if (event.component.hasProperty('dtend')) {
-    return instantOf(event.endDate, tzidOf(event, 'dtend')) - instantOf(event.startDate, tzidOf(event, 'dtstart'))
+    return { days: 0, ms: instantOf(event.endDate, tzidOf(event, 'dtend')) - instantOf(event.startDate, tzidOf(event, 'dtstart')) }
   }
   const duration = event.component.getFirstPropertyValue('duration')
-  return duration instanceof ICAL.Duration ? duration.toSeconds() * 1000 : 0
+  if (!(duration instanceof ICAL.Duration)) return { days: 0, ms: 0 }
+  const sign = duration.isNegative ? -1 : 1
+  return { days: sign * (duration.weeks * 7 + duration.days), ms: sign * ((duration.hours * 60 + duration.minutes) * 60 + duration.seconds) * 1000 }
+}
+
+// When an occurrence that lasts `length` ends, which starts at the local time `startDate`, in the time zone `tzid`, if
+// any, the instant `start`.
+function endOf(startDate: ICAL.Time, start: number, tzid: string | null, { days, ms }: Length): number {
+  return (days === 0 ? start : instantOf(startDate.clone().adjust(days, 0, 0, 0), tzid)) + ms
 }
 
 const isCancelled = (event: ICAL.Event) => String(event.component.getFirstPropertyValue('status') ?? '').toUpperCase() === 'CANCELLED'
@@ -81,12 +93,17 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
   }
   if (!Array.isArray(parsed) || parsed[0] !== 'vcalendar') throw refused("its answer isn't an iCalendar calendar")
   const calendar = new ICAL.Component(parsed)
+  // ical.js looks a TZID up among every component of the calendar each time it reads a time in it, and only remembers
+  // those it finds: with a TZID that has no VTIMEZONE, each time would go through every event. So the events are read in
+  // a calendar of their own, that only has the time zones.
+  const zones = new ICAL.Component(['vcalendar', [], calendar.getAllSubcomponents('vtimezone').map(({ jCal }) => jCal)])
 
   // The events by their UID: those that recur, or don't, and the occurrences changed on their own, which ical.js relates
   // to their recurring event only when it's told which they are. Events without a UID are on their own.
   const groups: { events: ICAL.Component[]; changed: ICAL.Component[] }[] = []
   const byUid = new Map<string, (typeof groups)[number]>()
   for (const vevent of calendar.getAllSubcomponents('vevent')) {
+    vevent.parent = zones
     const uid = vevent.getFirstPropertyValue('uid')
     let group = typeof uid === 'string' && uid !== '' ? byUid.get(uid) : undefined
     if (!group) {
@@ -115,7 +132,7 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
     const tzid = tzidOf(event, 'dtstart')
     const cancelled = isCancelled(event)
     const title = titleOf(event)
-    let duration: number | undefined
+    let length: Length | undefined
     // ical.js's details of an occurrence say whether it was changed on its own, but they're slow to get: only for the
     // events that have such occurrences, and for whole days, whose end they give.
     const changes = Object.keys(event.exceptions).length > 0 || event.rangeExceptions.length > 0
@@ -129,17 +146,21 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
         throw refused(`it has more than ${MAX_OCCURRENCES_PER_READ} events and occurrences`)
       }
       if (count > MAX_OCCURRENCES_PER_EVENT) return null
+      // An RDATE that's a period, which isn't read.
+      if (!(next instanceof ICAL.Time)) continue
       const original = instantOf(next, tzid)
+      // The occurrences come in order, so the next ones are all later. But an occurrence after `to` that was changed on
+      // its own, to before it, is left out: since `to` is two years after the read, it doesn't matter.
       if (original >= toMs) return found
       const details = changes || next.isDate ? event.getOccurrenceDetails(next) : null
       const item = details?.item ?? event
       if (item === event ? cancelled : isCancelled(item)) continue
       const startDate = details?.startDate ?? next
-      const start = startDate === next ? original : instantOf(startDate, tzidOf(item, 'dtstart'))
+      const itemTzid = item === event ? tzid : tzidOf(item, 'dtstart')
+      const start = startDate === next ? original : instantOf(startDate, itemTzid)
       let end: number
       if (startDate.isDate) end = instantOf(details!.endDate, null)
-      else if (item === event) end = start + (duration ??= durationOf(event))
-      else end = start + durationOf(item)
+      else end = endOf(startDate, start, itemTzid, item === event ? (length ??= lengthOf(event)) : lengthOf(item))
       if (end <= start || end <= fromMs || start >= toMs) continue
       found.push({ start: new Date(start), end: new Date(end), title: item === event ? title : titleOf(item) })
     }

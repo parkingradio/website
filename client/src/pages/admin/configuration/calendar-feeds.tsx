@@ -102,7 +102,7 @@ function AddFeed({ onAdded }: { onAdded: (feed: Feed) => void }) {
   const [name, setName] = useState('')
   const [kind, setKind] = useState<FeedKind | null>(null)
   const [link, setLink] = useState('')
-  // While the server reads the link, which can take up to 20 seconds.
+  // While the server reads the link, which can take up to 30 seconds.
   const [busy, setBusy] = useState(false)
   // Why the feed couldn't be added, if it couldn't.
   const [error, setError] = useState<string | null>(null)

@@ -107,6 +107,18 @@ describe('calendarEvents', () => {
       expect(one('DTSTART;TZID=America/Toronto:20261124T190000', 'DURATION:PT2H30M')).toEqual([['2026-11-25T00:00:00.000Z', '2026-11-25T02:30:00.000Z']])
     })
 
+    it("count their DURATION's days in their local time, and its hours as they pass, across a change of daylight saving time", () => {
+      const start = 'DTSTART;TZID=America/Toronto:20261031T120000'
+      expect(one(start, 'DURATION:P1D')).toEqual([['2026-10-31T16:00:00.000Z', '2026-11-01T17:00:00.000Z']])
+      expect(one(start, 'DURATION:P1DT2H')).toEqual([['2026-10-31T16:00:00.000Z', '2026-11-01T19:00:00.000Z']])
+      expect(one(start, 'DURATION:PT24H')).toEqual([['2026-10-31T16:00:00.000Z', '2026-11-01T16:00:00.000Z']])
+      const weekly = vevent('DTSTART;TZID=America/Toronto:20261024T120000', 'DURATION:P1W', 'RRULE:FREQ=WEEKLY;COUNT=2')
+      expect(intervals(feed(TORONTO, weekly))).toEqual([
+        ['2026-10-24T16:00:00.000Z', '2026-10-31T16:00:00.000Z'],
+        ['2026-10-31T16:00:00.000Z', '2026-11-07T17:00:00.000Z'],
+      ])
+    })
+
     it('end at their DTEND across a change of daylight saving time, e.g. a stay over a weekend', () => {
       const stay = ['DTSTART;TZID=America/Toronto:20261031T160000', 'DTEND;TZID=America/Toronto:20261102T110000', 'SUMMARY:Reserved']
       for (const zone of [TORONTO, []]) {
@@ -157,6 +169,28 @@ describe('calendarEvents', () => {
         'RDATE;TZID=America/Toronto:20261210T100000',
       )
       expect(intervals(feed(TORONTO, event)).map(([start]) => start)).toEqual(['2026-12-01T15:00:00.000Z', '2026-12-03T15:00:00.000Z', '2026-12-10T15:00:00.000Z'])
+    })
+
+    it('leave out the occurrences of an RDATE that is a period, but not the others', () => {
+      const event = vevent('DTSTART:20261201T150000Z', 'DTEND:20261201T160000Z', 'RRULE:FREQ=DAILY;COUNT=2', 'RDATE;VALUE=PERIOD:20261210T150000Z/20261210T170000Z', 'RDATE:20261212T150000Z')
+      expect(intervals(feed(event)).map(([start]) => start)).toEqual(['2026-12-01T15:00:00.000Z', '2026-12-02T15:00:00.000Z', '2026-12-12T15:00:00.000Z'])
+    })
+
+    // RFC 5545 requires a feed to define the time zones it names, as Google's do. When it doesn't, the library the server
+    // reads feeds with compares their local times with the UTC ones of an EXDATE or a RECURRENCE-ID as if they were UTC, so
+    // that these don't name the occurrence they should (see "Events" in docs/design/server/calendar.md). This is what it
+    // does then, which isn't the design's: it's only pinned here so that a change is seen.
+    it("can miss the occurrences that an EXDATE or a RECURRENCE-ID names in UTC, when the feed doesn't define their time zone", () => {
+      const uid = 'UID:undefined-zone@example.com'
+      const series = ['DTSTART;TZID=America/Toronto:20261201T190000', 'DTEND;TZID=America/Toronto:20261201T200000', 'RRULE:FREQ=DAILY;COUNT=3']
+      const text = (zone: string[]) =>
+        feed(
+          zone,
+          vevent(uid, ...series, 'EXDATE:20261203T000000Z'),
+          vevent(uid, 'RECURRENCE-ID:20261204T000000Z', 'DTSTART;TZID=America/Toronto:20261203T210000', 'DTEND;TZID=America/Toronto:20261203T220000'),
+        )
+      expect(intervals(text(TORONTO)).map(([start]) => start)).toEqual(['2026-12-02T00:00:00.000Z', '2026-12-04T02:00:00.000Z'])
+      expect(intervals(text([])).map(([start]) => start)).toEqual(['2026-12-02T00:00:00.000Z', '2026-12-03T00:00:00.000Z', '2026-12-04T00:00:00.000Z'])
     })
 
     it('repeat whole days', () => {
@@ -273,14 +307,19 @@ describe('calendarEvents', () => {
     expect(failure(feed(vevent('DTSTART:20261124T230000Z', 'RRULE:FREQ=NEVER')))).toMatchObject({ status: 400 })
   })
 
-  it('reads a calendar of thousands of events quickly', () => {
-    const events = Array.from({ length: 5000 }, (_, index) =>
-      vevent(`DTSTART;TZID=America/Toronto:2026${String((index % 12) + 1).padStart(2, '0')}15T120000`, `DTEND;TZID=America/Toronto:2026${String((index % 12) + 1).padStart(2, '0')}15T130000`, 'SUMMARY:An event', `DESCRIPTION:${'x'.repeat(150)}`),
-    )
+  // ical.js looks a time zone up among all of a calendar's components, and only remembers those it finds, so that a
+  // TZID without a VTIMEZONE once made a read go through every event for each of its times.
+  it("reads a calendar of nearly 10 MB quickly, even when it doesn't define its time zone", () => {
+    const events = Array.from({ length: 28_000 }, (_, index) => {
+      const day = `2026${String((index % 12) + 1).padStart(2, '0')}15`
+      return vevent(`DTSTART;TZID=America/Toronto:${day}T120000`, `DTEND;TZID=America/Toronto:${day}T130000`, 'SUMMARY:An event', `DESCRIPTION:${'x'.repeat(150)}`)
+    })
+    const text = feed(...events)
+    expect(text.length).toBeGreaterThan(9_500_000)
     const started = performance.now()
-    expect(read(feed(TORONTO, ...events)).events).toHaveLength(5000)
-    expect(performance.now() - started).toBeLessThan(2000)
-  })
+    expect(read(text).events).toHaveLength(28_000)
+    expect(performance.now() - started).toBeLessThan(5000)
+  }, 20_000)
 
   it('keeps from a year before a read to two years after it', () => {
     expect(keptTime(new Date('2026-11-22T12:00:00Z'))).toEqual(WINDOW)

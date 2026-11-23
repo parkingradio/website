@@ -8,6 +8,8 @@
 # - a link whose server can't be found fails with 502
 # - a feed that's in the database is listed, without its link, and can be removed
 # - the links are never logged
+# - in the image, a feed's text is gone through in a process of its own, which a recurring event that ical.js looks for
+#   without end can't take the server down with
 
 source "$(dirname "$0")/lib.sh"
 
@@ -70,3 +72,28 @@ expect_body_contains '"total":0'
 
 echo "  the links are never logged"
 if docker logs --since "$since" "$CONTAINER" 2>&1 | grep -qF "$SECRET"; then fail "the server logged a feed's link"; fi
+
+echo "  a feed's text is gone through in a process of its own, which stops, in the server's image"
+# parse <rule> <options> -- go through a feed with one event that recurs by the rule, with the server's own module, in
+# its image, and with parseFeed's options, a JavaScript object, printing how many events it has, or why it failed.
+parse() {
+    docker exec "$CONTAINER" node --input-type=module --eval "
+        import { parseFeed } from '/app/server/dist/calendar/parse.js'
+        const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20200101T100000Z',
+          'DTEND:20200101T110000Z', 'RRULE:$1', 'END:VEVENT', 'END:VCALENDAR', ''].join('\\r\\n')
+        parseFeed({ text, kind: 'occupation', from: new Date('2019-01-01'), to: new Date('2021-01-01') }, $2)
+          .then(({ events }) => console.log('events:', events.length), (error) => console.log(error.message))"
+}
+# expect_parse <rule> <pattern> [<options>] -- expect going through the rule's feed to print something that matches.
+expect_parse() {
+    local output
+    output="$(parse "$1" "${3:-"{}"}")"
+    printf '%s' "$output" | grep -qE -- "$2" || fail "expected $1 to give \"$2\", got: ${output}"
+}
+expect_parse 'FREQ=DAILY;COUNT=3' '^events: 3$'
+# Every day of February 30, which ical.js goes on looking for, filling its caches, until the process is killed, or runs
+# out of memory.
+expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes more than [0-9]+ (seconds|MB) to go through$"
+expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes more than [0-9]+ MB to go through$" '{ maxMemoryMb: 32 }'
+request "${BASE_URL}/healthz"
+expect_status 200

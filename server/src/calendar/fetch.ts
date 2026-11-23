@@ -74,9 +74,10 @@ export async function readLink(
     let url = link
     for (let redirects = 0; ; redirects++) {
       const response = await fetch(url, { redirect: 'manual', signal: both, headers: { Accept: 'text/calendar, */*;q=0.5' } })
-      const location = response.headers.get('location')
-      if (response.status >= 300 && response.status < 400 && location !== null) {
+      if (response.status >= 300 && response.status < 400) {
         await response.body?.cancel()
+        const location = response.headers.get('location')
+        if (location === null) throw refused(`its server redirects without a link (${response.status})`)
         if (redirects === MAX_REDIRECTS) throw refused(`it redirects more than ${MAX_REDIRECTS} times`)
         const next = URL.parse(location, url)
         if (next?.protocol !== 'https:') throw refused("it redirects to a link that isn't https")

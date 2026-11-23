@@ -26,6 +26,9 @@ const NOT_A_LINK = 'The link must be an https or webcal link'
 
 // The link as the server keeps it, or an error, which never quotes it, since it's a secret.
 export function normalizedLink(sent: string): { link: string } | { error: string } {
+  // The NUL character is refused, rather than dropped or encoded, as parsing a link would (see "Text" in
+  // docs/design/server/README.md).
+  if (sent.includes('\0')) return { error: NOT_A_LINK }
   let url: URL
   try {
     url = new URL(sent)

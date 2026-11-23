@@ -1,9 +1,10 @@
 import type { FastifyBaseLogger } from 'fastify'
 import { withoutValues } from '../api/errors.js'
-import { calendarEvents, keptTime } from './events.js'
+import { keptTime } from './events.js'
 import type { CalendarEvent } from './events.js'
 import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
 import { FeedReadError, ReadAborted, readLink } from './fetch.js'
+import { parseFeed } from './parse.js'
 
 // What the server read from the calendar feeds, which it keeps in memory, and reads again every 15 minutes (see
 // "Reading the feeds" in docs/design/server/calendar.md). Every server reads them on its own.
@@ -44,8 +45,9 @@ export type CalendarReads = {
 type Options = {
   feeds: CalendarFeedsStore
   log: FastifyBaseLogger
-  // Reads a link, as readLink does, but for tests.
+  // Reads a link, as readLink does, and goes through its text, as parseFeed does, but for tests.
   readText?: (link: string, signal: AbortSignal) => Promise<string>
+  parse?: typeof parseFeed
 }
 
 // Waits `ms`, or until `signal` aborts, without keeping the process alive.
@@ -63,7 +65,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-export function calendarReads({ feeds, log, readText = (link, signal) => readLink(link, { signal }) }: Options): CalendarReads {
+export function calendarReads({ feeds, log, readText = (link, signal) => readLink(link, { signal }), parse = parseFeed }: Options): CalendarReads {
   const reads = new Map<string, FeedRead>()
   // The feeds whose reads are kept: those that the latest listing gave, and those added since, but not those removed
   // since. A read that ends is only kept if its feed is still one of them, so that a removed feed's isn't kept again.
@@ -78,7 +80,7 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
     try {
       const text = await readText(link, stopping.signal)
       const readAt = new Date()
-      const { events, skipped } = calendarEvents(text, kind, keptTime(readAt))
+      const { events, skipped } = await parse({ text, kind, ...keptTime(readAt) }, { signal: stopping.signal })
       if (skipped > 0) log.warn({ feed: id, name, skipped }, "Left out events of a calendar feed that can't be read, or have too many occurrences")
       return { events, readAt }
     } catch (error) {

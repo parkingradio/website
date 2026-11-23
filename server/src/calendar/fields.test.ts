@@ -27,6 +27,12 @@ describe('Link', () => {
     }
   })
 
+  it('refuses a link with the NUL character, rather than dropping or encoding it', () => {
+    for (const sent of ['https://example.com/a.ics\0', '\0https://example.com/a.ics', 'webcal://example.com/a\0b.ics']) {
+      expect(error(sent), JSON.stringify(sent)).toBe('The link must be an https or webcal link')
+    }
+  })
+
   it('refuses a link with a user name or a password', () => {
     expect(error('https://user:secret@example.com/feed.ics')).toBe("The link can't have a user name or a password")
     expect(error('webcal://user@example.com/feed.ics')).toBe("The link can't have a user name or a password")
