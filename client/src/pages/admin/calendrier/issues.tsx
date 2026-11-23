@@ -108,7 +108,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
               {undatedSessions.map((session) => (
                 <IssueRow
                   key={session.id}
-                  className={session.status !== 'planned' ? `admin-status-${session.status}` : undefined}
+                  className={`admin-status-${session.status}`}
                   when="à déterminer"
                   action={
                     <Link to={sessionPath(session)} className="admin-button">
@@ -172,7 +172,7 @@ function IssueRow({ when, action, className, children }: { when: string; action:
 // One of a conflict's things, with its kind.
 function ConflictingThing({ thing }: { thing: NamedThing }) {
   return (
-    <span className={thing.kind === 'session' && thing.status !== 'planned' ? `calendar-issue-thing admin-status-${thing.status}` : 'calendar-issue-thing'}>
+    <span className={thing.kind === 'session' ? `calendar-issue-thing admin-status-${thing.status}` : 'calendar-issue-thing'}>
       {THING_KIND_LABELS[thing.kind]}&nbsp;:{' '}
       {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} /> : <OccupationLabel title={thing.title} calendar={thing.calendar} />}
     </span>

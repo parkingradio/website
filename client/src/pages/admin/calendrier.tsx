@@ -2,7 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import { quebecDayAndTime } from '../../quebec-time'
 import { Button } from './button'
-import { useReportConflicts, useTabShownCount } from './conflict-count'
+import { useTabShownCount } from '../../api/use-tab-shown'
+import { useReportConflicts } from './conflict-count'
 import { useQueryParams } from './list'
 import { ChosenDay } from './calendrier/day'
 import { NewSessionForm } from './calendrier/new-session'
@@ -18,14 +19,13 @@ import './calendrier/calendrier.css'
 // E.g. "novembre 2026".
 const monthFormat = new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
-// The calendar last read, and the days it was read for, and why the last request failed, if it did.
-type Reads = { last: { from: string; to: string; calendar: Calendar } | null; error: string | null }
-
 // Reads the calendar of the days from `from` to `to`, again whenever they change, and when the tab is shown again, at
 // most once a minute, and tells the menu's badge how many conflicts there are. Only the last request's answer counts.
-function useCalendar(from: string, to: string): Reads {
-  const [reads, setReads] = useState<Reads>({ last: null, error: null })
-  const shown = useTabShownCount()
+// Returns the calendar last read, whatever its days, the one read for these days, once it is, and why the last request
+// failed, if it did.
+function useCalendar(from: string, to: string): { last: Calendar | null; shown: Calendar | null; error: string | null } {
+  const [reads, setReads] = useState<{ read: { from: string; to: string; calendar: Calendar } | null; error: string | null }>({ read: null, error: null })
+  const tabShown = useTabShownCount()
   const report = useReportConflicts()
 
   useEffect(() => {
@@ -33,15 +33,16 @@ function useCalendar(from: string, to: string): Reads {
     api.GET('/api/admin/calendar', { params: { query: { from, to } } }).then((result) => {
       if (cancelled) return
       if (!result.ok) return setReads((reads) => ({ ...reads, error: result.error }))
-      setReads({ last: { from, to, calendar: result }, error: null })
+      setReads({ read: { from, to, calendar: result }, error: null })
       report(result.conflicts.length)
     })
     return () => {
       cancelled = true
     }
-  }, [from, to, shown, report])
+  }, [from, to, tabShown, report])
 
-  return reads
+  const { read, error } = reads
+  return { last: read?.calendar ?? null, shown: read && read.from === from && read.to === to ? read.calendar : null, error }
 }
 
 export function Calendrier() {
@@ -49,13 +50,14 @@ export function Calendrier() {
   const today = quebecDayAndTime(new Date()).day
   const day = readDay(params.get('day'))
   const month = readMonth(params.get('month')) ?? monthOf(day ?? today)
-  const chosen = day !== null && gridDays(month).includes(day) ? day : null
+  const grid = gridDays(month)
+  const chosen = day !== null && grid.includes(day) ? day : null
   const issuesOpen = params.get('issues') === 'open'
-  const { from, to } = gridRange(month)
-  const { last, error } = useCalendar(from, to)
+  const { from, to } = gridRange(grid)
+  const reads = useCalendar(from, to)
   // Only a calendar read for the month's days is shown in it.
-  const current = last && last.from === from && last.to === to ? last.calendar : null
-  const days = useMemo(() => current && calendarDays(current, month), [current, month])
+  // With the grid of its own, which depends on the month alone, unlike `grid`, which is made again on each render.
+  const days = useMemo(() => reads.shown && calendarDays(reads.shown, gridDays(month)), [reads.shown, month])
   const monthNameId = useId()
 
   // The day the form for a new session was opened on, which shows while it's the chosen day. Choosing another day, or
@@ -88,14 +90,14 @@ export function Calendrier() {
   return (
     <>
       <h1>Calendrier</h1>
-      {error !== null && (
+      {reads.error !== null && (
         <p className="admin-error" role="alert">
-          Le calendrier n'a pas pu être chargé&nbsp;: {error}
+          Le calendrier n'a pas pu être chargé&nbsp;: {reads.error}
         </p>
       )}
-      {last && (
+      {reads.last && (
         <Issues
-          calendar={last.calendar}
+          calendar={reads.last}
           open={issuesOpen}
           onToggle={() => change({ issues: issuesOpen ? null : 'open' }, { replace: true })}
           onShowDay={(shown) => {
@@ -130,6 +132,7 @@ export function Calendrier() {
       <Month
         key={month}
         month={month}
+        grid={grid}
         nameId={monthNameId}
         today={today}
         chosen={chosen}
@@ -145,7 +148,7 @@ export function Calendrier() {
         <ChosenDay
           day={chosen}
           today={today}
-          shown={days?.get(chosen) ?? null}
+          entries={days?.get(chosen) ?? null}
           onClose={() => {
             focusNext.current = `.calendar-month [data-day="${chosen}"]`
             choose(null)

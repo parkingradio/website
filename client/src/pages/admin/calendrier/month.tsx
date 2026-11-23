@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { LAST_DAY, WHOLE_DAY, gridDays, isFree, monthOf } from './model'
+import { LAST_DAY, isFree, monthOf } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationCalendar, OccupationTitle, SessionTitle } from './things'
 
@@ -16,6 +16,8 @@ const MOVES: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -
 
 type MonthProps = {
   month: string
+  // The days of its grid.
+  grid: string[]
   // The id of the month's name, which names the table.
   nameId: string
   today: string
@@ -30,8 +32,7 @@ type MonthProps = {
 
 // The grid is one stop for the keyboard, its days' buttons: the one with the focus, or else the chosen day, or else today,
 // or else the month's first day. Tab from it goes to its "+", if it has one, which the arrows move from as from its day.
-export function Month({ month, nameId, today, chosen, days, onChoose, onAdd }: MonthProps) {
-  const grid = gridDays(month)
+export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAdd }: MonthProps) {
   const id = useId()
   const [focused, setFocused] = useState<string | null>(null)
   const stop = focused ?? chosen ?? (grid.includes(today) ? today : `${month}-01`)
@@ -76,7 +77,7 @@ export function Month({ month, nameId, today, chosen, days, onChoose, onAdd }: M
               const classes = [
                 !inMonth && 'calendar-other-month',
                 day === chosen && 'calendar-chosen',
-                entries.some((entry) => isFree(entry) && entry.part === WHOLE_DAY) && 'calendar-available',
+                entries.some((entry) => isFree(entry) && entry.wholeDay) && 'calendar-available',
               ]
               // The day's button and its "+", which are both its stop, and move with the arrows.
               const stopProps = { tabIndex: day === stop ? 0 : -1, onFocus: () => setFocused(day), onKeyDown: (event: KeyboardEvent) => onKeyDown(event, day) }
@@ -131,7 +132,7 @@ function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
       {entries.map((entry, i) =>
         isFree(entry) ? (
           <li key={i} className="calendar-free">
-            {entry.part === WHOLE_DAY ? 'disponible' : `dispo ${entry.part}`}
+            {entry.wholeDay ? 'disponible' : `dispo ${entry.part}`}
           </li>
         ) : (
           <MonthThing key={i} dayThing={entry} />
@@ -143,8 +144,8 @@ function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
 
 // A thing, in a day of the month: its part of the day, and what it is, after its kind for screen readers, and "conflit"
 // when one of its conflicts is on that day.
-function MonthThing({ dayThing: { thing, part, conflictsWith } }: { dayThing: DayThing }) {
-  const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`, conflictsWith.length > 0 && 'calendar-conflict']
+function MonthThing({ dayThing: { thing, part, conflicts } }: { dayThing: DayThing }) {
+  const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && `admin-status-${thing.status}`, conflicts.length > 0 && 'calendar-conflict']
   // A session's performers, which screen readers read after ", avec", or an occupation's calendar, after its title.
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   const detail = performers ? (
@@ -162,7 +163,7 @@ function MonthThing({ dayThing: { thing, part, conflictsWith } }: { dayThing: Da
         {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} inMonth /> : <OccupationTitle title={thing.title} calendar={thing.calendar} />}
       </span>
       {detail && <span className="calendar-detail">{detail}</span>}
-      {conflictsWith.length > 0 && <span className="calendar-conflict-tag">conflit</span>}
+      {conflicts.length > 0 && <span className="calendar-conflict-tag">conflit</span>}
     </li>
   )
 }

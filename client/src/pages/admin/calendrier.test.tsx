@@ -219,23 +219,19 @@ describe('Calendrier', () => {
       expect(cell('2026-11-22').querySelectorAll('.calendar-conflict')).toHaveLength(2)
     })
 
-    it('shows free time from today on, in the month, on the days on which no session starts, outside what takes them', async () => {
+    it("shows the free time of the month's own days, a day that nothing takes as available", async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
       renderAt('/admin/calendrier')
       await loaded()
 
       const free = (day: string) => [...cell(day).querySelectorAll('.calendar-free')].map((tag) => tag.textContent)
-      expect(free('2026-11-18')).toEqual([])
       expect(free('2026-11-19')).toEqual(['disponible'])
       expect(cell('2026-11-19')).toHaveClass('calendar-available')
-      expect(free('2026-11-20')).toEqual(["dispo jusqu'à 15 h"])
-      expect(free('2026-11-21')).toEqual([])
-      expect(free('2026-11-22')).toEqual(['dispo dès 11 h'])
-      // A cancelled session doesn't take the studio.
-      expect(free('2026-11-24')).toEqual(['disponible'])
-      // Around an occupation.
       expect(free('2026-11-26')).toEqual(["dispo jusqu'à 10 h", 'dispo dès 16 h'])
+      expect(cell('2026-11-26')).not.toHaveClass('calendar-available')
+      // Not that of the month after, which the model has (see model.test.ts).
       expect(free('2026-12-05')).toEqual([])
+      expect(cell('2026-12-05')).not.toHaveClass('calendar-available')
     })
   })
 
@@ -655,7 +651,9 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier?day=2026-11-24')
       await loaded()
       // After the day's free time, which a cancelled session doesn't take.
-      expect(within(chosenDay()!).getAllByRole('listitem').map((row) => row.className)).toEqual(['calendar-row', 'calendar-row admin-status-cancelled'])
+      const [stretch, cancelled] = within(chosenDay()!).getAllByRole('listitem')
+      expect(stretch).toHaveTextContent(/^disponible/)
+      expect(cancelled).toHaveClass('calendar-row', 'admin-status-cancelled')
     })
 
     it('says when there is nothing to settle, and warns of the feeds that were not read', async () => {

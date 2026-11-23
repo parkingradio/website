@@ -1,27 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { api } from '../../api/client'
+import { useTabShownCount } from '../../api/use-tab-shown'
 import { quebecDayAndTime } from '../../quebec-time'
 
 // The number of conflicts that the menu's badge on "calendrier" shows (see docs/design/client/admin/layout.md).
-
-const MINUTE_MS = 60 * 1000
-
-// A counter that's bumped each time the browser's tab is shown again, at most once a minute, e.g. to read something
-// again.
-export function useTabShownCount(): number {
-  const [count, setCount] = useState(0)
-  useEffect(() => {
-    let last = Date.now()
-    const onChange = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - last < MINUTE_MS) return
-      last = Date.now()
-      setCount((count) => count + 1)
-    }
-    document.addEventListener('visibilitychange', onChange)
-    return () => document.removeEventListener('visibilitychange', onChange)
-  }, [])
-  return count
-}
 
 // What Calendrier tells the badge the number of conflicts is, each time it reads the calendar. Nothing outside the
 // layout, e.g. in tests of the page alone.
@@ -37,7 +19,7 @@ const onCalendar = (pathname: string) => ['/admin', '/admin/calendrier'].include
 // it stays as it was.
 export function useConflictCount(pathname: string): [number | null, (count: number) => void] {
   const [count, setCount] = useState<number | null>(null)
-  const shown = useTabShownCount()
+  const tabShown = useTabShownCount()
   const skipped = onCalendar(pathname)
 
   useEffect(() => {
@@ -50,7 +32,7 @@ export function useConflictCount(pathname: string): [number | null, (count: numb
     return () => {
       cancelled = true
     }
-  }, [pathname, skipped, shown])
+  }, [pathname, skipped, tabShown])
 
   return [count, setCount]
 }

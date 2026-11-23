@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, checkSessionOnDay, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey } from './model'
-import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed, NewSessionOnDay } from './model'
+import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
+import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
@@ -25,10 +25,10 @@ describe('the grid', () => {
   })
 
   it('asks the server only for the days it takes', () => {
-    expect(gridRange('2026-11')).toEqual({ from: '2026-11-01', to: '2026-12-05' })
+    expect(gridRange(gridDays('2026-11'))).toEqual({ from: '2026-11-01', to: '2026-12-05' })
     // 2000-01-01 is a Saturday, and 2999-12-31 a Tuesday.
-    expect(gridRange('2000-01')).toEqual({ from: '2000-01-01', to: '2000-02-05' })
-    expect(gridRange('2999-12')).toEqual({ from: '2999-12-01', to: '2999-12-31' })
+    expect(gridRange(gridDays('2000-01'))).toEqual({ from: '2000-01-01', to: '2000-02-05' })
+    expect(gridRange(gridDays('2999-12'))).toEqual({ from: '2999-12-01', to: '2999-12-31' })
   })
 
   it('goes from month to month', () => {
@@ -180,7 +180,7 @@ describe('the days of the month', () => {
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
-  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), '2026-11')
+  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), gridDays('2026-11'))
 
   it('have what takes them, by start, then end, with their names', () => {
     expect(thingsOn(days.get('2026-11-21')!).map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
@@ -193,7 +193,7 @@ describe('the days of the month', () => {
   })
 
   it('say "conflit" only on the days the overlap takes', () => {
-    const conflicts = (day: string) => thingsOn(days.get(day)!).map(({ conflictsWith }) => conflictsWith.map((other) => other.kind))
+    const conflicts = (day: string) => thingsOn(days.get(day)!).map(({ conflicts }) => conflicts.map(({ other }) => other.kind))
     expect(conflicts('2026-11-20')).toEqual([[]])
     expect(conflicts('2026-11-21')).toEqual([['session'], ['occupation']])
     expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
@@ -203,8 +203,16 @@ describe('the days of the month', () => {
     expect(days.get('2026-11-22')!.map(({ part }) => part)).toEqual(["jusqu'à 11 h", "jusqu'à 1 h", 'dès 11 h'])
     // A thing before a stretch that starts when it does: a cancelled session, which doesn't take the studio.
     const cancelled = session('off', '2026-11-23T22:00:00-05:00', '2026-11-24T02:00:00-05:00', 'cancelled')
-    const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11')
+    const shown = calendarDays(calendar({ sessions: [cancelled] }), gridDays('2026-11'))
     expect(shown.get('2026-11-24')!.map(({ part }) => part)).toEqual(["jusqu'à 2 h", 'toute la journée'])
+  })
+
+  it('come from each thing with every one of its conflicts, whatever days they take', () => {
+    const [stayed, played, repaired] = thingsWithConflicts(calendar({ sessions: [late], occupations: [repair, stay], conflicts: [conflict] }))
+    expect([stayed.thing.kind, played.thing.kind, repaired.thing.kind]).toEqual(['occupation', 'session', 'occupation'])
+    expect(stayed.conflicts).toEqual([{ conflict, other: { kind: 'session', id: 'late', title: 'LATE', status: 'planned' } }])
+    expect(played.conflicts).toEqual([{ conflict, other: { kind: 'occupation', title: null, calendar: 'Séjours' } }])
+    expect(repaired.conflicts).toEqual([])
   })
 
   it('name each other thing once, for things that are the same', () => {
@@ -215,8 +223,8 @@ describe('the days of the month', () => {
       { start: late.start!, end: late.end!, things: [stays[0], sessionThing(late)] },
       { start: late.start!, end: late.end!, things: [stays[1], sessionThing(late)] },
     ]
-    const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), '2026-11')
-    const lines = thingsOn(shown.get('2026-11-21')!).map(({ conflictsWith }) => conflictsWith.map(inSentence))
+    const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), gridDays('2026-11'))
+    const lines = thingsOn(shown.get('2026-11-21')!).map(({ conflicts }) => conflicts.map(({ other }) => inSentence(other)))
     expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
   })
 
@@ -227,7 +235,7 @@ describe('the days of the month', () => {
     expect(free('2026-11-19')).toEqual(['toute la journée'])
     // In the month after too, as in its own month's grid.
     expect(free('2026-12-01')).toEqual(['toute la journée'])
-    expect(freeOf(calendarDays(calendar({}), '2026-12').get('2026-12-01')!)).toEqual(['toute la journée'])
+    expect(freeOf(calendarDays(calendar({}), gridDays('2026-12')).get('2026-12-01')!)).toEqual(['toute la journée'])
     // The stay starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // A session starts.
@@ -242,68 +250,23 @@ describe('the days of the month', () => {
 
   it('have free time around an occupation that starts on them', () => {
     const repairs = [{ feedId: 'o', start: '2026-11-24T10:00:00-05:00', end: '2026-11-24T16:00:00-05:00', wholeDay: false, title: '' }]
-    const shown = calendarDays(calendar({ occupations: repairs }), '2026-11')
+    const shown = calendarDays(calendar({ occupations: repairs }), gridDays('2026-11'))
     expect(freeOf(shown.get('2026-11-24')!)).toEqual(["jusqu'à 10 h", 'dès 16 h'])
     // In order of time, with what takes the day.
     expect(shown.get('2026-11-24')!.map(({ part }) => part)).toEqual(["jusqu'à 10 h", '10 h – 16 h', 'dès 16 h'])
     // Today's stretches count from 00:00 too.
-    expect(freeOf(calendarDays(calendar({ occupations: repairs, today: '2026-11-24' }), '2026-11').get('2026-11-24')!)).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    expect(freeOf(calendarDays(calendar({ occupations: repairs, today: '2026-11-24' }), gridDays('2026-11')).get('2026-11-24')!)).toEqual(["jusqu'à 10 h", 'dès 16 h'])
   })
 
   it("don't count cancelled sessions", () => {
     const cancelled = session('off', '2026-11-23T20:00:00-05:00', '2026-11-23T23:00:00-05:00', 'cancelled')
-    const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11')
+    const shown = calendarDays(calendar({ sessions: [cancelled] }), gridDays('2026-11'))
     expect(freeOf(shown.get('2026-11-23')!)).toEqual(['toute la journée'])
     expect(thingsOn(shown.get('2026-11-23')!)).toHaveLength(1)
   })
 
   it("have free time only in the 365 days from the server's today", () => {
-    expect(freeOf(calendarDays(calendar({}), '2027-11').get('2027-11-18')!)).toEqual(['toute la journée'])
-    expect(freeOf(calendarDays(calendar({}), '2027-11').get('2027-11-19')!)).toEqual([])
-  })
-})
-
-describe('a new session on a day', () => {
-  const on = (day: string, start: string, end: string, changes: Partial<NewSessionOnDay> = {}) =>
-    checkSessionOnDay(day, { start, end, type: 'guest-mixes', takeover: null, name: '', ...changes })
-
-  it('ends on the day when its end is after its start, and otherwise the next day', () => {
-    expect(on('2026-11-21', '19:00', '23:00').fields).toMatchObject({ start: '2026-11-21T19:00-05:00', durationMinutes: 240 })
-    expect(on('2026-11-21', '21:00', '01:00').fields).toMatchObject({ start: '2026-11-21T21:00-05:00', durationMinutes: 240 })
-    // Equal times are refused, as the session form refuses them.
-    expect(on('2026-11-21', '21:00', '21:00').errors).toEqual({ end: 'La fin doit être après le début.' })
-    expect(on('2026-11-21', '', '').errors).toEqual({ start: "Indiquez l'heure de début.", end: "Indiquez l'heure de fin." })
-  })
-
-  it('follows the clocks', () => {
-    // The first 1 h, as the clocks go back.
-    expect(on('2026-10-31', '21:00', '01:00').fields).toMatchObject({ start: '2026-10-31T21:00-04:00', durationMinutes: 240 })
-    // Equal times, though the second 1 h 30 is after the first.
-    expect(on('2026-11-01', '01:30', '01:30').errors).toEqual({ end: 'La fin doit être après le début.' })
-    // An earlier time is the next day's, even when it's also later that night.
-    expect(on('2026-11-01', '01:30', '01:15').fields).toMatchObject({ start: '2026-11-01T01:30-04:00', durationMinutes: 1485 })
-    // A time they skip, as they go forward.
-    expect(on('2027-03-13', '23:00', '02:30').errors).toEqual({ end: "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été." })
-    // Within the years 2000 to 2999, in UTC.
-    expect(on('2999-12-31', '18:00', '20:00').errors).toEqual({ endDay: 'Une session a lieu entre les années 2000 et 2999.' })
-  })
-
-  it('sends only what it has, and only a takeover its collective, and "Autre" its name', () => {
-    const collective = { id: 'collective-1', name: 'Haute Rive' }
-    expect(on('2026-11-21', '21:00', '01:00', { type: 'takeover', takeover: collective, name: 'SOIRÉE' }).fields).toEqual({
-      start: '2026-11-21T21:00-05:00',
-      durationMinutes: 240,
-      type: 'takeover',
-      takeover: 'collective-1',
-      application: null,
-      name: '',
-      raEvent: null,
-      description: '',
-    })
-    expect(on('2026-11-21', '21:00', '01:00', { type: 'other', takeover: collective, name: ' ATELIER ' }).fields).toMatchObject({ type: 'other', takeover: null, name: 'ATELIER' })
-    expect(on('2026-11-21', '21:00', '01:00', { type: 'other' }).errors).toEqual({ name: 'Indiquez le nom de la session.' })
-    // A name that's too long, but isn't shown, doesn't keep it from being sent.
-    expect(on('2026-11-21', '21:00', '01:00', { name: 'x'.repeat(101) }).errors).toBeUndefined()
-    expect(on('2026-11-21', '21:00', '01:00', { type: null }).errors).toEqual({ type: 'Choisissez le type de la session.' })
+    expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-18')!)).toEqual(['toute la journée'])
+    expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-19')!)).toEqual([])
   })
 })

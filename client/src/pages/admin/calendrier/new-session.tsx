@@ -8,8 +8,8 @@ import { FormActions, Labeled } from '../fields'
 import { CollectivesFailure } from '../profile-details'
 import { failure, sessionPath } from '../session-errors'
 import { NameField, TakeoverField, TypeField } from '../session-form'
-import { checkSessionOnDay } from './model'
-import type { NewSessionOnDay } from './model'
+import { checkSessionOnDay } from './new-session-fields'
+import type { NewSessionOnDay } from './new-session-fields'
 
 // A short form for a new session on the chosen day, `day`, under its things, which adds it without sets, then goes to
 // its page (see "A new session" in docs/design/client/admin/calendrier.md). It's checked as the session form checks it,
@@ -28,7 +28,6 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
   const [values, setValues] = useState(EMPTY)
   const update = (changes: Partial<NewSessionOnDay>) => setValues((values) => ({ ...values, ...changes }))
   const checked = checkSessionOnDay(day, values)
-  const { form, times } = checked
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(checked.errors ?? {}, async () => {
     // There are fields, since there are no errors by then.
     const result = await api.POST('/api/admin/sessions', { body: { session: checked.fields! }, bodySerializer: formData })
@@ -40,7 +39,6 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
   // The years' errors are about the days: the chosen day, and the one the session ends on.
   const startError = shown('day') ?? shown('start')
   const endError = shown('endDay') ?? shown('end')
-  const lasts = 'start' in times && times.start ? times.durationMinutes : null
   return (
     <form ref={formRef} className="admin-form calendar-new" aria-labelledby={headingId} onSubmit={submit} noValidate>
       <h3 id={headingId} ref={heading} className="calendar-heading" tabIndex={-1}>
@@ -67,10 +65,10 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
           />
         </Labeled>
       </div>
-      {lasts !== null && (
+      {checked.durationMinutes !== null && (
         <p className="admin-hint" role="status">
-          Dure {formatDuration(lasts)}
-          {form.endDay !== day && ", jusqu'au lendemain"}.
+          Dure {formatDuration(checked.durationMinutes)}
+          {checked.endsNextDay && ", jusqu'au lendemain"}.
         </p>
       )}
       <TypeField type={values.type} onChange={(type) => update({ type })} error={shown('type')} onLeave={leave('type')} />
@@ -83,7 +81,7 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
           onLeave={leave('takeover')}
         />
       )}
-      {values.type === 'other' && <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />}
+      {values.type === 'other' && <NameField name={values.name} type={values.type} takeover={values.takeover} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />}
       <FormActions error={error} busy={busy} submitLabel="créer" onCancel={onCancel} />
     </form>
   )

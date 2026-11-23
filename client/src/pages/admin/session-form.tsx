@@ -149,7 +149,7 @@ export function SessionForm({
           </>
         )}
 
-        <NameField form={form} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
+        <NameField name={form.name} type={form.type} takeover={form.takeover} onChange={(name) => update({ name })} error={shown('name')} onLeave={leave('name')} />
 
         <DescriptionField form={form} onChange={(description) => update({ description })} error={shown('description')} onLeave={leave('description')} />
 
@@ -358,12 +358,19 @@ export function TakeoverField({
 
 // The session's own name, which a session of type "other" needs, and which replaces the one the other types give it,
 // which the empty field shows.
-export function NameField({ form, onChange, error, onLeave }: GroupProps<string> & { form: SessionFormValues }) {
-  const placeholder = (form.type && typeName(form.type, form.takeover)) ?? (form.type === 'takeover' ? 'NOM DU COLLECTIF TAKEOVER' : 'p. ex. LISTENING PARTY')
+export function NameField({
+  name,
+  type,
+  takeover,
+  onChange,
+  error,
+  onLeave,
+}: GroupProps<string> & { name: string; type: SessionType | null; takeover: Reference | null }) {
+  const placeholder = (type && typeName(type, takeover)) ?? (type === 'takeover' ? 'NOM DU COLLECTIF TAKEOVER' : 'p. ex. LISTENING PARTY')
   return (
     <Labeled label="Nom" error={error}>
       <input
-        value={form.name}
+        value={name}
         placeholder={placeholder}
         aria-invalid={error ? true : undefined}
         onChange={(event) => onChange(event.target.value)}

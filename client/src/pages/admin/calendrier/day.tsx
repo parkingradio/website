@@ -11,13 +11,13 @@ type ChosenDayProps = {
   day: string
   today: string
   // What's on it, once the calendar is read for the month's days, or else null.
-  shown: CalendarDay | null
+  entries: CalendarDay | null
   onClose: () => void
   // Under what's on it, e.g. the form for a new session.
   children?: ReactNode
 }
 
-export function ChosenDay({ day, today, shown, onClose, children }: ChosenDayProps) {
+export function ChosenDay({ day, today, entries, onClose, children }: ChosenDayProps) {
   const headingId = useId()
   return (
     <section className="calendar-day" aria-labelledby={headingId}>
@@ -38,12 +38,12 @@ export function ChosenDay({ day, today, shown, onClose, children }: ChosenDayPro
           ×
         </button>
       </div>
-      {shown &&
-        (shown.length === 0 ? (
+      {entries &&
+        (entries.length === 0 ? (
           <p className="admin-placeholder">Rien ce jour-là.</p>
         ) : (
           <ul className="calendar-rows">
-            {shown.map((entry, i) =>
+            {entries.map((entry, i) =>
               isFree(entry) ? (
                 <li key={i} className="calendar-row">
                   <span className="calendar-row-kind calendar-free">disponible</span>
@@ -61,12 +61,11 @@ export function ChosenDay({ day, today, shown, onClose, children }: ChosenDayPro
 }
 
 // A thing on the chosen day: its kind, its times in full, what it is, and its conflicts on that day.
-function ThingRow({ day, dayThing: { thing, conflictsWith } }: { day: string; dayThing: DayThing }) {
+function ThingRow({ day, dayThing: { thing, conflicts } }: { day: string; dayThing: DayThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
-  const status = thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`
   return (
-    <li className={status ? `calendar-row ${status}` : 'calendar-row'}>
-      <span className={`calendar-row-kind calendar-${thing.kind}${conflictsWith.length > 0 ? ' calendar-conflict' : ''}`}>{THING_KIND_LABELS[thing.kind]}</span>
+    <li className={thing.kind === 'session' ? `calendar-row admin-status-${thing.status}` : 'calendar-row'}>
+      <span className={`calendar-row-kind calendar-${thing.kind}${conflicts.length > 0 ? ' calendar-conflict' : ''}`}>{THING_KIND_LABELS[thing.kind]}</span>
       <span>{fullTimes(thing, day)}</span>
       <span>
         {thing.kind === 'session' ? (
@@ -77,7 +76,7 @@ function ThingRow({ day, dayThing: { thing, conflictsWith } }: { day: string; da
         ) : (
           <OccupationLabel title={thing.title} calendar={thing.calendar} />
         )}
-        {conflictsWith.map((other, i) => (
+        {conflicts.map(({ other }, i) => (
           <span key={i} className="calendar-conflict-line">
             conflit avec {inSentence(other)}
           </span>
