@@ -5,13 +5,14 @@ import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
 import { LinkTaken } from './feeds.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
 import { FeedName, Link, PrivateTitles } from './fields.js'
-import type { CalendarReads, FeedToRead, SuccessfulRead } from './reads.js'
+import { readAsOf } from './reads.js'
+import type { CalendarReads, FeedRead, FeedToRead, SuccessfulRead } from './reads.js'
 
 // The calendar feeds that the studio's occupations are read from (see docs/design/server/calendar.md). Their links are
 // secrets, which only the admin pages get: they're never logged, since requests' bodies never are, and the errors of
 // reading a link are the server's own (see fetch.ts), and the MCP server's tools never give them (see mcp/tools.ts).
 
-const Feed = z
+export const Feed = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -37,26 +38,34 @@ const linkTaken = (feed: Pick<StoredFeed, 'name'> | null): ApiError => ({
   error: feed ? `The feed "${feed.name}" already has this link` : 'Another feed already has this link',
 })
 
+// What was read from `feed` as it is now (see "Reading the feeds" in docs/design/server/calendar.md): nothing when it was
+// read from another link, e.g. on a server that hasn't taken in a change of link yet, and no titles when they're private.
+export const currentRead = (feed: StoredFeed, reads: CalendarReads) => readAsOf(reads.of(feed.id), feed)
+
+// A feed, as the endpoints give it, with `read`, what was read from it as it is now, if anything (see `currentRead`).
+export function feedBody(
+  { id, name, link, privateTitles, createdBy, createdAt, updatedBy, updatedAt }: StoredFeed,
+  read: FeedRead | undefined,
+): z.infer<typeof Feed> {
+  return {
+    id,
+    name,
+    link,
+    privateTitles,
+    createdBy,
+    createdAt: createdAt.toISOString(),
+    updatedBy,
+    updatedAt: updatedAt?.toISOString() ?? null,
+    readAt: read?.readAt?.toISOString() ?? null,
+    error: read?.error ?? null,
+  }
+}
+
 type Options = { feeds: CalendarFeedsStore; reads: CalendarReads }
 
 export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }: Options) {
   const api = zodRoutes(app)
-
-  function feed({ id, name, link, privateTitles, createdBy, createdAt, updatedBy, updatedAt }: StoredFeed): z.infer<typeof Feed> {
-    const read = reads.of(id)
-    return {
-      id,
-      name,
-      link,
-      privateTitles,
-      createdBy,
-      createdAt: createdAt.toISOString(),
-      updatedBy,
-      updatedAt: updatedAt?.toISOString() ?? null,
-      readAt: read?.readAt?.toISOString() ?? null,
-      error: read?.error ?? null,
-    }
-  }
+  const feed = (stored: StoredFeed) => feedBody(stored, currentRead(stored, reads))
 
   // Reads the link of a feed that's added or changed, or says why it can't be read.
   async function readFeed(toRead: FeedToRead): Promise<SuccessfulRead | { status: 400 | 502; error: ApiError }> {

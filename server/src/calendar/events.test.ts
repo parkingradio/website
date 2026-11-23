@@ -140,6 +140,40 @@ describe('calendarEvents', () => {
     it('take the studio even when they say they are free', () => {
       expect(one('DTSTART;VALUE=DATE:20261123', 'TRANSP:TRANSPARENT')).toHaveLength(1)
     })
+
+    it('are whole-day, unlike timed events, even those from 00:00 to 00:00, and so are their occurrences', () => {
+      const wholeDays = (...parts: string[][]) => read(feed(TORONTO, ...parts)).events.map(({ start, wholeDay }) => [start.toISOString(), wholeDay])
+      expect(wholeDays(vevent('DTSTART;VALUE=DATE:20261123'))).toEqual([['2026-11-23T05:00:00.000Z', true]])
+      expect(wholeDays(vevent('DTSTART;TZID=America/Toronto:20261123T000000', 'DTEND;TZID=America/Toronto:20261124T000000'))).toEqual([['2026-11-23T05:00:00.000Z', false]])
+      expect(wholeDays(vevent('DTSTART;VALUE=DATE:20261123', 'RRULE:FREQ=DAILY;COUNT=2'))).toEqual([
+        ['2026-11-23T05:00:00.000Z', true],
+        ['2026-11-24T05:00:00.000Z', true],
+      ])
+    })
+
+    it('follow their own DTSTART when an occurrence is changed on its own', () => {
+      const wholeDays = (...parts: string[][]) => read(feed(TORONTO, ...parts)).events.map(({ start, end, wholeDay }) => [start.toISOString(), end.toISOString(), wholeDay])
+      // A whole-day occurrence that's made timed.
+      expect(
+        wholeDays(
+          vevent('UID:days', 'DTSTART;VALUE=DATE:20261123', 'RRULE:FREQ=DAILY;COUNT=2'),
+          vevent('UID:days', 'RECURRENCE-ID;VALUE=DATE:20261124', 'DTSTART;TZID=America/Toronto:20261124T100000', 'DTEND;TZID=America/Toronto:20261124T120000'),
+        ),
+      ).toEqual([
+        ['2026-11-23T05:00:00.000Z', '2026-11-24T05:00:00.000Z', true],
+        ['2026-11-24T15:00:00.000Z', '2026-11-24T17:00:00.000Z', false],
+      ])
+      // A timed occurrence that's made whole-day.
+      expect(
+        wholeDays(
+          vevent('UID:times', 'DTSTART;TZID=America/Toronto:20261123T100000', 'DTEND;TZID=America/Toronto:20261123T120000', 'RRULE:FREQ=DAILY;COUNT=2'),
+          vevent('UID:times', 'RECURRENCE-ID;TZID=America/Toronto:20261124T100000', 'DTSTART;VALUE=DATE:20261124', 'DTEND;VALUE=DATE:20261125'),
+        ),
+      ).toEqual([
+        ['2026-11-23T15:00:00.000Z', '2026-11-23T17:00:00.000Z', false],
+        ['2026-11-24T05:00:00.000Z', '2026-11-25T05:00:00.000Z', true],
+      ])
+    })
   })
 
   describe('recurring events', () => {
@@ -209,8 +243,8 @@ describe('calendarEvents', () => {
         vevent(uid, 'RECURRENCE-ID;TZID=America/Toronto:20261215T190000', 'DTSTART;TZID=America/Toronto:20261215T190000', 'DTEND;TZID=America/Toronto:20261215T200000', 'STATUS:CANCELLED'),
       )
       expect(read(text).events).toEqual([
-        { start: new Date('2026-12-02T00:00:00Z'), end: new Date('2026-12-02T01:00:00Z'), title: 'Atelier' },
-        { start: new Date('2026-12-09T23:00:00Z'), end: new Date('2026-12-09T23:30:00Z'), title: 'Atelier déplacé' },
+        { start: new Date('2026-12-02T00:00:00Z'), end: new Date('2026-12-02T01:00:00Z'), wholeDay: false, title: 'Atelier' },
+        { start: new Date('2026-12-09T23:00:00Z'), end: new Date('2026-12-09T23:30:00Z'), wholeDay: false, title: 'Atelier déplacé' },
       ])
     })
 
@@ -303,7 +337,7 @@ describe('calendarEvents', () => {
   it('keeps the titles, unless they are private', () => {
     const text = feed(vevent('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z', 'SUMMARY:  Réparation du toit ', 'DESCRIPTION:Guest: Jane Doe', 'LOCATION:Studio'))
     expect(read(text).events[0].title).toBe('Réparation du toit')
-    expect(read(text, true).events[0]).toEqual({ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), title: null })
+    expect(read(text, true).events[0]).toEqual({ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), wholeDay: false, title: null })
     expect(read(feed(vevent('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z'))).events[0].title).toBe('')
   })
 

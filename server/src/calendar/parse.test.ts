@@ -30,7 +30,7 @@ describe('parseFeed', () => {
   it("gives the feed's events", async () => {
     const text = feed('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z', 'SUMMARY:Réparation du toit')
     expect(await parseFeed({ text, privateTitles: false, ...WINDOW })).toEqual({
-      events: [{ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), title: 'Réparation du toit' }],
+      events: [{ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), wholeDay: false, title: 'Réparation du toit' }],
       skipped: 0,
     })
     expect((await parseFeed({ text, privateTitles: true, ...WINDOW })).events[0].title).toBeNull()

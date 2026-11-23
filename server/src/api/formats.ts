@@ -89,6 +89,20 @@ export function inQuebecTime(instant: Date | string): string {
   return `${new Date(ms + offsetMs(offset)).toISOString().slice(0, 19)}${offset}`
 }
 
+// The day it is in Québec at `instant`, "YYYY-MM-DD".
+export const quebecDay = (instant: Date) => inQuebecTime(instant).slice(0, 'YYYY-MM-DD'.length)
+
+// The instant Québec's day `day`, "YYYY-MM-DD", starts at: 00:00, which always exists once, since the clocks change at
+// 2:00.
+export const dayStart = (day: string) => instantIn(null, `${day}T00:00`)
+
+// The day `days` days after `day`, "YYYY-MM-DD", or before it when `days` is negative, by the calendar: e.g. a day of 23
+// or 25 hours counts as one.
+export const addDays = (day: string, days: number) => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 'YYYY-MM-DD'.length)
+
+// How many days `to` is after `from`, both "YYYY-MM-DD".
+export const daysBetween = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / DAY_MS
+
 // An instant, as responses give it: an ISO 8601 string, which is written in Québec time (see `inQuebecTime`) whatever the
 // offset a route gives it with, e.g. a Date's `toISOString`. Every instant of every response is one, which is what makes
 // them all in Québec time, errors' included. It's for responses only: requests send instants that `dateTimeWith` checks,

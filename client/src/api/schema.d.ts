@@ -2666,6 +2666,23 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/admin/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
+        get: operations["get_calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/features": {
         parameters: {
             query?: never;
@@ -3385,6 +3402,23 @@ export interface components {
             redirect?: string;
             unknownClient?: boolean;
         };
+        CalendarConflict: {
+            /**
+             * Format: date-time
+             * @description When its two things start to overlap
+             */
+            start: string;
+            /**
+             * Format: date-time
+             * @description When its two things stop overlapping
+             */
+            end: string;
+            /** @description The two things that overlap, in their order */
+            things: [
+                components["schemas"]["CalendarThing"],
+                components["schemas"]["CalendarThing"]
+            ];
+        };
         CalendarFeed: {
             id: string;
             name: string;
@@ -3404,6 +3438,43 @@ export interface components {
             readAt: string | null;
             /** @description Why its last read failed, or null when it succeeded, or until it is read */
             error: string | null;
+        };
+        CalendarOccupation: {
+            /** @description The id of the feed it's read from, one of `feeds` */
+            feedId: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @description Whether it takes whole days */
+            wholeDay: boolean;
+            /** @description Its title, empty for none, or null when its feed's titles are private */
+            title: string | null;
+        };
+        CalendarThing: {
+            /** @constant */
+            kind: "session";
+            id: string;
+            /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+            title: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            status: components["schemas"]["SessionStatus"];
+        } | {
+            /** @constant */
+            kind: "occupation";
+            /** @description The id of the feed it's read from, one of `feeds` */
+            feedId: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @description Whether it takes whole days */
+            wholeDay: boolean;
+            /** @description Its title, empty for none, or null when its feed's titles are private */
+            title: string | null;
         };
         ChosenPlaylist: {
             url: string;
@@ -7016,6 +7087,76 @@ export interface operations {
                         total: number;
                         feeds: components["schemas"]["CalendarFeed"][];
                     };
+                };
+            };
+            /** @description Default Response */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Default Response */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_calendar: {
+        parameters: {
+            query: {
+                /** @description The first day, in Québec, e.g. "2026-11-01" */
+                from: string;
+                /** @description The last day, in Québec, included, e.g. "2026-11-30": at most 400 days from `from`, both included */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        ok: true;
+                        /**
+                         * Format: date
+                         * @description The day the conflicts are counted from: today, in Québec
+                         */
+                        today: string;
+                        /** @description Every feed, in the order they were added, with when each was last read, and why that failed */
+                        feeds: components["schemas"]["CalendarFeed"][];
+                        /** @description The sessions with a start that take some of the days, whatever their status, by start */
+                        sessions: components["schemas"]["Session"][];
+                        /** @description The occupations that take some of the days, by start, then end */
+                        occupations: components["schemas"]["CalendarOccupation"][];
+                        /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
+                        conflicts: components["schemas"]["CalendarConflict"][];
+                        /** @description The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for */
+                        undatedSessions: components["schemas"]["Session"][];
+                    };
+                };
+            };
+            /** @description Default Response */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

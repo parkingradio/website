@@ -241,7 +241,7 @@ function setBody(row: StoredSet): SetBody {
   }
 }
 
-function sessionBody(row: StoredSession): SessionBody {
+export function sessionBody(row: StoredSession): SessionBody {
   return {
     id: row.id,
     start: row.startAt?.toISOString() ?? null,

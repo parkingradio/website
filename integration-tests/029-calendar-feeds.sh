@@ -9,6 +9,7 @@
 # - a feed that's in the database is listed, with its link, and can be renamed and have its titles made private without
 #   being read, but a new link whose server can't be found fails with 502, without changing it; and it can be removed
 # - the links are never logged
+# - the calendar gives the sessions of its days, those without a date, and the feeds, and refuses more than 400 days
 # - in the image, the server's module that goes through a feed's text (calendar/parse.js) starts its process, gets its
 #   events back, and fails a feed that ical.js would go through without end, when its time is up, or it runs out of
 #   memory. That's checked with the module, in a process of its own, rather than through the server, which can only
@@ -97,6 +98,25 @@ request --header "Cookie: ${cookie}" --request DELETE "${URL}/${FEED}"
 expect_status 404
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains '"total":0'
+
+echo "  the calendar gives the sessions of its days, those without a date, and the feeds, and refuses more than 400 days"
+readonly CALENDAR="${BASE_URL}/api/admin/calendar"
+request "${CALENDAR}?from=2031-03-10&to=2031-03-10"
+expect_status 401
+# Years from now, and without a start, so that the sessions of other tests are in neither.
+sql "insert into sessions (id, created_by, start_at, duration_minutes, type, name, status)
+     values ('8a6d1f0e-2b3c-4d5e-8f70-112233445566', '${ADMIN_EMAIL}', '2031-03-10 23:00-04', 60, 'other', 'Atelier', 'cancelled'),
+            ('8a6d1f0e-2b3c-4d5e-8f70-112233445567', '${ADMIN_EMAIL}', null, 60, 'other', 'Sans date', 'planned')"
+request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2031-03-10"
+expect_status 200
+expect_body_contains '"feeds":[],"sessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445566"'
+expect_body_contains '"start":"2031-03-10T23:00:00-04:00","end":"2031-03-11T00:00:00-04:00"'
+expect_body_contains '"occupations":[],"conflicts":'
+expect_body_contains '"undatedSessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445567"'
+request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2032-04-13"
+expect_status 400
+expect_body_contains '{"ok":false,"error":"The calendar has at most 400 days, `from` and `to` included"}'
+sql "delete from sessions where id in ('8a6d1f0e-2b3c-4d5e-8f70-112233445566', '8a6d1f0e-2b3c-4d5e-8f70-112233445567')"
 
 echo "  the links are never logged"
 if docker logs --since "$since" "$CONTAINER" 2>&1 | grep -qF "$SECRET"; then fail "the server logged a feed's link"; fi

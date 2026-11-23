@@ -7,7 +7,7 @@ import type { CalendarFeedsStore, FeedChanges, NewFeed, StoredFeed } from './fee
 import { LinkTaken } from './feeds.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
 import type { CalendarReads, FeedRead, ReadSettings, SuccessfulRead } from './reads.js'
-import { calendarFeedsRoutes } from './routes.js'
+import { calendarFeedsRoutes } from './feeds-routes.js'
 
 // The endpoints of calendar feeds (see docs/design/server/calendar.md), with a fake store and fake reads.
 
@@ -53,7 +53,7 @@ const reads: CalendarReads = {
   stopped: async () => {},
 }
 
-const EVENTS = [{ start: new Date('2026-11-23T15:00:00Z'), end: new Date('2026-11-23T16:00:00Z'), title: 'Réparation' }]
+const EVENTS = [{ start: new Date('2026-11-23T15:00:00Z'), end: new Date('2026-11-23T16:00:00Z'), wholeDay: false, title: 'Réparation' }]
 
 async function buildApp(logs?: string[]) {
   const app = Fastify({ logger: logs ? { level: 'info', stream: { write: (line: string) => logs.push(line) } } : false })
@@ -113,6 +113,9 @@ describe('calendar feeds routes', () => {
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
       kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: LINK, privateTitles: false } })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" }] })
+      // What was read from another link isn't the feed's, e.g. on a server that hasn't taken in a change of link yet.
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: 'https://example.com/former.ics', privateTitles: false } })
+      expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
     })
 
     it('requires a session', async () => {

@@ -149,6 +149,7 @@ const store: SessionsStore = {
     return session
   }),
   ofApplications: async () => [],
+  forCalendar: async () => ({ given: [], others: [] }),
 }
 
 // Sessions' flyers, as the bucket would keep them.
