@@ -4,19 +4,21 @@ import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import { mockFetch } from '../../test-utils'
 
-// Who applications are emailed to, the SoundCloud app, the YouTube channel, the calendar feeds and the feature flags have
-// their own tests, in configuration/recipients.test.tsx, configuration/soundcloud.test.tsx, configuration/youtube.test.tsx,
-// configuration/calendar-feeds.test.tsx and configuration/features.test.tsx: these are for the section that gathers them.
+// Who applications are emailed to, the SoundCloud app, the YouTube channel, the Discord bot, the calendar feeds and the
+// feature flags have their own tests, in configuration/recipients.test.tsx, configuration/soundcloud.test.tsx,
+// configuration/youtube.test.tsx, configuration/discord.test.tsx, configuration/calendar-feeds.test.tsx and
+// configuration/features.test.tsx: these are for the section that gathers them.
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 // No flags, so that these tests don't depend on flags that are bound to be retired.
 const NO_FEATURES = { '/api/admin/features': { ok: true, features: [] } }
 // Nobody gets applications by email yet, as on a new server.
 const NO_RECIPIENTS = { '/api/admin/applications/recipients': { ok: true, recipients: [], updatedBy: null, updatedAt: null } }
-// No SoundCloud or YouTube credentials yet either.
+// No SoundCloud, YouTube or Discord credentials yet either.
 const NO_CREDENTIALS = {
   '/api/admin/radio/credentials': { ok: true, credentials: null },
   '/api/admin/video/credentials': { ok: true, credentials: null },
+  '/api/admin/chat/discord': { ok: true, credentials: null },
 }
 // No calendar feeds either.
 const NO_FEEDS = { '/api/admin/calendar/feeds': { ok: true, total: 0, feeds: [] } }
@@ -36,7 +38,7 @@ function renderAt(path: string) {
 }
 
 describe('The configuration section', () => {
-  it('shows who applications are emailed to, then the SoundCloud app, the YouTube channel, the calendar feeds and the feature flags', async () => {
+  it('shows who applications are emailed to, then the SoundCloud app, the YouTube channel, the chat, the calendar feeds and the feature flags', async () => {
     mockFetch(PAGE)
     renderAt('/admin/configuration')
 
@@ -45,13 +47,16 @@ describe('The configuration section', () => {
       'Envoi des candidatures par e-mail',
       'Connexion SoundCloud',
       'Connexion YouTube',
+      'Chat',
       'Calendriers externes',
       'Features',
     ])
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['Connexion Discord'])
     await screen.findByText('Aucune feature pour le moment.')
     await screen.findByRole('textbox', { name: "Adresse e-mail d'un destinataire" })
     await screen.findByRole('textbox', { name: 'Client ID' })
     await screen.findByRole('textbox', { name: 'ID de la chaîne' })
+    await screen.findByRole('textbox', { name: 'ID du salon Discord' })
     await screen.findByText('Aucun calendrier externe pour le moment.')
   })
 

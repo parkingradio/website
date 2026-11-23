@@ -31,6 +31,9 @@ import { sessionsStore } from './sessions/store.js'
 import { eventsStore } from './events/store.js'
 import { calendarFeedsStore } from './calendar/feeds.js'
 import { calendarReads } from './calendar/reads.js'
+import { discordCredentialsStore } from './chat/credentials.js'
+import { discord } from './chat/discord.js'
+import { discordStandIn } from './chat/stand-in.js'
 import { oauthStore } from './oauth/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
@@ -56,6 +59,8 @@ app.addHook('onClose', () => db.$client.end())
 app.addHook('onClose', async () => {
   await Promise.all(backgroundTasks.map((task) => task.stopped()))
 })
+
+if (config.chatStandIn) app.log.info('Using the stand-in for Discord (CHAT_STAND_IN)')
 
 try {
   await migrateDatabase(db)
@@ -88,6 +93,8 @@ await registerRoutes(app, {
   events: eventsStore(db),
   calendarFeeds,
   calendarReads: calendarFeedReads,
+  discord: config.chatStandIn ? discordStandIn : discord,
+  discordCredentials: discordCredentialsStore(db),
   oauth: oauthStore(db),
 })
 

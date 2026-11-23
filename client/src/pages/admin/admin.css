@@ -243,6 +243,16 @@
   color: #666;
 }
 
+/* A part of a section, e.g. "Connexion Discord" in Configuration's "Chat". */
+.admin-subheading {
+  margin: 1.5rem 0 0;
+  text-transform: uppercase;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
 /* Who did what and when, under what it's about. */
 .admin-meta {
   margin: 0.5rem 0 0;

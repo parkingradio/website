@@ -69,6 +69,7 @@ export const SCOPE_DESCRIPTIONS: Record<string, { text: string; except: string[]
       "choisir les destinataires de l'envoi des candidatures par e-mail",
       'changer la connexion SoundCloud',
       'changer la connexion YouTube',
+      'voir ou changer la connexion Discord du chat',
       'ajouter, modifier ou retirer les calendriers externes',
       'voir ou changer les features de la page Configuration',
       'voir, ajouter ou remplacer les photos et les flyers',

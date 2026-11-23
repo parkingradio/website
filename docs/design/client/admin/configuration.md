@@ -5,6 +5,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
+- "Chat": the chat, with "Connexion Discord": the Discord bot the server reaches it through, and its channel.
 - "Calendriers externes": the calendars that the studio's occupations are read from.
 - "Features": the feature flags.
 
@@ -47,6 +48,26 @@ one, and the key, whose field only shows dots in its place, since it's never sen
 asks YouTube whether it accepts the key and finds the channel, without saving them, and "enregistrer" saves them, which
 it only allows once they've been verified, each with a check mark like the SoundCloud app's.
 
+## Chat
+
+The chat, in parts, each under its own subheading. For now, there's only one: "Connexion Discord".
+
+### Connexion Discord
+
+The Discord bot the server reaches the chat through, and the channel it reaches (see
+[The Discord credentials](../../server/chat.md#the-discord-credentials)). It says that they're only checked and kept for
+now, and that the home page shows the chat through WidgetBot. It says that the bot's token is on its application's "Bot"
+page on Discord's developer portal, linking to it (`https://discord.com/developers/applications`), and that the channel's
+id is the second number in the channel's address, `https://discord.com/channels/<server id>/<channel id>`. It shows the
+bot's and the channel's names, e.g. "Bot « parking.chat » → #chat", which admin last changed them, and when, or, until
+they're entered, that there are none.
+
+Under that, a form replaces them, like the YouTube credentials, with the same buttons and check marks: "ID du salon
+Discord", filled in with the current one, and "Token du bot Discord", whose field only shows dots in its place, since
+it's never sent back.
+"vérifier" asks Discord whether they pass the check (see
+[The Discord credentials](../../server/chat.md#the-discord-credentials)), without saving them.
+
 ## Calendriers externes
 
 The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
@@ -83,6 +104,7 @@ retired flag is removed too.
   `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
 - `GET /api/admin/video/credentials`, `POST /api/admin/video/credentials/check` and
   `PUT /api/admin/video/credentials`, for "Connexion YouTube".
+- `GET /api/admin/chat/discord`, `POST /api/admin/chat/discord/check` and `PUT /api/admin/chat/discord`, for "Chat".
 - `GET /api/admin/calendar/feeds`, `POST /api/admin/calendar/feeds`, `PATCH /api/admin/calendar/feeds/:id` and
   `DELETE /api/admin/calendar/feeds/:id`, for "Calendriers externes".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".

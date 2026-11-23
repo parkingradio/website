@@ -225,5 +225,8 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`PATCH /api/admin/calendar/feeds/:id`](calendar.md#patch-apiadmincalendarfeedsid-admin) | admin | Changing a calendar feed's name or link, once a new link gives a calendar |
 | [`DELETE /api/admin/calendar/feeds/:id`](calendar.md#delete-apiadmincalendarfeedsid-admin) | admin | Removing a calendar feed, and forgetting what was read from it |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
+| [`GET /api/admin/chat/discord`](chat.md#get-apiadminchatdiscord-admin) | admin | The Discord bot the server reaches the chat through, and its channel |
+| [`PUT /api/admin/chat/discord`](chat.md#put-apiadminchatdiscord-admin) | admin | Entering the bot's token and the channel, once they pass the check with Discord |
+| [`POST /api/admin/chat/discord/check`](chat.md#post-apiadminchatdiscordcheck-admin) | admin | Whether a bot's token and a channel pass the check with Discord, without saving them |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

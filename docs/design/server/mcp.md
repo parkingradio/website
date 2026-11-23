@@ -75,9 +75,11 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   give someone access, or send applicants' personal data to someone.
   `GET /api/admin/applications/recipients` is a tool.
 - The endpoints that enter or check the credentials of the SoundCloud app (see
-  [The SoundCloud app](radio.md#the-soundcloud-app)) and of YouTube (see
-  [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
-  `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
+  [The SoundCloud app](radio.md#the-soundcloud-app)), of YouTube (see
+  [The YouTube credentials](video.md#the-youtube-credentials)) and of the chat's Discord bot (see
+  [The Discord credentials](chat.md#the-discord-credentials)), so that secrets aren't sent to the model's provider.
+  `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools, but
+  `GET /api/admin/chat/discord` isn't, since apps don't need it.
 - The endpoints that add, change and remove [calendar feeds](calendar.md#feeds): adding one, or changing it, can send
   its link, which is a secret (see [Calendar feeds' links](#results)), and a feed that's removed can only be added
   again with its link. `GET /api/admin/calendar/feeds` and `POST /api/admin/calendar/feeds/refresh`, which reads every

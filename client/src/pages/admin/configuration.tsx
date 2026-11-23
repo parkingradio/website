@@ -1,12 +1,13 @@
 import { CalendarFeeds } from './configuration/calendar-feeds'
+import { DiscordCredentials } from './configuration/discord'
 import { Features } from './configuration/features'
 import { Recipients } from './configuration/recipients'
 import { SoundCloudCredentials } from './configuration/soundcloud'
 import { YouTubeCredentials } from './configuration/youtube'
 
 // The settings that change what the site does: who applications are emailed to, the SoundCloud app the server reads
-// SoundCloud through, the YouTube channel it reads the site's video from, the calendars that the studio's occupations
-// are read from, and the feature flags.
+// SoundCloud through, the YouTube channel it reads the site's video from, the Discord bot it reaches the chat through,
+// the calendars that the studio's occupations are read from, and the feature flags.
 export function Configuration() {
   return (
     <>
@@ -20,6 +21,10 @@ export function Configuration() {
 
       <h2>Connexion YouTube</h2>
       <YouTubeCredentials />
+
+      <h2>Chat</h2>
+      <h3 className="admin-subheading">Connexion Discord</h3>
+      <DiscordCredentials />
 
       <h2>Calendriers externes</h2>
       <CalendarFeeds />

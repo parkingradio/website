@@ -330,3 +330,30 @@ test('a collective is added with an artist picked and one added by name, shown, 
 
   for (const id of [knownId, addedId]) expect((await page.request.delete(`/api/admin/artists/${id}`)).ok()).toBe(true)
 })
+
+// With the stand-in for Discord, which accepts any credentials in the right format (see "The chat" in the README). Tests
+// side by side save the same ones, so that each finds what it saved whatever the order.
+test("Discord's credentials are verified, then saved, and the token is never shown again", async ({ page }) => {
+  const token = 'MTA5ODc2NTQzMjEwOTg3NjU0Mw.Gabc12.e2e-secret'
+  await logIn(page, { at: '/admin/configuration' })
+  await expect(page.getByRole('heading', { level: 2, name: 'Chat' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Connexion Discord' })).toBeVisible()
+  // Among the forms of the other services' credentials, which have the same buttons.
+  const form = page.locator('form').filter({ has: page.getByRole('textbox', { name: 'ID du salon Discord' }) })
+  const channelId = form.getByRole('textbox', { name: 'ID du salon Discord' })
+  const botToken = form.getByLabel('Token du bot Discord')
+
+  await channelId.fill('1234567890123456789')
+  await botToken.fill(token)
+  await form.getByRole('button', { name: 'vérifier' }).click()
+  await expect(form.getByRole('status', { name: 'Identifiants acceptés par Discord' })).toBeVisible()
+  await form.getByRole('button', { name: 'enregistrer' }).click()
+  await expect(form.getByRole('status', { name: 'Identifiants enregistrés' })).toBeVisible()
+  await expect(page.getByText(`Bot « stand-in » → #chat. Changés par ${admin.email}`)).toBeVisible()
+
+  await page.reload()
+  await expect(channelId).toHaveValue('1234567890123456789')
+  await expect(botToken).toHaveValue('')
+  await expect(page.getByText(`Bot « stand-in » → #chat. Changés par ${admin.email}`)).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(token)
+})
