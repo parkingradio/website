@@ -14,6 +14,54 @@ const dayButton = (page: Page, day: string) => page.getByRole('button', { name: 
 const dayCell = (page: Page, day: string) => page.locator('.calendar-month td').filter({ has: dayButton(page, day) })
 const chosenDay = (page: Page, day: string) => page.getByRole('region', { name: longDay(day) })
 
+// An instant, at a time of a day in Québec.
+const at = (day: string, time: string) => quebecInstant(day, time)!.toISOString()
+
+// Three days from today in Québec, in the 365 days that conflicts are found in, or four, so that the next day is in its
+// month too.
+function soon(): string {
+  const third = addDays(quebecDayAndTime(new Date()).day, 3)
+  return addDays(third, 1).slice(0, 7) === third.slice(0, 7) ? third : addDays(third, 1)
+}
+
+// A test's own feeds, read three days before `day`, the second one, whose titles are private, having failed its last
+// read, and a repair and a stay on `day` that overlap, with their conflict.
+function ownCalendar(unique: string, day: string) {
+  const readAt = at(addDays(day, -3), '00:00')
+  const feed = (id: string, name: string, privateTitles: boolean, error: string | null) => ({
+    id,
+    name,
+    link: `https://example.com/${id}.ics`,
+    privateTitles,
+    createdBy: 'admin@example.com',
+    createdAt: readAt,
+    updatedBy: null,
+    updatedAt: null,
+    readAt,
+    error,
+  })
+  const team = `Équipe ${unique}`
+  const stays = `Séjours ${unique}`
+  const repair = { feedId: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
+  const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: null }
+  const extra: CalendarExtra = {
+    feeds: [feed(`team-${unique}`, team, false, null), feed(`stays-${unique}`, stays, true, "The link can't be read: its server fails (503)")],
+    occupations: [repair, stay],
+    // The repair and the stay, in the order of things: by start.
+    conflicts: [{ start: stay.start, end: repair.end, things: [{ kind: 'occupation', ...repair }, { kind: 'occupation', ...stay }] }],
+  }
+  return { extra, team, stays }
+}
+
+// E.g. "ven. 13 nov.", as the page writes a day in a list's row, or in a thing's times.
+const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
+
+// Whether the page scrolls sideways, which it shouldn't, on phones too.
+const scrollsSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+
+// The narrowest phones the admin pages are made for, which the mobile project's is wider than.
+const NARROW = { width: 360, height: 800 }
+
 test('a session is in its month, and on its day, where a new session is added', async ({ page }, testInfo) => {
   const { unique, day } = own(testInfo)
   await logIn(page)
@@ -91,35 +139,8 @@ test('a session is in its month, and on its day, where a new session is added', 
 
 test('occupations and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page }, testInfo) => {
   const { unique } = own(testInfo)
-  // Three days from today in Québec, in the 365 days that conflicts are found in, or four, so that the next day is in
-  // its month too.
-  const third = addDays(quebecDayAndTime(new Date()).day, 3)
-  const day = addDays(third, 1).slice(0, 7) === third.slice(0, 7) ? third : addDays(third, 1)
-  const at = (on: string, time: string) => quebecInstant(on, time)!.toISOString()
-  const readAt = at(addDays(day, -3), '00:00')
-  const feed = (id: string, name: string, privateTitles: boolean, error: string | null) => ({
-    id,
-    name,
-    link: `https://example.com/${id}.ics`,
-    privateTitles,
-    createdBy: 'admin@example.com',
-    createdAt: readAt,
-    updatedBy: null,
-    updatedAt: null,
-    readAt,
-    error,
-  })
-  const team = `Équipe ${unique}`
-  const stays = `Séjours ${unique}`
-  const repair = { feedId: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
-  // A stay, from a feed whose titles are private.
-  const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: null }
-  const extra: CalendarExtra = {
-    feeds: [feed(`team-${unique}`, team, false, null), feed(`stays-${unique}`, stays, true, "The link can't be read: its server fails (503)")],
-    occupations: [repair, stay],
-    // The repair and the stay, in the order of things: by start.
-    conflicts: [{ start: stay.start, end: repair.end, things: [{ kind: 'occupation', ...repair }, { kind: 'occupation', ...stay }] }],
-  }
+  const day = soon()
+  const { extra, team, stays } = ownCalendar(unique, day)
   await withCalendar(page, extra)
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
@@ -160,4 +181,106 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await expect(calendar).toHaveAttribute('href', '/admin/calendrier?issues=open')
   await calendar.click()
   await expect(issues.getByRole('button', { name: /1 conflit/ })).toHaveAttribute('aria-expanded', 'true')
+})
+
+test('the list has each thing once, from today, on one line, which shows its day in the month', async ({ page, isMobile }, testInfo) => {
+  const { unique } = own(testInfo)
+  if (isMobile) await page.setViewportSize(NARROW)
+  const today = quebecDayAndTime(new Date()).day
+  const day = soon()
+  const { extra, team, stays } = ownCalendar(unique, day)
+  // Closed for three whole days, ten days from today, and an occupation near the list's end, whose title, a link, has
+  // no spaces.
+  const closed = addDays(today, 10)
+  const far = addDays(today, 350)
+  const link = `https://example.com/${'tres-long-'.repeat(12)}${unique}`
+  extra.occupations.push(
+    { feedId: `team-${unique}`, start: at(closed, '00:00'), end: at(addDays(closed, 3), '00:00'), wholeDay: true, title: `FERMÉ ${unique}` },
+    { feedId: `team-${unique}`, start: at(far, '10:00'), end: at(far, '12:00'), wholeDay: false, title: link },
+  )
+  await withCalendar(page, extra)
+  await logIn(page, { at: '/admin/calendrier?view=list' })
+
+  const list = page.getByRole('region', { name: 'À venir' })
+  const rows = list.getByRole('button')
+  await expect(rows.filter({ hasText: unique })).toHaveText([
+    `${dayInYear(day)} 10 h – 16 h · occupation RÉPARATION ${unique}, calendrier ${team} · conflit avec ${stays}`,
+    `${dayInYear(day)} 12 h – 11 h · occupation ${stays} · conflit avec RÉPARATION ${unique}`,
+    `${dayInYear(closed)} du ${dayInYear(closed)} au ${dayInYear(addDays(closed, 2))} · occupation FERMÉ ${unique}, calendrier ${team}`,
+    `${dayInYear(far)} 10 h – 12 h · occupation ${link}, calendrier ${team}`,
+  ])
+  // The seeded marathon, once, over three days, whose end depends on the clocks changing in between, and the seeded
+  // takeover that was cancelled.
+  const marathon = rows.filter({ hasText: 'MARATHON MODULAIRE' })
+  await expect(marathon).toHaveCount(1)
+  await expect(marathon).toContainText(/18 h – \S+\. \d+ \S+, \d+ h/)
+  await expect(rows.filter({ hasText: 'LES NUITS BASSES TAKEOVER' })).toContainText('LES NUITS BASSES TAKEOVER annulée')
+  await expect(list).toContainText(`La liste s'arrête au ${longDay(addDays(today, 364))}.`)
+  expect(await scrollsSideways(page)).toBe(false)
+
+  // The last row, far down the list, shows its day, chosen, in the month, with the focus on it, and the chosen day in
+  // view.
+  const last = rows.filter({ hasText: link })
+  await last.scrollIntoViewIfNeeded()
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await (isMobile ? last.tap() : last.click())
+  await expect(page).toHaveURL(`/admin/calendrier?month=${far.slice(0, 7)}&day=${far}`)
+  await expect(dayButton(page, far)).toBeFocused()
+  await expect(chosenDay(page, far).getByRole('heading', { name: longDay(far) })).toBeInViewport({ ratio: 1 })
+  await expect(chosenDay(page, far)).toContainText(link)
+  // Back to the list, where it was, which the browser puts back once the page shows it at once, while it's read again,
+  // which the test waits for, so that it doesn't end while its fake answers.
+  const reread = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/admin/calendar')
+  await page.goBack()
+  await expect(page).toHaveURL('/admin/calendrier?view=list')
+  await expect(last).toBeInViewport({ ratio: 0.9 })
+  await reread
+})
+
+test('on phones, the month marks what takes each day, with a "+" as large as a finger, and choosing a day brings it into view', async ({ page, isMobile }, testInfo) => {
+  const { unique } = own(testInfo)
+  if (isMobile) await page.setViewportSize(NARROW)
+  const day = soon()
+  const month = day.slice(0, 7)
+  await withCalendar(page, ownCalendar(unique, day).extra)
+  await logIn(page, { at: `/admin/calendrier?month=${month}` })
+
+  const marks = dayCell(page, day).locator('.calendar-marks')
+  await expect(dayCell(page, day)).toContainText(`RÉPARATION ${unique}`)
+  expect(await scrollsSideways(page)).toBe(false)
+  if (isMobile) {
+    // The repair and the stay, both in a conflict, which the day says.
+    await expect(marks).toBeVisible()
+    await expect(marks.locator('.calendar-mark-occupation.calendar-mark-conflict')).toHaveCount(2)
+    await expect(marks).toHaveClass(/calendar-marks-conflict/)
+    await expect(dayCell(page, day).locator('.calendar-things')).toHaveCSS('position', 'absolute')
+    // A "+" of at least 24 × 24 px, which overlaps neither its day's number nor the next day's, on a two-digit day from
+    // today on.
+    const plus = (await page.getByRole('button', { name: `nouvelle session le ${longDay(`${month}-28`)}` }).boundingBox())!
+    expect(plus.width).toBeGreaterThanOrEqual(24)
+    expect(plus.height).toBeGreaterThanOrEqual(24)
+    for (const number of [`${month}-28`, addDays(`${month}-28`, 1)]) {
+      const box = (await dayButton(page, number).boundingBox())!
+      const overlaps = plus.x < box.x + box.width && box.x < plus.x + plus.width && plus.y < box.y + box.height && box.y < plus.y + plus.height
+      expect(overlaps).toBe(false)
+    }
+  } else {
+    await expect(marks).toBeHidden()
+  }
+
+  // A day of the grid's first week, in view at the top of the page, while the chosen day is under the month, out of
+  // view, tapped or clicked where it is, so that only the page scrolls to the chosen day.
+  await page.evaluate(() => window.scrollTo(0, 0))
+  const number = (await dayButton(page, `${month}-01`).boundingBox())!
+  const [x, y] = [number.x + number.width / 2, number.y + number.height / 2]
+  expect(y).toBeLessThan(page.viewportSize()!.height)
+  await (isMobile ? page.touchscreen.tap(x, y) : page.mouse.click(x, y))
+  await expect(chosenDay(page, `${month}-01`).getByRole('heading', { name: longDay(`${month}-01`) })).toBeInViewport({ ratio: 1 })
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+  // The form for a new session fits too.
+  const add = page.getByRole('button', { name: `nouvelle session le ${longDay(day)}` })
+  await (isMobile ? add.tap() : add.click())
+  await expect(page.getByRole('form', { name: 'Nouvelle session' })).toBeVisible()
+  expect(await scrollsSideways(page)).toBe(false)
 })

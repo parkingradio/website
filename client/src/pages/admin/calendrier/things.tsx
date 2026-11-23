@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { SESSION_STATUS_LABELS } from '../describe'
+import { SESSION_STATUS_LABELS, THING_KIND_LABELS } from '../describe'
 import { sessionPath } from '../session-errors'
 import type { SessionStatus } from '../../../session-fields'
-import type { OccupationName } from './model'
+import type { OccupationName, Thing } from './model'
 
 // A session's title, linking to its page, and its status, unless it's planned, wherever the Calendrier page shows it.
 export function SessionTitle({ id, title, status, inMonth = false }: { id: string; title: string; status: SessionStatus; inMonth?: boolean }) {
@@ -36,16 +37,32 @@ export function OccupationCalendar({ calendar }: { calendar: string }) {
   )
 }
 
-// An occupation's name, within a line: its title, then its calendar, or its calendar alone.
-export function OccupationLabel({ title, calendar }: OccupationName) {
+// An occupation's name, within a line: its title, in bold if `strong`, then its calendar, or its calendar alone.
+export function OccupationLabel({ title, calendar, strong = false }: OccupationName & { strong?: boolean }) {
+  const name = <OccupationTitle title={title} calendar={calendar} />
   return (
     <>
-      <OccupationTitle title={title} calendar={calendar} />
+      {strong ? <strong>{name}</strong> : name}
       {title !== null && (
         <span className="admin-meta">
           <OccupationCalendar calendar={calendar} />
         </span>
       )}
+    </>
+  )
+}
+
+// A thing's kind, "session" or "occupation", in its color and with its shape, framed in red when it's in a conflict.
+export function ThingKind({ kind, conflict }: { kind: Thing['kind']; conflict: boolean }) {
+  return <span className={`calendar-kind calendar-${kind}${conflict ? ' calendar-conflict' : ''}`}>{THING_KIND_LABELS[kind]}</span>
+}
+
+// What a row of "À régler" or of the list says, on one line: when, then what it is. The whole row is what's done about
+// it, a button or a link, so its text, which names it, has no links of its own.
+export function LineText({ when, children }: { when: string; children: ReactNode }) {
+  return (
+    <>
+      <span className="calendar-line-when">{when}</span> <span className="calendar-line-what">{children}</span>
     </>
   )
 }

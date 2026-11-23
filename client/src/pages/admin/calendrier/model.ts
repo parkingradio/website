@@ -2,7 +2,7 @@ import type { Data, Schema } from '../../../api/client'
 import { isDay } from '../../../application-fields'
 import { addDays, daysBetween, quebecDayAndTime, quebecInstant } from '../../../quebec-time'
 import type { Session } from '../../../session-fields'
-import { endsByItsTime, formatDayInYear, formatQuebecDayInYear, formatTime, shortTimes } from '../describe'
+import { endsByItsTime, formatDayInYear, formatQuebecDay, formatQuebecDayInYear, formatTime, shortTimes } from '../describe'
 
 // What the Calendrier page shows of the calendar, worked out from what the server gives (see
 // docs/design/client/admin/calendrier.md), without React. Days are "YYYY-MM-DD" in Québec, and months "YYYY-MM", which
@@ -32,7 +32,7 @@ export const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
-// How many days from the server's today conflicts are found in, and free time shown in.
+// How many days from today conflicts are found in, and free time and the list shown in.
 const HORIZON_DAYS = 365
 
 // `value` if it's a month the page shows, from 2000-01 to 2999-12, or else null.
@@ -69,6 +69,11 @@ export function gridDays(month: string): string[] {
 // The days the page asks the server for, for a grid's `days`: all of them, within the days the server takes.
 export function gridRange(days: string[]): { from: string; to: string } {
   return { from: days[0] < FIRST_DAY ? FIRST_DAY : days[0], to: days.at(-1)! > LAST_DAY ? LAST_DAY : days.at(-1)! }
+}
+
+// The days the list shows, and asks the server for: the 365 days from `today`, those conflicts are found in.
+export function listRange(today: string): { from: string; to: string } {
+  return { from: today, to: addDays(today, HORIZON_DAYS - 1) }
 }
 
 // When `day` starts in Québec, at 00:00, which is never skipped, in milliseconds: the days the clocks change on are 23 or
@@ -124,6 +129,11 @@ export function fullTimes(times: Times, day: string): string {
     return from.day === day ? until : `du ${formatDayInYear(from.day)} ${until}`
   }
   return from.day === day ? shortTimes(times) : `${formatQuebecDayInYear(times.start)}, ${shortTimes(times)}`
+}
+
+// The day something starts, e.g. "sam. 21 nov.", with its year when it isn't `today`'s, e.g. "sam. 2 janv. 2027".
+export function startDay({ start }: Times, today: string): string {
+  return dayOf(Date.parse(start)).slice(0, 4) === today.slice(0, 4) ? formatQuebecDayInYear(start) : formatQuebecDay(start)
 }
 
 // A thing's name alone, without its calendar's: a session's title, or an occupation's, or its calendar's name when it
@@ -272,4 +282,31 @@ function withFreeTime(day: string, dayThings: DayThing[], today: string): Calend
     ...freeStretches(day, taking).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
   ]
   return entries.sort(([a], [b]) => a - b).map(([, entry]) => entry)
+}
+
+// One of a thing's conflicts in the list, and whether their overlap misses the day it's listed on, so that the list says
+// the day it starts.
+export type ListedConflict = ThingConflict & { elsewhere: boolean }
+
+// A thing in the list, on the first of the list's days it takes some of, `day`, with every one of its conflicts.
+export type ListedThing = { day: string; thing: Thing; conflicts: ListedConflict[] }
+
+// A month of the list, with its things, in order.
+export type ListedMonth = { month: string; things: ListedThing[] }
+
+// What the list shows of `calendar`, read for the days from `from` to `to`: every month they take some of, and each
+// thing, once, on the first of these days it takes some of, by start, then end (see "The list" in
+// docs/design/client/admin/calendrier.md).
+export function listedMonths(calendar: Calendar, from: string, to: string): ListedMonth[] {
+  const months: ListedMonth[] = []
+  for (let month = monthOf(from); month <= monthOf(to); month = addMonths(month, 1)) months.push({ month, things: [] })
+  for (const { thing, conflicts } of thingsWithConflicts(calendar)) {
+    // The calendar only has what takes some of its days.
+    const day = daysOf(thing, [from, to])[0]
+    if (day === undefined) continue
+    months
+      .find(({ month }) => month === monthOf(day))!
+      .things.push({ day, thing, conflicts: conflicts.map((each) => ({ ...each, elsewhere: !takesSomeOf(each.conflict, day) })) })
+  }
+  return months
 }

@@ -64,6 +64,29 @@ const CALENDAR: Calendar = {
 }
 const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [] }
 
+// The list's days, from today to 364 days later, and what the server gives for them: a two-week stay that's going on,
+// with conflicts today and on later days, a cancelled session, a session over three days, a whole-day occupation over
+// three days, and a day with two things.
+const LIST = '/api/admin/calendar?from=2026-11-19&to=2027-11-18'
+const LONG_STAY = { feedId: 'stays', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: null }
+const MEETING = { feedId: 'team', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
+const DELIVERY = { feedId: 'team', start: '2026-12-15T10:00:00-05:00', end: '2026-12-15T12:00:00-05:00', wholeDay: false, title: 'LIVRAISON' }
+const EVENING = session('session-6', 'SOIRÉE DE DÉCEMBRE', '2026-12-15T20:00:00-05:00', '2026-12-15T22:00:00-05:00')
+const CLOSED_LATER = { feedId: 'team', start: '2026-12-09T00:00:00-05:00', end: '2026-12-12T00:00:00-05:00', wholeDay: true, title: 'FERMÉ' }
+const MARATHON = session('session-5', 'MARATHON MODULAIRE', '2027-02-06T18:00:00-05:00', '2027-02-08T01:00:00-05:00')
+const conflictThing = (thing: object) => thing as Calendar['conflicts'][number]['things'][number]
+const longStay = conflictThing({ kind: 'occupation', ...LONG_STAY })
+const LIST_CALENDAR: Calendar = {
+  ...CALENDAR,
+  sessions: [TAKEOVER, CANCELLED, EVENING, MARATHON],
+  occupations: [LONG_STAY, MEETING, REPAIR, CLOSED_LATER, DELIVERY],
+  conflicts: [
+    { start: MEETING.start, end: MEETING.end, things: [longStay, conflictThing({ kind: 'occupation', ...MEETING })] },
+    { start: TAKEOVER.start!, end: TAKEOVER.end!, things: [longStay, CONFLICT.things[1]] },
+    { start: REPAIR.start, end: REPAIR.end, things: [longStay, conflictThing({ kind: 'occupation', ...REPAIR })] },
+  ],
+}
+
 // The collectives a new session's form picks a takeover's from.
 const HAUTE_RIVE = { id: 'collective-1', name: 'Haute Rive', members: [] } as unknown as Collective
 const COLLECTIVES = { '/api/admin/collectives': { ok: true, collectives: [HAUTE_RIVE] } }
@@ -101,13 +124,24 @@ const addButton = (day: string) => within(cell(day)).getByRole('button', { name:
 const newSession = () => screen.queryByRole('form', { name: 'Nouvelle session' })
 const chosenDay = () => screen.queryByRole('region', { name: /2026/ })
 const loaded = () => screen.findByRole('region', { name: 'À régler' })
+const list = () => screen.getByRole('region', { name: 'À venir' })
+const listRow = (name: string | RegExp) => within(list()).getByRole('button', { name })
+
+// Where the page brings the chosen day into view, which jsdom has no way to.
+const scrollIntoView = vi.fn()
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
+  Element.prototype.scrollIntoView = scrollIntoView
 })
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  scrollIntoView.mockReset()
+  // @ts-expect-error jsdom has none.
+  delete Element.prototype.scrollIntoView
+})
 
 describe('Calendrier', () => {
   describe('asks for the days of its grid', () => {
@@ -157,9 +191,13 @@ describe('Calendrier', () => {
       await waitFor(() => expect(requestsTo('GET', OCTOBER)).toHaveLength(1))
       expect(screen.getByRole('heading', { name: 'octobre 2026' })).toBeInTheDocument()
 
-      fireEvent.click(screen.getByRole('button', { name: "aujourd'hui" }))
+      // Which keeps the focus.
+      const todayButton = screen.getByRole('button', { name: "aujourd'hui" })
+      act(() => todayButton.focus())
+      fireEvent.click(todayButton)
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-19')
       expect(dayButton('2026-11-19')).toHaveAttribute('aria-pressed', 'true')
+      expect(document.activeElement).toBe(todayButton)
     })
   })
 
@@ -257,6 +295,25 @@ describe('Calendrier', () => {
       // Going back finds December, which the page showed before November: choosing days added no step.
       back()
       expect(path()).toBe('/admin/calendrier?month=2026-12')
+    })
+
+    it('brings the chosen day, under the month, into view, when it is chosen by clicking it', async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY })
+      renderAt('/admin/calendrier?day=2026-11-20')
+      await loaded()
+      // Not when the page opens with it.
+      expect(scrollIntoView).not.toHaveBeenCalled()
+
+      fireEvent.click(cell('2026-11-26'))
+      expect(scrollIntoView.mock.contexts).toEqual([chosenDay()])
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+      // Nor when it's unchosen, nor by "+", which puts the focus on its form, nor by "aujourd'hui", nor going back.
+      fireEvent.click(cell('2026-11-26'))
+      fireEvent.click(addButton('2026-11-27'))
+      fireEvent.click(screen.getByRole('button', { name: "aujourd'hui" }))
+      fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
+      back()
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
     })
 
     it("but not by clicking a session's link, which opens its page", async () => {
@@ -593,6 +650,218 @@ describe('Calendrier', () => {
       expect(await within(form).findByRole('alert')).toHaveTextContent("Les collectifs n'ont pas pu être chargés : Boom")
       fireEvent.click(within(form).getByRole('radio', { name: 'Takeover' }))
       expect(within(form).getByRole('combobox', { name: 'Collectif' })).toBeDisabled()
+    })
+  })
+
+  describe('the views', () => {
+    it('ask for the 365 days from today with the list, and the grid otherwise', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [LIST]: LIST_CALENDAR })
+      const first = renderAt('/admin/calendrier?view=list')
+      await loaded()
+      expect(requestsTo('GET', LIST)).toHaveLength(1)
+      expect(list()).toBeInTheDocument()
+      // Without a legend, since the rows say what they are.
+      expect(screen.queryByRole('list', { name: 'Légende' })).not.toBeInTheDocument()
+      first.unmount()
+
+      renderAt('/admin/calendrier?view=semaine')
+      await loaded()
+      expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+      expect(screen.getByRole('table', { name: 'novembre 2026' })).toBeInTheDocument()
+    })
+
+    it('add a step to the history, keeping the month and the day, the one shown doing nothing', async () => {
+      mockFetch({ ...LOGGED_IN, [DECEMBER]: EMPTY, [LIST]: LIST_CALENDAR })
+      renderAt('/admin/calendrier?month=2026-12&day=2026-12-02')
+      await loaded()
+      const [month, listed] = within(screen.getByRole('group', { name: 'Vue' })).getAllByRole('button')
+      expect([month.textContent, listed.textContent]).toEqual(['mois', 'liste'])
+      expect(month).toHaveAttribute('aria-pressed', 'true')
+      const heading = screen.getByRole('heading', { name: 'décembre 2026' })
+
+      act(() => listed.focus())
+      fireEvent.click(listed)
+      expect(path()).toBe('/admin/calendrier?month=2026-12&day=2026-12-02&view=list')
+      // The same heading, which screen readers announce, and the same buttons, which keep the focus.
+      expect(heading).toHaveTextContent('À venir')
+      expect(heading).toHaveAttribute('aria-live', 'polite')
+      expect(document.activeElement).toBe(listed)
+      expect(listed).toHaveAttribute('aria-pressed', 'true')
+      expect(month).toHaveAttribute('aria-pressed', 'false')
+      for (const name of ['mois précédent', 'mois suivant', "aujourd'hui"]) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+      expect(chosenDay()).not.toBeInTheDocument()
+      await waitFor(() => expect(requestsTo('GET', LIST)).toHaveLength(1))
+
+      fireEvent.click(listed)
+      expect(path()).toBe('/admin/calendrier?month=2026-12&day=2026-12-02&view=list')
+      back()
+      expect(path()).toBe('/admin/calendrier?month=2026-12&day=2026-12-02')
+      expect(chosenDay()).toHaveAccessibleName('mercredi 2 décembre 2026')
+    })
+
+    it('close the form for a new session, which stays closed when going back', async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, [LIST]: LIST_CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      fireEvent.click(addButton('2026-11-25'))
+      expect(newSession()).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'liste' }))
+      fireEvent.click(screen.getByRole('button', { name: 'mois' }))
+      expect(chosenDay()).toHaveAccessibleName('mercredi 25 novembre 2026')
+      expect(newSession()).not.toBeInTheDocument()
+    })
+  })
+
+  describe('the list', () => {
+    it('gives every month of its days, each thing once, on the first of them it takes, on one line', async () => {
+      mockFetch({ ...LOGGED_IN, [LIST]: LIST_CALENDAR })
+      renderAt('/admin/calendrier?view=list')
+      await loaded()
+
+      const months = within(list()).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+      expect(months).toHaveLength(13)
+      expect([months[0], months[1], months[2], months.at(-1)]).toEqual(['novembre 2026', 'décembre 2026', 'janvier 2027', 'novembre 2027'])
+      expect(within(list()).getAllByRole('listitem').map(visibleText)).toEqual([
+        // Going on since yesterday, with its conflicts: today's, and those of later days, with their day.
+        "jeu. 19 nov. mer. 18 nov., 15 h – mer. 2 déc., 11 h · occupation Séjours · conflit avec RÉUNION · conflit avec HAUTE RIVE TAKEOVER (sam. 21 nov.) · conflit avec RÉPARATION (jeu. 26 nov.)",
+        "jeu. 19 nov. 10 h – 12 h · occupation RÉUNION, calendrier Calendrier de l'équipe · conflit avec Séjours",
+        'sam. 21 nov. 21 h – 1 h · session HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan · conflit avec Séjours',
+        'mar. 24 nov. 20 h – 23 h · session LIVE PERFORMANCE annulée',
+        "jeu. 26 nov. 10 h – 16 h · occupation RÉPARATION, calendrier Calendrier de l'équipe · conflit avec Séjours",
+        "mer. 9 déc. du mer. 9 déc. au ven. 11 déc. · occupation FERMÉ, calendrier Calendrier de l'équipe",
+        // In order of start.
+        "mar. 15 déc. 10 h – 12 h · occupation LIVRAISON, calendrier Calendrier de l'équipe",
+        'mar. 15 déc. 20 h – 22 h · session SOIRÉE DE DÉCEMBRE',
+        'sam. 6 févr. 18 h – lun. 8 févr., 1 h · session MARATHON MODULAIRE',
+      ])
+      // Each row is one control, without links, and a cancelled session's in its status colors.
+      expect(within(list()).queryByRole('link')).not.toBeInTheDocument()
+      expect(listRow(/LIVE PERFORMANCE/).closest('li')).toHaveClass('admin-status-cancelled')
+      // A month without anything, and where the list stops.
+      expect(within(list()).getByRole('heading', { name: 'janvier 2027' }).nextElementSibling).toHaveTextContent(/^Rien\.$/)
+      expect(within(list()).getByRole('heading', { name: 'novembre 2027' }).nextElementSibling).toHaveTextContent(/^Rien\.$/)
+      expect(list().lastElementChild).toHaveTextContent("La liste s'arrête au jeudi 18 novembre 2027.")
+      // Without free time.
+      expect(within(list()).queryByText(/dispo/)).not.toBeInTheDocument()
+    })
+
+    it("says a conflict's day with its year when it isn't today's", async () => {
+      const late = session('session-7', 'NOUVEL AN', '2027-01-01T22:00:00-05:00', '2027-01-02T02:00:00-05:00')
+      const stay = { ...LONG_STAY, end: '2027-01-02T11:00:00-05:00' }
+      const conflict = { start: late.start!, end: late.end!, things: [conflictThing({ kind: 'occupation', ...stay }), conflictThing({ kind: 'session', id: late.id, title: late.title, start: late.start, end: late.end, status: 'planned' })] }
+      mockFetch({ ...LOGGED_IN, [LIST]: { ...EMPTY, sessions: [late], occupations: [stay], conflicts: [conflict] } })
+      renderAt('/admin/calendrier?view=list')
+      await loaded()
+
+      expect(visibleText(within(list()).getAllByRole('listitem')[0])).toBe('jeu. 19 nov. mer. 18 nov., 15 h – sam. 2 janv., 11 h · occupation Séjours · conflit avec NOUVEL AN (ven. 1 janv. 2027)')
+    })
+
+    it('shows the day of a row, chosen, in the month, as a step in the history, and back finds the list', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY, [LIST]: LIST_CALENDAR })
+      renderAt('/admin/calendrier?view=list')
+      await loaded()
+
+      fireEvent.click(listRow(/^sam\. 21 nov\./))
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-21')
+      await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
+      expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
+      // Once it shows what's on it, the chosen day is brought into view.
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([chosenDay()]))
+      expect(chosenDay()).toHaveTextContent('HAUTE RIVE TAKEOVER')
+
+      // The list, as it was, while it's read again.
+      const again = held()
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY, [LIST]: again.body })
+      back()
+      expect(path()).toBe('/admin/calendrier?view=list')
+      expect(listRow(/^sam\. 21 nov\./)).toBeInTheDocument()
+      await again.answer(LIST_CALENDAR)
+
+      // Something going on since before today is on today.
+      fireEvent.click(listRow(/^jeu\. 19 nov\.\s+mer\. 18 nov\./))
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-19')
+      back()
+      // A day of another month.
+      fireEvent.click(listRow(/SOIRÉE DE DÉCEMBRE/))
+      expect(path()).toBe('/admin/calendrier?month=2026-12&day=2026-12-15')
+      await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-12-15')))
+    })
+
+    it('shows the day of a conflict of "À régler" in the month, as a step in the history', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [LIST]: LIST_CALENDAR })
+      renderAt('/admin/calendrier?view=list&issues=open')
+      const box = await loaded()
+
+      const row = () => within(box).getAllByRole('button', { name: /^sam\. 21 nov\./ })[0]
+      fireEvent.click(row())
+      expect(path()).toBe('/admin/calendrier?issues=open&month=2026-11&day=2026-11-21')
+      await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
+      // From the month of that day, it doesn't add one.
+      fireEvent.click(screen.getByRole('button', { name: 'fermer le jour' }))
+      fireEvent.click(row())
+      expect(path()).toBe('/admin/calendrier?issues=open&month=2026-11&day=2026-11-21')
+      back()
+      expect(path()).toBe('/admin/calendrier?view=list&issues=open')
+    })
+
+    it('shows nothing before its calendar is read', async () => {
+      const read = held()
+      mockFetch({ ...LOGGED_IN, [LIST]: read.body })
+      renderAt('/admin/calendrier?view=list')
+
+      expect(await screen.findByRole('region', { name: 'À venir' })).toBeEmptyDOMElement()
+      await read.answer(LIST_CALENDAR)
+      expect(within(list()).getAllByRole('heading', { level: 3 })).toHaveLength(13)
+    })
+
+    it('shows only the view asked for last, whatever order the answers come in', async () => {
+      const read = held()
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [LIST]: read.body })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      fireEvent.click(screen.getByRole('button', { name: 'liste' }))
+      fireEvent.click(screen.getByRole('button', { name: 'mois' }))
+      await waitFor(() => expect(requestsTo('GET', NOVEMBER)).toHaveLength(2))
+      await read.answer({ ...LIST_CALENDAR, undatedSessions: [] })
+      // November's: the list's answer came too late.
+      expect(screen.getByRole('region', { name: 'À régler' })).toHaveTextContent('1 sans date')
+      fireEvent.click(screen.getByRole('button', { name: 'liste' }))
+      // Nor was it kept for the list.
+      expect(list()).toBeEmptyDOMElement()
+    })
+  })
+
+  describe('on narrow screens', () => {
+    it("marks what's on each day, for the eyes only, in the month's order", async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      const marks = (day: string) => cell(day).querySelector('.calendar-marks')
+      const kinds = (day: string) => [...marks(day)!.children].map((mark) => mark.className.match(/calendar-mark-(session|occupation|free)/)![1])
+      const conflicting = (day: string) => [...marks(day)!.children].map((mark) => mark.classList.contains('calendar-mark-conflict'))
+      expect(marks('2026-11-21')).toHaveAttribute('aria-hidden', 'true')
+      expect(marks('2026-11-21')).toHaveTextContent(/^$/)
+      // Both in a conflict, which the day says.
+      expect(kinds('2026-11-21')).toEqual(['occupation', 'session'])
+      expect(conflicting('2026-11-21')).toEqual([true, true])
+      expect(marks('2026-11-21')).toHaveClass('calendar-marks-conflict')
+      // Free time once, after the things, whatever its stretches.
+      expect(kinds('2026-11-22')).toEqual(['occupation', 'session', 'free'])
+      expect(kinds('2026-11-26')).toEqual(['occupation', 'free'])
+      expect(marks('2026-11-26')).not.toHaveClass('calendar-marks-conflict')
+      // A day free all day.
+      expect(kinds('2026-11-19')).toEqual(['free'])
+      // Done and cancelled sessions.
+      expect(marks('2026-11-07')!.firstElementChild).toHaveClass('calendar-mark-done')
+      expect(marks('2026-11-24')!.firstElementChild).toHaveClass('calendar-mark-cancelled')
+      // Only the month's own days have free time.
+      expect(marks('2026-12-01')).toBeNull()
+      expect(kinds('2026-12-02')).toEqual(['occupation'])
+      // The day's words still describe its button.
+      expect(dayButton('2026-11-19')).toHaveAccessibleDescription('disponible')
     })
   })
 
