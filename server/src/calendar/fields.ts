@@ -11,8 +11,8 @@ export const FeedName = z
   .max(NAME_MAX_LENGTH, `The name must be at most ${NAME_MAX_LENGTH} characters`)
   .meta({ description: `Trimmed, then between 1 and ${NAME_MAX_LENGTH} characters` })
 
-// A feed's link, as the server keeps it (see "Feeds" in docs/design/server/calendar.md): an https link, which a webcal
-// link stands for, without what comes after `#`, and with the characters links can't have encoded, so that two links
+// A feed's link, as the server keeps it: an https link, which a webcal link stands for (see "Feeds" in
+// docs/design/server/calendar.md), without what comes after `#`, and with the characters links can't have encoded, so that two links
 // for the same calendar are the same. Its length is checked as it's kept, since that's what the database's unique index
 // holds, which has a limit.
 export const LINK_MAX_LENGTH = 2000

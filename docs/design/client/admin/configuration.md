@@ -64,10 +64,9 @@ doesn't undo it, and closes the form; "annuler" closes it without saving. Either
 Under the list, a form adds a feed, with the same fields, "Masquer les titres" checked to start with. "ajouter" adds it,
 and clears the form.
 
-"enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first, which can take up
-to 30 seconds, or longer while it goes through other calendars (see
-[Reading the feeds](../../server/calendar.md#reading-the-feeds)), and the button can't be used meanwhile. When the feed
-can't be saved, the form says why, e.g. that another feed has that link, naming it.
+"enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first (see
+[Reading the feeds](../../server/calendar.md#reading-the-feeds)), which can take a while, and the button can't be used
+meanwhile. When the feed can't be saved, the form says why, e.g. that another feed has that link, naming it.
 
 ## Features
 
