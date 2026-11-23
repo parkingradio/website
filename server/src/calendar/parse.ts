@@ -10,14 +10,16 @@ import { FeedReadError, ReadAborted, refused } from './fetch.js'
 // with it, and the server never waits on it.
 
 export const PARSE_TIMEOUT_MS = 10_000
-export const PARSE_MAX_MEMORY_MB = 384
+// The process's heap, which holds what it reads: a calendar of 10 MB with 45,000 events, about as many as a read can go
+// through, needs under 128 MB. The process takes more memory than that in all.
+export const PARSE_MAX_MEMORY_MB = 192
 
 export type ToParse = { text: string; kind: FeedKind; from: Date; to: Date }
 // What the process sends back: the events, or why the read fails, or the type of an error it didn't expect.
 export type ParseResult = { read: { events: CalendarEvent[]; skipped: number } } | { failed: { status: 400 | 502; message: string } } | { unexpected: string }
 
 // The process's module, next to this one: JavaScript in the built server, and TypeScript in development and tests, which
-// tsx loads.
+// tsx loads, from wherever it's installed rather than from the current directory.
 const compiled = import.meta.url.endsWith('.js')
 const PROCESS = new URL(compiled ? './parse-process.js' : './parse-process.ts', import.meta.url)
 
@@ -31,7 +33,7 @@ let queue: Promise<void> = Promise.resolve()
 
 // The events of a feed that has `kind`, from its text, that take some of the time from `from` to `to`, as calendarEvents
 // gives them, once the feeds before it were gone through. Throws a FeedReadError when the text isn't a calendar, has too
-// many events and occurrences, or takes more than PARSE_TIMEOUT_MS or PARSE_MAX_MEMORY_MB to go through, or a ReadAborted
+// many events and occurrences, or takes more than PARSE_TIMEOUT_MS, or too much memory, to go through, or a ReadAborted
 // as soon as `signal` aborts, even while it waits its turn. `timeoutMs` and `maxMemoryMb` are only for tests.
 export function parseFeed(toParse: ToParse, options: Options = {}): Promise<Read> {
   const { signal } = options
@@ -57,7 +59,7 @@ function goThrough(toParse: ToParse, { signal, timeoutMs = PARSE_TIMEOUT_MS, max
     return null
   }
   const child = fork(PROCESS, {
-    execArgv: [`--max-old-space-size=${maxMemoryMb}`, ...(compiled ? [] : ['--import', 'tsx'])],
+    execArgv: [`--max-old-space-size=${maxMemoryMb}`, ...(compiled ? [] : ['--import', import.meta.resolve('tsx')])],
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     killSignal: 'SIGKILL',
     // Dates go through as they are.
@@ -82,7 +84,7 @@ function goThrough(toParse: ToParse, { signal, timeoutMs = PARSE_TIMEOUT_MS, max
   })
   // V8 aborts a process that runs out of memory.
   child.on('exit', (code, exitSignal) => {
-    if (exitSignal === 'SIGABRT') reject(refused(`it takes more than ${PARSE_MAX_MEMORY_MB} MB to go through`))
+    if (exitSignal === 'SIGABRT') reject(refused('it takes too much memory to go through'))
     else reject(stopped() ?? new Error(`The process that goes through a calendar feed ended (${exitSignal ?? code})`))
     ended()
   })

@@ -49,12 +49,12 @@ calendar within 20 seconds, or when the calendar is over 10 MB. It also fails wh
 error, with a redirect without a link, or with something that isn't valid iCalendar, or isn't a calendar: e.g. an
 `RRULE` that isn't valid fails the whole read, not only its event. The server then goes through the calendar for its
 events (see [Events](#events)) apart from the rest of what it does, which never waits for it, and the read fails when
-that takes more than 10 seconds, or more than 384 MB of memory: e.g. for a recurring event whose rule never gives an
-occurrence, such as every February 30, which an iCalendar library can look for without end. The server goes through one
-calendar at a time, whatever it's read for: a read whose calendar is downloaded while the server goes through another
-one waits until that one is done, which takes up to 10 seconds, and only then has its own 10 seconds. So adding a feed
-takes at most 30 seconds, plus up to 10 seconds for each calendar the server goes through before its own: usually none,
-or one, since the reads every 15 minutes go one feed after another.
+that takes more than 10 seconds, or too much memory, far more than a calendar of 10 MB takes: e.g. for a recurring event
+whose rule never gives an occurrence, such as every February 30, which an iCalendar library can look for without end.
+The server goes through one calendar at a time, whatever it's read for: a read whose calendar is downloaded while the
+server goes through another one waits until that one is done, which takes up to 10 seconds, and only then has its own 10
+seconds. So adding a feed takes at most 30 seconds, plus up to 10 seconds for each calendar the server goes through
+before its own: usually none, or one, since the reads every 15 minutes go one feed after another.
 
 A read that fails keeps what was read before, if anything was, and the feed says why it failed (`error`), until a read
 succeeds. What was read is only kept in memory: after the server restarts, a feed has neither `readAt` nor `error` until
@@ -92,9 +92,10 @@ occurrence given by an `RDATE` that's a period, and a recurring event with more 
 one every minute. But a read that would go through more than 50,000 events and occurrences in all fails, rather than
 leave out some of them without anyone knowing.
 
-An occupation keeps its title (`SUMMARY`), or none. Quiet time doesn't: the stays of guests can have their names, so the
-server never keeps, gives or logs the titles, descriptions or locations of quiet time's events. They're only quiet
-time, from the feed's name.
+An occupation keeps its title (`SUMMARY`), or none, on one line: one that's longer than 200 characters is cut to at most
+200, "…" included, after its last whole word that fits, or within its first word when none does. Quiet time doesn't: the
+stays of guests can have their names, so the server never keeps, gives or logs the titles, descriptions or locations of
+quiet time's events. They're only quiet time, from the feed's name.
 
 ## `GET /api/admin/calendar/feeds` (admin)
 
@@ -120,8 +121,8 @@ that read as its first, and responds `{"ok": true, "feed": <the feed>}`. Fails w
 - 409 when a feed already has that link, with an error that names it.
 - 400 when a field doesn't follow its rules, or when the link's server refuses it (it answers with a 4xx status other
   than 408 and 429, e.g. 404), or answers with something that isn't valid iCalendar, isn't a calendar, is over 10 MB,
-  has too many events and occurrences, or takes more than 10 seconds or 384 MB to go through, or when it redirects more
-  than 5 times, to a link that isn't `https`, or without a link.
+  has too many events and occurrences, or takes more than 10 seconds, or too much memory, to go through, or when it
+  redirects more than 5 times, to a link that isn't `https`, or without a link.
 - 502 when the link's server can't be reached, doesn't give the whole calendar within 20 seconds, fails, or refuses
   requests for now (a 5xx, 408 or 429 status), or when the server shuts down meanwhile.
 

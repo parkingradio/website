@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarEvents, keptTime, MAX_OCCURRENCES_PER_EVENT, MAX_OCCURRENCES_PER_READ } from './events.js'
+import { calendarEvents, keptTime, MAX_OCCURRENCES_PER_EVENT, MAX_OCCURRENCES_PER_READ, shortTitle, TITLE_MAX_LENGTH } from './events.js'
 import type { FeedKind } from './fields.js'
 import { FeedReadError } from './fetch.js'
 
@@ -287,6 +287,18 @@ describe('calendarEvents', () => {
     const many = Array.from({ length: Math.ceil(MAX_OCCURRENCES_PER_READ / MAX_OCCURRENCES_PER_EVENT) + 1 }, () => vevent('DTSTART:20261124T230000Z', 'DTEND:20261124T230100Z', 'RRULE:FREQ=MINUTELY'))
     const error = failure(feed(...many))
     expect(error).toMatchObject({ status: 400, message: `The link can't be read: it has more than ${MAX_OCCURRENCES_PER_READ} events and occurrences` })
+  })
+
+  it(`keeps titles on one line, of at most ${TITLE_MAX_LENGTH} characters, cut after a whole word`, () => {
+    expect(shortTitle('  Réparation\n du\t toit ')).toBe('Réparation du toit')
+    expect(shortTitle('mot '.repeat(49) + 'mots')).toBe('mot '.repeat(49) + 'mots')
+    expect(shortTitle('mot '.repeat(60))).toBe(`${'mot '.repeat(49)}mot…`)
+    expect(shortTitle('mot '.repeat(48) + 'mot motlong')).toBe(`${'mot '.repeat(48)}mot…`)
+    // Within a word when none fits, but not within a character.
+    expect(shortTitle('x'.repeat(300))).toBe(`${'x'.repeat(199)}…`)
+    expect(shortTitle(`${'x'.repeat(198)}😀y`)).toBe(`${'x'.repeat(198)}…`)
+    const text = feed(vevent('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z', `SUMMARY:${'x'.repeat(300)}`))
+    expect(read(text).events[0].title).toBe(`${'x'.repeat(199)}…`)
   })
 
   it("keeps occupations' titles, but never quiet time's", () => {

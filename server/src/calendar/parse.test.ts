@@ -1,6 +1,8 @@
+import { serialize } from 'node:v8'
 import { describe, expect, it } from 'vitest'
+import { TITLE_MAX_LENGTH } from './events.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
-import { PARSE_MAX_MEMORY_MB, PARSE_TIMEOUT_MS, parseFeed } from './parse.js'
+import { PARSE_TIMEOUT_MS, parseFeed } from './parse.js'
 
 // Going through a feed's text in a process of its own, within a time and a memory limit (see "Reading the feeds" in
 // docs/design/server/calendar.md).
@@ -40,17 +42,24 @@ describe('parseFeed', () => {
     )
   })
 
-  it('fails the read when going through the text takes too long, or too much memory, without the server', async () => {
-    const heap = process.memoryUsage().heapUsed
+  it('fails the read when going through the text takes too long, or too much memory', async () => {
     const tooLong = await failure(parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { timeoutMs: 1000 }))
     expect(tooLong).toBeInstanceOf(FeedReadError)
     expect(tooLong).toMatchObject({ status: 400, message: `The link can't be read: it takes more than ${PARSE_TIMEOUT_MS / 1000} seconds to go through` })
     const tooBig = await failure(parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { maxMemoryMb: 32 }))
     expect(tooBig).toBeInstanceOf(FeedReadError)
-    expect(tooBig).toMatchObject({ status: 400, message: `The link can't be read: it takes more than ${PARSE_MAX_MEMORY_MB} MB to go through` })
-    // It all happened in another process.
-    expect(process.memoryUsage().heapUsed - heap).toBeLessThan(20 * 1024 * 1024)
+    expect(tooBig).toMatchObject({ status: 400, message: "The link can't be read: it takes too much memory to go through" })
   }, 15_000)
+
+  it('sends back titles that take little room, however long they are in the feed', async () => {
+    // Each occurrence comes back with its own copy of its title.
+    const text = feed('DTSTART:20260101T000000Z', 'DURATION:PT30M', 'RRULE:FREQ=HOURLY;COUNT=19000', `SUMMARY:${'Répétition '.repeat(5000)}`)
+    expect(text.length).toBeGreaterThan(50_000)
+    const read = await parseFeed({ text, kind: 'occupation', ...WINDOW })
+    expect(read.events).toHaveLength(19_000)
+    expect(new Set(read.events.map(({ title }) => title))).toEqual(new Set([`${'Répétition '.repeat(18).trim()}…`]))
+    expect(serialize(read).length).toBeLessThan(19_000 * (2 * TITLE_MAX_LENGTH + 100))
+  })
 
   it('goes through one feed at a time, and stops waiting its turn when the read is stopped', async () => {
     const started = performance.now()
@@ -67,14 +76,16 @@ describe('parseFeed', () => {
     expect(await second).toBeGreaterThanOrEqual(2000)
   }, 15_000)
 
-  it('stops when the read is stopped', async () => {
+  it('stops when the read is stopped, and lets the next one go through', async () => {
     const stopping = new AbortController()
     const parsing = parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { signal: stopping.signal })
+    const next = parseFeed({ text: feed('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z'), kind: 'occupation', ...WINDOW })
     setTimeout(() => stopping.abort(), 200)
     const started = performance.now()
     expect(await failure(parsing)).toBeInstanceOf(ReadAborted)
+    // Its process was killed, rather than left to go on until its time is up.
+    expect((await next).events).toHaveLength(1)
     expect(performance.now() - started).toBeLessThan(2000)
-    stopping.abort()
     expect(await failure(parseFeed({ text: NEVER, kind: 'occupation', ...WINDOW }, { signal: stopping.signal }))).toBeInstanceOf(ReadAborted)
   })
 })

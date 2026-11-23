@@ -8,8 +8,10 @@
 # - a link whose server can't be found fails with 502
 # - a feed that's in the database is listed, without its link, and can be removed
 # - the links are never logged
-# - in the image, a feed's text is gone through in a process of its own, which a recurring event that ical.js looks for
-#   without end can't take the server down with
+# - in the image, the server's module that goes through a feed's text (calendar/parse.js) starts its process, gets its
+#   events back, and fails a feed that ical.js would go through without end, when its time is up, or it runs out of
+#   memory. That's checked with the module, in a process of its own, rather than through the server, which can only
+#   read a feed over https.
 
 source "$(dirname "$0")/lib.sh"
 
@@ -73,7 +75,7 @@ expect_body_contains '"total":0'
 echo "  the links are never logged"
 if docker logs --since "$since" "$CONTAINER" 2>&1 | grep -qF "$SECRET"; then fail "the server logged a feed's link"; fi
 
-echo "  a feed's text is gone through in a process of its own, which stops, in the server's image"
+echo "  in the image, a feed's text is gone through in a process of its own, which stops"
 # parse <rule> <options> -- go through a feed with one event that recurs by the rule, with the server's own module, in
 # its image, and with parseFeed's options, a JavaScript object, printing how many events it has, or why it failed.
 parse() {
@@ -93,7 +95,5 @@ expect_parse() {
 expect_parse 'FREQ=DAILY;COUNT=3' '^events: 3$'
 # Every day of February 30, which ical.js goes on looking for, filling its caches, until the process is killed, or runs
 # out of memory.
-expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes more than [0-9]+ (seconds|MB) to go through$"
-expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes more than [0-9]+ MB to go through$" '{ maxMemoryMb: 32 }'
-request "${BASE_URL}/healthz"
-expect_status 200
+expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes (more than [0-9]+ seconds|too much memory) to go through$"
+expect_parse 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' "^The link can't be read: it takes too much memory to go through$" '{ maxMemoryMb: 32 }'

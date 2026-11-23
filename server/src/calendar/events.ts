@@ -78,6 +78,23 @@ function endOf(startDate: ICAL.Time, start: number, tzid: string | null, { days,
   return (days === 0 ? start : instantOf(startDate.clone().adjust(days, 0, 0, 0), tzid)) + ms
 }
 
+// The longest title an event keeps, "…" included. Each occurrence of an event has its own copy of its title once the
+// events are sent to the server (see parse.ts), so this is what bounds their size, with MAX_OCCURRENCES_PER_READ.
+export const TITLE_MAX_LENGTH = 200
+
+// `summary` on one line, trimmed, and cut, with "…", after its last whole word that fits in TITLE_MAX_LENGTH, or within
+// a word when none does, but never within a character.
+export function shortTitle(summary: string): string {
+  const title = summary.replace(/\s+/g, ' ').trim()
+  if (title.length <= TITLE_MAX_LENGTH) return title
+  // With a character more, to tell whether the last word ends in them, taking away the last word and the space before it
+  // leaves the words that do, or nothing when none does.
+  const words = title.slice(0, TITLE_MAX_LENGTH).replace(/ ?\S*$/, '')
+  if (words) return `${words}…`
+  const end = /[\uD800-\uDBFF]/.test(title[TITLE_MAX_LENGTH - 2]) ? TITLE_MAX_LENGTH - 2 : TITLE_MAX_LENGTH - 1
+  return `${title.slice(0, end)}…`
+}
+
 const isCancelled = (event: ICAL.Event) => String(event.component.getFirstPropertyValue('status') ?? '').toUpperCase() === 'CANCELLED'
 
 // The events and occurrences of a feed that has `kind`, from its text, that take some of the time from `from` to `to`,
@@ -92,27 +109,35 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
     throw refused("its answer isn't valid iCalendar")
   }
   if (!Array.isArray(parsed) || parsed[0] !== 'vcalendar') throw refused("its answer isn't an iCalendar calendar")
-  const calendar = new ICAL.Component(parsed)
+  // The calendar's components, in jCal: each event is only made a component, which ical.js reads it as, when its turn
+  // comes, and both are dropped once it's gone through, so that a read takes little more memory than the jCal.
+  const components = parsed[2] as unknown[][]
   // ical.js looks a TZID up among every component of the calendar each time it reads a time in it, and only remembers
   // those it finds: with a TZID that has no VTIMEZONE, each time would go through every event. So the events are read in
   // a calendar of their own, that only has the time zones.
-  const zones = new ICAL.Component(['vcalendar', [], calendar.getAllSubcomponents('vtimezone').map(({ jCal }) => jCal)])
+  const zones = new ICAL.Component(['vcalendar', [], components.filter(([name]) => name === 'vtimezone')])
+  // The first value of the property `name` of a component in jCal, if it has one.
+  const valueOf = ([, properties]: unknown[], name: string) => (properties as unknown[][]).find(([property]) => property === name)?.[3]
 
   // The events by their UID: those that recur, or don't, and the occurrences changed on their own, which ical.js relates
   // to their recurring event only when it's told which they are. Events without a UID are on their own.
-  const groups: { events: ICAL.Component[]; changed: ICAL.Component[] }[] = []
-  const byUid = new Map<string, (typeof groups)[number]>()
-  for (const vevent of calendar.getAllSubcomponents('vevent')) {
-    vevent.parent = zones
-    const uid = vevent.getFirstPropertyValue('uid')
+  type Group = { events: unknown[][]; changed: unknown[][] }
+  const groups: (Group | undefined)[] = []
+  const byUid = new Map<string, Group>()
+  for (const vevent of components) {
+    if (vevent[0] !== 'vevent') continue
+    const uid = valueOf(vevent, 'uid')
     let group = typeof uid === 'string' && uid !== '' ? byUid.get(uid) : undefined
     if (!group) {
       group = { events: [], changed: [] }
       groups.push(group)
       if (typeof uid === 'string' && uid !== '') byUid.set(uid, group)
     }
-    ;(vevent.hasProperty('recurrence-id') ? group.changed : group.events).push(vevent)
+    ;(valueOf(vevent, 'recurrence-id') === undefined ? group.events : group.changed).push(vevent)
   }
+  // From here, each event's jCal is only kept by its group, which is dropped once it's gone through.
+  byUid.clear()
+  components.length = 0
 
   const events: CalendarEvent[] = []
   let skipped = 0
@@ -120,10 +145,8 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
   const fromMs = from.getTime()
   const toMs = to.getTime()
 
-  // The title of an occurrence of `event`, which only occupations keep.
-  // ical.js's values are slices of the feed's text, which they would keep in memory: the titles kept are copies.
-  const titleOf = (event: ICAL.Event) =>
-    kind === 'occupation' ? Buffer.from(String(event.component.getFirstPropertyValue('summary') ?? '').trim()).toString() : null
+  // The title of an occurrence of `event`, which only occupations keep, as shortTitle gives it.
+  const titleOf = (event: ICAL.Event) => (kind === 'occupation' ? shortTitle(String(event.component.getFirstPropertyValue('summary') ?? '')) : null)
 
   // The occurrences of `event` that take some of the time from `from` to `to`, or null when it has too many. An event
   // that doesn't recur has one.
@@ -166,7 +189,11 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
     }
   }
 
-  for (const { events: recurring, changed } of groups) {
+  for (const [index, group] of groups.entries()) {
+    groups[index] = undefined
+    const component = (jCal: unknown[]) => new ICAL.Component(jCal, zones)
+    const recurring = group!.events.map(component)
+    const changed = group!.changed.map(component)
     // Occurrences changed on their own whose recurring event isn't in the feed are events of their own.
     const alone = recurring.length === 0
     for (const vevent of alone ? changed : recurring) {
