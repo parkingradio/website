@@ -15,6 +15,7 @@ import {
   NO_SUCH_ARTIST,
   NO_SUCH_COLLECTIVE,
   NO_SUCH_SESSION,
+  after,
   brokenSessionRule,
 } from './fields.js'
 import type { BrokenRule, SentPerformer, Status } from './fields.js'
@@ -32,6 +33,8 @@ export type StoredSet = SetRow & { performers: Reference[]; application: StoredA
 // A session, as the database keeps it, with the collective whose takeover it is, its application, and its sets, in order.
 export type SessionRow = typeof sessions.$inferSelect
 export type StoredSession = SessionRow & { takeover: Reference | null; application: StoredApplicationLink | null; sets: StoredSet[] }
+// A session whose sets weren't loaded, which the calendar only counts (see `forCalendar`).
+export type SessionWithoutSets = Omit<StoredSession, 'sets'> & { sets: null }
 
 // What a session stores of `flyer`, a flyer that was stored, or null for none: where it's stored (see `Photos` in
 // artists/store.ts), and its MIME type, or nulls.
@@ -142,10 +145,11 @@ export type SessionsStore = {
   // that collective's takeovers: none when there's no such artist or collective. With `from` or `to`, only those that
   // start at or after `from` and before `to`, which leaves out those without a start.
   list(filter?: { artist?: string; takeover?: string; from?: Date; to?: Date }): Promise<StoredSession[]>
-  // What the calendar needs, in one query, in the order of `list` (see "The calendar" in docs/design/server/calendar.md):
-  // the sessions with a start that take some of the time from `range.from` to `range.to`, whatever their status, those
-  // with a start that aren't cancelled that take some of `window`, and those without a start that aren't cancelled.
-  forCalendar(range: { from: Date; to: Date }, window: { from: Date; to: Date }): Promise<StoredSession[]>
+  // What the calendar needs, from one query, in the order of `list` (see "The calendar" in
+  // docs/design/server/calendar.md): the sessions with a start that take some of the time from `range.from` to
+  // `range.to`, whatever their status, and those without a start that aren't cancelled, with their sets, and those with a
+  // start that aren't cancelled that take some of `window`, without them, unless they're among the others.
+  forCalendar(range: { from: Date; to: Date }, window: { from: Date; to: Date }): Promise<(StoredSession | SessionWithoutSets)[]>
   get(id: string): Promise<StoredSession | null>
   // Adds a session, as "planned", and `sets` to it, in order, as `addSet` would add each one, all of them or none.
   // Throws a NoSuchReference, a BrokenFields or a Conflict, with the `setIndex` of the set it's about, if it's about
@@ -237,6 +241,11 @@ async function setsOf(db: Queryable, sessionIds: string[]): Promise<Map<string, 
 // The sessions that match `where`, in the order of `list`, or only the first `limit` of them, with their takeovers and
 // their sets.
 export async function sessionsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<StoredSession[]> {
+  return addSets(db, await sessionRowsWhere(db, where, limit))
+}
+
+// Like `sessionsWhere`, but without their sets.
+async function sessionRowsWhere(db: Queryable, where: SQL | undefined, limit?: number): Promise<Omit<StoredSession, 'sets'>[]> {
   const query = db
     .select({ session: sessions, takeoverName: collectives.name, receivedAt: applications.receivedAt })
     .from(sessions)
@@ -245,17 +254,21 @@ export async function sessionsWhere(db: Queryable, where: SQL | undefined, limit
     .where(where)
     .orderBy(sql`${sessions.startAt} desc nulls first`, desc(sessions.createdAt))
   const rows = await (limit === undefined ? query : query.limit(limit))
-  if (rows.length === 0) return []
-  const setsBySession = await setsOf(
-    db,
-    rows.map(({ session }) => session.id),
-  )
   return rows.map(({ session, takeoverName, receivedAt }) => ({
     ...session,
     takeover: session.takeoverId === null ? null : { id: session.takeoverId, name: takeoverName! },
     application: storedApplicationLink(session.applicationId, receivedAt),
-    sets: setsBySession.get(session.id) ?? [],
   }))
+}
+
+// The sessions `rows`, in the same order, with their sets.
+async function addSets(db: Queryable, rows: Omit<StoredSession, 'sets'>[]): Promise<StoredSession[]> {
+  if (rows.length === 0) return []
+  const setsBySession = await setsOf(
+    db,
+    rows.map(({ id }) => id),
+  )
+  return rows.map((row) => ({ ...row, sets: setsBySession.get(row.id) ?? [] }))
 }
 
 // One of the takeovers of the collective `collectiveId`, the first in the order of `list`, or null when it has none.
@@ -551,11 +564,15 @@ export function sessionsStore(db: Queryable): SessionsStore {
       return sessionsWhere(db, and(...conditions))
     },
 
-    forCalendar(range, window) {
+    async forCalendar(range, window) {
       const takesSomeOf = ({ from, to }: { from: Date; to: Date }) =>
         sql`(${sessions.startAt} is not null and session_period(${sessions.startAt}, ${sessions.durationMinutes}) && tstzrange(${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz))`
       const notCancelled = ne(sessions.status, 'cancelled')
-      return sessionsWhere(db, or(takesSomeOf(range), and(notCancelled, or(takesSomeOf(window), isNull(sessions.startAt)))))
+      const rows = await sessionRowsWhere(db, or(takesSomeOf(range), and(notCancelled, or(takesSomeOf(window), isNull(sessions.startAt)))))
+      // Only those the calendar gives in full have their sets loaded.
+      const full = rows.filter(({ startAt, durationMinutes }) => startAt === null || (startAt < range.to && after(startAt, durationMinutes) > range.from))
+      const withSets = new Map((await addSets(db, full)).map((session) => [session.id, session]))
+      return rows.map((row) => withSets.get(row.id) ?? { ...row, sets: null })
     },
 
     async get(id) {

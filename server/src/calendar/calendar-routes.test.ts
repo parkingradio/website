@@ -73,9 +73,11 @@ function session(id: string, startAt: string | null, durationMinutes: number, st
 let rows: StoredSession[]
 const overlaps = (row: StoredSession, { from, to }: { from: Date; to: Date }) =>
   row.startAt !== null && row.startAt < to && row.startAt.getTime() + row.durationMinutes * 60_000 > from.getTime()
-// As the store has it, in any order, since the route orders them.
+// As the store has it, in any order, since the route orders them: only those given in full have their sets.
 const forCalendar = vi.fn<SessionsStore['forCalendar']>(async (range, window) =>
-  rows.filter((row) => overlaps(row, range) || (row.status !== 'cancelled' && (row.startAt === null || overlaps(row, window)))),
+  rows
+    .filter((row) => overlaps(row, range) || (row.status !== 'cancelled' && (row.startAt === null || overlaps(row, window))))
+    .map((row) => (row.startAt === null || overlaps(row, range) ? row : { ...row, sets: null })),
 )
 const sessions = { forCalendar } as unknown as SessionsStore
 

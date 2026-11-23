@@ -7,6 +7,9 @@ import type { FeedKind } from './fields.js'
 // There's one conflict per pair of things that overlap, so a feed with many events that all overlap each other gives many
 // conflicts, e.g. about 2 million for 2,000 events. No calendar the studio's feeds are read from is like that, so nothing
 // keeps it from happening.
+//
+// Likewise, the calendar gives every conflict of the 365 days whatever the days asked for, so what `get_calendar` gives
+// apps grows with them, e.g. with whole-day reminders in the team's calendar, even for a single day.
 
 // A session, as the calendar counts it: one without a start, or that's cancelled, doesn't count.
 export type CalendarSession = { id: string; title: string; start: Date | null; end: Date | null; status: Status }

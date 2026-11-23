@@ -134,7 +134,7 @@ and shapes:
 | `GET /api/admin/collectives` | `id`, `name`, `country`, `city` and `members` |
 | `GET /api/admin/applications` | `id`, `artistId`, `collectiveId`, `receivedAt`, `status`, `dates`, `sets` and `sessions`, and `name`, the name of its artist or collective, which the tool looks up |
 | `GET /api/admin/sessions` | `id`, `start`, `end`, `durationMinutes`, `type`, `title`, `takeover`, `application`, `status`, `announced` and `sets`, each with its `id`, `durationMinutes`, `status`, `performers` and `application` |
-| `GET /api/admin/calendar` | Its `sessions` and `undatedSessions`, with the fields of `GET /api/admin/sessions`'s but `sets`, since the calendar is about when the studio is taken: `list_sessions`, with `from` and `to`, gives the sets of a period |
+| `GET /api/admin/calendar` | `sessions` and `undatedSessions`, each with `id`, `start`, `end`, `durationMinutes`, `type`, `title`, `takeover`, `application`, `status` and `announced`: the summary of `GET /api/admin/sessions` without `sets` |
 
 **Contact details.** The email and the phone of artists and collectives are never in what tools give, whether they
 succeed or fail: whatever a tool gives is sent to the model's provider, and these are people's personal contact details.

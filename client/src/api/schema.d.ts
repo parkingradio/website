@@ -2673,7 +2673,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, with the calendar feeds they are read from, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, and the calendar feeds that occupations and quiet time are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
         get: operations["get_calendar"];
         put?: never;
         post?: never;
@@ -7168,7 +7168,7 @@ export interface operations {
                         quietTimes: components["schemas"]["CalendarQuietTime"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
                         conflicts: components["schemas"]["CalendarConflict"][];
-                        /** @description The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for */
+                        /** @description The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for */
                         undatedSessions: components["schemas"]["Session"][];
                     };
                 };

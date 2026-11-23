@@ -235,7 +235,21 @@ const SUMMARIES: Record<string, Summary> = {
   list_collectives: {
     summarize: async ({ collectives, ...rest }) => ({ ...rest, collectives: pick(collectives, ['id', 'name', 'country', 'city', 'members']) }),
   },
-  list_applications: { summarize: summarizeApplications },
+  list_applications: {
+    summarize: async ({ applications, ...rest }, send) => {
+      // With the name of their artist or collective, which the route doesn't give.
+      const names = new Map<string, string>()
+      const owners = await Promise.all([send('GET', '/api/admin/artists'), send('GET', '/api/admin/collectives')])
+      for (const [field, { body }] of [['artists', owners[0]], ['collectives', owners[1]]] as const) {
+        for (const { id, name } of ((body as JsonObject)[field] ?? []) as { id: string; name: string }[]) names.set(id, name)
+      }
+      const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates', 'sets', 'sessions']).map((summary) => ({
+        ...summary,
+        name: names.get((summary.artistId ?? summary.collectiveId) as string) ?? null,
+      }))
+      return { ...rest, applications: summaries }
+    },
+  },
   list_sessions: {
     summarize: async ({ sessions, ...rest }) => ({
       ...rest,
@@ -247,27 +261,13 @@ const SUMMARIES: Record<string, Summary> = {
   },
   get_calendar: {
     says:
-      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, with `from` and `to`, the sets of a period. Ask for a month at a time.',
+      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, with `from` and `to`, the sets of a period.',
     summarize: async ({ sessions, undatedSessions, ...rest }) => ({
       ...rest,
       sessions: pick(sessions, SESSION_SUMMARY),
       undatedSessions: pick(undatedSessions, SESSION_SUMMARY),
     }),
   },
-}
-
-// The applications' summaries, with the name of their artist or collective, which the route doesn't give.
-async function summarizeApplications({ applications, ...rest }: JsonObject, send: Send): Promise<JsonObject> {
-  const names = new Map<string, string>()
-  const owners = await Promise.all([send('GET', '/api/admin/artists'), send('GET', '/api/admin/collectives')])
-  for (const [field, { body }] of [['artists', owners[0]], ['collectives', owners[1]]] as const) {
-    for (const { id, name } of ((body as JsonObject)[field] ?? []) as { id: string; name: string }[]) names.set(id, name)
-  }
-  const summaries = pick(applications, ['id', 'artistId', 'collectiveId', 'receivedAt', 'status', 'dates', 'sets', 'sessions']).map((summary) => ({
-    ...summary,
-    name: names.get((summary.artistId ?? summary.collectiveId) as string) ?? null,
-  }))
-  return { ...rest, applications: summaries }
 }
 
 function pickOne(item: JsonObject, fields: string[]): JsonObject {

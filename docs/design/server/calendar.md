@@ -95,7 +95,8 @@ they can be out of date: a feed whose last read failed still gives what it read 
 yet, e.g. right after the server restarts, gives nothing. So the calendar also gives every feed, with when it was last
 read and why that failed, and apps should tell the admin when a feed's last read failed, or when it hasn't been read
 yet, since occupations or quiet time can then be missing. The calendar of days more than a year before a feed's last
-read, or more than two years after it, has none of that feed's occupations or quiet time (see [Events](#events)).
+successful read (its `readAt`), or more than two years after it, has none of that feed's occupations or quiet time (see
+[Events](#events)).
 
 An occupation, or a quiet time, is given with its feed's id (`feed`), its `start` and `end`, and whether it takes whole
 days (`wholeDay`), and an occupation with its `title` too, `""` for none. They have no id of their own, since they're
@@ -134,7 +135,7 @@ they're given with, so the conflicts of the same things are always in the same o
 ## Sessions without a date
 
 The sessions without a start that aren't cancelled need a date: the calendar gives them, the most recently added first,
-whatever its range.
+then in order of their id, whatever its range.
 
 ## `GET /api/admin/calendar` (admin)
 
@@ -156,7 +157,7 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | `occupations` | list | The occupations that take some of the days, each with its `feed`, `start`, `end`, `wholeDay` and `title`, in the order of things (see [Conflicts](#conflicts)) |
 | `quietTimes` | list | The quiet times that take some of the days, each with its `feed`, `start`, `end` and `wholeDay`, in the order of things |
 | `conflicts` | list | The conflicts of the next 365 days, whatever the days asked for (see [Conflicts](#conflicts)) |
-| `undatedSessions` | list of sessions | The sessions without a date, whatever the days asked for, as `GET /api/admin/sessions` gives them (see [Sessions without a date](#sessions-without-a-date)) |
+| `undatedSessions` | list of sessions | The sessions without a date, whatever the days asked for, as `GET /api/admin/sessions` gives them, in reverse order of `createdAt`, then in order of `id` (see [Sessions without a date](#sessions-without-a-date)) |
 
 It isn't a list of a collection, so it has no `total` (see [Totals, in Conventions](README.md#conventions)).
 

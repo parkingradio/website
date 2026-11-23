@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { Day, EARLIEST_INSTANT, LATEST_INSTANT, addDays, dayStart, dayWith, daysBetween, quebecDay } from '../api/formats.js'
+import { Day, addDays, dayStart, dayWith, daysBetween, quebecDay } from '../api/formats.js'
 import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { Status, after, sessionTitle } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
-import type { SessionsStore, StoredSession } from '../sessions/store.js'
+import type { SessionWithoutSets, SessionsStore, StoredSession } from '../sessions/store.js'
 import { compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.js'
 import type { CalendarSession, EventThing, Thing } from './conflicts.js'
 import type { CalendarFeedsStore } from './feeds.js'
@@ -14,9 +14,10 @@ import { Feed, feedBody } from './routes.js'
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
 
-// The days of the years 2000 to 2999, like the instants that requests send.
-const FIRST_DAY = new Date(EARLIEST_INSTANT).toISOString().slice(0, 'YYYY-MM-DD'.length)
-const LAST_DAY = addDays(new Date(LATEST_INSTANT).toISOString().slice(0, 'YYYY-MM-DD'.length), -1)
+// The days of the years 2000 to 2999, like the instants that requests send (see `EARLIEST_INSTANT` and `LATEST_INSTANT`
+// in api/formats.ts).
+const FIRST_DAY = '2000-01-01'
+const LAST_DAY = '2999-12-31'
 const MAX_DAYS = 400
 // The conflicts are those of the days from today.
 const CONFLICT_DAYS = 365
@@ -72,7 +73,7 @@ const CalendarResponse = z.object({
   conflicts: z.array(Conflict).meta({ description: 'The conflicts of the next 365 days, from today, whatever the days asked for' }),
   undatedSessions: z
     .array(SessionBody)
-    .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for" }),
+    .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for" }),
 })
 
 const eventBody = ({ feed, start, end, wholeDay }: EventThing) => ({ feed, start: start.toISOString(), end: end.toISOString(), wholeDay })
@@ -87,7 +88,7 @@ function thingBody(thing: Thing): z.infer<typeof Thing> {
 }
 
 // A session, as the calendar counts it.
-function calendarSession(row: StoredSession): CalendarSession {
+function calendarSession(row: StoredSession | SessionWithoutSets): CalendarSession {
   const { id, startAt: start, durationMinutes, status } = row
   return { id, title: sessionTitle(row), start, end: start && after(start, durationMinutes), status }
 }
@@ -106,7 +107,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       schema: {
         operationId: 'get_calendar',
         summary:
-          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, with the calendar feeds they are read from, and, whatever the days, the conflicts of the next 365 days and the sessions without a date',
+          'What takes the studio over the days from `from` to `to`, both included, in Québec: sessions, occupations and quiet time, and the calendar feeds that occupations and quiet time are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date',
         tags: ['Calendar'],
         querystring: CalendarQuery,
         response: { 200: CalendarResponse },
@@ -123,8 +124,8 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const inWindow = takesSomeOf(window)
       // What was read from each feed is taken once, so that its status and its events are from the same read. Only the
       // events of the days asked for, or of the 365 days, are needed: a read keeps three years.
-      const read = listed.map((feed) => ({ feed, read: reads.of(feed.id) }))
-      const events: EventThing[] = read.flatMap(({ feed, read }) =>
+      const withReads = listed.map((feed) => ({ feed, read: reads.of(feed.id) }))
+      const events: EventThing[] = withReads.flatMap(({ feed, read }) =>
         (read?.events ?? [])
           .filter((event) => inRange(event) || inWindow(event))
           .map(({ start, end, wholeDay, title }) => ({ kind: feed.kind, feed: feed.id, start, end, wholeDay, title })),
@@ -132,25 +133,21 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const order = thingOrder(listed.map(({ id }) => id))
       const eventsInRange = events.filter(inRange).sort(order)
 
-      const counted = stored.map((row) => ({ row, session: calendarSession(row) }))
-      const sessionsInRange = counted
-        .filter(({ session }) => inRange(session))
-        .sort((a, b) => a.session.start!.getTime() - b.session.start!.getTime() || a.row.createdAt.getTime() - b.row.createdAt.getTime() || compareStrings(a.row.id, b.row.id))
-      const undated = stored
+      // The sessions given in full, those of the days asked for and those without a start, are those with their sets.
+      const given = stored.filter((row): row is StoredSession => row.sets !== null)
+      const sessionsInRange = given
+        .filter((row) => row.startAt !== null)
+        .sort((a, b) => a.startAt!.getTime() - b.startAt!.getTime() || a.createdAt.getTime() - b.createdAt.getTime() || compareStrings(a.id, b.id))
+      const undated = given
         .filter((row) => row.startAt === null)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || compareStrings(a.id, b.id))
-      const found = conflicts(
-        counted.map(({ session }) => session),
-        events,
-        window,
-        order,
-      )
+      const found = conflicts(stored.map(calendarSession), events, window, order)
 
       return {
         ok: true as const,
         today,
-        feeds: read.map(({ feed, read }) => feedBody(feed, read)),
-        sessions: sessionsInRange.map(({ row }) => sessionBody(row)),
+        feeds: withReads.map(({ feed, read }) => feedBody(feed, read)),
+        sessions: sessionsInRange.map(sessionBody),
         occupations: eventsInRange.filter(({ kind }) => kind === 'occupation').map(occupationBody),
         quietTimes: eventsInRange.filter(({ kind }) => kind === 'quiet-time').map(eventBody),
         conflicts: found.map(({ start, end, things: [first, second] }) => ({

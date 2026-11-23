@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { sessions } from '../db/schema.js'
+import { artists, sessions, setPerformers, sets } from '../db/schema.js'
 import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import type { Status } from './fields.js'
@@ -19,16 +19,33 @@ afterAll(async () => {
 })
 
 beforeEach(async () => {
-  await database.db.execute(sql`truncate sessions cascade`)
+  await database.db.execute(sql`truncate sessions, artists cascade`)
 })
 
 // Times as hours after a base instant.
 const at = (hours: number) => new Date(Date.UTC(2026, 10, 23) + hours * 3_600_000)
 
-// Adds a session named `name`, which starts at `start`, or has no start, and lasts `hours`.
-async function add(name: string, start: number | null, hours: number, status: Status = 'planned') {
+// Adds a session named `name`, which starts at `start`, or has no start, and lasts `hours`, and returns its id.
+async function add(name: string, start: number | null, hours: number, status: Status = 'planned'): Promise<string> {
   const startAt = start === null ? null : at(start)
-  await database.db.insert(sessions).values({ createdBy: 'admin@example.com', startAt, durationMinutes: hours * 60, type: 'other', name, status })
+  const [{ id }] = await database.db
+    .insert(sessions)
+    .values({ createdBy: 'admin@example.com', startAt, durationMinutes: hours * 60, type: 'other', name, status })
+    .returning({ id: sessions.id })
+  return id
+}
+
+// Gives the session `sessionId` a set of an hour, played by a new artist, `performer`.
+async function addSet(sessionId: string, performer: string) {
+  const [artist] = await database.db
+    .insert(artists)
+    .values({ name: performer, country: '', city: '', genres: [], bio: '', links: {}, phone: '' })
+    .returning({ id: artists.id })
+  const [set] = await database.db
+    .insert(sets)
+    .values({ createdBy: 'admin@example.com', sessionId, position: 0, durationMinutes: 60, performanceTypes: [], otherPerformanceType: '', genres: [] })
+    .returning({ id: sets.id })
+  await database.db.insert(setPerformers).values({ setId: set.id, artistId: artist.id, position: 0 })
 }
 
 async function names(range: [number, number], window: [number, number]) {
@@ -57,9 +74,15 @@ describe('forCalendar', () => {
     expect(await names([0, 10], [100, 200])).toEqual(['across its end', 'in the window', 'without a start'])
   })
 
-  it('gives each session once, with its sets', async () => {
-    await add('in both', 105, 1)
+  it('gives each session once, with its sets when it takes some of the range or has no start, and without them otherwise', async () => {
+    for (const [name, start] of [['in both', 105], ['only in the window', 150], ['without a start', null]] as const) {
+      await addSet(await add(name, start, 1), `Artist ${name}`)
+    }
     const found = await sessionsStore(database.db).forCalendar({ from: at(100), to: at(110) }, { from: at(100), to: at(200) })
-    expect(found.map(({ name, sets }) => [name, sets])).toEqual([['in both', []]])
+    const performers = (name: string) => found.find((session) => session.name === name)!.sets?.map(({ performers }) => performers.map(({ name }) => name))
+    expect(found.map(({ name }) => name).sort()).toEqual(['in both', 'only in the window', 'without a start'])
+    expect(performers('in both')).toEqual([['Artist in both']])
+    expect(performers('without a start')).toEqual([['Artist without a start']])
+    expect(found.find((session) => session.name === 'only in the window')!.sets).toBeNull()
   })
 })
