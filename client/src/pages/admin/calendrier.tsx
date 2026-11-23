@@ -19,11 +19,11 @@ import './calendrier/calendrier.css'
 // E.g. "novembre 2026".
 const monthFormat = new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
-// Reads the calendar of the days from `from` to `to`, again whenever they change, and when the tab is shown again, at
-// most once a minute, and tells the menu's badge how many conflicts there are. Only the last request's answer counts.
-// Returns the calendar last read, whatever its days, the one read for these days, once it is, and why the last request
-// failed, if it did.
-function useCalendar(from: string, to: string): { last: Calendar | null; shown: Calendar | null; error: string | null } {
+// Reads the calendar of the days from `from` to `to`, again whenever they change, or `version` does, and when the tab is
+// shown again, at most once a minute, and tells the menu's badge how many conflicts there are. Only the last request's
+// answer counts. Returns the calendar last read, whatever its days, the one read for these days, once it is, and why the
+// last request failed, if it did.
+function useCalendar(from: string, to: string, version: number): { last: Calendar | null; shown: Calendar | null; error: string | null } {
   const [reads, setReads] = useState<{ read: { from: string; to: string; calendar: Calendar } | null; error: string | null }>({ read: null, error: null })
   const tabShown = useTabShownCount()
   const report = useReportConflicts()
@@ -39,7 +39,7 @@ function useCalendar(from: string, to: string): { last: Calendar | null; shown: 
     return () => {
       cancelled = true
     }
-  }, [from, to, tabShown, report])
+  }, [from, to, version, tabShown, report])
 
   const { read, error } = reads
   return { last: read?.calendar ?? null, shown: read && read.from === from && read.to === to ? read.calendar : null, error }
@@ -54,19 +54,24 @@ export function Calendrier() {
   const chosen = day !== null && grid.includes(day) ? day : null
   const issuesOpen = params.get('issues') === 'open'
   const { from, to } = gridRange(grid)
-  const reads = useCalendar(from, to)
-  // Only a calendar read for the month's days is shown in it.
-  // With the grid of its own, which depends on the month alone, unlike `grid`, which is made again on each render.
+  // How many sessions were added, each of which reads the calendar again.
+  const [addedCount, setAddedCount] = useState(0)
+  const reads = useCalendar(from, to, addedCount)
+  // Only a calendar read for the month's days is shown in it, with the grid of its own, which depends on the month alone,
+  // unlike `grid`, which is made again on each render.
   const days = useMemo(() => reads.shown && calendarDays(reads.shown, gridDays(month)), [reads.shown, month])
   const monthNameId = useId()
 
-  // The day the form for a new session was opened on, which shows while it's the chosen day. Choosing another day, or
-  // none, in any way, e.g. going back in the history, closes it.
+  // The day the form for a new session was opened on, which shows while it's the chosen day, and the session last added,
+  // and its day, which the chosen day says, until the form opens again. Choosing another day, or none, in any way, e.g.
+  // going back in the history, closes the form, and leaves out what it added.
   const [adding, setAdding] = useState<string | null>(null)
+  const [added, setAdded] = useState<{ day: string; title: string } | null>(null)
   const [lastChosen, setLastChosen] = useState(chosen)
   if (chosen !== lastChosen) {
     setLastChosen(chosen)
     if (adding !== chosen) setAdding(null)
+    setAdded(null)
   }
 
   // How many times a "+" was used, each of which puts the focus on the form, even when it's open already.
@@ -141,6 +146,7 @@ export function Calendrier() {
         onAdd={(shown) => {
           if (shown !== chosen) choose(shown)
           setAdding(shown)
+          setAdded(null)
           setAddings((addings) => addings + 1)
         }}
       />
@@ -163,7 +169,19 @@ export function Calendrier() {
                 focusNext.current = `.calendar-month [data-add="${chosen}"]`
                 setAdding(null)
               }}
+              onAdded={(session) => {
+                // The day stays chosen, with the focus on it in the month, where the session shows once it's read.
+                focusNext.current = `.calendar-month [data-day="${chosen}"]`
+                setAdding(null)
+                setAdded({ day: chosen, title: session.title })
+                setAddedCount((count) => count + 1)
+              }}
             />
+          )}
+          {added?.day === chosen && (
+            <p className="admin-notice" role="status">
+              La session {added.title} a été ajoutée.
+            </p>
           )}
         </ChosenDay>
       )}

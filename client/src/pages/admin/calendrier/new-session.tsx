@@ -1,29 +1,36 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { api, formData } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { useCheckedForm } from '../checked-form'
 import { formatDuration } from '../describe'
 import { FormActions, Labeled } from '../fields'
 import { CollectivesFailure } from '../profile-details'
-import { failure, sessionPath } from '../session-errors'
+import type { Session } from '../../../session-fields'
+import { failure } from '../session-errors'
 import { NameField, TakeoverField, TypeField } from '../session-form'
 import { checkSessionOnDay } from './new-session-fields'
 import type { NewSessionOnDay } from './new-session-fields'
 
-// A short form for a new session on the chosen day, `day`, under its things, which adds it without sets, then goes to
-// its page (see "A new session" in docs/design/client/admin/calendrier.md). It's checked as the session form checks it,
+// A short form for a new session on the chosen day, `day`, under its things, which adds it without sets, then says so with
+// `onAdded` (see "A new session" in docs/design/client/admin/calendrier.md). It's checked as the session form checks it,
 // with the collectives loaded each time it opens. It puts the focus on its heading when it opens, and whenever
 // `focusRequests` changes, rather than on its start, which would say what's wrong with it once it's left, moving what's
 // under it, e.g. as it's tapped.
 
 const EMPTY: NewSessionOnDay = { start: '', end: '', type: null, takeover: null, name: '' }
 
-export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; focusRequests: number; onCancel: () => void }) {
+type NewSessionFormProps = {
+  day: string
+  // Changes each time the form is to take the focus again, e.g. when its "+" is used while it's open.
+  focusRequests: number
+  onCancel: () => void
+  onAdded: (session: Session) => void
+}
+
+export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSessionFormProps) {
   const headingId = useId()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => heading.current?.focus(), [focusRequests])
-  const navigate = useNavigate()
   const collectives = useApi('/api/admin/collectives')
   const [values, setValues] = useState(EMPTY)
   const update = (changes: Partial<NewSessionOnDay>) => setValues((values) => ({ ...values, ...changes }))
@@ -32,7 +39,7 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
     // There are fields, since there are no errors by then.
     const result = await api.POST('/api/admin/sessions', { body: { session: checked.fields! }, bodySerializer: formData })
     if (!result.ok) return failure("La session n'a pas pu être ajoutée", result)
-    navigate(sessionPath(result.session))
+    onAdded(result.session)
     return null
   })
 

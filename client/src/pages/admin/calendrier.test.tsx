@@ -508,7 +508,7 @@ describe('Calendrier', () => {
       expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
     })
 
-    it('adds the session, without sets, and with its other fields empty, then goes to its page', async () => {
+    it('adds the session, without sets, and with its other fields empty, then shows it on its day, still chosen', async () => {
       const added = session('session-9', 'HAUTE RIVE TAKEOVER', '2026-11-25T21:00:00-05:00', '2026-11-26T01:00:00-05:00')
       mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, 'POST /api/admin/sessions': { ok: true, session: added } })
       renderAt('/admin/calendrier')
@@ -529,9 +529,20 @@ describe('Calendrier', () => {
       })
       fireEvent.click(collective)
       fireEvent.mouseDown(screen.getByRole('option', { name: /^Haute Rive/ }))
+      // The calendar as it is once the session is added.
+      const POST = { 'POST /api/admin/sessions': { ok: true, session: added } }
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, ...POST, [NOVEMBER]: { ...CALENDAR, sessions: [...CALENDAR.sessions, added] } })
       create()
 
-      await waitFor(() => expect(path()).toBe('/admin/sessions/session-9'))
+      // The form closes, and the day stays chosen, with the focus on it, and says so.
+      await waitFor(() => expect(newSession()).not.toBeInTheDocument())
+      expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-25')
+      expect(document.activeElement).toBe(dayButton('2026-11-25'))
+      expect(within(chosenDay()!).getByRole('status')).toHaveTextContent('La session HAUTE RIVE TAKEOVER a été ajoutée.')
+      // It's read again, which shows the session.
+      await waitFor(() => expect(within(chosenDay()!).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-9'))
+      expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+      expect(cellText('2026-11-25')).toContain('21 h – 1 hsession : HAUTE RIVE TAKEOVER')
       expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1)
       expect(sentSession()).toEqual({
         start: '2026-11-25T21:00-05:00',
@@ -544,6 +555,10 @@ describe('Calendrier', () => {
         description: '',
       })
       expect((requestsTo('POST', '/api/admin/sessions')[0].body as FormData).has('flyer')).toBe(false)
+
+      // Until the form opens again.
+      fireEvent.click(addButton('2026-11-25'))
+      expect(within(chosenDay()!).queryByText(/a été ajoutée/)).not.toBeInTheDocument()
     })
 
     it("shows the server's error, naming the session it would overlap", async () => {

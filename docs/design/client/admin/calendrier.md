@@ -136,9 +136,9 @@ anything, « Rien ce jour-là. ».
 ### A new session
 
 A day's "+" opens a short form for a new session on the chosen day, "Nouvelle session", under the day's things, and puts
-the focus on its heading. It adds the session with only what's needed to add one, without sets, and with its other fields empty
-(see [`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)), then goes to its page, where
-the rest is added. Its fields are:
+the focus on its heading. It adds the session with only what's needed to add one, without sets, and with its other
+fields empty (see [`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)): the rest is added
+on its page, which its link on the chosen day leads to. Its fields are:
 
 - "Début" and "Fin", each a time of day, in Québec time. The session starts on the chosen day, and ends on that day when
   the end's time is after the start's, or else the next day, e.g. "21 h – 1 h". An end at the start's time is refused,
@@ -152,8 +152,11 @@ the rest is added. Its fields are:
 - "Nom", only for "Autre", which needs one (see [Types and names](../../server/sessions.md#types-and-names)).
 
 It says what's wrong as the session form does (see [Errors, in Sessions](sessions.md#errors)), e.g. naming the session
-the new one would overlap, and linking to it. "créer" adds the session, and "annuler" closes the form, which puts the
-focus back on the day's "+". Choosing another day, or none, closes it too, and what was typed in it is lost.
+the new one would overlap, and linking to it. "créer" adds the session, then closes the form, with the day still chosen
+and the focus on it in the month, reads the calendar again, which then shows the session, and says « La session GUEST
+MIXES a été ajoutée. » under the day's things, until the form opens again, or another day, or none, is chosen. "annuler"
+closes the form, which puts the focus back on the day's "+". Choosing another day, or none, closes it too, and what was
+typed in it is lost.
 
 ## Loading and errors
 
@@ -165,6 +168,7 @@ and the form for a new session, which doesn't wait for the calendar.
 ## Endpoints
 
 - `GET /api/admin/calendar`, for the days of the month's grid, within those the server takes. It's read when the page
-  opens, when the month changes, and when the browser's tab is shown again, at most once a minute.
+  opens, when the month changes, when a new session is added, and when the browser's tab is shown again, at most once a
+  minute.
 - `GET /api/admin/collectives`, to pick a takeover's collective, each time the form for a new session opens, and
   `POST /api/admin/sessions`, to add the session.

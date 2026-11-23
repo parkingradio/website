@@ -64,15 +64,19 @@ test('a session is in its month, and on its day, where a new session is added', 
   // Up to when the other starts.
   await form.getByLabel('Fin').fill('21:00')
   await form.getByRole('button', { name: 'créer' }).click()
-  await expect(page).toHaveURL(/^[^?]*\/admin\/sessions\/(?!nouvelle)[^/?]+$/)
-  const newId = new URL(page.url()).pathname.split('/').at(-1)!
-  await expect(page.getByRole('heading', { level: 1, name: `E2E NEW ${unique}` })).toBeVisible()
+  // The page stays, with the form closed, the day chosen and the focus on it, and shows the new session there.
+  await expect(chosen.getByRole('status')).toHaveText(`La session E2E NEW ${unique} a été ajoutée.`)
+  await expect(page).toHaveURL(`/admin/calendrier?month=${month}&day=${day}`)
+  await expect(chosen.getByRole('form')).toHaveCount(0)
+  await expect(dayButton(page, day)).toBeFocused()
+  await expect(chosen.getByRole('listitem')).toHaveText([`session18 h – 21 hE2E NEW ${unique}`, `session21 h – 1 hE2E ${unique}`])
+  await expect(dayCell(page, day)).toContainText('18 h – 21 h')
+  // Its link leads to its page.
+  const link = chosen.getByRole('link', { name: `E2E NEW ${unique}` })
+  const newId = (await link.getAttribute('href'))!.split('/').at(-1)!
+  await link.click()
   await expect(page.getByLabel('Session', { exact: true })).toContainText(`${longDay(day)}, de 18 h à 21 h`)
-  // Back to the month, with its day chosen, the form closed, and the new session on the day.
   await page.goBack()
-  await expect(chosenDay(page, day).getByRole('listitem')).toHaveText([`session18 h – 21 hE2E NEW ${unique}`, `session21 h – 1 hE2E ${unique}`])
-  await expect(dayButton(page, day)).toHaveAttribute('aria-pressed', 'true')
-  await expect(chosenDay(page, day).getByRole('form')).toHaveCount(0)
 
   // The seeded session without a date needs settling, and leads to its page.
   const issues = page.getByRole('region', { name: 'À régler' })
