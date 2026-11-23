@@ -1,7 +1,7 @@
 import type { Data, Schema } from '../../../api/client'
 import { isDay, isTime } from '../../../application-fields'
 import { addDays, daysBetween, quebecDayAndTime, quebecInstant } from '../../../quebec-time'
-import { EMPTY_SESSION_FORM } from '../../../session-fields'
+import { EMPTY_SESSION_FORM, checkSession, sessionTimes } from '../../../session-fields'
 import type { Reference, Session, SessionFormValues, SessionType } from '../../../session-fields'
 import { endsByItsTime, formatDayInYear, formatQuebecDayInYear, formatTime, shortTimes } from '../describe'
 
@@ -75,12 +75,7 @@ export function gridRange(month: string): { from: string; to: string } {
 
 // When `day` starts in Québec, at 00:00, which is never skipped, in milliseconds: the days the clocks change on are 23 or
 // 25 hours long.
-const dayStarts = new Map<string, number>()
-function dayStart(day: string): number {
-  let start = dayStarts.get(day)
-  if (start === undefined) dayStarts.set(day, (start = quebecInstant(day, '00:00')!.getTime()))
-  return start
-}
+const dayStart = (day: string) => quebecInstant(day, '00:00')!.getTime()
 
 const dayOf = (instant: number) => quebecDayAndTime(new Date(instant)).day
 // E.g. "21 h", the time it is in Québec at `instant`.
@@ -160,9 +155,10 @@ export function thingKey(thing: ConflictThing): string {
   return JSON.stringify([thing.feedId, Date.parse(thing.start), Date.parse(thing.end), thing.wholeDay, thing.title])
 }
 
-// An occupation's name, with its feed's name from `feeds`, which has it.
+// An occupation's name, with its feed's name from `feeds`, which has it, as the server's calendar has every occupation's
+// feed.
 function occupationName({ feedId, title }: Schema<'CalendarOccupation'>, feeds: Feed[]): OccupationName {
-  return { title: title || null, calendar: feeds.find(({ id }) => id === feedId)?.name ?? '?' }
+  return { title: title || null, calendar: feeds.find(({ id }) => id === feedId)!.name }
 }
 
 // A conflict's thing, as the page names it.
@@ -251,9 +247,20 @@ export function calendarDays(calendar: Calendar, month: string): Map<string, Cal
 export type NewSessionOnDay = { start: string; end: string; type: SessionType | null; takeover: Reference | null; name: string }
 
 // The new session on `day` as the session form has it, to check it as that form does. It ends on `day` when its end's
-// time is after its start's, and otherwise the next day, so that equal times are refused, as the end isn't after the
-// start. Only "Autre" has a name, since the form only shows it for "Autre".
-export function sessionOnDay(day: string, { start, end, type, takeover, name }: NewSessionOnDay): SessionFormValues {
+// time is after its start's, and otherwise the next day. Only "Autre" has a name, since the form only shows it for
+// "Autre".
+function sessionOnDay(day: string, { start, end, type, takeover, name }: NewSessionOnDay): SessionFormValues {
   const endDay = isTime(start) && isTime(end) && end < start ? addDays(day, 1) : day
   return { ...EMPTY_SESSION_FORM, day, lastDay: day, start, endDay, end, type, takeover, name: type === 'other' ? name : '' }
+}
+
+// Checks the new session on `day` as the session form checks it (see `checkSession`), and returns what the server would
+// be sent, or what's wrong with each field, along with the session as the session form has it, and its times, or what's
+// wrong with them. Equal times are refused, even on the night the clocks go back, when the second one is an hour after
+// the first.
+export function checkSessionOnDay(day: string, values: NewSessionOnDay) {
+  const form = sessionOnDay(day, values)
+  let times = sessionTimes(form)
+  if (isTime(values.start) && values.start === values.end) times = { errors: { ...('errors' in times && times.errors), end: 'La fin doit être après le début.' } }
+  return { form, times, ...checkSession(form, times) }
 }

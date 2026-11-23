@@ -2,14 +2,13 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { api, formData } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
-import { checkSession, sessionTimes } from '../../../session-fields'
 import { useCheckedForm } from '../checked-form'
 import { formatDuration } from '../describe'
 import { FormActions, Labeled } from '../fields'
 import { CollectivesFailure } from '../profile-details'
 import { failure, sessionPath } from '../session-errors'
 import { NameField, TakeoverField, TypeField } from '../session-form'
-import { sessionOnDay } from './model'
+import { checkSessionOnDay } from './model'
 import type { NewSessionOnDay } from './model'
 
 // A short form for a new session on the chosen day, `day`, under its things, which adds it without sets, then goes to
@@ -28,9 +27,8 @@ export function NewSessionForm({ day, focusRequests, onCancel }: { day: string; 
   const collectives = useApi('/api/admin/collectives')
   const [values, setValues] = useState(EMPTY)
   const update = (changes: Partial<NewSessionOnDay>) => setValues((values) => ({ ...values, ...changes }))
-  const form = sessionOnDay(day, values)
-  const times = sessionTimes(form)
-  const checked = checkSession(form, times)
+  const checked = checkSessionOnDay(day, values)
+  const { form, times } = checked
   const { form: formRef, submit, busy, error, shown, leave } = useCheckedForm(checked.errors ?? {}, async () => {
     // There are fields, since there are no errors by then.
     const result = await api.POST('/api/admin/sessions', { body: { session: checked.fields! }, bodySerializer: formData })

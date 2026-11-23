@@ -132,4 +132,4 @@ While a list can't be changed for a moment, e.g. while it's sent, or while a mov
 - `GET /api/admin/me`, to know whether there's a session, and the admin's email.
 - `POST /api/auth/login`, from the login form.
 - `POST /api/auth/logout`, from "se déconnecter".
-- `GET /api/admin/calendar`, for today only, for the badge on "calendrier".
+- `GET /api/admin/calendar`, for the badge on "calendrier".

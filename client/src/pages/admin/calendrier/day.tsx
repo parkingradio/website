@@ -24,10 +24,13 @@ export function ChosenDay({ day, today, shown, onClose, children }: ChosenDayPro
       <div className="calendar-day-heading">
         <h2 id={headingId} className="calendar-heading">
           {formatDay(day)}
+          {/* Screen readers read ", aujourd'hui", rather than the "·". */}
           {day === today && (
             <>
-              {' '}
-              <span className="calendar-day-today">· aujourd'hui</span>
+              <span className="visually-hidden">,</span>{' '}
+              <span className="calendar-day-today">
+                <span aria-hidden="true">·</span> aujourd'hui
+              </span>
             </>
           )}
         </h2>

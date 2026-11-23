@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { checkSession } from '../../../session-fields'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, sessionOnDay, thingKey } from './model'
+import { addMonths, calendarDays, checkSessionOnDay, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed, NewSessionOnDay } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
@@ -266,7 +265,7 @@ describe('the days of the month', () => {
 
 describe('a new session on a day', () => {
   const on = (day: string, start: string, end: string, changes: Partial<NewSessionOnDay> = {}) =>
-    checkSession(sessionOnDay(day, { start, end, type: 'guest-mixes', takeover: null, name: '', ...changes }))
+    checkSessionOnDay(day, { start, end, type: 'guest-mixes', takeover: null, name: '', ...changes })
 
   it('ends on the day when its end is after its start, and otherwise the next day', () => {
     expect(on('2026-11-21', '19:00', '23:00').fields).toMatchObject({ start: '2026-11-21T19:00-05:00', durationMinutes: 240 })
@@ -279,6 +278,10 @@ describe('a new session on a day', () => {
   it('follows the clocks', () => {
     // The first 1 h, as the clocks go back.
     expect(on('2026-10-31', '21:00', '01:00').fields).toMatchObject({ start: '2026-10-31T21:00-04:00', durationMinutes: 240 })
+    // Equal times, though the second 1 h 30 is after the first.
+    expect(on('2026-11-01', '01:30', '01:30').errors).toEqual({ end: 'La fin doit être après le début.' })
+    // An earlier time is the next day's, even when it's also later that night.
+    expect(on('2026-11-01', '01:30', '01:15').fields).toMatchObject({ start: '2026-11-01T01:30-04:00', durationMinutes: 1485 })
     // A time they skip, as they go forward.
     expect(on('2027-03-13', '23:00', '02:30').errors).toEqual({ end: "Cette heure n'existe pas cette nuit-là, au passage à l'heure d'été." })
     // Within the years 2000 to 2999, in UTC.

@@ -43,21 +43,20 @@ starts is written like a session's times in short (see [Times, in Sessions](sess
 
 Changing the month adds a step to the browser's history, and unchooses the day, unless it chooses one too, e.g.
 "aujourd'hui". Choosing a day, or opening or closing "À régler", doesn't add one. So going back from a session's page
-finds the page as it was, with the form for a new session closed, since it isn't in the address (see
-[A new session](#a-new-session)).
+finds the page as it was, with the form for a new session closed (see [A new session](#a-new-session)).
 
 ## À régler
 
 One box under the title, about what needs settling (see [The calendar](../../server/calendar.md#the-calendar)). Its
-first row has "À régler", then how many conflicts and sessions without a date there are, each in a tag, e.g. "2
-conflits", in red, and "1 sans date", and a chevron: the row is a button that opens the box and closes it. While there's
-nothing to settle, the row says "rien" instead, and can't be used (see
-[Controls that can't be used](layout.md#controls-that-cant-be-used)). It's closed by default.
+first row has "À régler", then, for each kind there are some of, how many in a tag, e.g. "2 conflits", in red, and "1
+sans date", and a chevron: the row is a button that opens the box and closes it. While there's nothing to settle, the
+row says "rien" instead, which says why it does nothing: it's greyed out, and screen readers announce it as unavailable.
+It's closed by default.
 
-Under that row, the box warns about each feed whose last read failed, or that hasn't been read yet (see
-[Warnings](layout.md#warnings)), naming it, and saying why the read failed, if it did, linking to Configuration, and that
-conflicts can be missing or out of date. While there are no feeds at all, it says that conflicts with occupations can't
-be found, and links to Configuration.
+Under that row, the box warns (see [Warnings](layout.md#warnings)) about each feed whose last read failed, naming it,
+saying why, and that conflicts can be missing or out of date, and linking to Configuration, and about each feed that
+hasn't been read yet, naming it, and saying that conflicts can be missing. While there are no feeds at all, it says that
+conflicts with occupations can't be found, and links to Configuration.
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag, a heading and a sentence
 about them, then a row for each one: when it is, what it is, and what to do, on the right, which screen readers read
@@ -121,7 +120,8 @@ green, and says "disponible". Otherwise, each stretch has a green tag: "dispo ju
 
 Under the month, the chosen day, with the day as its heading, e.g. "jeudi 19 novembre 2026", and "aujourd'hui" for
 today, and a "×" ("fermer le jour" for screen readers) that unchooses it, which puts the focus back on the day in the
-month. It has a row for each thing that takes some of the day, and each stretch of its free time, in the month's order.
+month. It has a row for each thing that takes some of the day, and each stretch of its free time (see
+[Free time](#free-time)), even on a day of the month before or after, in the month's order.
 A thing's row has:
 
 - its kind: "session" or "occupation";

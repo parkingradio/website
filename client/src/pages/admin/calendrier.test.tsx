@@ -14,8 +14,10 @@ const NOVEMBER = '/api/admin/calendar?from=2026-11-01&to=2026-12-05'
 const DECEMBER = '/api/admin/calendar?from=2026-11-29&to=2027-01-02'
 const OCTOBER = '/api/admin/calendar?from=2026-09-27&to=2026-10-31'
 
+// A session, which lasts from `start` to `end`, or 3 hours when its date isn't known.
 function session(id: string, title: string, start: string | null, end: string | null, fields: Partial<Session> = {}): Session {
-  return { id, title, start, end, durationMinutes: 180, status: 'planned', sets: [], createdAt: '2026-10-01T12:00:00Z', ...fields } as Session
+  const durationMinutes = start && end ? (Date.parse(end) - Date.parse(start)) / 60000 : 180
+  return { id, title, start, end, durationMinutes, status: 'planned', sets: [], createdAt: '2026-10-01T12:00:00Z', ...fields } as Session
 }
 
 const performers = (...names: string[]) => ({ performers: names.map((name) => ({ id: name, name })) })
@@ -146,7 +148,11 @@ describe('Calendrier', () => {
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       expect(path()).toBe('/admin/calendrier?month=2026-12')
       await waitFor(() => expect(requestsTo('GET', DECEMBER)).toHaveLength(1))
-      fireEvent.click(screen.getByRole('button', { name: 'mois précédent' }))
+      // Going back finds the month before, with its day chosen.
+      back()
+      expect(path()).toBe('/admin/calendrier?day=2026-11-21')
+      expect(screen.getByRole('heading', { name: 'novembre 2026' })).toBeInTheDocument()
+      expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
       fireEvent.click(screen.getByRole('button', { name: 'mois précédent' }))
       await waitFor(() => expect(requestsTo('GET', OCTOBER)).toHaveLength(1))
       expect(screen.getByRole('heading', { name: 'octobre 2026' })).toBeInTheDocument()
@@ -235,9 +241,11 @@ describe('Calendrier', () => {
 
   describe('choosing a day', () => {
     it('by clicking it, or again to unchoose it, without a step in the history', async () => {
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
-      renderAt('/admin/calendrier')
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY })
+      renderAt('/admin/calendrier?month=2026-12')
       await loaded()
+      fireEvent.click(screen.getByRole('button', { name: 'mois précédent' }))
+      expect(path()).toBe('/admin/calendrier?month=2026-11')
 
       fireEvent.click(cell('2026-11-26'))
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-26')
@@ -250,6 +258,9 @@ describe('Calendrier', () => {
       fireEvent.click(dayButton('2026-12-02'))
       expect(path()).toBe('/admin/calendrier?month=2026-11')
       expect(chosenDay()).not.toBeInTheDocument()
+      // Going back finds December, which the page showed before November: choosing days added no step.
+      back()
+      expect(path()).toBe('/admin/calendrier?month=2026-12')
     })
 
     it("but not by clicking a session's link, which opens its page", async () => {
@@ -344,7 +355,7 @@ describe('Calendrier', () => {
 
       renderAt('/admin/calendrier?day=2026-11-19')
       await loaded()
-      expect(chosenDay()).toHaveAccessibleName("jeudi 19 novembre 2026 · aujourd'hui")
+      expect(chosenDay()).toHaveAccessibleName("jeudi 19 novembre 2026, aujourd'hui")
       expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(['disponibletoute la journée'])
     })
 
@@ -701,7 +712,7 @@ describe('Calendrier', () => {
       // December 2, whose occupation November's calendar has.
       expect(cellText('2026-12-02')).toBe('2+')
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
-      await december.answer(CALENDAR)
+      await december.answer({ ...EMPTY, occupations: [CLOSED] })
       expect(cellText('2026-12-02')).toBe("2+toute la journéeoccupation : Calendrier de l'équipe")
     })
 
@@ -715,7 +726,7 @@ describe('Calendrier', () => {
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       await waitFor(() => expect(requestsTo('GET', january)).toHaveLength(1))
-      await december.answer({ ...CALENDAR, undatedSessions: [] })
+      await december.answer({ ...EMPTY, occupations: [CLOSED], undatedSessions: [] })
       expect(screen.getByRole('heading', { name: 'janvier 2027' })).toBeInTheDocument()
       // January's: December's answer came too late.
       expect(screen.getByRole('region', { name: 'À régler' })).toHaveTextContent('1 sans date')

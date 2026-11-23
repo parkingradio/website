@@ -50,17 +50,17 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
             </>
           )}
           {conflicts.length > 0 && (
-              <>
-                {' '}
-                <Tag conflict>{conflictCount(conflicts.length)}</Tag>
-              </>
-            )}
-            {undatedSessions.length > 0 && (
-              <>
-                {' '}
-                <Tag>{undatedSessions.length} sans date</Tag>
-              </>
-            )}
+            <>
+              {' '}
+              <Tag conflict>{conflictCount(conflicts.length)}</Tag>
+            </>
+          )}
+          {undatedSessions.length > 0 && (
+            <>
+              {' '}
+              <Tag>{undatedSessions.length} sans date</Tag>
+            </>
+          )}
           {!nothing && (
             <span aria-hidden="true" className="calendar-issues-chevron">
               {open ? '⌄' : '›'}
