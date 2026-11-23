@@ -13,11 +13,18 @@ export type Conflict = Calendar['conflicts'][number]
 export type ConflictThing = Conflict['things'][number]
 export type Feed = Calendar['feeds'][number]
 
-// Something that takes the studio: a session, with a start, an occupation or quiet time.
+// An occupation as the page names it: its title, or null when it has none or its feed's titles are private, and its
+// feed's name, `calendar`, which stands in for its title when it has none (see "What's shown" in
+// docs/design/client/admin/calendrier.md).
+export type OccupationName = { title: string | null; calendar: string }
+
+// Something that takes the studio, as the page shows it: a session, with a start, or an occupation.
 export type Thing =
   | ({ kind: 'session' } & Omit<Session, 'start' | 'end'> & { start: string; end: string })
-  | ({ kind: 'occupation' } & Schema<'CalendarOccupation'>)
-  | ({ kind: 'quiet-time' } & Schema<'CalendarQuietTime'>)
+  | ({ kind: 'occupation' } & Omit<Schema<'CalendarOccupation'>, 'feedId' | 'title'> & OccupationName)
+
+// What the page names a conflict's thing by: a session, by its title, or an occupation.
+export type NamedThing = { kind: 'session'; id: string; title: string; status: Session['status'] } | ({ kind: 'occupation' } & OccupationName)
 
 // The days the server takes (see docs/design/server/calendar.md).
 const FIRST_DAY = '2000-01-01'
@@ -142,63 +149,75 @@ export function freeTime(day: string, busy: Times[]): string[] {
   })
 }
 
-// What tells things apart, the way the server does: a session by its id, and an occupation or quiet time by all it's
-// given with (see "The calendar" in docs/design/server/calendar.md).
-export function thingKey(thing: Thing | ConflictThing): string {
+// What tells things apart, the way the server does: a session by its id, and an occupation by all it's given with (see
+// "The calendar" in docs/design/server/calendar.md).
+export function thingKey(thing: ConflictThing): string {
   if (thing.kind === 'session') return `session ${thing.id}`
-  return JSON.stringify([thing.kind, thing.feed, Date.parse(thing.start), Date.parse(thing.end), thing.wholeDay, 'title' in thing ? thing.title : ''])
+  return JSON.stringify([thing.feedId, Date.parse(thing.start), Date.parse(thing.end), thing.wholeDay, thing.title])
 }
 
-// The calendar an occupation or quiet time is changed in, by its feed's name, e.g. « calendrier « Équipe » ».
-export function calendarOf(feeds: Feed[], feed: string): string {
-  return `calendrier «\u00a0${feeds.find(({ id }) => id === feed)?.name ?? '?'}\u00a0»`
+// An occupation's name, with its feed's name from `feeds`, which has it.
+function occupationName({ feedId, title }: Schema<'CalendarOccupation'>, feeds: Feed[]): OccupationName {
+  return { title: title || null, calendar: feeds.find(({ id }) => id === feedId)?.name ?? '?' }
 }
 
-// An occupation's title, or "sans titre".
-export const occupationTitle = (title: string) => title || 'sans titre'
+// A conflict's thing, as the page names it.
+export function namedThing(thing: ConflictThing, feeds: Feed[]): NamedThing {
+  if (thing.kind === 'session') return { kind: 'session', id: thing.id, title: thing.title, status: thing.status }
+  return { kind: 'occupation', ...occupationName(thing, feeds) }
+}
 
-// The other thing of a conflict, within a sentence, e.g. "la session HAUTE RIVE TAKEOVER", "l'occupation RÉPARATION" or
-// "le silence du calendrier « Séjours »".
-export function inSentence(thing: ConflictThing, feeds: Feed[]): string {
+// The other thing of a conflict, within a sentence, e.g. "la session HAUTE RIVE TAKEOVER", "l'occupation RÉPARATION
+// (Équipe)" or "l'occupation Séjours".
+export function inSentence(thing: NamedThing): string {
   if (thing.kind === 'session') return `la session ${thing.title}`
-  if (thing.kind === 'occupation') return `l'occupation ${occupationTitle(thing.title)}`
-  return `le silence du ${calendarOf(feeds, thing.feed)}`
+  return thing.title === null ? `l'occupation ${thing.calendar}` : `l'occupation ${thing.title} (${thing.calendar})`
 }
 
-// Every thing of the calendar: sessions, occupations and quiet time.
-function thingsOf(calendar: Calendar): Thing[] {
+// Every thing of the calendar, sessions and occupations, with their keys.
+function thingsOf({ sessions, occupations, feeds }: Calendar): { key: string; thing: Thing }[] {
   return [
-    ...calendar.sessions.flatMap(({ start, end, ...session }): Thing[] => (start !== null && end !== null ? [{ kind: 'session', ...session, start, end }] : [])),
-    ...calendar.occupations.map((occupation): Thing => ({ kind: 'occupation', ...occupation })),
-    ...calendar.quietTimes.map((quietTime): Thing => ({ kind: 'quiet-time', ...quietTime })),
+    ...sessions.flatMap(({ start, end, ...session }) => {
+      if (start === null || end === null) return []
+      const thing = { kind: 'session' as const, ...session, start, end }
+      return [{ key: thingKey(thing), thing }]
+    }),
+    ...occupations.map((occupation) => {
+      const { start, end, wholeDay } = occupation
+      return { key: thingKey({ kind: 'occupation', ...occupation }), thing: { kind: 'occupation' as const, start, end, wholeDay, ...occupationName(occupation, feeds) } }
+    }),
   ]
 }
 
 // A thing on a day: its part of the day, and the other things of its conflicts whose overlap takes some of the day.
-export type DayThing = { thing: Thing; part: string; conflictsWith: ConflictThing[] }
+export type DayThing = { thing: Thing; part: string; conflictsWith: NamedThing[] }
 
-// A day of the grid: what takes some of it, quiet time first, then in order of start and end, and its free time, if it
-// has any (see "Free time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
+// A day of the grid: what takes some of it, in order of start, then end, and its free time, if it has any (see "Free
+// time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
 export type CalendarDay = { things: DayThing[]; free: string[] }
 
 // The days of the grid of `month`, as they're shown with `calendar`, read for them, on `today`.
 export function calendarDays(calendar: Calendar, month: string, today: string): Map<string, CalendarDay> {
   const days = gridDays(month)
   const byDay = new Map(days.map((day): [string, CalendarDay] => [day, { things: [], free: [] }]))
-  const conflicts = new Map<string, Conflict[]>()
+  // Each thing's conflicts, by its key, with their two things' keys and names.
+  const conflicts = new Map<string, { conflict: Conflict; things: { key: string; named: NamedThing }[] }[]>()
   for (const conflict of calendar.conflicts) {
-    // Once for two things that are the same, e.g. an event that's twice in its feed.
-    for (const key of new Set(conflict.things.map(thingKey))) conflicts.set(key, [...(conflicts.get(key) ?? []), conflict])
+    const keyed = { conflict, things: conflict.things.map((thing) => ({ key: thingKey(thing), named: namedThing(thing, calendar.feeds) })) }
+    for (const { key } of keyed.things) conflicts.set(key, [...(conflicts.get(key) ?? []), keyed])
   }
-  const order = (thing: Thing) => (thing.kind === 'quiet-time' ? 0 : 1)
-  const things = thingsOf(calendar).sort((a, b) => order(a) - order(b) || Date.parse(a.start) - Date.parse(b.start) || Date.parse(a.end) - Date.parse(b.end))
-  for (const thing of things) {
-    const key = thingKey(thing)
+  const things = thingsOf(calendar).sort(({ thing: a }, { thing: b }) => Date.parse(a.start) - Date.parse(b.start) || Date.parse(a.end) - Date.parse(b.end))
+  for (const { key, thing } of things) {
     for (const day of daysOf(thing, [days[0], days.at(-1)!])) {
-      const conflictsWith = (conflicts.get(key) ?? [])
-        .filter((conflict) => takesSomeOf(conflict, day))
-        .map((conflict) => conflict.things.find((other) => thingKey(other) !== key) ?? conflict.things[0])
-      byDay.get(day)!.things.push({ thing, part: partOfDay(thing, day), conflictsWith })
+      // Each other thing once, even when it's in conflict with two things that are the same as this one.
+      const others = new Map<string, NamedThing>()
+      for (const { conflict, things } of conflicts.get(key) ?? []) {
+        if (!takesSomeOf(conflict, day)) continue
+        // The other thing, or this one, in conflict with another that's the same.
+        const other = things.find((other) => other.key !== key) ?? things[0]
+        others.set(other.key, other.named)
+      }
+      byDay.get(day)!.things.push({ thing, part: partOfDay(thing, day), conflictsWith: [...others.values()] })
     }
   }
   const horizon = addDays(today, HORIZON_DAYS)
@@ -206,7 +225,8 @@ export function calendarDays(calendar: Calendar, month: string, today: string): 
     if (day < today || day >= horizon) continue
     // Cancelled sessions don't take the studio.
     const taking = shown.things.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
-    if (taking.some((thing) => thing.kind !== 'quiet-time' && Date.parse(thing.start) >= dayStart(day))) continue
+    // A day on which a session starts has no free time.
+    if (taking.some((thing) => thing.kind === 'session' && Date.parse(thing.start) >= dayStart(day))) continue
     shown.free = freeTime(day, taking)
   }
   return byDay

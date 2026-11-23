@@ -26,10 +26,9 @@ logged-in admin's email and a "se déconnecter" button:
 
 While there are conflicts (see [Conflicts](../../server/calendar.md#conflicts)), "calendrier" has a red badge with how
 many there are, which screen readers read along with it, e.g. « calendrier, 2 conflits », and it opens Calendrier with
-"À régler" open (`?issues=open`, see [Calendrier](calendrier.md#the-address)). The number is read when the admin pages
-load, each time another page of them opens, and when the browser's tab is shown again, at most once a minute, except on
-Calendrier, which reads the calendar itself, and gives the badge its number. When it can't be read, the badge stays as
-it was, and there's none until it's been read once: Calendrier says why.
+"À régler" open (`?issues=open`, see [Calendrier](calendrier.md#the-address)). The number is read again each time an
+admin page opens, and when the browser's tab is shown again; on Calendrier, it's the number "À régler" shows. When it
+can't be read, the badge stays as it was, and there's none until it's been read once.
 
 When logging out fails, the admin stays logged in, and the menu says so under "se déconnecter". The section itself is
 shown to the right of the menu. On narrow screens like phones, the menu becomes a row above the section instead.

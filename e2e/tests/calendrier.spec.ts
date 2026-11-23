@@ -3,8 +3,8 @@ import { addDays, quebecDayAndTime, quebecInstant } from '../../client/src/quebe
 import { test, expect, adminMenu, logIn, longDay, own, withCalendar } from './fixtures.ts'
 import type { CalendarExtra } from './fixtures.ts'
 
-// The studio's calendar: a session of the test's own, in the month and on its day, and occupations, quiet time and
-// conflicts, which the tests fake, since the server under test has no feeds (see `withCalendar`). The browser is in
+// The studio's calendar: a session of the test's own, in the month and on its day, and occupations and conflicts,
+// which the tests fake, since the server under test has no feeds (see `withCalendar`). The browser is in
 // another time zone than Québec's, whose days and times the page shows all the same.
 
 test.use({ timezoneId: 'Asia/Tokyo' })
@@ -62,7 +62,7 @@ test("a session is in its month, and on its day, which leads to a new session's 
   expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
 })
 
-test('occupations, quiet time and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page }, testInfo) => {
+test('occupations and their conflicts are shown in the month, on their day, in "À régler" and in the menu', async ({ page }, testInfo) => {
   const { unique } = own(testInfo)
   // Three days from today in Québec, in the 365 days that conflicts are found in, or four, so that the next day is in
   // its month too.
@@ -70,52 +70,60 @@ test('occupations, quiet time and their conflicts are shown in the month, on the
   const day = addDays(third, 1).slice(0, 7) === third.slice(0, 7) ? third : addDays(third, 1)
   const at = (on: string, time: string) => quebecInstant(on, time)!.toISOString()
   const readAt = at(addDays(day, -3), '00:00')
-  const feed = (id: string, name: string, kind: 'occupation' | 'quiet-time', error: string | null) => ({
+  const feed = (id: string, name: string, privateTitles: boolean, error: string | null) => ({
     id,
     name,
-    kind,
+    link: `https://example.com/${id}.ics`,
+    privateTitles,
     createdBy: 'admin@example.com',
     createdAt: readAt,
+    updatedBy: null,
+    updatedAt: null,
     readAt,
     error,
   })
-  const occupation = { feed: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
-  const stay = { feed: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false }
+  const team = `Équipe ${unique}`
+  const stays = `Séjours ${unique}`
+  const repair = { feedId: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
+  // A stay, from a feed whose titles are private.
+  const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: null }
   const extra: CalendarExtra = {
-    feeds: [feed(`team-${unique}`, 'Équipe e2e', 'occupation', null), feed(`stays-${unique}`, 'Séjours e2e', 'quiet-time', "The link can't be read: its server fails (503)")],
-    occupations: [occupation],
-    quietTimes: [stay],
-    // The occupation and the stay, in the order of things: by start.
-    conflicts: [{ start: stay.start, end: occupation.end, things: [{ kind: 'occupation', ...occupation }, { kind: 'quiet-time', ...stay }] }],
+    feeds: [feed(`team-${unique}`, team, false, null), feed(`stays-${unique}`, stays, true, "The link can't be read: its server fails (503)")],
+    occupations: [repair, stay],
+    // The repair and the stay, in the order of things: by start.
+    conflicts: [{ start: stay.start, end: repair.end, things: [{ kind: 'occupation', ...repair }, { kind: 'occupation', ...stay }] }],
   }
   await withCalendar(page, extra)
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
-  // In the month, each "conflit" on the day they overlap, and the stay's end the next day, without it.
+  // In the month, each "conflit" on the day they overlap, and the stay's end the next day, without it, then free time.
   const cell = dayCell(page, day)
-  await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}conflit`)
-  await expect(cell).toContainText('12 h – 11 hsilenceconflit')
-  await expect(dayCell(page, addDays(day, 1)).locator('.calendar-quiet-time')).toHaveText("jusqu'à 11 hsilence")
-  // Which the day's button reads, as its description, whose spaces can be non-breaking ones.
-  const description = new RegExp(`10 h – 16 h occupation : RÉPARATION ${unique} conflit`.replaceAll(' ', '\\s'), 'i')
+  await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}, calendrier ${team}conflit`)
+  await expect(cell).toContainText(`12 h – 11 hoccupation : ${stays}conflit`)
+  const next = dayCell(page, addDays(day, 1))
+  await expect(next.locator('.calendar-occupation')).toHaveText(`jusqu'à 11 hoccupation : ${stays}`)
+  await expect(next.locator('.calendar-free')).toHaveText('dispo dès 11 h')
+  // Which the day's button reads, as its description, whose spaces can be non-breaking ones, and where the browser can
+  // put one before the separator's comma.
+  const description = new RegExp(`10 h – 16 h occupation : RÉPARATION ${unique}, calendrier ${team} conflit`.replaceAll(' ', '\\s').replace(',', '\\s?,'), 'i')
   await expect(dayButton(page, day)).toHaveAccessibleDescription(description)
 
   const chosen = chosenDay(page, day)
-  // Quiet time first, among the test's own things, whatever else takes the day.
+  // By start, among the test's own things, whatever else takes the day.
   await expect(chosen.getByRole('listitem').filter({ hasText: unique })).toHaveText([
-    `silence12 h – 11 hcalendrier « Séjours e2e »conflit avec l'occupation RÉPARATION ${unique}`,
-    `occupation10 h – 16 hRÉPARATION ${unique} (calendrier « Équipe e2e »)conflit avec le silence du calendrier « Séjours e2e »`,
+    `occupation10 h – 16 hRÉPARATION ${unique}, calendrier ${team}conflit avec l'occupation ${stays}`,
+    `occupation12 h – 11 h${stays}conflit avec l'occupation RÉPARATION ${unique} (${team})`,
   ])
 
   const issues = page.getByRole('region', { name: 'À régler' })
-  await expect(issues).toContainText("⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours e2e » a échoué : The link can't be read: its server fails (503)")
+  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503)`)
   await issues.getByRole('button', { name: /1 conflit/ }).click()
   await expect(page).toHaveURL(/[?&]issues=open/)
-  await expect(issues.getByRole('listitem').first()).toContainText(`occupation : RÉPARATION ${unique}, à changer dans le calendrier « Équipe e2e »`)
-  await expect(issues.getByRole('listitem').first()).toContainText('silence, à changer dans le calendrier « Séjours e2e »')
+  await expect(issues.getByRole('listitem').first()).toContainText(`occupation : RÉPARATION ${unique}, calendrier ${team}occupation : ${stays}`)
 
   const sources = page.getByRole('region', { name: 'Sources' })
-  await expect(sources).toContainText('Équipe e2e Lu le')
+  await expect(sources).toContainText(`${team} Lu le`)
+  await expect(sources).toContainText(`${stays} (titres masqués) Lu le`)
   await expect(sources).toContainText("La dernière lecture a échoué : The link can't be read: its server fails (503)")
 
   // The menu's badge, on another page, which leads back to the conflicts.

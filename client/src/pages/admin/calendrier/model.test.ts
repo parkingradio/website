@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, fullTimes, gridDays, gridRange, partOfDay, readDay, readMonth, thingKey } from './model'
-import type { Calendar, Conflict, ConflictThing } from './model'
+import { addMonths, calendarDays, daysOf, freeTime, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey } from './model'
+import type { Calendar, Conflict, ConflictThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
@@ -132,17 +132,31 @@ describe('free time', () => {
 
 describe('things', () => {
   it('are told apart as the server does', () => {
-    const occupation = { kind: 'occupation', feed: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false, title: 'A' } as const
+    const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false, title: 'A' } as const
     // The same instants, written otherwise.
     expect(thingKey({ ...occupation, start: '2026-11-15T02:00:00Z' })).toBe(thingKey(occupation))
-    for (const other of [{ title: 'B' }, { feed: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
+    for (const other of [{ title: 'B' }, { title: null }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
       expect(thingKey({ ...occupation, ...other })).not.toBe(thingKey(occupation))
     }
-    expect(thingKey({ kind: 'quiet-time', feed: 'f', start: occupation.start, end: occupation.end, wholeDay: false })).not.toBe(thingKey({ ...occupation, title: '' }))
     const session = { kind: 'session', id: 's', title: 'X', start: occupation.start, end: occupation.end, status: 'planned' } as const
-    expect(thingKey({ ...({ id: 's' } as Session), kind: 'session', start: occupation.start, end: occupation.end })).toBe(thingKey(session))
+    expect(thingKey({ ...session, title: 'Y' })).toBe(thingKey(session))
+  })
+
+  it("name an occupation by its title and its feed's name, or by its feed's name alone", () => {
+    const feeds = [feed('f', 'Équipe'), feed('g', 'Séjours')]
+    const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false } as const
+    expect(namedThing({ ...occupation, title: 'RÉPARATION' }, feeds)).toEqual({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })
+    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Équipe' })
+    expect(namedThing({ ...occupation, feedId: 'g', title: null }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
+    expect(inSentence({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe("l'occupation RÉPARATION (Équipe)")
+    expect(inSentence({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe("l'occupation Séjours")
+    expect(inSentence({ kind: 'session', id: 's', title: 'HAUTE RIVE', status: 'planned' })).toBe('la session HAUTE RIVE')
   })
 })
+
+function feed(id: string, name: string): Feed {
+  return { id, name, link: `https://example.com/${id}.ics`, privateTitles: false, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
+}
 
 // A session of the calendar, with what the page shows of it.
 function session(id: string, start: string, end: string, status: Session['status'] = 'planned'): Session {
@@ -150,36 +164,50 @@ function session(id: string, start: string, end: string, status: Session['status
 }
 
 function calendar(fields: Partial<Calendar>): Calendar {
-  return { ok: true, today: '2026-11-19', feeds: [], sessions: [], occupations: [], quietTimes: [], conflicts: [], undatedSessions: [], ...fields }
+  return { ok: true, today: '2026-11-19', feeds: [feed('q', 'Séjours'), feed('o', 'Équipe')], sessions: [], occupations: [], conflicts: [], undatedSessions: [], ...fields }
 }
 
-describe('the days of the month', () => {
-  const stay = { feed: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false }
-  const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
-  const repair = { feed: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
-  const conflict: Conflict = {
-    start: late.start!,
-    end: late.end!,
-    things: [{ kind: 'quiet-time', ...stay }, { kind: 'session', id: 'late', title: 'LATE', start: late.start!, end: late.end!, status: 'planned' }] as ConflictThing[],
-  }
-  const days = calendarDays(calendar({ sessions: [late], occupations: [repair], quietTimes: [stay], conflicts: [conflict] }), '2026-11', '2026-11-19')
+const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
 
-  it('have what takes them, quiet time first', () => {
-    expect(days.get('2026-11-21')!.things.map(({ thing, part }) => [thing.kind, part])).toEqual([
-      ['quiet-time', 'toute la journée'],
-      ['session', '21 h – 1 h'],
+describe('the days of the month', () => {
+  // A stay, in a feed whose titles are private, a session during it, and a repair over three whole days.
+  const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: null }
+  const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
+  const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
+  const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
+  const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), '2026-11', '2026-11-19')
+
+  it('have what takes them, by start, then end, with their names', () => {
+    expect(days.get('2026-11-21')!.things.map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
+      ['occupation', null, 'toute la journée'],
+      ['session', 'LATE', '21 h – 1 h'],
     ])
-    expect(days.get('2026-11-26')!.things.map(({ part }) => part)).toEqual(['toute la journée'])
+    expect(days.get('2026-11-21')!.things[0].thing).toMatchObject({ calendar: 'Séjours' })
+    expect(days.get('2026-11-26')!.things.map(({ thing, part }) => [thing.title, part])).toEqual([['RÉPARATION', 'toute la journée']])
+    expect(days.get('2026-11-26')!.things[0].thing).toMatchObject({ calendar: 'Équipe' })
   })
 
   it('say "conflit" only on the days the overlap takes', () => {
     const conflicts = (day: string) => days.get(day)!.things.map(({ conflictsWith }) => conflictsWith.map((other) => other.kind))
     expect(conflicts('2026-11-20')).toEqual([[]])
-    expect(conflicts('2026-11-21')).toEqual([['session'], ['quiet-time']])
-    expect(conflicts('2026-11-22')).toEqual([['session'], ['quiet-time']])
+    expect(conflicts('2026-11-21')).toEqual([['session'], ['occupation']])
+    expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
   })
 
-  it('have free time from today on, where nothing but quiet time starts', () => {
+  it('name each other thing once, for things that are the same', () => {
+    // Two stays with the same dates, in a feed whose titles are private, each in conflict with the session and the other.
+    const stays: ConflictThing[] = [{ kind: 'occupation', ...stay }, { kind: 'occupation', ...stay }]
+    const conflicts: Conflict[] = [
+      { start: stay.start, end: stay.end, things: stays as [ConflictThing, ConflictThing] },
+      { start: late.start!, end: late.end!, things: [stays[0], sessionThing(late)] },
+      { start: late.start!, end: late.end!, things: [stays[1], sessionThing(late)] },
+    ]
+    const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), '2026-11', '2026-11-19')
+    const lines = shown.get('2026-11-21')!.things.map(({ conflictsWith }) => conflictsWith.map(inSentence))
+    expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
+  })
+
+  it('have free time from today on, where no session starts, outside what takes them', () => {
     const free = (day: string) => days.get(day)!.free
     // Before today.
     expect(free('2026-11-18')).toEqual([])
@@ -187,15 +215,24 @@ describe('the days of the month', () => {
     // In the month after too, as in its own month's grid.
     expect(free('2026-12-01')).toEqual(['toute la journée'])
     expect(calendarDays(calendar({}), '2026-12', '2026-11-19').get('2026-12-01')!.free).toEqual(['toute la journée'])
-    // Quiet time starts at 15 h.
+    // The stay starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // A session starts.
     expect(free('2026-11-21')).toEqual([])
     // The session's tail, and the stay, end.
     expect(free('2026-11-22')).toEqual(['dès 11 h'])
-    // A whole-day occupation, which starts on the 25th and takes the 26th whole.
+    // A whole-day occupation, which takes the 25th to the 27th whole.
     expect(free('2026-11-25')).toEqual([])
     expect(free('2026-11-26')).toEqual([])
+    expect(free('2026-11-28')).toEqual(['toute la journée'])
+  })
+
+  it('have free time around an occupation that starts on them', () => {
+    const repairs = [{ feedId: 'o', start: '2026-11-24T10:00:00-05:00', end: '2026-11-24T16:00:00-05:00', wholeDay: false, title: '' }]
+    const shown = calendarDays(calendar({ occupations: repairs }), '2026-11', '2026-11-19')
+    expect(shown.get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    // Today's stretches count from 00:00 too.
+    expect(calendarDays(calendar({ occupations: repairs }), '2026-11', '2026-11-24').get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
   })
 
   it("don't count cancelled sessions", () => {

@@ -188,9 +188,8 @@ the panel, while the session has no event on RA, with the event's link in its fi
 `/admin/sessions/nouvelle`, then goes to its page. A new session starts without a type, which has to be picked. A
 collective's page leads to it as its takeover, with "Takeover" and the collective picked (`?takeover=<id>`), unless it
 isn't one of the collectives loaded, e.g. when they can't be loaded, in which case nothing is picked. Calendrier leads
-to it on a day (`?day=YYYY-MM-DD`, see [Calendrier](calendrier.md#the-chosen-day)), which the form then starts with as
-the start's date, as if it had been typed, so that the end's date is that day too, unless it isn't a day, in which case
-it's ignored. From top to bottom, the form has:
+to it on a day (`?day=YYYY-MM-DD`, see [Calendrier](calendrier.md#the-chosen-day)), which is then the start's date, and
+the end's, unless it isn't a day, in which case it's ignored. From top to bottom, the form has:
 
 - "Quand": "Début" and "Fin", each a "date" and an "heure", in Québec time (see [Times](#times)), then how long the
   session lasts, e.g. « Dure 4 h. », once they're valid. The end's date keeps its distance in days from the start's:

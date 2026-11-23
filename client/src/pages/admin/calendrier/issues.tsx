@@ -3,9 +3,9 @@ import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
 import { THING_KIND_LABELS, conflictCount, formatDuration, formatQuebecDay, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { calendarOf, fullTimes, occupationTitle } from './model'
-import type { Calendar, ConflictThing, Feed } from './model'
-import { SessionTitle } from './things'
+import { fullTimes, namedThing } from './model'
+import type { Calendar, Feed, NamedThing } from './model'
+import { OccupationLabel, SessionTitle } from './things'
 
 // "À régler": the conflicts and the sessions without a date, with what the feeds' reads say about them (see "À régler" in
 // docs/design/client/admin/calendrier.md).
@@ -49,7 +49,10 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
         <div id={contentId}>
           {conflicts.length > 0 && (
             <>
-              <p>Le studio n'accueille qu'une chose à la fois&nbsp;: déplacez, raccourcissez ou annulez l'une des deux.</p>
+              <p>
+                Le studio n'accueille qu'une chose à la fois&nbsp;: déplacez, raccourcissez ou annulez l'une des deux. Les
+                occupations se changent dans leur calendrier.
+              </p>
               <ul className="calendar-issue-list">
                 {conflicts.map((conflict, i) => {
                   const day = quebecDayAndTime(new Date(conflict.start)).day
@@ -60,7 +63,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
                       </button>{' '}
                       <span className="calendar-issue-times">{fullTimes(conflict, day)}</span>
                       {conflict.things.map((thing, j) => (
-                        <ConflictingThing key={j} thing={thing} feeds={feeds} />
+                        <ConflictingThing key={j} thing={namedThing(thing, feeds)} />
                       ))}
                     </li>
                   )
@@ -91,20 +94,12 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, open, 
   )
 }
 
-// One of a conflict's things, with its kind, and for an occupation or quiet time, where it's changed.
-function ConflictingThing({ thing, feeds }: { thing: ConflictThing; feeds: Feed[] }) {
+// One of a conflict's things, with its kind.
+function ConflictingThing({ thing }: { thing: NamedThing }) {
   return (
     <span className="calendar-issue-thing">
-      {THING_KIND_LABELS[thing.kind]}
-      {thing.kind === 'session' ? (
-        <>
-          &nbsp;: <SessionTitle id={thing.id} title={thing.title} status={thing.status} />
-        </>
-      ) : (
-        <>
-          {thing.kind === 'occupation' && <>&nbsp;: {occupationTitle(thing.title)}</>}, à changer dans le {calendarOf(feeds, thing.feed)}
-        </>
-      )}
+      {THING_KIND_LABELS[thing.kind]}&nbsp;:{' '}
+      {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} /> : <OccupationLabel title={thing.title} calendar={thing.calendar} />}
     </span>
   )
 }
@@ -114,7 +109,7 @@ function FeedWarnings({ feeds }: { feeds: Feed[] }) {
   if (feeds.length === 0) {
     return (
       <p className="admin-notice">
-        Aucun calendrier externe&nbsp;: les conflits avec des occupations ou du silence ne peuvent pas être trouvés. Ils
+        Aucun calendrier externe&nbsp;: les conflits avec des occupations ne peuvent pas être trouvés. Ils
         s'ajoutent dans <Link to="/admin/configuration">Configuration</Link>, «&nbsp;Calendriers externes&nbsp;».
       </p>
     )

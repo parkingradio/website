@@ -2,9 +2,9 @@ import { useId } from 'react'
 import { Link } from 'react-router'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
 import { newSessionPath } from '../session-errors'
-import { calendarOf, fullTimes, inSentence, occupationTitle } from './model'
-import type { CalendarDay, DayThing, Feed } from './model'
-import { SessionTitle } from './things'
+import { fullTimes, inSentence } from './model'
+import type { CalendarDay, DayThing } from './model'
+import { OccupationLabel, SessionTitle } from './things'
 
 // The chosen day, under the month (see "The chosen day" in docs/design/client/admin/calendrier.md).
 
@@ -13,11 +13,10 @@ type ChosenDayProps = {
   today: string
   // What's on it, once the calendar is read for the month's days, or else null.
   shown: CalendarDay | null
-  feeds: Feed[]
   onClose: () => void
 }
 
-export function ChosenDay({ day, today, shown, feeds, onClose }: ChosenDayProps) {
+export function ChosenDay({ day, today, shown, onClose }: ChosenDayProps) {
   const headingId = useId()
   return (
     <section className="calendar-day" aria-labelledby={headingId}>
@@ -41,7 +40,7 @@ export function ChosenDay({ day, today, shown, feeds, onClose }: ChosenDayProps)
         ) : (
           <ul className="calendar-rows">
             {shown.things.map((dayThing, i) => (
-              <ThingRow key={i} day={day} dayThing={dayThing} feeds={feeds} />
+              <ThingRow key={i} day={day} dayThing={dayThing} />
             ))}
             {shown.free.length > 0 && (
               <li className="calendar-row">
@@ -61,7 +60,7 @@ export function ChosenDay({ day, today, shown, feeds, onClose }: ChosenDayProps)
 }
 
 // A thing on the chosen day: its kind, its times in full, what it is, and its conflicts on that day.
-function ThingRow({ day, dayThing: { thing, conflictsWith }, feeds }: { day: string; dayThing: DayThing; feeds: Feed[] }) {
+function ThingRow({ day, dayThing: { thing, conflictsWith } }: { day: string; dayThing: DayThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
     <li className="calendar-row">
@@ -73,16 +72,12 @@ function ThingRow({ day, dayThing: { thing, conflictsWith }, feeds }: { day: str
             <SessionTitle id={thing.id} title={thing.title} status={thing.status} />
             {performers && <span className="admin-meta"> {performers}</span>}
           </>
-        ) : thing.kind === 'occupation' ? (
-          <>
-            {occupationTitle(thing.title)} <span className="admin-meta">({calendarOf(feeds, thing.feed)})</span>
-          </>
         ) : (
-          <span className="admin-meta">{calendarOf(feeds, thing.feed)}</span>
+          <OccupationLabel title={thing.title} calendar={thing.calendar} />
         )}
         {conflictsWith.map((other, i) => (
           <span key={i} className="calendar-conflict-line">
-            conflit avec {inSentence(other, feeds)}
+            conflit avec {inSentence(other)}
           </span>
         ))}
       </span>

@@ -125,7 +125,6 @@ export function Calendrier() {
           day={chosen}
           today={today}
           shown={days?.get(chosen) ?? null}
-          feeds={current?.feeds ?? []}
           onClose={() => {
             focusNext.current = chosen
             choose(null)
@@ -146,9 +145,6 @@ function Legend() {
       </li>
       <li>
         <span className="calendar-swatch calendar-occupation" /> occupation
-      </li>
-      <li>
-        <span className="calendar-swatch calendar-quiet-time" /> silence
       </li>
       <li>
         <span className="calendar-swatch calendar-free" /> disponible

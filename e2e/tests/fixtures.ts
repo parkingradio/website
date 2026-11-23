@@ -107,15 +107,14 @@ type Schemas = components['schemas']
 export type CalendarExtra = {
   feeds: Schemas['CalendarFeed'][]
   occupations: Schemas['CalendarOccupation'][]
-  quietTimes: Schemas['CalendarQuietTime'][]
   conflicts: Schemas['CalendarConflict'][]
 }
 
 // Has the page see the studio's calendar (GET /api/admin/calendar) with `extra` added to what the server answers, as if
 // it had read them from feeds, which the server under test has none of: it only reads https links, and couldn't reach a
-// feed of the tests' own. Like the server, it gives only the occupations and the quiet time that take some of the days
-// asked for, but every conflict, whatever the days: `extra` has to follow the server's other rules, e.g. that conflicts
-// are those of the next 365 days (see docs/design/server/calendar.md).
+// feed of the tests' own. Like the server, it gives only the occupations that take some of the days asked for, but every
+// conflict, whatever the days. `extra` has to follow the server's other rules (see docs/design/server/calendar.md), e.g.
+// its order, since it's added after what the server answers, which has no occupations and no conflicts.
 export async function withCalendar(page: Page, extra: CalendarExtra) {
   await page.route(
     (url) => url.pathname === '/api/admin/calendar',
@@ -130,7 +129,6 @@ export async function withCalendar(page: Page, extra: CalendarExtra) {
           ...calendar,
           feeds: [...calendar.feeds, ...extra.feeds],
           occupations: [...calendar.occupations, ...extra.occupations.filter(within)],
-          quietTimes: [...calendar.quietTimes, ...extra.quietTimes.filter(within)],
           conflicts: [...calendar.conflicts, ...extra.conflicts],
         },
       })

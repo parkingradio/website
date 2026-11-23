@@ -2,9 +2,9 @@ import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { WHOLE_DAY, gridDays, monthOf, occupationTitle } from './model'
+import { WHOLE_DAY, gridDays, monthOf } from './model'
 import type { CalendarDay, DayThing } from './model'
-import { SessionTitle } from './things'
+import { OccupationCalendar, OccupationTitle, SessionTitle } from './things'
 
 // The month's grid, from Sunday to Saturday, with what takes each day, and its free time (see "The month" in
 // docs/design/client/admin/calendrier.md).
@@ -121,31 +121,20 @@ function DayCell({ id, things, free }: { id: string; things: DayThing[]; free: s
   )
 }
 
-// A thing, in a day of the month: its part of the day, and what it is, after its kind for screen readers, or "silence",
-// and "conflit" when one of its conflicts is on that day.
+// A thing, in a day of the month: its part of the day, and what it is, after its kind for screen readers, and "conflit"
+// when one of its conflicts is on that day.
 function MonthThing({ dayThing: { thing, part, conflictsWith } }: { dayThing: DayThing }) {
   const classes = [`calendar-${thing.kind}`, thing.kind === 'session' && thing.status !== 'planned' && `admin-status-${thing.status}`, conflictsWith.length > 0 && 'calendar-conflict']
-  const kind = <span className="visually-hidden">{THING_KIND_LABELS[thing.kind]}&nbsp;: </span>
-  const performers = thing.kind === 'session' && sessionPerformers(thing)
+  // A session's performers, or an occupation's calendar, after its title.
+  const detail = thing.kind === 'session' ? sessionPerformers(thing) : thing.title !== null && <OccupationCalendar calendar={thing.calendar} />
   return (
     <li className={classes.filter(Boolean).join(' ')}>
       <span className="calendar-part">{part}</span>
       <span className="calendar-title">
-        {thing.kind === 'session' && (
-          <>
-            {kind}
-            <SessionTitle id={thing.id} title={thing.title} status={thing.status} inMonth />
-          </>
-        )}
-        {thing.kind === 'occupation' && (
-          <>
-            {kind}
-            {occupationTitle(thing.title)}
-          </>
-        )}
-        {thing.kind === 'quiet-time' && THING_KIND_LABELS[thing.kind]}
+        <span className="visually-hidden">{THING_KIND_LABELS[thing.kind]}&nbsp;: </span>
+        {thing.kind === 'session' ? <SessionTitle id={thing.id} title={thing.title} status={thing.status} inMonth /> : <OccupationTitle title={thing.title} calendar={thing.calendar} />}
       </span>
-      {performers && <span className="calendar-performers">{performers}</span>}
+      {detail && <span className="calendar-detail">{detail}</span>}
       {conflictsWith.length > 0 && <span className="calendar-conflict-tag">conflit</span>}
     </li>
   )

@@ -207,7 +207,6 @@ describe("The menu's badge on calendrier", () => {
     feeds: [],
     sessions: [],
     occupations: [],
-    quietTimes: [],
     undatedSessions: [],
     conflicts: Array.from({ length: conflicts }, () => ({ start: '2026-11-21T21:00:00-05:00', end: '2026-11-21T23:00:00-05:00', things: [] })),
   })

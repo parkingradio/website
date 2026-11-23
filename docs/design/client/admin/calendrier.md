@@ -1,44 +1,44 @@
 # Calendrier
 
-At `/admin/calendrier`: what takes the studio, i.e. sessions, occupations and quiet time, and what needs settling (see
+At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, and what needs settling (see
 [Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)), and weeks start on
-Sunday. From top to bottom, the page has "À régler", the toolbar, the month, the chosen day and "Sources".
+Sunday. From top to bottom, the page has "À régler", the toolbar, a legend, the month, the chosen day and "Sources".
 
 "Today" is the day it is in Québec, by the browser's clock.
 
 ## What's shown
 
-There are three kinds of things, plus the studio's free time and conflicts. Each one has a color and, besides the color,
-words that say what it is:
+Sessions, occupations, free time and conflicts each have their own color, which the legend gives, and besides the color,
+something else that tells them apart:
 
-- Sessions: light blue, with a dark blue bar on their left, and their title. Sessions that are done or cancelled take the
-  [status colors](layout.md#status-colors), with "jouée" or "annulée" written. Past planned sessions keep their color,
-  so that one that wasn't marked "jouée" stands out.
-- Occupations: light blue too, with a dashed border, and their title, or "sans titre" without one.
-- Quiet time: a hatched violet band, with "silence". It never has a title: the page only names it "silence", and by its
-  feed's name.
-- Free time: green, with "disponible" or "dispo …" (see [Free time](#free-time)).
-- Conflicts: a red border, with "conflit".
+- Sessions have a bar on their left, and their title. Sessions that are done or cancelled take the
+  [status colors](layout.md#status-colors), with "jouée" or "annulée" written. Past planned sessions keep their color, so
+  that one that wasn't marked "jouée" stands out.
+- Occupations have a dashed border. An occupation is named by its title, then the name of its feed, its calendar, e.g.
+  « RÉPARATION », « Calendrier de l'équipe », or by its calendar's name alone, as it's written, when it has no title or
+  its feed's titles are private, e.g. « Séjours ». Its title is cut short in the month, after two lines. Screen readers
+  read « , calendrier » between the two.
+- Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
+- Conflicts have a red outline, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 
-Occupations and quiet time can't be changed on the site: the chosen day and "À régler" name the calendar each one is
-changed in, by its feed's name. A legend, under the toolbar, gives each kind with its color.
+Occupations can't be changed on the site, only in their calendars, which their names give.
 
 A thing's times are written in two ways:
 
-- **Its part of a day**, in the month: of the time the thing takes, the part from 00:00 on the day to 00:00 on the next.
-  When that's the whole day, "toute la journée", whole-day or not. Else, when the thing started on an earlier day,
-  "jusqu'à 1 h". Else, when it ends within the day, or at 00:00 on the next, "21 h – 23 h". Else, when it ends the
-  next day at an earlier time than it starts, "21 h – 1 h", like a session's times in short (see
-  [Times, in Sessions](sessions.md#times)), and "jusqu'à 1 h" on the next day. Else "dès 18 h".
-- **In full**, on a day, e.g. the chosen day: when it takes whole days, from 00:00 to 00:00, whole-day or not,
-  "toute la journée" for one day, or "du ven. 13 nov. au dim. 15 nov." from its first day to its last. Else, when it
-  starts on that day, as a session's times in short: "21 h – 23 h", "21 h – 1 h", or "18 h – dim. 15 nov., 2 h". Else
-  the same, after the day it starts: "ven. 13 nov., 21 h – 1 h".
+- **Its part of a day**, in the month: "toute la journée", "21 h – 23 h", "dès 18 h", or "jusqu'à 1 h" on a day after
+  the one it starts on.
+- **In full**, on a day, e.g. the chosen day: "21 h – 23 h", "18 h – dim. 15 nov., 2 h", or "ven. 13 nov., 21 h – 1 h"
+  on a day after the one it starts on.
+
+Something that takes whole days, from 00:00 to 00:00, is written as such, whether it's whole-day or not: "toute la
+journée", or in full "du ven. 13 nov. au dim. 15 nov.". Something that ends the next day at an earlier time than it
+starts is written like a session's times in short (see [Times, in Sessions](sessions.md#times)), "21 h – 1 h", then
+"jusqu'à 1 h" on the next day.
 
 ## The address
 
-- `month=YYYY-MM`: the month shown, from 2000-01 to 2999-12, which the server takes. Without it, or with a value the
-  page doesn't know, it's today's month.
+- `month=YYYY-MM`: the month shown, among those the server takes. Without it, or with a value the page doesn't know, it's
+  today's month.
 - `day=YYYY-MM-DD`: the chosen day. Without `month`, the month shown is the day's. A day that isn't in the month's grid,
   or isn't a day, is ignored.
 - `issues=open`: "À régler" is open.
@@ -55,60 +55,53 @@ opens the box and closes it, or "Rien à régler." while there are none. It's cl
 
 Above that button, the box warns about each feed whose last read failed, or that hasn't been read yet (see
 [Warnings](layout.md#warnings)), naming it, and saying why the read failed, if it did, and that conflicts can be missing
-or out of date. While there are no feeds at all, it says that conflicts with occupations and quiet time can't be found,
-and links to Configuration.
+or out of date. While there are no feeds at all, it says that conflicts with occupations can't be found, and links to
+Configuration.
 
 Opened, it lists:
 
 - The conflicts, in the server's order, after « Le studio n'accueille qu'une chose à la fois : déplacez, raccourcissez
-  ou annulez l'une des deux. ». Each one has the day it starts, as a button that shows that day, chosen, in the month,
-  with the focus on it, and the time its two things overlap, in full on that day. Then the two things, each with its
-  kind: a session's title links to its page, and an occupation, by its title, or quiet time, says « à changer dans le
-  calendrier « Calendrier de l'équipe » », by its feed's name.
+  ou annulez l'une des deux. Les occupations se changent dans leur calendrier. ». Each one has the day it starts, as a
+  button that shows that day, chosen, in the month, with the focus on it, and the time its two things overlap, in full on
+  that day. Then the two things, each with its kind: a session by its title, which links to its page, and an occupation
+  by its name.
 - The sessions without a date, the most recently added first, under "Sans date". Each one has its title, linking to its
   page, its sets' performers, set by set, the sets separated by "·", and its duration.
 
-Conflicts are those of the next 365 days (see [Conflicts](../../server/calendar.md#conflicts)): things that only
-overlap outside them, e.g. in a month more than a year away, or before today, don't show "conflit".
-
 ## The toolbar
 
-"←" and "→" ("mois précédent" and "mois suivant" for screen readers), the month, e.g. "novembre 2026", which screen
-readers announce when it changes, "aujourd'hui", which shows today's month and chooses today, and "nouvelle session",
-which opens the session form (see [Sessions](sessions.md#the-session-form)). "←" can't be used on 2000-01, saying « Le
-calendrier commence en 2000. », nor "→" on 2999-12, saying « Le calendrier s'arrête en 2999. » (see
-[Controls that can't be used](layout.md#controls-that-cant-be-used)).
+"←" and "→" ("mois précédent" and "mois suivant" for screen readers), which can't go beyond the months the server takes,
+the month, e.g. "novembre 2026", which screen readers announce when it changes, "aujourd'hui", which shows today's month
+and chooses today, and "nouvelle session", which opens the session form (see [Sessions](sessions.md#the-session-form)).
 
 ## The month
 
-A table with the days of the week, "dim" to "sam", then the weeks that have the month's days, 4 to 6 of them. The days
-of the months before and after are faded out, with what's on them. Today's number is in a black square.
+A table with the days of the week, "dim" to "sam", then the weeks that have the month's days. The days of the months
+before and after are faded out, with what's on them. Today stands out.
 
-Each day lists what takes some of it, its quiet time first, as a band, then its sessions and occupations, in order of
-their start, each with its part of the day (see [What's shown](#whats-shown)). A session also has its sets' performers,
-cut short when they don't fit. A thing that's in a conflict has "conflit" on the days the time it overlaps the other
-thing takes some of. Screen readers read each thing's kind before it, e.g. « occupation : RÉPARATION ».
+Each day lists what takes some of it, in order of start, then end, each with its part of the day and its name (see
+[What's shown](#whats-shown)). A session also has its sets' performers, cut short when they don't fit. A thing that's in
+a conflict has "conflit" on the days the time it overlaps the other thing takes some of. Screen readers read each thing's
+kind before it, e.g. « occupation : RÉPARATION, calendrier Calendrier de l'équipe ».
 
-Clicking a day chooses it, outlined in black, and clicking it again unchooses it. Clicking a session opens its page,
-without choosing its day.
+Clicking a day chooses it, and clicking it again unchooses it. Clicking a session opens its page, without choosing its
+day.
 
 With the keyboard, the month is one stop: Tab goes to the chosen day, or else to today, when it's in the month's grid,
-or else to the month's first day. The arrows go to the day before or after, or to the same day of the week before or
-after, and stop at the grid's edges. Enter or Space chooses the day, or unchooses it. Screen readers name the table by
-its month, e.g. "novembre 2026", and each day, e.g. "jeudi 19 novembre 2026", say which one is today, and which one is
-chosen, and read what's on it, as its description. The sessions' links in the month are left out of the keyboard's way,
-since the chosen day has them.
+or else to the month's first day. The arrows move between days, within the grid, and Enter or Space chooses the day, or
+unchooses it. Screen readers name the table by its month, and each day by its date, e.g. "jeudi 19 novembre 2026", say
+which one is today, and which one is chosen, and read what's on it. The sessions' links in the month are left out of the
+keyboard's way, since the chosen day has them.
 
 ### Free time
 
 A day has free time when it's in the 365 days from today, those conflicts are found in, and no session that isn't
-cancelled, and no occupation, starts on it. The stretches of its free time are the day's time, from 00:00 to 00:00,
-outside what takes some of it: quiet time, and things that started on an earlier day. Today's stretches count from
-00:00 too, even those that are over.
+cancelled starts on it. Its free time is the parts of the day, from 00:00 to 00:00, that nothing takes, cancelled
+sessions aside. Today's stretches count from 00:00 too, even those that are over.
 
-The month shows the free time of its own days, not that of the months before and after. A day that nothing takes,
-cancelled sessions aside, is green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à
-15 h", "dispo dès 11 h" or "dispo 11 h – 15 h".
+The month shows the free time of its own days, not that of the months before and after. A day that nothing takes is
+green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or "dispo
+11 h – 15 h".
 
 ## The chosen day
 
@@ -116,36 +109,33 @@ Under the month, the chosen day, with the day as its heading, e.g. "jeudi 19 nov
 today, and a "×" ("fermer le jour" for screen readers) that unchooses it, which puts the focus back on the day in the
 month. It has a row for each thing that takes some of the day, in the month's order, with:
 
-- its kind: "session", "occupation" or "silence";
+- its kind: "session" or "occupation";
 - its times, in full on that day (see [What's shown](#whats-shown));
-- for a session, its title, linking to its page, its sets' performers, and its status; for an occupation, its title, and
-  the calendar it's changed in, by its feed's name; for quiet time, that calendar;
-- for each of its conflicts whose overlap takes some of the day, "conflit avec" the other thing, e.g. « conflit avec la
-  session HAUTE RIVE TAKEOVER ».
+- for a session, its title, linking to its page, its sets' performers, and its status; for an occupation, its name;
+- for each other thing it's in conflict with, during some of the day, "conflit avec" that thing, e.g. « conflit avec la
+  session HAUTE RIVE TAKEOVER », « conflit avec l'occupation RÉPARATION (Calendrier de l'équipe) ».
 
 Then, when the day has free time, a "disponible" row, with "toute la journée", or its stretches, e.g. "jusqu'à 15 h,
-dès 20 h". On a day without anything, « Rien ce jour-là. ». From today on, "nouvelle session ce jour →" opens the session form on that day (see
-[The session form](sessions.md#the-session-form)).
+dès 20 h". On a day without anything, « Rien ce jour-là. ». From today on, "nouvelle session ce jour →" opens the
+session form on that day (see [The session form](sessions.md#the-session-form)).
 
 ## Sources
 
 Where each kind of thing comes from:
 
 - Sessions: from the site, linking to [Sessions](sessions.md).
-- Occupations and quiet time: each of their feeds, by name, with when it was last read, or that it hasn't been read yet,
-  and why its last read failed, as [Configuration](configuration.md#calendriers-externes) says it. A kind without feeds
-  says so, and that they're added in Configuration, "Calendriers externes", linking to Configuration.
+- Occupations: each feed, by name, with "titres masqués" when its titles are private, when it was last read, or that it
+  hasn't been read yet, and why its last read failed, as [Configuration](configuration.md#calendriers-externes) says it.
+  Without feeds, it says so, and that they're added in Configuration, "Calendriers externes", linking to Configuration.
 
 ## Loading and errors
 
-When the calendar can't be read, the page says why at its top, « Le calendrier n'a pas pu être chargé : … », until it's
-read again. "À régler" and "Sources" show the last calendar read, whatever its days, and nothing before the first. The
-month and the chosen day only show things, and free time, from a calendar read for the month's days: while another
-month loads, or when it couldn't be read, its days show only their numbers, and the chosen day only its heading and
-"nouvelle session ce jour →".
+When the calendar can't be read, the page says why at its top, until it's read again. "À régler" and "Sources" show the
+last calendar read, whatever its days, and nothing before the first. The month and the chosen day only show what a
+calendar read for the month's days has: until then, its days show only their numbers, and the chosen day only its
+heading and "nouvelle session ce jour →".
 
 ## Endpoints
 
-- `GET /api/admin/calendar`, from the first day of the month's grid to its last, or from 2000-01-01, or to 2999-12-31,
-  when the grid goes beyond them. It's read when the page opens, when the month changes, and when the browser's tab is
-  shown again, at most once a minute.
+- `GET /api/admin/calendar`, for the days of the month's grid, within those the server takes. It's read when the page
+  opens, when the month changes, and when the browser's tab is shown again.

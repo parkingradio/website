@@ -4,7 +4,7 @@ import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { byWhom, lastRead } from '../describe'
-import { ReadFailure } from '../feeds'
+import { FeedName, ReadFailure } from '../feeds'
 
 // The calendar feeds that the studio's occupations are read from, in the configuration section (see
 // docs/design/client/admin/configuration.md).
@@ -127,8 +127,7 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
   return (
     <li>
       <p>
-        <b>{feed.name}</b>
-        {feed.privateTitles && ' (titres masqués)'}{' '}
+        <FeedName feed={feed} />{' '}
         <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}

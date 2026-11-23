@@ -1,23 +1,17 @@
-/* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color, the same in the
-   legend, the month and the chosen day: sessions light blue with a dark blue bar, occupations the same with a dashed
-   border, quiet time a hatched violet band, free time green, and conflicts a red border. */
+/* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color and its shape, the
+   same in the legend, the month and the chosen day: sessions light blue with a dark blue bar on their left, occupations
+   light violet with a dashed violet border, free time green, and conflicts a red frame, inside the bar and the
+   border, so that the shapes stay seen. */
 
-.calendar-session,
-.calendar-occupation {
+.calendar-session {
+  border-left: 3px solid #1d4fa3;
   background: #e4eefb;
   color: #12305f;
 }
 
-.calendar-session {
-  border-left: 3px solid #1d4fa3;
-}
-
 .calendar-occupation {
-  border: 1px dashed #1d4fa3;
-}
-
-.calendar-quiet-time {
-  background: repeating-linear-gradient(135deg, #efe7fb 0 5px, #e0d2f5 5px 10px);
+  border: 1px dashed #6a3fb5;
+  background: #f1eafb;
   color: #4b2a85;
 }
 
@@ -26,9 +20,9 @@
   color: #1b5e2a;
 }
 
+/* Within the border, so that the day's cell, which cuts what overflows, doesn't cut it on phones. */
 .calendar-conflict {
-  outline: 2px solid #c62828;
-  outline-offset: -2px;
+  box-shadow: inset 0 0 0 2px #c62828;
 }
 
 /* The page's headings other than the sections', without their lines and margins. */
@@ -248,8 +242,21 @@
   text-decoration: underline;
 }
 
-/* Cut short when they don't fit, on one line. */
-.calendar-things .calendar-performers {
+/* An occupation's title, from someone else's calendar, which can be long, is cut short after two lines. */
+.calendar-things .calendar-occupation .calendar-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* A calendar's name, in place of an occupation's title, which isn't one: as it's written. */
+.calendar-feed-name {
+  text-transform: none;
+}
+
+/* Cut short when they don't fit, on one line: a session's performers, or an occupation's calendar. */
+.calendar-things .calendar-detail {
   display: block;
   overflow: hidden;
   white-space: nowrap;
