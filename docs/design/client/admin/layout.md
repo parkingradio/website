@@ -77,8 +77,9 @@ Wherever the admin pages list applications, sessions or sets, or show them, e.g.
 that are done, their rows or their blocks, are greyed out, text, links and background, and rejected applications and
 cancelled sessions and sets are faded out the same way, in a color of their own, yellow, so that the two are told apart
 at a glance. Each one also has its status written, so that it isn't told by color alone, except in Calendrier's month on
-narrow screens like phones, whose sessions are marks, done ones grey and cancelled ones hollow: the chosen day writes
-their status, and screen readers read it with the day (see [On phones, in Calendrier](calendrier.md#on-phones)).
+narrow screens like phones, whose sessions are marks, told apart by their shape, done ones filled grey and cancelled
+ones hollow, which its legend names: the chosen day writes their status, and screen readers read it with the day (see
+[On phones, in Calendrier](calendrier.md#on-phones)).
 
 Buttons that change a status, e.g. on a session's page, show the status the entry has in black, even when it can't be
 picked (see [Controls that can't be used](#controls-that-cant-be-used)), e.g. an application's that its sets give it,

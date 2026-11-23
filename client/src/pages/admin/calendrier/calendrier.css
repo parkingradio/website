@@ -155,7 +155,7 @@
   overflow-wrap: anywhere;
 }
 
-.calendar-line-what strong {
+.calendar-line-what :is(strong, .calendar-occupation-title) {
   font-weight: 700;
 }
 
@@ -449,8 +449,9 @@
   margin-top: 0.5rem;
 }
 
-/* The marks of what's on a day, which only phones show. */
-.calendar-marks {
+/* The marks of what's on a day, and the legend's sessions' status, which only phones show. */
+.calendar-marks,
+.calendar-legend .calendar-legend-narrow {
   display: none;
 }
 
@@ -485,6 +486,10 @@
     white-space: nowrap;
   }
 
+  .calendar-legend .calendar-legend-narrow {
+    display: flex;
+  }
+
   .calendar-marks {
     display: flex;
     flex-wrap: wrap;
@@ -500,11 +505,11 @@
     height: 12px;
   }
 
-  /* The strokes that tell marks apart have a contrast of at least 3:1, which the pale fills don't: done sessions have a
-     grey bar, cancelled ones are hollow, and free time is a circle with a border. */
+  /* The strokes that tell marks apart have a contrast of at least 3:1, which the pale fills don't: done sessions are
+     filled grey, cancelled ones are hollow, and free time is a circle with a border. */
   .calendar-mark-session.calendar-mark-done {
     border-left-color: #767676;
-    background: #e0e0e0;
+    background: #767676;
   }
 
   .calendar-mark-session.calendar-mark-cancelled {

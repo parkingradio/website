@@ -131,9 +131,10 @@ export function fullTimes(times: Times, day: string): string {
   return from.day === day ? shortTimes(times) : `${formatQuebecDayInYear(times.start)}, ${shortTimes(times)}`
 }
 
-// The day something starts, e.g. "sam. 21 nov.", with its year when it isn't `today`'s, e.g. "sam. 2 janv. 2027".
-export function startDay({ start }: Times, today: string): string {
-  return dayOf(Date.parse(start)).slice(0, 4) === today.slice(0, 4) ? formatQuebecDayInYear(start) : formatQuebecDay(start)
+// The day something starts, e.g. "sam. 21 nov.", with its year when it isn't `near`'s, e.g. "sam. 2 janv. 2027", `near`
+// being a day the reader knows the year of, e.g. today.
+export function startDay({ start }: Times, near: string): string {
+  return dayOf(Date.parse(start)).slice(0, 4) === near.slice(0, 4) ? formatQuebecDayInYear(start) : formatQuebecDay(start)
 }
 
 // A thing's name alone, without its calendar's: a session's title, or an occupation's, or its calendar's name when it

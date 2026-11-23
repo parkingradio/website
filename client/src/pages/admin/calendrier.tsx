@@ -4,7 +4,7 @@ import { quebecDayAndTime } from '../../quebec-time'
 import { Button } from './button'
 import { useTabShownCount } from '../../api/use-tab-shown'
 import { useReportConflicts } from './conflict-count'
-import { formatMonth } from './describe'
+import { SESSION_STATUS_LABELS, formatMonth } from './describe'
 import { useQueryParams } from './list'
 import { ChosenDay } from './calendrier/day'
 import { NewSessionForm } from './calendrier/new-session'
@@ -18,6 +18,10 @@ import './calendrier/calendrier.css'
 // The studio's calendar: what takes it, month by month or as a list, and what needs settling (see
 // docs/design/client/admin/calendrier.md).
 
+// A day's button in the month, and its "+", by their selectors.
+const dayInMonth = (day: string) => `.calendar-month [data-day="${day}"]`
+const addInMonth = (day: string) => `.calendar-month [data-add="${day}"]`
+
 // The page's views, and their buttons' names.
 const VIEWS = ['month', 'list'] as const
 type View = (typeof VIEWS)[number]
@@ -29,8 +33,8 @@ type Read = { from: string; to: string; calendar: Calendar }
 // Reads the calendar of the days from `from` to `to`, again whenever they change, or `version` does, and when the tab is
 // shown again, at most once a minute, and tells the menu's badge how many conflicts there are. Only the last request's
 // answer counts. Returns the calendar last read, whatever its days, the one read for these days, once it is, and why the
-// last request failed, if it did. The last two reads, for other days, are kept, so that going back to the other view, or
-// to the month before, shows it while it's read again.
+// last request failed, if it did. The last two reads are kept, whatever their days, so that going back to what was shown
+// just before shows it while it's read again.
 function useCalendar(from: string, to: string, version: number): { last: Calendar | null; shown: Calendar | null; error: string | null } {
   const [reads, setReads] = useState<{ last: Read[]; error: string | null }>({ last: [], error: null })
   const tabShown = useTabShownCount()
@@ -94,7 +98,7 @@ export function Calendrier() {
   // closed.
   const focusNext = useRef<string | null>(null)
   // The day whose chosen day, under the month, is brought into view once it's chosen and shows what's on it, e.g. once
-  // it's chosen by clicking it.
+  // it's chosen by clicking it: its heading, as long as the day stays in view in the month, which has the focus.
   const scrollTo = useRef<string | null>(null)
   useEffect(() => {
     const next = focusNext.current
@@ -103,7 +107,8 @@ export function Calendrier() {
     if (scrollTo.current !== null && scrollTo.current === shownDay && days) {
       scrollTo.current = null
       // jsdom has no scrollIntoView.
-      document.querySelector('.calendar-day')?.scrollIntoView?.({ block: 'nearest' })
+      document.querySelector('.calendar-day h2')?.scrollIntoView?.({ block: 'nearest' })
+      document.querySelector(dayInMonth(shownDay))?.closest('td')?.scrollIntoView?.({ block: 'nearest' })
     }
   })
 
@@ -115,7 +120,7 @@ export function Calendrier() {
   const showDay = (shown: string) => change({ view: null, month: monthOf(shown), day: shown }, { replace: view === 'month' && monthOf(shown) === month })
   // The same, from a row of "À régler" or of the list, with the focus on the day, and the chosen day in view.
   const goToDay = (shown: string) => {
-    focusNext.current = `.calendar-month [data-day="${shown}"]`
+    focusNext.current = dayInMonth(shown)
     scrollTo.current = shown
     showDay(shown)
   }
@@ -177,7 +182,7 @@ export function Calendrier() {
         </div>
       </div>
       {view === 'list' ? (
-        <List nameId={headingId} today={today} to={to} months={months} onShowDay={goToDay} />
+        <List nameId={headingId} to={to} months={months} onShowDay={goToDay} />
       ) : (
         <>
           <Legend />
@@ -208,7 +213,7 @@ export function Calendrier() {
           today={today}
           entries={days?.get(shownDay) ?? null}
           onClose={() => {
-            focusNext.current = `.calendar-month [data-day="${shownDay}"]`
+            focusNext.current = dayInMonth(shownDay)
             choose(null)
           }}
         >
@@ -218,12 +223,12 @@ export function Calendrier() {
               day={shownDay}
               focusRequests={addings}
               onCancel={() => {
-                focusNext.current = `.calendar-month [data-add="${shownDay}"]`
+                focusNext.current = addInMonth(shownDay)
                 setAdding(null)
               }}
               onAdded={(session) => {
                 // The day stays chosen, with the focus on it in the month, where the session shows once it's read.
-                focusNext.current = `.calendar-month [data-day="${shownDay}"]`
+                focusNext.current = dayInMonth(shownDay)
                 setAdding(null)
                 setAdded({ day: shownDay, title: session.title })
                 setAddedCount((count) => count + 1)
@@ -257,6 +262,12 @@ function Legend() {
       <li>
         <span className="calendar-swatch calendar-conflict" /> conflit
       </li>
+      {/* Which only narrow screens need, whose month doesn't write sessions' status. */}
+      {(['done', 'cancelled'] as const).map((status) => (
+        <li key={status} className="calendar-legend-narrow">
+          <span className={`calendar-mark calendar-mark-session calendar-mark-${status}`} /> {SESSION_STATUS_LABELS[status]}
+        </li>
+      ))}
     </ul>
   )
 }

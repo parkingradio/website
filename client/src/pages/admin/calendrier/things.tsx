@@ -25,7 +25,7 @@ export function SessionStatus({ status }: { status: SessionStatus }) {
 
 // An occupation's title, or its calendar's name in its place, as it's written.
 export function OccupationTitle({ title, calendar }: OccupationName) {
-  return <span className={title === null ? 'calendar-feed-name' : undefined}>{title ?? calendar}</span>
+  return <span className={`calendar-occupation-title${title === null ? ' calendar-feed-name' : ''}`}>{title ?? calendar}</span>
 }
 
 // An occupation's calendar, after its title, which screen readers read after ", calendrier".
@@ -37,12 +37,11 @@ export function OccupationCalendar({ calendar }: { calendar: string }) {
   )
 }
 
-// An occupation's name, within a line: its title, in bold if `strong`, then its calendar, or its calendar alone.
-export function OccupationLabel({ title, calendar, strong = false }: OccupationName & { strong?: boolean }) {
-  const name = <OccupationTitle title={title} calendar={calendar} />
+// An occupation's name, within a line: its title, then its calendar, or its calendar alone.
+export function OccupationLabel({ title, calendar }: OccupationName) {
   return (
     <>
-      {strong ? <strong>{name}</strong> : name}
+      <OccupationTitle title={title} calendar={calendar} />
       {title !== null && (
         <span className="admin-meta">
           <OccupationCalendar calendar={calendar} />

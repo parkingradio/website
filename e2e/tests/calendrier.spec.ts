@@ -53,6 +53,11 @@ function ownCalendar(unique: string, day: string) {
   return { extra, team, stays }
 }
 
+// Eight occupations of an hour each on `day`, of `unique`'s first feed, from 12 h, so that its chosen day is longer than
+// a phone's screen, and its week, in the month, too long on wider screens to leave room for the chosen day's heading.
+const busy = (unique: string, day: string) =>
+  Array.from({ length: 8 }, (_, i) => ({ feedId: `team-${unique}`, start: at(day, `${12 + i}:00`), end: at(day, `${13 + i}:00`), wholeDay: false, title: `OCCUPÉ ${i + 1}` }))
+
 // E.g. "ven. 13 nov.", as the page writes a day in a list's row, or in a thing's times.
 const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
 
@@ -61,6 +66,12 @@ const scrollsSideways = (page: Page) => page.evaluate(() => document.documentEle
 
 // The narrowest phones the admin pages are made for, which the mobile project's is wider than.
 const NARROW = { width: 360, height: 800 }
+
+// Where the navigation bar, which stays at the top of the screen, ends.
+async function underTheBar(page: Page): Promise<number> {
+  const bar = (await page.locator('.navbar').boundingBox())!
+  return bar.y + bar.height
+}
 
 test('a session is in its month, and on its day, where a new session is added', async ({ page }, testInfo) => {
   const { unique, day } = own(testInfo)
@@ -197,13 +208,14 @@ test('the list has each thing once, from today, on one line, which shows its day
   extra.occupations.push(
     { feedId: `team-${unique}`, start: at(closed, '00:00'), end: at(addDays(closed, 3), '00:00'), wholeDay: true, title: `FERMÉ ${unique}` },
     { feedId: `team-${unique}`, start: at(far, '10:00'), end: at(far, '12:00'), wholeDay: false, title: link },
+    ...busy(unique, far),
   )
   await withCalendar(page, extra)
   await logIn(page, { at: '/admin/calendrier?view=list' })
 
   const list = page.getByRole('region', { name: 'À venir' })
   const rows = list.getByRole('button')
-  await expect(rows.filter({ hasText: unique })).toHaveText([
+  await expect(rows.filter({ hasText: unique }).filter({ hasNotText: 'OCCUPÉ' })).toHaveText([
     `${dayInYear(day)} 10 h – 16 h · occupation RÉPARATION ${unique}, calendrier ${team} · conflit avec ${stays}`,
     `${dayInYear(day)} 12 h – 11 h · occupation ${stays} · conflit avec RÉPARATION ${unique}`,
     `${dayInYear(closed)} du ${dayInYear(closed)} au ${dayInYear(addDays(closed, 2))} · occupation FERMÉ ${unique}, calendrier ${team}`,
@@ -218,15 +230,16 @@ test('the list has each thing once, from today, on one line, which shows its day
   await expect(list).toContainText(`La liste s'arrête au ${longDay(addDays(today, 364))}.`)
   expect(await scrollsSideways(page)).toBe(false)
 
-  // The last row, far down the list, shows its day, chosen, in the month, with the focus on it, and the chosen day in
-  // view.
+  // The last row, far down the list, shows its day, chosen, in the month, with the focus on it, in view under the bar,
+  // and on a phone, where there's room for both, the chosen day's heading in view too.
   const last = rows.filter({ hasText: link })
   await last.scrollIntoViewIfNeeded()
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
   await (isMobile ? last.tap() : last.click())
   await expect(page).toHaveURL(`/admin/calendrier?month=${far.slice(0, 7)}&day=${far}`)
   await expect(dayButton(page, far)).toBeFocused()
-  await expect(chosenDay(page, far).getByRole('heading', { name: longDay(far) })).toBeInViewport({ ratio: 1 })
+  if (isMobile) await expect(chosenDay(page, far).getByRole('heading', { name: longDay(far) })).toBeInViewport({ ratio: 1 })
+  expect((await dayCell(page, far).boundingBox())!.y).toBeGreaterThanOrEqual(await underTheBar(page))
   await expect(chosenDay(page, far)).toContainText(link)
   // Back to the list, where it was, which the browser puts back once the page shows it at once, while it's read again,
   // which the test waits for, so that it doesn't end while its fake answers.
@@ -242,7 +255,12 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
   if (isMobile) await page.setViewportSize(NARROW)
   const day = soon()
   const month = day.slice(0, 7)
-  await withCalendar(page, ownCalendar(unique, day).extra)
+  // A day of the grid's first week other than the test's own, its Sunday or else the Monday after, which is busy.
+  const sunday = addDays(`${month}-01`, -new Date(`${month}-01`).getUTCDay())
+  const first = sunday !== day ? sunday : addDays(day, 1)
+  const { extra } = ownCalendar(unique, day)
+  extra.occupations.push(...busy(unique, first))
+  await withCalendar(page, extra)
   await logIn(page, { at: `/admin/calendrier?month=${month}` })
 
   const marks = dayCell(page, day).locator('.calendar-marks')
@@ -253,13 +271,17 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
     await expect(marks).toBeVisible()
     await expect(marks.locator('.calendar-mark-occupation.calendar-mark-conflict')).toHaveCount(2)
     await expect(marks).toHaveClass(/calendar-marks-conflict/)
-    await expect(dayCell(page, day).locator('.calendar-things')).toHaveCSS('position', 'absolute')
-    // A "+" of at least 24 × 24 px, which overlaps neither its day's number nor the next day's, on a two-digit day from
-    // today on.
-    const plus = (await page.getByRole('button', { name: `nouvelle session le ${longDay(`${month}-28`)}` }).boundingBox())!
+    // Its words are there for screen readers only.
+    const words = (await dayCell(page, day).locator('.calendar-things').boundingBox())!
+    expect(words.width * words.height).toBeLessThanOrEqual(1)
+    // A "+" of at least 24 × 24 px, which overlaps neither its day's number nor the next day's, next to it, on a
+    // two-digit day from today on that isn't a Saturday.
+    const today = quebecDayAndTime(new Date()).day
+    const twoDigits = Array.from({ length: 19 }, (_, i) => `${month}-${10 + i}`).find((each) => each >= today && new Date(each).getUTCDay() !== 6)!
+    const plus = (await page.getByRole('button', { name: `nouvelle session le ${longDay(twoDigits)}` }).boundingBox())!
     expect(plus.width).toBeGreaterThanOrEqual(24)
     expect(plus.height).toBeGreaterThanOrEqual(24)
-    for (const number of [`${month}-28`, addDays(`${month}-28`, 1)]) {
+    for (const number of [twoDigits, addDays(twoDigits, 1)]) {
       const box = (await dayButton(page, number).boundingBox())!
       const overlaps = plus.x < box.x + box.width && box.x < plus.x + plus.width && plus.y < box.y + box.height && box.y < plus.y + plus.height
       expect(overlaps).toBe(false)
@@ -268,15 +290,17 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
     await expect(marks).toBeHidden()
   }
 
-  // A day of the grid's first week, in view at the top of the page, while the chosen day is under the month, out of
-  // view, tapped or clicked where it is, so that only the page scrolls to the chosen day.
-  await page.evaluate(() => window.scrollTo(0, 0))
-  const number = (await dayButton(page, `${month}-01`).boundingBox())!
+  // The busy day, in the grid's first week, at the bottom of the screen, while the chosen day is under the month, out of
+  // view, tapped or clicked where it is, so that only the page scrolls: toward the chosen day's heading, all of it on a
+  // phone, where there's room, but keeping the day in view under the bar.
+  await page.locator('.calendar-month tbody tr').first().evaluate((week) => week.scrollIntoView({ block: 'end' }))
+  const scrolled = await page.evaluate(() => window.scrollY)
+  const number = (await dayButton(page, first).boundingBox())!
   const [x, y] = [number.x + number.width / 2, number.y + number.height / 2]
-  expect(y).toBeLessThan(page.viewportSize()!.height)
   await (isMobile ? page.touchscreen.tap(x, y) : page.mouse.click(x, y))
-  await expect(chosenDay(page, `${month}-01`).getByRole('heading', { name: longDay(`${month}-01`) })).toBeInViewport({ ratio: 1 })
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  if (isMobile) await expect(chosenDay(page, first).getByRole('heading', { name: longDay(first) })).toBeInViewport({ ratio: 1 })
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(scrolled)
+  expect((await dayCell(page, first).boundingBox())!.y).toBeGreaterThanOrEqual(await underTheBar(page))
 
   // The form for a new session fits too.
   const add = page.getByRole('button', { name: `nouvelle session le ${longDay(day)}` })

@@ -339,8 +339,9 @@ describe('the list', () => {
     expect(listedMonths(calendar({ sessions: [played] }), from, to).flatMap(({ things }) => things)).toEqual([])
   })
 
-  it("says the day an overlap starts, with its year when it isn't today's", () => {
+  it("says the day an overlap starts, with its year when it isn't that of the day it's near", () => {
     expect(startDay(times('2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00'), '2026-11-19')).toBe('sam. 21 nov.')
     expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2026-11-19')).toBe('sam. 2 janv. 2027')
+    expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2027-01-01')).toBe('sam. 2 janv.')
   })
 })

@@ -297,7 +297,7 @@ describe('Calendrier', () => {
       expect(path()).toBe('/admin/calendrier?month=2026-12')
     })
 
-    it('brings the chosen day, under the month, into view, when it is chosen by clicking it', async () => {
+    it('brings the chosen day, under the month, into view, and the day in the month too, when it is chosen by clicking it', async () => {
       mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY })
       renderAt('/admin/calendrier?day=2026-11-20')
       await loaded()
@@ -305,15 +305,16 @@ describe('Calendrier', () => {
       expect(scrollIntoView).not.toHaveBeenCalled()
 
       fireEvent.click(cell('2026-11-26'))
-      expect(scrollIntoView.mock.contexts).toEqual([chosenDay()])
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+      // Its heading, then the day, which the heading's being in view mustn't hide.
+      expect(scrollIntoView.mock.contexts).toEqual([within(chosenDay()!).getByRole('heading', { level: 2 }), cell('2026-11-26')])
+      expect(scrollIntoView.mock.calls).toEqual([[{ block: 'nearest' }], [{ block: 'nearest' }]])
       // Nor when it's unchosen, nor by "+", which puts the focus on its form, nor by "aujourd'hui", nor going back.
       fireEvent.click(cell('2026-11-26'))
       fireEvent.click(addButton('2026-11-27'))
       fireEvent.click(screen.getByRole('button', { name: "aujourd'hui" }))
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       back()
-      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
     })
 
     it("but not by clicking a session's link, which opens its page", async () => {
@@ -746,15 +747,24 @@ describe('Calendrier', () => {
       expect(within(list()).queryByText(/dispo/)).not.toBeInTheDocument()
     })
 
-    it("says a conflict's day with its year when it isn't today's", async () => {
+    it("says a conflict's day with its year when it isn't the row's day's", async () => {
+      const asThing = ({ id, title, start, end }: Session) => conflictThing({ kind: 'session', id, title, start, end, status: 'planned' })
+      // A stay until January, and another over January, each in conflict with a session in January.
       const late = session('session-7', 'NOUVEL AN', '2027-01-01T22:00:00-05:00', '2027-01-02T02:00:00-05:00')
+      const later = session('session-8', 'ÉPIPHANIE', '2027-01-06T20:00:00-05:00', '2027-01-06T23:00:00-05:00')
       const stay = { ...LONG_STAY, end: '2027-01-02T11:00:00-05:00' }
-      const conflict = { start: late.start!, end: late.end!, things: [conflictThing({ kind: 'occupation', ...stay }), conflictThing({ kind: 'session', id: late.id, title: late.title, start: late.start, end: late.end, status: 'planned' })] }
-      mockFetch({ ...LOGGED_IN, [LIST]: { ...EMPTY, sessions: [late], occupations: [stay], conflicts: [conflict] } })
+      const january = { ...LONG_STAY, start: '2027-01-04T15:00:00-05:00', end: '2027-01-08T11:00:00-05:00' }
+      const conflicts = [
+        { start: late.start!, end: late.end!, things: [conflictThing({ kind: 'occupation', ...stay }), asThing(late)] },
+        { start: later.start!, end: later.end!, things: [conflictThing({ kind: 'occupation', ...january }), asThing(later)] },
+      ]
+      mockFetch({ ...LOGGED_IN, [LIST]: { ...EMPTY, sessions: [late, later], occupations: [stay, january], conflicts } })
       renderAt('/admin/calendrier?view=list')
       await loaded()
 
-      expect(visibleText(within(list()).getAllByRole('listitem')[0])).toBe('jeu. 19 nov. mer. 18 nov., 15 h – sam. 2 janv., 11 h · occupation Séjours · conflit avec NOUVEL AN (ven. 1 janv. 2027)')
+      const rows = within(list()).getAllByRole('listitem').map(visibleText)
+      expect(rows[0]).toBe('jeu. 19 nov. mer. 18 nov., 15 h – sam. 2 janv., 11 h · occupation Séjours · conflit avec NOUVEL AN (ven. 1 janv. 2027)')
+      expect(rows[2]).toBe('lun. 4 janv. 15 h – ven. 8 janv., 11 h · occupation Séjours · conflit avec ÉPIPHANIE (mer. 6 janv.)')
     })
 
     it('shows the day of a row, chosen, in the month, as a step in the history, and back finds the list', async () => {
@@ -767,7 +777,7 @@ describe('Calendrier', () => {
       await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
       expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
       // Once it shows what's on it, the chosen day is brought into view.
-      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([chosenDay()]))
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([within(chosenDay()!).getByRole('heading', { level: 2 }), cell('2026-11-21')]))
       expect(chosenDay()).toHaveTextContent('HAUTE RIVE TAKEOVER')
 
       // The list, as it was, while it's read again.
@@ -862,6 +872,11 @@ describe('Calendrier', () => {
       expect(kinds('2026-12-02')).toEqual(['occupation'])
       // The day's words still describe its button.
       expect(dayButton('2026-11-19')).toHaveAccessibleDescription('disponible')
+      // The legend gives the sessions' status, which narrow screens alone show, as marks.
+      const legend = screen.getByRole('list', { name: 'Légende' })
+      const narrow = [...legend.querySelectorAll('.calendar-legend-narrow')]
+      expect(narrow.map((item) => item.textContent?.trim())).toEqual(['jouée', 'annulée'])
+      expect(narrow.map((item) => item.firstElementChild?.className)).toEqual(['calendar-mark calendar-mark-session calendar-mark-done', 'calendar-mark calendar-mark-session calendar-mark-cancelled'])
     })
   })
 

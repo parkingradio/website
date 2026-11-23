@@ -10,7 +10,6 @@ import { LineText, OccupationLabel, SessionStatus, ThingKind } from './things'
 type ListProps = {
   // The id of the toolbar's heading, which names the list.
   nameId: string
-  today: string
   // The list's last day.
   to: string
   // What's in it, once the calendar is read for its days, or else null.
@@ -19,7 +18,7 @@ type ListProps = {
   onShowDay: (day: string) => void
 }
 
-export function List({ nameId, today, to, months, onShowDay }: ListProps) {
+export function List({ nameId, to, months, onShowDay }: ListProps) {
   return (
     <section className="calendar-list" aria-labelledby={nameId}>
       {months?.map(({ month, things }) => (
@@ -32,7 +31,7 @@ export function List({ nameId, today, to, months, onShowDay }: ListProps) {
               {things.map((listed, i) => (
                 <li key={i} className={listed.thing.kind === 'session' ? `admin-status-${listed.thing.status}` : undefined}>
                   <button type="button" className="calendar-line" onClick={() => onShowDay(listed.day)}>
-                    <ListedText listed={listed} today={today} />
+                    <ListedText listed={listed} />
                   </button>
                 </li>
               ))}
@@ -47,7 +46,7 @@ export function List({ nameId, today, to, months, onShowDay }: ListProps) {
 
 // A thing's row: its day, its times in full on that day, its kind, what it is, and each of its conflicts, with the day it
 // starts when it's on another day.
-function ListedText({ listed: { day, thing, conflicts }, today }: { listed: ListedThing; today: string }) {
+function ListedText({ listed: { day, thing, conflicts } }: { listed: ListedThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
     <LineText when={formatDayInYear(day)}>
@@ -59,14 +58,14 @@ function ListedText({ listed: { day, thing, conflicts }, today }: { listed: List
           {performers && ` · ${performers}`}
         </>
       ) : (
-        <OccupationLabel title={thing.title} calendar={thing.calendar} strong />
+        <OccupationLabel title={thing.title} calendar={thing.calendar} />
       )}
       {conflicts.map(({ conflict, other, elsewhere }, i) => (
         <Fragment key={i}>
           {' · '}
           <span className="calendar-conflict-text">
             conflit avec {nameOf(other)}
-            {elsewhere && ` (${startDay(conflict, today)})`}
+            {elsewhere && ` (${startDay(conflict, day)})`}
           </span>
         </Fragment>
       ))}

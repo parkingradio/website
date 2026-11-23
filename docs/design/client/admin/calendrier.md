@@ -89,8 +89,7 @@ the server takes, the month, e.g. "novembre 2026", and "aujourd'hui", which show
 the list: "À venir" in their place. Screen readers announce the month, or "À venir", when it changes.
 
 Then "mois" and "liste" ("Vue" for screen readers), which show the month and the list, the one shown being pressed, and
-doing nothing. They're at the same place whichever view is shown: at the toolbar's end, or on narrow screens like
-phones, on its first line.
+doing nothing. They're at the same place whichever view is shown.
 
 ## The month
 
@@ -121,13 +120,14 @@ way, since the chosen day has them.
 
 ### On phones
 
-On narrow screens like phones, each day of the month shows its number, its "+", and marks in place of the words of what's
-on it: a small square for each thing, in the month's order, which looks like the thing does on wider screens, as the
-legend shows (a session's bar, an occupation's dashed border), with a red frame when the thing has "conflit" on the day;
-a session that's done is grey, and one that's cancelled hollow. Then a green circle when the day has free time, as the
-legend shows too, and a red "!" when something on it has "conflit". Screen readers still read the day's words, as its
-description, and the chosen day writes them. Tapping a day chooses it, or unchooses it, the month having no links to
-sessions there.
+On narrow screens like phones, each day of the month shows its number, its "+", and marks in place of the words of
+what's on it: a small square for each thing, in the month's order, which looks like the thing does on wider screens, as
+the legend shows (a session's bar, an occupation's dashed border), with a red frame when the thing has "conflit" on the
+day; a session that's done is filled grey, and one that's cancelled hollow, which the legend shows too, as "jouée" and
+"annulée". Then a green circle when the day has free time, and a red "!" when something on it has "conflit". Screen
+readers still read the day's words, as its description, and the chosen day writes them. Tapping a day chooses it, or
+unchooses it, the month having no links to sessions there.
+
 
 ### Free time
 
@@ -144,9 +144,11 @@ green, and says "disponible". Otherwise, each stretch has a green tag: "dispo ju
 
 Under the month, the chosen day, with the day as its heading, e.g. "jeudi 19 novembre 2026", and "aujourd'hui" for
 today, and a "×" ("fermer le jour" for screen readers) that unchooses it, which puts the focus back on the day in the
-month. Choosing a day, in the month or from a row of "À régler" or of the list, brings the chosen day into view, when
-it isn't already. It has a row for each thing that takes some of the day, and each stretch of its free time (see
-[Free time](#free-time)), even on a day of the month before or after, in the month's order.
+month. Choosing a day, in the month or from a row of "À régler" or of the list, brings the chosen day's heading into
+view, when it isn't already, as far as the day in the month stays in view too. It has a row for each thing that takes
+some of the day, and each stretch of its free time (see [Free time](#free-time)), even on a day of the month before or
+after, in the month's order.
+
 A thing's row has:
 
 - its kind: "session" or "occupation";
@@ -201,9 +203,10 @@ are: the day, without its year, which its month gives, then its times in full on
   or its calendar's name alone (see [What's shown](#whats-shown));
 - for each other thing it's in conflict with, "·" and, in red, "conflit avec" that thing's name, as in "À régler", and,
   when their overlap doesn't take some of the row's day, the day it starts, without its year unless it's another year
-  than today's.
+  than the row's day's.
 
-E.g. « jeu. 26 nov. 10 h – 16 h · occupation RÉPARATION Calendrier de l'équipe · conflit avec Séjours (sam. 28 nov.) ».
+E.g. « mar. 1 déc. 15 h – 11 h · occupation Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier de l'équipe
+(mer. 2 déc.) ».
 
 As in "À régler", the whole row is one control, whose text has no links of its own: it shows the row's day, chosen, in
 the month, with the focus on it, where the chosen day links to a session's page. Screen readers name the list by the
@@ -215,8 +218,8 @@ When the calendar can't be read, the page says why at its top, until it's read a
 read, whatever its days, and nothing before the first. The month and the chosen day only show what a calendar read for
 the month's days has: until then, its days show only their numbers, and their "+", and the chosen day only its heading,
 and the form for a new session, which doesn't wait for the calendar. Likewise, the list only shows what a calendar read
-for its days has, and nothing until then. Going back from a day shown from the list finds the list as it last showed
-it, while it's read again, and so does going back from the list to the month it was shown from.
+for its days has, and nothing until then. Going back to what was shown just before, e.g. from a day shown from the list
+to the list, shows it as it last showed it, while it's read again.
 
 ## Endpoints
 

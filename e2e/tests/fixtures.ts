@@ -113,8 +113,9 @@ export type CalendarExtra = {
 // Has the page see the studio's calendar (GET /api/admin/calendar) with `extra` added to what the server answers, as if
 // it had read them from feeds, which the server under test has none of: it only reads https links, and couldn't reach a
 // feed of the tests' own. Like the server, it gives only the occupations that take some of the days asked for, but every
-// conflict, whatever the days. `extra` has to follow the server's other rules (see docs/design/server/calendar.md), e.g.
-// its order, since it's added after what the server answers, which has no occupations and no conflicts.
+// conflict, whatever the days, and the occupations in its order, by start, then end. `extra` has to follow the server's
+// other rules (see docs/design/server/calendar.md), e.g. the conflicts' order, since they're added after the server's,
+// which has none.
 export async function withCalendar(page: Page, extra: CalendarExtra) {
   await page.route(
     (url) => url.pathname === '/api/admin/calendar',
@@ -128,7 +129,9 @@ export async function withCalendar(page: Page, extra: CalendarExtra) {
         json: {
           ...calendar,
           feeds: [...calendar.feeds, ...extra.feeds],
-          occupations: [...calendar.occupations, ...extra.occupations.filter(within)],
+          occupations: [...calendar.occupations, ...extra.occupations.filter(within)].sort(
+            (a, b) => Date.parse(a.start) - Date.parse(b.start) || Date.parse(a.end) - Date.parse(b.end),
+          ),
           conflicts: [...calendar.conflicts, ...extra.conflicts],
         },
       })
