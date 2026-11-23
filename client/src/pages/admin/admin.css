@@ -874,27 +874,40 @@ tr[data-dragging] > td {
   gap: 6px;
 }
 
-/* Feature flags, each a switch with its name, then what it does and who last switched it. */
-.admin-features {
+/* A list of settings, e.g. feature flags, each a switch with its name, then what it does and who last switched it, or
+   calendar feeds, each with its name, its link, then who added it and when it was last read, or the form that changes
+   it. */
+.admin-list {
   margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
 }
 
-.admin-features li {
+.admin-list li {
   padding: 0.75rem 0;
   border-bottom: 1px solid #ddd;
 }
 
-.admin-features label {
+.admin-list li > label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
 }
 
-.admin-features p {
+.admin-list p {
   margin: 0.25rem 0 0;
+}
+
+/* A calendar feed's link, which is long, and has no spaces. */
+.admin-feed-link {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.admin-list li > .admin-form {
+  margin-top: 0;
 }
 
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */

@@ -69,23 +69,23 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
   in responses as in requests. So removing a value from a list, or renaming one, has to change the stored data that
   still uses it, in the same change: until then, every response that would include the old value fails.
-- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions and sets refuse the fields they
-  don't take in the JSON they're sent: its body, or the part of a `multipart/form-data` request that has an item's
-  fields, e.g. an artist's profile. Such a request fails with 400, and the error names the field: otherwise, a
-  misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it follow their own
-  rules, e.g. the other fields of a collective's members are ignored. The parts of a `multipart/form-data` request that
-  the endpoint doesn't read are ignored too, e.g. a form's submit button.
-- **Changes.** An artist, a collective, an application, a session or a set is changed with `PATCH`, which only changes
-  the fields it's sent, and leaves the others as they are. It takes JSON, never `multipart/form-data`, with any of the
-  fields its endpoint lists, at least one, each following the rules it follows when the item is added: a field that's
-  sent replaces the item's as a whole, even a list or an object, e.g. an artist's `links`, rather than being merged into
-  it, and null, or a blank string, where adding the item takes one for none, removes it the same way. The rules that
-  involve several fields, or other items, e.g. a takeover's collective, or sessions not overlapping, are checked on the
-  item as it would then be, with the fields that weren't sent as they are. A `PATCH` without any field fails with 400.
-  It sets `updatedBy` and `updatedAt`, even when nothing actually changes. Likewise, the endpoints of an item's photo or
-  flyer that give, replace or remove it, `PUT` and `DELETE` on `…/photo` and `…/flyer`, set them, even when there's no
-  photo or flyer to remove, and the endpoints that change a status, or whether a session is announced, say who changed
-  it and when even when it doesn't change.
+- **Unknown fields.** The admin endpoints of artists, collectives, applications, sessions, sets and calendar feeds
+  refuse the fields they don't take in the JSON they're sent: its body, or the part of a `multipart/form-data` request
+  that has an item's fields, e.g. an artist's profile. Such a request fails with 400, and the error names the field:
+  otherwise, a misspelled field would go unnoticed. That's only the top-level fields of that JSON: the objects in it
+  follow their own rules, e.g. the other fields of a collective's members are ignored. The parts of a
+  `multipart/form-data` request that the endpoint doesn't read are ignored too, e.g. a form's submit button.
+- **Changes.** An artist, a collective, an application, a session, a set or a calendar feed is changed with `PATCH`,
+  which only changes the fields it's sent, and leaves the others as they are. It takes JSON, never
+  `multipart/form-data`, with any of the fields its endpoint lists, at least one, each following the rules it follows
+  when the item is added: a field that's sent replaces the item's as a whole, even a list or an object, e.g. an artist's
+  `links`, rather than being merged into it, and null, or a blank string, where adding the item takes one for none,
+  removes it the same way. The rules that involve several fields, or other items, e.g. a takeover's collective, or
+  sessions not overlapping, are checked on the item as it would then be, with the fields that weren't sent as they are.
+  A `PATCH` without any field fails with 400. It sets `updatedBy` and `updatedAt`, even when nothing actually changes.
+  Likewise, the endpoints of an item's photo or flyer that give, replace or remove it, `PUT` and `DELETE` on `…/photo`
+  and `…/flyer`, set them, even when there's no photo or flyer to remove, and the endpoints that change a status, or
+  whether a session is announced, say who changed it and when even when it doesn't change.
 
 Requests and responses are described field by field. A field whose type says "or null" is always there, but can be
 `null`.
@@ -218,6 +218,10 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
+| [`GET /api/admin/calendar/feeds`](calendar.md#get-apiadmincalendarfeeds-admin) | admin | The calendar feeds that the studio's occupations are read from, with their links, and when each was last read, or why that failed |
+| [`POST /api/admin/calendar/feeds`](calendar.md#post-apiadmincalendarfeeds-admin) | admin | Adding a calendar feed, once its link gives a calendar |
+| [`PATCH /api/admin/calendar/feeds/:id`](calendar.md#patch-apiadmincalendarfeedsid-admin) | admin | Changing a calendar feed's name, link or whether its titles are private, once a new link gives a calendar |
+| [`DELETE /api/admin/calendar/feeds/:id`](calendar.md#delete-apiadmincalendarfeedsid-admin) | admin | Removing a calendar feed, and forgetting what was read from it |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/features`](features.md#get-apiadminfeatures-admin) | admin | Every feature flag, and whether it's on |
 | [`PUT /api/admin/features/:id`](features.md#put-apiadminfeaturesid-admin) | admin | Turning a feature flag on or off |

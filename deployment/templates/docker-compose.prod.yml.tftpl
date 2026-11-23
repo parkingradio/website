@@ -8,6 +8,10 @@ services:
       - ./certs/rds-global-bundle.pem:/app/certs/rds-global-bundle.pem:ro
     expose:
       - "3000"
+    # No core dumps: the processes that read calendar feeds abort when they run out of memory, which is expected, and
+    # each would otherwise leave the host a core of a few hundred MB to write.
+    ulimits:
+      core: 0
 
   nginx:
     image: nginx:1.27-alpine

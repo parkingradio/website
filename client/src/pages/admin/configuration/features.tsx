@@ -24,7 +24,7 @@ export function Features() {
         (loaded.value.features.length === 0 ? (
           <p className="admin-placeholder">Aucune feature pour le moment.</p>
         ) : (
-          <ul className="admin-features">
+          <ul className="admin-list">
             {loaded.value.features.map((feature) => (
               <FeatureSwitch key={feature.id as FeatureId} loaded={feature} />
             ))}

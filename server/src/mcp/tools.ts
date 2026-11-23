@@ -178,28 +178,41 @@ function descriptionOf(route: ToolRoute, name: string): string {
   // The tools that change some of an item's fields (see "Changes" in docs/design/server/README.md).
   if (route.method === 'PATCH') sentences.push("What it isn't given stays as it is, and a list or an object it's given replaces the whole one.")
   if (route.schema.multipart) sentences.push(`Tools can't send a ${multipartParts(route.schema.multipart).file}.`)
+  const hidden = hiddenBy(route)
   // Not for the tools that only answer `{"ok": true}`, e.g. `delete_artist`.
-  if (hasContactDetails(route) && (route.schema.response as Record<number, unknown> | undefined)?.[200] !== Ok) {
-    sentences.push('Emails and phone numbers are never shown.')
-  }
-  if (hasContactDetails(route) && route.method === 'PATCH') sentences.push('Given as null or "", the email or phone is removed.')
+  if ((route.schema.response as Record<number, unknown> | undefined)?.[200] !== Ok) sentences.push(...hidden.map(({ said }) => said))
+  if (hidden.includes(CONTACT_DETAILS) && route.method === 'PATCH') sentences.push('Given as null or "", the email or phone is removed.')
   return sentences.join(' ')
 }
 
-// Whether the route's responses have the emails and phone numbers of artists or collectives, which tools never give,
-// since what a tool gives is sent to the model's provider (see docs/design/server/mcp.md).
-export function hasContactDetails(route: Pick<ToolRoute, 'url'>): boolean {
-  return /^\/api\/admin\/(artists|collectives)(\/|$)/.test(route.url)
+// What tools never give, whether they succeed or fail, wherever it is in what the routes under `path` answer, since what a
+// tool gives is sent to the model's provider (see "Results" in docs/design/server/mcp.md), and what their descriptions say
+// about it.
+// `of` is the id of the schema whose fields they are, e.g. CalendarFeed, when their names alone don't tell, which a test
+// relies on to check that every route that gives them is under `path`.
+type Hidden = { path: RegExp; fields: string[]; of?: string; said: string }
+// The emails and phone numbers of artists and collectives.
+const CONTACT_DETAILS: Hidden = { path: /^\/api\/admin\/(artists|collectives)(\/|$)/, fields: ['email', 'phone'], said: 'Emails and phone numbers are never shown.' }
+// The links of calendar feeds, which are secrets. Any other `link` in the calendar's responses would be left out too.
+const FEED_LINKS: Hidden = { path: /^\/api\/admin\/calendar(\/|$)/, fields: ['link'], of: 'CalendarFeed', said: "Calendar feeds' links are never shown." }
+export const HIDDEN = [CONTACT_DETAILS, FEED_LINKS]
+
+const hiddenBy = (route: Pick<ToolRoute, 'url'>) => HIDDEN.filter(({ path }) => path.test(route.url))
+
+// The fields that the tool of `route` never gives.
+export function hiddenFields(route: Pick<ToolRoute, 'url'>): string[] {
+  return hiddenBy(route).flatMap(({ fields }) => fields)
 }
 
-// `value`, without its `email` and `phone` fields, wherever they are.
-export function withoutContactDetails(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutContactDetails)
+// `value`, without its `fields`, wherever they are.
+export function withoutFields(value: unknown, fields: string[]): unknown {
+  if (fields.length === 0) return value
+  if (Array.isArray(value)) return value.map((item) => withoutFields(item, fields))
   if (value === null || typeof value !== 'object') return value
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => key !== 'email' && key !== 'phone')
-      .map(([key, field]) => [key, withoutContactDetails(field)]),
+      .filter(([key]) => !fields.includes(key))
+      .map(([key, field]) => [key, withoutFields(field, fields)]),
   )
 }
 
@@ -260,7 +273,8 @@ function text(value: unknown): string {
   return JSON.stringify(value).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
 }
 
-// A tool that fails gives the status and the error, with all its fields.
+// A tool that fails gives the status and the error, with all the fields it's given: a route's error, without those that
+// tools never give (see `withoutFields`).
 export function failure(status: number, body: unknown): ToolCall {
   const error = typeof body === 'object' && body !== null ? body : { error: body }
   const message = 'error' in error && typeof error.error === 'string' ? error.error : undefined
@@ -295,6 +309,7 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
     if (names.has(name)) throw new Error(`Two tools are named \`${name}\``)
     names.add(name)
     const { schema, parts, json, nullable, nullableInLists } = argumentsOf(route)
+    const hidden = hiddenFields(route)
     const call = async (args: JsonObject, as: ToolUser): Promise<ToolCall> => {
       const invalid = [...route.url.matchAll(/:(\w+)/g)].find(([, param]) => segment(args[param]) === null)
       if (invalid) return failure(400, { error: `\`${invalid[1]}\` isn't valid` })
@@ -340,11 +355,10 @@ export function buildTools(routes: ToolRoute[], app: FastifyInstance): Tool[] {
       }
 
       const response = await send(route.method, url, payload)
-      if (response.status >= 400) return failure(response.status, response.body)
+      if (response.status >= 400) return failure(response.status, withoutFields(response.body, hidden))
       let result = response.body
       if (SUMMARIES[name]) result = await SUMMARIES[name](result as JsonObject, send)
-      if (hasContactDetails(route)) result = withoutContactDetails(result)
-      return { result: { content: [{ type: 'text', text: text(result) }] } }
+      return { result: { content: [{ type: 'text', text: text(withoutFields(result, hidden)) }] } }
     }
 
     return {

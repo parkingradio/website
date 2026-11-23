@@ -5,6 +5,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
+- "Calendriers externes": the calendars that the studio's occupations are read from.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -46,6 +47,27 @@ one, and the key, whose field only shows dots in its place, since it's never sen
 asks YouTube whether it accepts the key and finds the channel, without saving them, and "enregistrer" saves them, which
 it only allows once they've been verified, each with a check mark like the SoundCloud app's.
 
+## Calendriers externes
+
+The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
+what takes the studio outside sessions is read from these calendars, each occupation under its calendar's name, and
+that the server reads them every 15 minutes.
+
+It lists the feeds, in the order they were added, each with its name, "titres masqués" when its titles are private, its
+link, as text, which admin added it and when, when it was last read, or that it hasn't been read yet, and why its last
+read failed, if it did. While there are none, it says so. "retirer" removes a feed, once the admin confirms.
+
+"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, "Lien" and "Masquer les titres"
+(`privateTitles`). "enregistrer" saves only what was changed, so that a form opened before another admin's change
+doesn't undo it, and closes the form; "annuler" closes it without saving. Either way, the focus goes back to "modifier".
+
+Under the list, a form adds a feed, with the same fields, "Masquer les titres" checked to start with. "ajouter" adds it,
+and clears the form.
+
+"enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first (see
+[Reading the feeds](../../server/calendar.md#reading-the-feeds)), which can take a while, and the button can't be used
+meanwhile. When the feed can't be saved, the form says why, e.g. that another feed has that link, naming it.
+
 ## Features
 
 The feature flags (see [Features](../../server/features.md)). It lists every flag, each with a switch, its name, what it
@@ -62,4 +84,6 @@ retired flag is removed too.
   `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
 - `GET /api/admin/video/credentials`, `POST /api/admin/video/credentials/check` and
   `PUT /api/admin/video/credentials`, for "Connexion YouTube".
+- `GET /api/admin/calendar/feeds`, `POST /api/admin/calendar/feeds`, `PATCH /api/admin/calendar/feeds/:id` and
+  `DELETE /api/admin/calendar/feeds/:id`, for "Calendriers externes".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".

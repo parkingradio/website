@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { registerRoutes } from '../app.js'
 import type { Dependencies } from '../app.js'
 import { AREAS, loadRules, rules } from './documentation.js'
-import { buildTools, collectToolRoutes, hasContactDetails } from './tools.js'
+import { HIDDEN, buildTools, collectToolRoutes, hiddenFields } from './tools.js'
 
 // The tools of the API's routes, against docs/design/server/mcp.md. Registering the routes only needs their
 // dependencies to handle requests, which these tests don't send.
@@ -43,6 +43,7 @@ describe('the tools of the API', () => {
         ...['delete_session_flyer', 'delete_session'],
         ...['create_set', 'update_set', 'update_set_status', 'update_set_position', 'update_set_session', 'delete_set'],
         ...['list_events', 'get_public_artist', 'get_public_collective'],
+        'list_calendar_feeds',
       ].sort(),
     )
   })
@@ -66,7 +67,7 @@ describe('the tools of the API', () => {
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
     expect(areas).toMatchObject({
       ...{ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
-      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives' },
+      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar' },
     })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
@@ -128,15 +129,32 @@ describe('the tools of the API', () => {
     )
   })
 
-  // So that a new endpoint can't give them without the tools leaving them out.
-  it("never give emails or phone numbers, except those of artists and collectives, which they leave out", async () => {
+  // So that a new endpoint can't give emails, phone numbers or calendar feeds, with their links, without the tools leaving
+  // them out.
+  it('leave out of what they give every email, phone number and calendar feed link that their endpoint could give', async () => {
     const { routes } = await apiTools()
-    for (const route of routes.filter((route) => !hasContactDetails(route))) {
-      for (const response of Object.values((route.schema.response ?? {}) as Record<string, z.ZodType>)) {
-        const names = propertyNames(z.toJSONSchema(response, { io: 'output', unrepresentable: 'any' }))
-        expect(names.has('email') || names.has('phone'), `${route.method} ${route.url}`).toBe(false)
+    for (const route of routes) {
+      for (const [status, response] of Object.entries((route.schema.response ?? {}) as Record<string, z.ZodType>)) {
+        const json = z.toJSONSchema(response, { io: 'output', unrepresentable: 'any' }) as { $defs?: Record<string, unknown> }
+        const names = propertyNames(json)
+        const where = `${route.method} ${route.url} (${status})`
+        for (const { fields, of } of HIDDEN) {
+          // Fields of a schema of their own are only checked where it is, since others can have the same names.
+          const given = of ? fields.filter(() => json.$defs !== undefined && of in json.$defs) : fields.filter((field) => names.has(field))
+          for (const field of given) expect(hiddenFields(route), `${where}: ${field}`).toContain(field)
+        }
       }
     }
+    expect(hiddenFields({ url: '/api/admin/calendar/feeds' })).toEqual(['link'])
+    expect(hiddenFields({ url: '/api/admin/artists/:id' })).toEqual(['email', 'phone'])
+    expect(hiddenFields({ url: '/api/admin/sessions' })).toEqual([])
+  })
+
+  it("say that calendar feeds' links are never shown", async () => {
+    const { tools } = await apiTools()
+    expect(tools.find(({ name }) => name === 'list_calendar_feeds')!.description).toBe(
+      "Once per conversation, before using it, read the rules with `read_documentation`, area `calendar`. Every calendar feed that the studio's occupations are read from, in the order they were added. Calendar feeds' links are never shown.",
+    )
   })
 })
 

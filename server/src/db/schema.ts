@@ -380,6 +380,25 @@ export const featureFlags = pgTable('feature_flags', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 })
 
+// The calendars that the studio's occupations are read from (see calendar/feeds.ts). A feed's link is a secret, which
+// only the admin pages show. Two feeds can't have the same link, as the server keeps it (see calendar/fields.ts). What's
+// read from them is only kept in memory.
+export const calendarFeeds = pgTable(
+  'calendar_feeds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    link: text('link').notNull(),
+    privateTitles: boolean('private_titles').notNull(),
+    createdBy: text('created_by').notNull(), // the email of the admin who added it
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // Who last changed it, and when, or null until it's changed.
+    updatedBy: text('updated_by'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }),
+  },
+  (table) => [uniqueIndex('calendar_feeds_link_idx').on(table.link)],
+)
+
 // The apps that admins allowed to act as them, e.g. Claude, through the MCP server (see oauth/store.ts and
 // docs/design/server/oauth.md). An app uses its connection with an access token, whose hash is here, and a refresh token
 // (see oauthRefreshTokens).

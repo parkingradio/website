@@ -59,17 +59,21 @@ function offsetMs(offset: string): number {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-// The instant it is the local date and time `local`, "YYYY-MM-DDTHH:MM", in the time zone `zone`, or in Québec's when
-// there's none, or Intl doesn't know it. A time the clocks show twice, as they go back, is the first of the two instants,
-// and a time they skip, as they go forward, is moved forward by as much as they skip, e.g. 2:30 becomes 3:30: that's the
-// rule of RFC 5545 and of Temporal ("compatible").
+// Whether Intl knows the time zone `zone`, e.g. "America/Toronto", which `instantIn` reads times in.
+export const isTimeZone = (zone: string) => offsetFormat(zone) !== null
+
+// The instant it is the local date and time `local`, "YYYY-MM-DDTHH:MM" or "YYYY-MM-DDTHH:MM:SS", in the time zone
+// `zone`, or in Québec's when there's none, or Intl doesn't know it. A time the clocks show twice, as they go back, is the
+// first of the two instants, and a time they skip, as they go forward, is moved forward by as much as they skip, e.g. 2:30
+// becomes 3:30: that's the rule of RFC 5545 and of Temporal ("compatible").
 export function instantIn(given: string | null | undefined, local: string): Date {
-  const zone = given && offsetFormat(given) ? given : QUEBEC_TIME_ZONE
-  const wall = Date.parse(`${local}:00Z`)
+  const zone = given && isTimeZone(given) ? given : QUEBEC_TIME_ZONE
+  const wall = Date.parse(`${local.length === 'YYYY-MM-DDTHH:MM'.length ? `${local}:00` : local}Z`)
   // The zone's offset at that time is the one it has a day before, or a day after, since clocks change at most once in
-  // between. Each one is right if it gives back that time.
+  // between: the same one, unless they change. Each one is right if it gives back that time.
   const before = wall - offsetMs(offsetIn(zone, wall - DAY_MS))
   const after = wall - offsetMs(offsetIn(zone, wall + DAY_MS))
+  if (before === after) return new Date(before)
   const right = [before, after].filter((ms) => ms + offsetMs(offsetIn(zone, ms)) === wall)
   // None is right in a gap, where the offset before it moves the time forward by the gap.
   return new Date(right.length > 0 ? Math.min(...right) : before)

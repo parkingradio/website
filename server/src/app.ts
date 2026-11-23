@@ -12,6 +12,9 @@ import type { ApplicationsStore } from './applications/store.js'
 import type { TurnstileVerifier } from './applications/turnstile.js'
 import { artistsRoutes } from './artists/routes.js'
 import type { ArtistsStore, Photos } from './artists/store.js'
+import type { CalendarFeedsStore } from './calendar/feeds.js'
+import type { CalendarReads } from './calendar/reads.js'
+import { calendarFeedsRoutes } from './calendar/routes.js'
 import { collectivesRoutes } from './collectives/routes.js'
 import type { CollectivesStore } from './collectives/store.js'
 import type { SendEmail } from './core/email.js'
@@ -71,6 +74,9 @@ export type Dependencies = {
   sessions: SessionsStore
   // The announced sessions, as the public sees them.
   events: EventsStore
+  calendarFeeds: CalendarFeedsStore
+  // What was read from the calendar feeds.
+  calendarReads: CalendarReads
   oauth: OAuthStore
 }
 
@@ -104,6 +110,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
+  await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })
