@@ -24,15 +24,17 @@ Occupations can't be changed on the site, only in their calendars, which their n
 
 A thing's times are written in two ways:
 
-- **Its part of a day**, in the month: "toute la journée", "21 h – 23 h", "dès 18 h", or "jusqu'à 1 h" on a day after
-  the one it starts on.
+- **Its part of a day**, in the month: "toute la journée", "21 h – 23 h", "dès 18 h", or "jusqu'à 1 h" on a day it
+  takes from its start.
 - **In full**, on a day, e.g. the chosen day: "21 h – 23 h", "18 h – dim. 15 nov., 2 h", or "ven. 13 nov., 21 h – 1 h"
   on a day after the one it starts on.
 
 Something that takes whole days, from 00:00 to 00:00, is written as such, whether it's whole-day or not: "toute la
-journée", or in full "du ven. 13 nov. au dim. 15 nov.". Something that ends the next day at an earlier time than it
-starts is written like a session's times in short (see [Times, in Sessions](sessions.md#times)), "21 h – 1 h", then
-"jusqu'à 1 h" on the next day.
+journée", or in full "du ven. 13 nov. au dim. 15 nov.". Otherwise, something that starts at 00:00 is written from the
+start of its day: "jusqu'à 11 h", or in full "jusqu'au dim. 29 nov., 11 h" when it ends on a later day, or "du sam. 28
+nov. jusqu'au lun. 30 nov., 11 h" on a day after the one it starts on. Something that ends the next day at an earlier
+time than it starts is written like a session's times in short (see [Times, in Sessions](sessions.md#times)),
+"21 h – 1 h", then "jusqu'à 1 h" on the next day.
 
 ## The address
 
@@ -58,22 +60,19 @@ saying why, and that conflicts can be missing or out of date, and linking to Con
 hasn't been read yet, naming it, and saying that conflicts can be missing. While there are no feeds at all, it says that
 conflicts with occupations can't be found, and links to Configuration.
 
-Opened, it has a group for each kind of thing to settle, each under a divider, with its tag, a heading and a sentence
-about them, then a row for each one, on one line: when it is, then what it is. The whole row is what's done about it,
-by clicking it, or with the keyboard, as one control, which its text names, and which shows when it's hovered or has the
-focus. Its text has no links of its own.
+Opened, it has a group for each kind of thing to settle, each under a divider, with its tag and a heading, then a row
+for each one, on one line: when it is, then what it is. The whole row is what's done about it, by clicking it, or with
+the keyboard, as one control, which its text names, and which shows when it's hovered or has the focus. Its text has no
+links of its own.
 
-- The conflicts: "conflits", "chevauchements à résoudre", « Le studio n'accueille qu'une chose à la fois : déplacez,
-  raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier. », then each one, in the
-  server's order. Its row has the day it starts, without its year unless it's another year than today's, then the time
-  its two things overlap, in full on that day, or "jusqu'à 11 h", or "jusqu'au dim. 29 nov., 11 h", when it starts
-  with the day, then "·" and the two things' names, joined by "et": a session's title, and an occupation's, or its
-  calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER ». It shows that
-  day, chosen, in the month, with the focus on it.
-- The sessions without a date: "sans date", "sessions à placer", « Donnez-leur une date pour les voir dans le mois, et
-  dans les conflits. », then each one, the most recently added first. Its row has "à déterminer" as when it is, then its
-  title, "·", its sets' performers, set by set, the sets separated by "·", and its duration, e.g. « à déterminer LES
-  SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h ». It opens the session's page.
+- The conflicts: "conflits", "chevauchements à résoudre", then each one, in the server's order. Its row has the day it
+  starts, without its year unless it's another year than today's, then the time its two things overlap, in full on that
+  day (see [What's shown](#whats-shown)), then "·" and the two things' names, joined by "et": a session's title, and an
+  occupation's, or its calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER
+  ». It shows that day, chosen, in the month, with the focus on it.
+- The sessions without a date: "sans date", "sessions à placer", then each one, the most recently added first. Its row
+  has "à déterminer" as when it is, then its title, "·", its sets' performers, set by set, the sets separated by "·",
+  and its duration, e.g. « à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h ». It opens the session's page.
 
 ## The toolbar
 

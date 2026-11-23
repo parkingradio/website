@@ -628,9 +628,10 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier?month=2026-12&issues=open')
       const box = await screen.findByRole('region', { name: 'À régler' })
 
-      // A group for each kind, with its tag, its heading, and what to do.
+      // A group for each kind, with its tag and its heading.
       expect([...box.querySelectorAll('h3')].map(visibleText)).toEqual(['conflits chevauchements à résoudre', 'sans date sessions à placer'])
-      expect(box).toHaveTextContent("déplacez, raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier.")
+      // Without sentences under them.
+      expect(box.querySelectorAll('.calendar-issue-group > p')).toHaveLength(0)
       const [conflict, later, undated] = within(box).getAllByRole('listitem')
       // One line each, a single control, without links of its own.
       expect(visibleText(conflict)).toBe('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')

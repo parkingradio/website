@@ -103,13 +103,14 @@ export function partOfDay({ start, end }: Times, day: string): string {
   const [from, to] = [Date.parse(start), Date.parse(end)]
   const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
   if (from <= dayFrom && to >= dayTo) return WHOLE_DAY
-  if (from < dayFrom) return `jusqu'à ${timeOf(to)}`
+  if (from <= dayFrom) return `jusqu'à ${timeOf(to)}`
   if (to <= dayTo || endsByItsTime(start, end)) return `${timeOf(from)} – ${timeOf(to)}`
   return `dès ${timeOf(from)}`
 }
 
-// Something's times in full, on `day`, e.g. "21 h – 1 h", "toute la journée", "du ven. 13 nov. au dim. 15 nov." or "ven.
-// 13 nov., 21 h – 1 h" (see "What's shown" in docs/design/client/admin/calendrier.md).
+// Something's times in full, on `day`, e.g. "21 h – 1 h", "toute la journée", "du ven. 13 nov. au dim. 15 nov.",
+// "jusqu'au dim. 15 nov., 11 h" or "ven. 13 nov., 21 h – 1 h" (see "What's shown" in
+// docs/design/client/admin/calendrier.md).
 export function fullTimes(times: Times, day: string): string {
   const from = quebecDayAndTime(new Date(times.start))
   const to = quebecDayAndTime(new Date(times.end))
@@ -117,16 +118,12 @@ export function fullTimes(times: Times, day: string): string {
     const last = addDays(to.day, -1)
     return from.day === last ? WHOLE_DAY : `du ${formatDayInYear(from.day)} au ${formatDayInYear(last)}`
   }
+  // From the start of its day, as the month writes it.
+  if (from.time === '00:00') {
+    const until = to.day === from.day ? `jusqu'à ${formatTime(to.time)}` : `jusqu'au ${formatDayInYear(to.day)}, ${formatTime(to.time)}`
+    return from.day === day ? until : `du ${formatDayInYear(from.day)} ${until}`
+  }
   return from.day === day ? shortTimes(times) : `${formatQuebecDayInYear(times.start)}, ${shortTimes(times)}`
-}
-
-// When a conflict's two things overlap, on `day`, the day it starts, as "À régler" writes it: in full (see `fullTimes`),
-// unless it starts with the day, e.g. "jusqu'à 11 h", or "jusqu'au dim. 29 nov., 11 h" when it runs past it.
-export function overlapTimes(conflict: Times, day: string): string {
-  const from = quebecDayAndTime(new Date(conflict.start))
-  const to = quebecDayAndTime(new Date(conflict.end))
-  if (from.time !== '00:00' || to.time === '00:00') return fullTimes(conflict, day)
-  return to.day === day ? `jusqu'à ${formatTime(to.time)}` : `jusqu'au ${formatDayInYear(to.day)}, ${formatTime(to.time)}`
 }
 
 // A thing's name alone, without its calendar's: a session's title, or an occupation's, or its calendar's name when it

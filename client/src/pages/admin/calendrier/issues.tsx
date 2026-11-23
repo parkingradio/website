@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
 import { conflictCount, formatDuration, formatQuebecDay, formatQuebecDayInYear, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { nameOf, namedThing, overlapTimes } from './model'
+import { fullTimes, nameOf, namedThing } from './model'
 import type { Calendar, Feed } from './model'
 import { SessionStatus } from './things'
 
@@ -77,7 +77,6 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
             <IssueGroup
               tag={<Tag conflict>conflits</Tag>}
               heading="chevauchements à résoudre"
-              explanation={"Le studio n'accueille qu'une chose à la fois\u00a0: déplacez, raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier."}
             >
               {conflicts.map((conflict, i) => {
                 const day = quebecDayAndTime(new Date(conflict.start)).day
@@ -88,7 +87,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
                   <li key={i}>
                     <button type="button" className="calendar-issue-row" onClick={() => onShowDay(day)}>
                       <IssueText when={when}>
-                        {overlapTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
+                        {fullTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
                       </IssueText>
                     </button>
                   </li>
@@ -100,7 +99,6 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
             <IssueGroup
               tag={<Tag>sans date</Tag>}
               heading="sessions à placer"
-              explanation="Donnez-leur une date pour les voir dans le mois, et dans les conflits."
             >
               {undatedSessions.map((session) => (
                 <li key={session.id} className={`admin-status-${session.status}`}>
@@ -126,14 +124,13 @@ function Tag({ conflict = false, children }: { conflict?: boolean; children: Rea
   return <span className={conflict ? 'calendar-tag calendar-conflict-tag' : 'calendar-tag'}>{children}</span>
 }
 
-// A kind of thing to settle: its tag and its heading, what to do about it, then a row for each one.
-function IssueGroup({ tag, heading, explanation, children }: { tag: ReactNode; heading: string; explanation: string; children: ReactNode }) {
+// A kind of thing to settle: its tag and its heading, then a row for each one.
+function IssueGroup({ tag, heading, children }: { tag: ReactNode; heading: string; children: ReactNode }) {
   return (
     <div className="calendar-issue-group">
       <h3>
         {tag} {heading}
       </h3>
-      <p className="admin-meta">{explanation}</p>
       <ul className="calendar-issue-list">{children}</ul>
     </div>
   )

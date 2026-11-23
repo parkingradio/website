@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, nameOf, namedThing, overlapTimes, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
+import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, nameOf, namedThing, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
@@ -95,16 +95,8 @@ describe("a thing's part of a day", () => {
   })
 })
 
-describe("a conflict's overlap, in \"À régler\"", () => {
-  it('is in full, unless it starts with its day', () => {
-    expect(overlapTimes(times('2026-11-28T18:00:00-05:00', '2026-11-28T19:00:00-05:00'), '2026-11-28')).toBe('18 h – 19 h')
-    expect(overlapTimes(times('2026-11-28T18:00:00-05:00', '2026-11-29T11:00:00-05:00'), '2026-11-28')).toBe('18 h – 11 h')
-    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
-    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-29T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'au dim. 29 nov., 11 h")
-    expect(overlapTimes(times('2026-11-28T00:00:00-05:00', '2026-11-30T00:00:00-05:00'), '2026-11-28')).toBe('du sam. 28 nov. au dim. 29 nov.')
-  })
-
-  it('is between things named by their names alone', () => {
+describe("a conflict's things", () => {
+  it('are named by their names alone', () => {
     expect(nameOf({ kind: 'session', id: 's', title: 'GUEST MIXES', status: 'planned' })).toBe('GUEST MIXES')
     expect(nameOf({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe('RÉPARATION')
     expect(nameOf({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe('Séjours')
@@ -130,6 +122,15 @@ describe("a thing's times in full", () => {
     expect(fullTimes(days, '2026-10-30')).toBe('du ven. 30 oct. au dim. 1 nov.')
     expect(fullTimes(days, '2026-11-01')).toBe('du ven. 30 oct. au dim. 1 nov.')
     expect(fullTimes(times('2027-03-13T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('du sam. 13 mars au dim. 14 mars')
+  })
+
+  it('from the start of its day, as the month writes it, when it starts at 00:00', () => {
+    expect(fullTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
+    expect(partOfDay(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
+    const stay = times('2026-11-28T00:00:00-05:00', '2026-11-30T11:00:00-05:00')
+    expect(fullTimes(stay, '2026-11-28')).toBe("jusqu'au lun. 30 nov., 11 h")
+    expect(fullTimes(stay, '2026-11-29')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
+    expect(fullTimes(stay, '2026-11-30')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
   })
 })
 
