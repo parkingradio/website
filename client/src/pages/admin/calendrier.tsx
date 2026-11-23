@@ -11,7 +11,6 @@ import { Issues } from './calendrier/issues'
 import { Month } from './calendrier/month'
 import { FIRST_MONTH, LAST_MONTH, addMonths, calendarDays, gridDays, gridRange, monthOf, readDay, readMonth } from './calendrier/model'
 import type { Calendar } from './calendrier/model'
-import { Sources } from './calendrier/sources'
 import './calendrier/calendrier.css'
 
 // The studio's calendar: what takes it, month by month, and what needs settling (see
@@ -131,7 +130,6 @@ export function Calendrier() {
           }}
         />
       )}
-      {last && <Sources feeds={last.calendar.feeds} />}
     </>
   )
 }

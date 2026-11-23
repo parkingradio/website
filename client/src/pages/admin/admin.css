@@ -94,14 +94,16 @@
 }
 
 /* Buttons that look like the text around them, rather than like pills: tracks left out of the rotation (see
-   below), the headers of the columns that sort a list, and the one that shows a long bio or description whole,
-   underlined like a link since nothing else says it can be clicked. */
+   below), the headers of the columns that sort a list, the one that shows a long bio or description whole,
+   underlined like a link since nothing else says it can be clicked, and the first row of Calendrier's "À régler". */
 .admin .radio-track-left-out button,
 .admin .radio-track-left-out button:hover,
 .admin .admin-sort,
 .admin .admin-sort:hover,
 .admin .admin-more,
-.admin .admin-more:hover {
+.admin .admin-more:hover,
+.admin .calendar-issues-header,
+.admin .calendar-issues-header:hover {
   padding: 0;
   border: none;
   background: none;

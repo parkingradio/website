@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey } from './model'
-import type { Calendar, Conflict, ConflictThing, Feed } from './model'
+import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, namedThing, partOfDay, readDay, readMonth, thingKey } from './model'
+import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
 const times = (start: string, end: string) => ({ start, end })
+// The parts of the day of `day`'s free time, outside `busy`.
+const parts = (day: string, busy: { start: string; end: string }[]) => freeTime(day, busy).map(({ part }) => part)
+// What takes a day, and the parts of the day of its free time.
+const thingsOn = (entries: CalendarDay) => entries.filter((entry): entry is DayThing => !isFree(entry))
+const freeOf = (entries: CalendarDay) => entries.filter(isFree).map(({ part }) => part)
 
 describe('the grid', () => {
   it('runs from the Sunday of the first week to the Saturday of the last', () => {
@@ -114,19 +119,19 @@ describe("a thing's times in full", () => {
 
 describe('free time', () => {
   it("is the day's time outside what takes it", () => {
-    expect(freeTime('2026-11-20', [])).toEqual(['toute la journée'])
+    expect(parts('2026-11-20', [])).toEqual(['toute la journée'])
     // A stay that ends at 11 h, and another that starts at 15 h.
     const stays = [times('2026-11-18T15:00:00-05:00', '2026-11-20T11:00:00-05:00'), times('2026-11-20T15:00:00-05:00', '2026-11-22T11:00:00-05:00')]
-    expect(freeTime('2026-11-20', stays)).toEqual(['11 h – 15 h'])
-    expect(freeTime('2026-11-20', stays.slice(0, 1))).toEqual(['dès 11 h'])
-    expect(freeTime('2026-11-20', stays.slice(1))).toEqual(["jusqu'à 15 h"])
-    expect(freeTime('2026-11-19', stays)).toEqual([])
+    expect(parts('2026-11-20', stays)).toEqual(['11 h – 15 h'])
+    expect(parts('2026-11-20', stays.slice(0, 1))).toEqual(['dès 11 h'])
+    expect(parts('2026-11-20', stays.slice(1))).toEqual(["jusqu'à 15 h"])
+    expect(parts('2026-11-19', stays)).toEqual([])
   })
 
   it('is measured on the days the clocks change', () => {
-    expect(freeTime('2026-11-01', [times('2026-11-01T11:00:00-05:00', '2026-11-02T00:00:00-05:00')])).toEqual(["jusqu'à 11 h"])
-    expect(freeTime('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-14T11:00:00-04:00')])).toEqual(['dès 11 h'])
-    expect(freeTime('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00')])).toEqual([])
+    expect(parts('2026-11-01', [times('2026-11-01T11:00:00-05:00', '2026-11-02T00:00:00-05:00')])).toEqual(["jusqu'à 11 h"])
+    expect(parts('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-14T11:00:00-04:00')])).toEqual(['dès 11 h'])
+    expect(parts('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00')])).toEqual([])
   })
 })
 
@@ -178,17 +183,17 @@ describe('the days of the month', () => {
   const days = calendarDays(calendar({ sessions: [late], occupations: [stay, repair], conflicts: [conflict] }), '2026-11')
 
   it('have what takes them, by start, then end, with their names', () => {
-    expect(days.get('2026-11-21')!.things.map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
+    expect(thingsOn(days.get('2026-11-21')!).map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
       ['occupation', null, 'toute la journée'],
       ['session', 'LATE', '21 h – 1 h'],
     ])
-    expect(days.get('2026-11-21')!.things[0].thing).toMatchObject({ calendar: 'Séjours' })
-    expect(days.get('2026-11-26')!.things.map(({ thing, part }) => [thing.title, part])).toEqual([['RÉPARATION', 'toute la journée']])
-    expect(days.get('2026-11-26')!.things[0].thing).toMatchObject({ calendar: 'Équipe' })
+    expect(thingsOn(days.get('2026-11-21')!)[0].thing).toMatchObject({ calendar: 'Séjours' })
+    expect(thingsOn(days.get('2026-11-26')!).map(({ thing, part }) => [thing.title, part])).toEqual([['RÉPARATION', 'toute la journée']])
+    expect(thingsOn(days.get('2026-11-26')!)[0].thing).toMatchObject({ calendar: 'Équipe' })
   })
 
   it('say "conflit" only on the days the overlap takes', () => {
-    const conflicts = (day: string) => days.get(day)!.things.map(({ conflictsWith }) => conflictsWith.map((other) => other.kind))
+    const conflicts = (day: string) => thingsOn(days.get(day)!).map(({ conflictsWith }) => conflictsWith.map((other) => other.kind))
     expect(conflicts('2026-11-20')).toEqual([[]])
     expect(conflicts('2026-11-21')).toEqual([['session'], ['occupation']])
     expect(conflicts('2026-11-22')).toEqual([['session'], ['occupation']])
@@ -203,18 +208,18 @@ describe('the days of the month', () => {
       { start: late.start!, end: late.end!, things: [stays[1], sessionThing(late)] },
     ]
     const shown = calendarDays(calendar({ sessions: [late], occupations: [stay, stay], conflicts }), '2026-11')
-    const lines = shown.get('2026-11-21')!.things.map(({ conflictsWith }) => conflictsWith.map(inSentence))
+    const lines = thingsOn(shown.get('2026-11-21')!).map(({ conflictsWith }) => conflictsWith.map(inSentence))
     expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
   })
 
   it('have free time from today on, where no session starts, outside what takes them', () => {
-    const free = (day: string) => days.get(day)!.free
+    const free = (day: string) => freeOf(days.get(day)!)
     // Before today.
     expect(free('2026-11-18')).toEqual([])
     expect(free('2026-11-19')).toEqual(['toute la journée'])
     // In the month after too, as in its own month's grid.
     expect(free('2026-12-01')).toEqual(['toute la journée'])
-    expect(calendarDays(calendar({}), '2026-12').get('2026-12-01')!.free).toEqual(['toute la journée'])
+    expect(freeOf(calendarDays(calendar({}), '2026-12').get('2026-12-01')!)).toEqual(['toute la journée'])
     // The stay starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
     // A session starts.
@@ -230,20 +235,22 @@ describe('the days of the month', () => {
   it('have free time around an occupation that starts on them', () => {
     const repairs = [{ feedId: 'o', start: '2026-11-24T10:00:00-05:00', end: '2026-11-24T16:00:00-05:00', wholeDay: false, title: '' }]
     const shown = calendarDays(calendar({ occupations: repairs }), '2026-11')
-    expect(shown.get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    expect(freeOf(shown.get('2026-11-24')!)).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    // In order of time, with what takes the day.
+    expect(shown.get('2026-11-24')!.map(({ part }) => part)).toEqual(["jusqu'à 10 h", '10 h – 16 h', 'dès 16 h'])
     // Today's stretches count from 00:00 too.
-    expect(calendarDays(calendar({ occupations: repairs, today: '2026-11-24' }), '2026-11').get('2026-11-24')!.free).toEqual(["jusqu'à 10 h", 'dès 16 h'])
+    expect(freeOf(calendarDays(calendar({ occupations: repairs, today: '2026-11-24' }), '2026-11').get('2026-11-24')!)).toEqual(["jusqu'à 10 h", 'dès 16 h'])
   })
 
   it("don't count cancelled sessions", () => {
     const cancelled = session('off', '2026-11-23T20:00:00-05:00', '2026-11-23T23:00:00-05:00', 'cancelled')
     const shown = calendarDays(calendar({ sessions: [cancelled] }), '2026-11')
-    expect(shown.get('2026-11-23')!.free).toEqual(['toute la journée'])
-    expect(shown.get('2026-11-23')!.things).toHaveLength(1)
+    expect(freeOf(shown.get('2026-11-23')!)).toEqual(['toute la journée'])
+    expect(thingsOn(shown.get('2026-11-23')!)).toHaveLength(1)
   })
 
   it("have free time only in the 365 days from the server's today", () => {
-    expect(calendarDays(calendar({}), '2027-11').get('2027-11-18')!.free).toEqual(['toute la journée'])
-    expect(calendarDays(calendar({}), '2027-11').get('2027-11-19')!.free).toEqual([])
+    expect(freeOf(calendarDays(calendar({}), '2027-11').get('2027-11-18')!)).toEqual(['toute la journée'])
+    expect(freeOf(calendarDays(calendar({}), '2027-11').get('2027-11-19')!)).toEqual([])
   })
 })

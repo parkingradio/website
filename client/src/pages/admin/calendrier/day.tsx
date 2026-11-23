@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { Link } from 'react-router'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
 import { newSessionPath } from '../session-errors'
-import { fullTimes, inSentence } from './model'
+import { fullTimes, inSentence, isFree } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationLabel, SessionTitle } from './things'
 
@@ -35,18 +35,19 @@ export function ChosenDay({ day, today, shown, onClose }: ChosenDayProps) {
         </button>
       </div>
       {shown &&
-        (shown.things.length === 0 && shown.free.length === 0 ? (
+        (shown.length === 0 ? (
           <p className="admin-placeholder">Rien ce jour-là.</p>
         ) : (
           <ul className="calendar-rows">
-            {shown.things.map((dayThing, i) => (
-              <ThingRow key={i} day={day} dayThing={dayThing} />
-            ))}
-            {shown.free.length > 0 && (
-              <li className="calendar-row">
-                <span className="calendar-row-kind calendar-free">disponible</span>
-                <span>{shown.free.join(', ')}</span>
-              </li>
+            {shown.map((entry, i) =>
+              isFree(entry) ? (
+                <li key={i} className="calendar-row">
+                  <span className="calendar-row-kind calendar-free">disponible</span>
+                  <span>{entry.part}</span>
+                </li>
+              ) : (
+                <ThingRow key={i} day={day} dayThing={entry} />
+              ),
             )}
           </ul>
         ))}

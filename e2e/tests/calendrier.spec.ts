@@ -52,12 +52,10 @@ test("a session is in its month, and on its day, which leads to a new session's 
   await expect(chosenDay(page, day)).toBeVisible()
   await expect(dayButton(page, day)).toHaveAttribute('aria-pressed', 'true')
 
-  // The seeded session without a date needs settling, and the sessions come from the site, the rest from Configuration.
-  await page.getByRole('region', { name: 'À régler' }).getByRole('button', { name: /sans date/ }).click()
-  await expect(page.getByRole('region', { name: 'À régler' }).getByRole('link', { name: 'LES SŒURS ONDES TAKEOVER' })).toBeVisible()
-  const sources = page.getByRole('region', { name: 'Sources' })
-  await expect(sources.getByRole('link', { name: 'Sessions' })).toHaveAttribute('href', '/admin/sessions')
-  await expect(sources.getByRole('link', { name: 'Configuration' }).first()).toHaveAttribute('href', '/admin/configuration')
+  // The seeded session without a date needs settling, and leads to its page.
+  const issues = page.getByRole('region', { name: 'À régler' })
+  await issues.getByRole('button', { name: /sans date/ }).click()
+  await expect(issues.getByRole('link', { name: /^lui donner une date\s?: LES SŒURS ONDES TAKEOVER →$/ })).toHaveAttribute('href', /^\/admin\/sessions\//)
 
   expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)
 })
@@ -116,15 +114,14 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   ])
 
   const issues = page.getByRole('region', { name: 'À régler' })
-  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503)`)
+  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503) (voir Configuration)`)
+  await expect(issues.getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
   await issues.getByRole('button', { name: /1 conflit/ }).click()
   await expect(page).toHaveURL(/[?&]issues=open/)
   await expect(issues.getByRole('listitem').first()).toContainText(`occupation : RÉPARATION ${unique}, calendrier ${team}occupation : ${stays}`)
-
-  const sources = page.getByRole('region', { name: 'Sources' })
-  await expect(sources).toContainText(`${team} Lu le`)
-  await expect(sources).toContainText(`${stays} (titres masqués) Lu le`)
-  await expect(sources).toContainText("La dernière lecture a échoué : The link can't be read: its server fails (503)")
+  // Which shows its day, chosen.
+  await issues.getByRole('button', { name: /^voir le jour, / }).click()
+  await expect(dayButton(page, day)).toBeFocused()
 
   // The menu's badge, on another page, which leads back to the conflicts.
   await adminMenu(page).getByRole('link', { name: 'sessions' }).click()

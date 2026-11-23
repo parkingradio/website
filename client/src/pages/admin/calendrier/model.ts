@@ -126,9 +126,12 @@ export function fullTimes(times: Times, day: string): string {
   return from.day === day ? shortTimes(times) : `${formatQuebecDayInYear(times.start)}, ${shortTimes(times)}`
 }
 
-// The free time of `day` outside what takes some of it, `busy`, as parts of the day: `WHOLE_DAY` when that's nothing, or
-// else each stretch, e.g. "jusqu'à 15 h", "dès 11 h" or "11 h – 15 h", or nothing when it's all taken.
-export function freeTime(day: string, busy: Times[]): string[] {
+// A stretch of free time on a day: when it starts, in milliseconds, and the part of the day it is, `WHOLE_DAY`, or e.g.
+// "jusqu'à 15 h", "dès 11 h" or "11 h – 15 h".
+export type FreeStretch = { start: number; part: string }
+
+// The free time of `day` outside what takes some of it, `busy`, stretch by stretch, or nothing when it's all taken.
+export function freeTime(day: string, busy: Times[]): FreeStretch[] {
   const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
   const taken = busy
     .map(({ start, end }) => [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)])
@@ -142,10 +145,10 @@ export function freeTime(day: string, busy: Times[]): string[] {
   }
   if (free < dayTo) stretches.push([free, dayTo])
   return stretches.map(([from, to]) => {
-    if (from === dayFrom && to === dayTo) return WHOLE_DAY
-    if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
-    if (to === dayTo) return `dès ${timeOf(from)}`
-    return `${timeOf(from)} – ${timeOf(to)}`
+    if (from === dayFrom && to === dayTo) return { start: from, part: WHOLE_DAY }
+    if (from === dayFrom) return { start: from, part: `jusqu'à ${timeOf(to)}` }
+    if (to === dayTo) return { start: from, part: `dès ${timeOf(from)}` }
+    return { start: from, part: `${timeOf(from)} – ${timeOf(to)}` }
   })
 }
 
@@ -192,14 +195,17 @@ function thingsOf({ sessions, occupations, feeds }: Calendar): { key: string; th
 // A thing on a day: its part of the day, and the other things of its conflicts whose overlap takes some of the day.
 export type DayThing = { thing: Thing; part: string; conflictsWith: NamedThing[] }
 
-// A day of the grid: what takes some of it, in order of start, then end, and its free time, if it has any (see "Free
-// time" in docs/design/client/admin/calendrier.md), as `freeTime` gives it.
-export type CalendarDay = { things: DayThing[]; free: string[] }
+// What's on a day of the grid, in order of time: what takes some of it, by start, then end, and the stretches of its free
+// time, if it has any (see "Free time" in docs/design/client/admin/calendrier.md), among them.
+export type DayEntry = DayThing | FreeStretch
+export type CalendarDay = DayEntry[]
+
+export const isFree = (entry: DayEntry): entry is FreeStretch => !('thing' in entry)
 
 // The days of the grid of `month`, as they're shown with `calendar`, read for them.
 export function calendarDays(calendar: Calendar, month: string): Map<string, CalendarDay> {
   const days = gridDays(month)
-  const byDay = new Map(days.map((day): [string, CalendarDay] => [day, { things: [], free: [] }]))
+  const byDay = new Map(days.map((day): [string, DayThing[]] => [day, []]))
   // Each thing's conflicts, by its key, with their two things' keys and names.
   const conflicts = new Map<string, { conflict: Conflict; things: { key: string; named: NamedThing }[] }[]>()
   for (const conflict of calendar.conflicts) {
@@ -217,19 +223,23 @@ export function calendarDays(calendar: Calendar, month: string): Map<string, Cal
         const other = things.find((other) => other.key !== key) ?? things[0]
         others.set(other.key, other.named)
       }
-      byDay.get(day)!.things.push({ thing, part: partOfDay(thing, day), conflictsWith: [...others.values()] })
+      byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflictsWith: [...others.values()] })
     }
   }
   // The days conflicts are found in, from the server's today.
   const { today } = calendar
   const horizon = addDays(today, HORIZON_DAYS)
-  for (const [day, shown] of byDay) {
-    if (day < today || day >= horizon) continue
-    // Cancelled sessions don't take the studio.
-    const taking = shown.things.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
-    // A day on which a session starts has no free time.
-    if (taking.some((thing) => thing.kind === 'session' && Date.parse(thing.start) >= dayStart(day))) continue
-    shown.free = freeTime(day, taking)
-  }
-  return byDay
+  return new Map(
+    [...byDay].map(([day, dayThings]): [string, CalendarDay] => {
+      if (day < today || day >= horizon) return [day, dayThings]
+      // Cancelled sessions don't take the studio.
+      const taking = dayThings.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
+      // A day on which a session starts has no free time.
+      if (taking.some((thing) => thing.kind === 'session' && Date.parse(thing.start) >= dayStart(day))) return [day, dayThings]
+      // When each entry starts on the day, the things that started earlier at 00:00, a thing before a stretch that starts
+      // when it does, e.g. a cancelled session.
+      const when = (entry: DayEntry) => (isFree(entry) ? entry.start : Math.max(Date.parse(entry.thing.start), dayStart(day)))
+      return [day, [...dayThings, ...freeTime(day, taking)].sort((a, b) => when(a) - when(b))]
+    }),
+  )
 }

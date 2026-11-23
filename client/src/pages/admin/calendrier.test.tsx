@@ -90,7 +90,7 @@ const dayButton = (day: string) => document.querySelector<HTMLButtonElement>(`.c
 const cell = (day: string) => dayButton(day).closest('td')!
 const cellText = (day: string) => visibleText(cell(day))
 const chosenDay = () => screen.queryByRole('region', { name: /2026/ })
-const loaded = () => screen.findByRole('heading', { name: 'Sources' })
+const loaded = () => screen.findByRole('region', { name: 'À régler' })
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -177,7 +177,7 @@ describe('Calendrier', () => {
       expect(cell('2026-11-07').querySelector('li')).toHaveClass('admin-status-done')
       expect(cellText('2026-11-24')).toContain('session : LIVE PERFORMANCE annulée')
       // An occupation's title, then its calendar, or its calendar alone.
-      expect(cellText('2026-11-26')).toBe("2610 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo jusqu'à 10 hdispo dès 16 h")
+      expect(cellText('2026-11-26')).toBe("26dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(cell('2026-11-26').querySelector('.calendar-title')).toHaveTextContent(/^occupation : RÉPARATION$/)
       // Things of the other months too.
       expect(cellText('2026-12-02')).toBe("2toute la journéeoccupation : Calendrier de l'équipe")
@@ -200,7 +200,8 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier')
       await loaded()
 
-      expect(cellText('2026-11-20')).toBe("20dès 15 hoccupation : Séjoursdispo jusqu'à 15 h")
+      // Free time and things in order of time.
+      expect(cellText('2026-11-20')).toBe("20dispo jusqu'à 15 hdès 15 hoccupation : Séjours")
       expect(cell('2026-11-21').querySelectorAll('.calendar-conflict')).toHaveLength(2)
       expect(cell('2026-11-22').querySelectorAll('.calendar-conflict')).toHaveLength(2)
     })
@@ -333,7 +334,7 @@ describe('Calendrier', () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
       const first = renderAt('/admin/calendrier?day=2026-11-26')
       await loaded()
-      expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(["occupation10 h – 16 hRÉPARATION, calendrier Calendrier de l'équipe", "disponiblejusqu'à 10 h, dès 16 h"])
+      expect(within(chosenDay()!).getAllByRole('listitem').map(visibleText)).toEqual(["disponiblejusqu'à 10 h", "occupation10 h – 16 hRÉPARATION, calendrier Calendrier de l'équipe", 'disponibledès 16 h'])
       first.unmount()
 
       renderAt('/admin/calendrier?day=2026-11-19')
@@ -356,7 +357,7 @@ describe('Calendrier', () => {
       ])
       const box = screen.getByRole('region', { name: 'À régler' })
       expect(visibleText(within(box).getAllByRole('listitem')[0])).toBe(
-        "sam. 21 nov. 2026 10 h – 12 hoccupation : Séjoursoccupation : MÉNAGE, calendrier Calendrier de l'équipe",
+        "sam. 21 nov. 202610 h – 12 hoccupation : Séjoursoccupation : MÉNAGE, calendrier Calendrier de l'équipevoir le jour →",
       )
     })
 
@@ -394,15 +395,17 @@ describe('Calendrier', () => {
       renderAt('/admin/calendrier?month=2026-12&issues=open')
       const box = await screen.findByRole('region', { name: 'À régler' })
 
-      const [conflict, undated] = within(box).getAllByRole('listitem')
-      expect(visibleText(conflict)).toBe('sam. 21 nov. 2026 21 h – 1 hoccupation : Séjourssession : HAUTE RIVE TAKEOVER')
+      // A group for each kind, with its tag, its heading, and what to do.
+      expect([...box.querySelectorAll('h3')].map(visibleText)).toEqual(['conflits chevauchements à résoudre', 'sans date sessions à placer'])
       expect(box).toHaveTextContent("déplacez, raccourcissez ou annulez l'une des deux. Les occupations se changent dans leur calendrier.")
+      const [conflict, undated] = within(box).getAllByRole('listitem')
+      expect(visibleText(conflict)).toBe('sam. 21 nov. 202621 h – 1 hoccupation : Séjourssession : HAUTE RIVE TAKEOVERvoir le jour →')
       expect(within(conflict).getByRole('link', { name: 'HAUTE RIVE TAKEOVER' })).toHaveAttribute('href', '/admin/sessions/session-1')
-      expect(visibleText(undated)).toBe('LES SŒURS ONDES TAKEOVER Ondine · Écume 3 h')
-      expect(within(undated).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-4')
+      expect(visibleText(undated)).toBe('à déterminerLES SŒURS ONDES TAKEOVER Ondine · Écume · 3 hlui donner une date : LES SŒURS ONDES TAKEOVER →')
+      expect(within(undated).getByRole('link', { name: /^lui donner une date\s?: LES SŒURS ONDES TAKEOVER →$/ })).toHaveAttribute('href', '/admin/sessions/session-4')
 
       // Its day shows it, chosen, in its month, with the focus on it.
-      fireEvent.click(within(conflict).getByRole('button', { name: 'sam. 21 nov. 2026' }))
+      fireEvent.click(within(conflict).getByRole('button', { name: 'voir le jour, sam. 21 nov. 2026' }))
       expect(path()).toBe('/admin/calendrier?month=2026-11&issues=open&day=2026-11-21')
       await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-11-21')))
       expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
@@ -428,12 +431,13 @@ describe('Calendrier', () => {
       expect(played).toHaveClass('calendar-row', 'admin-status-done')
       expect(played).toHaveTextContent('MATINALE jouée')
       const box = screen.getByRole('region', { name: 'À régler' })
-      expect(within(box).getByText(/^session/)).toHaveClass('admin-status-done')
+      expect(box.querySelector('.calendar-issue-thing')).toHaveClass('admin-status-done')
       first.unmount()
 
       renderAt('/admin/calendrier?day=2026-11-24')
       await loaded()
-      expect(within(chosenDay()!).getAllByRole('listitem')[0]).toHaveClass('admin-status-cancelled')
+      // After the day's free time, which a cancelled session doesn't take.
+      expect(within(chosenDay()!).getAllByRole('listitem').map((row) => row.className)).toEqual(['calendar-row', 'calendar-row admin-status-cancelled'])
     })
 
     it('says when there is nothing to settle, and warns of the feeds that were not read', async () => {
@@ -444,10 +448,12 @@ describe('Calendrier', () => {
 
       const box = screen.getByRole('region', { name: 'À régler' })
       expect(within(box).getByText('Rien à régler.')).toBeInTheDocument()
+      expect(within(box).queryByRole('button')).not.toBeInTheDocument()
       expect([...box.querySelectorAll('.admin-warning')].map(visibleText)).toEqual([
-        "⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : The link can't be read: its server fails (503)",
+        "⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : The link can't be read: its server fails (503) (voir Configuration)",
         "⚠ Le calendrier « Nouveau » n'a pas encore été lu : des conflits peuvent manquer.",
       ])
+      expect(within(box.querySelector('.admin-warning')!).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
     })
 
     it('says when there are no feeds', async () => {
@@ -460,25 +466,6 @@ describe('Calendrier', () => {
       expect(box).toHaveTextContent('Aucun calendrier externe : les conflits avec des occupations ne peuvent pas être trouvés.')
       expect(within(box).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
     })
-  })
-
-  it('says where each kind of thing comes from', async () => {
-    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
-    const first = renderAt('/admin/calendrier')
-    await loaded()
-
-    let sources = screen.getByRole('region', { name: 'Sources' })
-    expect(within(sources).getByRole('link', { name: 'Sessions' })).toHaveAttribute('href', '/admin/sessions')
-    expect(sources).toHaveTextContent(
-      "OccupationsCalendrier de l'équipe Lu le 19 novembre 2026 à 11 h 50.Séjours (titres masqués) Lu le 19 novembre 2026 à 11 h 50.La dernière lecture a échoué : The link can't be read: its server fails (503)",
-    )
-    first.unmount()
-
-    mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [] } })
-    renderAt('/admin/calendrier')
-    await loaded()
-    sources = screen.getByRole('region', { name: 'Sources' })
-    expect(sources).toHaveTextContent("OccupationsAucun calendrier pour le moment : ils s'ajoutent dans Configuration, « Calendriers externes ».")
   })
 
   describe('while loading, and when it fails', () => {
@@ -538,7 +525,7 @@ describe('Calendrier', () => {
       await shown()
 
       expect(await screen.findByRole('alert')).toHaveTextContent("Le calendrier n'a pas pu être chargé : Internal server error")
-      expect(cellText('2026-11-26')).toBe("2610 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo jusqu'à 10 hdispo dès 16 h")
+      expect(cellText('2026-11-26')).toBe("26dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
     })
   })

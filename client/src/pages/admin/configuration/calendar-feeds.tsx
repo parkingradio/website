@@ -3,8 +3,7 @@ import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
-import { byWhom, lastRead } from '../describe'
-import { FeedName, ReadFailure } from '../feeds'
+import { byWhom, dateTimeFormat } from '../describe'
 
 // The calendar feeds that the studio's occupations are read from, in the configuration section (see
 // docs/design/client/admin/configuration.md).
@@ -127,7 +126,8 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
   return (
     <li>
       <p>
-        <FeedName feed={feed} />{' '}
+        <b>{feed.name}</b>
+        {feed.privateTitles && ' (titres masqués)'}{' '}
         <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}
@@ -137,9 +137,9 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
       </p>
       <p className="admin-feed-link">{feed.link}</p>
       <p className="admin-meta">
-        {byWhom('Ajouté', feed.createdBy, feed.createdAt)} {lastRead(feed)}
+        {byWhom('Ajouté', feed.createdBy, feed.createdAt)} {feed.readAt ? `Lu le ${dateTimeFormat.format(new Date(feed.readAt))}.` : 'Pas encore lu.'}
       </p>
-      <ReadFailure feed={feed} />
+      {feed.error && <p className="admin-error">La dernière lecture a échoué&nbsp;: {feed.error}</p>}
       {error && (
         <p className="admin-error" role="alert">
           Le calendrier n'a pas pu être retiré&nbsp;: {error}

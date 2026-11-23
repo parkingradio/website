@@ -19,7 +19,7 @@ export function SessionTitle({ id, title, status, inMonth = false }: { id: strin
 
 // An occupation's title, or its calendar's name in its place, as it's written.
 export function OccupationTitle({ title, calendar }: OccupationName) {
-  return title ?? <span className="calendar-feed-name">{calendar}</span>
+  return <span className={title === null ? 'calendar-occupation-title calendar-feed-name' : 'calendar-occupation-title'}>{title ?? calendar}</span>
 }
 
 // An occupation's calendar, after its title, which screen readers read after ", calendrier".

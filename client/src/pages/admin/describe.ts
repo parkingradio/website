@@ -290,11 +290,6 @@ export function byWhom(verb: string, who: string | null, when: string | null): s
   return `${verb} par ${who} le ${dateTimeFormat.format(new Date(when))}.`
 }
 
-// When a calendar feed was last read, or that it hasn't been yet, e.g. "Lu le 19 novembre 2026 à 14 h 05.".
-export function lastRead({ readAt }: { readAt: string | null }): string {
-  return readAt ? `Lu le ${dateTimeFormat.format(new Date(readAt))}.` : 'Pas encore lu.'
-}
-
 // Who added an artist or a collective, or that they applied by themselves, e.g. "collectif, ajouté par …".
 export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: string | null; createdAt: string }): string {
   return `${kind}, ${byWhom('ajouté', createdBy, createdAt) ?? `inscrit par le formulaire «\u00a0appliquer\u00a0» le ${dateFormat.format(new Date(createdAt))}.`}`

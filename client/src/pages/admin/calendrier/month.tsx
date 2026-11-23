@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react'
 import { addDays } from '../../../quebec-time'
 import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
-import { WHOLE_DAY, gridDays, monthOf } from './model'
+import { WHOLE_DAY, gridDays, isFree, monthOf } from './model'
 import type { CalendarDay, DayThing } from './model'
 import { OccupationCalendar, OccupationTitle, SessionTitle } from './things'
 
@@ -66,17 +66,15 @@ export function Month({ month, nameId, today, chosen, days, onChoose }: MonthPro
         {Array.from({ length: grid.length / 7 }, (_, week) => (
           <tr key={grid[week * 7]}>
             {grid.slice(week * 7, week * 7 + 7).map((day) => {
-              const shown = days?.get(day)
-              const things = shown?.things ?? []
               const inMonth = monthOf(day) === month
               // Only the month's own days show their free time.
-              const free = shown && inMonth ? shown.free : []
+              const entries = (days?.get(day) ?? []).filter((entry) => inMonth || !isFree(entry))
               // What's on the day, which describes its button.
-              const thingsId = things.length > 0 || free.length > 0 ? `${id}${day}` : undefined
+              const entriesId = entries.length > 0 ? `${id}${day}` : undefined
               const classes = [
                 !inMonth && 'calendar-other-month',
                 day === chosen && 'calendar-chosen',
-                free[0] === WHOLE_DAY && 'calendar-available',
+                entries.some((entry) => isFree(entry) && entry.part === WHOLE_DAY) && 'calendar-available',
               ]
               return (
                 <td key={day} className={classes.filter(Boolean).join(' ') || undefined} onClick={(event) => onClick(event, day)}>
@@ -86,7 +84,7 @@ export function Month({ month, nameId, today, chosen, days, onChoose }: MonthPro
                     data-day={day}
                     tabIndex={day === stop ? 0 : -1}
                     aria-label={formatDay(day)}
-                    aria-describedby={thingsId}
+                    aria-describedby={entriesId}
                     aria-pressed={day === chosen}
                     aria-current={day === today ? 'date' : undefined}
                     onFocus={() => setFocused(day)}
@@ -94,7 +92,7 @@ export function Month({ month, nameId, today, chosen, days, onChoose }: MonthPro
                   >
                     {Number(day.slice(8))}
                   </button>
-                  {thingsId && <DayCell id={thingsId} things={things} free={free} />}
+                  {entriesId && <DayCell id={entriesId} entries={entries} />}
                 </td>
               )
             })}
@@ -105,18 +103,19 @@ export function Month({ month, nameId, today, chosen, days, onChoose }: MonthPro
   )
 }
 
-// What's on a day: its things, then its free time.
-function DayCell({ id, things, free }: { id: string; things: DayThing[]; free: string[] }) {
+// What's on a day: its things and the stretches of its free time, in order of time.
+function DayCell({ id, entries }: { id: string; entries: CalendarDay }) {
   return (
     <ul id={id} className="calendar-things">
-      {things.map((dayThing, i) => (
-        <MonthThing key={i} dayThing={dayThing} />
-      ))}
-      {free.map((stretch) => (
-        <li key={stretch} className="calendar-free">
-          {stretch === WHOLE_DAY ? 'disponible' : `dispo ${stretch}`}
-        </li>
-      ))}
+      {entries.map((entry, i) =>
+        isFree(entry) ? (
+          <li key={i} className="calendar-free">
+            {entry.part === WHOLE_DAY ? 'disponible' : `dispo ${entry.part}`}
+          </li>
+        ) : (
+          <MonthThing key={i} dayThing={entry} />
+        ),
+      )}
     </ul>
   )
 }

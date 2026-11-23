@@ -32,42 +32,73 @@
   border: none;
 }
 
-/* "À régler", boxed under the title. */
+/* "À régler": one box under the title, whose first row, the toggle, has its title, its counts and a chevron. */
 .calendar-issues {
   margin-top: 1.5rem;
-  padding: 0.75rem 1rem;
   border: 1px solid #000;
 }
 
+/* The heading is the box's first row, written like the rest of the page, but for its title. */
 .admin .calendar-issues h2 {
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
-.calendar-issues > p {
-  margin: 0.5rem 0;
-}
-
-.admin .calendar-issues-toggle {
-  display: inline-flex;
+.admin .calendar-issues .calendar-issues-header {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 10px;
+  width: 100%;
+  padding: 0.75rem 1rem;
 }
 
-.calendar-count {
+.calendar-issues-title {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calendar-issues-chevron {
+  margin-left: auto;
+  font-size: 1.1rem;
+}
+
+.admin button.calendar-issues-header:hover .calendar-issues-title {
+  text-decoration: underline;
+}
+
+.calendar-issues > .admin-notice {
+  margin: 0 1rem 0.75rem;
+}
+
+/* A count, or a group's kind, in a tag: conflicts in their red, sessions without a date in a border. */
+.calendar-tag {
   padding: 0 6px;
   border: 1px solid currentColor;
+  font-weight: 300;
 }
 
-.calendar-count.calendar-conflict-tag {
+.calendar-tag.calendar-conflict-tag {
   margin: 0;
   border-color: #c62828;
 }
 
-.calendar-issues h3 {
-  margin: 1rem 0 0.25rem;
+/* The groups, opened: conflicts, then the sessions without a date, each under a divider. */
+.calendar-issue-group {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #000;
+}
+
+.admin .calendar-issue-group h3 {
+  margin: 0;
   font-size: 13px;
-  text-transform: uppercase;
+}
+
+.calendar-issue-group > p {
+  margin: 0.25rem 0 0;
 }
 
 .calendar-issue-list {
@@ -76,24 +107,33 @@
   list-style: none;
 }
 
+/* A row: when, what, and what to do about it, on the right. */
 .calendar-issue-list li {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #ddd;
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px dotted #999;
   line-height: 1.6;
 }
 
-.admin .calendar-issue-list button {
+/* What a row is about, a session's or an occupation's title, in bold. */
+.calendar-issue-what :is(a, .calendar-occupation-title) {
+  font-weight: 700;
+}
+
+.calendar-issue-when {
+  color: #666;
+}
+
+.admin .calendar-issue-action button {
   padding: 0 6px;
 }
 
-.calendar-issue-times {
-  margin-right: 0.5rem;
-}
-
-/* Each of a conflict's two things, on a line of its own. */
+/* Each of a conflict's two things, on a line of its own, after the time they overlap. */
 .calendar-issue-thing {
   display: block;
-  padding-left: 1rem;
 }
 
 /* The toolbar, with the month's name between its arrows. */
@@ -338,16 +378,6 @@
   color: #b3261e;
 }
 
-/* Sources: each feed, with when it was last read. */
-.calendar-source p,
-p.calendar-source {
-  margin: 0;
-}
-
-.calendar-source + .calendar-source {
-  margin-top: 0.5rem;
-}
-
 /* On phones, the month is squeezed into seven narrow columns. */
 @media (max-width: 700px) {
   .calendar-month {
@@ -370,5 +400,10 @@ p.calendar-source {
 
   .calendar-toolbar .admin-button {
     margin-left: 0;
+  }
+
+  .calendar-issue-list li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
   }
 }
