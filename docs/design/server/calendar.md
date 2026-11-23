@@ -85,8 +85,7 @@ their title, and are only known by their feed's name. No event's description or 
 The calendar is what takes the studio over a range of days in Québec time, from 00:00 on its first day to 00:00 on the
 day after its last, e.g. a month:
 
-- the sessions with a start that take some of that time, whatever their status, so that cancelled ones can be shown,
-  by start,
+- the sessions with a start that take some of that time, by start, whatever their status (cancelled ones included),
 - the occupations that take some of it, by start, then end,
 - every feed, with when it was last read (`readAt`) and why that failed (`error`),
 - and, whatever the range, what needs settling: the [conflicts](#conflicts) of the 365 days from `today`, the day in
@@ -95,13 +94,13 @@ day after its last, e.g. a month:
 Its occupations are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can be out
 of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read yet,
 e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or when
-it hasn't been read yet. They only go back as far as what a read keeps (see [Events](#events)), so the calendar of past
-days can lack occupations that took place then.
+it hasn't been read yet. Occupations also only cover what a read keeps, from a year before it to two years after it (see
+[Events](#events)), so the calendar of days outside that can lack occupations.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
-known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title`, `""` for none, or `null` when
-its feed's titles are private (see [Events](#events)). Occupations have no id, and two of them can be the same in all of
-these, e.g. two stays with the same dates in a feed whose titles are private.
+known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
+Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates in a feed
+whose titles are private.
 
 ## Conflicts
 
@@ -111,10 +110,10 @@ Cancelled sessions, and sessions without a start, don't count; done ones do. A t
 doesn't overlap it, and a whole-day occupation overlaps whatever is on its days.
 
 The conflicts are those of the 365 days from `today`: from 00:00 today to 00:00 on the day 365 days later. A conflict is
-one of them when some of the time its two things overlap is, so one that ended this morning is there until midnight,
-while two things that only overlapped yesterday aren't one, even when one of them is still going on.
+one of them when its two things overlap during some of those days, so one that ended this morning is there until
+midnight, while two things that only overlapped yesterday aren't one, even when one of them is still going on.
 
-There's one conflict for each pair of things that overlap, by start, then end, which has:
+There's one conflict for each pair of things that overlap. Conflicts are by start, then end, and each has:
 
 - `start` and `end`: the time its two things overlap, all of it, even outside the 365 days,
 - `things`: the two things, by start, then end, each with its `kind`: `"session"`, with the session's `id`, `title`,

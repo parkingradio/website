@@ -48,9 +48,10 @@ async function addSet(sessionId: string, performer: string) {
   await database.db.insert(setPerformers).values({ setId: set.id, artistId: artist.id, position: 0 })
 }
 
+// The names of the sessions the calendar gives in full, and of the others it counts.
 async function names(range: [number, number], window: [number, number]) {
-  const found = await sessionsStore(database.db).forCalendar({ from: at(range[0]), to: at(range[1]) }, { from: at(window[0]), to: at(window[1]) })
-  return found.map(({ name }) => name).sort()
+  const { given, others } = await sessionsStore(database.db).forCalendar({ from: at(range[0]), to: at(range[1]) }, { from: at(window[0]), to: at(window[1]) })
+  return { given: given.map(({ name }) => name).sort(), others: others.map(({ name }) => name).sort() }
 }
 
 describe('forCalendar', () => {
@@ -61,7 +62,7 @@ describe('forCalendar', () => {
     await add('in it', 12, 1, 'done')
     await add('across its start', 9, 2, 'cancelled')
     // The window is elsewhere, and has none of them.
-    expect(await names([10, 20], [100, 200])).toEqual(['across it', 'across its start', 'in it'])
+    expect(await names([10, 20], [100, 200])).toEqual({ given: ['across it', 'across its start', 'in it'], others: [] })
   })
 
   it("gives those of the window that aren't cancelled, and those without a start that aren't cancelled", async () => {
@@ -71,18 +72,19 @@ describe('forCalendar', () => {
     await add('before the window', 50, 50)
     await add('without a start', null, 1)
     await add('cancelled without a start', null, 1, 'cancelled')
-    expect(await names([0, 10], [100, 200])).toEqual(['across its end', 'in the window', 'without a start'])
+    expect(await names([0, 10], [100, 200])).toEqual({ given: ['without a start'], others: ['across its end', 'in the window'] })
   })
 
   it('gives each session once, with its sets when it takes some of the range or has no start, and without them otherwise', async () => {
     for (const [name, start] of [['in both', 105], ['only in the window', 150], ['without a start', null]] as const) {
       await addSet(await add(name, start, 1), `Artist ${name}`)
     }
-    const found = await sessionsStore(database.db).forCalendar({ from: at(100), to: at(110) }, { from: at(100), to: at(200) })
-    const performers = (name: string) => found.find((session) => session.name === name)!.sets?.map(({ performers }) => performers.map(({ name }) => name))
-    expect(found.map(({ name }) => name).sort()).toEqual(['in both', 'only in the window', 'without a start'])
+    const { given, others } = await sessionsStore(database.db).forCalendar({ from: at(100), to: at(110) }, { from: at(100), to: at(200) })
+    const performers = (name: string) => given.find((session) => session.name === name)!.sets.map(({ performers }) => performers.map(({ name }) => name))
+    expect(given.map(({ name }) => name).sort()).toEqual(['in both', 'without a start'])
     expect(performers('in both')).toEqual([['Artist in both']])
     expect(performers('without a start')).toEqual([['Artist without a start']])
-    expect(found.find((session) => session.name === 'only in the window')!.sets).toBeNull()
+    expect(others.map(({ name }) => name)).toEqual(['only in the window'])
+    expect(others[0]).not.toHaveProperty('sets')
   })
 })

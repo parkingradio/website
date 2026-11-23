@@ -4,12 +4,12 @@ import { Day, addDays, dayStart, dayWith, daysBetween, quebecDay } from '../api/
 import { Timestamp, firstIssue, zodRoutes } from '../api/schemas.js'
 import { Status, after, sessionTitle } from '../sessions/fields.js'
 import { SessionBody, sessionBody } from '../sessions/routes.js'
-import type { SessionWithoutSets, SessionsStore, StoredSession } from '../sessions/store.js'
+import type { SessionWithoutSets, SessionsStore } from '../sessions/store.js'
 import { compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.js'
 import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
 import type { CalendarFeedsStore } from './feeds.js'
 import type { CalendarReads } from './reads.js'
-import { Feed, currentRead, feedBody } from './routes.js'
+import { Feed, currentRead, feedBody } from './feeds-routes.js'
 
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
@@ -33,7 +33,7 @@ function calendarDay(name: 'from' | 'to', description: string) {
 const CalendarQuery = z
   .object({
     from: calendarDay('from', 'The first day, in Québec, e.g. "2026-11-01"'),
-    to: calendarDay('to', 'The last day, in Québec, included, e.g. "2026-11-30"'),
+    to: calendarDay('to', `The last day, in Québec, included, e.g. "2026-11-30": at most ${MAX_DAYS} days from \`from\`, both included`),
   })
   .refine(({ from, to }) => to >= from, "`to` can't be before `from`")
   .refine(({ from, to }) => daysBetween(from, to) < MAX_DAYS, `The calendar has at most ${MAX_DAYS} days, \`from\` and \`to\` included`)
@@ -67,12 +67,12 @@ const CalendarResponse = z.object({
   ok: z.literal(true),
   today: Day.meta({ description: 'The day the conflicts are counted from: today, in Québec' }),
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
-  sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start, then createdAt, then id' }),
+  sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start' }),
   occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),
   conflicts: z.array(Conflict).meta({ description: 'The conflicts of the next 365 days, from today, whatever the days asked for' }),
   undatedSessions: z
     .array(SessionBody)
-    .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for" }),
+    .meta({ description: "The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for" }),
 })
 
 const occupationBody = ({ feedId, start, end, wholeDay, title }: OccupationThing) => ({ feedId, start: start.toISOString(), end: end.toISOString(), wholeDay, title })
@@ -84,7 +84,7 @@ function thingBody(thing: Thing): z.infer<typeof Thing> {
 }
 
 // A session, as the calendar counts it.
-function calendarSession(row: StoredSession | SessionWithoutSets): CalendarSession {
+function calendarSession(row: SessionWithoutSets): CalendarSession {
   const { id, startAt: start, durationMinutes, status } = row
   return { id, title: sessionTitle(row), start, end: start && after(start, durationMinutes), status }
 }
@@ -115,7 +115,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       const today = quebecDay(new Date())
       const window = { from: dayStart(today), to: dayStart(addDays(today, CONFLICT_DAYS)) }
 
-      const [listed, stored] = await Promise.all([feeds.list(), sessions.forCalendar(range, window)])
+      const [listed, { given, others }] = await Promise.all([feeds.list(), sessions.forCalendar(range, window)])
       const inRange = takesSomeOf(range)
       // What was read from each feed is taken once, so that its status and its occupations are from the same read, that
       // of the feed as it is now. The occupations are in the order of the feeds, then as they were read, which ties keep
@@ -125,15 +125,13 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
         (read?.events ?? []).map(({ start, end, wholeDay, title }) => ({ kind: 'occupation' as const, feedId: feed.id, start, end, wholeDay, title })),
       )
 
-      // The sessions given in full, those of the days asked for and those without a start, are those with their sets.
-      const given = stored.filter((row): row is StoredSession => row.sets !== null)
       const sessionsInRange = given
         .filter((row) => row.startAt !== null)
         .sort((a, b) => a.startAt!.getTime() - b.startAt!.getTime() || a.createdAt.getTime() - b.createdAt.getTime() || compareStrings(a.id, b.id))
       const undated = given
         .filter((row) => row.startAt === null)
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || compareStrings(a.id, b.id))
-      const found = conflicts(stored.map(calendarSession), occupations, window)
+      const found = conflicts([...given, ...others].map(calendarSession), occupations, window)
 
       return {
         ok: true as const,

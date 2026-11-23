@@ -7,7 +7,7 @@ import type { CalendarFeedsStore, FeedChanges, NewFeed, StoredFeed } from './fee
 import { LinkTaken } from './feeds.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
 import type { CalendarReads, FeedRead, ReadSettings, SuccessfulRead } from './reads.js'
-import { calendarFeedsRoutes } from './routes.js'
+import { calendarFeedsRoutes } from './feeds-routes.js'
 
 // The endpoints of calendar feeds (see docs/design/server/calendar.md), with a fake store and fake reads.
 

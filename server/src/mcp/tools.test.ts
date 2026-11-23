@@ -92,7 +92,9 @@ describe('the tools of the API', () => {
     }
     // The tools that summarize what they give say which tool gives all of it.
     expect(description('list_sessions')).toContain('Gives a summary of each one: `get_session` gives all of it.')
-    expect(description('get_calendar')).toContain('Gives a summary of each session, without its sets: `get_session` gives all of a session')
+    expect(description('get_calendar')).toContain(
+      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, whose `from` and `to` are instants, not days,',
+    )
     expect(tools.find(({ name }) => name === 'get_calendar')!.inputSchema.required).toEqual(['from', 'to'])
     // Only what admins decide: sets and sessions make applications planned or done.
     const decide = tools.find(({ name }) => name === 'update_application_decision')!

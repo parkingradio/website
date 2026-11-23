@@ -85,12 +85,11 @@ function session(id: string, startAt: string | null, durationMinutes: number, st
 let rows: StoredSession[]
 const overlaps = (row: StoredSession, { from, to }: { from: Date; to: Date }) =>
   row.startAt !== null && row.startAt < to && row.startAt.getTime() + row.durationMinutes * 60_000 > from.getTime()
-// As the store has it, in any order, since the route orders them: only those given in full have their sets.
-const forCalendar = vi.fn<SessionsStore['forCalendar']>(async (range, window) =>
-  rows
-    .filter((row) => overlaps(row, range) || (row.status !== 'cancelled' && (row.startAt === null || overlaps(row, window))))
-    .map((row) => (row.startAt === null || overlaps(row, range) ? row : { ...row, sets: null })),
-)
+// As the store has it, in any order, since the route orders them (see calendar.db.test.ts).
+const forCalendar = vi.fn<SessionsStore['forCalendar']>(async (range, window) => ({
+  given: rows.filter((row) => overlaps(row, range) || (row.status !== 'cancelled' && row.startAt === null)),
+  others: rows.filter((row) => row.status !== 'cancelled' && overlaps(row, window) && !overlaps(row, range)),
+}))
 const sessions = { forCalendar } as unknown as SessionsStore
 
 async function buildApp() {
@@ -205,7 +204,7 @@ describe('GET /api/admin/calendar', () => {
     expect(reads.of).toHaveBeenCalledTimes(2 * FEEDS.length)
   })
 
-  it('gives the sessions by start, then by when they were added, then by id, and private titles as null', async () => {
+  it('gives the sessions by start, and private titles as null', async () => {
     rows = [
       session('b', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-02T12:00:00Z'),
       session('c', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-01T12:00:00Z'),

@@ -261,7 +261,7 @@ const SUMMARIES: Record<string, Summary> = {
   },
   get_calendar: {
     says:
-      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, with `from` and `to`, the sets of a period.',
+      'Gives a summary of each session, without its sets: `get_session` gives all of a session, and `list_sessions`, whose `from` and `to` are instants, not days, the sets of a period.',
     summarize: async ({ sessions, undatedSessions, ...rest }) => ({
       ...rest,
       sessions: pick(sessions, SESSION_SUMMARY),

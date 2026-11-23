@@ -7114,7 +7114,7 @@ export interface operations {
             query: {
                 /** @description The first day, in Québec, e.g. "2026-11-01" */
                 from: string;
-                /** @description The last day, in Québec, included, e.g. "2026-11-30" */
+                /** @description The last day, in Québec, included, e.g. "2026-11-30": at most 400 days from `from`, both included */
                 to: string;
             };
             header?: never;
@@ -7139,13 +7139,13 @@ export interface operations {
                         today: string;
                         /** @description Every feed, in the order they were added, with when each was last read, and why that failed */
                         feeds: components["schemas"]["CalendarFeed"][];
-                        /** @description The sessions with a start that take some of the days, whatever their status, by start, then createdAt, then id */
+                        /** @description The sessions with a start that take some of the days, whatever their status, by start */
                         sessions: components["schemas"]["Session"][];
                         /** @description The occupations that take some of the days, by start, then end */
                         occupations: components["schemas"]["CalendarOccupation"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
                         conflicts: components["schemas"]["CalendarConflict"][];
-                        /** @description The sessions without a start that aren't cancelled, the most recently added first, then by id, whatever the days asked for */
+                        /** @description The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for */
                         undatedSessions: components["schemas"]["Session"][];
                     };
                 };
