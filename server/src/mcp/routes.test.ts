@@ -23,6 +23,8 @@ const USER = TEST_ADMIN
 let grant: AccessGrant | null
 const store = { findAccessToken: vi.fn<OAuthStore['findAccessToken']>(async () => grant) }
 
+const FEED_LINK = 'https://example.com/private-secret.ics'
+
 // The profile of the tests' multipart route, like an artist's.
 const Profile = z.object({ name: z.string(), email: z.string().nullable(), phone: z.string() })
 let saved: z.infer<typeof Profile>
@@ -143,6 +145,16 @@ async function buildApp(logs?: string[], environment = 'test') {
         schema: { operationId: 'create_things', summary: 'Things', body: z.object({ things: z.array(Thing), names: z.array(z.string()).optional() }) },
       },
       async (request) => request.body,
+    )
+    // Like the calendar's routes, whose feeds' links tools don't give, whether they succeed or fail.
+    api.get(
+      '/api/admin/calendar/feeds/:id',
+      { config: { admin: true, tool: { title: 'Voir un calendrier' } }, schema: { operationId: 'get_calendar_feed', summary: 'A feed', params: ById } },
+      async (request, reply) => {
+        const feed = { id: 'f', name: 'Séjours', link: FEED_LINK, privateTitles: true }
+        if (request.params.id === 'conflict') return reply.status(409).send({ ok: false, error: 'In the way', feeds: [feed] })
+        return { ok: true, feed, nested: { feeds: [feed] } }
+      },
     )
     api.get(
       '/api/admin/artists',
@@ -383,7 +395,7 @@ describe('the MCP server', () => {
       const response = await post(app, { jsonrpc: '2.0', id: 1, method: 'tools/list' })
       const tools = response.json().result.tools as { name: string; title: string; description: string; annotations: object; inputSchema: object }[]
       expect(tools.map(({ name }) => name)).toEqual([
-        ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'create_things', 'list_artists'],
+        ...['get_thing', 'update_thing', 'get_artist', 'create_artist', 'update_artist', 'update_session', 'create_times', 'create_things', 'get_calendar_feed', 'list_artists'],
         'read_documentation',
       ])
       const get = tools.find(({ name }) => name === 'get_thing')!
@@ -463,6 +475,17 @@ describe('the MCP server', () => {
       expect(saved).toEqual({ name: 'Aurore B.', email: 'aurore@example.com', phone: '555 0100' })
       expect((await call(app, 'update_artist', { id: 'a', email: null, phone: '', pinned: true })).body.pinned).toBe(true)
       expect(saved).toEqual({ name: 'Aurore B.', email: null, phone: '' })
+    })
+
+    it("never give calendar feeds' links, wherever they are, whether they succeed or fail", async () => {
+      const app = await buildApp()
+      const feed = { id: 'f', name: 'Séjours', privateTitles: true }
+      const succeeded = await call(app, 'get_calendar_feed', { id: 'f' })
+      expect(succeeded.body).toEqual({ ok: true, feed, nested: { feeds: [feed] } })
+      const failed = await call(app, 'get_calendar_feed', { id: 'conflict' })
+      expect(failed.isError).toBe(true)
+      expect(failed.body).toEqual({ status: 409, ok: false, error: 'In the way', feeds: [feed] })
+      expect(JSON.stringify([succeeded, failed])).not.toContain('private-secret')
     })
 
     it('say what changing only some fields does, and that artists\' emails and phone numbers are never shown', async () => {

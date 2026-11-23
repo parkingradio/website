@@ -1169,8 +1169,13 @@
           "name": {
             "type": "string"
           },
-          "kind": {
-            "$ref": "#/components/schemas/FeedKind"
+          "link": {
+            "type": "string",
+            "description": "Its link, as the server keeps it"
+          },
+          "privateTitles": {
+            "type": "boolean",
+            "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
           },
           "createdBy": {
             "type": "string",
@@ -1179,6 +1184,25 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "updatedBy": {
+            "description": "The email of the admin who last changed it, or null until it is changed",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was last changed, or null until it is"
           },
           "readAt": {
             "anyOf": [
@@ -1203,9 +1227,12 @@
         "required": [
           "id",
           "name",
-          "kind",
+          "link",
+          "privateTitles",
           "createdBy",
           "createdAt",
+          "updatedBy",
+          "updatedAt",
           "readAt",
           "error"
         ],
@@ -2022,14 +2049,6 @@
         "enum": [
           "evenements-publics"
         ]
-      },
-      "FeedKind": {
-        "type": "string",
-        "enum": [
-          "occupation",
-          "quiet-time"
-        ],
-        "description": "What its events are: occupations, or quiet time"
       },
       "GenreId": {
         "type": "string",
@@ -10357,7 +10376,7 @@
     "/api/admin/calendar/feeds": {
       "get": {
         "operationId": "list_calendar_feeds",
-        "summary": "Every calendar feed that the studio's occupations and quiet time are read from, in the order they were added, without their links",
+        "summary": "Every calendar feed that the studio's occupations are read from, in the order they were added",
         "tags": [
           "Calendar"
         ],
@@ -10438,18 +10457,19 @@
                     "maxLength": 100,
                     "description": "Trimmed, then between 1 and 100 characters"
                   },
-                  "kind": {
-                    "$ref": "#/components/schemas/FeedKind"
-                  },
                   "link": {
-                    "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters once its characters that links can't have are encoded. It's a secret, which is never sent back",
+                    "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
                     "type": "string"
+                  },
+                  "privateTitles": {
+                    "type": "boolean",
+                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
                   }
                 },
                 "required": [
                   "name",
-                  "kind",
-                  "link"
+                  "link",
+                  "privateTitles"
                 ],
                 "additionalProperties": false
               }
@@ -10547,6 +10567,148 @@
       }
     },
     "/api/admin/calendar/feeds/{id}": {
+      "patch": {
+        "summary": "Changes a calendar feed's name, link or whether its titles are private, once a new link gives a calendar",
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Trimmed, then between 1 and 100 characters"
+                  },
+                  "link": {
+                    "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
+                    "type": "string"
+                  },
+                  "privateTitles": {
+                    "type": "boolean",
+                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "feed": {
+                      "$ref": "#/components/schemas/CalendarFeed"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "feed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "summary": "Removes a calendar feed, and forgets what was read from it",
         "tags": [

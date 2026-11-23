@@ -1,5 +1,5 @@
 {
-  "id": "49947fda-4958-41eb-b5cc-00867f31ebef",
+  "id": "500f8cbf-b16e-4076-95b0-63a7bae3b2d5",
   "prevId": "03506233-53b8-4e91-a8ed-8a24a57a340f",
   "version": "7",
   "dialect": "postgresql",
@@ -374,15 +374,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "kind": {
-          "name": "kind",
+        "link": {
+          "name": "link",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "link": {
-          "name": "link",
-          "type": "text",
+        "private_titles": {
+          "name": "private_titles",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true
         },
@@ -398,6 +398,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -421,12 +433,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "calendar_feeds_kind": {
-          "name": "calendar_feeds_kind",
-          "value": "\"calendar_feeds\".\"kind\" in ('occupation', 'quiet-time')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.collective_members": {

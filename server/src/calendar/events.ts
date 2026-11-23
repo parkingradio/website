@@ -1,6 +1,5 @@
 import ICAL from 'ical.js'
 import { instantIn, isTimeZone } from '../api/formats.js'
-import type { FeedKind } from './fields.js'
 import { FeedReadError, refused } from './fetch.js'
 
 // What a read keeps of a feed: its events, from the iCalendar text its link gave (see "Events" in
@@ -11,8 +10,8 @@ import { FeedReadError, refused } from './fetch.js'
 // time zone that the feed doesn't define, and doesn't resolve the times that the clocks skip or show twice as RFC 5545
 // says. ical.js is only trusted with the time zones the feed defines whose names aren't IANA's.
 
-// An event, or an occurrence of a recurring event: from `start`, included, to `end`, excluded. Only occupations have a
-// title, which is "" for none: quiet time's are never kept.
+// An event, or an occurrence of a recurring event: from `start`, included, to `end`, excluded. Its title is "" when it
+// has none, and null when its feed's titles are private, which are never read.
 export type CalendarEvent = { start: Date; end: Date; title: string | null }
 
 // How many occurrences a recurring event can have until the end of the time a read keeps before it's left out, e.g. one
@@ -97,10 +96,10 @@ export function shortTitle(summary: string): string {
 
 const isCancelled = (event: ICAL.Event) => String(event.component.getFirstPropertyValue('status') ?? '').toUpperCase() === 'CANCELLED'
 
-// The events and occurrences of a feed that has `kind`, from its text, that take some of the time from `from` to `to`,
+// The events and occurrences of a feed, from its text, that take some of the time from `from` to `to`,
 // sorted by when they start, and how many events were left out because they couldn't be read, or had too many
 // occurrences. Throws a FeedReadError when the text isn't a calendar, or has too many events and occurrences in all.
-export function calendarEvents(text: string, kind: FeedKind, { from, to }: { from: Date; to: Date }): { events: CalendarEvent[]; skipped: number } {
+export function calendarEvents(text: string, privateTitles: boolean, { from, to }: { from: Date; to: Date }): { events: CalendarEvent[]; skipped: number } {
   let parsed: unknown
   try {
     parsed = ICAL.parse(text)
@@ -145,8 +144,8 @@ export function calendarEvents(text: string, kind: FeedKind, { from, to }: { fro
   const fromMs = from.getTime()
   const toMs = to.getTime()
 
-  // The title of an occurrence of `event`, which only occupations keep, as shortTitle gives it.
-  const titleOf = (event: ICAL.Event) => (kind === 'occupation' ? shortTitle(String(event.component.getFirstPropertyValue('summary') ?? '')) : null)
+  // The title of an occurrence of `event`, as shortTitle gives it, unless the feed's titles are private.
+  const titleOf = (event: ICAL.Event) => (privateTitles ? null : shortTitle(String(event.component.getFirstPropertyValue('summary') ?? '')))
 
   // The occurrences of `event` that take some of the time from `from` to `to`, or null when it has too many. An event
   // that doesn't recur has one.

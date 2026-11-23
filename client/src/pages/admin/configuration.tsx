@@ -6,7 +6,7 @@ import { YouTubeCredentials } from './configuration/youtube'
 
 // The settings that change what the site does: who applications are emailed to, the SoundCloud app the server reads
 // SoundCloud through, the YouTube channel it reads the site's video from, the calendars that the studio's occupations
-// and quiet time are read from, and the feature flags.
+// are read from, and the feature flags.
 export function Configuration() {
   return (
     <>

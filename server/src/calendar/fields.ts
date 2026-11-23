@@ -3,11 +3,6 @@ import { z } from 'zod'
 // The fields of calendar feeds (see "Feeds" in docs/design/server/calendar.md). They're in a module of their own, which
 // only needs zod, so that the database's schema doesn't load what reading the feeds needs.
 
-// A feed's kind: what its events are.
-export const FEED_KINDS = ['occupation', 'quiet-time'] as const
-export const FeedKind = z.enum(FEED_KINDS).meta({ id: 'FeedKind', description: 'What its events are: occupations, or quiet time' })
-export type FeedKind = z.infer<typeof FeedKind>
-
 const NAME_MAX_LENGTH = 100
 export const FeedName = z
   .string()
@@ -57,5 +52,9 @@ export const Link = z
   .meta({
     description:
       `Trimmed: an https or webcal link, without a user name or a password, of at most ${LINK_MAX_LENGTH} characters ` +
-      "once its characters that links can't have are encoded. It's a secret, which is never sent back",
+      "as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
   })
+
+export const PrivateTitles = z.boolean().meta({
+  description: "Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations",
+})

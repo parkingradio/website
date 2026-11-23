@@ -40,7 +40,7 @@ design: when they disagree, these documents still win.
 | [Applications](server/applications.md) | Artists' and collectives' applications, applying through the form, and the emails about them |
 | [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
 | [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets, and their calendar feed |
-| [Calendar](server/calendar.md) | What takes the studio besides sessions: occupations and quiet time, and the calendar feeds they're read from |
+| [Calendar](server/calendar.md) | What takes the studio besides sessions: occupations, and the calendar feeds they're read from |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |

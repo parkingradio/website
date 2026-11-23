@@ -2384,7 +2384,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every calendar feed that the studio's occupations and quiet time are read from, in the order they were added, without their links */
+        /** Every calendar feed that the studio's occupations are read from, in the order they were added */
         get: operations["list_calendar_feeds"];
         put?: never;
         /** Adds a calendar feed, once its link gives a calendar */
@@ -2400,9 +2400,10 @@ export interface paths {
                     "application/json": {
                         /** @description Trimmed, then between 1 and 100 characters */
                         name: string;
-                        kind: components["schemas"]["FeedKind"];
-                        /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters once its characters that links can't have are encoded. It's a secret, which is never sent back */
+                        /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link: string;
+                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+                        privateTitles: boolean;
                     };
                 };
             };
@@ -2562,7 +2563,107 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        patch?: never;
+        /** Changes a calendar feed's name, link or whether its titles are private, once a new link gives a calendar */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Trimmed, then between 1 and 100 characters */
+                        name?: string;
+                        /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
+                        link?: string;
+                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+                        privateTitles?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                            feed: components["schemas"]["CalendarFeed"];
+                        };
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/admin/features": {
@@ -3287,11 +3388,18 @@ export interface components {
         CalendarFeed: {
             id: string;
             name: string;
-            kind: components["schemas"]["FeedKind"];
+            /** @description Its link, as the server keeps it */
+            link: string;
+            /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles, descriptions or locations */
+            privateTitles: boolean;
             /** @description The email of the admin who added it */
             createdBy: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description The email of the admin who last changed it, or null until it is changed */
+            updatedBy: string | null;
+            /** @description When it was last changed, or null until it is */
+            updatedAt: string | null;
             /** @description When it was last read successfully, or null until then */
             readAt: string | null;
             /** @description Why its last read failed, or null when it succeeded, or until it is read */
@@ -3418,11 +3526,6 @@ export interface components {
         };
         /** @enum {string} */
         FeatureId: "evenements-publics";
-        /**
-         * @description What its events are: occupations, or quiet time
-         * @enum {string}
-         */
-        FeedKind: "occupation" | "quiet-time";
         /** @enum {string} */
         GenreId: "house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber";
         LeftOutTrack: {

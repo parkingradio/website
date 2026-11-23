@@ -1,29 +1,34 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { ApiError, ById, Ok, Timestamp, Total, objectError, zodRoutes } from '../api/schemas.js'
+import { ApiError, ById, Ok, Timestamp, Total, changesTo, objectError, zodRoutes } from '../api/schemas.js'
 import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
 import { LinkTaken } from './feeds.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
-import { FeedKind, FeedName, Link } from './fields.js'
-import type { CalendarReads } from './reads.js'
+import { FeedName, Link, PrivateTitles } from './fields.js'
+import type { CalendarReads, FeedToRead, SuccessfulRead } from './reads.js'
 
-// The calendar feeds that the studio's occupations and quiet time are read from (see docs/design/server/calendar.md).
-// Their links are secrets, which no response has, and which aren't logged: requests' bodies never are, and the errors
-// of reading a link are the server's own (see fetch.ts).
+// The calendar feeds that the studio's occupations are read from (see docs/design/server/calendar.md). Their links are
+// secrets, which only the admin pages get: they're never logged, since requests' bodies never are, and the errors of
+// reading a link are the server's own (see fetch.ts), and the MCP server's tools never give them (see mcp/tools.ts).
 
 const Feed = z
   .object({
     id: z.string(),
     name: z.string(),
-    kind: FeedKind,
+    link: z.string().meta({ description: 'Its link, as the server keeps it' }),
+    privateTitles: PrivateTitles,
     createdBy: z.string().meta({ description: 'The email of the admin who added it' }),
     createdAt: Timestamp,
+    updatedBy: z.string().nullable().meta({ description: 'The email of the admin who last changed it, or null until it is changed' }),
+    updatedAt: Timestamp.nullable().meta({ description: 'When it was last changed, or null until it is' }),
     readAt: Timestamp.nullable().meta({ description: 'When it was last read successfully, or null until then' }),
     error: z.string().nullable().meta({ description: 'Why its last read failed, or null when it succeeded, or until it is read' }),
   })
   .meta({ id: 'CalendarFeed' })
 
-const NewFeed = z.strictObject({ name: FeedName, kind: FeedKind, link: Link }, { error: objectError('The feed must be an object with its name, kind and link') })
+const FEED_FIELDS = { name: FeedName, link: Link, privateTitles: PrivateTitles }
+const NewFeed = z.strictObject(FEED_FIELDS, { error: objectError('The feed must be an object with its name, link and privateTitles') })
+const FeedChanges = changesTo(FEED_FIELDS)
 
 const NO_SUCH_FEED: ApiError = { ok: false, error: 'No such feed' }
 
@@ -37,9 +42,31 @@ type Options = { feeds: CalendarFeedsStore; reads: CalendarReads }
 export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }: Options) {
   const api = zodRoutes(app)
 
-  function feed({ id, name, kind, createdBy, createdAt }: StoredFeed): z.infer<typeof Feed> {
+  function feed({ id, name, link, privateTitles, createdBy, createdAt, updatedBy, updatedAt }: StoredFeed): z.infer<typeof Feed> {
     const read = reads.of(id)
-    return { id, name, kind, createdBy, createdAt: createdAt.toISOString(), readAt: read?.readAt?.toISOString() ?? null, error: read?.error ?? null }
+    return {
+      id,
+      name,
+      link,
+      privateTitles,
+      createdBy,
+      createdAt: createdAt.toISOString(),
+      updatedBy,
+      updatedAt: updatedAt?.toISOString() ?? null,
+      readAt: read?.readAt?.toISOString() ?? null,
+      error: read?.error ?? null,
+    }
+  }
+
+  // Reads the link of a feed that's added or changed, or says why it can't be read.
+  async function readFeed(toRead: FeedToRead): Promise<SuccessfulRead | { status: 400 | 502; error: ApiError }> {
+    try {
+      return await reads.read(toRead)
+    } catch (error) {
+      if (error instanceof FeedReadError) return { status: error.status, error: { ok: false, error: error.message } }
+      if (error instanceof ReadAborted) return { status: 502, error: { ok: false, error: 'The server is shutting down' } }
+      throw error
+    }
   }
 
   api.get(
@@ -48,7 +75,7 @@ export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }
       config: { admin: true, tool: { title: 'Voir les calendriers externes' } },
       schema: {
         operationId: 'list_calendar_feeds',
-        summary: "Every calendar feed that the studio's occupations and quiet time are read from, in the order they were added, without their links",
+        summary: "Every calendar feed that the studio's occupations are read from, in the order they were added",
         tags: ['Calendar'],
         response: { 200: z.object({ ok: z.literal(true), total: Total, feeds: z.array(Feed) }) },
       },
@@ -71,27 +98,66 @@ export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }
       },
     },
     async (request, reply) => {
-      const { name, kind, link } = request.body
+      const { name, link, privateTitles } = request.body
       const taken = await feeds.withLink(link)
       if (taken) return reply.status(409).send(linkTaken(taken))
-      let read
-      try {
-        read = await reads.read({ name, kind, link })
-      } catch (error) {
-        if (error instanceof FeedReadError) return reply.status(error.status).send({ ok: false, error: error.message })
-        if (error instanceof ReadAborted) return reply.status(502).send({ ok: false, error: 'The server is shutting down' })
-        throw error
-      }
+      const read = await readFeed({ name, link, privateTitles })
+      if ('status' in read) return reply.status(read.status).send(read.error)
       let added: StoredFeed
       try {
-        added = await feeds.add({ name, kind, link, createdBy: request.user!.email })
+        added = await feeds.add({ name, link, privateTitles, createdBy: request.user!.email })
       } catch (error) {
         if (error instanceof LinkTaken) return reply.status(409).send(linkTaken(error.feed))
         throw error
       }
       reads.added(added.id, read)
-      request.log.info({ feed: added.id, name, kind, by: added.createdBy }, 'Added a calendar feed')
+      request.log.info({ feed: added.id, name, privateTitles, by: added.createdBy }, 'Added a calendar feed')
       return { ok: true as const, feed: feed(added) }
+    },
+  )
+
+  api.patch(
+    '/api/admin/calendar/feeds/:id',
+    {
+      config: { admin: true, tool: null },
+      schema: {
+        summary: "Changes a calendar feed's name, link or whether its titles are private, once a new link gives a calendar",
+        tags: ['Calendar'],
+        // Any id, so that one that isn't a feed's gets a 404.
+        params: ById,
+        body: FeedChanges,
+        response: { 200: z.object({ ok: z.literal(true), feed: Feed }), 400: ApiError, 404: ApiError, 409: ApiError, 502: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const changes = request.body
+      const current = await feeds.get(request.params.id)
+      if (!current) return reply.status(404).send(NO_SUCH_FEED)
+      // Only a new link is read, and can be another feed's: the feed's own, e.g. as a webcal link, isn't new.
+      const newLink = changes.link !== undefined && changes.link !== current.link ? changes.link : null
+      let read: SuccessfulRead | undefined
+      if (newLink !== null) {
+        const taken = await feeds.withLink(newLink)
+        if (taken && taken.id !== current.id) return reply.status(409).send(linkTaken(taken))
+        const result = await readFeed({ id: current.id, name: changes.name ?? current.name, link: newLink, privateTitles: changes.privateTitles ?? current.privateTitles })
+        if ('status' in result) return reply.status(result.status).send(result.error)
+        read = result
+      }
+      let updated: StoredFeed | null
+      try {
+        updated = await feeds.update(current.id, changes, request.user!.email)
+      } catch (error) {
+        if (error instanceof LinkTaken) return reply.status(409).send(linkTaken(error.feed))
+        throw error
+      }
+      // Removed while its link was read.
+      if (!updated) return reply.status(404).send(NO_SUCH_FEED)
+      reads.changed(updated.id, { link: updated.link, privateTitles: updated.privateTitles }, read)
+      request.log.info(
+        { feed: updated.id, name: updated.name, privateTitles: updated.privateTitles, newLink: newLink !== null, by: updated.updatedBy },
+        'Changed a calendar feed',
+      )
+      return { ok: true as const, feed: feed(updated) }
     },
   )
 

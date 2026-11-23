@@ -1,4 +1,4 @@
-import type { FeatureId, Schema } from '../../api/client'
+import type { FeatureId } from '../../api/client'
 import { performanceTypeName } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
@@ -55,9 +55,6 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
   },
 }
 
-// What a calendar feed's events are, in the order the form that adds one gives them.
-export const FEED_KIND_LABELS: Record<Schema<'FeedKind'>, string> = { occupation: 'occupations', 'quiet-time': 'silence' }
-
 // What an app that's allowed a scope can do, as the page where admins allow it says it, in plain words (see
 // docs/design/server/oauth.md): a sentence, then what's left out of it, listed under it. For `admin`, that's what the MCP
 // server's tools leave out, in the same order (see "Tools" in docs/design/server/mcp.md).
@@ -69,7 +66,7 @@ export const SCOPE_DESCRIPTIONS: Record<string, { text: string; except: string[]
       "choisir les destinataires de l'envoi des candidatures par e-mail",
       'changer la connexion SoundCloud',
       'changer la connexion YouTube',
-      'ajouter ou retirer les calendriers externes',
+      'ajouter, modifier ou retirer les calendriers externes',
       'voir ou changer les features de la page Configuration',
       'voir, ajouter ou remplacer les photos et les flyers',
     ],

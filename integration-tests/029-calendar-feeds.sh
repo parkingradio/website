@@ -6,7 +6,8 @@
 # - there are none until one is added
 # - a link that isn't https or webcal, or fields the endpoint doesn't take, are refused before the link is read
 # - a link whose server can't be found fails with 502
-# - a feed that's in the database is listed, without its link, and can be removed
+# - a feed that's in the database is listed, with its link, and can be renamed and have its titles made private without
+#   being read, but a new link whose server can't be found fails with 502, without changing it; and it can be removed
 # - the links are never logged
 # - in the image, the server's module that goes through a feed's text (calendar/parse.js) starts its process, gets its
 #   events back, and fails a feed that ical.js would go through without end, when its time is up, or it runs out of
@@ -23,7 +24,9 @@ echo "  the endpoints require a session"
 request "$URL"
 expect_status 401
 request --request POST --header 'Content-Type: application/json' \
-    --data "{\"name\":\"x\",\"kind\":\"occupation\",\"link\":\"https://calendar.invalid/${SECRET}\"}" "$URL"
+    --data "{\"name\":\"x\",\"privateTitles\":false,\"link\":\"https://calendar.invalid/${SECRET}\"}" "$URL"
+expect_status 401
+request --request PATCH --header 'Content-Type: application/json' --data '{"name":"x"}' "${URL}/00000000-0000-4000-8000-000000000000"
 expect_status 401
 request --request DELETE "${URL}/00000000-0000-4000-8000-000000000000"
 expect_status 401
@@ -37,37 +40,60 @@ add() {
     request --header "Cookie: ${cookie}" --request POST --header 'Content-Type: application/json' --data "$1" "$URL"
 }
 
+# change <id> <body> -- change a feed, as the admin.
+change() {
+    request --header "Cookie: ${cookie}" --request PATCH --header 'Content-Type: application/json' --data "$2" "${URL}/$1"
+}
+
 echo "  there are none until one is added"
 request --header "Cookie: ${cookie}" "$URL"
 expect_status 200
 expect_body_contains '{"ok":true,"total":0,"feeds":[]}'
 
 echo "  a link that isn't https or webcal, or a field it doesn't take, is refused before it's read"
-add "{\"name\":\"Team\",\"kind\":\"occupation\",\"link\":\"http://example.com/${SECRET}.ics\"}"
+add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"http://example.com/${SECRET}.ics\"}"
 expect_status 400
 expect_body_contains 'The link must be an https or webcal link'
-add "{\"name\":\"Team\",\"kind\":\"occupation\",\"link\":\"https://example.com/${SECRET}.ics\",\"url\":\"x\"}"
+add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"https://example.com/${SECRET}.ics\",\"url\":\"x\"}"
 expect_status 400
 expect_body_contains 'Unknown field: `url`'
 
 echo "  a link whose server can't be found fails with 502, and isn't added"
-add "{\"name\":\"Team\",\"kind\":\"occupation\",\"link\":\"webcal://calendar.invalid/${SECRET}.ics\"}"
+add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"webcal://calendar.invalid/${SECRET}.ics\"}"
 expect_status 502
 expect_body_contains "The link can't be read"
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains '"total":0'
 
-echo "  a feed is listed without its link, and can be removed, once"
-sql "insert into calendar_feeds (id, name, kind, link, created_by)
-     values ('6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f', 'Séjours', 'quiet-time', 'https://calendar.invalid/${SECRET}-stays.ics', '${ADMIN_EMAIL}')"
+echo "  a feed is listed with its link, can be changed, and removed, once"
+readonly FEED='6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f'
+sql "insert into calendar_feeds (id, name, link, private_titles, created_by)
+     values ('${FEED}', 'Séjours', 'https://calendar.invalid/${SECRET}-stays.ics', false, '${ADMIN_EMAIL}')"
 request --header "Cookie: ${cookie}" "$URL"
 expect_status 200
 expect_body_contains '"total":1'
-expect_body_contains '"name":"Séjours","kind":"quiet-time"'
-if printf '%s' "$BODY" | grep -qF "$SECRET"; then fail "the list has a feed's link"; fi
-request --header "Cookie: ${cookie}" --request DELETE "${URL}/6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f"
+expect_body_contains "\"name\":\"Séjours\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"privateTitles\":false"
+change "$FEED" '{}'
+expect_status 400
+expect_body_contains 'There must be at least one field to change'
+change "$FEED" '{"kind":"quiet-time"}'
+expect_status 400
+expect_body_contains 'Unknown field: `kind`'
+change 00000000-0000-4000-8000-000000000000 '{"name":"x"}'
+expect_status 404
+# Its own link, as a webcal link, isn't read.
+change "$FEED" "{\"name\":\"Invités\",\"privateTitles\":true,\"link\":\"webcal://calendar.invalid/${SECRET}-stays.ics\"}"
 expect_status 200
-request --header "Cookie: ${cookie}" --request DELETE "${URL}/6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f"
+expect_body_contains "\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"privateTitles\":true"
+expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
+change "$FEED" "{\"name\":\"Other\",\"link\":\"https://calendar.invalid/${SECRET}-other.ics\"}"
+expect_status 502
+expect_body_contains "The link can't be read"
+request --header "Cookie: ${cookie}" "$URL"
+expect_body_contains "\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\""
+request --header "Cookie: ${cookie}" --request DELETE "${URL}/${FEED}"
+expect_status 200
+request --header "Cookie: ${cookie}" --request DELETE "${URL}/${FEED}"
 expect_status 404
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains '"total":0'
@@ -83,7 +109,7 @@ parse() {
         import { parseFeed } from '/app/server/dist/calendar/parse.js'
         const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20200101T100000Z',
           'DTEND:20200101T110000Z', 'RRULE:$1', 'END:VEVENT', 'END:VCALENDAR', ''].join('\\r\\n')
-        parseFeed({ text, kind: 'occupation', from: new Date('2019-01-01'), to: new Date('2021-01-01') }, $2)
+        parseFeed({ text, privateTitles: false, from: new Date('2019-01-01'), to: new Date('2021-01-01') }, $2)
           .then(({ events }) => console.log('events:', events.length), (error) => console.log(error.message))"
 }
 # expect_parse <rule> <pattern> [<options>] -- expect going through the rule's feed to print something that matches.

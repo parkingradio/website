@@ -5,7 +5,7 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Envoi des candidatures par e-mail": who the applications artists send are emailed to.
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
-- "Calendriers externes": the calendars that the studio's occupations and quiet time are read from.
+- "Calendriers externes": the calendars that the studio's occupations are read from.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -49,22 +49,31 @@ it only allows once they've been verified, each with a check mark like the Sound
 
 ## Calendriers externes
 
-The calendar feeds that the studio's occupations and quiet time are read from (see [Calendar](../../server/calendar.md)).
-It says what each kind is: occupations ("occupations") are anything else that takes the studio, e.g. from the team's
-Google Calendar, whose link is its "adresse secrète au format iCal", in its settings, and quiet time ("silence") is when
-guests stay at the studio, from a private calendar of their stays. It says that the server reads the calendars every 15
-minutes, and that their links are secret, so they're never shown again once they're added.
+The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
+what takes the studio outside sessions is read from these calendars, in iCal, each occupation known by its calendar's
+name, e.g. from the team's Google Calendar, whose link is its "adresse secrète au format iCal", in its settings. It says
+that the server reads them every 15 minutes, that their links are secret, since anyone who has one can read its
+calendar, and are never given to connected apps, and what private titles ("titres privés") are: the server never keeps
+the titles, descriptions or locations of the calendar's events, e.g. for a calendar of guests' stays, which can have
+their names, so that its occupations are only known by its name.
 
-It lists the feeds, in the order they were added, each with its name, its kind, which admin added it, and when, and when
-it was last read, or that it hasn't been read yet, and, when its last read failed, why. Each one is removed with
-"retirer", once the admin confirms. While there are none, it says so.
+It lists the feeds, in the order they were added, each with its name, "titres privés" when its titles are private, its
+link, as text rather than as a link, which admin added it, and when, and when it was last read, or that it hasn't been
+read yet, and, when its last read failed, why. Each one is removed with "retirer", once the admin confirms, and changed
+with "modifier". While there are none, it says so.
 
-Under that, a form adds a feed: its name ("Nom"), its kind ("Type", "occupations" or "silence") and its link ("Lien"),
-whose field shows dots, like the other secrets of the page. "ajouter" adds it, once all three are filled in: the server
-reads the link first, which can take up to 30 seconds, plus up to 10 seconds for each other calendar the server goes
-through first (see [Reading the feeds](../../server/calendar.md#reading-the-feeds)), during which "ajouter" can't be
-used again. Once it's added, the form is cleared, and the list shows it. When it can't be added, the form says why, e.g.
-that another feed has that link, naming it.
+"modifier" replaces the feed's details with a form, filled in with them: its name ("Nom"), its link ("Lien") and a
+checkbox, "Titres privés". "enregistrer" saves them, once the name and the link are filled in: when the link changed, the
+server reads it first, which takes as long as when a feed is added (see below), during which "enregistrer" can't be used
+again. Once it's saved, the form closes, and the feed shows its new details. "annuler" closes the form without saving.
+When it can't be saved, the form says why, e.g. that another feed has that link, naming it.
+
+Under the list, a form adds a feed: its name ("Nom"), its link ("Lien") and "Titres privés", which is checked to start
+with. "ajouter" adds it, once the name and the link are filled in: the server reads the link first, which can take up
+to 30 seconds, plus up to 10 seconds for each other calendar the server goes through first (see
+[Reading the feeds](../../server/calendar.md#reading-the-feeds)), during which "ajouter" can't be used again. Once it's
+added, the form is cleared, and the list shows it. When it can't be added, the form says why, e.g. that another feed has
+that link, naming it.
 
 ## Features
 
@@ -82,6 +91,6 @@ retired flag is removed too.
   `PUT /api/admin/radio/credentials`, for "Connexion SoundCloud".
 - `GET /api/admin/video/credentials`, `POST /api/admin/video/credentials/check` and
   `PUT /api/admin/video/credentials`, for "Connexion YouTube".
-- `GET /api/admin/calendar/feeds`, `POST /api/admin/calendar/feeds` and `DELETE /api/admin/calendar/feeds/:id`, for
-  "Calendriers externes".
+- `GET /api/admin/calendar/feeds`, `POST /api/admin/calendar/feeds`, `PATCH /api/admin/calendar/feeds/:id` and
+  `DELETE /api/admin/calendar/feeds/:id`, for "Calendriers externes".
 - `GET /api/admin/features` and `PUT /api/admin/features/:id`, for "Features".

@@ -1,6 +1,5 @@
 import { fork } from 'node:child_process'
 import type { CalendarEvent } from './events.js'
-import type { FeedKind } from './fields.js'
 import { FeedReadError, ReadAborted, refused } from './fetch.js'
 
 // Going through a feed's text for its events, in a process of its own, within a time and a memory limit (see "Reading
@@ -14,7 +13,7 @@ export const PARSE_TIMEOUT_MS = 10_000
 // through, needs under 128 MB. The process takes more memory than that in all.
 export const PARSE_MAX_MEMORY_MB = 192
 
-export type ToParse = { text: string; kind: FeedKind; from: Date; to: Date }
+export type ToParse = { text: string; privateTitles: boolean; from: Date; to: Date }
 // What the process sends back: the events, or why the read fails, or the type of an error it didn't expect.
 export type ParseResult = { read: { events: CalendarEvent[]; skipped: number } } | { failed: { status: 400 | 502; message: string } } | { unexpected: string }
 
@@ -31,7 +30,7 @@ type Read = { events: CalendarEvent[]; skipped: number }
 // that there's never more than one process next to the server, with its memory.
 let queue: Promise<void> = Promise.resolve()
 
-// The events of a feed that has `kind`, from its text, that take some of the time from `from` to `to`, as calendarEvents
+// The events of a feed, from its text, that take some of the time from `from` to `to`, as calendarEvents
 // gives them, once the feeds before it were gone through. Throws a FeedReadError when the text isn't a calendar, has too
 // many events and occurrences, or takes more than PARSE_TIMEOUT_MS, or too much memory, to go through, or a ReadAborted
 // as soon as `signal` aborts, even while it waits its turn. `timeoutMs` and `maxMemoryMb` are only for tests.
