@@ -22,16 +22,7 @@ export function CalendarFeeds() {
     <>
       <p>
         Ce qui occupe le studio en dehors des sessions est lu dans des calendriers externes, au format iCal, chaque occupation
-        sous le nom de son calendrier. Par exemple, le lien du Google Agenda de l'équipe est son «&nbsp;adresse secrète au
-        format iCal&nbsp;», dans ses paramètres.
-      </p>
-      <p>
-        Le serveur lit ces calendriers toutes les 15 minutes. Leurs liens sont secrets, puisque quiconque a le lien d'un
-        calendrier peut le lire&nbsp;: ils ne sont jamais donnés aux applications connectées.
-      </p>
-      <p>
-        Avec <b>titres privés</b>, le serveur ne garde jamais les titres des événements du calendrier, qui n'apparaissent
-        que sous son nom&nbsp;: par exemple pour un calendrier des séjours d'invités, qui peut donner leurs noms.
+        sous le nom de son calendrier. Le serveur lit ces calendriers toutes les 15 minutes.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -136,7 +127,7 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
     <li>
       <p>
         <b>{feed.name}</b>
-        {feed.privateTitles && ' (titres privés)'}{' '}
+        {feed.privateTitles && ' (titres masqués)'}{' '}
         <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}
@@ -219,7 +210,7 @@ function FeedForm({
         <div className="admin-choices">
           <label>
             <input type="checkbox" checked={privateTitles} onChange={(event) => setPrivateTitles(event.target.checked)} />
-            Titres privés
+            Masquer les titres
           </label>
         </div>
         <div className="admin-row">

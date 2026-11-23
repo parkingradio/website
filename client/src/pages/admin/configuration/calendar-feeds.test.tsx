@@ -33,7 +33,7 @@ const items = () => screen.queryAllByRole('listitem').filter((item) => item.clos
 const addForm = () => screen.getByRole('button', { name: 'ajouter' }).closest('form')!
 const nameField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Nom' })
 const linkField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Lien' })
-const privateTitlesBox = (form = addForm()) => within(form).getByRole('checkbox', { name: 'Titres privés' })
+const privateTitlesBox = (form = addForm()) => within(form).getByRole('checkbox', { name: 'Masquer les titres' })
 const addButton = () => screen.getByRole('button', { name: 'ajouter' })
 
 function fill() {
@@ -64,7 +64,7 @@ describe('The calendar feeds', () => {
     expect(within(team).queryByRole('link')).toBeNull()
     expect(within(team).getByText(/^Ajouté par admin@example.com le 7 novembre 2026/)).toHaveTextContent(/Lu le 22 novembre 2026 à 12 h 15\.$/)
     expect(team).not.toHaveTextContent('a échoué')
-    expect(stays).toHaveTextContent('Séjours (titres privés)')
+    expect(stays).toHaveTextContent('Séjours (titres masqués)')
     expect(stays).toHaveTextContent('https://example.com/stays.ics')
     expect(stays).toHaveTextContent('Pas encore lu.')
     expect(within(stays).getByText(/^La dernière lecture a échoué/)).toHaveTextContent("La dernière lecture a échoué : The link can't be read: its server fails (503)")
@@ -139,7 +139,7 @@ describe('The calendar feeds', () => {
 
     await waitFor(() => expect(within(items()[0]).queryByRole('button', { name: 'enregistrer' })).toBeNull())
     expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe', link: 'https://example.com/new.ics', privateTitles: true }])
-    expect(items()[0]).toHaveTextContent('Équipe (titres privés)')
+    expect(items()[0]).toHaveTextContent('Équipe (titres masqués)')
     expect(items()[0]).toHaveTextContent('https://example.com/new.ics')
     // The add form is as it was.
     expect(nameField()).toHaveValue('')

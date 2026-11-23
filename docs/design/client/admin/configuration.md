@@ -50,32 +50,24 @@ it only allows once they've been verified, each with a check mark like the Sound
 ## Calendriers externes
 
 The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
-what takes the studio outside sessions is read from these calendars, in iCal, each occupation known by its calendar's
-name, e.g. from the team's Google Calendar, whose link is its "adresse secrète au format iCal", in its settings. It says
-that the server reads them every 15 minutes, that their links are secret, since anyone who has one can read its
-calendar, and are never given to connected apps, and what private titles ("titres privés") are: the server never keeps
-the titles of the calendar's events, e.g. for a calendar of guests' stays, which can have their names, so that its
-occupations are only known by its name.
+what takes the studio outside sessions is read from these calendars, each occupation under its calendar's name, and
+that the server reads them every 15 minutes.
 
-It lists the feeds, in the order they were added, each with its name, "titres privés" when its titles are private, its
-link, as text rather than as a link, which admin added it, and when, and when it was last read, or that it hasn't been
-read yet, and, when its last read failed, why. Each one is removed with "retirer", once the admin confirms, and changed
-with "modifier". While there are none, it says so.
+It lists the feeds, in the order they were added, each with its name, "titres masqués" when its titles are private, its
+link, as text, which admin added it and when, when it was last read, or that it hasn't been read yet, and why its last
+read failed, if it did. While there are none, it says so. "retirer" removes a feed, once the admin confirms.
 
-"modifier" replaces the feed's details with a form, filled in with them: its name ("Nom"), which gets the focus, its
-link ("Lien") and a checkbox, "Titres privés". "enregistrer" saves what was changed, and only that, so that a form
-opened before another admin changed the feed doesn't undo their changes, once the name and the link are filled in: when
-the link changed, the server reads it first, which takes as long as when a feed is added (see below), during which
-"enregistrer" can't be used again. Once it's saved, or when nothing was changed, the form closes, and the feed shows its
-details as they are then. "annuler" closes the form without saving. Once the form closes, the focus goes back to the
-feed's "modifier". When it can't be saved, the form says why, e.g. that another feed has that link, naming it.
+"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, "Lien" and "Masquer les titres"
+(`privateTitles`). "enregistrer" saves only what was changed, so that a form opened before another admin's change
+doesn't undo it, and closes the form; "annuler" closes it without saving. Either way, the focus goes back to "modifier".
 
-Under the list, a form adds a feed: its name ("Nom"), its link ("Lien") and "Titres privés", which is checked to start
-with. "ajouter" adds it, once the name and the link are filled in: the server reads the link first, which can take up
-to 30 seconds, plus up to 10 seconds for each other calendar the server goes through first (see
-[Reading the feeds](../../server/calendar.md#reading-the-feeds)), during which "ajouter" can't be used again. Once it's
-added, the form is cleared, and the list shows it. When it can't be added, the form says why, e.g. that another feed has
-that link, naming it.
+Under the list, a form adds a feed, with the same fields, "Masquer les titres" checked to start with. "ajouter" adds it,
+and clears the form.
+
+"enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first, which can take up
+to 30 seconds, or longer while it goes through other calendars (see
+[Reading the feeds](../../server/calendar.md#reading-the-feeds)), and the button can't be used meanwhile. When the feed
+can't be saved, the form says why, e.g. that another feed has that link, naming it.
 
 ## Features
 
