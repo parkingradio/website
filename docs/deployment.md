@@ -216,6 +216,24 @@ read as in [Database migrations](#database-migrations), says:
   - `Failed to make the sizes of a photo or flyer`, for any other reason, e.g. the bucket's. It's tried again the next
     time the server starts.
 
+## Discord
+
+The server reaches Parking Radio's Discord server through a Discord bot of its own (see
+[Chat](design/server/chat.md)), whose token and channel are entered on the admin pages (see
+[Configuration](design/client/admin/configuration.md#chat)). Each deployment has its own bot, and test deployments
+reach a channel of their own, e.g. on a test server, rather than Parking Radio's #chat. To create a bot:
+
+1. On Discord's developer portal (`https://discord.com/developers/applications`), create an application, e.g.
+   "parking.chat (test)". Under "Installation", set "Install Link" to "None". Under "Bot", turn off "Public Bot", so
+   that only its owner can add it to a server, and turn on the Message Content intent, which lets it read messages'
+   text. "Reset Token" shows its token, once.
+2. Under "OAuth2", generate a link with the `bot` scope and no permissions, so that the bot only gets permissions on its
+   channel (step 3), not on the whole server. Open it, and add the bot to the server.
+3. In the channel's permissions, give the bot "View Channel", "Read Message History" and "Manage Webhooks", in that
+   channel only.
+4. Get the channel's id: with Discord open in a browser, it's the second number in the channel's address,
+   `https://discord.com/channels/<server id>/<channel id>`. Enter it with the token on the admin pages.
+
 ## Email
 
 The app sends emails as `noreply@<domain>` (e.g. admin invites) through SES. Terraform verifies the domain as an SES

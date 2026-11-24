@@ -60,8 +60,11 @@ export function CredentialsForm<Saved>({ saved: loaded, savedId, labels, service
     setBusy(true)
     const result = await check(typed)
     setBusy(false)
-    if (result.ok) setVerified(typed)
-    else setOutcome({ ok: false, error: `Les identifiants n'ont pas pu être vérifiés : ${result.error}` })
+    // Once they're verified, why they couldn't be before, e.g. until they were fixed on the service, no longer shows.
+    if (result.ok) {
+      setVerified(typed)
+      setOutcome(null)
+    } else setOutcome({ ok: false, error: `Les identifiants n'ont pas pu être vérifiés : ${result.error}` })
   }
 
   const submit = async (event: FormEvent) => {

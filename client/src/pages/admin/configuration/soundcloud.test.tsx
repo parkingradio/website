@@ -158,6 +158,24 @@ describe('The SoundCloud app', () => {
     expect(screen.getByText(/^Changés par admin@example.com le 7 octobre 2026/)).toBeInTheDocument()
   })
 
+  it('no longer says why the credentials could not be verified once they are, e.g. after fixing them on the service', async () => {
+    mockFetch({ ...NONE, [`POST ${CHECK_URL}`]: { ok: false, error: 'SoundCloud refused these credentials' } })
+    render(<SoundCloudCredentials />)
+
+    await waitFor(() => expect(clientId()).toBeInTheDocument())
+    type('client-id', 'the-secret')
+    fireEvent.click(verifyButton())
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('SoundCloud refused these credentials'))
+
+    // The same credentials, verified again.
+    mockFetch({ ...NONE, ...ACCEPTED })
+    fireEvent.click(verifyButton())
+
+    await waitFor(() => expect(verified()).toHaveTextContent('✓'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(saveButton()).toBeEnabled()
+  })
+
   it('says why verified credentials could not be saved', async () => {
     mockFetch({ ...NONE, ...ACCEPTED, [`PUT ${URL}`]: { ok: false, error: 'The credentials cannot be checked with SoundCloud' } })
     render(<SoundCloudCredentials />)

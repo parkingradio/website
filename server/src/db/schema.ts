@@ -103,6 +103,23 @@ export const youtubeCredentials = pgTable(
   (table) => [check('youtube_credentials_single_row', sql`${table.id} = 1`)],
 )
 
+// The token of the Discord bot the server reaches the chat through, and the channel it reaches, as entered on the admin
+// pages. There is only ever one row, and none until they've been entered.
+export const discordCredentials = pgTable(
+  'discord_credentials',
+  {
+    id: smallint('id').primaryKey().default(1),
+    botToken: text('bot_token').notNull(),
+    channelId: text('channel_id').notNull(),
+    // The bot's and the channel's names on Discord, as they were when the credentials were checked.
+    botName: text('bot_name').notNull(),
+    channelName: text('channel_name').notNull(),
+    updatedBy: text('updated_by').notNull(), // the email of the admin who last changed them
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [check('discord_credentials_single_row', sql`${table.id} = 1`)],
+)
+
 // Artists. Two of them can't have the same email address, whatever its case. See the profile's schemas in
 // artists/profile.ts for what each field may contain. Admins can leave out the country, city, genres, bio, links and
 // phone, which are then empty, and the email, which is then null.

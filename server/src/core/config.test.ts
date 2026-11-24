@@ -95,6 +95,17 @@ describe('config', () => {
     })
   })
 
+  describe('chatStandIn', () => {
+    it('is on only when CHAT_STAND_IN is true', () => {
+      process.env.CHAT_STAND_IN = 'true'
+      expect(config.chatStandIn).toBe(true)
+      process.env.CHAT_STAND_IN = 'false'
+      expect(config.chatStandIn).toBe(false)
+      delete process.env.CHAT_STAND_IN
+      expect(config.chatStandIn).toBe(false)
+    })
+  })
+
   describe('siteOrigin', () => {
     it('is the deployment when MAIL_DOMAIN is set', () => {
       process.env.MAIL_DOMAIN = 'parking.example.test'

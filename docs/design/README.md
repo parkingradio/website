@@ -45,6 +45,7 @@ design: when they disagree, these documents still win.
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |
 | [RA events](server/ra-events.md) | Parking Radio's events, read from Resident Advisor |
+| [Chat](server/chat.md) | The chat of Parking Radio's Discord server, and the Discord bot the server reaches it through |
 | [Features](server/features.md) | Feature flags |
 
 ## Client

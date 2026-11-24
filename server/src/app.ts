@@ -16,6 +16,9 @@ import type { CalendarFeedsStore } from './calendar/feeds.js'
 import type { CalendarReads } from './calendar/reads.js'
 import { adminCalendarRoutes } from './calendar/calendar-routes.js'
 import { calendarFeedsRoutes } from './calendar/feeds-routes.js'
+import type { DiscordCredentialsStore } from './chat/credentials.js'
+import type { Discord } from './chat/discord.js'
+import { chatRoutes } from './chat/routes.js'
 import { collectivesRoutes } from './collectives/routes.js'
 import type { CollectivesStore } from './collectives/store.js'
 import type { SendEmail } from './core/email.js'
@@ -78,6 +81,9 @@ export type Dependencies = {
   calendarFeeds: CalendarFeedsStore
   // What was read from the calendar feeds.
   calendarReads: CalendarReads
+  // Discord, or its stand-in (see chat/stand-in.ts).
+  discord: Discord
+  discordCredentials: DiscordCredentialsStore
   oauth: OAuthStore
 }
 
@@ -113,6 +119,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })
   await app.register(adminCalendarRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads, sessions: deps.sessions })
+  await app.register(chatRoutes, { discord: deps.discord, credentials: deps.discordCredentials })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.
   await app.register(oauthRoutes, { store: deps.oauth, issuer: deps.siteOrigin })

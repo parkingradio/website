@@ -83,6 +83,13 @@ A few artists and collectives apply through the "Appliquer" form, which needs Cl
 Turnstile test keys from `.env.example`. It refuses to seed when `MAIL_DOMAIN` is set, since the server would then send
 emails.
 
+### The chat
+
+`CHAT_STAND_IN`, which `.env.example` sets, has the server use a stand-in for Discord, so that nothing reaches it: it
+accepts any Discord credentials in the right format on the Configuration page, and gives them made-up names. The
+integration and browser tests use it too. To check credentials with Discord itself, e.g. with a bot on a test server of
+your own, remove it from `.env` (see "Discord" in [docs/deployment.md](docs/deployment.md#discord)).
+
 ### Several checkouts
 
 To run several checkouts (e.g. git worktrees) side by side, give each one its own ports in its `.env`:

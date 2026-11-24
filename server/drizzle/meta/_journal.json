@@ -141,6 +141,13 @@
       "when": 1795540964988,
       "tag": "0019_calendar_feeds_without_private_titles",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795552253803,
+      "tag": "0020_discord_credentials",
+      "breakpoints": true
     }
   ]
 }

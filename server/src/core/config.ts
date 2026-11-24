@@ -74,4 +74,9 @@ export const config = {
   get turnstileSecretKey() {
     return required('TURNSTILE_SECRET_KEY')
   },
+  // Whether the server uses a stand-in for Discord, so that nothing reaches it, e.g. in development and in tests (see "The
+  // chat" in the README): when CHAT_STAND_IN is `true`.
+  get chatStandIn() {
+    return process.env.CHAT_STAND_IN === 'true'
+  },
 }
