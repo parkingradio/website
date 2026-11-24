@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import App from '../../app'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { held, mockFetch, requestsTo, visibleText as shownText } from '../../test-utils'
+import { held, mockFetch, requestsTo, shownTime, timeParts, typeTime, visibleText as shownText } from '../../test-utils'
 import type { Calendar, ConflictThing } from './calendrier/model'
 
 // Today is Thursday, November 19, 2026, in Québec.
@@ -443,7 +443,8 @@ describe('Calendrier', () => {
   describe('a new session', () => {
     // What it sent to add the session.
     const sentSession = () => JSON.parse((requestsTo('POST', '/api/admin/sessions')[0].body as FormData).get('session') as string)
-    const time = (label: 'Début' | 'Fin', value: string) => fireEvent.change(within(newSession()!).getByLabelText(label), { target: { value } })
+    const timeField = (label: 'Début' | 'Fin') => within(newSession()!).getByRole('group', { name: label })
+    const time = (label: 'Début' | 'Fin', value: string) => typeTime(timeField(label), value)
     const create = () => fireEvent.click(within(newSession()!).getByRole('button', { name: 'créer' }))
 
     it('is added from the "+" of each day from today on, named by its day', async () => {
@@ -495,12 +496,12 @@ describe('Calendrier', () => {
       fireEvent.click(addButton('2026-11-22'))
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-22')
       expect(document.activeElement).toBe(within(newSession()!).getByRole('heading', { name: 'Nouvelle session' }))
-      expect(within(newSession()!).getByLabelText('Début')).toHaveValue('21:00')
+      expect(shownTime(timeField('Début'))).toBe('21 h 00')
 
       // Another day's "+" opens it there, empty.
       fireEvent.click(addButton('2026-11-25'))
       expect(chosenDay()).toHaveAccessibleName('mercredi 25 novembre 2026')
-      expect(within(newSession()!).getByLabelText('Début')).toHaveValue('')
+      expect(shownTime(timeField('Début'))).toBe('–– h ––')
 
       // "annuler" closes it, and puts the focus back on the "+".
       fireEvent.click(within(newSession()!).getByRole('button', { name: 'annuler' }))
@@ -538,7 +539,8 @@ describe('Calendrier', () => {
       expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()
       expect(within(form).getByText("Indiquez l'heure de fin.")).toBeInTheDocument()
       expect(within(form).getByText('Choisissez le type de la session.')).toBeInTheDocument()
-      await waitFor(() => expect(document.activeElement).toBe(within(form).getByLabelText('Début')))
+      // Its hour.
+      await waitFor(() => expect(document.activeElement).toBe(timeParts(timeField('Début'))[0]))
 
       // The end the next day, when it's before the start, but not at the start.
       time('Début', '21:00')
@@ -562,6 +564,42 @@ describe('Calendrier', () => {
       expect(within(form).getByLabelText('Nom')).toHaveAttribute('placeholder', 'p. ex. LISTENING PARTY')
       expect(within(form).getByText('Indiquez le nom de la session.')).toBeInTheDocument()
       expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(0)
+    })
+
+    it('takes times in the 24-hour format, which have no time while their hour or their minute is empty, and is sent with Enter', async () => {
+      mockFetch({ ...LOGGED_IN, ...COLLECTIVES, [NOVEMBER]: CALENDAR, 'POST /api/admin/sessions': { ok: false, error: 'Internal Server Error' } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(addButton('2026-11-25'))
+      const form = newSession()!
+
+      // Going from a time's hour to its minute isn't leaving it.
+      act(() => timeParts(timeField('Début'))[0].focus())
+      act(() => timeParts(timeField('Début'))[1].focus())
+      expect(within(form).queryByText("Indiquez l'heure de début.")).not.toBeInTheDocument()
+      act(() => timeParts(timeField('Fin'))[0].focus())
+      expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()
+
+      time('Début', '21:00')
+      time('Fin', '23:00')
+      expect(shownTime(timeField('Début'))).toBe('21 h 00')
+      expect(within(form).getByText('Dure 2 h.')).toBeInTheDocument()
+      // Emptying only the start's minute leaves its hour, but no time.
+      const [, minute] = timeParts(timeField('Début'))
+      act(() => minute.focus())
+      fireEvent.keyDown(minute, { key: 'Backspace' })
+      expect(shownTime(timeField('Début'))).toBe('21 h ––')
+      expect(within(form).queryByText(/^Dure/)).not.toBeInTheDocument()
+      expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()
+      // The same time again.
+      time('Début', '21:00')
+      expect(within(form).queryByText("Indiquez l'heure de début.")).not.toBeInTheDocument()
+      expect(within(form).getByText('Dure 2 h.')).toBeInTheDocument()
+
+      // Enter in a time sends the form.
+      fireEvent.click(within(form).getByRole('radio', { name: 'Guest mixes' }))
+      fireEvent.keyDown(minute, { key: 'Enter' })
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/sessions')).toHaveLength(1))
     })
 
     it('adds the session, without sets, and with its other fields empty, then shows it on its day, still chosen', async () => {

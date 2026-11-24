@@ -4,10 +4,10 @@ The site is a single-page application: changing to another page does not require
 opens at its top, except when going back or forward in the browser's history, or when the page says otherwise (see
 [From an application](admin/sessions.md#from-an-application)).
 
-The site declares French as its language. Times of day are shown and entered in the 24-hour format, e.g. "21 h 30": the
-time fields are the browser's own, which follow the page's language in the browsers that format them by it. Pages'
-paths are in French, like everything visitors and admins read, while their query parameters, and the values in them,
-are in English, [like the API's](../server/README.md#conventions).
+The site declares French as its language. Times of day are shown and entered in the 24-hour format, e.g. "21 h 30",
+whatever the browser or its settings: a time field takes the hour and the minute, typed, and has no time while either is
+empty. Pages' paths are in French, like everything visitors and admins read, while their query parameters, and the
+values in them, are in English, [like the API's](../server/README.md#conventions).
 
 ## Navigation bar
 

@@ -3,7 +3,7 @@ import { api, formData } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
 import { useCheckedForm } from '../checked-form'
 import { formatDuration } from '../describe'
-import { FormActions, Labeled } from '../fields'
+import { FieldError, FormActions, TimeInput } from '../fields'
 import { CollectivesFailure } from '../profile-details'
 import type { Session } from '../../../session-fields'
 import { failure } from '../session-errors'
@@ -53,24 +53,14 @@ export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSes
       </h3>
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
       <div className="admin-row admin-times">
-        <Labeled label="Début" error={startError}>
-          <input
-            type="time"
-            value={values.start}
-            aria-invalid={startError ? true : undefined}
-            onChange={(event) => update({ start: event.target.value })}
-            onBlur={leave('start', 'day')}
-          />
-        </Labeled>
-        <Labeled label="Fin" error={endError}>
-          <input
-            type="time"
-            value={values.end}
-            aria-invalid={endError ? true : undefined}
-            onChange={(event) => update({ end: event.target.value })}
-            onBlur={leave('end', 'endDay')}
-          />
-        </Labeled>
+        <div className="admin-field">
+          <TimeInput label="Début" value={values.start} invalid={!!startError} onChange={(start) => update({ start })} onBlur={leave('start', 'day')} />
+          <FieldError message={startError} />
+        </div>
+        <div className="admin-field">
+          <TimeInput label="Fin" value={values.end} invalid={!!endError} onChange={(end) => update({ end })} onBlur={leave('end', 'endDay')} />
+          <FieldError message={endError} />
+        </div>
       </div>
       {checked.durationMinutes !== null && (
         <p className="admin-hint" role="status">

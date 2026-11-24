@@ -1,4 +1,4 @@
-import { act, fireEvent } from '@testing-library/react'
+import { act, fireEvent, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { AppConfig, ConfigState } from './config-context'
 
@@ -147,3 +147,16 @@ export async function moveWithKeyboard(handle: HTMLElement, by: number, { cancel
     laidOut.mockRestore()
   }
 }
+
+/** A time field's parts (see `TimeInput` in pages/admin/fields.tsx), its hour then its minute, `field` being its group. */
+export const timeParts = (field: HTMLElement) => within(field).getAllByRole('spinbutton')
+
+/** Types `time`, e.g. "21:00", into a time field, `field` being its group: its hour, then its minute, a digit at a time. */
+export function typeTime(field: HTMLElement, time: string) {
+  act(() => timeParts(field)[0].focus())
+  // The focus moves on to the minute once the hour can't take another digit.
+  for (const digit of time.replace(':', '')) fireEvent(document.activeElement!, new InputEvent('beforeinput', { data: digit, inputType: 'insertText', bubbles: true, cancelable: true }))
+}
+
+/** What a time field shows, e.g. "21 h 00", or "–– h ––" when it's empty, `field` being its group, without its bidi marks. */
+export const shownTime = (field: HTMLElement) => field.textContent!.replace(/[\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim()

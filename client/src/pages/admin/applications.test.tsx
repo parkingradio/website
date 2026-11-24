@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from '../../application-fields'
@@ -6,7 +6,7 @@ import App from '../../app'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, requestsTo, timeParts, typeTime } from '../../test-utils'
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
@@ -1003,20 +1003,22 @@ describe('An application’s page', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'modifier' }))
     fireEvent.click(screen.getByRole('button', { name: 'ajouter une plage horaire' }))
-    const start = screen.getByLabelText('Début de la plage 2')
-    const end = screen.getByLabelText('Fin de la plage 2')
-    fireEvent.change(start, { target: { value: '23:00' } })
+    const start = screen.getByRole('group', { name: 'Début de la plage 2' })
+    const end = screen.getByRole('group', { name: 'Fin de la plage 2' })
+    // A time's hour, the first of its parts, which say whether it's invalid.
+    const hour = (time: HTMLElement) => timeParts(time)[0]
+    typeTime(start, '23:00')
     // Going from the start to the end of the slot isn't leaving the time slots.
-    fireEvent.blur(start, { relatedTarget: end })
+    act(() => hour(end).focus())
     expect(screen.queryByText('Une des plages horaires est invalide.')).not.toBeInTheDocument()
-    fireEvent.change(end, { target: { value: '21:00' } })
-    fireEvent.blur(end)
+    typeTime(end, '21:00')
+    act(() => (document.activeElement as HTMLElement).blur())
     expect(screen.getByText('Une des plages horaires est invalide.')).toBeInTheDocument()
-    expect(start).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('Début de la plage 1')).not.toHaveAttribute('aria-invalid')
+    expect(hour(start)).toHaveAttribute('aria-invalid', 'true')
+    expect(hour(screen.getByRole('group', { name: 'Début de la plage 1' }))).not.toHaveAttribute('aria-invalid')
 
     fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(start).toHaveFocus())
+    await waitFor(() => expect(hour(start)).toHaveFocus())
     expect(requestsTo('PATCH', '/api/admin/applications/application-1')).toHaveLength(0)
   })
 

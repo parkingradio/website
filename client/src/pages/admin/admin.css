@@ -179,7 +179,8 @@
   margin-top: 1.5rem;
 }
 
-.admin-form label {
+.admin-form label,
+.admin-form .admin-time {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -190,6 +191,7 @@
 .admin-form input:not([type='radio'], [type='checkbox']),
 .admin-form select,
 .admin-form textarea,
+.admin-form .admin-time-input,
 .admin-search {
   padding: 0.5rem 0.6rem;
   border: 1px solid #000;
@@ -203,6 +205,7 @@
 .admin-form input:focus-visible,
 .admin-form select:focus-visible,
 .admin-form textarea:focus-visible,
+.admin-form .admin-time-input[data-focus-within],
 .admin-search:focus-visible,
 .admin-status-select:focus-visible {
   outline: 2px solid #000;
@@ -705,13 +708,48 @@ dl.admin-record {
   align-items: flex-start;
 }
 
-.admin-form .admin-times label {
+.admin-form .admin-times label,
+.admin-form .admin-times .admin-time {
   align-self: auto;
 }
 
 /* The hours and minutes of a duration. */
 .admin-form .admin-duration input {
   width: 5rem;
+}
+
+/* A day and a time, e.g. side by side, as tall as each other and as the text inputs, rather than the browsers' own heights
+   for date fields, which differ from one browser to another. */
+.admin-form input[type='date'],
+.admin-form .admin-time-input {
+  box-sizing: border-box;
+  height: 2.25rem;
+}
+
+/* A time of day's hour and minute, in a box like the other inputs', as wide for "1 h 00" as for "21 h 00". */
+.admin-form .admin-time-input {
+  display: flex;
+  align-items: center;
+  min-width: 6.5em;
+  font-variant-numeric: tabular-nums;
+  /* Its parts are laid out as blocks, which would lose the spaces around the "h" between the hour and the minute. */
+  white-space: pre;
+  cursor: text;
+}
+
+.admin-form .admin-time-input .react-aria-DateSegment {
+  padding: 0 1px;
+}
+
+.admin-form .admin-time-input .react-aria-DateSegment[data-placeholder] {
+  color: #666;
+}
+
+/* The part being typed, as text is when it's selected. */
+.admin-form .admin-time-input .react-aria-DateSegment:focus {
+  outline: none;
+  background: #000;
+  color: #fff;
 }
 
 /* A field, with what's wrong with it under it. */
@@ -728,13 +766,15 @@ dl.admin-record {
   font-size: 12px;
 }
 
-.admin-form [aria-invalid='true'] {
+.admin-form [aria-invalid='true'],
+.admin-form .admin-time-input[data-invalid] {
   border-color: #b3261e;
 }
 
 .admin-form input[aria-invalid='true'],
 .admin-form select[aria-invalid='true'],
-.admin-form textarea[aria-invalid='true'] {
+.admin-form textarea[aria-invalid='true'],
+.admin-form .admin-time-input[data-invalid] {
   outline: 1px solid #b3261e;
 }
 

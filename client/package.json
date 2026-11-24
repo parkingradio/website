@@ -15,10 +15,12 @@
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
+    "@internationalized/date": "^3.12.4",
     "fuse.js": "^7.5.0",
     "hls.js": "^1.7.3",
     "openapi-fetch": "^0.17.0",
     "react": "^19.2.8",
+    "react-aria-components": "^1.22.1",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.0"
   },
