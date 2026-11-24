@@ -168,7 +168,6 @@ describe('calendar feeds routes', () => {
       const valid = { name: 'New', link: 'https://example.com/new.ics' }
       const refused = [
         [{ ...valid, name: ' ' }, '`name`: The name must not be blank'],
-        [{ ...valid, privateTitles: true }, 'Unknown field: `privateTitles`'],
         [{ ...valid, kind: 'occupation' }, 'Unknown field: `kind`'],
         [{ ...valid, link: `http://example.com/${SECRET}` }, '`link`: The link must be an https or webcal link'],
         [{ ...valid, link: `https://user:${SECRET}@example.com/` }, "`link`: The link can't have a user name or a password"],
@@ -310,7 +309,6 @@ describe('calendar feeds routes', () => {
       const refused = [
         [{}, 'There must be at least one field to change'],
         [{ name: ' ' }, '`name`: The name must not be blank'],
-        [{ privateTitles: true }, 'Unknown field: `privateTitles`'],
         [{ link: `http://example.com/${SECRET}` }, '`link`: The link must be an https or webcal link'],
         [{ name: 'x', kind: 'occupation' }, 'Unknown field: `kind`'],
       ] as const

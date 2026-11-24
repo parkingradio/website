@@ -16,9 +16,8 @@ something else that tells them apart:
   [status colors](layout.md#status-colors), with "jouée" or "annulée" written. Past planned sessions keep their color, so
   that one that wasn't marked "jouée" stands out.
 - Occupations have a dashed border. An occupation is named by its title, then the name of its feed, its calendar, e.g.
-  « RÉPARATION », « Calendrier de l'équipe », or « Airbnb », « Séjours », or by its calendar's name alone, as it's
-  written, when it has no title (`""`), e.g. « Calendrier de l'équipe ». Its title is cut short in the month, after two
-  lines.
+  « Airbnb », « Séjours », or by its calendar's name alone, as it's written, when it has no title, e.g. « Calendrier de
+  l'équipe ». Its title is cut short in the month, after two lines.
 - Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
 - Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 

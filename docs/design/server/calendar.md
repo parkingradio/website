@@ -17,7 +17,9 @@ the sessions without a date (see [The calendar](#the-calendar)).
 
 A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
 the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", which its
-occupations are known by, and there can be several with the same name.
+occupations are known by, and there can be several with the same name. Its events' titles reach the admin pages and
+the apps connected to the site, so a calendar whose titles have personal data, e.g. guests' names, shouldn't be added
+as a feed.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a
@@ -92,8 +94,8 @@ it hasn't been read yet. Occupations also only cover what a read keeps, from a y
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
-Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates, both
-titled by the platform they were booked on.
+Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates, booked
+on the same platform.
 
 ## Conflicts
 
