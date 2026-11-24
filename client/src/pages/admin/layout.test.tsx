@@ -199,7 +199,6 @@ describe("The menu's badge on calendrier", () => {
   const FEED = {
     name: "Calendrier de l'équipe",
     link: 'https://example.com/team.ics',
-    privateTitles: false,
     createdBy: 'admin@example.com',
     createdAt: '2026-11-01T12:00:00Z',
     updatedBy: null,

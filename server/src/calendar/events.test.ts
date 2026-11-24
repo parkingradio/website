@@ -43,13 +43,13 @@ function feed(...parts: string[][]): string {
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Google Inc//Google Calendar 70.9054//EN', ...parts.flat(), 'END:VCALENDAR', ''].join('\r\n')
 }
 
-function read(text: string, privateTitles = false, window = WINDOW) {
-  return calendarEvents(text, privateTitles, window)
+function read(text: string, window = WINDOW) {
+  return calendarEvents(text, window)
 }
 
 // The events of a feed, as ISO strings in UTC.
-function intervals(text: string, privateTitles = false, window = WINDOW) {
-  return read(text, privateTitles, window).events.map(({ start, end }) => [start.toISOString(), end.toISOString()])
+function intervals(text: string, window = WINDOW) {
+  return read(text, window).events.map(({ start, end }) => [start.toISOString(), end.toISOString()])
 }
 
 const one = (...lines: string[]) => intervals(feed(TORONTO, vevent(...lines)))
@@ -121,7 +121,7 @@ describe('calendarEvents', () => {
     it('end at their DTEND across a change of daylight saving time, e.g. a stay over a weekend', () => {
       const stay = ['DTSTART;TZID=America/Toronto:20261031T160000', 'DTEND;TZID=America/Toronto:20261102T110000', 'SUMMARY:Reserved']
       for (const zone of [TORONTO, []]) {
-        expect(intervals(feed(zone, vevent(...stay)), true)).toEqual([['2026-10-31T20:00:00.000Z', '2026-11-02T16:00:00.000Z']])
+        expect(intervals(feed(zone, vevent(...stay)))).toEqual([['2026-10-31T20:00:00.000Z', '2026-11-02T16:00:00.000Z']])
       }
     })
   })
@@ -334,10 +334,9 @@ describe('calendarEvents', () => {
     expect(read(text).events[0].title).toBe(`${'x'.repeat(199)}…`)
   })
 
-  it('keeps the titles, unless they are private', () => {
+  it('keeps the titles, and neither the descriptions nor the locations', () => {
     const text = feed(vevent('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z', 'SUMMARY:  Réparation du toit ', 'DESCRIPTION:Guest: Jane Doe', 'LOCATION:Studio'))
-    expect(read(text).events[0].title).toBe('Réparation du toit')
-    expect(read(text, true).events[0]).toEqual({ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), wholeDay: false, title: null })
+    expect(read(text).events).toEqual([{ start: new Date('2026-11-24T23:00:00Z'), end: new Date('2026-11-25T01:00:00Z'), wholeDay: false, title: 'Réparation du toit' }])
     expect(read(feed(vevent('DTSTART:20261124T230000Z', 'DTEND:20261125T010000Z'))).events[0].title).toBe('')
   })
 

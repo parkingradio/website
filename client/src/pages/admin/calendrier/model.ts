@@ -13,9 +13,8 @@ export type Conflict = Calendar['conflicts'][number]
 export type ConflictThing = Conflict['things'][number]
 export type Feed = Calendar['feeds'][number]
 
-// An occupation as the page names it: its title, or null when it has none or its feed's titles are private, and its
-// feed's name, `calendar`, which stands in for its title when it has none (see "What's shown" in
-// docs/design/client/admin/calendrier.md).
+// An occupation as the page names it: its title, or null when it has none, and its feed's name, `calendar`, which stands
+// in for its title then (see "What's shown" in docs/design/client/admin/calendrier.md).
 export type OccupationName = { title: string | null; calendar: string }
 
 // Something that takes the studio, as the page shows it: a session, with a start, or an occupation.

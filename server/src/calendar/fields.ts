@@ -54,7 +54,3 @@ export const Link = z
       `Trimmed: an https or webcal link, without a user name or a password, of at most ${LINK_MAX_LENGTH} characters ` +
       "as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
   })
-
-export const PrivateTitles = z.boolean().meta({
-  description: "Whether its titles are private: the server then never keeps, gives or logs its events' titles",
-})

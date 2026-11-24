@@ -389,7 +389,6 @@ export const calendarFeeds = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     name: text('name').notNull(),
     link: text('link').notNull(),
-    privateTitles: boolean('private_titles').notNull(),
     createdBy: text('created_by').notNull(), // the email of the admin who added it
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Who last changed it, and when, or null until it's changed.

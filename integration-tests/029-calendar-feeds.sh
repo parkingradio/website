@@ -25,7 +25,7 @@ echo "  the endpoints require a session"
 request "$URL"
 expect_status 401
 request --request POST --header 'Content-Type: application/json' \
-    --data "{\"name\":\"x\",\"privateTitles\":false,\"link\":\"https://calendar.invalid/${SECRET}\"}" "$URL"
+    --data "{\"name\":\"x\",\"link\":\"https://calendar.invalid/${SECRET}\"}" "$URL"
 expect_status 401
 request --request PATCH --header 'Content-Type: application/json' --data '{"name":"x"}' "${URL}/00000000-0000-4000-8000-000000000000"
 expect_status 401
@@ -52,15 +52,15 @@ expect_status 200
 expect_body_contains '{"ok":true,"total":0,"feeds":[]}'
 
 echo "  a link that isn't https or webcal, or a field it doesn't take, is refused before it's read"
-add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"http://example.com/${SECRET}.ics\"}"
+add "{\"name\":\"Team\",\"link\":\"http://example.com/${SECRET}.ics\"}"
 expect_status 400
 expect_body_contains 'The link must be an https or webcal link'
-add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"https://example.com/${SECRET}.ics\",\"url\":\"x\"}"
+add "{\"name\":\"Team\",\"link\":\"https://example.com/${SECRET}.ics\",\"url\":\"x\"}"
 expect_status 400
 expect_body_contains 'Unknown field: `url`'
 
 echo "  a link whose server can't be found fails with 502, and isn't added"
-add "{\"name\":\"Team\",\"privateTitles\":false,\"link\":\"webcal://calendar.invalid/${SECRET}.ics\"}"
+add "{\"name\":\"Team\",\"link\":\"webcal://calendar.invalid/${SECRET}.ics\"}"
 expect_status 502
 expect_body_contains "The link can't be read"
 request --header "Cookie: ${cookie}" "$URL"
@@ -68,24 +68,24 @@ expect_body_contains '"total":0'
 
 echo "  a feed is listed with its link, can be changed, and removed, once"
 readonly FEED='6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f'
-sql "insert into calendar_feeds (id, name, link, private_titles, created_by)
-     values ('${FEED}', 'Séjours', 'https://calendar.invalid/${SECRET}-stays.ics', false, '${ADMIN_EMAIL}')"
+sql "insert into calendar_feeds (id, name, link, created_by)
+     values ('${FEED}', 'Séjours', 'https://calendar.invalid/${SECRET}-stays.ics', '${ADMIN_EMAIL}')"
 request --header "Cookie: ${cookie}" "$URL"
 expect_status 200
 expect_body_contains '"total":1'
-expect_body_contains "\"name\":\"Séjours\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"privateTitles\":false"
+expect_body_contains "\"name\":\"Séjours\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"createdBy\""
 change "$FEED" '{}'
 expect_status 400
 expect_body_contains 'There must be at least one field to change'
-change "$FEED" '{"kind":"quiet-time"}'
+change "$FEED" '{"privateTitles":true}'
 expect_status 400
-expect_body_contains 'Unknown field: `kind`'
+expect_body_contains 'Unknown field: `privateTitles`'
 change 00000000-0000-4000-8000-000000000000 '{"name":"x"}'
 expect_status 404
 # Its own link, as a webcal link, isn't read.
-change "$FEED" "{\"name\":\"Invités\",\"privateTitles\":true,\"link\":\"webcal://calendar.invalid/${SECRET}-stays.ics\"}"
+change "$FEED" "{\"name\":\"Invités\",\"link\":\"webcal://calendar.invalid/${SECRET}-stays.ics\"}"
 expect_status 200
-expect_body_contains "\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"privateTitles\":true"
+expect_body_contains "\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\",\"createdBy\""
 expect_body_contains "\"updatedBy\":\"${ADMIN_EMAIL}\""
 change "$FEED" "{\"name\":\"Other\",\"link\":\"https://calendar.invalid/${SECRET}-other.ics\"}"
 expect_status 502
@@ -129,7 +129,7 @@ parse() {
         import { parseFeed } from '/app/server/dist/calendar/parse.js'
         const text = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20200101T100000Z',
           'DTEND:20200101T110000Z', 'RRULE:$1', 'END:VEVENT', 'END:VCALENDAR', ''].join('\\r\\n')
-        parseFeed({ text, privateTitles: false, from: new Date('2019-01-01'), to: new Date('2021-01-01') }, $2)
+        parseFeed({ text, from: new Date('2019-01-01'), to: new Date('2021-01-01') }, $2)
           .then(({ events }) => console.log('events:', events.length), (error) => console.log(error.message))"
 }
 # expect_parse <rule> <pattern> [<options>] -- expect going through the rule's feed to print something that matches.

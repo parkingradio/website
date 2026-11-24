@@ -12,16 +12,15 @@ import { calendarReads, READ_INTERVAL_MS } from './reads.js'
 const NOW = new Date('2026-11-22T12:00:00Z')
 
 const linkOf = (id: string) => `https://example.com/${id}.ics`
-const settingsOf = (id: string, privateTitles = false) => ({ link: linkOf(id), privateTitles })
 
-function feed(id: string, privateTitles = false): StoredFeed {
-  return { id, name: `Feed ${id}`, link: linkOf(id), privateTitles, createdBy: 'admin@example.com', createdAt: NOW, updatedBy: null, updatedAt: null }
+function feed(id: string): StoredFeed {
+  return { id, name: `Feed ${id}`, link: linkOf(id), createdBy: 'admin@example.com', createdAt: NOW, updatedBy: null, updatedAt: null }
 }
 
 // A calendar with one event, which starts `day` days after NOW.
-function calendar(day = 1, summary = 'Réparation') {
+function calendar(day = 1) {
   const start = new Date(NOW.getTime() + day * 24 * 60 * 60 * 1000).toISOString().replace(/[-:]|\.\d+/g, '')
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', `DTSTART:${start}`, 'DURATION:PT1H', `SUMMARY:${summary}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', `DTSTART:${start}`, 'DURATION:PT1H', 'SUMMARY:Réparation', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
 }
 
 // A promise and what settles it.
@@ -51,7 +50,7 @@ const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn() }
 function reader() {
   // The text is gone through in the tests' own process, without the time passing that a process of its own would take
   // (see parse.test.ts).
-  const parse: typeof parseFeed = async ({ text, privateTitles, from, to }) => calendarEvents(text, privateTitles, { from, to })
+  const parse: typeof parseFeed = async ({ text, from, to }) => calendarEvents(text, { from, to })
   return calendarReads({ feeds: store, log: log as unknown as FastifyBaseLogger, readText, parse })
 }
 
@@ -62,11 +61,11 @@ describe('calendarReads', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(NOW)
-    stored = [feed('a'), feed('b', true)]
+    stored = [feed('a'), feed('b')]
     list.mockReset().mockImplementation(async () => stored)
     answers = new Map([
       ['a', calendar(1)],
-      ['b', calendar(2, 'Jane Doe')],
+      ['b', calendar(2)],
     ])
     readText.mockClear()
     vi.clearAllMocks()
@@ -78,12 +77,10 @@ describe('calendarReads', () => {
 
   it('reads every feed when it starts, then every 15 minutes', async () => {
     const reads = reader()
-    expect(reads.of('a')).toBeUndefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
     reads.start()
     await settle()
-    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, settings: settingsOf('a') })
-    // Private titles are never kept.
-    expect(reads.of('b')!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), wholeDay: false, title: null }])
+    expect(reads.of(feed('a'))).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, link: linkOf('a') })
     expect(readText).toHaveBeenCalledTimes(2)
 
     // A feed added meanwhile, e.g. by another server, is read with the others.
@@ -94,28 +91,37 @@ describe('calendarReads', () => {
     expect(readText).toHaveBeenCalledTimes(2)
     await vi.advanceTimersByTimeAsync(1)
     expect(readText).toHaveBeenCalledTimes(5)
-    expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-11-26T12:00:00Z') }], readAt: new Date(NOW.getTime() + READ_INTERVAL_MS) })
-    expect(reads.of('c')).toMatchObject({ events: [{ start: new Date('2026-11-25T12:00:00Z') }], error: null })
+    expect(reads.of(feed('a'))).toMatchObject({ events: [{ start: new Date('2026-11-26T12:00:00Z') }], readAt: new Date(NOW.getTime() + READ_INTERVAL_MS) })
+    expect(reads.of(feed('c'))).toMatchObject({ events: [{ start: new Date('2026-11-25T12:00:00Z') }], error: null })
     reads.stop()
     await reads.stopped()
+  })
+
+  it("gives nothing read from another link than the feed's, e.g. on a server that hasn't taken in a change of link yet", async () => {
+    const reads = reader()
+    reads.start()
+    await settle()
+    expect(reads.of(feed('a'))).toBeDefined()
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toBeUndefined()
+    reads.stop()
   })
 
   it('keeps what it read before when a read fails, and says why until one succeeds', async () => {
     const reads = reader()
     reads.start()
     await settle()
-    const before = reads.of('a')!
+    const before = reads.of(feed('a'))!
 
     answers.set('a', new FeedReadError(502, "The link can't be read: its server fails (503)"))
     answers.set('b', '<html>Not a calendar</html>')
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toEqual({ ...before, error: "The link can't be read: its server fails (503)" })
-    expect(reads.of('b')).toMatchObject({ error: "The link can't be read: its answer isn't valid iCalendar" })
+    expect(reads.of(feed('a'))).toEqual({ ...before, error: "The link can't be read: its server fails (503)" })
+    expect(reads.of(feed('b'))).toMatchObject({ error: "The link can't be read: its answer isn't valid iCalendar" })
     expect(log.warn).toHaveBeenCalledWith({ feed: 'a', name: 'Feed a', error: "The link can't be read: its server fails (503)" }, 'Failed to read a calendar feed')
 
     answers.set('a', calendar(5))
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toMatchObject({ readAt: new Date(NOW.getTime() + 2 * READ_INTERVAL_MS), error: null })
+    expect(reads.of(feed('a'))).toMatchObject({ readAt: new Date(NOW.getTime() + 2 * READ_INTERVAL_MS), error: null })
     reads.stop()
   })
 
@@ -124,7 +130,7 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    expect(reads.of('a')).toEqual({ events: [], readAt: null, error: "The link can't be read: its server refuses it (404)", settings: settingsOf('a') })
+    expect(reads.of(feed('a'))).toEqual({ events: [], readAt: null, error: "The link can't be read: its server refuses it (404)", link: linkOf('a') })
     reads.stop()
   })
 
@@ -133,7 +139,7 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    expect(reads.of('a')!.error).toBe("The link can't be read: something went wrong")
+    expect(reads.of(feed('a'))!.error).toBe("The link can't be read: something went wrong")
     expect(JSON.stringify([log.warn.mock.calls, log.error.mock.calls])).not.toContain('Jane Doe')
     reads.stop()
   })
@@ -160,8 +166,8 @@ describe('calendarReads', () => {
     reads.removed('a')
     a.resolve(calendar(1))
     await settle()
-    expect(reads.of('a')).toBeUndefined()
-    expect(reads.of('b')).toBeDefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
+    expect(reads.of(feed('b'))).toBeDefined()
     reads.stop()
   })
 
@@ -172,12 +178,12 @@ describe('calendarReads', () => {
     reads.start()
     await settle()
     // The listing started before `c` was added, and `b` removed.
-    reads.added('c', { events: [], readAt: NOW, settings: { link: linkOf('c'), privateTitles: false } })
+    reads.added('c', { events: [], readAt: NOW, link: linkOf('c') })
     reads.removed('b')
     listed.resolve([feed('a'), feed('b')])
     await settle()
-    expect(reads.of('c')).toEqual({ events: [], readAt: NOW, error: null, settings: settingsOf('c') })
-    expect(reads.of('b')).toBeUndefined()
+    expect(reads.of(feed('c'))).toEqual({ events: [], readAt: NOW, error: null, link: linkOf('c') })
+    expect(reads.of(feed('b'))).toBeUndefined()
     expect(readText).toHaveBeenCalledTimes(1)
     reads.stop()
   })
@@ -191,65 +197,15 @@ describe('calendarReads', () => {
       reads.start()
       await settle()
       // The new link is read while the former one is.
-      const read = await reads.read({ id: 'a', name: 'Feed a', link: linkOf('a2'), privateTitles: false })
-      reads.changed('a', { link: linkOf('a2'), privateTitles: false }, read)
-      expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
+      const read = await reads.read({ id: 'a', name: 'Feed a', link: linkOf('a2') })
+      reads.changed('a', linkOf('a2'), read)
+      expect(reads.of({ id: 'a', link: linkOf('a2') })).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
       if (ending === 'succeeds') a.resolve(calendar(1))
       else a.reject(new FeedReadError(502, "The link can't be read: its server fails (503)"))
       await settle()
-      expect(reads.of('a'), ending).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
+      expect(reads.of({ id: 'a', link: linkOf('a2') }), ending).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
       reads.stop()
     }
-  })
-
-  it("forgets what was read from a feed's former link when the read of its new one was made with other titles", async () => {
-    answers.set('a2', calendar(9, 'Jane Doe'))
-    const reads = reader()
-    reads.start()
-    await settle()
-    // Its titles became private while its new link was read with them.
-    const read = await reads.read({ id: 'a', name: 'Feed a', link: linkOf('a2'), privateTitles: false })
-    stored = [{ ...feed('a', true), link: linkOf('a2') }, feed('b', true)]
-    reads.changed('a', { link: linkOf('a2'), privateTitles: true }, read)
-    expect(reads.of('a')).toBeUndefined()
-    // Its next read reads its new link.
-    await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z'), title: null }], error: null })
-    reads.stop()
-  })
-
-  it('forgets the titles of a feed as soon as they become private, and ignores the reads made with them', async () => {
-    const reads = reader()
-    reads.start()
-    await settle()
-    const a = deferred<string>()
-    answers.set('a', () => a.promise)
-    await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    reads.changed('a', { link: linkOf('a'), privateTitles: true })
-    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: null }], readAt: NOW, error: null, settings: settingsOf('a', true) })
-    a.resolve(calendar(1))
-    await settle()
-    expect(reads.of('a')).toMatchObject({ events: [{ title: null }], readAt: NOW })
-    reads.stop()
-  })
-
-  it('forgets the titles of a feed whose titles became private elsewhere once the feeds are listed, even when its read then fails', async () => {
-    const reads = reader()
-    reads.start()
-    await settle()
-    expect(reads.of('a')).toMatchObject({ events: [{ title: 'Réparation' }] })
-    const listed = deferred<StoredFeed[]>()
-    list.mockImplementationOnce(() => listed.promise)
-    const a = deferred<string>()
-    answers.set('a', () => a.promise)
-    await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    listed.resolve([feed('a', true), feed('b', true)])
-    await settle()
-    expect(reads.of('a')).toMatchObject({ events: [{ title: null }], readAt: NOW, settings: settingsOf('a', true) })
-    a.reject(new FeedReadError(502, "The link can't be read: its server fails (503)"))
-    await settle()
-    expect(reads.of('a')).toMatchObject({ events: [{ title: null }], readAt: NOW, error: "The link can't be read: its server fails (503)" })
-    reads.stop()
   })
 
   it('forgets what was read from the former link of a feed whose link changed elsewhere, even when the new one then fails', async () => {
@@ -257,37 +213,10 @@ describe('calendarReads', () => {
     reads.start()
     await settle()
     answers.set('a2', new FeedReadError(502, "The link can't be read: its server fails (503)"))
-    stored = [{ ...feed('a'), link: linkOf('a2') }, feed('b', true)]
+    stored = [{ ...feed('a'), link: linkOf('a2') }, feed('b')]
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
     expect(readText.mock.calls.map(([link]) => link)).toContain(linkOf('a2'))
-    expect(reads.of('a')).toEqual({ events: [], readAt: null, error: "The link can't be read: its server fails (503)", settings: settingsOf('a2') })
-    reads.stop()
-  })
-
-  it("forgets the titles of a feed whose titles became private when the feeds are listed before it's changed", async () => {
-    const reads = reader()
-    reads.start()
-    await settle()
-    // The listing sees the change before the request that made it says so.
-    stored = [feed('a', true), feed('b', true)]
-    const a = deferred<string>()
-    answers.set('a', () => a.promise)
-    await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toMatchObject({ events: [{ title: null }] })
-    reads.changed('a', settingsOf('a', true))
-    expect(reads.of('a')).toMatchObject({ events: [{ title: null }] })
-    reads.stop()
-  })
-
-  it('only reads the titles of a feed whose titles stop being private with its next read', async () => {
-    const reads = reader()
-    reads.start()
-    await settle()
-    stored = [feed('a'), feed('b')]
-    reads.changed('b', { link: linkOf('b'), privateTitles: false })
-    expect(reads.of('b')).toMatchObject({ events: [{ title: null }] })
-    await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('b')).toMatchObject({ events: [{ title: 'Jane Doe' }] })
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toEqual({ events: [], readAt: null, error: "The link can't be read: its server fails (503)", link: linkOf('a2') })
     reads.stop()
   })
 
@@ -298,11 +227,11 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    reads.changed('a', { link: linkOf('a2'), privateTitles: false })
-    listed.resolve([feed('a'), feed('b', true)])
+    reads.changed('a', linkOf('a2'))
+    listed.resolve([feed('a'), feed('b')])
     await settle()
     expect(readText.mock.calls.map(([link]) => link)).toEqual([linkOf('a2'), linkOf('b')])
-    expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z'), title: 'Réparation' }] })
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z'), title: 'Réparation' }] })
     reads.stop()
   })
 
@@ -312,7 +241,7 @@ describe('calendarReads', () => {
     await settle()
     stored = [feed('a')]
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('b')).toBeUndefined()
+    expect(reads.of(feed('b'))).toBeUndefined()
     reads.stop()
   })
 
@@ -335,7 +264,7 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    const adding = reads.read({ name: 'New', link: linkOf('new'), privateTitles: false })
+    const adding = reads.read({ name: 'New', link: linkOf('new') })
     reads.stop()
     await expect(adding).rejects.toBeInstanceOf(ReadAborted)
     await reads.stopped()
@@ -343,6 +272,6 @@ describe('calendarReads', () => {
     // It doesn't read again.
     await vi.advanceTimersByTimeAsync(2 * READ_INTERVAL_MS)
     expect(readText).toHaveBeenCalledTimes(2)
-    expect(reads.of('a')).toBeUndefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
   })
 })

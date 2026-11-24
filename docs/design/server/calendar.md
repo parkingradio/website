@@ -4,8 +4,8 @@ Parking Radio has one studio, which holds one thing at a time. Two kinds of thin
 
 - **Sessions**, which are entered on the site (see [Sessions](sessions.md)).
 - **Occupations**: anything else that takes the studio, e.g. repairs, private workshops, or guests staying at the
-  studio. They're read from calendars (see [Feeds](#feeds)), e.g. a Google Calendar the team shares, or a private
-  calendar of the guests' stays, and each one is known by the name of the calendar it's read from, e.g. "Séjours".
+  studio. They're read from calendars (see [Feeds](#feeds)), e.g. a Google Calendar the team shares, or a calendar of
+  the guests' stays, and each one is known by the name of the calendar it's read from, e.g. "Séjours".
 
 Occupations can't be changed on the site, or with the tools: only in their own calendars. The feeds they're read from
 are added, changed and removed on the admin pages, not with the tools, since their links are secrets.
@@ -17,11 +17,9 @@ the sessions without a date (see [The calendar](#the-calendar)).
 
 A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
 the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", which its
-occupations are known by, and there can be several with the same name.
-
-A feed's titles can be private (`privateTitles`): the server then never keeps, gives or logs its events' titles, so
-that they never reach the site or the apps connected to it, e.g. for a calendar of guests' stays, which can have their
-names.
+occupations are known by, and there can be several with the same name. Its events' titles reach the admin pages and
+the apps connected to the site, so a calendar whose titles have personal data, e.g. guests' names, shouldn't be added
+as a feed.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a
@@ -34,7 +32,6 @@ A feed has these fields:
 | `id` | string | |
 | `name` | string | |
 | `link` | string | Its link, as an `https` link when it was given as a `webcal` one |
-| `privateTitles` | boolean | Whether its titles are private |
 | `createdBy` | string | The email of the admin who added it |
 | `createdAt` | string | When it was added |
 | `updatedBy`, `updatedAt` | string or null | Who last changed it (an admin's email), and when, or null until it's changed |
@@ -54,8 +51,7 @@ A read that fails keeps what was read before, if anything was, and the feed says
 succeeds. What was read is only kept in memory: after the server restarts, a feed has neither `readAt` nor `error` until
 it's read again.
 
-What's given always matches the feed's current link and `privateTitles`: hiding its titles takes effect at once, while
-showing them again takes effect with its next read.
+What's given always matches the feed's current link: what was read from its former link is never given.
 
 ## Events
 
@@ -77,8 +73,7 @@ it. Beyond RFC 5545:
   knowing.
 
 An occupation is known by its feed's name, and has a title, from its event's `SUMMARY`, on one line, cut to 200
-characters, or `""` when it has none. The occupations of a feed whose titles are private have none, `null` in place of
-their title, and are only known by their feed's name. No event's description or location is ever kept.
+characters, or `""` when it has none. No event's description or location is ever kept.
 
 ## The calendar
 
@@ -99,8 +94,8 @@ it hasn't been read yet. Occupations also only cover what a read keeps, from a y
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
-Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates in a feed
-whose titles are private.
+Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates, booked
+on the same platform.
 
 ## Conflicts
 
@@ -164,7 +159,6 @@ Every feed, with its link, in the order they were added.
 |---|---|---|
 | `name` | string | Trimmed, then between 1 and 100 characters |
 | `link` | string | Trimmed: an `https` or `webcal` link, without a user name or a password, of at most 2,000 characters |
-| `privateTitles` | boolean | Whether its titles are private |
 
 Reads the link (see [Reading the feeds](#reading-the-feeds)), and only if that gives a calendar, adds the feed, with
 that read as its first, and responds `{"ok": true, "feed": <the feed>}`. Fails with:

@@ -79,9 +79,8 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   [The YouTube credentials](video.md#the-youtube-credentials)), so that secrets aren't sent to the model's provider.
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints that add, change and remove [calendar feeds](calendar.md#feeds): adding one, or changing it, can send
-  its link, which is a secret (see [Calendar feeds' links](#results)), or make its titles stop being private, and a
-  feed that's removed can only be added again with its link. `GET /api/admin/calendar/feeds` is a tool, without the
-  links.
+  its link, which is a secret (see [Calendar feeds' links](#results)), and a feed that's removed can only be added
+  again with its link. `GET /api/admin/calendar/feeds` is a tool, without the links.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
   or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and

@@ -13,10 +13,9 @@ import type { Status } from '../sessions/fields.js'
 // A session, as the calendar counts it: one without a start, or that's cancelled, doesn't count.
 export type CalendarSession = { id: string; title: string; start: Date | null; end: Date | null; status: Status }
 
-// The things that take the studio, as conflicts give them. An occupation's title is null when its feed's titles are
-// private.
+// The things that take the studio, as conflicts give them. An occupation's title is "" when it has none.
 export type SessionThing = { kind: 'session'; id: string; title: string; start: Date; end: Date; status: Status }
-export type OccupationThing = { kind: 'occupation'; feedId: string; start: Date; end: Date; wholeDay: boolean; title: string | null }
+export type OccupationThing = { kind: 'occupation'; feedId: string; start: Date; end: Date; wholeDay: boolean; title: string }
 export type Thing = SessionThing | OccupationThing
 
 // Two things that overlap, from `start` to `end`, in their order.

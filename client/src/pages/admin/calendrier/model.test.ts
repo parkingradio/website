@@ -200,7 +200,7 @@ describe('things', () => {
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false, title: 'A' } as const
     // The same instants, written otherwise.
     expect(thingKey({ ...occupation, start: '2026-11-15T02:00:00Z' })).toBe(thingKey(occupation))
-    for (const other of [{ title: 'B' }, { title: null }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
+    for (const other of [{ title: 'B' }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
       expect(thingKey({ ...occupation, ...other })).not.toBe(thingKey(occupation))
     }
     const session = { kind: 'session', id: 's', title: 'X', start: occupation.start, end: occupation.end, status: 'planned' } as const
@@ -211,8 +211,7 @@ describe('things', () => {
     const feeds = [feed('f', 'Équipe'), feed('g', 'Séjours')]
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false } as const
     expect(namedThing({ ...occupation, title: 'RÉPARATION' }, feeds)).toEqual({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, feedId: 'g', title: null }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
+    expect(namedThing({ ...occupation, feedId: 'g', title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
     expect(inSentence({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe("l'occupation RÉPARATION (Équipe)")
     expect(inSentence({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe("l'occupation Séjours")
     expect(inSentence({ kind: 'session', id: 's', title: 'HAUTE RIVE', status: 'planned' })).toBe('la session HAUTE RIVE')
@@ -220,7 +219,7 @@ describe('things', () => {
 })
 
 function feed(id: string, name: string): Feed {
-  return { id, name, link: `https://example.com/${id}.ics`, privateTitles: false, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
+  return { id, name, link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
 }
 
 // A session of the calendar, with what the page shows of it.
@@ -235,8 +234,8 @@ function calendar(fields: Partial<Calendar>): Calendar {
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
 
 describe('the days of the month', () => {
-  // A stay, in a feed whose titles are private, a session during it, and a repair over three whole days.
-  const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: null }
+  // A stay, without a title, a session during it, and a repair over three whole days.
+  const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: '' }
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
@@ -276,7 +275,7 @@ describe('the days of the month', () => {
   })
 
   it('name each other thing once, for things that are the same', () => {
-    // Two stays with the same dates, in a feed whose titles are private, each in conflict with the session and the other.
+    // Two stays with the same dates, without titles, each in conflict with the session and the other.
     const stays: ConflictThing[] = [{ kind: 'occupation', ...stay }, { kind: 'occupation', ...stay }]
     const conflicts: Conflict[] = [
       { start: stay.start, end: stay.end, things: stays as [ConflictThing, ConflictThing] },
@@ -341,7 +340,7 @@ describe('the list', () => {
   // A stay going on since yesterday, until December, in conflict with a meeting today and a session later on, a
   // session over three days, and a repair over three whole days in January.
   const { from, to } = listRange('2026-11-19')
-  const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: null }
+  const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: '' }
   const meeting = { feedId: 'o', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const marathon = session('marathon', '2027-02-06T18:00:00-05:00', '2027-02-08T01:00:00-05:00')

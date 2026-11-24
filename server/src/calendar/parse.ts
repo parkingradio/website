@@ -13,7 +13,7 @@ export const PARSE_TIMEOUT_MS = 10_000
 // through, needs under 128 MB. The process takes more memory than that in all.
 export const PARSE_MAX_MEMORY_MB = 192
 
-export type ToParse = { text: string; privateTitles: boolean; from: Date; to: Date }
+export type ToParse = { text: string; from: Date; to: Date }
 // What the process sends back: the events, or why the read fails, or the type of an error it didn't expect.
 export type ParseResult = { read: { events: CalendarEvent[]; skipped: number } } | { failed: { status: 400 | 502; message: string } } | { unexpected: string }
 

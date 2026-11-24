@@ -9,7 +9,7 @@ import { byWhom, dateTimeFormat } from '../describe'
 // docs/design/client/admin/configuration.md).
 
 type Feed = Schema<'CalendarFeed'>
-type FeedFields = Pick<Feed, 'name' | 'link' | 'privateTitles'>
+type FeedFields = Pick<Feed, 'name' | 'link'>
 
 // The server's limit (see server/src/calendar/fields.ts), which decides. The link has none here, since a link that's
 // pasted would be cut short without a word: the server says when it's too long.
@@ -55,7 +55,7 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
         </ul>
       )}
       <FeedForm
-        initial={{ name: '', link: '', privateTitles: true }}
+        initial={{ name: '', link: '' }}
         action="ajouter"
         failure="Le calendrier n'a pas pu être ajouté"
         save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
@@ -66,12 +66,12 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
 }
 
 // What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed
-// the feed doesn't undo their changes, e.g. make its titles stop being private. The server trims the name and the link.
+// the feed doesn't undo their changes, e.g. a new name, when only the link is changed here. The server trims the name and
+// the link.
 function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
   const changes: Partial<FeedFields> = {}
   if (fields.name.trim() !== feed.name) changes.name = fields.name
   if (fields.link.trim() !== feed.link) changes.link = fields.link
-  if (fields.privateTitles !== feed.privateTitles) changes.privateTitles = fields.privateTitles
   return changes
 }
 
@@ -127,8 +127,7 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
   return (
     <li>
       <p>
-        <b>{feed.name}</b>
-        {feed.privateTitles && ' (titres masqués)'}{' '}
+        <b>{feed.name}</b>{' '}
         <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}
@@ -171,7 +170,6 @@ function FeedForm({
 }) {
   const [name, setName] = useState(initial.name)
   const [link, setLink] = useState(initial.link)
-  const [privateTitles, setPrivateTitles] = useState(initial.privateTitles)
   // While the server saves the feed, which can take up to 30 seconds, or longer while it goes through other calendars,
   // when it reads a new link.
   const [busy, setBusy] = useState(false)
@@ -185,7 +183,7 @@ function FeedForm({
     if (!complete || busy) return
     setBusy(true)
     setError(null)
-    const result = await save({ name, link, privateTitles })
+    const result = await save({ name, link })
     setBusy(false)
     if (!result.ok) {
       setError(result.error)
@@ -193,7 +191,6 @@ function FeedForm({
     }
     setName(initial.name)
     setLink(initial.link)
-    setPrivateTitles(initial.privateTitles)
     onSaved(result.feed)
   }
 
@@ -208,12 +205,6 @@ function FeedForm({
           Lien
           <input value={link} autoComplete="off" spellCheck={false} onChange={(event) => setLink(event.target.value)} required />
         </label>
-        <div className="admin-choices">
-          <label>
-            <input type="checkbox" checked={privateTitles} onChange={(event) => setPrivateTitles(event.target.checked)} />
-            Masquer les titres
-          </label>
-        </div>
         <div className="admin-row">
           <button type="submit" disabled={busy || !complete}>
             {action}

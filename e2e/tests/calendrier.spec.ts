@@ -24,15 +24,14 @@ function soon(): string {
   return addDays(third, 1).slice(0, 7) === third.slice(0, 7) ? third : addDays(third, 1)
 }
 
-// A test's own feeds, read three days before `day`, the second one, whose titles are private, having failed its last
-// read, and a repair and a stay on `day` that overlap, with their conflict.
+// A test's own feeds, read three days before `day`, the second one having failed its last read, and a repair and a stay
+// on `day` that overlap, with their conflict, the stay without a title.
 function ownCalendar(unique: string, day: string) {
   const readAt = at(addDays(day, -3), '00:00')
-  const feed = (id: string, name: string, privateTitles: boolean, error: string | null) => ({
+  const feed = (id: string, name: string, error: string | null) => ({
     id,
     name,
     link: `https://example.com/${id}.ics`,
-    privateTitles,
     createdBy: 'admin@example.com',
     createdAt: readAt,
     updatedBy: null,
@@ -43,9 +42,9 @@ function ownCalendar(unique: string, day: string) {
   const team = `Équipe ${unique}`
   const stays = `Séjours ${unique}`
   const repair = { feedId: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
-  const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: null }
+  const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: '' }
   const extra: CalendarExtra = {
-    feeds: [feed(`team-${unique}`, team, false, null), feed(`stays-${unique}`, stays, true, "The link can't be read: its server fails (503)")],
+    feeds: [feed(`team-${unique}`, team, null), feed(`stays-${unique}`, stays, "The link can't be read: its server fails (503)")],
     occupations: [repair, stay],
     // The repair and the stay, in the order of things: by start.
     conflicts: [{ start: stay.start, end: repair.end, things: [{ kind: 'occupation', ...repair }, { kind: 'occupation', ...stay }] }],

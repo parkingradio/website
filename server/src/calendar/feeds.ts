@@ -12,15 +12,14 @@ export type StoredFeed = {
   name: string
   // A secret, which only the admin pages show (see "Feeds" in docs/design/server/calendar.md).
   link: string
-  privateTitles: boolean
   createdBy: string
   createdAt: Date
   updatedBy: string | null
   updatedAt: Date | null
 }
 
-export type NewFeed = Pick<StoredFeed, 'name' | 'link' | 'privateTitles' | 'createdBy'>
-export type FeedChanges = Partial<Pick<StoredFeed, 'name' | 'link' | 'privateTitles'>>
+export type NewFeed = Pick<StoredFeed, 'name' | 'link' | 'createdBy'>
+export type FeedChanges = Partial<Pick<StoredFeed, 'name' | 'link'>>
 
 // Another feed has the link of a feed being added or changed: `feed`, when it's known.
 export class LinkTaken extends Error {
