@@ -5,6 +5,10 @@ import { testImage } from './test-photos.js'
 
 // What photos and flyers are served as, made from real images (see "Photos" in docs/design/server/artists.md).
 
+// For the tests that go through the largest images: in CI, alongside the other test files, they can take about as long
+// as vitest's default timeout of 5 s.
+const LARGE_IMAGES_TIMEOUT_MS = 20_000
+
 describe('resize', () => {
   it('makes a WebP image of that width, keeping its proportions', async () => {
     for (const format of ['jpeg', 'png', 'webp'] as const) {
@@ -53,7 +57,7 @@ describe('resize', () => {
   it("is never taller than WebP allows, even for a very tall photo, which is then narrower", async () => {
     const size = await sharp(await resize(await testImage('png', 1000, 60000), 1280)).metadata()
     expect(size).toMatchObject({ height: 16383, width: 273 })
-  })
+  }, LARGE_IMAGES_TIMEOUT_MS)
 
   it("fails for what can't be read in full, even though it starts like an image, or has too many pixels", async () => {
     // Cut short anywhere: sharp would otherwise read what's there, and fill in the rest, unless told to fail on a
@@ -65,7 +69,7 @@ describe('resize', () => {
       }
     }
     await expect(resize(await testImage('png', 12000, 12000), 320)).rejects.toThrow(/pixel limit/)
-  })
+  }, LARGE_IMAGES_TIMEOUT_MS)
 
   it('reads a JPEG with bytes after its end, which browsers show', async () => {
     const photo = Buffer.concat([await testImage('jpeg', 640, 480), Buffer.alloc(1000, 7)])
