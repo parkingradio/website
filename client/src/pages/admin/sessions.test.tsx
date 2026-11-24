@@ -267,7 +267,6 @@ async function expectSearch(query: string, found: string[]) {
   await waitFor(() => expect(days()).toEqual(found))
 }
 
-// What was sent as the session's fields in a request to save one, as JSON in the "session" part.
 // The date of the session's start or end, in its form, and its time (see `typeTime` and `shownTime`), whose hour is the
 // first of its parts.
 const dayInput = (when: 'Début' | 'Fin') => within(screen.getByRole('group', { name: when })).getByLabelText('date')
@@ -276,6 +275,7 @@ const timeHour = (when: 'Début' | 'Fin') => timeParts(timeField(when))[0]
 // How long the session form says the session lasts, rather than what's said of the sets' handles after their table.
 const lasts = () => within(screen.getByRole('group', { name: 'Quand' })).queryByRole('status')
 
+// What was sent as the session's fields in a request to save one, as JSON in the "session" part.
 function sentSession(request: RequestInit) {
   return JSON.parse((request.body as FormData).get('session') as string)
 }

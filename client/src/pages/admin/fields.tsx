@@ -107,7 +107,7 @@ export function TimeInput({
     setLast(value)
     setTime(toTime(value))
   }
-  const shown = (shown: string) => {
+  const report = (shown: string) => {
     if (shown === last) return
     setLast(shown)
     onChange(shown)
@@ -131,7 +131,7 @@ export function TimeInput({
             <DateInput className="admin-time-input">
               {(segment) => <DateSegment segment={segment} />}
             </DateInput>
-            <ShownTime segments={state.segments} onShown={shown} />
+            <ShownTime segments={state.segments} onShown={report} />
           </>
         )}
       </TimeField>

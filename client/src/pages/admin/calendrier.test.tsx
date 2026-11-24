@@ -573,6 +573,13 @@ describe('Calendrier', () => {
       fireEvent.click(addButton('2026-11-25'))
       const form = newSession()!
 
+      // Going from a time's hour to its minute isn't leaving it.
+      act(() => timeParts(timeField('Début'))[0].focus())
+      act(() => timeParts(timeField('Début'))[1].focus())
+      expect(within(form).queryByText("Indiquez l'heure de début.")).not.toBeInTheDocument()
+      act(() => timeParts(timeField('Fin'))[0].focus())
+      expect(within(form).getByText("Indiquez l'heure de début.")).toBeInTheDocument()
+
       time('Début', '21:00')
       time('Fin', '23:00')
       expect(shownTime(timeField('Début'))).toBe('21 h 00')
