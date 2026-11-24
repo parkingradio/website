@@ -175,7 +175,7 @@ function MonthThing({ dayThing: { thing, part, conflicts } }: { dayThing: DayThi
       <span className="visually-hidden">, avec</span> {performers}
     </>
   ) : (
-    thing.kind === 'occupation' && thing.title !== '' && <OccupationCalendar calendar={thing.calendar} />
+    thing.kind === 'occupation' && thing.title !== null && <OccupationCalendar calendar={thing.calendar} />
   )
   return (
     <li className={classes.filter(Boolean).join(' ')}>

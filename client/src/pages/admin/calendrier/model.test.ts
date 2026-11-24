@@ -99,7 +99,7 @@ describe("a conflict's things", () => {
   it('are named by their names alone', () => {
     expect(nameOf({ kind: 'session', id: 's', title: 'GUEST MIXES', status: 'planned' })).toBe('GUEST MIXES')
     expect(nameOf({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe('RÉPARATION')
-    expect(nameOf({ kind: 'occupation', title: '', calendar: 'Séjours' })).toBe('Séjours')
+    expect(nameOf({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe('Séjours')
   })
 })
 
@@ -208,12 +208,13 @@ describe('things', () => {
   })
 
   it("name an occupation by its title and its feed's name, or by its feed's name alone", () => {
-    const feeds = [feed('f', 'Équipe')]
+    const feeds = [feed('f', 'Équipe'), feed('g', 'Séjours')]
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false } as const
     expect(namedThing({ ...occupation, title: 'RÉPARATION' }, feeds)).toEqual({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: '', calendar: 'Équipe' })
+    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Équipe' })
+    expect(namedThing({ ...occupation, feedId: 'g', title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
     expect(inSentence({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe("l'occupation RÉPARATION (Équipe)")
-    expect(inSentence({ kind: 'occupation', title: '', calendar: 'Équipe' })).toBe("l'occupation Équipe")
+    expect(inSentence({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe("l'occupation Séjours")
     expect(inSentence({ kind: 'session', id: 's', title: 'HAUTE RIVE', status: 'planned' })).toBe('la session HAUTE RIVE')
   })
 })
@@ -243,7 +244,7 @@ describe('the days of the month', () => {
 
   it('have what takes them, by start, then end, with their names', () => {
     expect(thingsOn(days.get('2026-11-21')!).map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
-      ['occupation', '', 'toute la journée'],
+      ['occupation', null, 'toute la journée'],
       ['session', 'LATE', '21 h – 1 h'],
     ])
     expect(thingsOn(days.get('2026-11-21')!)[0].thing).toMatchObject({ calendar: 'Séjours' })
@@ -270,7 +271,7 @@ describe('the days of the month', () => {
     const [stayed, played, repaired] = thingsWithConflicts(calendar({ sessions: [late], occupations: [repair, stay], conflicts: [conflict] }))
     expect([stayed.thing.kind, played.thing.kind, repaired.thing.kind]).toEqual(['occupation', 'session', 'occupation'])
     expect(stayed.conflicts).toEqual([{ conflict, other: { kind: 'session', id: 'late', title: 'LATE', status: 'planned' } }])
-    expect(played.conflicts).toEqual([{ conflict, other: { kind: 'occupation', title: '', calendar: 'Séjours' } }])
+    expect(played.conflicts).toEqual([{ conflict, other: { kind: 'occupation', title: null, calendar: 'Séjours' } }])
     expect(repaired.conflicts).toEqual([])
   })
 
@@ -337,8 +338,8 @@ describe('the list', () => {
     expect(listRange('2027-11-19')).toEqual({ from: '2027-11-19', to: '2028-11-17' })
   })
 
-  // A stay without a title, going on since yesterday, until December, in conflict with a meeting today and a session
-  // later on, a session over three days, and a repair over three whole days in January.
+  // A stay going on since yesterday, until December, in conflict with a meeting today and a session later on, a
+  // session over three days, and a repair over three whole days in January.
   const { from, to } = listRange('2026-11-19')
   const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: '' }
   const meeting = { feedId: 'o', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
@@ -354,7 +355,7 @@ describe('the list', () => {
 
   it('has every month of its days, each thing once, on the first of these days it takes, by start, then end', () => {
     expect(months.map(({ month }) => month)).toEqual(['2026-11', '2026-12', ...Array.from({ length: 11 }, (_, i) => addMonths('2027-01', i))])
-    const listed = months.flatMap(({ month, things }) => things.map(({ day, thing }) => [month, day, thing.kind === 'session' ? thing.title : thing.title || thing.calendar, thing.start]))
+    const listed = months.flatMap(({ month, things }) => things.map(({ day, thing }) => [month, day, thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar), thing.start]))
     expect(listed).toEqual([
       // Today, though it started yesterday.
       ['2026-11', '2026-11-19', 'Séjours', stay.start],

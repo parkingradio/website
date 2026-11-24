@@ -13,9 +13,9 @@ export type Conflict = Calendar['conflicts'][number]
 export type ConflictThing = Conflict['things'][number]
 export type Feed = Calendar['feeds'][number]
 
-// An occupation as the page names it: its title, "" when it has none, and its feed's name, `calendar`, which stands in for
-// its title then (see "What's shown" in docs/design/client/admin/calendrier.md).
-export type OccupationName = { title: string; calendar: string }
+// An occupation as the page names it: its title, or null when it has none, and its feed's name, `calendar`, which stands
+// in for its title then (see "What's shown" in docs/design/client/admin/calendrier.md).
+export type OccupationName = { title: string | null; calendar: string }
 
 // Something that takes the studio, as the page shows it: a session, with a start, or an occupation.
 export type Thing =
@@ -156,7 +156,7 @@ export function startDay({ start }: Times, near: string): string {
 
 // A thing's name alone, without its calendar's: a session's title, or an occupation's, or its calendar's name when it
 // has none.
-export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : thing.title || thing.calendar)
+export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar))
 
 // A stretch of free time on a day: the part of the day it is, "toute la journée", or e.g. "jusqu'à 15 h", "dès 11 h" or
 // "11 h – 15 h", and whether it's the whole day.
@@ -201,7 +201,7 @@ export function thingKey(thing: ConflictThing): string {
 // An occupation's name, with its feed's name from `feeds`, which has it, as the server's calendar has every occupation's
 // feed.
 function occupationName({ feedId, title }: Schema<'CalendarOccupation'>, feeds: Feed[]): OccupationName {
-  return { title, calendar: feeds.find(({ id }) => id === feedId)!.name }
+  return { title: title || null, calendar: feeds.find(({ id }) => id === feedId)!.name }
 }
 
 // A conflict's thing, as the page names it.
@@ -214,7 +214,7 @@ export function namedThing(thing: ConflictThing, feeds: Feed[]): NamedThing {
 // (Équipe)" or "l'occupation Séjours".
 export function inSentence(thing: NamedThing): string {
   if (thing.kind === 'session') return `la session ${thing.title}`
-  return thing.title === '' ? `l'occupation ${thing.calendar}` : `l'occupation ${thing.title} (${thing.calendar})`
+  return thing.title === null ? `l'occupation ${thing.calendar}` : `l'occupation ${thing.title} (${thing.calendar})`
 }
 
 // Every thing of the calendar, sessions and occupations, with their keys.
