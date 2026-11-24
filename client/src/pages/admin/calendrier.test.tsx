@@ -994,6 +994,58 @@ describe('Calendrier', () => {
     })
   })
 
+  describe('reading the feeds again', () => {
+    const REFRESH = 'POST /api/admin/calendar/feeds/refresh'
+    const refreshButton = () => screen.getByRole('button', { name: 'relire les calendriers externes' })
+    // What screen readers are told about it.
+    const said = () => visibleText(document.querySelector('.calendar-toolbar + [role="status"]')!)
+
+    it('reads them, greyed out and keeping the focus meanwhile, then reads the calendar again', async () => {
+      const refresh = held()
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: refresh.body })
+      renderAt('/admin/calendrier')
+      await loaded()
+      const button = refreshButton()
+      act(() => button.focus())
+
+      fireEvent.click(button)
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      expect(said()).toBe('Lecture des calendriers externes…')
+      await waitFor(() => expect(requestsTo('POST', '/api/admin/calendar/feeds/refresh')).toHaveLength(1))
+      // Clicking it again meanwhile does nothing.
+      fireEvent.click(button)
+      expect(requestsTo('POST', '/api/admin/calendar/feeds/refresh')).toHaveLength(1)
+      expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+
+      await refresh.answer({ ok: true, total: 1, feeds: [TEAM] })
+      await waitFor(() => expect(requestsTo('GET', NOVEMBER)).toHaveLength(2))
+      expect(button).not.toHaveAttribute('aria-disabled')
+      expect(said()).toBe('Calendriers externes relus.')
+      expect(document.activeElement).toBe(button)
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('tells screen readers which feeds could not be read, whose warnings "À régler" has', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: { ok: true, total: 2, feeds: [TEAM, STAYS, { ...STAYS, id: 'airbnb', name: 'Airbnb' }] } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(refreshButton())
+      await waitFor(() => expect(said()).toBe('Calendriers externes relus, sauf « Séjours » et « Airbnb » : voir « À régler ».'))
+    })
+
+    it('says why they could not be read again, without reading the calendar again', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: { ok: false, error: 'Internal server error' } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      fireEvent.click(refreshButton())
+
+      expect(await screen.findByRole('alert')).toHaveTextContent("Les calendriers externes n'ont pas pu être relus : Internal server error")
+      expect(refreshButton()).not.toHaveAttribute('aria-disabled')
+      expect(said()).toBe('')
+      expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+    })
+  })
+
   describe('while loading, and when it fails', () => {
     it('says why the calendar could not be read', async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ok: false, error: 'Internal server error' } })

@@ -22,7 +22,8 @@ export function CalendarFeeds() {
     <>
       <p>
         Ce qui occupe le studio en dehors des sessions est lu dans des calendriers externes, au format iCal, chaque occupation
-        sous le nom de son calendrier. Le serveur lit ces calendriers toutes les 15 minutes.
+        sous le nom de son calendrier. Le serveur lit ces calendriers toutes les 15 minutes, et quand on les relit avec ↻ dans
+        Calendrier.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">

@@ -47,6 +47,7 @@ const reads: CalendarReads = {
   added: vi.fn(),
   changed: vi.fn(),
   removed: vi.fn(),
+  refresh: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
   stopped: async () => {},

@@ -48,6 +48,7 @@ const reads: CalendarReads = {
     if (done) kept.set(id, { ...done, error: null })
   }),
   removed: vi.fn((id: string) => kept.delete(id)),
+  refresh: vi.fn<CalendarReads['refresh']>(),
   start: vi.fn(),
   stop: vi.fn(),
   stopped: async () => {},
@@ -93,6 +94,7 @@ describe('calendar feeds routes', () => {
     ]
     kept = new Map()
     read.mockImplementation(async ({ link }) => ({ events: EVENTS, readAt: NOW, link }))
+    vi.mocked(reads.refresh).mockResolvedValue()
   })
 
   afterEach(() => {
@@ -117,6 +119,47 @@ describe('calendar feeds routes', () => {
     it('requires a session', async () => {
       const app = await buildApp()
       expect((await app.inject({ method: 'GET', url: URL })).statusCode).toBe(401)
+    })
+  })
+
+  describe('POST /api/admin/calendar/feeds/refresh', () => {
+    const refresh = async (app: App, headers: Record<string, string> = {}) =>
+      app.inject({ method: 'POST', url: `${URL}/refresh`, headers, cookies: await sessionCookies() })
+
+    it('reads every feed, then gives every feed as it is once each read has ended, with its link', async () => {
+      const app = await buildApp()
+      // What the reads keep is only there once they've ended.
+      vi.mocked(reads.refresh).mockImplementation(async () => {
+        kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)" })
+      })
+      const response = await refresh(app)
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({
+        ok: true,
+        total: 1,
+        feeds: [
+          {
+            ...{ id: FEED_A, name: "Calendrier de l'équipe", link: LINK, createdBy: 'someone@example.com', createdAt: '2026-11-01T07:00:00-05:00' },
+            ...{ updatedBy: null, updatedAt: null, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" },
+          },
+        ],
+      })
+      expect(reads.refresh).toHaveBeenCalledOnce()
+    })
+
+    it('fails with 502 when the server shuts down meanwhile', async () => {
+      const app = await buildApp()
+      vi.mocked(reads.refresh).mockRejectedValue(new ReadAborted())
+      const response = await refresh(app)
+      expect(response.statusCode).toBe(502)
+      expect(response.json()).toEqual({ ok: false, error: 'The server is shutting down' })
+    })
+
+    it('requires a session, and refuses requests from other sites', async () => {
+      const app = await buildApp()
+      expect((await app.inject({ method: 'POST', url: `${URL}/refresh` })).statusCode).toBe(401)
+      expect((await refresh(app, { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403)
+      expect(reads.refresh).not.toHaveBeenCalled()
     })
   })
 

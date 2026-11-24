@@ -80,7 +80,8 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   `GET /api/admin/radio/credentials` and `GET /api/admin/video/credentials`, which don't give the secrets, are tools.
 - The endpoints that add, change and remove [calendar feeds](calendar.md#feeds): adding one, or changing it, can send
   its link, which is a secret (see [Calendar feeds' links](#results)), and a feed that's removed can only be added
-  again with its link. `GET /api/admin/calendar/feeds` is a tool, without the links.
+  again with its link. `GET /api/admin/calendar/feeds` and `POST /api/admin/calendar/feeds/refresh`, which reads every
+  feed again, are tools, without the links.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
   or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and
@@ -147,8 +148,9 @@ whose endpoints give feeds say so.
 
 ### Hints
 
-The tools of `GET` endpoints, of `POST /api/admin/radio/preview`, which only reads a playlist, and `read_documentation`
-have `readOnlyHint`. Every other tool has `destructiveHint`, since it changes what admins rely on: apps then ask the
+The tools of `GET` endpoints, of `POST /api/admin/radio/preview`, which only reads a playlist, of
+`POST /api/admin/calendar/feeds/refresh`, which only reads the calendar feeds again, and `read_documentation` have
+`readOnlyHint`. Every other tool has `destructiveHint`, since it changes what admins rely on: apps then ask the
 admin to confirm before calling it, which is what keeps text from the public from making the model change things on its
 own. Every tool has `openWorldHint` set to `false`.
 

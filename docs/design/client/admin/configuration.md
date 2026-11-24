@@ -51,7 +51,8 @@ it only allows once they've been verified, each with a check mark like the Sound
 
 The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
 what takes the studio outside sessions is read from these calendars, each occupation under its calendar's name, and
-that the server reads them every 15 minutes.
+that the server reads them every 15 minutes, and when they're read again with "↻" in
+[Calendrier](calendrier.md#the-toolbar).
 
 It lists the feeds, in the order they were added, each with its name, its link, as text, which admin added it and when,
 when it was last read, or that it hasn't been read yet, and why its last read failed, if it did. While there are none,

@@ -257,6 +257,109 @@ describe('calendarReads', () => {
     reads.stop()
   })
 
+  describe('refresh', () => {
+    // Settles when `promise` does, as whether it fulfilled.
+    const outcome = (promise: Promise<unknown>) => promise.then(
+      () => true,
+      () => false,
+    )
+
+    it('reads every feed, and resolves once each read has ended, whether it failed or not', async () => {
+      const a = deferred<string>()
+      answers.set('a', () => a.promise)
+      answers.set('b', new FeedReadError(502, "The link can't be read: its server fails (503)"))
+      const reads = reader()
+      let done = false
+      const refreshed = reads.refresh().then(() => (done = true))
+      await settle()
+      expect(done).toBe(false)
+      a.resolve(calendar(1))
+      await refreshed
+      expect(readText).toHaveBeenCalledTimes(2)
+      expect(reads.of(feed('a'))).toMatchObject({ error: null })
+      expect(reads.of(feed('b'))).toMatchObject({ error: "The link can't be read: its server fails (503)" })
+    })
+
+    it('reads every feed again once the read under way ends, once for all the refreshes asked for meanwhile', async () => {
+      const a = deferred<string>()
+      answers.set('a', () => a.promise)
+      const reads = reader()
+      reads.start()
+      await settle()
+      // What `a` gives once it's read again, after the refreshes were asked for, e.g. once an event changed in it.
+      const first = reads.refresh()
+      const second = reads.refresh()
+      expect(second).toBe(first)
+      answers.set('a', calendar(5))
+      let done = false
+      void first.then(() => (done = true))
+      a.resolve(calendar(1))
+      await settle()
+      expect(done).toBe(true)
+      expect(readText.mock.calls.map(([link]) => link)).toEqual([linkOf('a'), linkOf('b'), linkOf('a'), linkOf('b')])
+      expect(reads.of(feed('a'))).toMatchObject({ events: [{ start: new Date('2026-11-27T12:00:00Z') }] })
+      // A refresh asked for once that's done reads them again.
+      await reads.refresh()
+      expect(readText).toHaveBeenCalledTimes(6)
+      reads.stop()
+      await reads.stopped()
+    })
+
+    it('rejects when the feeds cannot be listed, which only the reads every 15 minutes log', async () => {
+      list.mockRejectedValueOnce(new Error('The database is down'))
+      const reads = reader()
+      await expect(reads.refresh()).rejects.toThrow('The database is down')
+      expect(log.error).not.toHaveBeenCalled()
+    })
+
+    it("reads every feed of its own when it waits for a read whose listing fails", async () => {
+      const listed = deferred<StoredFeed[]>()
+      list.mockImplementationOnce(() => listed.promise)
+      const reads = reader()
+      reads.start()
+      await settle()
+      const refreshed = outcome(reads.refresh())
+      listed.reject(new Error('The database is down'))
+      expect(await refreshed).toBe(true)
+      expect(readText).toHaveBeenCalledTimes(2)
+      // The read every 15 minutes logs that its listing failed.
+      expect(log.error).toHaveBeenCalledOnce()
+      reads.stop()
+      await reads.stopped()
+    })
+
+    it('stops, even when a read of every feed failed to list them, and rejects the refreshes cut short, or asked for after that, without listing the feeds', async () => {
+      const listed = deferred<StoredFeed[]>()
+      list.mockImplementationOnce(() => listed.promise)
+      const reads = reader()
+      const failing = outcome(reads.refresh())
+      // It waits for the first one.
+      const waiting = reads.refresh()
+      reads.stop()
+      listed.reject(new Error('The database is down'))
+      await reads.stopped()
+      expect(await failing).toBe(false)
+      await expect(waiting).rejects.toBeInstanceOf(ReadAborted)
+      await expect(reads.refresh()).rejects.toBeInstanceOf(ReadAborted)
+      expect(list).toHaveBeenCalledOnce()
+    })
+
+    it('rejects when the reads stop meanwhile, which then wait for it to end', async () => {
+      answers.set('a', (signal) => new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(new ReadAborted()))))
+      const reads = reader()
+      const refreshed = reads.refresh()
+      await settle()
+      let ended = false
+      void refreshed.catch(() => (ended = true))
+      reads.stop()
+      await reads.stopped()
+      expect(ended).toBe(true)
+      await expect(refreshed).rejects.toBeInstanceOf(ReadAborted)
+      // The feed after it isn't read.
+      expect(readText).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('cuts short the reads under way when it stops, those of feeds being added included, and then stops', async () => {
     const aborted = (signal: AbortSignal) => new Promise<string>((_, reject) => signal.addEventListener('abort', () => reject(new ReadAborted())))
     answers.set('a', aborted)
