@@ -5,7 +5,7 @@ import { ApiError, Credential, Ok, Timestamp, zodRoutes } from '../api/schemas.j
 import { cached } from '../core/cache.js'
 import { YOUTUBE_VIDEO_ID } from '../sessions/links.js'
 import type { YouTubeCredentials, YouTubeCredentialsStore } from './credentials.js'
-import { YouTubeKeyRefused } from './youtube.js'
+import { API_KEY, NOT_AN_API_KEY, YouTubeKeyRefused } from './youtube.js'
 import type { YouTube } from './youtube.js'
 
 // The video the site shows, read from YouTube (see docs/design/server/video.md).
@@ -26,7 +26,7 @@ const CredentialsRequest = z.object({
     .trim()
     .regex(CHANNEL_ID, "Not a YouTube channel's id, which is UC then 22 letters, digits, - or _")
     .meta({ description: "The channel's id, trimmed: UC then 22 letters, digits, - or _" }),
-  apiKey: Credential,
+  apiKey: Credential.regex(API_KEY, NOT_AN_API_KEY).meta({ description: `The API key, only letters, digits, - or _. ${Credential.description}` }),
 })
 
 // What `GET` and `PUT /api/admin/video/credentials` respond. The key is never sent back.

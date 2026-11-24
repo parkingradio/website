@@ -6,12 +6,20 @@ import { YOUTUBE_VIDEO_ID } from '../sessions/links.js'
 // API key (see docs/design/server/video.md). Each request costs a unit of the key's daily quota.
 //
 // The key is sent in a header, which Google's APIs take in place of the `key` parameter, so that it's never in a URL,
-// which errors and logs could include. YouTube's messages don't include it either, but it's taken out of them anyway.
+// which errors and logs could include. YouTube's messages don't include it either, but it's taken out of every message
+// anyway, and its format is checked before it's sent (see `API_KEY`).
 //
 // YouTube's answers are checked against these schemas rather than trusted, and anything unexpected fails the request with
 // an error that says what was wrong.
 const API = 'https://www.googleapis.com/youtube/v3'
 const REQUEST_TIMEOUT_MS = 10_000
+
+// The characters Google's API keys are made of, which a key has to be made of to be sent at all: Node's fetch refuses a
+// header with a line break in it, with an error that quotes the header, key included, and characters past U+00FF fail
+// too. With only these, a request can't fail because of its header, so that its errors never have the key. It allows a
+// blank key, which the routes refuse as too short, and `get` refuses too.
+export const API_KEY = /^[A-Za-z0-9_-]*$/
+export const NOT_AN_API_KEY = 'Not a YouTube API key, which only has letters, digits, - or _'
 
 const Channels = z.object({
   // Without any, when there's no such channel. There can only be one, since the request names one.
@@ -53,6 +61,8 @@ export type YouTube = {
 }
 
 async function get<T>(apiKey: string, resource: string, query: Record<string, string>, schema: z.ZodType<T>): Promise<T> {
+  if (!apiKey || !API_KEY.test(apiKey)) throw new YouTubeKeyRefused(NOT_AN_API_KEY)
+  const redact = (message: string) => message.replaceAll(apiKey, '[key]')
   let response: Response
   try {
     response = await fetch(`${API}/${resource}?${new URLSearchParams(query)}`, {
@@ -60,18 +70,21 @@ async function get<T>(apiKey: string, resource: string, query: Record<string, st
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
-    throw new Error(`YouTube cannot be reached: ${errorMessage(error)}`, { cause: error })
+    // Fetch says why in its error's cause, e.g. that www.googleapis.com can't be found.
+    const reason = error instanceof Error && error.cause !== undefined ? error.cause : error
+    // eslint-disable-next-line preserve-caught-error -- the logs would include the cause, whose messages aren't redacted.
+    throw new Error(`YouTube cannot be reached: ${redact(errorMessage(reason))}`)
   }
   if (!response.ok) {
     const answer = ErrorAnswer.safeParse(await response.json().catch(() => null))
     const reason = answer.data?.error.errors?.[0]?.reason
-    const message = answer.data?.error.message?.replaceAll(apiKey, '[key]').slice(0, 500) || `${response.status}`
+    const message = redact(answer.data?.error.message ?? '').slice(0, 500) || `${response.status}`
     if (reason && QUOTA_REASONS.has(reason)) throw new YouTubeStatusError(`YouTube refuses requests for now: ${message}`, reason)
     // What Google's APIs answer for a key that isn't valid, or can't be used for YouTube.
     if (response.status === 400 || response.status === 403) throw new YouTubeKeyRefused(`YouTube refused this key: ${message}`)
     throw new YouTubeStatusError(`YouTube responded to /${resource} with ${response.status}: ${message}`, reason)
   }
-  const unexpected = (problem: string) => new Error(`Unexpected answer from YouTube to /${resource}: ${problem}`)
+  const unexpected = (problem: string) => new Error(`Unexpected answer from YouTube to /${resource}: ${redact(problem)}`)
   let answer: unknown
   try {
     answer = await response.json()

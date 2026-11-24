@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { YouTubeKeyRefused, youtube } from './youtube.js'
+import { NOT_AN_API_KEY, YouTubeKeyRefused, youtube } from './youtube.js'
 
 const KEY = 'AIza-the-key'
 const CHANNEL_ID = 'UCvMw4qUIPPwkcZmBRRS0vNA'
@@ -105,6 +105,36 @@ describe('youtube', () => {
       youtubeAnswers(failure(500, 'backendError', 'Backend Error'))
       await expect(youtube.channel(KEY, CHANNEL_ID)).rejects.toThrow('YouTube responded to /channels with 500: Backend Error')
     })
+
+    it("says why YouTube can't be reached, which fetch gives as its error's cause, without keeping that error", async () => {
+      const cause = Object.assign(new Error(`getaddrinfo ENOTFOUND www.googleapis.com (${KEY})`), { code: 'ENOTFOUND' })
+      fetchMock.mockRejectedValue(new TypeError('fetch failed', { cause }))
+
+      const failed = youtube.channel(KEY, CHANNEL_ID)
+
+      await expect(failed).rejects.toThrow(new Error('YouTube cannot be reached: getaddrinfo ENOTFOUND www.googleapis.com ([key])'))
+      await expect(failed).rejects.not.toHaveProperty('cause')
+    })
+
+    it.each([
+      ['a line break, which fetch would refuse with an error that quotes the header', 'AIza-the\nkey'],
+      ['a letter past U+00FF', 'AIza-the-keyŁ'],
+      ['a letter Latin-1 has', 'AIza-the-key\u00e9'],
+      ['a space', 'AIza the-key'],
+    ])('refuses a key with %s before sending any request, without quoting it', async (_, key) => {
+      youtubeAnswers(() => Response.json({}))
+
+      const failed = youtube.channel(key, CHANNEL_ID)
+
+      await expect(failed).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
+      await expect(failed).rejects.not.toThrow(key)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('refuses a blank key before sending any request', async () => {
+      await expect(youtube.channel('', CHANNEL_ID)).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 
   describe('newestUpload', () => {
@@ -156,6 +186,10 @@ describe('youtube', () => {
 
       youtubeAnswers(failure(403, 'quotaExceeded', 'Quota exceeded.'))
       await expect(youtube.newestUpload(KEY, UPLOADS)).rejects.toThrow('YouTube refuses requests for now: Quota exceeded.')
+
+      fetchMock.mockClear()
+      await expect(youtube.newestUpload('AIza-the\nkey', UPLOADS)).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
+      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 })

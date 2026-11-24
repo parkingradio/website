@@ -5082,7 +5082,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200,
-                    "description": "Trimmed, then between 1 and 200 characters"
+                    "pattern": "^[A-Za-z0-9_-]*$",
+                    "description": "The API key, only letters, digits, - or _. Trimmed, then between 1 and 200 characters"
                   }
                 },
                 "required": [
@@ -5179,7 +5180,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200,
-                    "description": "Trimmed, then between 1 and 200 characters"
+                    "pattern": "^[A-Za-z0-9_-]*$",
+                    "description": "The API key, only letters, digits, - or _. Trimmed, then between 1 and 200 characters"
                   }
                 },
                 "required": [

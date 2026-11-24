@@ -8,7 +8,7 @@ import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import { inQuebecTime } from '../api/formats.js'
 import type { YouTubeCredentials } from './credentials.js'
 import { videoRoutes } from './routes.js'
-import { YouTubeKeyRefused } from './youtube.js'
+import { NOT_AN_API_KEY, YouTubeKeyRefused } from './youtube.js'
 import type { YouTube } from './youtube.js'
 
 const channel = vi.fn<YouTube['channel']>()
@@ -376,6 +376,8 @@ describe('video routes', () => {
         ['the channel id names two channels', { channelId: `${CHANNEL_ID},${CHANNEL_ID}`, apiKey: 'key' }, NOT_A_CHANNEL],
         ['the key is blank', { channelId: CHANNEL_ID, apiKey: ' ' }, '`apiKey`: Too small: expected string to have >=1 characters'],
         ['the key is too long', { channelId: CHANNEL_ID, apiKey: 'x'.repeat(201) }, '`apiKey`: Too big: expected string to have <=200 characters'],
+        ['the key has a line break in it', { channelId: CHANNEL_ID, apiKey: 'the-key\nline' }, `\`apiKey\`: ${NOT_AN_API_KEY}`],
+        ['the key has a space in it', { channelId: CHANNEL_ID, apiKey: 'the key' }, `\`apiKey\`: ${NOT_AN_API_KEY}`],
         ['the body is null', null, 'body: Invalid input: expected object, received null'],
       ])('responds 400 when %s, saying why, without asking YouTube', async (_, body, error) => {
         const app = await buildApp()
@@ -386,6 +388,18 @@ describe('video routes', () => {
         expect(response.json()).toEqual({ ok: false, error })
         expect(channel).not.toHaveBeenCalled()
         expect(save).not.toHaveBeenCalled()
+      })
+
+      it("doesn't quote a key that isn't in its format, in the response or in the logs", async () => {
+        const logs: string[] = []
+        const app = await buildApp(logs)
+
+        const response = await sendTo(app, { channelId: CHANNEL_ID, apiKey: ' the-secret\nline ' })
+
+        expect(response.statusCode).toBe(400)
+        expect(response.body).not.toContain('the-secret')
+        expect(logs.join('')).toContain(NOT_AN_API_KEY)
+        expect(logs.join('')).not.toContain('the-secret')
       })
 
       it('responds 400, saying why, and keeps the credentials it had, when YouTube refuses the key', async () => {

@@ -21,7 +21,9 @@ credentials' `error`: visitors never see YouTube's errors.
 The channel's id, found in the [advanced settings](https://www.youtube.com/account_advanced) of its YouTube account, and
 the key the server reads it with, an API key of a Google Cloud project, restricted to the YouTube Data API v3. They're
 kept in the database rather than set when the site is deployed, so that they can be changed without deploying it again.
-The key is never sent back once it's entered: it can only be replaced. It never appears in the logs, or in any error.
+The key is made only of letters, digits, `-` and `_`, as Google's API keys are: one in any other form, e.g. with a line
+break pasted into it, is refused without being sent anywhere. The key is never sent back once it's entered: it can only
+be replaced. It never appears in the logs, or in any error.
 
 The server checks them with YouTube before it saves them, so that a typo can't leave the site without a video, and reads
 the video through them right away. With another key for the same channel, it goes on with the video it read before until
@@ -60,7 +62,7 @@ minute.
 | Request field | Type | |
 |---|---|---|
 | `channelId` | string | The channel's id: `UC`, then 22 letters, digits, `-` or `_`. Trimmed |
-| `apiKey` | string | The API key, up to 200 characters. Trimmed |
+| `apiKey` | string | The API key: up to 200 letters, digits, `-` or `_`, which Google's API keys are made of. Trimmed |
 
 Asks YouTube for the channel with the key, and only if YouTube accepts the key and finds the channel, saves them, reads
 the video through them, and responds like `GET /api/admin/video/credentials`: its `error` is that of this read, which
