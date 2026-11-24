@@ -1026,14 +1026,14 @@ describe('Calendrier', () => {
     })
 
     it('tells screen readers which feeds could not be read, whose warnings "À régler" has', async () => {
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: { ok: true, total: 2, feeds: [TEAM, STAYS, { ...STAYS, id: 'airbnb', name: 'Airbnb' }] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: { ok: true, total: 3, feeds: [TEAM, STAYS, { ...STAYS, id: 'airbnb', name: 'Airbnb' }] } })
       renderAt('/admin/calendrier')
       await loaded()
       fireEvent.click(refreshButton())
       await waitFor(() => expect(said()).toBe('Calendriers externes relus, sauf « Séjours » et « Airbnb » : voir « À régler ».'))
     })
 
-    it('says why they could not be read again, without reading the calendar again', async () => {
+    it('says why they could not be read again, without reading the calendar again, until they are read again', async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: { ok: false, error: 'Internal server error' } })
       renderAt('/admin/calendrier')
       await loaded()
@@ -1043,6 +1043,15 @@ describe('Calendrier', () => {
       expect(refreshButton()).not.toHaveAttribute('aria-disabled')
       expect(said()).toBe('')
       expect(requestsTo('GET', NOVEMBER)).toHaveLength(1)
+
+      // Used again, the error goes away as soon as it's clicked.
+      const refresh = held()
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [REFRESH]: refresh.body })
+      fireEvent.click(refreshButton())
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      await refresh.answer({ ok: true, total: 1, feeds: [TEAM] })
+      await waitFor(() => expect(said()).toBe('Calendriers externes relus.'))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
   })
 

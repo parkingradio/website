@@ -93,7 +93,7 @@ the server takes, the month, e.g. "novembre 2026", and "aujourd'hui", which show
 the list: "À venir" in their place. Screen readers announce the month, or "À venir", when it changes.
 
 Then "mois" and "liste" ("Vue" for screen readers), which show the month and the list, the one shown being pressed, and
-doing nothing, then "↻" ("relire les calendriers externes" for screen readers), which has the server read every calendar
+doing nothing. Then "↻" ("relire les calendriers externes" for screen readers), which has the server read every calendar
 feed again (see [Reading the feeds](../../server/calendar.md#reading-the-feeds)), e.g. right after an event changed in
 one of them, then reads the calendar again. While the feeds are read, its arrow turns, unless the browser asks for less
 motion, and it's greyed out (see [Controls that can't be used](layout.md#controls-that-cant-be-used)), and screen

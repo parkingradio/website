@@ -41,14 +41,14 @@ A feed has these fields:
 ## Reading the feeds
 
 The server reads every feed when it starts, then every 15 minutes, and when it's asked to
-([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)), e.g. right after an event changed
-in one of the calendars. It also reads a feed when it's added, or when its link changes. Asking for every feed to be read
-answers once each read has ended, so what it gives was read after it was asked for; adding a feed, or changing its link,
-waits for that link's read, so that a link that doesn't give a calendar is refused. Nothing else waits for a read: the
-server keeps what it read in memory, and gives what it read last.
+([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)), e.g. right after an event
+changed in one of the calendars. It also reads a feed when it's added, or when its link changes. Asking for every feed
+to be read answers once each read has ended, so what it gives comes from reads that started after it was asked for;
+adding a feed, or changing its link, waits for that link's read, so that a link that doesn't give a calendar is refused.
+Nothing else waits for a read: the server keeps what it read in memory, and gives what it read last.
 
-Feeds are read one at a time, and so are reads of every feed: when they're asked for while every feed is being read, the
-feeds are read again once that ends, once for all the requests made meanwhile.
+A read of every feed reads them one at a time, and those reads go one at a time too: when one is asked for while another
+is under way, every feed is read again once that one ends, once for all the requests made meanwhile.
 
 A read has limits on how long it takes and on the calendar's size, and fails beyond them. It also fails when the link's
 server answers with an error, or with something that isn't valid iCalendar.
@@ -97,8 +97,9 @@ of date or missing: a feed whose last read failed still gives what it read befor
 e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or when
 it hasn't been read yet. When the occupations have to be up to date, e.g. because the admin just changed an event in one
 of the calendars, apps can have every feed read first: that waits for every read, which can take a while, so they
-shouldn't do it before every calendar they ask for, only when they need it. Occupations also only cover what a read keeps, from a year before it to two years after it (see
-[Events](#events)), so the calendar of days outside that can lack occupations.
+shouldn't do it before every calendar they ask for, only when they need it. Occupations also only cover what a read
+keeps, from a year before it to two years after it (see [Events](#events)), so the calendar of days outside that can
+lack occupations.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).

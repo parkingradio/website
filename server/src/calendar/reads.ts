@@ -250,7 +250,8 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
 
     async stopped() {
       await running
-      // The reads of every feed that refreshes asked for meanwhile, which end without listing the feeds.
+      // The reads of every feed that refreshes asked for meanwhile: those that haven't listed the feeds yet end without
+      // listing them.
       await Promise.allSettled([current, next])
     },
   }
