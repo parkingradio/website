@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
 import { conflictCount, formatDuration, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { nameOf, namedThing, boundedTimes, startDay } from './model'
+import { briefTimes, nameOf, namedThing, startDay } from './model'
 import type { Calendar, Feed } from './model'
 import { SessionStatus } from './things'
 
@@ -85,7 +85,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
                   <li key={i}>
                     <button type="button" className="calendar-line" onClick={() => onShowDay(day)}>
                       <LineText when={startDay(conflict, today)}>
-                        {boundedTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
+                        {briefTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
                       </LineText>
                     </button>
                   </li>

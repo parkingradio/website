@@ -274,7 +274,7 @@
   color: #fff;
 }
 
-/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler". */
+/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler" and of the list. */
 .admin :is(.calendar-number, .calendar-add, .calendar-line):focus-visible {
   outline: 2px solid #1d4fa3;
 }
@@ -453,12 +453,9 @@
    year, its kind, as wide as "occupation" with its padding and border (see .calendar-kind), so that the kinds start at
    the same place, and its times in brief, of 17 characters at most but for things of four weeks or more, which wrap,
    then what it is, which alone wraps otherwise. */
-.calendar-listed {
+.admin .calendar-line.calendar-listed {
   --listed-day: 13ch;
   --listed-kind: calc(10ch + 2 * 6px + 2 * 1px);
-}
-
-.admin .calendar-line.calendar-listed {
   grid-template-columns: var(--listed-day) var(--listed-kind) 17ch minmax(0, 1fr);
 }
 

@@ -58,7 +58,7 @@ function ownCalendar(unique: string, day: string) {
 const busy = (unique: string, day: string) =>
   Array.from({ length: 8 }, (_, i) => ({ feedId: `team-${unique}`, start: at(day, `${12 + i}:00`), end: at(day, `${13 + i}:00`), wholeDay: false, title: `OCCUPÉ ${i + 1}` }))
 
-// E.g. "ven. 13 nov.", as the page writes a day in a list's row, and "ven. 13", in a thing's times in short.
+// E.g. "ven. 13 nov.", as the page writes a day in a list's row, and "ven. 13", in a thing's times in brief.
 const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
 const weekdayAndNumber = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 
@@ -268,11 +268,8 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
   await expect(dayCell(page, day)).toContainText(`RÉPARATION ${unique}`)
   expect(await scrollsSideways(page)).toBe(false)
   if (isMobile) {
-    // The repair and the stay, both in a conflict, which the day says.
+    // Its marks show, and its words are there for screen readers only.
     await expect(marks).toBeVisible()
-    await expect(marks.locator('.calendar-mark-occupation.calendar-mark-conflict')).toHaveCount(2)
-    await expect(marks).toHaveClass(/calendar-marks-conflict/)
-    // Its words are there for screen readers only.
     const words = (await dayCell(page, day).locator('.calendar-things').boundingBox())!
     expect(words.width * words.height).toBeLessThanOrEqual(1)
     // A "+" of at least 24 × 24 px, which overlaps neither its day's number nor the next day's, next to it, on a

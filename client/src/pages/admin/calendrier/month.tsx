@@ -142,7 +142,7 @@ function DayMarks({ entries }: { entries: CalendarDay }) {
         const classes = [`calendar-mark calendar-mark-${thing.kind}`, thing.kind === 'session' && `calendar-mark-${thing.status}`, conflicts.length > 0 && 'calendar-mark-conflict']
         return <span key={i} className={classes.filter(Boolean).join(' ')} />
       })}
-      {things.length < entries.length && <span className="calendar-mark calendar-mark-free" />}
+      {entries.some(isFree) && <span className="calendar-mark calendar-mark-free" />}
     </span>
   )
 }

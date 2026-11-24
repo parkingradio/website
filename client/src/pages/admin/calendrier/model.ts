@@ -115,9 +115,10 @@ export function partOfDay({ start, end }: Times, day: string): string {
 
 // Something's times in brief, on `day`, which it takes some of, e.g. "18 h – 21 h", "21 h – 1 h", "15 h → mar. 24", "→ 11 h",
 // "journée" or "→ jeu. 3", where a later day is the last one it takes, with its month when it's four weeks or more after
-// `day`, e.g. "→ sam. 2 janv.": at most 17 characters, but for things that long, unlike `shortTimes`, which says the
-// times it ends at (see "What's shown" in docs/design/client/admin/calendrier.md).
-export function boundedTimes(times: Times, day: string): string {
+// `day`, e.g. "→ sam. 2 janv." (see "What's shown" in docs/design/client/admin/calendrier.md). Where `shortTimes` would
+// give the day and the time something ends, it gives the last day it takes, so that it fits in 17 characters (the
+// list's column, see calendrier.css), except with a month.
+export function briefTimes(times: Times, day: string): string {
   const [from, to] = [Date.parse(times.start), Date.parse(times.end)]
   const last = dayOf(to - 1)
   // A weekday and a number only come back together four weeks or more later.
@@ -319,7 +320,7 @@ export function listedMonths(calendar: Calendar, from: string, to: string): List
   const months: ListedMonth[] = []
   for (let month = monthOf(from); month <= monthOf(to); month = addMonths(month, 1)) months.push({ month, things: [] })
   for (const { thing, conflicts } of thingsWithConflicts(calendar)) {
-    // The calendar only has what takes some of its days.
+    // Leaving out what's outside these days, which a calendar read for them doesn't have.
     const day = daysOf(thing, [from, to])[0]
     if (day === undefined) continue
     months

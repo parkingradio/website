@@ -5,7 +5,7 @@ import App from '../../app'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
 import { held, mockFetch, requestsTo, visibleText as shownText } from '../../test-utils'
-import type { Calendar } from './calendrier/model'
+import type { Calendar, ConflictThing } from './calendrier/model'
 
 // Today is Thursday, November 19, 2026, in Québec.
 const NOW = new Date('2026-11-19T12:00:00-05:00')
@@ -74,16 +74,15 @@ const DELIVERY = { feedId: 'team', start: '2026-12-15T10:00:00-05:00', end: '202
 const EVENING = session('session-6', 'SOIRÉE DE DÉCEMBRE', '2026-12-15T20:00:00-05:00', '2026-12-15T22:00:00-05:00')
 const CLOSED_LATER = { feedId: 'team', start: '2026-12-09T00:00:00-05:00', end: '2026-12-12T00:00:00-05:00', wholeDay: true, title: 'FERMÉ' }
 const MARATHON = session('session-5', 'MARATHON MODULAIRE', '2027-02-06T18:00:00-05:00', '2027-02-08T01:00:00-05:00')
-const conflictThing = (thing: object) => thing as Calendar['conflicts'][number]['things'][number]
-const longStay = conflictThing({ kind: 'occupation', ...LONG_STAY })
+const longStay: ConflictThing = { kind: 'occupation', ...LONG_STAY }
 const LIST_CALENDAR: Calendar = {
   ...CALENDAR,
   sessions: [TAKEOVER, CANCELLED, EVENING, MARATHON],
   occupations: [LONG_STAY, MEETING, REPAIR, CLOSED_LATER, DELIVERY],
   conflicts: [
-    { start: MEETING.start, end: MEETING.end, things: [longStay, conflictThing({ kind: 'occupation', ...MEETING })] },
+    { start: MEETING.start, end: MEETING.end, things: [longStay, { kind: 'occupation', ...MEETING }] },
     { start: TAKEOVER.start!, end: TAKEOVER.end!, things: [longStay, CONFLICT.things[1]] },
-    { start: REPAIR.start, end: REPAIR.end, things: [longStay, conflictThing({ kind: 'occupation', ...REPAIR })] },
+    { start: REPAIR.start, end: REPAIR.end, things: [longStay, { kind: 'occupation', ...REPAIR }] },
   ],
 }
 
@@ -748,15 +747,15 @@ describe('Calendrier', () => {
     })
 
     it("says a conflict's day with its year when it isn't the row's day's", async () => {
-      const asThing = ({ id, title, start, end }: Session) => conflictThing({ kind: 'session', id, title, start, end, status: 'planned' })
+      const asThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
       // A stay until January, and another over January, each in conflict with a session in January.
       const late = session('session-7', 'NOUVEL AN', '2027-01-01T22:00:00-05:00', '2027-01-02T02:00:00-05:00')
       const later = session('session-8', 'ÉPIPHANIE', '2027-01-06T20:00:00-05:00', '2027-01-06T23:00:00-05:00')
       const stay = { ...LONG_STAY, end: '2027-01-02T11:00:00-05:00' }
       const january = { ...LONG_STAY, start: '2027-01-04T15:00:00-05:00', end: '2027-01-08T11:00:00-05:00' }
-      const conflicts = [
-        { start: late.start!, end: late.end!, things: [conflictThing({ kind: 'occupation', ...stay }), asThing(late)] },
-        { start: later.start!, end: later.end!, things: [conflictThing({ kind: 'occupation', ...january }), asThing(later)] },
+      const conflicts: Calendar['conflicts'] = [
+        { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, asThing(late)] },
+        { start: later.start!, end: later.end!, things: [{ kind: 'occupation', ...january }, asThing(later)] },
       ]
       mockFetch({ ...LOGGED_IN, [LIST]: { ...EMPTY, sessions: [late, later], occupations: [stay, january], conflicts } })
       renderAt('/admin/calendrier?view=list')
@@ -876,7 +875,8 @@ describe('Calendrier', () => {
       const legend = screen.getByRole('list', { name: 'Légende' })
       const narrow = [...legend.querySelectorAll('.calendar-legend-narrow')]
       expect(narrow.map((item) => item.textContent?.trim())).toEqual(['jouée', 'annulée'])
-      expect(narrow.map((item) => item.firstElementChild?.className)).toEqual(['calendar-mark calendar-mark-session calendar-mark-done', 'calendar-mark calendar-mark-session calendar-mark-cancelled'])
+      expect(narrow[0].firstElementChild).toHaveClass('calendar-mark', 'calendar-mark-session', 'calendar-mark-done')
+      expect(narrow[1].firstElementChild).toHaveClass('calendar-mark', 'calendar-mark-session', 'calendar-mark-cancelled')
     })
   })
 

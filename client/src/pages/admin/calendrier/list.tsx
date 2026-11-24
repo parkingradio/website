@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { formatDay, formatDayInYear, formatMonth, sessionPerformers } from '../describe'
-import { nameOf, boundedTimes, startDay } from './model'
+import { briefTimes, nameOf, startDay } from './model'
 import type { ListedMonth, ListedThing } from './model'
 import { OccupationLabel, SessionStatus, ThingKind } from './things'
 
@@ -51,7 +51,7 @@ function ListedText({ listed: { day, thing, conflicts } }: { listed: ListedThing
   return (
     <>
       <span className="calendar-line-when">{formatDayInYear(day)}</span> <ThingKind kind={thing.kind} conflict={conflicts.length > 0} />{' '}
-      <span>{boundedTimes(thing, day)}</span>{' '}
+      <span>{briefTimes(thing, day)}</span>{' '}
       <span className="calendar-line-what">
         {thing.kind === 'session' ? (
           <>

@@ -36,7 +36,7 @@ type Read = { from: string; to: string; calendar: Calendar }
 // last request failed, if it did. The last two reads are kept, whatever their days, so that going back to what was shown
 // just before shows it while it's read again.
 function useCalendar(from: string, to: string, version: number): { last: Calendar | null; shown: Calendar | null; error: string | null } {
-  const [reads, setReads] = useState<{ last: Read[]; error: string | null }>({ last: [], error: null })
+  const [reads, setReads] = useState<{ recent: Read[]; error: string | null }>({ recent: [], error: null })
   const tabShown = useTabShownCount()
   const report = useReportConflicts()
 
@@ -46,7 +46,7 @@ function useCalendar(from: string, to: string, version: number): { last: Calenda
       if (cancelled) return
       if (!result.ok) return setReads((reads) => ({ ...reads, error: result.error }))
       const read = { from, to, calendar: result }
-      setReads(({ last }) => ({ last: [read, ...last.filter((other) => other.from !== from || other.to !== to)].slice(0, 2), error: null }))
+      setReads(({ recent }) => ({ recent: [read, ...recent.filter((other) => other.from !== from || other.to !== to)].slice(0, 2), error: null }))
       report(result.conflicts.length)
     })
     return () => {
@@ -54,8 +54,8 @@ function useCalendar(from: string, to: string, version: number): { last: Calenda
     }
   }, [from, to, version, tabShown, report])
 
-  const shown = reads.last.find((read) => read.from === from && read.to === to)
-  return { last: reads.last[0]?.calendar ?? null, shown: shown?.calendar ?? null, error: reads.error }
+  const shown = reads.recent.find((read) => read.from === from && read.to === to)
+  return { last: reads.recent[0]?.calendar ?? null, shown: shown?.calendar ?? null, error: reads.error }
 }
 
 export function Calendrier() {
@@ -65,7 +65,8 @@ export function Calendrier() {
   const day = readDay(params.get('day'))
   const month = readMonth(params.get('month')) ?? monthOf(day ?? today)
   const grid = gridDays(month)
-  const chosen = day !== null && grid.includes(day) ? day : null
+  // The chosen day, which is in the month's grid, while the month is shown.
+  const chosen = view === 'month' && day !== null && grid.includes(day) ? day : null
   const issuesOpen = params.get('issues') === 'open'
   const { from, to } = view === 'list' ? listRange(today) : gridRange(grid)
   // How many sessions were added, each of which reads the calendar again.
@@ -76,18 +77,16 @@ export function Calendrier() {
   const days = useMemo(() => (view === 'month' && reads.shown ? calendarDays(reads.shown, gridDays(month)) : null), [view, reads.shown, month])
   const months = useMemo(() => (view === 'list' && reads.shown ? listedMonths(reads.shown, from, to) : null), [view, reads.shown, from, to])
   const headingId = useId()
-  // The chosen day, while the month is shown.
-  const shownDay = view === 'month' ? chosen : null
 
   // The day the form for a new session was opened on, which shows while it's the chosen day, and the session last added,
   // and its day, which the chosen day says, until the form opens again. Choosing another day, or none, in any way, e.g.
   // going back in the history, or showing the list, closes the form, and leaves out what it added.
   const [adding, setAdding] = useState<string | null>(null)
   const [added, setAdded] = useState<{ day: string; title: string } | null>(null)
-  const [lastShown, setLastShown] = useState(shownDay)
-  if (shownDay !== lastShown) {
-    setLastShown(shownDay)
-    if (adding !== shownDay) setAdding(null)
+  const [lastChosen, setLastChosen] = useState(chosen)
+  if (chosen !== lastChosen) {
+    setLastChosen(chosen)
+    if (adding !== chosen) setAdding(null)
     setAdded(null)
   }
 
@@ -104,11 +103,11 @@ export function Calendrier() {
     const next = focusNext.current
     focusNext.current = null
     if (next) document.querySelector<HTMLElement>(next)?.focus()
-    if (scrollTo.current !== null && scrollTo.current === shownDay && days) {
+    if (scrollTo.current !== null && scrollTo.current === chosen && days) {
       scrollTo.current = null
       // jsdom has no scrollIntoView.
       document.querySelector('.calendar-day h2')?.scrollIntoView?.({ block: 'nearest' })
-      document.querySelector(dayInMonth(shownDay))?.closest('td')?.scrollIntoView?.({ block: 'nearest' })
+      document.querySelector(dayInMonth(chosen))?.closest('td')?.scrollIntoView?.({ block: 'nearest' })
     }
   })
 
@@ -156,7 +155,7 @@ export function Calendrier() {
             ←
           </Button>
         )}
-        <h2 id={headingId} className={`calendar-heading calendar-toolbar-heading calendar-toolbar-heading-${view}`} aria-live="polite">
+        <h2 id={headingId} className={`calendar-heading calendar-toolbar-heading${view === 'month' ? ' calendar-toolbar-heading-month' : ''}`} aria-live="polite">
           {view === 'list' ? 'À venir' : formatMonth(month)}
         </h2>
         {view === 'month' && (
@@ -195,8 +194,9 @@ export function Calendrier() {
             chosen={chosen}
             days={days}
             onChoose={(shown) => {
-              scrollTo.current = shown === chosen ? null : shown
-              choose(shown === chosen ? null : shown)
+              const next = shown === chosen ? null : shown
+              scrollTo.current = next
+              choose(next)
             }}
             onAdd={(shown) => {
               if (shown !== chosen) choose(shown)
@@ -207,35 +207,35 @@ export function Calendrier() {
           />
         </>
       )}
-      {shownDay && (
+      {chosen && (
         <ChosenDay
-          day={shownDay}
+          day={chosen}
           today={today}
-          entries={days?.get(shownDay) ?? null}
+          entries={days?.get(chosen) ?? null}
           onClose={() => {
-            focusNext.current = dayInMonth(shownDay)
+            focusNext.current = dayInMonth(chosen)
             choose(null)
           }}
         >
-          {adding === shownDay && (
+          {adding === chosen && (
             <NewSessionForm
-              key={shownDay}
-              day={shownDay}
+              key={chosen}
+              day={chosen}
               focusRequests={addings}
               onCancel={() => {
-                focusNext.current = addInMonth(shownDay)
+                focusNext.current = addInMonth(chosen)
                 setAdding(null)
               }}
               onAdded={(session) => {
                 // The day stays chosen, with the focus on it in the month, where the session shows once it's read.
-                focusNext.current = dayInMonth(shownDay)
+                focusNext.current = dayInMonth(chosen)
                 setAdding(null)
-                setAdded({ day: shownDay, title: session.title })
+                setAdded({ day: chosen, title: session.title })
                 setAddedCount((count) => count + 1)
               }}
             />
           )}
-          {added?.day === shownDay && (
+          {added?.day === chosen && (
             <p className="admin-notice" role="status">
               La session {added.title} a été ajoutée.
             </p>
