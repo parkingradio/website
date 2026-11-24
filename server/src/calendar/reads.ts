@@ -15,10 +15,12 @@ import { parseFeed } from './parse.js'
 export const READ_INTERVAL_MS = 15 * 60 * 1000
 
 // What was read from a feed: its events and when, as of the last read that succeeded, or none and null until one does,
-// why the last read failed, or null when it succeeded, and the link its events were read from. A read is only kept while
-// its feed still has that link, so that what's kept is always that of the feed as it is (see "Reading the feeds" in
-// docs/design/server/calendar.md).
-export type FeedRead = { events: CalendarEvent[]; readAt: Date | null; error: string | null; link: string }
+// and why the last read failed, or null when it succeeded.
+export type FeedRead = { events: CalendarEvent[]; readAt: Date | null; error: string | null }
+
+// What's kept of a read: also the link its events were read from. It's only kept while its feed still has that link, so
+// that what's kept is always that of the feed as it is (see "Reading the feeds" in docs/design/server/calendar.md).
+type KeptRead = FeedRead & { link: string }
 
 // A feed to read, which has no id yet while it's being added.
 export type FeedToRead = Pick<StoredFeed, 'name' | 'link'> & { id?: string }
@@ -27,8 +29,10 @@ export type FeedToRead = Pick<StoredFeed, 'name' | 'link'> & { id?: string }
 export type SuccessfulRead = { events: CalendarEvent[]; readAt: Date; link: string }
 
 export type CalendarReads = {
-  // What was read from the feed `id`, or undefined until a read of it ends.
-  of(id: string): FeedRead | undefined
+  // What was read from `feed` as it is now (see "Reading the feeds" in docs/design/server/calendar.md), or undefined
+  // until a read of it ends, or when what was read is from another link, e.g. on a server that hasn't taken in a change
+  // of link yet.
+  of(feed: Pick<StoredFeed, 'id' | 'link'>): FeedRead | undefined
   // Reads the link of a feed that's being added or changed, without keeping what it read. Throws a FeedReadError when it
   // can't be read, or a ReadAborted when the reads stop meanwhile.
   read(feed: FeedToRead): Promise<SuccessfulRead>
@@ -72,7 +76,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 export function calendarReads({ feeds, log, readText = (link, signal) => readLink(link, { signal }), parse = parseFeed }: Options): CalendarReads {
   // What was read from the feeds, which always goes with what `known` has of them (see `reconcile`).
-  const reads = new Map<string, FeedRead>()
+  const reads = new Map<string, KeptRead>()
   // The feeds whose reads are kept, with their links: those that the latest listing gave, and those added or changed
   // since, as they are since, but not those removed since. A read that ends is only kept if its feed is still one of them,
   // with the link it was made from, so that a removed feed's isn't kept again, and one of a link that changed isn't.
@@ -163,7 +167,10 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
   }
 
   return {
-    of: (id) => reads.get(id),
+    of({ id, link }) {
+      const read = reads.get(id)
+      return read?.link === link ? read : undefined
+    },
     read,
 
     added(id, read) {

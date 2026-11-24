@@ -41,7 +41,7 @@ const store = {
 let kept: Map<string, FeedRead>
 const read = vi.fn<CalendarReads['read']>()
 const reads: CalendarReads = {
-  of: (id) => kept.get(id),
+  of: ({ id }) => kept.get(id),
   read,
   added: vi.fn((id: string, done: SuccessfulRead) => kept.set(id, { ...done, error: null })),
   changed: vi.fn((id: string, _link: string, done?: SuccessfulRead) => {
@@ -110,11 +110,8 @@ describe('calendar feeds routes', () => {
       }
 
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
-      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", link: LINK })
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)" })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" }] })
-      // What was read from another link isn't the feed's, e.g. on a server that hasn't taken in a change of link yet.
-      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", link: 'https://example.com/former.ics' })
-      expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
     })
 
     it('requires a session', async () => {

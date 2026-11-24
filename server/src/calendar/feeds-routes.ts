@@ -36,14 +36,7 @@ const linkTaken = (feed: Pick<StoredFeed, 'name'> | null): ApiError => ({
   error: feed ? `The feed "${feed.name}" already has this link` : 'Another feed already has this link',
 })
 
-// What was read from `feed` as it is now (see "Reading the feeds" in docs/design/server/calendar.md): nothing when it was
-// read from another link, e.g. on a server that hasn't taken in a change of link yet.
-export function currentRead(feed: StoredFeed, reads: CalendarReads): FeedRead | undefined {
-  const read = reads.of(feed.id)
-  return read?.link === feed.link ? read : undefined
-}
-
-// A feed, as the endpoints give it, with `read`, what was read from it as it is now, if anything (see `currentRead`).
+// A feed, as the endpoints give it, with `read`, what was read from it as it is now, if anything (see `CalendarReads.of`).
 export function feedBody(
   { id, name, link, createdBy, createdAt, updatedBy, updatedAt }: StoredFeed,
   read: FeedRead | undefined,
@@ -65,7 +58,7 @@ type Options = { feeds: CalendarFeedsStore; reads: CalendarReads }
 
 export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }: Options) {
   const api = zodRoutes(app)
-  const feed = (stored: StoredFeed) => feedBody(stored, currentRead(stored, reads))
+  const feed = (stored: StoredFeed) => feedBody(stored, reads.of(stored))
 
   // Reads the link of a feed that's added or changed, or says why it can't be read.
   async function readFeed(toRead: FeedToRead): Promise<SuccessfulRead | { status: 400 | 502; error: ApiError }> {

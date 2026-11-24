@@ -77,11 +77,11 @@ describe('calendarReads', () => {
 
   it('reads every feed when it starts, then every 15 minutes', async () => {
     const reads = reader()
-    expect(reads.of('a')).toBeUndefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
     reads.start()
     await settle()
-    expect(reads.of('a')).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, link: linkOf('a') })
-    expect(reads.of('b')!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), wholeDay: false, title: 'Airbnb' }])
+    expect(reads.of(feed('a'))).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, link: linkOf('a') })
+    expect(reads.of(feed('b'))!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), wholeDay: false, title: 'Airbnb' }])
     expect(readText).toHaveBeenCalledTimes(2)
 
     // A feed added meanwhile, e.g. by another server, is read with the others.
@@ -92,28 +92,37 @@ describe('calendarReads', () => {
     expect(readText).toHaveBeenCalledTimes(2)
     await vi.advanceTimersByTimeAsync(1)
     expect(readText).toHaveBeenCalledTimes(5)
-    expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-11-26T12:00:00Z') }], readAt: new Date(NOW.getTime() + READ_INTERVAL_MS) })
-    expect(reads.of('c')).toMatchObject({ events: [{ start: new Date('2026-11-25T12:00:00Z') }], error: null })
+    expect(reads.of(feed('a'))).toMatchObject({ events: [{ start: new Date('2026-11-26T12:00:00Z') }], readAt: new Date(NOW.getTime() + READ_INTERVAL_MS) })
+    expect(reads.of(feed('c'))).toMatchObject({ events: [{ start: new Date('2026-11-25T12:00:00Z') }], error: null })
     reads.stop()
     await reads.stopped()
+  })
+
+  it("gives nothing read from another link than the feed's, e.g. on a server that hasn't taken in a change of link yet", async () => {
+    const reads = reader()
+    reads.start()
+    await settle()
+    expect(reads.of(feed('a'))).toBeDefined()
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toBeUndefined()
+    reads.stop()
   })
 
   it('keeps what it read before when a read fails, and says why until one succeeds', async () => {
     const reads = reader()
     reads.start()
     await settle()
-    const before = reads.of('a')!
+    const before = reads.of(feed('a'))!
 
     answers.set('a', new FeedReadError(502, "The link can't be read: its server fails (503)"))
     answers.set('b', '<html>Not a calendar</html>')
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toEqual({ ...before, error: "The link can't be read: its server fails (503)" })
-    expect(reads.of('b')).toMatchObject({ error: "The link can't be read: its answer isn't valid iCalendar" })
+    expect(reads.of(feed('a'))).toEqual({ ...before, error: "The link can't be read: its server fails (503)" })
+    expect(reads.of(feed('b'))).toMatchObject({ error: "The link can't be read: its answer isn't valid iCalendar" })
     expect(log.warn).toHaveBeenCalledWith({ feed: 'a', name: 'Feed a', error: "The link can't be read: its server fails (503)" }, 'Failed to read a calendar feed')
 
     answers.set('a', calendar(5))
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('a')).toMatchObject({ readAt: new Date(NOW.getTime() + 2 * READ_INTERVAL_MS), error: null })
+    expect(reads.of(feed('a'))).toMatchObject({ readAt: new Date(NOW.getTime() + 2 * READ_INTERVAL_MS), error: null })
     reads.stop()
   })
 
@@ -122,7 +131,7 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    expect(reads.of('a')).toEqual({ events: [], readAt: null, error: "The link can't be read: its server refuses it (404)", link: linkOf('a') })
+    expect(reads.of(feed('a'))).toEqual({ events: [], readAt: null, error: "The link can't be read: its server refuses it (404)", link: linkOf('a') })
     reads.stop()
   })
 
@@ -131,7 +140,7 @@ describe('calendarReads', () => {
     const reads = reader()
     reads.start()
     await settle()
-    expect(reads.of('a')!.error).toBe("The link can't be read: something went wrong")
+    expect(reads.of(feed('a'))!.error).toBe("The link can't be read: something went wrong")
     expect(JSON.stringify([log.warn.mock.calls, log.error.mock.calls])).not.toContain('Jane Doe')
     reads.stop()
   })
@@ -158,8 +167,8 @@ describe('calendarReads', () => {
     reads.removed('a')
     a.resolve(calendar(1))
     await settle()
-    expect(reads.of('a')).toBeUndefined()
-    expect(reads.of('b')).toBeDefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
+    expect(reads.of(feed('b'))).toBeDefined()
     reads.stop()
   })
 
@@ -174,8 +183,8 @@ describe('calendarReads', () => {
     reads.removed('b')
     listed.resolve([feed('a'), feed('b')])
     await settle()
-    expect(reads.of('c')).toEqual({ events: [], readAt: NOW, error: null, link: linkOf('c') })
-    expect(reads.of('b')).toBeUndefined()
+    expect(reads.of(feed('c'))).toEqual({ events: [], readAt: NOW, error: null, link: linkOf('c') })
+    expect(reads.of(feed('b'))).toBeUndefined()
     expect(readText).toHaveBeenCalledTimes(1)
     reads.stop()
   })
@@ -191,11 +200,11 @@ describe('calendarReads', () => {
       // The new link is read while the former one is.
       const read = await reads.read({ id: 'a', name: 'Feed a', link: linkOf('a2') })
       reads.changed('a', linkOf('a2'), read)
-      expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
+      expect(reads.of({ id: 'a', link: linkOf('a2') })).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
       if (ending === 'succeeds') a.resolve(calendar(1))
       else a.reject(new FeedReadError(502, "The link can't be read: its server fails (503)"))
       await settle()
-      expect(reads.of('a'), ending).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
+      expect(reads.of({ id: 'a', link: linkOf('a2') }), ending).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z') }], error: null })
       reads.stop()
     }
   })
@@ -208,7 +217,7 @@ describe('calendarReads', () => {
     stored = [{ ...feed('a'), link: linkOf('a2') }, feed('b')]
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
     expect(readText.mock.calls.map(([link]) => link)).toContain(linkOf('a2'))
-    expect(reads.of('a')).toEqual({ events: [], readAt: null, error: "The link can't be read: its server fails (503)", link: linkOf('a2') })
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toEqual({ events: [], readAt: null, error: "The link can't be read: its server fails (503)", link: linkOf('a2') })
     reads.stop()
   })
 
@@ -223,7 +232,7 @@ describe('calendarReads', () => {
     listed.resolve([feed('a'), feed('b')])
     await settle()
     expect(readText.mock.calls.map(([link]) => link)).toEqual([linkOf('a2'), linkOf('b')])
-    expect(reads.of('a')).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z'), title: 'Réparation' }] })
+    expect(reads.of({ id: 'a', link: linkOf('a2') })).toMatchObject({ events: [{ start: new Date('2026-12-01T12:00:00Z'), title: 'Réparation' }] })
     reads.stop()
   })
 
@@ -233,7 +242,7 @@ describe('calendarReads', () => {
     await settle()
     stored = [feed('a')]
     await vi.advanceTimersByTimeAsync(READ_INTERVAL_MS)
-    expect(reads.of('b')).toBeUndefined()
+    expect(reads.of(feed('b'))).toBeUndefined()
     reads.stop()
   })
 
@@ -264,6 +273,6 @@ describe('calendarReads', () => {
     // It doesn't read again.
     await vi.advanceTimersByTimeAsync(2 * READ_INTERVAL_MS)
     expect(readText).toHaveBeenCalledTimes(2)
-    expect(reads.of('a')).toBeUndefined()
+    expect(reads.of(feed('a'))).toBeUndefined()
   })
 })

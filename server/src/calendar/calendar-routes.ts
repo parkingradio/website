@@ -9,7 +9,7 @@ import { compareStrings, conflicts, takesSomeOf, thingOrder } from './conflicts.
 import type { CalendarSession, OccupationThing, Thing } from './conflicts.js'
 import type { CalendarFeedsStore } from './feeds.js'
 import type { CalendarReads } from './reads.js'
-import { Feed, currentRead, feedBody } from './feeds-routes.js'
+import { Feed, feedBody } from './feeds-routes.js'
 
 // The studio's calendar: what takes it over a range of days, and what needs settling (see "The calendar" in
 // docs/design/server/calendar.md).
@@ -120,7 +120,7 @@ export async function adminCalendarRoutes(app: FastifyInstance, { feeds, reads, 
       // What was read from each feed is taken once, so that its status and its occupations are from the same read, that
       // of the feed as it is now. The occupations are in the order of the feeds, then as they were read, which ties keep
       // (see `thingOrder`).
-      const withReads = listed.map((feed) => ({ feed, read: currentRead(feed, reads) }))
+      const withReads = listed.map((feed) => ({ feed, read: reads.of(feed) }))
       const occupations: OccupationThing[] = withReads.flatMap(({ feed, read }) =>
         (read?.events ?? []).map(({ start, end, wholeDay, title }) => ({ kind: 'occupation' as const, feedId: feed.id, start, end, wholeDay, title })),
       )
