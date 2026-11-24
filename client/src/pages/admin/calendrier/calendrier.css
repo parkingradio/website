@@ -1,21 +1,24 @@
 /* The Calendrier page (see docs/design/client/admin/calendrier.md). Each kind of thing has its color and its shape, the
-   same in the legend, the month and the chosen day: sessions light blue with a dark blue bar on their left, occupations
-   light violet with a dashed violet border, free time green, and conflicts a red frame, inside the bar and the
-   border, so that the shapes stay seen. */
+   same in the legend, the month, the chosen day and the list, and in the marks of the month on phones: sessions light
+   blue with a dark blue bar on their left, occupations light violet with a dashed violet border, free time green, and
+   conflicts a red frame, inside the bar and the border, so that the shapes stay seen. */
 
-.calendar-session {
+.calendar-session,
+.calendar-mark-session {
   border-left: 3px solid #1d4fa3;
   background: #e4eefb;
   color: #12305f;
 }
 
-.calendar-occupation {
+.calendar-occupation,
+.calendar-mark-occupation {
   border: 1px dashed #6a3fb5;
   background: #f1eafb;
   color: #4b2a85;
 }
 
-.calendar-free {
+.calendar-free,
+.calendar-mark-free {
   background: #dcf1e0;
   color: #1b5e2a;
 }
@@ -103,18 +106,19 @@
   font-size: 13px;
 }
 
-.calendar-issue-list {
+/* The rows of "À régler" and of the list. */
+.calendar-lines {
   margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
 }
 
-.calendar-issue-list li {
+.calendar-lines li {
   border-top: 1px dotted #999;
 }
 
 /* A row, which is what's done about it, a button or a link: when, then what, on one line, as text. */
-.admin .calendar-issue-row {
+.admin .calendar-line {
   display: grid;
   grid-template-columns: 9rem minmax(0, 1fr);
   gap: 1rem;
@@ -128,37 +132,49 @@
   text-decoration: none;
 }
 
-.admin .calendar-issue-row:hover {
+.admin .calendar-line:hover {
   background: #f2f2f2;
   color: inherit;
 }
 
-.admin .calendar-issue-row:hover strong {
+.admin .calendar-line:hover strong {
   text-decoration: underline;
 }
 
-.admin .calendar-issue-row:focus-visible {
+.admin .calendar-line:focus-visible {
   outline-offset: -2px;
 }
 
-.calendar-issue-when {
+.calendar-line-when {
   color: #666;
 }
 
-/* What a row is about, its things' names or a session's title, in bold. */
-.calendar-issue-what strong {
+/* What a row is about, which can have a long name without spaces, e.g. an occupation's, cut wherever it has to be to fit,
+   and its things' names or a session's title in bold. */
+.calendar-line-what {
+  overflow-wrap: anywhere;
+}
+
+.calendar-line-what :is(strong, .calendar-occupation-title) {
   font-weight: 700;
 }
 
-/* The toolbar, with the month's name between its arrows. */
+/* The toolbar, with the month's name between its arrows, or "À venir" first, and the views' buttons at its end. */
 .calendar-toolbar {
   align-items: center;
 }
 
-.admin .calendar-month-name {
-  min-width: 11rem;
+.admin .calendar-toolbar-heading {
   font-size: 1rem;
+}
+
+.admin .calendar-toolbar-heading-month {
+  min-width: 11rem;
   text-align: center;
+}
+
+.admin .calendar-views {
+  margin: 0 0 0 auto;
 }
 
 .calendar-legend {
@@ -258,8 +274,8 @@
   color: #fff;
 }
 
-/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler". */
-.admin :is(.calendar-number, .calendar-add, .calendar-issue-row):focus-visible {
+/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler" and of the list. */
+.admin :is(.calendar-number, .calendar-add, .calendar-line):focus-visible {
   outline: 2px solid #1d4fa3;
 }
 
@@ -396,40 +412,154 @@
   line-height: 1.5;
 }
 
-.calendar-row-kind {
+.calendar-kind {
   align-self: start;
   justify-self: start;
   padding: 0 6px;
 }
 
-.calendar-conflict-line {
-  display: block;
+/* A conflict, written: on a line of its own on the chosen day, or within a row of the list. */
+.calendar-conflict-line,
+.calendar-conflict-text {
   color: #b3261e;
 }
 
-/* On phones, the month is squeezed into seven narrow columns. */
+.calendar-conflict-line {
+  display: block;
+}
+
+/* The list: each month, under its name, then its rows. */
+.admin .calendar-list h3 {
+  margin: 2rem 0 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #000;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.calendar-list .calendar-lines {
+  margin: 0;
+}
+
+.calendar-list .calendar-lines li:first-child {
+  border-top: none;
+}
+
+.calendar-list .admin-placeholder {
+  margin-top: 0.5rem;
+}
+
+/* A row of the list, in columns as wide as what they have at most, in the page's monospace font: its day, without its
+   year, its kind, as wide as "occupation" with its padding and border (see .calendar-kind), so that the kinds start at
+   the same place, and its times in brief, of 17 characters at most but for things of four weeks or more, which wrap,
+   then what it is, which alone wraps otherwise. */
+.admin .calendar-line.calendar-listed {
+  --listed-day: 13ch;
+  --listed-kind: calc(10ch + 2 * 6px + 2 * 1px);
+  grid-template-columns: var(--listed-day) var(--listed-kind) 17ch minmax(0, 1fr);
+}
+
+/* The marks of what's on a day, and the legend's sessions' status, which only phones show. */
+.calendar-marks,
+.calendar-legend .calendar-legend-narrow {
+  display: none;
+}
+
+/* On phones, the month is seven narrow columns, whose days show marks in place of their words, and the views' buttons
+   are on the toolbar's first line, so that they're where they are whichever view is shown. */
 @media (max-width: 700px) {
-  .calendar-month {
-    font-size: 10px;
+  .admin .calendar-views {
+    flex-basis: 100%;
+    order: -1;
+    margin: 0;
   }
 
   .calendar-month td {
-    height: 4rem;
+    height: 3.5rem;
     padding: 1px;
   }
 
-  .calendar-things li {
+  /* The number and a "+" as large as a finger needs fit side by side in the narrowest columns, about 44px. */
+  .admin .calendar-number {
+    min-width: 0;
     padding: 1px 2px;
   }
 
-  /* The number and the "+" fit side by side in the narrowest columns, about 44px. */
-  .admin .calendar-number {
-    min-width: 0;
+  /* Hidden but for screen readers, as .visually-hidden does (see index.css), rather than not shown, so that the day's
+     words, which describe its button, are still there to browse, with their links. */
+  .calendar-things {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
-  .admin .calendar-add {
-    width: 20px;
-    height: 20px;
+  .calendar-legend .calendar-legend-narrow {
+    display: flex;
+  }
+
+  .calendar-marks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 3px;
+  }
+
+  .calendar-mark,
+  .calendar-legend .calendar-swatch {
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+  }
+
+  /* The strokes that tell marks apart have a contrast of at least 3:1, which the pale fills don't: done sessions are
+     filled grey, cancelled ones are hollow, and free time is a circle with a border. */
+  .calendar-mark-session.calendar-mark-done {
+    border-left-color: #767676;
+    background: #767676;
+  }
+
+  .calendar-mark-session.calendar-mark-cancelled {
+    border: 2px solid #8a6d00;
+    background: none;
+  }
+
+  .calendar-mark-free,
+  .calendar-legend .calendar-free {
+    border: 1px solid #1b5e2a;
+    border-radius: 50%;
+  }
+
+  .calendar-mark-conflict,
+  .calendar-legend .calendar-conflict {
+    outline: 2px solid #c62828;
+    outline-offset: 1px;
+    box-shadow: none;
+  }
+
+  /* Drawn, not read: the day's description and the legend's words say it. */
+  .calendar-marks-conflict::after,
+  .calendar-legend .calendar-conflict::after {
+    content: '!';
+    content: '!' / '';
+    color: #c62828;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 12px;
+  }
+
+  /* The legend's conflict, as a day's marks have it: a frame, then a "!". */
+  .calendar-legend .calendar-conflict {
+    position: relative;
+    margin-right: 10px;
+  }
+
+  .calendar-legend .calendar-conflict::after {
+    position: absolute;
+    left: 17px;
   }
 
   .calendar-row {
@@ -437,8 +567,20 @@
     gap: 0.25rem;
   }
 
-  .admin .calendar-issue-row {
+  .admin .calendar-line {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 0.5rem;
+  }
+
+  /* What a row of the list is goes under its day, its kind and its times, which take all of the row's width, so that
+     its times in brief fit beside them in the narrowest phones. */
+  .admin .calendar-line.calendar-listed {
+    grid-template-columns: var(--listed-day) var(--listed-kind) minmax(0, 1fr);
+    gap: 0.25rem 0.375rem;
+    padding-inline: 0;
+  }
+
+  .calendar-listed .calendar-line-what {
+    grid-column: 1 / -1;
   }
 }

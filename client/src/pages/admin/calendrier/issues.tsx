@@ -2,9 +2,9 @@ import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
-import { conflictCount, formatDuration, formatQuebecDay, formatQuebecDayInYear, sessionPerformers } from '../describe'
+import { conflictCount, formatDuration, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { fullTimes, nameOf, namedThing } from './model'
+import { briefTimes, nameOf, namedThing, startDay } from './model'
 import type { Calendar, Feed } from './model'
 import { SessionStatus } from './things'
 
@@ -80,15 +80,13 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
             >
               {conflicts.map((conflict, i) => {
                 const day = quebecDayAndTime(new Date(conflict.start)).day
-                // Without its year, unless it's another one than today's.
-                const when = day.slice(0, 4) === today.slice(0, 4) ? formatQuebecDayInYear(conflict.start) : formatQuebecDay(conflict.start)
                 const [a, b] = conflict.things.map((thing) => nameOf(namedThing(thing, feeds)))
                 return (
                   <li key={i}>
-                    <button type="button" className="calendar-issue-row" onClick={() => onShowDay(day)}>
-                      <IssueText when={when}>
-                        {fullTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
-                      </IssueText>
+                    <button type="button" className="calendar-line" onClick={() => onShowDay(day)}>
+                      <LineText when={startDay(conflict, today)}>
+                        {briefTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
+                      </LineText>
                     </button>
                   </li>
                 )
@@ -102,12 +100,12 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
             >
               {undatedSessions.map((session) => (
                 <li key={session.id} className={`admin-status-${session.status}`}>
-                  <Link to={sessionPath(session)} className="calendar-issue-row">
-                    <IssueText when="à déterminer">
+                  <Link to={sessionPath(session)} className="calendar-line">
+                    <LineText when="à déterminer">
                       <strong>{session.title}</strong>
                       <SessionStatus status={session.status} /> ·{' '}
                       {[sessionPerformers(session), formatDuration(session.durationMinutes)].filter(Boolean).join(', ')}
-                    </IssueText>
+                    </LineText>
                   </Link>
                 </li>
               ))}
@@ -116,6 +114,16 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
         </div>
       )}
     </section>
+  )
+}
+
+// What a row says, on one line: when, then what it is. The whole row is what's done about it, a button or a link, so its
+// text, which names it, has no links of its own.
+function LineText({ when, children }: { when: string; children: ReactNode }) {
+  return (
+    <>
+      <span className="calendar-line-when">{when}</span> <span className="calendar-line-what">{children}</span>
+    </>
   )
 }
 
@@ -131,18 +139,8 @@ function IssueGroup({ tag, heading, children }: { tag: ReactNode; heading: strin
       <h3>
         {tag} {heading}
       </h3>
-      <ul className="calendar-issue-list">{children}</ul>
+      <ul className="calendar-lines">{children}</ul>
     </div>
-  )
-}
-
-// What a row to settle says, on one line: when, then what it is. The whole row is what's done about it, so its text,
-// which names it, has no links of its own.
-function IssueText({ when, children }: { when: string; children: ReactNode }) {
-  return (
-    <>
-      <span className="calendar-issue-when">{when}</span> <span className="calendar-issue-what">{children}</span>
-    </>
   )
 }
 

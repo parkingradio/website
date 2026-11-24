@@ -1,9 +1,9 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { THING_KIND_LABELS, formatDay, sessionPerformers } from '../describe'
+import { formatDay, sessionPerformers } from '../describe'
 import { fullTimes, inSentence, isFree } from './model'
 import type { CalendarDay, DayThing } from './model'
-import { OccupationLabel, SessionTitle } from './things'
+import { OccupationLabel, SessionTitle, ThingKind } from './things'
 
 // The chosen day, under the month (see "The chosen day" in docs/design/client/admin/calendrier.md).
 
@@ -46,7 +46,7 @@ export function ChosenDay({ day, today, entries, onClose, children }: ChosenDayP
             {entries.map((entry, i) =>
               isFree(entry) ? (
                 <li key={i} className="calendar-row">
-                  <span className="calendar-row-kind calendar-free">disponible</span>
+                  <span className="calendar-kind calendar-free">disponible</span>
                   <span>{entry.part}</span>
                 </li>
               ) : (
@@ -65,7 +65,7 @@ function ThingRow({ day, dayThing: { thing, conflicts } }: { day: string; dayThi
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
     <li className={thing.kind === 'session' ? `calendar-row admin-status-${thing.status}` : 'calendar-row'}>
-      <span className={`calendar-row-kind calendar-${thing.kind}${conflicts.length > 0 ? ' calendar-conflict' : ''}`}>{THING_KIND_LABELS[thing.kind]}</span>
+      <ThingKind kind={thing.kind} conflict={conflicts.length > 0} />
       <span>{fullTimes(thing, day)}</span>
       <span>
         {thing.kind === 'session' ? (

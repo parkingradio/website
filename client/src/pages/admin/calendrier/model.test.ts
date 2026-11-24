@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
-import { addMonths, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, nameOf, namedThing, partOfDay, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
+import { addMonths, briefTimes, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, listRange, listedMonths, nameOf, namedThing, partOfDay, readDay, readMonth, startDay, thingKey, thingsWithConflicts } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
@@ -131,6 +131,49 @@ describe("a thing's times in full", () => {
     expect(fullTimes(stay, '2026-11-28')).toBe("jusqu'au lun. 30 nov., 11 h")
     expect(fullTimes(stay, '2026-11-29')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
     expect(fullTimes(stay, '2026-11-30')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
+  })
+})
+
+describe("a thing's times in brief", () => {
+  it('are its times when they say when it ends: the same day, or the next night', () => {
+    expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-14T21:00:00-05:00'), '2026-11-14')).toBe('18 h – 21 h')
+    expect(briefTimes(times('2026-11-14T21:30:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h 30 – 1 h')
+    expect(briefTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('21 h – 0 h')
+    // Over the night the clocks go back, a 25-hour day.
+    expect(briefTimes(times('2026-10-31T22:00:00-04:00', '2026-11-01T02:00:00-05:00'), '2026-10-31')).toBe('22 h – 2 h')
+  })
+
+  it('are its start, then the last day it takes, when it ends on a later day, in another month or year too', () => {
+    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
+    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-25T00:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
+    // The next day at a later time than it starts.
+    expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-15T21:00:00-05:00'), '2026-11-14')).toBe('18 h → dim. 15')
+    expect(briefTimes(times('2026-12-30T20:00:00-05:00', '2027-01-01T11:00:00-05:00'), '2026-12-30')).toBe('20 h → ven. 1')
+    // With its month, four weeks or more after the day, when its weekday and number could be another day's.
+    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-18T11:00:00-05:00'), '2026-11-21')).toBe('15 h → ven. 18')
+    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-19T11:00:00-05:00'), '2026-11-21')).toBe('15 h → sam. 19 déc.')
+    expect(briefTimes(times('2026-11-18T15:00:00-05:00', '2027-01-02T11:00:00-05:00'), '2026-11-19')).toBe('→ sam. 2 janv.')
+  })
+
+  it('take the day from its start, after an earlier day or from 00:00', () => {
+    const stay = times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00')
+    expect(briefTimes(stay, '2026-11-23')).toBe('→ mar. 24')
+    expect(briefTimes(stay, '2026-11-24')).toBe('→ 11 h')
+    expect(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe('→ 11 h')
+    expect(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-30T11:00:00-05:00'), '2026-11-28')).toBe('→ lun. 30')
+    // Over the end of the month.
+    expect(briefTimes(times('2026-11-28T15:00:00-05:00', '2026-12-01T11:00:00-05:00'), '2026-11-29')).toBe('→ mar. 1')
+  })
+
+  it('are a whole day, or the last of several, on the days the clocks change too', () => {
+    expect(briefTimes(times('2026-11-26T00:00:00-05:00', '2026-11-27T00:00:00-05:00'), '2026-11-26')).toBe('journée')
+    expect(briefTimes(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01')).toBe('journée')
+    expect(briefTimes(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('journée')
+    const closed = times('2026-12-02T00:00:00-05:00', '2026-12-04T00:00:00-05:00')
+    expect(briefTimes(closed, '2026-12-02')).toBe('→ jeu. 3')
+    expect(briefTimes(closed, '2026-12-03')).toBe('journée')
+    // Starting before the day, to its end.
+    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T00:00:00-05:00'), '2026-11-23')).toBe('journée')
   })
 })
 
@@ -285,5 +328,63 @@ describe('the days of the month', () => {
   it("have free time only in the 365 days from the server's today", () => {
     expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-18')!)).toEqual(['toute la journée'])
     expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-19')!)).toEqual([])
+  })
+})
+
+describe('the list', () => {
+  it('has the 365 days from today, those conflicts are found in', () => {
+    expect(listRange('2026-11-19')).toEqual({ from: '2026-11-19', to: '2027-11-18' })
+    // Over a 29 February.
+    expect(listRange('2027-11-19')).toEqual({ from: '2027-11-19', to: '2028-11-17' })
+  })
+
+  // A stay going on since yesterday, until December, in conflict with a meeting today and a session later on, a
+  // session over three days, and a repair over three whole days in January.
+  const { from, to } = listRange('2026-11-19')
+  const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: null }
+  const meeting = { feedId: 'o', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
+  const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
+  const marathon = session('marathon', '2027-02-06T18:00:00-05:00', '2027-02-08T01:00:00-05:00')
+  const repair = { feedId: 'o', start: '2027-01-05T00:00:00-05:00', end: '2027-01-08T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
+  const stayThing = { kind: 'occupation', ...stay } as const
+  const conflicts: Conflict[] = [
+    { start: meeting.start, end: meeting.end, things: [stayThing, { kind: 'occupation', ...meeting }] },
+    { start: late.start!, end: late.end!, things: [stayThing, sessionThing(late)] },
+  ]
+  const months = listedMonths(calendar({ sessions: [late, marathon], occupations: [stay, meeting, repair], conflicts }), from, to)
+
+  it('has every month of its days, each thing once, on the first of these days it takes, by start, then end', () => {
+    expect(months.map(({ month }) => month)).toEqual(['2026-11', '2026-12', ...Array.from({ length: 11 }, (_, i) => addMonths('2027-01', i))])
+    const listed = months.flatMap(({ month, things }) => things.map(({ day, thing }) => [month, day, thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar), thing.start]))
+    expect(listed).toEqual([
+      // Today, though it started yesterday.
+      ['2026-11', '2026-11-19', 'Séjours', stay.start],
+      ['2026-11', '2026-11-19', 'RÉUNION', meeting.start],
+      ['2026-11', '2026-11-21', 'LATE', late.start],
+      ['2027-01', '2027-01-05', 'RÉPARATION', repair.start],
+      ['2027-02', '2027-02-06', 'MARATHON', marathon.start],
+    ])
+    expect(months[1].things).toEqual([])
+  })
+
+  it('gives each thing every one of its conflicts, saying which miss the day it is listed on', () => {
+    const [stayed, met, played] = months[0].things
+    expect(stayed.conflicts.map(({ other, elsewhere }) => [nameOf(other), elsewhere])).toEqual([
+      ['RÉUNION', false],
+      ['LATE', true],
+    ])
+    expect(met.conflicts.map(({ other, elsewhere }) => [nameOf(other), elsewhere])).toEqual([['Séjours', false]])
+    expect(played.conflicts.map(({ other, elsewhere }) => [nameOf(other), elsewhere])).toEqual([['Séjours', false]])
+  })
+
+  it('leaves out what the calendar has outside its days', () => {
+    const played = session('played', '2026-11-07T20:00:00-05:00', '2026-11-07T23:00:00-05:00', 'done')
+    expect(listedMonths(calendar({ sessions: [played] }), from, to).flatMap(({ things }) => things)).toEqual([])
+  })
+
+  it("says the day an overlap starts, with its year when it isn't that of the day it's near", () => {
+    expect(startDay(times('2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00'), '2026-11-19')).toBe('sam. 21 nov.')
+    expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2026-11-19')).toBe('sam. 2 janv. 2027')
+    expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2027-01-01')).toBe('sam. 2 janv.')
   })
 })
