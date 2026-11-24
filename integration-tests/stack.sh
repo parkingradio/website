@@ -48,7 +48,8 @@ wait_until() {
 export -f wait_until
 
 cleanup() {
-    docker rm --force "$CONTAINER" "$PG" >/dev/null 2>&1 || true
+    # With their anonymous volumes, if they have any, so that none outlives the run.
+    docker rm --force --volumes "$CONTAINER" "$PG" >/dev/null 2>&1 || true
     docker network rm "$NETWORK" >/dev/null 2>&1 || true
     # Its layers stay in the build cache, so the next build is just as fast.
     docker rmi "$BUILT_IMAGE" >/dev/null 2>&1 || true
@@ -59,9 +60,14 @@ start_stack() {
 
     # Started before the image is built, so that it comes up while the build runs. The same settings
     # as the development database in docker-compose.yml, and the same major version as RDS.
+    #
+    # Its data is in memory, on a tmpfs over the image's VOLUME, so that no volume is created, even
+    # by a run killed before its trap fired. It doesn't survive a restart of the container, which
+    # would start over from an empty database.
     echo "Starting Postgres..."
     docker network create --label "$LABEL" "$NETWORK" >/dev/null
     docker run --detach --name "$PG" --label "$LABEL" --network "$NETWORK" \
+        --tmpfs /var/lib/postgresql/data \
         --env POSTGRES_USER=parking_radio --env POSTGRES_PASSWORD=parking_radio \
         --env POSTGRES_DB=parking_radio \
         postgres:16 >/dev/null
