@@ -14,10 +14,9 @@ import { YOUTUBE_VIDEO_ID } from '../sessions/links.js'
 const API = 'https://www.googleapis.com/youtube/v3'
 const REQUEST_TIMEOUT_MS = 10_000
 
-// The characters Google's API keys are made of, which a key has to be made of to be sent at all: Node's fetch refuses a
-// header with a line break in it, with an error that quotes the header, key included, and characters past U+00FF fail
-// too. With only these, a request can't fail because of its header, so that its errors never have the key. It allows a
-// blank key, which the routes refuse as too short, and `get` refuses too.
+// The characters Google's API keys are made of, and the only ones a key is sent with: Node's fetch refuses a header
+// with a line break in it, with an error that quotes the header, key included, and fails on characters past U+00FF too.
+// It matches a blank key, so that the routes only say it's too short, but `get` refuses that too.
 export const API_KEY = /^[A-Za-z0-9_-]*$/
 export const NOT_AN_API_KEY = 'Not a YouTube API key, which only has letters, digits, - or _'
 
@@ -38,7 +37,8 @@ const ErrorAnswer = z.object({
 // The reasons YouTube gives for refusing requests for now, rather than refusing the key.
 const QUOTA_REASONS = new Set(['quotaExceeded', 'dailyLimitExceeded', 'rateLimitExceeded', 'userRateLimitExceeded'])
 
-// YouTube refused the key, e.g. because it isn't valid, or the YouTube Data API isn't enabled for its project.
+// The key was refused: by YouTube, e.g. because it isn't valid, or the YouTube Data API isn't enabled for its project, or
+// before asking YouTube, because it isn't in the format of Google's API keys (see `API_KEY`).
 export class YouTubeKeyRefused extends Error {}
 
 // YouTube answered with an error status, giving `reason` for it, if any, e.g. "playlistNotFound".
@@ -53,7 +53,8 @@ class YouTubeStatusError extends Error {
 
 export type YouTube = {
   // The id of the channel's uploads playlist, or null when YouTube finds no such channel. Throws a YouTubeKeyRefused when
-  // YouTube refuses the key, or another error, e.g. when YouTube can't be reached, or refuses requests for now.
+  // the key isn't in its format or YouTube refuses it, or another error, e.g. when YouTube can't be reached, or refuses
+  // requests for now.
   channel(apiKey: string, channelId: string): Promise<{ uploadsPlaylistId: string } | null>
   // The id of the newest video of an uploads playlist, or null when it has none. Throws like `channel`, and when the video's
   // id isn't one.
@@ -63,6 +64,14 @@ export type YouTube = {
 async function get<T>(apiKey: string, resource: string, query: Record<string, string>, schema: z.ZodType<T>): Promise<T> {
   if (!apiKey || !API_KEY.test(apiKey)) throw new YouTubeKeyRefused(NOT_AN_API_KEY)
   const redact = (message: string) => message.replaceAll(apiKey, '[key]')
+  // Fetch says why it failed in its error's cause, e.g. that www.googleapis.com can't be found, or only with its code,
+  // e.g. ECONNREFUSED when none of its addresses accept connections. Fetch's error isn't kept as the cause of this one,
+  // since the logs would include it, unredacted.
+  const unreachable = (error: unknown) => {
+    const cause = error instanceof Error && error.cause !== undefined ? error.cause : error
+    const code = cause instanceof Error && 'code' in cause ? String(cause.code) : ''
+    return new Error(`YouTube cannot be reached: ${redact(errorMessage(cause) || code || errorMessage(error))}`)
+  }
   let response: Response
   try {
     response = await fetch(`${API}/${resource}?${new URLSearchParams(query)}`, {
@@ -70,10 +79,7 @@ async function get<T>(apiKey: string, resource: string, query: Record<string, st
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
-    // Fetch says why in its error's cause, e.g. that www.googleapis.com can't be found.
-    const reason = error instanceof Error && error.cause !== undefined ? error.cause : error
-    // eslint-disable-next-line preserve-caught-error -- the logs would include the cause, whose messages aren't redacted.
-    throw new Error(`YouTube cannot be reached: ${redact(errorMessage(reason))}`)
+    throw unreachable(error)
   }
   if (!response.ok) {
     const answer = ErrorAnswer.safeParse(await response.json().catch(() => null))

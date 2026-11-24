@@ -62,7 +62,7 @@ minute.
 | Request field | Type | |
 |---|---|---|
 | `channelId` | string | The channel's id: `UC`, then 22 letters, digits, `-` or `_`. Trimmed |
-| `apiKey` | string | The API key: up to 200 letters, digits, `-` or `_`, which Google's API keys are made of. Trimmed |
+| `apiKey` | string | The API key: up to 200 letters, digits, `-` or `_`. Trimmed |
 
 Asks YouTube for the channel with the key, and only if YouTube accepts the key and finds the channel, saves them, reads
 the video through them, and responds like `GET /api/admin/video/credentials`: its `error` is that of this read, which

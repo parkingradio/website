@@ -116,23 +116,24 @@ describe('youtube', () => {
       await expect(failed).rejects.not.toHaveProperty('cause')
     })
 
-    it.each([
-      ['a line break, which fetch would refuse with an error that quotes the header', 'AIza-the\nkey'],
-      ['a letter past U+00FF', 'AIza-the-keyŁ'],
-      ['a letter Latin-1 has', 'AIza-the-key\u00e9'],
-      ['a space', 'AIza the-key'],
-    ])('refuses a key with %s before sending any request, without quoting it', async (_, key) => {
-      youtubeAnswers(() => Response.json({}))
+    it("gives the code of fetch's cause when its message is blank, e.g. when none of YouTube's addresses can be reached", async () => {
+      const cause = Object.assign(new AggregateError([new Error('connect ECONNREFUSED 142.250.0.1:443')], ''), { code: 'ECONNREFUSED' })
+      fetchMock.mockRejectedValue(new TypeError('fetch failed', { cause }))
 
-      const failed = youtube.channel(key, CHANNEL_ID)
-
-      await expect(failed).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
-      await expect(failed).rejects.not.toThrow(key)
-      expect(fetchMock).not.toHaveBeenCalled()
+      await expect(youtube.channel(KEY, CHANNEL_ID)).rejects.toThrow(new Error('YouTube cannot be reached: ECONNREFUSED'))
     })
 
-    it('refuses a blank key before sending any request', async () => {
-      await expect(youtube.channel('', CHANNEL_ID)).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
+    it.each([
+      ['a key with a line break, which fetch would refuse with an error that quotes the header', 'AIza-the\nkey'],
+      ['a key with a letter past U+00FF', 'AIza-the-keyŁ'],
+      ['a key with a letter Latin-1 has', 'AIza-the-key\u00e9'],
+      ['a key with a space', 'AIza the-key'],
+      ['a blank key', ''],
+    ])('refuses %s before sending any request, without quoting it', async (_, key) => {
+      const failed = youtube.channel(key, CHANNEL_ID)
+
+      await expect(failed).rejects.toBeInstanceOf(YouTubeKeyRefused)
+      await expect(failed).rejects.toThrow(new Error(NOT_AN_API_KEY))
       expect(fetchMock).not.toHaveBeenCalled()
     })
   })
@@ -180,7 +181,7 @@ describe('youtube', () => {
       },
     )
 
-    it('fails like `channel` when YouTube refuses the key, or requests for now', async () => {
+    it("fails like `channel` when the key isn't in its format, YouTube refuses it, or YouTube refuses requests for now", async () => {
       youtubeAnswers(failure(400, 'badRequest', 'API key expired. Please renew the API key.'))
       await expect(youtube.newestUpload(KEY, UPLOADS)).rejects.toBeInstanceOf(YouTubeKeyRefused)
 
@@ -188,7 +189,9 @@ describe('youtube', () => {
       await expect(youtube.newestUpload(KEY, UPLOADS)).rejects.toThrow('YouTube refuses requests for now: Quota exceeded.')
 
       fetchMock.mockClear()
-      await expect(youtube.newestUpload('AIza-the\nkey', UPLOADS)).rejects.toThrow(new YouTubeKeyRefused(NOT_AN_API_KEY))
+      const failed = youtube.newestUpload('AIza-the\nkey', UPLOADS)
+      await expect(failed).rejects.toBeInstanceOf(YouTubeKeyRefused)
+      await expect(failed).rejects.toThrow(new Error(NOT_AN_API_KEY))
       expect(fetchMock).not.toHaveBeenCalled()
     })
   })
