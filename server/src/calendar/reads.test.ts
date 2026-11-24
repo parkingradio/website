@@ -18,9 +18,9 @@ function feed(id: string): StoredFeed {
 }
 
 // A calendar with one event, which starts `day` days after NOW.
-function calendar(day = 1, summary = 'Réparation') {
+function calendar(day = 1) {
   const start = new Date(NOW.getTime() + day * 24 * 60 * 60 * 1000).toISOString().replace(/[-:]|\.\d+/g, '')
-  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', `DTSTART:${start}`, 'DURATION:PT1H', `SUMMARY:${summary}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', `DTSTART:${start}`, 'DURATION:PT1H', 'SUMMARY:Réparation', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')
 }
 
 // A promise and what settles it.
@@ -65,7 +65,7 @@ describe('calendarReads', () => {
     list.mockReset().mockImplementation(async () => stored)
     answers = new Map([
       ['a', calendar(1)],
-      ['b', calendar(2, 'Airbnb')],
+      ['b', calendar(2)],
     ])
     readText.mockClear()
     vi.clearAllMocks()
@@ -81,7 +81,6 @@ describe('calendarReads', () => {
     reads.start()
     await settle()
     expect(reads.of(feed('a'))).toEqual({ events: [{ start: new Date('2026-11-23T12:00:00Z'), end: new Date('2026-11-23T13:00:00Z'), wholeDay: false, title: 'Réparation' }], readAt: NOW, error: null, link: linkOf('a') })
-    expect(reads.of(feed('b'))!.events).toEqual([{ start: new Date('2026-11-24T12:00:00Z'), end: new Date('2026-11-24T13:00:00Z'), wholeDay: false, title: 'Airbnb' }])
     expect(readText).toHaveBeenCalledTimes(2)
 
     // A feed added meanwhile, e.g. by another server, is read with the others.

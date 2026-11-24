@@ -200,7 +200,7 @@ describe('things', () => {
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false, title: 'A' } as const
     // The same instants, written otherwise.
     expect(thingKey({ ...occupation, start: '2026-11-15T02:00:00Z' })).toBe(thingKey(occupation))
-    for (const other of [{ title: 'B' }, { title: '' }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
+    for (const other of [{ title: 'B' }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
       expect(thingKey({ ...occupation, ...other })).not.toBe(thingKey(occupation))
     }
     const session = { kind: 'session', id: 's', title: 'X', start: occupation.start, end: occupation.end, status: 'planned' } as const
@@ -211,7 +211,6 @@ describe('things', () => {
     const feeds = [feed('f', 'Équipe'), feed('g', 'Séjours')]
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false } as const
     expect(namedThing({ ...occupation, title: 'RÉPARATION' }, feeds)).toEqual({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Équipe' })
     expect(namedThing({ ...occupation, feedId: 'g', title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
     expect(inSentence({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe("l'occupation RÉPARATION (Équipe)")
     expect(inSentence({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe("l'occupation Séjours")

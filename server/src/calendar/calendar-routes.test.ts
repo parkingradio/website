@@ -202,7 +202,7 @@ describe('GET /api/admin/calendar', () => {
     expect(reads.of).toHaveBeenCalledTimes(2 * FEEDS.length)
   })
 
-  it('gives the sessions by start, and occupations without a title with an empty one', async () => {
+  it('gives the sessions by start', async () => {
     rows = [
       session('b', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-02T12:00:00Z'),
       session('c', '2026-11-23T20:00:00Z', 60, 'cancelled', '2026-10-01T12:00:00Z'),

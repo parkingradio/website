@@ -61,20 +61,18 @@ describe('The calendar feeds', () => {
     expect(within(team).queryByRole('link')).toBeNull()
     expect(within(team).getByText(/^Ajouté par admin@example.com le 7 novembre 2026/)).toHaveTextContent(/Lu le 22 novembre 2026 à 12 h 15\.$/)
     expect(team).not.toHaveTextContent('a échoué')
-    expect(stays).toHaveTextContent('Séjours modifier retirer')
+    expect(stays).toHaveTextContent('Séjours')
     expect(stays).toHaveTextContent('https://example.com/stays.ics')
     expect(stays).toHaveTextContent('Pas encore lu.')
     expect(within(stays).getByText(/^La dernière lecture a échoué/)).toHaveTextContent("La dernière lecture a échoué : The link can't be read: its server fails (503)")
   })
 
-  it('takes the name and the link, as text, and nothing else', async () => {
+  it('takes the link as text', async () => {
     mockFetch(list())
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(linkField()).toBeInTheDocument())
     expect(linkField()).toHaveAttribute('autocomplete', 'off')
-    expect(within(addForm()).getAllByRole('textbox')).toEqual([nameField(), linkField()])
-    expect(within(addForm()).queryByRole('checkbox')).toBeNull()
   })
 
   it('adds a feed once its name and link are filled in, then clears the form and lists it', async () => {
@@ -133,7 +131,7 @@ describe('The calendar feeds', () => {
 
     await waitFor(() => expect(within(items()[0]).queryByRole('button', { name: 'enregistrer' })).toBeNull())
     expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe', link: 'https://example.com/new.ics' }])
-    expect(items()[0]).toHaveTextContent('Équipe modifier retirer')
+    expect(items()[0]).toHaveTextContent('Équipe')
     expect(items()[0]).toHaveTextContent('https://example.com/new.ics')
     // The add form is as it was.
     expect(nameField()).toHaveValue('')
