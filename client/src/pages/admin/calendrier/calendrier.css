@@ -449,6 +449,19 @@
   margin-top: 0.5rem;
 }
 
+/* A row of the list, in columns as wide as what they have at most, in the page's monospace font: its day, without its
+   year, its kind, as wide as "occupation" with its padding and border (see .calendar-kind), so that the kinds start at
+   the same place, and its times in brief, of 17 characters at most but for things of four weeks or more, which wrap,
+   then what it is, which alone wraps otherwise. */
+.calendar-listed {
+  --listed-day: 13ch;
+  --listed-kind: calc(10ch + 2 * 6px + 2 * 1px);
+}
+
+.admin .calendar-line.calendar-listed {
+  grid-template-columns: var(--listed-day) var(--listed-kind) 17ch minmax(0, 1fr);
+}
+
 /* The marks of what's on a day, and the legend's sessions' status, which only phones show. */
 .calendar-marks,
 .calendar-legend .calendar-legend-narrow {
@@ -560,5 +573,17 @@
   .admin .calendar-line {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 0.5rem;
+  }
+
+  /* What a row of the list is goes under its day, its kind and its times, which take all of the row's width, so that
+     its times in brief fit beside them in the narrowest phones. */
+  .admin .calendar-line.calendar-listed {
+    grid-template-columns: var(--listed-day) var(--listed-kind) minmax(0, 1fr);
+    gap: 0.25rem 0.375rem;
+    padding-inline: 0;
+  }
+
+  .calendar-listed .calendar-line-what {
+    grid-column: 1 / -1;
   }
 }

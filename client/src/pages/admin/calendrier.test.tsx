@@ -725,16 +725,16 @@ describe('Calendrier', () => {
       expect([months[0], months[1], months[2], months.at(-1)]).toEqual(['novembre 2026', 'décembre 2026', 'janvier 2027', 'novembre 2027'])
       expect(within(list()).getAllByRole('listitem').map(visibleText)).toEqual([
         // Going on since yesterday, with its conflicts: today's, and those of later days, with their day.
-        "jeu. 19 nov. mer. 18 nov., 15 h – mer. 2 déc., 11 h · occupation Séjours · conflit avec RÉUNION · conflit avec HAUTE RIVE TAKEOVER (sam. 21 nov.) · conflit avec RÉPARATION (jeu. 26 nov.)",
-        "jeu. 19 nov. 10 h – 12 h · occupation RÉUNION, calendrier Calendrier de l'équipe · conflit avec Séjours",
-        'sam. 21 nov. 21 h – 1 h · session HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan · conflit avec Séjours',
-        'mar. 24 nov. 20 h – 23 h · session LIVE PERFORMANCE annulée',
-        "jeu. 26 nov. 10 h – 16 h · occupation RÉPARATION, calendrier Calendrier de l'équipe · conflit avec Séjours",
-        "mer. 9 déc. du mer. 9 déc. au ven. 11 déc. · occupation FERMÉ, calendrier Calendrier de l'équipe",
+        "jeu. 19 nov. occupation → mer. 2 Séjours · conflit avec RÉUNION · conflit avec HAUTE RIVE TAKEOVER (sam. 21 nov.) · conflit avec RÉPARATION (jeu. 26 nov.)",
+        "jeu. 19 nov. occupation 10 h – 12 h RÉUNION, calendrier Calendrier de l'équipe · conflit avec Séjours",
+        'sam. 21 nov. session 21 h – 1 h HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan · conflit avec Séjours',
+        'mar. 24 nov. session 20 h – 23 h LIVE PERFORMANCE annulée',
+        "jeu. 26 nov. occupation 10 h – 16 h RÉPARATION, calendrier Calendrier de l'équipe · conflit avec Séjours",
+        "mer. 9 déc. occupation → ven. 11 FERMÉ, calendrier Calendrier de l'équipe",
         // In order of start.
-        "mar. 15 déc. 10 h – 12 h · occupation LIVRAISON, calendrier Calendrier de l'équipe",
-        'mar. 15 déc. 20 h – 22 h · session SOIRÉE DE DÉCEMBRE',
-        'sam. 6 févr. 18 h – lun. 8 févr., 1 h · session MARATHON MODULAIRE',
+        "mar. 15 déc. occupation 10 h – 12 h LIVRAISON, calendrier Calendrier de l'équipe",
+        'mar. 15 déc. session 20 h – 22 h SOIRÉE DE DÉCEMBRE',
+        'sam. 6 févr. session 18 h → lun. 8 MARATHON MODULAIRE',
       ])
       // Each row is one control, without links, and a cancelled session's in its status colors.
       expect(within(list()).queryByRole('link')).not.toBeInTheDocument()
@@ -763,8 +763,8 @@ describe('Calendrier', () => {
       await loaded()
 
       const rows = within(list()).getAllByRole('listitem').map(visibleText)
-      expect(rows[0]).toBe('jeu. 19 nov. mer. 18 nov., 15 h – sam. 2 janv., 11 h · occupation Séjours · conflit avec NOUVEL AN (ven. 1 janv. 2027)')
-      expect(rows[2]).toBe('lun. 4 janv. 15 h – ven. 8 janv., 11 h · occupation Séjours · conflit avec ÉPIPHANIE (mer. 6 janv.)')
+      expect(rows[0]).toBe('jeu. 19 nov. occupation → sam. 2 janv. Séjours · conflit avec NOUVEL AN (ven. 1 janv. 2027)')
+      expect(rows[2]).toBe('lun. 4 janv. occupation 15 h → ven. 8 Séjours · conflit avec ÉPIPHANIE (mer. 6 janv.)')
     })
 
     it('shows the day of a row, chosen, in the month, as a step in the history, and back finds the list', async () => {
@@ -789,7 +789,7 @@ describe('Calendrier', () => {
       await again.answer(LIST_CALENDAR)
 
       // Something going on since before today is on today.
-      fireEvent.click(listRow(/^jeu\. 19 nov\.\s+mer\. 18 nov\./))
+      fireEvent.click(listRow(/^jeu\. 19 nov\. occupation → mer\. 2/))
       expect(path()).toBe('/admin/calendrier?month=2026-11&day=2026-11-19')
       back()
       // A day of another month.
@@ -922,7 +922,7 @@ describe('Calendrier', () => {
       const showDay = within(conflict).getByRole('button')
       expect(showDay).toHaveAccessibleName('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
       expect(within(conflict).queryByRole('link')).not.toBeInTheDocument()
-      expect(visibleText(later)).toBe("sam. 9 janv. 2027 jusqu'au dim. 10 janv., 11 h · Séjours et RÉPARATION")
+      expect(visibleText(later)).toBe('sam. 9 janv. 2027 → dim. 10 · Séjours et RÉPARATION')
       // Its duration after its sets' performers, which "·" separates.
       expect(visibleText(undated)).toBe('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
       expect(within(undated).getByRole('link')).toHaveAccessibleName('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')

@@ -2,7 +2,7 @@ import type { Data, Schema } from '../../../api/client'
 import { isDay } from '../../../application-fields'
 import { addDays, daysBetween, quebecDayAndTime, quebecInstant } from '../../../quebec-time'
 import type { Session } from '../../../session-fields'
-import { endsByItsTime, formatDayInYear, formatQuebecDay, formatQuebecDayInYear, formatTime, shortTimes } from '../describe'
+import { endsByItsTime, formatDayInYear, formatQuebecDay, formatQuebecDayInYear, formatTime, formatWeekdayAndNumber, shortTimes } from '../describe'
 
 // What the Calendrier page shows of the calendar, worked out from what the server gives (see
 // docs/design/client/admin/calendrier.md), without React. Days are "YYYY-MM-DD" in Québec, and months "YYYY-MM", which
@@ -111,6 +111,23 @@ export function partOfDay({ start, end }: Times, day: string): string {
   if (from <= dayFrom) return `jusqu'à ${timeOf(to)}`
   if (to <= dayTo || endsByItsTime(start, end)) return `${timeOf(from)} – ${timeOf(to)}`
   return `dès ${timeOf(from)}`
+}
+
+// Something's times in brief, on `day`, which it takes some of, e.g. "18 h – 21 h", "21 h – 1 h", "15 h → mar. 24", "→ 11 h",
+// "journée" or "→ jeu. 3", where a later day is the last one it takes, with its month when it's four weeks or more after
+// `day`, e.g. "→ sam. 2 janv.": at most 17 characters, but for things that long, unlike `shortTimes`, which says the
+// times it ends at (see "What's shown" in docs/design/client/admin/calendrier.md).
+export function boundedTimes(times: Times, day: string): string {
+  const [from, to] = [Date.parse(times.start), Date.parse(times.end)]
+  const last = dayOf(to - 1)
+  // A weekday and a number only come back together four weeks or more later.
+  const lastDay = () => (daysBetween(day, last) < 28 ? formatWeekdayAndNumber(last) : formatDayInYear(last))
+  // From the start of the day: since an earlier day, or 00:00.
+  if (from <= dayStart(day)) {
+    if (last > day) return `→ ${lastDay()}`
+    return to >= dayStart(addDays(day, 1)) ? 'journée' : `→ ${timeOf(to)}`
+  }
+  return endsByItsTime(times.start, times.end) ? shortTimes(times) : `${timeOf(from)} → ${lastDay()}`
 }
 
 // Something's times in full, on `day`, e.g. "21 h – 1 h", "toute la journée", "du ven. 13 nov. au dim. 15 nov.",

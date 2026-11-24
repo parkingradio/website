@@ -1,10 +1,10 @@
 import { Fragment } from 'react'
 import { formatDay, formatDayInYear, formatMonth, sessionPerformers } from '../describe'
-import { fullTimes, nameOf, startDay } from './model'
+import { nameOf, boundedTimes, startDay } from './model'
 import type { ListedMonth, ListedThing } from './model'
-import { LineText, OccupationLabel, SessionStatus, ThingKind } from './things'
+import { OccupationLabel, SessionStatus, ThingKind } from './things'
 
-// The list: what takes the studio over the 365 days from today, month by month, each thing once, on one line (see "The
+// The list: what takes the studio over the 365 days from today, month by month, each thing once, in columns (see "The
 // list" in docs/design/client/admin/calendrier.md).
 
 type ListProps = {
@@ -30,7 +30,7 @@ export function List({ nameId, to, months, onShowDay }: ListProps) {
             <ul className="calendar-lines">
               {things.map((listed, i) => (
                 <li key={i} className={listed.thing.kind === 'session' ? `admin-status-${listed.thing.status}` : undefined}>
-                  <button type="button" className="calendar-line" onClick={() => onShowDay(listed.day)}>
+                  <button type="button" className="calendar-line calendar-listed" onClick={() => onShowDay(listed.day)}>
                     <ListedText listed={listed} />
                   </button>
                 </li>
@@ -44,31 +44,34 @@ export function List({ nameId, to, months, onShowDay }: ListProps) {
   )
 }
 
-// A thing's row: its day, its times in full on that day, its kind, what it is, and each of its conflicts, with the day it
-// starts when it's on another day.
+// A thing's row, in columns: its day, its kind, its times in brief on that day, then what it is, and each of its
+// conflicts, with the day it starts when it's on another day, which alone wraps.
 function ListedText({ listed: { day, thing, conflicts } }: { listed: ListedThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
-    <LineText when={formatDayInYear(day)}>
-      {fullTimes(thing, day)} · <ThingKind kind={thing.kind} conflict={conflicts.length > 0} />{' '}
-      {thing.kind === 'session' ? (
-        <>
-          <strong>{thing.title}</strong>
-          <SessionStatus status={thing.status} />
-          {performers && ` · ${performers}`}
-        </>
-      ) : (
-        <OccupationLabel title={thing.title} calendar={thing.calendar} />
-      )}
-      {conflicts.map(({ conflict, other, elsewhere }, i) => (
-        <Fragment key={i}>
-          {' · '}
-          <span className="calendar-conflict-text">
-            conflit avec {nameOf(other)}
-            {elsewhere && ` (${startDay(conflict, day)})`}
-          </span>
-        </Fragment>
-      ))}
-    </LineText>
+    <>
+      <span className="calendar-line-when">{formatDayInYear(day)}</span> <ThingKind kind={thing.kind} conflict={conflicts.length > 0} />{' '}
+      <span>{boundedTimes(thing, day)}</span>{' '}
+      <span className="calendar-line-what">
+        {thing.kind === 'session' ? (
+          <>
+            <strong>{thing.title}</strong>
+            <SessionStatus status={thing.status} />
+            {performers && ` · ${performers}`}
+          </>
+        ) : (
+          <OccupationLabel title={thing.title} calendar={thing.calendar} />
+        )}
+        {conflicts.map(({ conflict, other, elsewhere }, i) => (
+          <Fragment key={i}>
+            {' · '}
+            <span className="calendar-conflict-text">
+              conflit avec {nameOf(other)}
+              {elsewhere && ` (${startDay(conflict, day)})`}
+            </span>
+          </Fragment>
+        ))}
+      </span>
+    </>
   )
 }

@@ -25,19 +25,24 @@ On narrow screens like phones, the month shows them as marks instead (see [On ph
 
 Occupations can't be changed on the site, only in their calendars, which their names give.
 
-A thing's times are written in two ways:
+A thing's times are written in three ways:
 
 - **Its part of a day**, in the month: "toute la journée", "21 h – 23 h", "dès 18 h", or "jusqu'à 1 h" on a day it
   takes from its start.
 - **In full**, on a day, e.g. the chosen day: "21 h – 23 h", "18 h – dim. 15 nov., 2 h", or "ven. 13 nov., 21 h – 1 h"
   on a day after the one it starts on.
+- **In brief**, on a day, in the list and in "À régler", where they're as short as they can be: "21 h – 23 h", or "21 h
+  – 1 h" when it ends the next day at an earlier time than it starts; its start, then the last day it takes, when that's
+  a later one, e.g. "15 h → mar. 24"; and on a day it takes from its start, "→ 11 h" when it ends on that day, "journée"
+  when it takes all of it, or else the last day it takes, e.g. "→ jeu. 3". A later day has its weekday and its number,
+  which are another day's only four weeks or more after, and its month too, then, e.g. "→ sam. 2 janv.".
 
 Something that takes whole days, from 00:00 to 00:00, is written as such, whether it's whole-day or not: "toute la
 journée", or in full "du ven. 13 nov. au dim. 15 nov.". Otherwise, something that starts at 00:00 is written from the
 start of its day: "jusqu'à 11 h", or in full "jusqu'au dim. 29 nov., 11 h" when it ends on a later day, or "du sam. 28
-nov. jusqu'au lun. 30 nov., 11 h" on a day after the one it starts on. Something that ends the next day at an earlier
-time than it starts is written like a session's times in short (see [Times, in Sessions](sessions.md#times)),
-"21 h – 1 h", then "jusqu'à 1 h" on the next day.
+nov. jusqu'au lun. 30 nov., 11 h" on a day after the one it starts on, and in brief "→ 11 h" or "→ dim. 29". Something
+that ends the next day at an earlier time than it starts is written like a session's times in short (see [Times, in
+Sessions](sessions.md#times)), "21 h – 1 h", then "jusqu'à 1 h" on the next day.
 
 ## The address
 
@@ -74,7 +79,7 @@ the keyboard, as one control, which its text names, and which shows when it's ho
 links of its own.
 
 - The conflicts: "conflits", "chevauchements à résoudre", then each one, in the server's order. Its row has the day it
-  starts, without its year unless it's another year than today's, then the time its two things overlap, in full on that
+  starts, without its year unless it's another year than today's, then the time its two things overlap, in brief on that
   day (see [What's shown](#whats-shown)), then "·" and the two things' names, joined by "et": a session's title, and an
   occupation's, or its calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER
   ». It shows that day, chosen, in the month, with the focus on it, whichever view is shown.
@@ -193,11 +198,11 @@ its name, e.g. "novembre 2026", then a row for each thing, or « Rien. » when i
 at, « La liste s'arrête au jeudi 18 novembre 2027. ». Free time isn't listed: the month shows it.
 
 Each thing is listed once, on the first of these days it takes some of: the day it starts, or today for something that
-started before. Things are in order of their start, then of their end. A thing's row is on one line, as "À régler"'s
-are: the day, without its year, which its month gives, then its times in full on that day (see
-[What's shown](#whats-shown)), "·", and what it is:
+started before. Things are in order of their start, then of their end. A thing's row is in columns, which start at the
+same place on every row: the day, without its year, which its month gives; its kind, "session" or "occupation", in its
+color and with its shape, framed in red when it's in a conflict; its times in brief on that day (see
+[What's shown](#whats-shown)); then what it is, which goes under the rest on narrow screens like phones:
 
-- its kind, "session" or "occupation", in its color and with its shape, framed in red when it's in a conflict;
 - for a session, its title, then its status, unless it's planned, in the [status colors](layout.md#status-colors), then
   "·" and its sets' performers, set by set, the sets separated by "·"; for an occupation, its title, then its calendar,
   or its calendar's name alone (see [What's shown](#whats-shown));
@@ -205,8 +210,8 @@ are: the day, without its year, which its month gives, then its times in full on
   when their overlap doesn't take some of the row's day, the day it starts, without its year unless it's another year
   than the row's day's.
 
-E.g. « mar. 1 déc. 15 h – 11 h · occupation Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier de l'équipe
-(mer. 2 déc.) ».
+E.g. « mar. 1 déc. | occupation | 15 h – 11 h | Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier de
+l'équipe (mer. 2 déc.) ».
 
 As in "À régler", the whole row is one control, whose text has no links of its own: it shows the row's day, chosen, in
 the month, with the focus on it, where the chosen day links to a session's page. Screen readers name the list by the

@@ -4,9 +4,9 @@ import { Link } from 'react-router'
 import { quebecDayAndTime } from '../../../quebec-time'
 import { conflictCount, formatDuration, sessionPerformers } from '../describe'
 import { sessionPath } from '../session-errors'
-import { fullTimes, nameOf, namedThing, startDay } from './model'
+import { nameOf, namedThing, boundedTimes, startDay } from './model'
 import type { Calendar, Feed } from './model'
-import { LineText, SessionStatus } from './things'
+import { SessionStatus } from './things'
 
 // "À régler": one box, whose first row opens it, with how many conflicts and sessions without a date there are, then
 // what the feeds' reads say, and, opened, the conflicts and the sessions without a date (see "À régler" in
@@ -85,7 +85,7 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
                   <li key={i}>
                     <button type="button" className="calendar-line" onClick={() => onShowDay(day)}>
                       <LineText when={startDay(conflict, today)}>
-                        {fullTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
+                        {boundedTimes(conflict, day)} · <strong>{a}</strong> et <strong>{b}</strong>
                       </LineText>
                     </button>
                   </li>
@@ -114,6 +114,16 @@ export function Issues({ calendar: { conflicts, undatedSessions, feeds }, today,
         </div>
       )}
     </section>
+  )
+}
+
+// What a row says, on one line: when, then what it is. The whole row is what's done about it, a button or a link, so its
+// text, which names it, has no links of its own.
+function LineText({ when, children }: { when: string; children: ReactNode }) {
+  return (
+    <>
+      <span className="calendar-line-when">{when}</span> <span className="calendar-line-what">{children}</span>
+    </>
   )
 }
 

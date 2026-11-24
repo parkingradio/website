@@ -247,6 +247,13 @@ export function formatMonth(month: string): string {
   return monthFormat.format(new Date(`${month}-01`))
 }
 
+const weekdayAndNumberFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
+
+// E.g. "mar. 24", for a day as "YYYY-MM-DD", by its weekday and its number alone.
+export function formatWeekdayAndNumber(day: string): string {
+  return weekdayAndNumberFormat.format(new Date(day))
+}
+
 const dayInYearFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 // E.g. "mer. 7 oct.", like `formatQuebecDayInYear`, but for a day.

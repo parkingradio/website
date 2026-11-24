@@ -58,8 +58,9 @@ function ownCalendar(unique: string, day: string) {
 const busy = (unique: string, day: string) =>
   Array.from({ length: 8 }, (_, i) => ({ feedId: `team-${unique}`, start: at(day, `${12 + i}:00`), end: at(day, `${13 + i}:00`), wholeDay: false, title: `OCCUPÉ ${i + 1}` }))
 
-// E.g. "ven. 13 nov.", as the page writes a day in a list's row, or in a thing's times.
+// E.g. "ven. 13 nov.", as the page writes a day in a list's row, and "ven. 13", in a thing's times in short.
 const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
+const weekdayAndNumber = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 
 // Whether the page scrolls sideways, which it shouldn't, on phones too.
 const scrollsSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
@@ -194,7 +195,7 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await expect(issues.getByRole('button', { name: /1 conflit/ })).toHaveAttribute('aria-expanded', 'true')
 })
 
-test('the list has each thing once, from today, on one line, which shows its day in the month', async ({ page, isMobile }, testInfo) => {
+test('the list has each thing once, from today, in columns, which shows its day in the month', async ({ page, isMobile }, testInfo) => {
   const { unique } = own(testInfo)
   if (isMobile) await page.setViewportSize(NARROW)
   const today = quebecDayAndTime(new Date()).day
@@ -216,16 +217,16 @@ test('the list has each thing once, from today, on one line, which shows its day
   const list = page.getByRole('region', { name: 'À venir' })
   const rows = list.getByRole('button')
   await expect(rows.filter({ hasText: unique }).filter({ hasNotText: 'OCCUPÉ' })).toHaveText([
-    `${dayInYear(day)} 10 h – 16 h · occupation RÉPARATION ${unique}, calendrier ${team} · conflit avec ${stays}`,
-    `${dayInYear(day)} 12 h – 11 h · occupation ${stays} · conflit avec RÉPARATION ${unique}`,
-    `${dayInYear(closed)} du ${dayInYear(closed)} au ${dayInYear(addDays(closed, 2))} · occupation FERMÉ ${unique}, calendrier ${team}`,
-    `${dayInYear(far)} 10 h – 12 h · occupation ${link}, calendrier ${team}`,
+    `${dayInYear(day)} occupation 10 h – 16 h RÉPARATION ${unique}, calendrier ${team} · conflit avec ${stays}`,
+    `${dayInYear(day)} occupation 12 h – 11 h ${stays} · conflit avec RÉPARATION ${unique}`,
+    `${dayInYear(closed)} occupation → ${weekdayAndNumber(addDays(closed, 2))} FERMÉ ${unique}, calendrier ${team}`,
+    `${dayInYear(far)} occupation 10 h – 12 h ${link}, calendrier ${team}`,
   ])
-  // The seeded marathon, once, over three days, whose end depends on the clocks changing in between, and the seeded
+  // The seeded marathon, once, over three days, whose last day depends on the clocks changing in between, and the seeded
   // takeover that was cancelled.
   const marathon = rows.filter({ hasText: 'MARATHON MODULAIRE' })
   await expect(marathon).toHaveCount(1)
-  await expect(marathon).toContainText(/18 h – \S+\. \d+ \S+, \d+ h/)
+  await expect(marathon).toContainText(/\s18\sh\s→\s\S+\.\s\d+\s/)
   await expect(rows.filter({ hasText: 'LES NUITS BASSES TAKEOVER' })).toContainText('LES NUITS BASSES TAKEOVER annulée')
   await expect(list).toContainText(`La liste s'arrête au ${longDay(addDays(today, 364))}.`)
   expect(await scrollsSideways(page)).toBe(false)
