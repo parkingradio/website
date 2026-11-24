@@ -144,18 +144,8 @@ function IssueGroup({ tag, heading, children }: { tag: ReactNode; heading: strin
   )
 }
 
-// The feeds whose last read failed, which are changed in Configuration, or that haven't been read yet, or that there are
-// none.
+// The feeds whose last read failed, which are changed in Configuration, or that haven't been read yet.
 function FeedWarnings({ feeds }: { feeds: Feed[] }) {
-  const configuration = <Link to="/admin/configuration">Configuration</Link>
-  if (feeds.length === 0) {
-    return (
-      <p className="admin-notice">
-        Aucun calendrier externe&nbsp;: les conflits avec des occupations ne peuvent pas être trouvés. Ils s'ajoutent dans{' '}
-        {configuration}, «&nbsp;Calendriers externes&nbsp;».
-      </p>
-    )
-  }
   return feeds
     .filter((feed) => feed.error !== null || feed.readAt === null)
     .map((feed) => (
@@ -164,7 +154,7 @@ function FeedWarnings({ feeds }: { feeds: Feed[] }) {
         {feed.error !== null ? (
           <>
             Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier «&nbsp;{feed.name}&nbsp;» a
-            échoué&nbsp;: {feed.error}. Voir {configuration}.
+            échoué&nbsp;: {feed.error}. Voir <Link to="/admin/configuration">Configuration</Link>.
           </>
         ) : (
           `Le calendrier «\u00a0${feed.name}\u00a0» n'a pas encore été lu\u00a0: des conflits peuvent manquer.`
