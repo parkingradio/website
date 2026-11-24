@@ -708,6 +708,14 @@ dl.admin-record {
   width: 5rem;
 }
 
+/* A day and a time, e.g. side by side, as tall as each other and as the text inputs, rather than the browsers' own heights
+   for date fields, which differ from one browser to another. */
+.admin-form input[type='date'],
+.admin-form .admin-time-input {
+  box-sizing: border-box;
+  height: 2.25rem;
+}
+
 /* A time of day's hour and minute, in a box like the other inputs', as wide for "1 h 00" as for "21 h 00". */
 .admin-form .admin-time-input {
   display: flex;
