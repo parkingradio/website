@@ -944,7 +944,7 @@ export interface paths {
                     "application/json": {
                         /** @description The channel's id, trimmed: UC then 22 letters, digits, - or _ */
                         channelId: string;
-                        /** @description Trimmed, then between 1 and 200 characters */
+                        /** @description The API key, only letters, digits, - or _. Trimmed, then between 1 and 200 characters */
                         apiKey: string;
                     };
                 };
@@ -1035,7 +1035,7 @@ export interface paths {
                     "application/json": {
                         /** @description The channel's id, trimmed: UC then 22 letters, digits, - or _ */
                         channelId: string;
-                        /** @description Trimmed, then between 1 and 200 characters */
+                        /** @description The API key, only letters, digits, - or _. Trimmed, then between 1 and 200 characters */
                         apiKey: string;
                     };
                 };

@@ -6,11 +6,14 @@
 # - the credentials' endpoints require a session
 # - there are none until they're entered
 # - credentials that aren't valid are refused before YouTube is asked about them
+# - a key with a line break in it is refused too, without being quoted in the response or the logs
 
 source "$(dirname "$0")/lib.sh"
 
 readonly URL="${BASE_URL}/api/admin/video/credentials"
 readonly CHANNEL_ID='UCvMw4qUIPPwkcZmBRRS0vNA'
+readonly SECRET='AIza-integration-secret-5d2e'
+since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "  there's no video until the credentials are entered"
 request "${BASE_URL}/api/video"
@@ -47,3 +50,16 @@ request --header "Cookie: ${cookie}" --request POST --header 'Content-Type: appl
 expect_status 400
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains '{"ok":true,"credentials":null}'
+
+echo "  a key with a line break in it is refused, and can't be checked either, without being quoted in the response or the logs"
+request --header "Cookie: ${cookie}" --request PUT --header 'Content-Type: application/json' \
+    --data "{\"channelId\":\"${CHANNEL_ID}\",\"apiKey\":\"${SECRET}\\nline\"}" "$URL"
+expect_status 400
+expect_body_contains 'Not a YouTube API key'
+expect_body_lacks "$SECRET"
+request --header "Cookie: ${cookie}" --request POST --header 'Content-Type: application/json' \
+    --data "{\"channelId\":\"${CHANNEL_ID}\",\"apiKey\":\"${SECRET}\\nline\"}" "${URL}/check"
+expect_status 400
+expect_body_contains 'Not a YouTube API key'
+expect_body_lacks "$SECRET"
+if docker logs --since "$since" "$CONTAINER" 2>&1 | grep -qF "$SECRET"; then fail "the server logged the YouTube key"; fi
