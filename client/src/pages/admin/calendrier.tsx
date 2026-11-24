@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import { quebecDayAndTime } from '../../quebec-time'
 import { Button } from './button'
@@ -99,7 +99,10 @@ export function Calendrier() {
   // The day whose chosen day, under the month, is brought into view once it's chosen and shows what's on it, e.g. once
   // it's chosen by clicking it: its heading, as long as the day stays in view in the month, which has the focus.
   const scrollTo = useRef<string | null>(null)
-  useEffect(() => {
+  // A layout effect, as in LoadedSession in sessions.tsx: a passive one runs in a later task when the update follows a
+  // request, e.g. once a session is added, and one still pending then could take `focusNext` from a click before the page
+  // shows what it names.
+  useLayoutEffect(() => {
     const next = focusNext.current
     focusNext.current = null
     if (next) document.querySelector<HTMLElement>(next)?.focus()

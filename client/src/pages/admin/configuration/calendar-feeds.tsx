@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
@@ -77,10 +77,11 @@ function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
 
 function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed: Feed) => void; onRemoved: () => void }) {
   const [editing, setEditing] = useState(false)
-  // Whether the form was closed, which then gives the focus back to "modifier".
+  // Whether the form was closed, which then gives the focus back to "modifier", in a layout effect (see LoadedSession in
+  // sessions.tsx), since the form also closes once the PATCH answers.
   const closed = useRef(false)
   const edit = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editing && closed.current) edit.current?.focus()
     closed.current = false
   }, [editing])
