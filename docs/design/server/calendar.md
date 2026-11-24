@@ -41,14 +41,13 @@ A feed has these fields:
 ## Reading the feeds
 
 The server reads every feed when it starts, then every 15 minutes, and when it's asked to
-([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)), e.g. right after an event
-changed in one of the calendars. It also reads a feed when it's added, or when its link changes. Asking for every feed
-to be read answers once each read has ended, so what it gives comes from reads that started after it was asked for;
-adding a feed, or changing its link, waits for that link's read, so that a link that doesn't give a calendar is refused.
-Nothing else waits for a read: the server keeps what it read in memory, and gives what it read last.
+([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)). It also reads a feed when it's
+added, or when its link changes: adding it, or changing its link, waits for that read, so that a link that doesn't give
+a calendar is refused. Apart from these and asking for every feed to be read (see its endpoint), nothing waits for a
+read: the server keeps what it read in memory, and gives what it read last.
 
-A read of every feed reads them one at a time, and those reads go one at a time too: when one is asked for while another
-is under way, every feed is read again once that one ends, once for all the requests made meanwhile.
+During a read of every feed, the feeds are read one at a time, and reads of every feed don't overlap: one asked for
+while another is under way starts once that one ends, once for every request made meanwhile.
 
 A read has limits on how long it takes and on the calendar's size, and fails beyond them. It also fails when the link's
 server answers with an error, or with something that isn't valid iCalendar.
@@ -95,11 +94,10 @@ day after its last, e.g. a month:
 Its occupations are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can be out
 of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read yet,
 e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or when
-it hasn't been read yet. When the occupations have to be up to date, e.g. because the admin just changed an event in one
-of the calendars, apps can have every feed read first: that waits for every read, which can take a while, so they
-shouldn't do it before every calendar they ask for, only when they need it. Occupations also only cover what a read
-keeps, from a year before it to two years after it (see [Events](#events)), so the calendar of days outside that can
-lack occupations.
+it hasn't been read yet. Apps can have every feed read again first when they need the occupations to be up to date,
+e.g. right after the admin changed an event, but not before every calendar they ask for, since that waits for every
+read. Occupations also only cover what a read keeps, from a year before it to two years after it (see
+[Events](#events)), so the calendar of days outside that can lack occupations.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
@@ -167,14 +165,13 @@ Every feed, with its link, in the order they were added.
 Takes no body. Reads every feed now, or once the read of every feed under way ends, if there's one (see
 [Reading the feeds](#reading-the-feeds)), and once each read has ended, responds with every feed as
 [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them then. A read that fails doesn't fail the
-request: its feed says why (`error`). Since the feeds are read one at a time, each within the limits of a read, this can
-take a while, and as long again when it waits for a read under way.
+request: its feed says why (`error`). This can take a while.
 
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
 | `total` | number | How many feeds there are |
-| `feeds` | list of feeds | Every feed, in the order they were added, with when each was last read (`readAt`), and why that failed (`error`) |
+| `feeds` | list of feeds | |
 
 Fails with 502 when the server shuts down meanwhile.
 
