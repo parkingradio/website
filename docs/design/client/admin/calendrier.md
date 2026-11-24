@@ -70,8 +70,7 @@ It's closed by default.
 
 Under that row, the box warns (see [Warnings](layout.md#warnings)) about each feed whose last read failed, naming it,
 saying why, and that conflicts can be missing or out of date, and linking to Configuration, and about each feed that
-hasn't been read yet, naming it, and saying that conflicts can be missing. While there are no feeds at all, it says that
-conflicts with occupations can't be found, and links to Configuration.
+hasn't been read yet, naming it, and saying that conflicts can be missing.
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag and a heading, then a row
 for each one, on one line: when it is, then what it is. The whole row is what's done about it, by clicking it, or with

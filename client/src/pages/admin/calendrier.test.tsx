@@ -983,15 +983,14 @@ describe('Calendrier', () => {
       expect(within(box.querySelector('.admin-warning')!).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
     })
 
-    it('says when there are no feeds', async () => {
+    it('has no notice when there are no feeds: with nothing to settle, it only has its row', async () => {
       // Without feeds, there are no occupations, and no conflicts.
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [], conflicts: [], undatedSessions: [] } })
       renderAt('/admin/calendrier')
       await loaded()
 
       const box = screen.getByRole('region', { name: 'À régler' })
-      expect(box).toHaveTextContent('Aucun calendrier externe : les conflits avec des occupations ne peuvent pas être trouvés.')
-      expect(within(box).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
+      expect(visibleText(box)).toBe('À régler rien')
     })
   })
 
