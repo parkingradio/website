@@ -19,7 +19,7 @@ import { leaving, useCheckedForm } from './checked-form'
 import { KIND_LABELS, artistOption, collectiveOption, entryPath } from './describe'
 import type { Owner } from './describe'
 import { compareText } from './list'
-import { FieldError, FormActions, Labeled, PerformanceTypesField } from './fields'
+import { FieldError, FormActions, Labeled, PerformanceTypesField, TimeInput } from './fields'
 
 // A form for an application's fields, to create an application or change one. Each field is checked as the server checks
 // it (see `checkApplication`), and says what's wrong once it's been left, or once the form is sent. The server's error is
@@ -171,21 +171,9 @@ export function ApplicationForm({ application = EMPTY, owners, submitLabel, onSu
         <p className="admin-hint">Heure du Québec. Sans plage horaire, l'artiste peut jouer à toute heure.</p>
         {timeSlots.map((slot, index) => (
           <div className="admin-row" key={index}>
-            <input
-              type="time"
-              aria-label={`Début de la plage ${index + 1}`}
-              aria-invalid={wrongSlot(slot) || undefined}
-              value={slot.start}
-              onChange={(event) => changeSlot(index, { start: event.target.value })}
-            />
+            <TimeInput aria-label={`Début de la plage ${index + 1}`} invalid={wrongSlot(slot)} value={slot.start} onChange={(start) => changeSlot(index, { start })} />
             à
-            <input
-              type="time"
-              aria-label={`Fin de la plage ${index + 1}`}
-              aria-invalid={wrongSlot(slot) || undefined}
-              value={slot.end}
-              onChange={(event) => changeSlot(index, { end: event.target.value })}
-            />
+            <TimeInput aria-label={`Fin de la plage ${index + 1}`} invalid={wrongSlot(slot)} value={slot.end} onChange={(end) => changeSlot(index, { end })} />
             <button type="button" aria-label={`retirer la plage ${index + 1}`} onClick={() => setTimeSlots(timeSlots.filter((_, i) => i !== index))}>
               ×
             </button>

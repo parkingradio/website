@@ -1,7 +1,7 @@
 import type { Locator, Page, Request } from '@playwright/test'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
 import { drag, moveWithKeyboard, pickUp } from './drag.ts'
-import { test, expect, adminMenu, logIn, longDay, own } from './fixtures.ts'
+import { test, expect, adminMenu, fillTime, logIn, longDay, own } from './fixtures.ts'
 
 // The sessions and their sets: the seeded ones (see seed-data.ts), searched and listed on their artists' and collectives'
 // pages, and sessions that tests add, change and delete, in Québec time, whatever the browser's time zone.
@@ -15,8 +15,9 @@ const statusOf = (row: Locator) => row.getByRole('cell').nth(6)
 const recordValue = (page: Page, record: string, label: string) =>
   page.getByLabel(record, { exact: true }).locator(':scope > dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
 const value = (page: Page, label: string) => recordValue(page, 'Session', label)
-// The date or the time a session starts or ends at, in its form.
-const timeInput = (page: Page, when: 'Début' | 'Fin', part: 'date' | 'heure') => page.getByRole('group', { name: when, exact: true }).getByLabel(part, { exact: true })
+// The date a session starts or ends on, in its form, and its time (see `fillTime`).
+const dayInput = (page: Page, when: 'Début' | 'Fin') => page.getByRole('group', { name: when, exact: true }).getByLabel('date', { exact: true })
+const timeField = (page: Page, when: 'Début' | 'Fin') => page.getByRole('group', { name: when, exact: true }).getByRole('group', { name: 'heure', exact: true })
 const raValue = (page: Page, label: string) => recordValue(page, "Contenu de l'événement RA", label)
 // Holds back the server's answers to the requests to `url`, until what this returns is called, and lets the requests go
 // through as usual afterwards.
@@ -321,9 +322,9 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await expect(reminder).toContainText('20:00 à 23:00')
   await expect(durationOf(rowsOf(sets, mine.artist.name))).toHaveText('à déterminer')
   await expect(rowsOf(sets, mine.artist.name)).toContainText('DJ, autre : Synthé')
-  await timeInput(page, 'Début', 'date').fill(day)
-  await timeInput(page, 'Début', 'heure').fill('20:00')
-  await timeInput(page, 'Fin', 'heure').fill('23:00')
+  await dayInput(page, 'Début').fill(day)
+  await fillTime(timeField(page, 'Début'), '20:00')
+  await fillTime(timeField(page, 'Fin'), '23:00')
   await page.getByRole('radio', { name: 'Autre' }).check()
   await page.getByLabel('Nom').fill(name)
   await page.getByRole('button', { name: 'ajouter la session' }).click()
@@ -388,9 +389,9 @@ test("an artist's sets, and a collective's takeover, are added from the pages of
   await page.getByRole('link', { name: 'créer une session' }).click()
   await expect(page.getByRole('combobox', { name: 'Collectif' })).toHaveValue(mine.collective.name)
   await expect(page.getByRole('combobox', { name: 'Candidature' })).toHaveValue(/^Reçue le /)
-  await timeInput(page, 'Début', 'date').fill(otherDay)
-  await timeInput(page, 'Début', 'heure').fill('20:00')
-  await timeInput(page, 'Fin', 'heure').fill('23:00')
+  await dayInput(page, 'Début').fill(otherDay)
+  await fillTime(timeField(page, 'Début'), '20:00')
+  await fillTime(timeField(page, 'Fin'), '23:00')
   await page.getByLabel('Nom').fill(`${name} TAKEOVER`)
   await page.getByRole('button', { name: 'ajouter la session' }).click()
   await expect(page.getByRole('heading', { level: 1, name: `${name} TAKEOVER` })).toBeVisible()
@@ -461,13 +462,13 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(page.getByRole('radio', { name: 'Takeover' })).toBeChecked()
   await expect(page.getByRole('combobox', { name: 'Collectif' })).toHaveValue(mine.collective.name)
   await expect(page.getByLabel('Nom')).toHaveAttribute('placeholder', `${mine.collective.name.toUpperCase()} TAKEOVER`)
-  await timeInput(page, 'Début', 'date').fill(day)
-  await timeInput(page, 'Début', 'heure').fill('23:00')
+  await dayInput(page, 'Début').fill(day)
+  await fillTime(timeField(page, 'Début'), '23:00')
   // The end's date starts as the start's.
-  await expect(timeInput(page, 'Fin', 'date')).toHaveValue(day)
-  await timeInput(page, 'Fin', 'heure').fill('01:30')
+  await expect(dayInput(page, 'Fin')).toHaveValue(day)
+  await fillTime(timeField(page, 'Fin'), '01:30')
   await expect(page.getByRole('status')).toHaveCount(0)
-  await timeInput(page, 'Fin', 'date').fill(addDays(day, 1))
+  await dayInput(page, 'Fin').fill(addDays(day, 1))
   await expect(page.getByRole('status')).toHaveText('Dure 2 h 30.')
   await page.getByLabel('Nom').fill(name)
   // Its event on RA, found by its number, exactly.
@@ -588,8 +589,8 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   // Moved to another day, its end with it, its sets in their order.
   await page.getByRole('button', { name: 'modifier', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('GUEST MIXES, sam. 10 oct. 2026')
-  await timeInput(page, 'Début', 'date').fill(otherDay)
-  await expect(timeInput(page, 'Fin', 'date')).toHaveValue(addDays(otherDay, 1))
+  await dayInput(page, 'Début').fill(otherDay)
+  await expect(dayInput(page, 'Fin')).toHaveValue(addDays(otherDay, 1))
   await page.getByRole('button', { name: 'enregistrer' }).click()
   await expect(value(page, 'Quand')).toHaveText(`${longDay(otherDay)}, de 23 h à 1 h 30 le lendemain`)
   // Its event on RA kept.
@@ -728,9 +729,9 @@ test.describe('in another time zone', () => {
     await logIn(page, { at: '/admin/sessions/nouvelle' })
     expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe('Asia/Tokyo')
 
-    await timeInput(page, 'Début', 'date').fill(day)
-    await timeInput(page, 'Début', 'heure').fill('21:00')
-    await timeInput(page, 'Fin', 'heure').fill('22:00')
+    await dayInput(page, 'Début').fill(day)
+    await fillTime(timeField(page, 'Début'), '21:00')
+    await fillTime(timeField(page, 'Fin'), '22:00')
     await page.getByRole('radio', { name: 'Guest mixes' }).check()
     await page.getByRole('button', { name: 'ajouter la session' }).click()
 

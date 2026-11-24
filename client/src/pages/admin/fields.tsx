@@ -1,6 +1,10 @@
-import { useId } from 'react'
-import type { ReactNode } from 'react'
-import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, performanceTypeName } from '../../application-fields'
+import { useEffect, useEffectEvent, useId, useState } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
+import { parseTime } from '@internationalized/date'
+import type { Time } from '@internationalized/date'
+import { DateInput, DateSegment, I18nProvider, Label, TimeField } from 'react-aria-components'
+import type { DateFieldState } from 'react-aria-components'
+import { OTHER_PERFORMANCE_TYPE_MAX_LENGTH, PERFORMANCE_TYPES, isTime, performanceTypeName } from '../../application-fields'
 import type { PerformanceTypeId } from '../../application-fields'
 import type { Duration } from '../../session-fields'
 import { Button } from './button'
@@ -30,8 +34,8 @@ export function Labeled({ label, error, children }: { label: string; error: stri
   )
 }
 
-// A number of hours and minutes, e.g. a duration, as two numbers, rather than as a time of day, which browsers can show as
-// AM or PM. It's named `label`, with what's wrong with it under it. It's part of a group of fields that's left as a whole.
+// A number of hours and minutes, e.g. a duration, as two numbers, rather than as a time of day, since it can be longer
+// than a day. It's named `label`, with what's wrong with it under it. It's part of a group of fields that's left as a whole.
 export function DurationField({
   label,
   value,
@@ -71,6 +75,91 @@ export function DurationField({
       <FieldError message={error} />
     </div>
   )
+}
+
+// A time of day, in the 24-hour format, e.g. "21 h 30", whatever the browser (see docs/design/client/architecture.md):
+// its hour and its minute, which are typed. Its value is "HH:MM", or "" while either is empty, like a native time field's.
+// It's named `label`, above it, or else `aria-label`. `onBlur` is called once the focus leaves the field, rather than
+// when it moves from its hour to its minute.
+export function TimeInput({
+  value,
+  onChange,
+  label,
+  'aria-label': ariaLabel,
+  invalid = false,
+  onBlur,
+}: {
+  value: string
+  onChange: (value: string) => void
+  label?: string
+  'aria-label'?: string
+  invalid?: boolean
+  onBlur?: () => void
+}) {
+  // The time React Aria is given. It shows it again whenever it changes, so while a part is empty, this stays the last
+  // complete time, rather than none, which would empty the part that's still there.
+  const [time, setTime] = useState(() => toTime(value))
+  // The value the field had last: the one it said it had, or the form's.
+  const [last, setLast] = useState(value)
+  // The form changed it, e.g. filling the end in from the start. This is done while rendering: an effect would run after
+  // the field had said what it shows, still the old time, which would undo the form's change.
+  if (value !== last) {
+    setLast(value)
+    setTime(toTime(value))
+  }
+  const shown = (shown: string) => {
+    if (shown === last) return
+    setLast(shown)
+    onChange(shown)
+  }
+  return (
+    <I18nProvider locale="fr-CA">
+      <TimeField
+        className="admin-time"
+        hourCycle={24}
+        validationBehavior="aria"
+        value={time}
+        onChange={setTime}
+        isInvalid={invalid}
+        aria-label={ariaLabel}
+        onBlur={onBlur}
+        onKeyDown={submitOnEnter}
+      >
+        {({ state }) => (
+          <>
+            {label && <Label>{label}</Label>}
+            <DateInput className="admin-time-input">
+              {(segment) => <DateSegment segment={segment} />}
+            </DateInput>
+            <ShownTime segments={state.segments} onShown={shown} />
+          </>
+        )}
+      </TimeField>
+    </I18nProvider>
+  )
+}
+
+const toTime = (value: string): Time | null => (isTime(value) ? parseTime(value) : null)
+
+// Says what a time field shows, as "HH:MM", or "" while its hour or its minute is empty, which React Aria doesn't: it
+// keeps the last complete time.
+function ShownTime({ segments, onShown }: { segments: DateFieldState['segments']; onShown: (shown: string) => void }) {
+  const parts = segments.filter((segment) => segment.isEditable)
+  const shown = parts.some((segment) => segment.isPlaceholder) ? '' : parts.map((segment) => String(segment.value).padStart(2, '0')).join(':')
+  const say = useEffectEvent(onShown)
+  useEffect(() => say(shown), [shown])
+  return null
+}
+
+// Enter in a time field sends its form, as in a native field, by clicking the form's default button, so that it doesn't
+// while that button is disabled, or greyed out (see Button).
+function submitOnEnter(event: KeyboardEvent<HTMLElement>) {
+  if (event.key !== 'Enter') return
+  const form = event.currentTarget.closest('form')
+  const button = form && [...form.elements].find((element): element is HTMLButtonElement => element instanceof HTMLButtonElement && element.type === 'submit')
+  if (!button) return
+  event.preventDefault()
+  button.click()
 }
 
 // The error of the server, if it refused what was sent, then the button that sends the form, and the one that cancels

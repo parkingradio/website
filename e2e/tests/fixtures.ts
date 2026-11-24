@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { test as base, expect } from '@playwright/test'
-import type { Page, TestInfo } from '@playwright/test'
+import type { Locator, Page, TestInfo } from '@playwright/test'
 import type { components } from '../../client/src/api/schema.d.ts'
 import { addDays, quebecInstant } from '../../client/src/quebec-time.ts'
 import { admin } from '../env.ts'
@@ -80,6 +80,12 @@ export function own(testInfo: TestInfo) {
 // Calendrier's month.
 export function longDay(day: string): string {
   return new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(day))
+}
+
+// Types `time`, e.g. "21:00", into a time field of the admin pages, `field` being its group: its hour, then its minute,
+// which the focus moves on to once the hour can't take another digit.
+export async function fillTime(field: Locator, time: string) {
+  await field.getByRole('spinbutton').first().pressSequentially(time.replace(':', ''))
 }
 
 // Goes to a page of the admin pages, `/admin` unless told otherwise, and sends the login form shown in its place, as the

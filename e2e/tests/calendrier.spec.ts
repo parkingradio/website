@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { addDays, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
-import { test, expect, adminMenu, logIn, longDay, own, withCalendar } from './fixtures.ts'
+import { test, expect, adminMenu, fillTime, logIn, longDay, own, withCalendar } from './fixtures.ts'
 import type { CalendarExtra } from './fixtures.ts'
 
 // The studio's calendar: a session of the test's own, in the month and on its day, and occupations and conflicts,
@@ -110,9 +110,14 @@ test('a session is in its month, and on its day, where a new session is added', 
   const form = chosen.getByRole('form', { name: 'Nouvelle session' })
   await expect(form.getByRole('heading', { name: 'Nouvelle session' })).toBeFocused()
   await page.keyboard.press('Tab')
-  await expect(form.getByLabel('Début')).toBeFocused()
-  await form.getByLabel('Début').fill('18:00')
-  await form.getByLabel('Fin').fill('22:00')
+  const start = form.getByRole('group', { name: 'Début', exact: true })
+  const end = form.getByRole('group', { name: 'Fin', exact: true })
+  await expect(start.getByRole('spinbutton').first()).toBeFocused()
+  // In the 24-hour format, whatever the browser's settings, between marks that keep it left to right.
+  await fillTime(start, '18:00')
+  await fillTime(end, '22:00')
+  await expect(start).toHaveText('\u206618 h 00\u2069')
+  await expect(end).toHaveText('\u206622 h 00\u2069')
   await form.getByRole('radio', { name: 'Autre' }).check()
   await form.getByLabel('Nom').fill(`E2E NEW ${unique}`)
   // The server refuses it while it overlaps the other session, which it names.
@@ -121,7 +126,7 @@ test('a session is in its month, and on its day, where a new session is added', 
   await expect(alert).toContainText("La session n'a pas pu être ajoutée")
   await expect(alert.getByRole('link', { name: new RegExp(`^E2E ${unique}, `) })).toHaveAttribute('href', `/admin/sessions/${id}`)
   // Up to when the other starts.
-  await form.getByLabel('Fin').fill('21:00')
+  await fillTime(end, '21:00')
   await form.getByRole('button', { name: 'créer' }).click()
   // The page stays, with the form closed, the day chosen and the focus on it, and shows the new session there.
   await expect(chosen.getByRole('status')).toHaveText(`La session E2E NEW ${unique} a été ajoutée.`)

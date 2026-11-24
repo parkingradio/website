@@ -24,7 +24,7 @@ import { raEventId } from '../../session-links'
 import { ApplicationField } from './application-field'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay } from './describe'
-import { DurationField, FieldError, FormActions, Labeled } from './fields'
+import { DurationField, FieldError, FormActions, Labeled, TimeInput } from './fields'
 import { ListedSets } from './listed-sets'
 import type { OpenListedSet } from './listed-sets'
 import { compareText, search } from './list'
@@ -295,10 +295,7 @@ function DayAndTime({
           date
           <input type="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
         </label>
-        <label>
-          heure
-          <input type="time" value={time} aria-invalid={timeError ? true : undefined} onChange={(event) => onTime(event.target.value)} />
-        </label>
+        <TimeInput label="heure" value={time} invalid={!!timeError} onChange={onTime} />
       </div>
       <FieldError message={dayError ?? timeError} />
     </div>
