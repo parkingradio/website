@@ -2402,8 +2402,6 @@ export interface paths {
                         name: string;
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link: string;
-                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
-                        privateTitles: boolean;
                     };
                 };
             };
@@ -2563,7 +2561,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Changes a calendar feed's name, link or whether its titles are private, once a new link gives a calendar */
+        /** Changes a calendar feed's name or link, once a new link gives a calendar */
         patch: {
             parameters: {
                 query?: never;
@@ -2580,8 +2578,6 @@ export interface paths {
                         name?: string;
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link?: string;
-                        /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
-                        privateTitles?: boolean;
                     };
                 };
             };
@@ -3424,8 +3420,6 @@ export interface components {
             name: string;
             /** @description Its link, as the server keeps it */
             link: string;
-            /** @description Whether its titles are private: the server then never keeps, gives or logs its events' titles */
-            privateTitles: boolean;
             /** @description The email of the admin who added it */
             createdBy: string;
             /** Format: date-time */
@@ -3448,8 +3442,8 @@ export interface components {
             end: string;
             /** @description Whether it takes whole days */
             wholeDay: boolean;
-            /** @description Its title, empty for none, or null when its feed's titles are private */
-            title: string | null;
+            /** @description Its title, empty when it has none */
+            title: string;
         };
         CalendarThing: {
             /** @constant */
@@ -3473,8 +3467,8 @@ export interface components {
             end: string;
             /** @description Whether it takes whole days */
             wholeDay: boolean;
-            /** @description Its title, empty for none, or null when its feed's titles are private */
-            title: string | null;
+            /** @description Its title, empty when it has none */
+            title: string;
         };
         ChosenPlaylist: {
             url: string;

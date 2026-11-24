@@ -20,12 +20,12 @@ function session(id: string, start: number | null, end: number, status: Status =
   return { id, title: `Session ${id}`, start: start === null ? null : at(start), end: start === null ? null : at(end), status }
 }
 
-function occupation(start: number, end: number, title: string | null = 'Réparation', feedId = 'team', wholeDay = false): OccupationThing {
+function occupation(start: number, end: number, title = 'Réparation', feedId = 'team', wholeDay = false): OccupationThing {
   return { kind: 'occupation', feedId, start: at(start), end: at(end), wholeDay, title }
 }
 
-// A stay, from a feed whose titles are private.
-const stay = (start: number, end: number, feedId = 'stays') => occupation(start, end, null, feedId)
+// A guest's stay, titled by the platform it was booked on.
+const stay = (start: number, end: number, feedId = 'stays') => occupation(start, end, 'Airbnb', feedId)
 
 // A thing, briefly: its session's id, or its feed and title.
 const named = (thing: Thing) => (thing.kind === 'session' ? `session ${thing.id}` : `${thing.feedId}${thing.title ? ` ${thing.title}` : ''}`)
@@ -38,11 +38,11 @@ function found(sessions: CalendarSession[], occupations: OccupationThing[], wind
 describe('conflicts', () => {
   it('are any two things that overlap, whatever they are', () => {
     expect(found([session('a', 1, 3)], [occupation(2, 4)])).toEqual([[2, 3, 'session a', 'team Réparation']])
-    expect(found([session('a', 1, 3)], [stay(0, 2)])).toEqual([[1, 2, 'stays', 'session a']])
+    expect(found([session('a', 1, 3)], [stay(0, 2)])).toEqual([[1, 2, 'stays Airbnb', 'session a']])
     // Two occupations, of different feeds, or of the same one.
-    expect(found([], [occupation(1, 3), stay(2, 5)])).toEqual([[2, 3, 'team Réparation', 'stays']])
+    expect(found([], [occupation(1, 3), stay(2, 5)])).toEqual([[2, 3, 'team Réparation', 'stays Airbnb']])
     expect(found([], [occupation(1, 5, 'A'), occupation(2, 3, 'B')])).toEqual([[2, 3, 'team A', 'team B']])
-    expect(found([], [stay(1, 5), stay(2, 6, 'other-team')])).toEqual([[2, 5, 'stays', 'other-team']])
+    expect(found([], [stay(1, 5), stay(2, 6, 'other-team')])).toEqual([[2, 5, 'stays Airbnb', 'other-team Airbnb']])
     // The same event in two feeds.
     expect(found([], [occupation(1, 2, 'Atelier'), occupation(1, 2, 'Atelier', 'other-team')])).toEqual([[1, 2, 'team Atelier', 'other-team Atelier']])
   })
@@ -58,13 +58,13 @@ describe('conflicts', () => {
   })
 
   it('give one conflict per pair of things, even of things that are the same', () => {
-    // E.g. two guests' stays with the same dates, of a feed whose titles are private.
+    // E.g. two guests' stays with the same dates, booked on the same platform.
     const [first, second] = [stay(1, 2), stay(1, 2)]
     expect(conflicts([], [first, second], WINDOW)).toEqual([{ start: at(1), end: at(2), things: [first, second] }])
     expect(found([session('a', 1, 2)], [occupation(0, 3), stay(1, 4)])).toEqual([
       [1, 2, 'team Réparation', 'session a'],
-      [1, 2, 'session a', 'stays'],
-      [1, 3, 'team Réparation', 'stays'],
+      [1, 2, 'session a', 'stays Airbnb'],
+      [1, 3, 'team Réparation', 'stays Airbnb'],
     ])
   })
 
@@ -86,7 +86,7 @@ describe('conflicts', () => {
       [0, 10, 'session a', 'session b'],
       [0, 10, 'session a', 'other-team B'],
       [0, 10, 'session a', 'team A'],
-      [0, 10, 'session a', 'stays'],
+      [0, 10, 'session a', 'stays Airbnb'],
     ])
     expect(found([], [occupation(2, 5, 'Late'), occupation(0, 10, 'Long'), occupation(1, 3, 'Early')])).toEqual([
       [1, 3, 'team Long', 'team Early'],
@@ -105,13 +105,13 @@ describe('conflicts', () => {
       { selector: ({ id }) => id, maxLength: 6 },
     )
     const occupations = fc.array(
-      fc.record({ feedId: fc.constantFrom(...FEEDS), start: hours, length, title: fc.constantFrom(null, '', 'A', 'B'), wholeDay: fc.boolean() }),
+      fc.record({ feedId: fc.constantFrom(...FEEDS), start: hours, length, title: fc.constantFrom('', 'A', 'B'), wholeDay: fc.boolean() }),
       { maxLength: 12 },
     )
     const window = fc.record({ from: hours, length: fc.integer({ min: 1, max: 12 }) })
 
     const toSession = ({ id, start, length, status }: { id: string; start: number | null; length: number; status: Status }) => session(id, start, (start ?? 0) + length, status)
-    const toOccupation = ({ feedId, start, length, title, wholeDay }: { feedId: string; start: number; length: number; title: string | null; wholeDay: boolean }) =>
+    const toOccupation = ({ feedId, start, length, title, wholeDay }: { feedId: string; start: number; length: number; title: string; wholeDay: boolean }) =>
       occupation(start, start + length, title, feedId, wholeDay)
 
     // The things, each with how it's named in the conflicts, on their own: a session by its id, and an occupation by its

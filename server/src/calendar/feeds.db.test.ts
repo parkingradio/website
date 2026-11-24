@@ -10,7 +10,7 @@ import type { CalendarFeedsStore } from './feeds.js'
 let database: TestDatabase
 let store: CalendarFeedsStore
 
-const feed = (name: string, link: string) => ({ name, link, privateTitles: false, createdBy: 'admin@example.com' })
+const feed = (name: string, link: string) => ({ name, link, createdBy: 'admin@example.com' })
 
 beforeAll(async () => {
   database = await testDatabase()
@@ -28,9 +28,9 @@ beforeEach(async () => {
 describe('calendarFeedsStore', () => {
   it('lists the feeds in the order they were added, and finds them by their link', async () => {
     const first = await store.add(feed('First', 'https://example.com/1.ics'))
-    const second = await store.add({ ...feed('Second', 'https://example.com/2.ics'), privateTitles: true })
+    const second = await store.add(feed('Second', 'https://example.com/2.ics'))
     expect(await store.list()).toEqual([first, second])
-    expect(second).toMatchObject({ name: 'Second', privateTitles: true, link: 'https://example.com/2.ics', createdBy: 'admin@example.com' })
+    expect(second).toMatchObject({ name: 'Second', link: 'https://example.com/2.ics', createdBy: 'admin@example.com' })
     expect(second).toMatchObject({ updatedBy: null, updatedAt: null })
     expect(await store.withLink('https://example.com/2.ics')).toEqual(second)
     expect(await store.withLink('https://example.com/3.ics')).toBeNull()
@@ -59,8 +59,8 @@ describe('calendarFeedsStore', () => {
     const renamed = await store.update(added.id, { name: 'Renamed' }, 'other@example.com')
     expect(renamed).toEqual({ ...added, name: 'Renamed', updatedBy: 'other@example.com', updatedAt: expect.any(Date) })
     expect(renamed!.updatedAt!.getTime()).toBeGreaterThanOrEqual(added.createdAt.getTime())
-    const changed = await store.update(added.id, { link: 'https://example.com/2.ics', privateTitles: true }, 'admin@example.com')
-    expect(changed).toMatchObject({ name: 'Renamed', link: 'https://example.com/2.ics', privateTitles: true, updatedBy: 'admin@example.com' })
+    const changed = await store.update(added.id, { link: 'https://example.com/2.ics' }, 'admin@example.com')
+    expect(changed).toMatchObject({ name: 'Renamed', link: 'https://example.com/2.ics', updatedBy: 'admin@example.com' })
     expect(await store.list()).toEqual([changed])
     expect(await store.update('not-a-uuid', { name: 'x' }, 'admin@example.com')).toBeNull()
     expect(await store.update('6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f', { name: 'x' }, 'admin@example.com')).toBeNull()

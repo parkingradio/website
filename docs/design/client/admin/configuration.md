@@ -53,16 +53,15 @@ The calendar feeds that the studio's occupations are read from (see [Calendar](.
 what takes the studio outside sessions is read from these calendars, each occupation under its calendar's name, and
 that the server reads them every 15 minutes.
 
-It lists the feeds, in the order they were added, each with its name, "titres masqués" when its titles are private, its
-link, as text, which admin added it and when, when it was last read, or that it hasn't been read yet, and why its last
-read failed, if it did. While there are none, it says so. "retirer" removes a feed, once the admin confirms.
+It lists the feeds, in the order they were added, each with its name, its link, as text, which admin added it and when,
+when it was last read, or that it hasn't been read yet, and why its last read failed, if it did. While there are none,
+it says so. "retirer" removes a feed, once the admin confirms.
 
-"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, "Lien" and "Masquer les titres"
-(`privateTitles`). "enregistrer" saves only what was changed, so that a form opened before another admin's change
-doesn't undo it, and closes the form; "annuler" closes it without saving. Either way, the focus goes back to "modifier".
+"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, and "Lien". "enregistrer" saves
+only what was changed, so that a form opened before another admin's change doesn't undo it, and closes the form;
+"annuler" closes it without saving. Either way, the focus goes back to "modifier".
 
-Under the list, a form adds a feed, with the same fields, "Masquer les titres" checked to start with. "ajouter" adds it,
-and clears the form.
+Under the list, a form adds a feed, with the same fields. "ajouter" adds it, and clears the form.
 
 "enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first (see
 [Reading the feeds](../../server/calendar.md#reading-the-feeds)), which can take a while, and the button can't be used

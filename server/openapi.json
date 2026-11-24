@@ -1209,10 +1209,6 @@
             "type": "string",
             "description": "Its link, as the server keeps it"
           },
-          "privateTitles": {
-            "type": "boolean",
-            "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
-          },
           "createdBy": {
             "type": "string",
             "description": "The email of the admin who added it"
@@ -1264,7 +1260,6 @@
           "id",
           "name",
           "link",
-          "privateTitles",
           "createdBy",
           "createdAt",
           "updatedBy",
@@ -1294,11 +1289,8 @@
             "description": "Whether it takes whole days"
           },
           "title": {
-            "description": "Its title, empty for none, or null when its feed's titles are private",
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "description": "Its title, empty when it has none"
           }
         },
         "required": [
@@ -1372,11 +1364,8 @@
                 "description": "Whether it takes whole days"
               },
               "title": {
-                "description": "Its title, empty for none, or null when its feed's titles are private",
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": "string",
+                "description": "Its title, empty when it has none"
               }
             },
             "required": [
@@ -10615,16 +10604,11 @@
                   "link": {
                     "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
                     "type": "string"
-                  },
-                  "privateTitles": {
-                    "type": "boolean",
-                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
                   }
                 },
                 "required": [
                   "name",
-                  "link",
-                  "privateTitles"
+                  "link"
                 ],
                 "additionalProperties": false
               }
@@ -10723,7 +10707,7 @@
     },
     "/api/admin/calendar/feeds/{id}": {
       "patch": {
-        "summary": "Changes a calendar feed's name, link or whether its titles are private, once a new link gives a calendar",
+        "summary": "Changes a calendar feed's name or link, once a new link gives a calendar",
         "tags": [
           "Calendar"
         ],
@@ -10743,10 +10727,6 @@
                   "link": {
                     "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
                     "type": "string"
-                  },
-                  "privateTitles": {
-                    "type": "boolean",
-                    "description": "Whether its titles are private: the server then never keeps, gives or logs its events' titles"
                   }
                 },
                 "additionalProperties": false,

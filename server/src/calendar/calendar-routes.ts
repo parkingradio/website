@@ -44,7 +44,7 @@ const Occupation = z
     start: Timestamp,
     end: Timestamp,
     wholeDay: z.boolean().meta({ description: 'Whether it takes whole days' }),
-    title: z.string().nullable().meta({ description: "Its title, empty for none, or null when its feed's titles are private" }),
+    title: z.string().meta({ description: 'Its title, empty when it has none' }),
   })
   .meta({ id: 'CalendarOccupation' })
 

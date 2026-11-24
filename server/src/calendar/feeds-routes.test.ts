@@ -6,7 +6,7 @@ import { useZodSchemas } from '../api/schemas.js'
 import type { CalendarFeedsStore, FeedChanges, NewFeed, StoredFeed } from './feeds.js'
 import { LinkTaken } from './feeds.js'
 import { FeedReadError, ReadAborted } from './fetch.js'
-import type { CalendarReads, FeedRead, ReadSettings, SuccessfulRead } from './reads.js'
+import type { CalendarReads, FeedRead, SuccessfulRead } from './reads.js'
 import { calendarFeedsRoutes } from './feeds-routes.js'
 
 // The endpoints of calendar feeds (see docs/design/server/calendar.md), with a fake store and fake reads.
@@ -44,7 +44,7 @@ const reads: CalendarReads = {
   of: (id) => kept.get(id),
   read,
   added: vi.fn((id: string, done: SuccessfulRead) => kept.set(id, { ...done, error: null })),
-  changed: vi.fn((id: string, _settings: ReadSettings, done?: SuccessfulRead) => {
+  changed: vi.fn((id: string, _link: string, done?: SuccessfulRead) => {
     if (done) kept.set(id, { ...done, error: null })
   }),
   removed: vi.fn((id: string) => kept.delete(id)),
@@ -85,7 +85,6 @@ describe('calendar feeds routes', () => {
         id: FEED_A,
         name: "Calendrier de l'équipe",
         link: LINK,
-        privateTitles: false,
         createdBy: 'someone@example.com',
         createdAt: new Date('2026-11-01T12:00:00Z'),
         updatedBy: null,
@@ -93,7 +92,7 @@ describe('calendar feeds routes', () => {
       },
     ]
     kept = new Map()
-    read.mockImplementation(async ({ link, privateTitles }) => ({ events: EVENTS, readAt: NOW, settings: { link, privateTitles } }))
+    read.mockImplementation(async ({ link }) => ({ events: EVENTS, readAt: NOW, link }))
   })
 
   afterEach(() => {
@@ -106,15 +105,15 @@ describe('calendar feeds routes', () => {
       const app = await buildApp()
       const list = async () => (await app.inject({ method: 'GET', url: URL, cookies: await sessionCookies() })).json()
       const feed = {
-        ...{ id: FEED_A, name: "Calendrier de l'équipe", link: LINK, privateTitles: false },
+        ...{ id: FEED_A, name: "Calendrier de l'équipe", link: LINK },
         ...{ createdBy: 'someone@example.com', createdAt: '2026-11-01T07:00:00-05:00', updatedBy: null, updatedAt: null },
       }
 
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
-      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: LINK, privateTitles: false } })
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", link: LINK })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: '2026-11-22T12:00:00-05:00', error: "The link can't be read: its server fails (503)" }] })
       // What was read from another link isn't the feed's, e.g. on a server that hasn't taken in a change of link yet.
-      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", settings: { link: 'https://example.com/former.ics', privateTitles: false } })
+      kept.set(FEED_A, { events: EVENTS, readAt: NOW, error: "The link can't be read: its server fails (503)", link: 'https://example.com/former.ics' })
       expect(await list()).toEqual({ ok: true, total: 1, feeds: [{ ...feed, readAt: null, error: null }] })
     })
 
@@ -127,27 +126,27 @@ describe('calendar feeds routes', () => {
   describe('POST /api/admin/calendar/feeds', () => {
     it('reads the link, then adds the feed with that read as its first', async () => {
       const app = await buildApp()
-      const response = await add(app, { name: '  Séjours ', link: 'webcal://example.com/stays.ics#x', privateTitles: true })
+      const response = await add(app, { name: '  Séjours ', link: 'webcal://example.com/stays.ics#x' })
 
       expect(response.statusCode).toBe(200)
       expect(response.json()).toEqual({
         ok: true,
         feed: {
-          ...{ id: FEED_B, name: 'Séjours', link: 'https://example.com/stays.ics', privateTitles: true },
+          ...{ id: FEED_B, name: 'Séjours', link: 'https://example.com/stays.ics' },
           ...{ createdBy: 'admin@example.com', createdAt: '2026-11-22T12:00:00-05:00', updatedBy: null, updatedAt: null },
           ...{ readAt: '2026-11-22T12:00:00-05:00', error: null },
         },
       })
-      const settings = { link: 'https://example.com/stays.ics', privateTitles: true }
-      expect(read).toHaveBeenCalledExactlyOnceWith({ name: 'Séjours', ...settings })
-      expect(store.add).toHaveBeenCalledExactlyOnceWith({ name: 'Séjours', ...settings, createdBy: 'admin@example.com' })
-      expect(reads.added).toHaveBeenCalledExactlyOnceWith(FEED_B, { events: EVENTS, readAt: NOW, settings })
+      const link = 'https://example.com/stays.ics'
+      expect(read).toHaveBeenCalledExactlyOnceWith({ name: 'Séjours', link })
+      expect(store.add).toHaveBeenCalledExactlyOnceWith({ name: 'Séjours', link, createdBy: 'admin@example.com' })
+      expect(reads.added).toHaveBeenCalledExactlyOnceWith(FEED_B, { events: EVENTS, readAt: NOW, link })
     })
 
     it("refuses a link that's already a feed's, naming that feed, without reading it", async () => {
       const app = await buildApp()
       for (const link of [LINK, LINK.replace('https:', 'webcal:'), `${LINK}#again`]) {
-        const response = await add(app, { name: 'Again', link, privateTitles: false })
+        const response = await add(app, { name: 'Again', link })
         expect(response.statusCode).toBe(409)
         expect(response.json()).toEqual({ ok: false, error: `The feed "Calendrier de l'équipe" already has this link` })
       }
@@ -158,7 +157,7 @@ describe('calendar feeds routes', () => {
     it('refuses a link that was added while it was being read', async () => {
       store.add.mockRejectedValueOnce(new LinkTaken({ name: 'Other' }))
       const app = await buildApp()
-      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics', privateTitles: false })
+      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics' })
       expect(response.statusCode).toBe(409)
       expect(response.json()).toEqual({ ok: false, error: 'The feed "Other" already has this link' })
       expect(reads.added).not.toHaveBeenCalled()
@@ -166,15 +165,15 @@ describe('calendar feeds routes', () => {
 
     it("refuses fields that don't follow their rules, and those it doesn't take", async () => {
       const app = await buildApp()
-      const valid = { name: 'New', link: 'https://example.com/new.ics', privateTitles: false }
+      const valid = { name: 'New', link: 'https://example.com/new.ics' }
       const refused = [
         [{ ...valid, name: ' ' }, '`name`: The name must not be blank'],
-        [{ ...valid, privateTitles: 'true' }, '`privateTitles`'],
+        [{ ...valid, privateTitles: true }, 'Unknown field: `privateTitles`'],
         [{ ...valid, kind: 'occupation' }, 'Unknown field: `kind`'],
         [{ ...valid, link: `http://example.com/${SECRET}` }, '`link`: The link must be an https or webcal link'],
         [{ ...valid, link: `https://user:${SECRET}@example.com/` }, "`link`: The link can't have a user name or a password"],
         [{ ...valid, url: 'x' }, 'Unknown field: `url`'],
-        [{ name: 'New', privateTitles: false }, '`link`'],
+        [{ name: 'New' }, '`link`'],
       ] as const
       for (const [body, error] of refused) {
         const response = await add(app, body)
@@ -192,19 +191,19 @@ describe('calendar feeds routes', () => {
         [502, "The link can't be read: its server can't be found"],
       ] as const) {
         read.mockRejectedValueOnce(new FeedReadError(status, message))
-        const response = await add(app, { name: 'New', link: 'https://example.com/new.ics', privateTitles: false })
+        const response = await add(app, { name: 'New', link: 'https://example.com/new.ics' })
         expect(response.statusCode).toBe(status)
         expect(response.json()).toEqual({ ok: false, error: message })
       }
       read.mockRejectedValueOnce(new ReadAborted())
-      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics', privateTitles: false })
+      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics' })
       expect(response.statusCode).toBe(502)
       expect(store.add).not.toHaveBeenCalled()
     })
 
     it('refuses requests from other sites', async () => {
       const app = await buildApp()
-      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics', privateTitles: false }, { 'sec-fetch-site': 'cross-site' })
+      const response = await add(app, { name: 'New', link: 'https://example.com/new.ics' }, { 'sec-fetch-site': 'cross-site' })
       expect(response.statusCode).toBe(403)
       expect(read).not.toHaveBeenCalled()
     })
@@ -213,11 +212,11 @@ describe('calendar feeds routes', () => {
       const logs: string[] = []
       const app = await buildApp(logs)
       const link = `https://example.com/${SECRET}.ics`
-      await add(app, { name: 'New', link, privateTitles: false })
-      await add(app, { name: 'Again', link, privateTitles: false })
+      await add(app, { name: 'New', link })
+      await add(app, { name: 'Again', link })
       read.mockRejectedValueOnce(new FeedReadError(400, "The link can't be read: its server refuses it (404)"))
-      await add(app, { name: 'Other', link: `${link}?other`, privateTitles: false })
-      await add(app, { name: 'Bad', link: `http://example.com/${SECRET}`, privateTitles: false })
+      await add(app, { name: 'Other', link: `${link}?other` })
+      await add(app, { name: 'Bad', link: `http://example.com/${SECRET}` })
       expect(logs.length).toBeGreaterThan(4)
       for (const line of logs) expect(line).not.toContain(SECRET)
     })
@@ -225,38 +224,37 @@ describe('calendar feeds routes', () => {
 
   describe('PATCH /api/admin/calendar/feeds/:id', () => {
     const NEW_LINK = 'https://example.com/new.ics'
-    const settings = (link: string, privateTitles: boolean) => ({ link, privateTitles })
 
-    it("changes the name and whether its titles are private without reading the feed, and says who changed it", async () => {
+    it('changes the name without reading the feed, and says who changed it', async () => {
       const app = await buildApp()
-      const response = await change(app, FEED_A.toUpperCase(), { name: ' Équipe ', privateTitles: true })
+      const response = await change(app, FEED_A.toUpperCase(), { name: ' Équipe ' })
       expect(response.statusCode).toBe(200)
       expect(response.json().feed).toEqual({
-        ...{ id: FEED_A, name: 'Équipe', link: LINK, privateTitles: true },
+        ...{ id: FEED_A, name: 'Équipe', link: LINK },
         ...{ createdBy: 'someone@example.com', createdAt: '2026-11-01T07:00:00-05:00', updatedBy: 'admin@example.com', updatedAt: '2026-11-22T12:00:00-05:00' },
         ...{ readAt: null, error: null },
       })
       expect(read).not.toHaveBeenCalled()
-      expect(store.update).toHaveBeenCalledExactlyOnceWith(FEED_A, { name: 'Équipe', privateTitles: true }, 'admin@example.com')
-      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, settings(LINK, true), undefined)
+      expect(store.update).toHaveBeenCalledExactlyOnceWith(FEED_A, { name: 'Équipe' }, 'admin@example.com')
+      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, LINK, undefined)
     })
 
     it("doesn't read the feed's own link, e.g. as a webcal link, which no other feed has", async () => {
       const app = await buildApp()
-      const response = await change(app, FEED_A, { link: `${LINK.replace('https:', 'webcal:')}#x`, privateTitles: true })
+      const response = await change(app, FEED_A, { link: `${LINK.replace('https:', 'webcal:')}#x` })
       expect(response.statusCode).toBe(200)
-      expect(response.json().feed).toMatchObject({ link: LINK, privateTitles: true })
+      expect(response.json().feed).toMatchObject({ link: LINK })
       expect(read).not.toHaveBeenCalled()
-      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, settings(LINK, true), undefined)
+      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, LINK, undefined)
     })
 
     it('reads a new link, then changes the feed with that read in place of the former one', async () => {
       const app = await buildApp()
-      const response = await change(app, FEED_A, { link: 'webcal://example.com/new.ics', privateTitles: true })
+      const response = await change(app, FEED_A, { link: 'webcal://example.com/new.ics' })
       expect(response.statusCode).toBe(200)
-      expect(response.json().feed).toMatchObject({ link: NEW_LINK, privateTitles: true, readAt: '2026-11-22T12:00:00-05:00', error: null })
-      expect(read).toHaveBeenCalledExactlyOnceWith({ id: FEED_A, name: "Calendrier de l'équipe", ...settings(NEW_LINK, true) })
-      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, settings(NEW_LINK, true), { events: EVENTS, readAt: NOW, settings: settings(NEW_LINK, true) })
+      expect(response.json().feed).toMatchObject({ link: NEW_LINK, readAt: '2026-11-22T12:00:00-05:00', error: null })
+      expect(read).toHaveBeenCalledExactlyOnceWith({ id: FEED_A, name: "Calendrier de l'équipe", link: NEW_LINK })
+      expect(reads.changed).toHaveBeenCalledExactlyOnceWith(FEED_A, NEW_LINK, { events: EVENTS, readAt: NOW, link: NEW_LINK })
     })
 
     it("fails like the read when the new link doesn't give a calendar, or can't be read for now, without changing the feed", async () => {
@@ -298,9 +296,9 @@ describe('calendar feeds routes', () => {
         expect(response.statusCode).toBe(404)
         expect(response.json()).toEqual({ ok: false, error: 'No such feed' })
       }
-      read.mockImplementationOnce(async ({ link, privateTitles }) => {
+      read.mockImplementationOnce(async ({ link }) => {
         feeds = []
-        return { events: EVENTS, readAt: NOW, settings: { link, privateTitles } }
+        return { events: EVENTS, readAt: NOW, link }
       })
       const response = await change(app, FEED_A, { link: NEW_LINK })
       expect(response.statusCode).toBe(404)
@@ -312,7 +310,7 @@ describe('calendar feeds routes', () => {
       const refused = [
         [{}, 'There must be at least one field to change'],
         [{ name: ' ' }, '`name`: The name must not be blank'],
-        [{ privateTitles: 'true' }, '`privateTitles`'],
+        [{ privateTitles: true }, 'Unknown field: `privateTitles`'],
         [{ link: `http://example.com/${SECRET}` }, '`link`: The link must be an https or webcal link'],
         [{ name: 'x', kind: 'occupation' }, 'Unknown field: `kind`'],
       ] as const

@@ -9,7 +9,6 @@ const TEAM = {
   id: 'feed-1',
   name: "Calendrier de l'équipe",
   link: TEAM_LINK,
-  privateTitles: false,
   createdBy: 'admin@example.com',
   createdAt: '2026-11-07T16:30:00-05:00',
   updatedBy: null,
@@ -22,7 +21,6 @@ const STAYS = {
   id: 'feed-2',
   name: 'Séjours',
   link: 'https://example.com/stays.ics',
-  privateTitles: true,
   readAt: null,
   error: "The link can't be read: its server fails (503)",
 }
@@ -33,7 +31,6 @@ const items = () => screen.queryAllByRole('listitem').filter((item) => item.clos
 const addForm = () => screen.getByRole('button', { name: 'ajouter' }).closest('form')!
 const nameField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Nom' })
 const linkField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Lien' })
-const privateTitlesBox = (form = addForm()) => within(form).getByRole('checkbox', { name: 'Masquer les titres' })
 const addButton = () => screen.getByRole('button', { name: 'ajouter' })
 
 function fill() {
@@ -53,7 +50,7 @@ describe('The calendar feeds', () => {
     await screen.findByText('Aucun calendrier externe pour le moment.')
   })
 
-  it('lists each feed with its link, whether its titles are private, who added it, and when it was last read, or why that failed', async () => {
+  it('lists each feed with its link, who added it, and when it was last read, or why that failed', async () => {
     mockFetch(list(TEAM, STAYS))
     render(<CalendarFeeds />)
 
@@ -64,19 +61,20 @@ describe('The calendar feeds', () => {
     expect(within(team).queryByRole('link')).toBeNull()
     expect(within(team).getByText(/^Ajouté par admin@example.com le 7 novembre 2026/)).toHaveTextContent(/Lu le 22 novembre 2026 à 12 h 15\.$/)
     expect(team).not.toHaveTextContent('a échoué')
-    expect(stays).toHaveTextContent('Séjours (titres masqués)')
+    expect(stays).toHaveTextContent('Séjours modifier retirer')
     expect(stays).toHaveTextContent('https://example.com/stays.ics')
     expect(stays).toHaveTextContent('Pas encore lu.')
     expect(within(stays).getByText(/^La dernière lecture a échoué/)).toHaveTextContent("La dernière lecture a échoué : The link can't be read: its server fails (503)")
   })
 
-  it('takes the link as text, and has private titles checked to start with', async () => {
+  it('takes the name and the link, as text, and nothing else', async () => {
     mockFetch(list())
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(linkField()).toBeInTheDocument())
     expect(linkField()).toHaveAttribute('autocomplete', 'off')
-    expect(privateTitlesBox()).toBeChecked()
+    expect(within(addForm()).getAllByRole('textbox')).toEqual([nameField(), linkField()])
+    expect(within(addForm()).queryByRole('checkbox')).toBeNull()
   })
 
   it('adds a feed once its name and link are filled in, then clears the form and lists it', async () => {
@@ -87,7 +85,6 @@ describe('The calendar feeds', () => {
     await waitFor(() => expect(items()).toHaveLength(1))
     expect(addButton()).toBeDisabled()
     fill()
-    fireEvent.click(privateTitlesBox())
     expect(addButton()).toBeEnabled()
     fireEvent.click(addButton())
     // The server reads the link first, which takes a while.
@@ -96,10 +93,9 @@ describe('The calendar feeds', () => {
 
     await waitFor(() => expect(items()).toHaveLength(2))
     expect(items()[1]).toHaveTextContent('Nouveau')
-    expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', link: 'webcal://example.com/secret.ics', privateTitles: false }])
+    expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', link: 'webcal://example.com/secret.ics' }])
     expect(nameField()).toHaveValue('')
     expect(linkField()).toHaveValue('')
-    expect(privateTitlesBox()).toBeChecked()
     expect(addButton()).toBeDisabled()
   })
 
@@ -120,7 +116,7 @@ describe('The calendar feeds', () => {
   })
 
   it('changes a feed in a form filled in with it, then shows it as it is then', async () => {
-    const changed = { ...TEAM, name: 'Équipe', link: 'https://example.com/new.ics', privateTitles: true, updatedBy: 'admin@example.com' }
+    const changed = { ...TEAM, name: 'Équipe', link: 'https://example.com/new.ics', updatedBy: 'admin@example.com' }
     mockFetch({ ...list(TEAM), [`PATCH ${URL}/feed-1`]: { ok: true, feed: changed } })
     render(<CalendarFeeds />)
 
@@ -129,17 +125,15 @@ describe('The calendar feeds', () => {
     const form = within(items()[0]).getByRole('button', { name: 'enregistrer' }).closest('form')!
     expect(nameField(form)).toHaveValue("Calendrier de l'équipe")
     expect(linkField(form)).toHaveValue(TEAM_LINK)
-    expect(privateTitlesBox(form)).not.toBeChecked()
     fireEvent.change(nameField(form), { target: { value: 'Équipe' } })
     fireEvent.change(linkField(form), { target: { value: 'https://example.com/new.ics' } })
-    fireEvent.click(privateTitlesBox(form))
     fireEvent.click(within(form).getByRole('button', { name: 'enregistrer' }))
     // The server reads the new link first.
     expect(within(form).getByText('Lecture du calendrier…')).toBeInTheDocument()
 
     await waitFor(() => expect(within(items()[0]).queryByRole('button', { name: 'enregistrer' })).toBeNull())
-    expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe', link: 'https://example.com/new.ics', privateTitles: true }])
-    expect(items()[0]).toHaveTextContent('Équipe (titres masqués)')
+    expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe', link: 'https://example.com/new.ics' }])
+    expect(items()[0]).toHaveTextContent('Équipe modifier retirer')
     expect(items()[0]).toHaveTextContent('https://example.com/new.ics')
     // The add form is as it was.
     expect(nameField()).toHaveValue('')

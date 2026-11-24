@@ -99,7 +99,7 @@ describe("a conflict's things", () => {
   it('are named by their names alone', () => {
     expect(nameOf({ kind: 'session', id: 's', title: 'GUEST MIXES', status: 'planned' })).toBe('GUEST MIXES')
     expect(nameOf({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe('RÉPARATION')
-    expect(nameOf({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe('Séjours')
+    expect(nameOf({ kind: 'occupation', title: '', calendar: 'Séjours' })).toBe('Séjours')
   })
 })
 
@@ -200,7 +200,7 @@ describe('things', () => {
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false, title: 'A' } as const
     // The same instants, written otherwise.
     expect(thingKey({ ...occupation, start: '2026-11-15T02:00:00Z' })).toBe(thingKey(occupation))
-    for (const other of [{ title: 'B' }, { title: null }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
+    for (const other of [{ title: 'B' }, { title: '' }, { feedId: 'g' }, { wholeDay: true }, { end: '2026-11-14T23:30:00-05:00' }]) {
       expect(thingKey({ ...occupation, ...other })).not.toBe(thingKey(occupation))
     }
     const session = { kind: 'session', id: 's', title: 'X', start: occupation.start, end: occupation.end, status: 'planned' } as const
@@ -208,19 +208,18 @@ describe('things', () => {
   })
 
   it("name an occupation by its title and its feed's name, or by its feed's name alone", () => {
-    const feeds = [feed('f', 'Équipe'), feed('g', 'Séjours')]
+    const feeds = [feed('f', 'Équipe')]
     const occupation = { kind: 'occupation', feedId: 'f', start: '2026-11-14T21:00:00-05:00', end: '2026-11-14T23:00:00-05:00', wholeDay: false } as const
     expect(namedThing({ ...occupation, title: 'RÉPARATION' }, feeds)).toEqual({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Équipe' })
-    expect(namedThing({ ...occupation, feedId: 'g', title: null }, feeds)).toEqual({ kind: 'occupation', title: null, calendar: 'Séjours' })
+    expect(namedThing({ ...occupation, title: '' }, feeds)).toEqual({ kind: 'occupation', title: '', calendar: 'Équipe' })
     expect(inSentence({ kind: 'occupation', title: 'RÉPARATION', calendar: 'Équipe' })).toBe("l'occupation RÉPARATION (Équipe)")
-    expect(inSentence({ kind: 'occupation', title: null, calendar: 'Séjours' })).toBe("l'occupation Séjours")
+    expect(inSentence({ kind: 'occupation', title: '', calendar: 'Équipe' })).toBe("l'occupation Équipe")
     expect(inSentence({ kind: 'session', id: 's', title: 'HAUTE RIVE', status: 'planned' })).toBe('la session HAUTE RIVE')
   })
 })
 
 function feed(id: string, name: string): Feed {
-  return { id, name, link: `https://example.com/${id}.ics`, privateTitles: false, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
+  return { id, name, link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
 }
 
 // A session of the calendar, with what the page shows of it.
@@ -235,8 +234,8 @@ function calendar(fields: Partial<Calendar>): Calendar {
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
 
 describe('the days of the month', () => {
-  // A stay, in a feed whose titles are private, a session during it, and a repair over three whole days.
-  const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: null }
+  // A stay, without a title, a session during it, and a repair over three whole days.
+  const stay = { feedId: 'q', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: '' }
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const repair = { feedId: 'o', start: '2026-11-25T00:00:00-05:00', end: '2026-11-28T00:00:00-05:00', wholeDay: true, title: 'RÉPARATION' }
   const conflict: Conflict = { start: late.start!, end: late.end!, things: [{ kind: 'occupation', ...stay }, sessionThing(late)] }
@@ -244,7 +243,7 @@ describe('the days of the month', () => {
 
   it('have what takes them, by start, then end, with their names', () => {
     expect(thingsOn(days.get('2026-11-21')!).map(({ thing, part }) => [thing.kind, thing.title, part])).toEqual([
-      ['occupation', null, 'toute la journée'],
+      ['occupation', '', 'toute la journée'],
       ['session', 'LATE', '21 h – 1 h'],
     ])
     expect(thingsOn(days.get('2026-11-21')!)[0].thing).toMatchObject({ calendar: 'Séjours' })
@@ -271,12 +270,12 @@ describe('the days of the month', () => {
     const [stayed, played, repaired] = thingsWithConflicts(calendar({ sessions: [late], occupations: [repair, stay], conflicts: [conflict] }))
     expect([stayed.thing.kind, played.thing.kind, repaired.thing.kind]).toEqual(['occupation', 'session', 'occupation'])
     expect(stayed.conflicts).toEqual([{ conflict, other: { kind: 'session', id: 'late', title: 'LATE', status: 'planned' } }])
-    expect(played.conflicts).toEqual([{ conflict, other: { kind: 'occupation', title: null, calendar: 'Séjours' } }])
+    expect(played.conflicts).toEqual([{ conflict, other: { kind: 'occupation', title: '', calendar: 'Séjours' } }])
     expect(repaired.conflicts).toEqual([])
   })
 
   it('name each other thing once, for things that are the same', () => {
-    // Two stays with the same dates, in a feed whose titles are private, each in conflict with the session and the other.
+    // Two stays with the same dates, without titles, each in conflict with the session and the other.
     const stays: ConflictThing[] = [{ kind: 'occupation', ...stay }, { kind: 'occupation', ...stay }]
     const conflicts: Conflict[] = [
       { start: stay.start, end: stay.end, things: stays as [ConflictThing, ConflictThing] },
@@ -338,10 +337,10 @@ describe('the list', () => {
     expect(listRange('2027-11-19')).toEqual({ from: '2027-11-19', to: '2028-11-17' })
   })
 
-  // A stay going on since yesterday, until December, in conflict with a meeting today and a session later on, a
-  // session over three days, and a repair over three whole days in January.
+  // A stay without a title, going on since yesterday, until December, in conflict with a meeting today and a session
+  // later on, a session over three days, and a repair over three whole days in January.
   const { from, to } = listRange('2026-11-19')
-  const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: null }
+  const stay = { feedId: 'q', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: '' }
   const meeting = { feedId: 'o', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
   const late = session('late', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00')
   const marathon = session('marathon', '2027-02-06T18:00:00-05:00', '2027-02-08T01:00:00-05:00')
@@ -355,7 +354,7 @@ describe('the list', () => {
 
   it('has every month of its days, each thing once, on the first of these days it takes, by start, then end', () => {
     expect(months.map(({ month }) => month)).toEqual(['2026-11', '2026-12', ...Array.from({ length: 11 }, (_, i) => addMonths('2027-01', i))])
-    const listed = months.flatMap(({ month, things }) => things.map(({ day, thing }) => [month, day, thing.kind === 'session' ? thing.title : (thing.title ?? thing.calendar), thing.start]))
+    const listed = months.flatMap(({ month, things }) => things.map(({ day, thing }) => [month, day, thing.kind === 'session' ? thing.title : thing.title || thing.calendar, thing.start]))
     expect(listed).toEqual([
       // Today, though it started yesterday.
       ['2026-11', '2026-11-19', 'Séjours', stay.start],

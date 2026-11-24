@@ -151,7 +151,7 @@ async function buildApp(logs?: string[], environment = 'test') {
       '/api/admin/calendar/feeds/:id',
       { config: { admin: true, tool: { title: 'Voir un calendrier' } }, schema: { operationId: 'get_calendar_feed', summary: 'A feed', params: ById } },
       async (request, reply) => {
-        const feed = { id: 'f', name: 'Séjours', link: FEED_LINK, privateTitles: true }
+        const feed = { id: 'f', name: 'Séjours', link: FEED_LINK }
         if (request.params.id === 'conflict') return reply.status(409).send({ ok: false, error: 'In the way', feeds: [feed] })
         return { ok: true, feed, nested: { feeds: [feed] } }
       },
@@ -168,7 +168,7 @@ async function buildApp(logs?: string[], environment = 'test') {
       async () => {
         const session = { id: 's', start: null, end: null, durationMinutes: 60, type: 'other', title: 'Atelier', takeover: null, application: null }
         const full = { ...session, status: 'planned', announced: false, name: 'Atelier', description: 'Long', sets: [{ id: 'set' }] }
-        const feeds = [{ id: 'f', name: 'Séjours', link: FEED_LINK, privateTitles: true }]
+        const feeds = [{ id: 'f', name: 'Séjours', link: FEED_LINK }]
         return { ok: true, today: '2026-11-23', feeds, sessions: [full], undatedSessions: [full], conflicts: [{ things: [{ kind: 'session', id: 's' }] }] }
       },
     )
@@ -490,7 +490,7 @@ describe('the MCP server', () => {
 
     it("never give calendar feeds' links, wherever they are, whether they succeed or fail", async () => {
       const app = await buildApp()
-      const feed = { id: 'f', name: 'Séjours', privateTitles: true }
+      const feed = { id: 'f', name: 'Séjours' }
       const succeeded = await call(app, 'get_calendar_feed', { id: 'f' })
       expect(succeeded.body).toEqual({ ok: true, feed, nested: { feeds: [feed] } })
       const failed = await call(app, 'get_calendar_feed', { id: 'conflict' })
@@ -564,7 +564,7 @@ describe('the MCP server', () => {
       expect((await call(app, 'get_calendar')).body).toEqual({
         ok: true,
         today: '2026-11-23',
-        feeds: [{ id: 'f', name: 'Séjours', privateTitles: true }],
+        feeds: [{ id: 'f', name: 'Séjours' }],
         sessions: [session],
         undatedSessions: [session],
         conflicts: [{ things: [{ kind: 'session', id: 's' }] }],

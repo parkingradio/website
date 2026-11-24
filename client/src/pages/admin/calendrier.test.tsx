@@ -25,7 +25,6 @@ const TEAM = {
   id: 'team',
   name: "Calendrier de l'équipe",
   link: 'https://example.com/team.ics',
-  privateTitles: false,
   createdBy: 'admin@example.com',
   createdAt: '2026-11-01T12:00:00Z',
   updatedBy: null,
@@ -33,8 +32,8 @@ const TEAM = {
   readAt: '2026-11-19T11:50:00-05:00',
   error: null,
 }
-// A feed of the guests' stays, whose titles are private.
-const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', privateTitles: true, error: "The link can't be read: its server fails (503)" }
+// A feed of the guests' stays, whose last read failed.
+const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', error: "The link can't be read: its server fails (503)" }
 
 const TAKEOVER = session('session-1', 'HAUTE RIVE TAKEOVER', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00', { sets: [performers('Aurore', 'Brume'), performers('Cyan')] as Session['sets'] })
 const PLAYED = session('session-2', 'SOIRÉE', '2026-11-07T20:00:00-05:00', '2026-11-07T23:00:00-05:00', { status: 'done' })
@@ -42,7 +41,8 @@ const CANCELLED = session('session-3', 'LIVE PERFORMANCE', '2026-11-24T20:00:00-
 const UNDATED = session('session-4', 'LES SŒURS ONDES TAKEOVER', null, null, { sets: [performers('Ondine'), performers('Écume')] as Session['sets'] })
 const REPAIR = { feedId: 'team', start: '2026-11-26T10:00:00-05:00', end: '2026-11-26T16:00:00-05:00', wholeDay: false, title: 'RÉPARATION' }
 const CLOSED = { feedId: 'team', start: '2026-12-02T00:00:00-05:00', end: '2026-12-04T00:00:00-05:00', wholeDay: true, title: '' }
-const STAY = { feedId: 'stays', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: null }
+// Without a title, so that it's named by its calendar alone.
+const STAY = { feedId: 'stays', start: '2026-11-20T15:00:00-05:00', end: '2026-11-22T11:00:00-05:00', wholeDay: false, title: '' }
 // The stay and the takeover, as the server gives them.
 const CONFLICT = {
   start: TAKEOVER.start!,
@@ -68,7 +68,7 @@ const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [] }
 // with conflicts today and on later days, a cancelled session, a session over three days, a whole-day occupation over
 // three days, and a day with two things.
 const LIST = '/api/admin/calendar?from=2026-11-19&to=2027-11-18'
-const LONG_STAY = { feedId: 'stays', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: null }
+const LONG_STAY = { feedId: 'stays', start: '2026-11-18T15:00:00-05:00', end: '2026-12-02T11:00:00-05:00', wholeDay: false, title: '' }
 const MEETING = { feedId: 'team', start: '2026-11-19T10:00:00-05:00', end: '2026-11-19T12:00:00-05:00', wholeDay: false, title: 'RÉUNION' }
 const DELIVERY = { feedId: 'team', start: '2026-12-15T10:00:00-05:00', end: '2026-12-15T12:00:00-05:00', wholeDay: false, title: 'LIVRAISON' }
 const EVENING = session('session-6', 'SOIRÉE DE DÉCEMBRE', '2026-12-15T20:00:00-05:00', '2026-12-15T22:00:00-05:00')
@@ -413,7 +413,7 @@ describe('Calendrier', () => {
     })
 
     it('names the other thing of a conflict between two occupations', async () => {
-      // A cleaning, during the stay, whose feed's titles are private, unlike the cleaning's.
+      // A cleaning, during the stay, which has a title, unlike the stay.
       const cleaning = { feedId: 'team', start: '2026-11-21T10:00:00-05:00', end: '2026-11-21T12:00:00-05:00', wholeDay: false, title: 'MÉNAGE' }
       const conflict = { start: cleaning.start, end: cleaning.end, things: [{ kind: 'occupation', ...STAY }, { kind: 'occupation', ...cleaning }] } as Calendar['conflicts'][number]
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, occupations: [STAY, cleaning], sessions: [], conflicts: [conflict] } })

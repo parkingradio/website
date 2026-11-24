@@ -16,8 +16,9 @@ something else that tells them apart:
   [status colors](layout.md#status-colors), with "jouée" or "annulée" written. Past planned sessions keep their color, so
   that one that wasn't marked "jouée" stands out.
 - Occupations have a dashed border. An occupation is named by its title, then the name of its feed, its calendar, e.g.
-  « RÉPARATION », « Calendrier de l'équipe », or by its calendar's name alone, as it's written, when it has no title or
-  its feed's titles are private, e.g. « Séjours ». Its title is cut short in the month, after two lines.
+  « RÉPARATION », « Calendrier de l'équipe », or « Airbnb », « Séjours », or by its calendar's name alone, as it's
+  written, when it has no title (`""`), e.g. « Calendrier de l'équipe ». Its title is cut short in the month, after two
+  lines.
 - Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
 - Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 
@@ -80,7 +81,7 @@ links of its own.
 - The conflicts: "conflits", "chevauchements à résoudre", then each one, in the server's order. Its row has the day it
   starts, without its year unless it's another year than today's, then the time its two things overlap, in brief on that
   day (see [What's shown](#whats-shown)), then "·" and the two things' names, joined by "et": a session's title, and an
-  occupation's, or its calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER
+  occupation's, or its calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Airbnb et HAUTE RIVE TAKEOVER
   ». It shows that day, chosen, in the month, with the focus on it, whichever view is shown.
 - The sessions without a date: "sans date", "sessions à placer", then each one, the most recently added first. Its row
   has "à déterminer" as when it is, then its title, "·", its sets' performers, set by set, the sets separated by "·",
@@ -209,8 +210,8 @@ color and with its shape, framed in red when it's in a conflict; its times in br
   when their overlap doesn't take some of the row's day, the day it starts, without its year unless it's another year
   than the row's day's.
 
-E.g. « mar. 1 déc. | occupation | 15 h – 11 h | Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier de
-l'équipe (mer. 2 déc.) ».
+E.g. « mar. 1 déc. | occupation | 15 h – 11 h | Airbnb Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier
+de l'équipe (mer. 2 déc.) ».
 
 As in "À régler", the whole row is one control, whose text has no links of its own: it shows the row's day, chosen, in
 the month, with the focus on it, where the chosen day links to a session's page. Screen readers name the list by the
