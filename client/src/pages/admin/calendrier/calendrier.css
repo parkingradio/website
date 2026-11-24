@@ -159,9 +159,38 @@
   font-weight: 700;
 }
 
-/* The toolbar, with the month's name between its arrows, or "À venir" first, and the views' buttons at its end. */
+/* The toolbar, with the month's name between its arrows, or "À venir" first, and the views' buttons, then the one that
+   reads the feeds again, at its end. */
 .calendar-toolbar {
   align-items: center;
+}
+
+.calendar-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Its arrow turns while the feeds are read, which is when it's greyed out. */
+.calendar-refresh span {
+  display: inline-block;
+}
+
+.calendar-refresh[aria-disabled='true'] span {
+  animation: calendar-refresh-turn 1s linear infinite;
+}
+
+@keyframes calendar-refresh-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-refresh[aria-disabled='true'] span {
+    animation: none;
+  }
 }
 
 .admin .calendar-toolbar-heading {
@@ -174,7 +203,7 @@
 }
 
 .admin .calendar-views {
-  margin: 0 0 0 auto;
+  margin: 0;
 }
 
 .calendar-legend {
@@ -466,12 +495,13 @@
 }
 
 /* On phones, the month is seven narrow columns, whose days show marks in place of their words, and the views' buttons
-   are on the toolbar's first line, so that they're where they are whichever view is shown. */
+   are on the toolbar's first line, with the one that reads the feeds again at its other end, so that they're where they
+   are whichever view is shown. */
 @media (max-width: 700px) {
-  .admin .calendar-views {
+  .calendar-toolbar-end {
     flex-basis: 100%;
     order: -1;
-    margin: 0;
+    justify-content: space-between;
   }
 
   .calendar-month td {

@@ -40,9 +40,14 @@ A feed has these fields:
 
 ## Reading the feeds
 
-The server reads every feed when it starts, then every 15 minutes, and reads a feed when it's added, or when its link
-changes: adding it, or changing its link, waits for that read, so that a link that doesn't give a calendar is refused.
-Nothing else waits for a read: the server keeps what it read in memory, and gives what it read last.
+The server reads every feed when it starts, then every 15 minutes, and when it's asked to
+([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)). It also reads a feed when it's
+added, or when its link changes: adding it, or changing its link, waits for that read, so that a link that doesn't give
+a calendar is refused. Apart from these and asking for every feed to be read (see its endpoint), nothing waits for a
+read: the server keeps what it read in memory, and gives what it read last.
+
+During a read of every feed, the feeds are read one at a time, and reads of every feed don't overlap: one asked for
+while another is under way starts once that one ends, once for every request made meanwhile.
 
 A read has limits on how long it takes and on the calendar's size, and fails beyond them. It also fails when the link's
 server answers with an error, or with something that isn't valid iCalendar.
@@ -89,7 +94,9 @@ day after its last, e.g. a month:
 Its occupations are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can be out
 of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read yet,
 e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or when
-it hasn't been read yet. Occupations also only cover what a read keeps, from a year before it to two years after it (see
+it hasn't been read yet. Apps can have every feed read again first when they need the occupations to be up to date,
+e.g. right after the admin changed an event, but not before every calendar they ask for, since that waits for every
+read. Occupations also only cover what a read keeps, from a year before it to two years after it (see
 [Events](#events)), so the calendar of days outside that can lack occupations.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
@@ -152,6 +159,21 @@ Every feed, with its link, in the order they were added.
 | `ok` | `true` | |
 | `total` | number | How many feeds there are |
 | `feeds` | list of feeds | |
+
+## `POST /api/admin/calendar/feeds/refresh` (admin)
+
+Takes no body. Reads every feed now, or once the read of every feed under way ends, if there's one (see
+[Reading the feeds](#reading-the-feeds)), and once each read has ended, responds with every feed as
+[`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them then. A read that fails doesn't fail the
+request: its feed says why (`error`). This can take a while.
+
+| Response field | Type | |
+|---|---|---|
+| `ok` | `true` | |
+| `total` | number | How many feeds there are |
+| `feeds` | list of feeds | |
+
+Fails with 502 when the server shuts down meanwhile.
 
 ## `POST /api/admin/calendar/feeds` (admin)
 

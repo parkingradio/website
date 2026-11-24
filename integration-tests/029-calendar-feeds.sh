@@ -6,8 +6,9 @@
 # - there are none until one is added
 # - a link that isn't https or webcal, or fields the endpoint doesn't take, are refused before the link is read
 # - a link whose server can't be found fails with 502
-# - a feed that's in the database is listed, with its link, and can be renamed and have its titles made private without
-#   being read, but a new link whose server can't be found fails with 502, without changing it; and it can be removed
+# - a feed that's in the database is listed, with its link, and can be renamed without being read, but a new link whose
+#   server can't be found fails with 502, without changing it; reading every feed again gives it, with why its read
+#   failed; and it can be removed
 # - the links are never logged
 # - the calendar gives the sessions of its days, those without a date, and the feeds, and refuses more than 400 days
 # - in the image, the server's module that goes through a feed's text (calendar/parse.js) starts its process, gets its
@@ -31,6 +32,8 @@ request --request PATCH --header 'Content-Type: application/json' --data '{"name
 expect_status 401
 request --request DELETE "${URL}/00000000-0000-4000-8000-000000000000"
 expect_status 401
+request --request POST "${URL}/refresh"
+expect_status 401
 
 login 198.51.100.32 "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
 expect_status 200
@@ -48,6 +51,9 @@ change() {
 
 echo "  there are none until one is added"
 request --header "Cookie: ${cookie}" "$URL"
+expect_status 200
+expect_body_contains '{"ok":true,"total":0,"feeds":[]}'
+request --header "Cookie: ${cookie}" --request POST "${URL}/refresh"
 expect_status 200
 expect_body_contains '{"ok":true,"total":0,"feeds":[]}'
 
@@ -92,6 +98,11 @@ expect_status 502
 expect_body_contains "The link can't be read"
 request --header "Cookie: ${cookie}" "$URL"
 expect_body_contains "\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\""
+echo "  reading every feed again reads it, and gives it once that has failed"
+request --header "Cookie: ${cookie}" --request POST "${URL}/refresh"
+expect_status 200
+expect_body_contains "\"total\":1,\"feeds\":[{\"id\":\"${FEED}\",\"name\":\"Invités\",\"link\":\"https://calendar.invalid/${SECRET}-stays.ics\""
+expect_body_contains "\"readAt\":null,\"error\":\"The link can't be read: its server can't be found\"}]}"
 request --header "Cookie: ${cookie}" --request DELETE "${URL}/${FEED}"
 expect_status 200
 request --header "Cookie: ${cookie}" --request DELETE "${URL}/${FEED}"

@@ -267,6 +267,12 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
   await expect(dayCell(page, day)).toContainText(`RÉPARATION ${unique}`)
   expect(await scrollsSideways(page)).toBe(false)
   if (isMobile) {
+    // The toolbar's first line has the views' buttons, and "↻" after them, and the month comes under it.
+    const box = async (name: string, role: 'button' | 'group' = 'button') => (await page.getByRole(role, { name, exact: true }).boundingBox())!
+    const [views, refresh, previous] = [await box('Vue', 'group'), await box('relire les calendriers externes'), await box('mois précédent')]
+    expect(Math.abs(refresh.y + refresh.height / 2 - (views.y + views.height / 2))).toBeLessThan(2)
+    expect(refresh.x).toBeGreaterThan(views.x + views.width)
+    expect(previous.y).toBeGreaterThanOrEqual(views.y + views.height)
     // Its marks show, and its words are there for screen readers only.
     await expect(marks).toBeVisible()
     const words = (await dayCell(page, day).locator('.calendar-things').boundingBox())!

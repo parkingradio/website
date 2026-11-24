@@ -6,8 +6,8 @@ import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
 import { FeedReadError, ReadAborted, readLink } from './fetch.js'
 import { parseFeed } from './parse.js'
 
-// What the server read from the calendar feeds, which it keeps in memory, and reads again every 15 minutes (see
-// "Reading the feeds" in docs/design/server/calendar.md). Every server reads them on its own.
+// What the server read from the calendar feeds, which it keeps in memory, and reads again every 15 minutes, and when it's
+// asked to (see "Reading the feeds" in docs/design/server/calendar.md). Every server reads them on its own.
 //
 // Neither the links nor what's in the feeds are ever logged: a failed read logs the feed's id and name, and the server's
 // own message.
@@ -43,11 +43,15 @@ export type CalendarReads = {
   changed(id: string, link: string, read?: SuccessfulRead): void
   // Forgets a feed that was just removed, even if a read of it ends after this.
   removed(id: string): void
+  // Reads every feed now, or once the read of every feed under way ends, if there's one, which every request made
+  // meanwhile shares, and resolves once each read has ended, whether it failed or not. Rejects when the feeds can't be
+  // listed, or with a ReadAborted when the reads stop first, or have stopped.
+  refresh(): Promise<void>
   // Reads every feed, then every 15 minutes, until it stops.
   start(): void
   // Stops reading, and cuts short the reads under way, those of the feeds being added or changed included.
   stop(): void
-  // Once it's stopped.
+  // Once it's stopped, and the reads of every feed asked for meanwhile have ended. Never rejects.
   stopped(): Promise<void>
 }
 
@@ -86,6 +90,10 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
   let listing: Map<string, string | null> | null = null
   const stopping = new AbortController()
   let running: Promise<void> = Promise.resolve()
+  // The read of every feed under way, if any, and the one asked for meanwhile, which starts once it ends. Neither one
+  // rejects without a handler, which would end the process: their callers handle what they reject with.
+  let current: Promise<void> | null = null
+  let next: Promise<void> | null = null
 
   async function read({ id, name, link }: FeedToRead): Promise<SuccessfulRead> {
     let unexpected: unknown
@@ -122,34 +130,67 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
     }
   }
 
-  async function refresh(feed: StoredFeed) {
+  async function readAndKeep(feed: StoredFeed) {
     // Whether the feed still has the link it's read from, unless it was removed, or its link changed, meanwhile.
-    const current = () => known.get(feed.id) === feed.link
+    const stillKnown = () => known.get(feed.id) === feed.link
     try {
       const done = await read(feed)
-      if (current()) reads.set(feed.id, { ...done, error: null })
+      if (stillKnown()) reads.set(feed.id, { ...done, error: null })
     } catch (error) {
       if (error instanceof ReadAborted) return
       const message = error instanceof FeedReadError ? error.message : "The link can't be read: something went wrong"
       log.warn({ feed: feed.id, name: feed.name, error: message }, 'Failed to read a calendar feed')
       // What was read before, which goes with the feed as it is (see `reconcile`).
       const before = reads.get(feed.id)
-      if (current()) reads.set(feed.id, before ? { ...before, error: message } : { events: [], readAt: null, error: message, link: feed.link })
+      if (stillKnown()) reads.set(feed.id, before ? { ...before, error: message } : { events: [], readAt: null, error: message, link: feed.link })
     }
   }
 
+  // Reads every feed, one at a time. Rejects when they can't be listed, or with a ReadAborted when the reads stop.
   async function readAll() {
-    try {
-      for (const feed of await list()) {
-        if (stopping.signal.aborted) return
-        // Unless it was removed meanwhile, and with its link as it is now, in case it was changed during the listing, or
-        // since.
-        const link = known.get(feed.id)
-        if (link !== undefined) await refresh({ ...feed, link })
-      }
-    } catch (error) {
-      log.error({ err: withoutValues(error) }, 'Failed to list the calendar feeds')
+    const goOn = () => {
+      if (stopping.signal.aborted) throw new ReadAborted()
     }
+    for (const feed of await list()) {
+      goOn()
+      // Unless it was removed meanwhile, and with its link as it is now, in case it was changed during the listing, or
+      // since.
+      const link = known.get(feed.id)
+      if (link !== undefined) await readAndKeep({ ...feed, link })
+    }
+    // The last read may have been cut short.
+    goOn()
+  }
+
+  // `promise`, which no longer ends the process if it rejects without another handler.
+  function handled(promise: Promise<void>): Promise<void> {
+    promise.catch(() => {})
+    return promise
+  }
+
+  // Reads every feed, once the read under way ends, if there's one: from its end, whether it failed or not, so that a
+  // read asked for meanwhile is one of its own (see "Reading the feeds" in docs/design/server/calendar.md). Once the
+  // reads have stopped, it rejects without listing the feeds, since the database is then closing.
+  function refresh(): Promise<void> {
+    if (stopping.signal.aborted) return Promise.reject(new ReadAborted())
+    if (next) return next
+    if (current) {
+      next = handled(
+        current
+          .catch(() => {})
+          .then(() => {
+            next = null
+            return refresh()
+          }),
+      )
+      return next
+    }
+    current = handled(
+      readAll().finally(() => {
+        current = null
+      }),
+    )
+    return current
   }
 
   // Makes what was read from the feed `id` go with what `known` has of it, however that changed, e.g. through another
@@ -187,10 +228,17 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
       know(id, null)
     },
 
+    refresh,
+
     start() {
       running = (async () => {
         while (!stopping.signal.aborted) {
-          await readAll()
+          try {
+            await refresh()
+          } catch (error) {
+            // A refresh that fails the same way is logged as its request.
+            if (!(error instanceof ReadAborted)) log.error({ err: withoutValues(error) }, 'Failed to list the calendar feeds')
+          }
           await pause(READ_INTERVAL_MS, stopping.signal)
         }
       })()
@@ -200,6 +248,11 @@ export function calendarReads({ feeds, log, readText = (link, signal) => readLin
       stopping.abort()
     },
 
-    stopped: () => running,
+    async stopped() {
+      await running
+      // The reads of every feed that refreshes asked for meanwhile: those that haven't listed the feeds yet end without
+      // listing them.
+      await Promise.allSettled([current, next])
+    },
   }
 }

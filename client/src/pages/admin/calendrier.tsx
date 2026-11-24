@@ -58,6 +58,28 @@ function useCalendar(from: string, to: string, version: number): { last: Calenda
   return { last: reads.recent[0]?.calendar ?? null, shown: shown?.calendar ?? null, error: reads.error }
 }
 
+// The feeds whose read failed, by their names, e.g. « « Séjours » et « Airbnb » ».
+const namesFormat = new Intl.ListFormat('fr', { type: 'conjunction' })
+
+// Whether the feeds are being read again, what screen readers are told about it, and why the request failed, if it did.
+type FeedsRefresh = { reading: boolean; said: string; error: string | null }
+
+// Reads the calendar feeds again, then calls `onRead`, so that the calendar is read again.
+function useFeedsRefresh(onRead: () => void): FeedsRefresh & { refresh: () => Promise<void> } {
+  const [state, setState] = useState<FeedsRefresh>({ reading: false, said: '', error: null })
+  const refresh = async () => {
+    setState({ reading: true, said: 'Lecture des calendriers externes…', error: null })
+    const result = await api.POST('/api/admin/calendar/feeds/refresh')
+    if (!result.ok) return setState({ reading: false, said: '', error: result.error })
+    // Sighted admins see the warnings of "À régler" change: screen readers are told which feeds they're about.
+    const failed = result.feeds.filter((feed) => feed.error !== null).map(({ name }) => `«\u00a0${name}\u00a0»`)
+    const said = failed.length === 0 ? 'Calendriers externes relus.' : `Calendriers externes relus, sauf ${namesFormat.format(failed)}\u00a0: voir «\u00a0À régler\u00a0».`
+    setState({ reading: false, said, error: null })
+    onRead()
+  }
+  return { ...state, refresh }
+}
+
 export function Calendrier() {
   const [params, change] = useQueryParams()
   const today = quebecDayAndTime(new Date()).day
@@ -69,9 +91,12 @@ export function Calendrier() {
   const chosen = view === 'month' && day !== null && grid.includes(day) ? day : null
   const issuesOpen = params.get('issues') === 'open'
   const { from, to } = view === 'list' ? listRange(today) : gridRange(grid)
-  // How many sessions were added, each of which reads the calendar again.
-  const [addedCount, setAddedCount] = useState(0)
-  const reads = useCalendar(from, to, addedCount)
+  // How many times the calendar was changed, e.g. by adding a session, or reading the feeds again, each of which reads it
+  // again.
+  const [changes, setChanges] = useState(0)
+  const changed = () => setChanges((count) => count + 1)
+  const reads = useCalendar(from, to, changes)
+  const feeds = useFeedsRefresh(changed)
   // Only a calendar read for the view's days is shown in it, with, for the month, the grid of its own, which depends on
   // the month alone, unlike `grid`, which is made again on each render.
   const days = useMemo(() => (view === 'month' && reads.shown ? calendarDays(reads.shown, gridDays(month)) : null), [view, reads.shown, month])
@@ -137,6 +162,11 @@ export function Calendrier() {
           Le calendrier n'a pas pu être chargé&nbsp;: {reads.error}
         </p>
       )}
+      {feeds.error !== null && (
+        <p className="admin-error" role="alert">
+          Les calendriers externes n'ont pas pu être relus&nbsp;: {feeds.error}
+        </p>
+      )}
       {reads.last && (
         <Issues
           calendar={reads.last}
@@ -175,14 +205,30 @@ export function Calendrier() {
             </button>
           </>
         )}
-        <div className="admin-filters calendar-views" role="group" aria-label="Vue">
-          {VIEWS.map((each) => (
-            <button key={each} type="button" aria-pressed={view === each} onClick={() => showView(each)}>
-              {VIEW_LABELS[each]}
-            </button>
-          ))}
+        <div className="calendar-toolbar-end">
+          <div className="admin-filters calendar-views" role="group" aria-label="Vue">
+            {VIEWS.map((each) => (
+              <button key={each} type="button" aria-pressed={view === each} onClick={() => showView(each)}>
+                {VIEW_LABELS[each]}
+              </button>
+            ))}
+          </div>
+          {/* Greyed out while the feeds are read, but keeping the focus (see "Controls that can't be used" in
+              docs/design/client/admin/layout.md). */}
+          <button
+            type="button"
+            className="calendar-refresh"
+            aria-label="relire les calendriers externes"
+            aria-disabled={feeds.reading || undefined}
+            onClick={feeds.reading ? undefined : feeds.refresh}
+          >
+            <span aria-hidden="true">↻</span>
+          </button>
         </div>
       </div>
+      <p className="visually-hidden" role="status">
+        {feeds.said}
+      </p>
       {view === 'list' ? (
         <List nameId={headingId} to={to} months={months} onShowDay={goToDay} />
       ) : (
@@ -234,7 +280,7 @@ export function Calendrier() {
                 focusNext.current = dayInMonth(chosen)
                 setAdding(null)
                 setAdded({ day: chosen, title: session.title })
-                setAddedCount((count) => count + 1)
+                changed()
               }}
             />
           )}

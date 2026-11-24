@@ -43,7 +43,7 @@ describe('the tools of the API', () => {
         ...['delete_session_flyer', 'delete_session'],
         ...['create_set', 'update_set', 'update_set_status', 'update_set_position', 'update_set_session', 'delete_set'],
         ...['list_events', 'get_public_artist', 'get_public_collective'],
-        ...['get_calendar', 'list_calendar_feeds'],
+        ...['get_calendar', 'list_calendar_feeds', 'refresh_calendar_feeds'],
       ].sort(),
     )
   })
@@ -51,7 +51,7 @@ describe('the tools of the API', () => {
   it('only read when their endpoint does, and are destructive otherwise', async () => {
     const { tools } = await apiTools()
     const reading = tools.filter(({ readOnly }) => readOnly).map(({ name }) => name)
-    expect(reading.filter((name) => !/^(list|get)_/.test(name))).toEqual(['preview_playlist'])
+    expect(reading.filter((name) => !/^(list|get)_/.test(name))).toEqual(['preview_playlist', 'refresh_calendar_feeds'])
     expect(tools.filter(({ readOnly }) => !readOnly).every(({ name }) => !/^(list|get)_/.test(name))).toBe(true)
   })
 
@@ -67,7 +67,8 @@ describe('the tools of the API', () => {
     const areas = Object.fromEntries(tools.map(({ name, description }) => [name, /area `([\w-]+)`/.exec(description)![1]]))
     expect(areas).toMatchObject({
       ...{ get_on_air: 'radio', get_youtube_credentials: 'video', get_application_recipients: 'applications', update_set: 'sessions', list_ra_events: 'ra-events' },
-      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar', get_calendar: 'calendar' },
+      ...{ list_events: 'events', get_public_artist: 'artists', get_public_collective: 'collectives', list_calendar_feeds: 'calendar', refresh_calendar_feeds: 'calendar' },
+      get_calendar: 'calendar',
     })
     const update = tools.find(({ name }) => name === 'update_artist')!
     expect(Object.keys(update.inputSchema.properties as object)).toEqual(
@@ -163,6 +164,9 @@ describe('the tools of the API', () => {
       "Once per conversation, before using it, read the rules with `read_documentation`, area `calendar`. Every calendar feed that the studio's occupations are read from, in the order they were added. Calendar feeds' links are never shown.",
     )
     expect(tools.find(({ name }) => name === 'get_calendar')!.description).toMatch(/ Calendar feeds' links are never shown\.$/)
+    expect(tools.find(({ name }) => name === 'refresh_calendar_feeds')!.description).toBe(
+      "Once per conversation, before using it, read the rules with `read_documentation`, area `calendar`. Reads every calendar feed now, and gives every feed once each read is done or failed. Calendar feeds' links are never shown.",
+    )
   })
 })
 

@@ -93,7 +93,13 @@ the server takes, the month, e.g. "novembre 2026", and "aujourd'hui", which show
 the list: "À venir" in their place. Screen readers announce the month, or "À venir", when it changes.
 
 Then "mois" and "liste" ("Vue" for screen readers), which show the month and the list, the one shown being pressed, and
-doing nothing. They're at the same place whichever view is shown.
+doing nothing. Then "↻" ("relire les calendriers externes" for screen readers), which has the server read every feed
+again (see [Reading the feeds](../../server/calendar.md#reading-the-feeds)), then reads the calendar again. While the
+feeds are read, its arrow turns, unless the browser asks for less motion, and it's greyed out (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)). Screen readers announce « Lecture des calendriers
+externes… », then « Calendriers externes relus. », or which feeds couldn't be read, e.g. « Calendriers externes relus,
+sauf « Séjours » : voir « À régler ». ». These buttons are at the same place whichever view is shown: at the toolbar's
+end, or on phones, on its first line, "↻" at its end.
 
 ## The month
 
@@ -218,7 +224,9 @@ toolbar's heading, "À venir".
 
 ## Loading and errors
 
-When the calendar can't be read, the page says why at its top, until it's read again. "À régler" shows the last calendar
+When the calendar can't be read, the page says why at its top, until it's read again. Likewise, when the feeds can't be
+read again, the page says why, « Les calendriers externes n'ont pas pu être relus : … », until "↻" is used again.
+"À régler" shows the last calendar
 read, whatever its days, and nothing before the first. The month and the chosen day only show what a calendar read for
 the month's days has: until then, its days show only their numbers, and their "+", and the chosen day only its heading,
 and the form for a new session, which doesn't wait for the calendar. Likewise, the list only shows what a calendar read
@@ -229,6 +237,7 @@ to the list, shows it as it last showed it, while it's read again.
 
 - `GET /api/admin/calendar`, for the days of the month's grid, within those the server takes, or for the list, from today
   to 364 days later. It's read when the page opens, when the view or the month changes, when a new session is added,
-  and when the browser's tab is shown again, at most once a minute.
+  once the feeds have been read again with "↻", and when the browser's tab is shown again, at most once a minute.
+- `POST /api/admin/calendar/feeds/refresh`, from "↻".
 - `GET /api/admin/collectives`, to pick a takeover's collective, each time the form for a new session opens, and
   `POST /api/admin/sessions`, to add the session.

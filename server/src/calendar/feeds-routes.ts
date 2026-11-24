@@ -29,7 +29,10 @@ const FEED_FIELDS = { name: FeedName, link: Link }
 const NewFeed = z.strictObject(FEED_FIELDS, { error: objectError('The feed must be an object with its name and link') })
 const FeedChanges = changesTo(FEED_FIELDS)
 
+const FeedList = z.object({ ok: z.literal(true), total: Total, feeds: z.array(Feed) })
+
 const NO_SUCH_FEED: ApiError = { ok: false, error: 'No such feed' }
+const SHUTTING_DOWN: ApiError = { ok: false, error: 'The server is shutting down' }
 
 const linkTaken = (feed: Pick<StoredFeed, 'name'> | null): ApiError => ({
   ok: false,
@@ -59,6 +62,11 @@ type Options = { feeds: CalendarFeedsStore; reads: CalendarReads }
 export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }: Options) {
   const api = zodRoutes(app)
   const feed = (stored: StoredFeed) => feedBody(stored, reads.of(stored))
+  // Every feed, as GET /api/admin/calendar/feeds gives them.
+  const listFeeds = async () => {
+    const listed = (await feeds.list()).map(feed)
+    return { ok: true as const, total: listed.length, feeds: listed }
+  }
 
   // Reads the link of a feed that's added or changed, or says why it can't be read.
   async function readFeed(toRead: FeedToRead): Promise<SuccessfulRead | { status: 400 | 502; error: ApiError }> {
@@ -66,7 +74,7 @@ export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }
       return await reads.read(toRead)
     } catch (error) {
       if (error instanceof FeedReadError) return { status: error.status, error: { ok: false, error: error.message } }
-      if (error instanceof ReadAborted) return { status: 502, error: { ok: false, error: 'The server is shutting down' } }
+      if (error instanceof ReadAborted) return { status: 502, error: SHUTTING_DOWN }
       throw error
     }
   }
@@ -79,12 +87,33 @@ export async function calendarFeedsRoutes(app: FastifyInstance, { feeds, reads }
         operationId: 'list_calendar_feeds',
         summary: "Every calendar feed that the studio's occupations are read from, in the order they were added",
         tags: ['Calendar'],
-        response: { 200: z.object({ ok: z.literal(true), total: Total, feeds: z.array(Feed) }) },
+        response: { 200: FeedList },
       },
     },
-    async () => {
-      const listed = (await feeds.list()).map(feed)
-      return { ok: true as const, total: listed.length, feeds: listed }
+    listFeeds,
+  )
+
+  api.post(
+    '/api/admin/calendar/feeds/refresh',
+    {
+      // It only reads the feeds again, which changes nothing that admins rely on (see "Hints" in
+      // docs/design/server/mcp.md).
+      config: { admin: true, tool: { title: 'Relire les calendriers externes', readOnly: true } },
+      schema: {
+        operationId: 'refresh_calendar_feeds',
+        summary: 'Reads every calendar feed now, and gives every feed once each read is done or failed',
+        tags: ['Calendar'],
+        response: { 200: FeedList, 502: ApiError },
+      },
+    },
+    async (_request, reply) => {
+      try {
+        await reads.refresh()
+      } catch (error) {
+        if (error instanceof ReadAborted) return reply.status(502).send(SHUTTING_DOWN)
+        throw error
+      }
+      return listFeeds()
     },
   )
 
