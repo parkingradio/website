@@ -6,7 +6,8 @@ At `/admin/configuration`: the settings that change what the site does. From top
 - "Connexion SoundCloud": the credentials of the SoundCloud app the server reads SoundCloud through.
 - "Connexion YouTube": the YouTube channel the server reads the site's video from, and the key it reads it with.
 - "Chat": the chat, with "Connexion Discord": the Discord bot the server reaches it through, and its channel.
-- "Calendriers externes": the calendars that the studio's occupations are read from.
+- "Calendriers externes": the calendars that the studio's occupations, and the time protected for sessions, are read
+  from.
 - "Features": the feature flags.
 
 `/admin/features`, where the feature flags used to be, leads here.
@@ -70,23 +71,28 @@ it's never sent back.
 
 ## Calendriers externes
 
-The calendar feeds that the studio's occupations are read from (see [Calendar](../../server/calendar.md)). It says that
-what takes the studio outside sessions is read from these calendars, each occupation under its calendar's name, and
-that the server reads them every 15 minutes.
+The calendar feeds that the studio's occupations and holds are read from (see [Calendar](../../server/calendar.md)). It
+says that what takes the studio outside sessions is read from some of these calendars, « Occupations », each occupation
+under its calendar's name, and the time protected for sessions from others, « Plages protégées », and that the server
+reads them every 15 minutes.
 
-It lists the feeds, in the order they were added, each with its name, its link, as text, which admin added it and when,
-when it was last read, or that it hasn't been read yet, and why its last read failed, if it did. While there are none,
-it says so. "retirer" removes a feed, once the admin confirms.
+It lists the feeds, in the order they were added, each with its name, its kind, « Occupations » or « Plages protégées »,
+its link, as text, which admin added it and when, when it was last read, or that it hasn't been read yet, and why its
+last read failed, if it did. While there are none, it says so. "retirer" removes a feed, once the admin confirms.
 
-"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, and "Lien". "enregistrer" saves
-only what was changed, so that a form opened before another admin's change doesn't undo it, and closes the form;
-"annuler" closes it without saving. Either way, the focus goes back to "modifier".
+"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, "Type", « Occupations » or
+« Plages protégées », one of which is picked, as radio buttons, and "Lien". "enregistrer" saves only what was changed,
+so that a form opened before another admin's change doesn't undo it, and closes the form; "annuler" closes it without
+saving. Either way, the focus goes back to "modifier".
 
-Under the list, a form adds a feed, with the same fields. "ajouter" adds it, and clears the form.
+Under the list, a form adds a feed, with the same fields, where no type is picked at first, so that it's always chosen
+(see [`POST /api/admin/calendar/feeds`](../../server/calendar.md#post-apiadmincalendarfeeds-admin)). "ajouter" adds it,
+and clears the form.
 
-"enregistrer" and "ajouter" need a name and a link. When the link is new, the server reads it first (see
+"enregistrer" and "ajouter" need a name, a type and a link. When the link is new, the server reads it first (see
 [Reading the feeds](../../server/calendar.md#reading-the-feeds)), which can take a while, and the button can't be used
-meanwhile. When the feed can't be saved, the form says why, e.g. that another feed has that link, naming it.
+meanwhile. Changing only the name or the type doesn't read it. When the feed can't be saved, the form says why, e.g.
+that another feed has that link, naming it.
 
 ## Features
 

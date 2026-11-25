@@ -201,6 +201,7 @@ describe('Admin pages', () => {
 describe("The menu's badge on calendrier", () => {
   const FEED = {
     name: "Calendrier de l'équipe",
+    kind: 'occupations',
     link: 'https://example.com/team.ics',
     createdBy: 'admin@example.com',
     createdAt: '2026-11-01T12:00:00Z',
@@ -221,6 +222,8 @@ describe("The menu's badge on calendrier", () => {
     feeds: [{ ...FEED, id: 'team' }],
     sessions: [],
     occupations: [],
+    holds: [],
+    unprotectedSessions: [],
     undatedSessions: [],
     conflicts: Array.from({ length: conflicts }, (_, i) => ({
       start: '2027-06-05T21:00:00-04:00',

@@ -20,7 +20,7 @@ const noStore = async (_request: FastifyRequest, reply: FastifyReply) => {
 }
 
 const NOT_AN_ADMINS_TOKEN: ApiError = { ok: false, error: "The link's token isn't an admin's" }
-const NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" }
+const NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds of occupations haven't all been read yet, with their links, since the server started" }
 const IcsSubscriptionToken = z
   .object({ ok: z.literal(true), token: z.string().meta({ description: "The token of the links of the admin's calendars" }) })
   .meta({ id: 'IcsSubscriptionToken' })
@@ -59,12 +59,12 @@ export async function adminCalendarsRoutes(app: FastifyInstance, { store, feeds,
 
   app.get('/occupations.ics', { onSend: noStore }, async (request, reply) => {
     if (!(await authorized(request, reply))) return reply
-    // What was read from each feed is taken once, as GET /api/admin/calendar does, so that whether it was read and what it
-    // gives are from the same read. Until a read of each one, with the link it has, has ended since the server started,
-    // whether it failed or not, the calendar fails, so that calendar apps keep what they had rather than lose the
-    // occupations of the feeds that haven't been read yet.
+    // What was read from each `occupations` feed is taken once, as GET /api/admin/calendar does, so that whether it was
+    // read and what it gives are from the same read. Until a read of each one, with the link it has, has ended since the
+    // server started, whether it failed or not, the calendar fails, so that calendar apps keep what they had rather than
+    // lose the occupations of the feeds that haven't been read yet. `holds` feeds don't count.
     const withReads: FeedWithRead[] = []
-    for (const feed of await feeds.list()) {
+    for (const feed of (await feeds.list()).filter(({ kind }) => kind === 'occupations')) {
       const read = reads.of(feed)
       if (!read) return reply.code(503).send(NOT_READ_YET)
       withReads.push({ feed, read })

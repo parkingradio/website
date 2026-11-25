@@ -4,6 +4,8 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import { APPLICATION_DECISIONS } from '../applications/fields.js'
 import type { ApplicationDecision, PerformanceTypeId, TimeSlot } from '../applications/fields.js'
 import { KEY_EXTENSIONS } from '../artists/keys.js'
+import { FEED_KINDS } from '../calendar/fields.js'
+import type { FeedKind } from '../calendar/fields.js'
 import type { PhotoFolder } from '../artists/keys.js'
 import type { Country, GenreId, LinkSiteId } from '../artists/profile.js'
 import { SESSION_TYPES, STATUSES } from '../sessions/fields.js'
@@ -401,14 +403,16 @@ export const featureFlags = pgTable('feature_flags', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 })
 
-// The calendars that the studio's occupations are read from (see calendar/feeds.ts). A feed's link is a secret, which
-// only the admin pages show. Two feeds can't have the same link, as the server keeps it (see calendar/fields.ts). What's
-// read from them is only kept in memory.
+// The calendars that the studio's occupations and holds are read from (see calendar/feeds.ts). A feed's link is a
+// secret, which only the admin pages show. Two feeds can't have the same link, as the server keeps it (see
+// calendar/fields.ts). What's read from them is only kept in memory.
 export const calendarFeeds = pgTable(
   'calendar_feeds',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     name: text('name').notNull(),
+    // One of FEED_KINDS, which the API always gives: there's no default.
+    kind: text('kind').$type<FeedKind>().notNull(),
     link: text('link').notNull(),
     createdBy: text('created_by').notNull(), // the email of the admin who added it
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -416,7 +420,7 @@ export const calendarFeeds = pgTable(
     updatedBy: text('updated_by'),
     updatedAt: timestamp('updated_at', { withTimezone: true }),
   },
-  (table) => [uniqueIndex('calendar_feeds_link_idx').on(table.link)],
+  (table) => [uniqueIndex('calendar_feeds_link_idx').on(table.link), check('calendar_feeds_kind', oneOf(table.kind, FEED_KINDS))],
 )
 
 // The apps that admins allowed to act as them, e.g. Claude, through the MCP server (see oauth/store.ts and

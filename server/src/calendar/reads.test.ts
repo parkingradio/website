@@ -14,7 +14,7 @@ const NOW = new Date('2026-11-22T12:00:00Z')
 const linkOf = (id: string) => `https://example.com/${id}.ics`
 
 function feed(id: string): StoredFeed {
-  return { id, name: `Feed ${id}`, link: linkOf(id), createdBy: 'admin@example.com', createdAt: NOW, updatedBy: null, updatedAt: null }
+  return { id, name: `Feed ${id}`, kind: 'occupations', link: linkOf(id), createdBy: 'admin@example.com', createdAt: NOW, updatedBy: null, updatedAt: null }
 }
 
 // A calendar with one event, which starts `day` days after NOW.

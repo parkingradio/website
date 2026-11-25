@@ -30,6 +30,7 @@ const performers = (...names: string[]) => ({ performers: names.map((name) => ({
 const TEAM = {
   id: 'team',
   name: "Calendrier de l'équipe",
+  kind: 'occupations' as const,
   link: 'https://example.com/team.ics',
   createdBy: 'admin@example.com',
   createdAt: '2026-11-01T12:00:00Z',
@@ -65,7 +66,9 @@ const CALENDAR: Calendar = {
   feeds: [TEAM, STAYS],
   sessions: [PLAYED, TAKEOVER, CANCELLED],
   occupations: [STAY, REPAIR, CLOSED],
+  holds: [],
   conflicts: [CONFLICT],
+  unprotectedSessions: [],
   undatedSessions: [UNDATED],
 }
 const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [] }

@@ -1205,6 +1205,9 @@
           "name": {
             "type": "string"
           },
+          "kind": {
+            "$ref": "#/components/schemas/CalendarFeedKind"
+          },
           "link": {
             "type": "string",
             "description": "Its link, as the server keeps it"
@@ -1259,6 +1262,7 @@
         "required": [
           "id",
           "name",
+          "kind",
           "link",
           "createdBy",
           "createdAt",
@@ -1266,6 +1270,42 @@
           "updatedAt",
           "readAt",
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarFeedKind": {
+        "type": "string",
+        "enum": [
+          "occupations",
+          "holds"
+        ],
+        "description": "What its events are: occupations, which take the studio, or holds, which protect time for sessions"
+      },
+      "CalendarHold": {
+        "type": "object",
+        "properties": {
+          "feedId": {
+            "type": "string",
+            "description": "The id of the feed it's read from, one of `feeds`"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wholeDay": {
+            "type": "boolean",
+            "description": "Whether it takes whole days"
+          }
+        },
+        "required": [
+          "feedId",
+          "start",
+          "end",
+          "wholeDay"
         ],
         "additionalProperties": false
       },
@@ -1379,6 +1419,33 @@
             "additionalProperties": false
           }
         ]
+      },
+      "CalendarUnprotectedSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "What the session is called: its name, or else the one its type gives it. Never empty"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
       },
       "ChatDiscord": {
         "type": "object",
@@ -10590,7 +10657,7 @@
     "/api/admin/calendar/feeds": {
       "get": {
         "operationId": "list_calendar_feeds",
-        "summary": "Every calendar feed that the studio's occupations are read from, in the order they were added",
+        "summary": "Every calendar feed that the studio's occupations and holds are read from, with its kind, in the order they were added",
         "tags": [
           "Calendar"
         ],
@@ -10654,7 +10721,7 @@
         }
       },
       "post": {
-        "summary": "Adds a calendar feed, once its link gives a calendar",
+        "summary": "Adds a calendar feed of occupations or holds, once its link gives a calendar",
         "tags": [
           "Calendar"
         ],
@@ -10671,6 +10738,9 @@
                     "maxLength": 100,
                     "description": "Trimmed, then between 1 and 100 characters"
                   },
+                  "kind": {
+                    "$ref": "#/components/schemas/CalendarFeedKind"
+                  },
                   "link": {
                     "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
                     "type": "string"
@@ -10678,6 +10748,7 @@
                 },
                 "required": [
                   "name",
+                  "kind",
                   "link"
                 ],
                 "additionalProperties": false
@@ -10864,7 +10935,7 @@
     },
     "/api/admin/calendar/feeds/{id}": {
       "patch": {
-        "summary": "Changes a calendar feed's name or link, once a new link gives a calendar",
+        "summary": "Changes a calendar feed's name, kind or link, once a new link gives a calendar",
         "tags": [
           "Calendar"
         ],
@@ -10880,6 +10951,9 @@
                     "minLength": 1,
                     "maxLength": 100,
                     "description": "Trimmed, then between 1 and 100 characters"
+                  },
+                  "kind": {
+                    "$ref": "#/components/schemas/CalendarFeedKind"
                   },
                   "link": {
                     "description": "Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded",
@@ -11083,7 +11157,7 @@
     "/api/admin/calendar": {
       "get": {
         "operationId": "get_calendar",
-        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date",
+        "summary": "What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date",
         "tags": [
           "Calendar"
         ],
@@ -11126,7 +11200,7 @@
                     "today": {
                       "type": "string",
                       "format": "date",
-                      "description": "The day the conflicts are counted from: today, in Québec"
+                      "description": "The day the conflicts and the sessions outside protected time are counted from: today, in Québec"
                     },
                     "feeds": {
                       "type": "array",
@@ -11149,12 +11223,26 @@
                       },
                       "description": "The occupations that take some of the days, by start, then end"
                     },
+                    "holds": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarHold"
+                      },
+                      "description": "The holds that take some of the days, by start, then end"
+                    },
                     "conflicts": {
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/CalendarConflict"
                       },
                       "description": "The conflicts of the next 365 days, from today, whatever the days asked for"
+                    },
+                    "unprotectedSessions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CalendarUnprotectedSession"
+                      },
+                      "description": "The sessions outside protected time, of the next 365 days, from today, by start, whatever the days asked for"
                     },
                     "undatedSessions": {
                       "type": "array",
@@ -11170,7 +11258,9 @@
                     "feeds",
                     "sessions",
                     "occupations",
+                    "holds",
                     "conflicts",
+                    "unprotectedSessions",
                     "undatedSessions"
                   ],
                   "additionalProperties": false

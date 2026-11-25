@@ -1,15 +1,21 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
-import { byWhom, dateTimeFormat } from '../describe'
+import { everyOne } from '../../../checks'
+import { FEED_KIND_LABELS, byWhom, dateTimeFormat } from '../describe'
 
-// The calendar feeds that the studio's occupations are read from, in the configuration section (see
+// The calendar feeds that the studio's occupations and holds are read from, in the configuration section (see
 // docs/design/client/admin/configuration.md).
 
 type Feed = Schema<'CalendarFeed'>
-type FeedFields = Pick<Feed, 'name' | 'link'>
+type FeedKind = Schema<'CalendarFeedKind'>
+type FeedFields = Pick<Feed, 'name' | 'kind' | 'link'>
+// What the form has, where no kind is picked at first when it adds a feed, so that it's always chosen.
+type FormFields = Omit<FeedFields, 'kind'> & { kind: FeedKind | null }
+// In the order the form offers them.
+const FEED_KINDS = everyOne<FeedKind>()(['occupations', 'holds'])
 
 // The server's limit (see server/src/calendar/fields.ts), which decides. The link has none here, since a link that's
 // pasted would be cut short without a word: the server says when it's too long.
@@ -21,8 +27,9 @@ export function CalendarFeeds() {
   return (
     <>
       <p>
-        Ce qui occupe le studio en dehors des sessions est lu dans des calendriers externes, au format iCal, chaque occupation
-        sous le nom de son calendrier. Le serveur lit ces calendriers toutes les 15 minutes.
+        Ce qui occupe le studio en dehors des sessions est lu dans des calendriers externes, au format iCal, de type
+        «&nbsp;Occupations&nbsp;», chaque occupation sous le nom de son calendrier. Le temps protégé pour les sessions est
+        lu dans ceux de type «&nbsp;Plages protégées&nbsp;». Le serveur lit ces calendriers toutes les 15 minutes.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -55,7 +62,7 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
         </ul>
       )}
       <FeedForm
-        initial={{ name: '', link: '' }}
+        initial={{ name: '', kind: null, link: '' }}
         action="ajouter"
         failure="Le calendrier n'a pas pu être ajouté"
         save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
@@ -71,6 +78,7 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
 function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
   const changes: Partial<FeedFields> = {}
   if (fields.name.trim() !== feed.name) changes.name = fields.name
+  if (fields.kind !== feed.kind) changes.kind = fields.kind
   if (fields.link.trim() !== feed.link) changes.link = fields.link
   return changes
 }
@@ -127,7 +135,7 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
   return (
     <li>
       <p>
-        <b>{feed.name}</b>{' '}
+        <b>{feed.name}</b> · {FEED_KIND_LABELS[feed.kind]}{' '}
         <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
           modifier
         </button>{' '}
@@ -161,7 +169,7 @@ function FeedForm({
   onSaved,
   onCancel,
 }: {
-  initial: FeedFields
+  initial: FormFields
   action: string
   failure: string
   save: (fields: FeedFields) => Promise<Saved>
@@ -169,13 +177,14 @@ function FeedForm({
   onCancel?: () => void
 }) {
   const [name, setName] = useState(initial.name)
+  const [kind, setKind] = useState(initial.kind)
   const [link, setLink] = useState(initial.link)
   // While the server saves the feed, which can take up to 30 seconds, or longer while it goes through other calendars,
   // when it reads a new link.
   const [busy, setBusy] = useState(false)
   // Why the feed couldn't be saved, if it couldn't.
   const [error, setError] = useState<string | null>(null)
-  const complete = name.trim() !== '' && link.trim() !== ''
+  const complete = name.trim() !== '' && kind !== null && link.trim() !== ''
   const reads = link.trim() !== initial.link
 
   const submit = async (event: FormEvent) => {
@@ -183,13 +192,14 @@ function FeedForm({
     if (!complete || busy) return
     setBusy(true)
     setError(null)
-    const result = await save({ name, link })
+    const result = await save({ name, kind, link })
     setBusy(false)
     if (!result.ok) {
       setError(result.error)
       return
     }
     setName(initial.name)
+    setKind(initial.kind)
     setLink(initial.link)
     onSaved(result.feed)
   }
@@ -201,6 +211,7 @@ function FeedForm({
           Nom
           <input autoFocus={onCancel !== undefined} value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
         </label>
+        <KindField kind={kind} onChange={setKind} />
         <label>
           Lien
           <input value={link} autoComplete="off" spellCheck={false} onChange={(event) => setLink(event.target.value)} required />
@@ -223,5 +234,23 @@ function FeedForm({
         </p>
       )}
     </>
+  )
+}
+
+// The feed's kind, one of which is picked, like a session's type (see TypeField in session-form.tsx).
+function KindField({ kind, onChange }: { kind: FeedKind | null; onChange: (kind: FeedKind) => void }) {
+  const name = useId()
+  return (
+    <fieldset className="admin-fields">
+      <legend>Type</legend>
+      <div className="admin-choices">
+        {FEED_KINDS.map((value) => (
+          <label key={value}>
+            <input type="radio" name={name} checked={kind === value} onChange={() => onChange(value)} />
+            {FEED_KIND_LABELS[value]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   )
 }

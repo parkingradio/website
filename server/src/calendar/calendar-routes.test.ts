@@ -8,6 +8,7 @@ import type { Status } from '../sessions/fields.js'
 import type { SessionsStore, StoredSession } from '../sessions/store.js'
 import { adminCalendarRoutes } from './calendar-routes.js'
 import type { CalendarFeedsStore, StoredFeed } from './feeds.js'
+import type { FeedKind } from './fields.js'
 import type { CalendarReads, FeedRead } from './reads.js'
 
 // The studio's calendar (see "The calendar" in docs/design/server/calendar.md), with fake stores and reads.
@@ -19,10 +20,13 @@ const NOW = new Date('2026-11-23T17:00:00Z')
 const TEAM = '6f1c3c8e-1b7a-4c1e-9d3f-2a1b0c9d8e7f'
 const STAYS = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d'
 const UNREAD = '1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e'
+const LOFT = '2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
+const BLOCKED = '3d4e5f6a-7b8c-4d9e-8f1a-2b3c4d5e6f7a'
 
-const feed = (id: string, name: string, link: string, createdAt: string): StoredFeed => ({
+const feed = (id: string, name: string, link: string, createdAt: string, kind: FeedKind = 'occupations'): StoredFeed => ({
   id,
   name,
+  kind,
   link,
   createdBy: 'someone@example.com',
   createdAt: new Date(createdAt),
@@ -34,6 +38,11 @@ const FEEDS: StoredFeed[] = [
   feed(TEAM, "Calendrier de l'équipe", 'https://example.com/team.ics', '2026-11-01T12:00:00Z'),
   feed(STAYS, 'Séjours', 'https://example.com/stays.ics', '2026-11-02T12:00:00Z'),
   feed(UNREAD, 'Autre', 'https://example.com/other.ics', '2026-11-03T12:00:00Z'),
+]
+// The time the loft's calendar keeps for sessions, from two feeds.
+const HOLDS_FEEDS: StoredFeed[] = [
+  feed(LOFT, 'Loft', 'https://example.com/loft.ics', '2026-11-04T12:00:00Z', 'holds'),
+  feed(BLOCKED, 'Bloqué', 'https://example.com/blocked.ics', '2026-11-05T12:00:00Z', 'holds'),
 ]
 let listed: StoredFeed[]
 const feeds = { list: vi.fn(async () => listed), withLink: vi.fn(), get: vi.fn(), add: vi.fn(), update: vi.fn(), remove: vi.fn() } satisfies CalendarFeedsStore
@@ -170,7 +179,7 @@ describe('GET /api/admin/calendar', () => {
     // With their links, which tools leave out (see mcp/tools.ts).
     const given = (id: string, createdAt: string) => {
       const { name, link } = FEEDS.find((feed) => feed.id === id)!
-      return { id, name, link, createdBy: 'someone@example.com', createdAt, updatedBy: null, updatedAt: null }
+      return { id, name, kind: 'occupations', link, createdBy: 'someone@example.com', createdAt, updatedBy: null, updatedAt: null }
     }
     expect(body.feeds).toEqual([
       { ...given(TEAM, '2026-11-01T07:00:00-05:00'), readAt: '2026-11-23T11:50:00-05:00', error: null },
@@ -196,11 +205,141 @@ describe('GET /api/admin/calendar', () => {
       },
     ])
     expect(body.undatedSessions.map(({ id }: { id: string }) => id)).toEqual(['undated-new', 'undated-old'])
+    // Without a `holds` feed, there are no holds, and nothing is known to be outside protected time.
+    expect(body.holds).toEqual([])
+    expect(body.unprotectedSessions).toEqual([])
 
     // Whatever the days asked for, the conflicts and the sessions without a date are the same.
     const other = (await calendar(app, 'from=2030-01-01&to=2030-01-01')).json()
     expect(other).toMatchObject({ today: '2026-11-23', sessions: [], occupations: [], conflicts: body.conflicts, undatedSessions: body.undatedSessions })
     expect(reads.of).toHaveBeenCalledTimes(2 * FEEDS.length)
+  })
+
+  it("gives the holds of the `holds` feeds that take some of the days, without their titles, which are neither occupations nor in conflicts", async () => {
+    listed = [...FEEDS, ...HOLDS_FEEDS]
+    rows = [
+      session('in-hold', '2026-11-28T01:00:00Z', 120),
+      // From 14:00 to 15:00 on November 28, which only the feed whose last read failed protects.
+      session('in-failed-feed', '2026-11-28T19:00:00Z', 60),
+    ]
+    kept.set(TEAM, { events: [event('2026-11-28T00:00:00Z', '2026-11-28T02:00:00Z', 'Réparation')], readAt: NOW, error: null })
+    kept.set(LOFT, {
+      events: [
+        // Ends when the first day starts.
+        event('2026-11-26T20:00:00Z', '2026-11-27T05:00:00Z', 'Nuit bloquée'),
+        event('2026-11-27T20:00:00Z', '2026-11-28T16:00:00Z', 'Nuit bloquée'),
+        // Starts when the day after the last one does.
+        event('2026-11-29T05:00:00Z', '2026-11-30T05:00:00Z', 'Après'),
+      ],
+      readAt: NOW,
+      error: null,
+    })
+    // Its last read failed: it gives what it read before, a whole day that overlaps the loft's hold.
+    kept.set(BLOCKED, { events: [event('2026-11-28T05:00:00Z', '2026-11-29T05:00:00Z', 'Invité : Jean Tremblay', true)], readAt: NOW, error: 'It failed' })
+    const body = (await calendar(await buildApp(), 'from=2026-11-27&to=2026-11-28')).json()
+    expect(body.feeds.map(({ id, kind }: { id: string; kind: string }) => [id, kind])).toEqual([
+      [TEAM, 'occupations'],
+      [STAYS, 'occupations'],
+      [UNREAD, 'occupations'],
+      [LOFT, 'holds'],
+      [BLOCKED, 'holds'],
+    ])
+    expect(body.holds).toEqual([
+      { feedId: LOFT, start: '2026-11-27T15:00:00-05:00', end: '2026-11-28T11:00:00-05:00', wholeDay: false },
+      { feedId: BLOCKED, start: '2026-11-28T00:00:00-05:00', end: '2026-11-29T00:00:00-05:00', wholeDay: true },
+    ])
+    expect(body.occupations.map(({ feedId }: { feedId: string }) => feedId)).toEqual([TEAM])
+    // Only the session and the repair conflict: holds overlap them, and each other, without conflicting.
+    expect(body.conflicts.map(({ things }: { things: { kind: string }[] }) => things.map(({ kind }) => kind))).toEqual([['occupation', 'session']])
+    // What the feed whose last read failed read before still protects sessions.
+    expect(body.unprotectedSessions).toEqual([])
+    expect(JSON.stringify(body)).not.toContain('Nuit bloquée')
+    expect(JSON.stringify(body)).not.toContain('Jean Tremblay')
+  })
+
+  it('gives the planned sessions of the next 365 days that are outside protected time, by start, whatever the days asked for', async () => {
+    listed = [...FEEDS, ...HOLDS_FEEDS]
+    kept.set(LOFT, {
+      events: [
+        // 11:00 to 15:00 on November 25, then 15:00 to 11:00 the next day, which follow each other.
+        event('2026-11-25T16:00:00Z', '2026-11-25T20:00:00Z', ''),
+        event('2026-11-25T20:00:00Z', '2026-11-26T16:00:00Z', ''),
+        // From 10:00 today to 13:00.
+        event('2026-11-23T15:00:00Z', '2026-11-23T18:00:00Z', ''),
+        // A day in March, months later.
+        event('2027-03-20T04:00:00Z', '2027-03-21T04:00:00Z', '', true),
+      ],
+      readAt: NOW,
+      error: null,
+    })
+    // Another feed's hold, which follows the loft's on November 26, from 11:00 to 13:00.
+    kept.set(BLOCKED, { events: [event('2026-11-26T16:00:00Z', '2026-11-26T18:00:00Z', '')], readAt: NOW, error: null })
+    rows = [
+      // Within the two holds of November 25 that follow each other, from 14:00 to 16:00.
+      session('across-holds', '2026-11-25T19:00:00Z', 120),
+      // Within the holds of two feeds, from 10:00 to 12:00 on November 26.
+      session('across-feeds', '2026-11-26T15:00:00Z', 120),
+      // From 12:00 to 14:00 on November 26: its last hour isn't protected.
+      session('partly', '2026-11-26T17:00:00Z', 120),
+      // From 9:00 today to 12:00, which is now: it has ended.
+      session('ends-now', '2026-11-23T14:00:00Z', 180),
+      // In March, months after the days asked for, and outside protected time.
+      session('later', '2027-04-01T00:00:00Z', 60),
+      // In March, within the whole-day hold.
+      session('in-march', '2027-03-20T18:00:00Z', 60),
+      // Done, cancelled, ended, or without a start: none of them count.
+      session('done', '2026-12-01T00:00:00Z', 60, 'done'),
+      session('cancelled', '2026-12-02T00:00:00Z', 60, 'cancelled'),
+      session('ended', '2026-11-23T15:00:00Z', 60),
+      session('undated', null, 60),
+      // Starts when the 365 days end.
+      session('next-year', '2027-11-23T05:00:00Z', 60),
+    ]
+    const body = (await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json()
+    expect(body.unprotectedSessions).toEqual([
+      { id: 'partly', title: 'GUEST MIXES', start: '2026-11-26T12:00:00-05:00', end: '2026-11-26T14:00:00-05:00' },
+      { id: 'later', title: 'GUEST MIXES', start: '2027-03-31T20:00:00-04:00', end: '2027-03-31T21:00:00-04:00' },
+    ])
+    // The same, whatever the days asked for.
+    expect((await calendar(await buildApp(), 'from=2030-01-01&to=2030-01-01')).json().unprotectedSessions).toEqual(body.unprotectedSessions)
+  })
+
+  it('only judges what is left of a session that is going on, from the same instant as today', async () => {
+    listed = HOLDS_FEEDS
+    // From 12:00 today, now, to 15:00, but not from 9:00.
+    kept.set(LOFT, { events: [event('2026-11-23T17:00:00Z', '2026-11-23T20:00:00Z', '')], readAt: NOW, error: null })
+    rows = [
+      // From 9:00 to 15:00: what's left of it is protected.
+      session('rest-protected', '2026-11-23T14:00:00Z', 360),
+      // From 9:00 to 16:00: what's left of it isn't all protected.
+      session('rest-unprotected', '2026-11-23T14:00:00Z', 420),
+    ]
+    const body = (await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json()
+    expect(body.unprotectedSessions.map(({ id }: { id: string }) => id)).toEqual(['rest-unprotected'])
+  })
+
+  it("gives every session outside protected time while a `holds` feed hasn't been read, and none without a `holds` feed", async () => {
+    rows = [session('upcoming', '2026-12-10T00:00:00Z', 120)]
+    listed = [...FEEDS, HOLDS_FEEDS[0]]
+    expect((await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json().unprotectedSessions.map(({ id }: { id: string }) => id)).toEqual([
+      'upcoming',
+    ])
+    listed = FEEDS
+    expect((await calendar(await buildApp(), 'from=2026-11-23&to=2026-11-23')).json().unprotectedSessions).toEqual([])
+  })
+
+  it("counts what was read from a feed as its kind's, as it is when the calendar is asked for", async () => {
+    rows = [session('upcoming', '2026-12-10T00:00:00Z', 120)]
+    kept.set(LOFT, { events: [event('2026-12-09T05:00:00Z', '2026-12-10T05:00:00Z', 'Gardé', true)], readAt: NOW, error: null })
+    listed = [HOLDS_FEEDS[0]]
+    const asHolds = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
+    expect(asHolds).toMatchObject({ occupations: [], conflicts: [], unprotectedSessions: [] })
+    expect(asHolds.holds).toHaveLength(1)
+    listed = [{ ...HOLDS_FEEDS[0], kind: 'occupations' }]
+    const asOccupations = (await calendar(await buildApp(), 'from=2026-12-09&to=2026-12-09')).json()
+    expect(asOccupations).toMatchObject({ holds: [], unprotectedSessions: [] })
+    expect(asOccupations.occupations).toEqual([{ feedId: LOFT, start: '2026-12-09T00:00:00-05:00', end: '2026-12-10T00:00:00-05:00', wholeDay: true, title: 'Gardé' }])
+    expect(asOccupations.conflicts).toHaveLength(1)
   })
 
   it('gives the sessions by start', async () => {

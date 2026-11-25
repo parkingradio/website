@@ -31,13 +31,16 @@ export const takesSomeOf =
   ({ start, end }: { start: Date | null; end: Date | null }) =>
     start !== null && end !== null && start < end && end > from && start < to
 
+// By start, then end.
+export const byStartThenEnd = (a: { start: Date; end: Date }, b: { start: Date; end: Date }) =>
+  a.start.getTime() - b.start.getTime() || a.end.getTime() - b.end.getTime()
+
 // The order of things: by start, then end, then sessions before occupations, and sessions by id. Occupations that are
 // tied stay in the order they're given in, so that sorting them is stable as long as they're given in a stable order,
 // e.g. by feed, then as they were read.
 export function thingOrder(a: Thing, b: Thing): number {
   return (
-    a.start.getTime() - b.start.getTime() ||
-    a.end.getTime() - b.end.getTime() ||
+    byStartThenEnd(a, b) ||
     Number(a.kind === 'occupation') - Number(b.kind === 'occupation') ||
     (a.kind === 'session' && b.kind === 'session' ? compareStrings(a.id, b.id) : 0)
   )

@@ -3,6 +3,7 @@ import { violatesConstraint } from '../api/errors.js'
 import type { Queryable } from '../db/connection.js'
 import { calendarFeeds } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
+import type { FeedKind } from './fields.js'
 
 // The calendar feeds that admins added (see docs/design/server/calendar.md). What's read from them is kept in memory
 // (see reads.ts).
@@ -10,6 +11,7 @@ import { isUuid } from '../db/uuid.js'
 export type StoredFeed = {
   id: string
   name: string
+  kind: FeedKind
   // A secret, which only the admin pages show (see "Feeds" in docs/design/server/calendar.md).
   link: string
   createdBy: string
@@ -18,8 +20,8 @@ export type StoredFeed = {
   updatedAt: Date | null
 }
 
-export type NewFeed = Pick<StoredFeed, 'name' | 'link' | 'createdBy'>
-export type FeedChanges = Partial<Pick<StoredFeed, 'name' | 'link'>>
+export type NewFeed = Pick<StoredFeed, 'name' | 'kind' | 'link' | 'createdBy'>
+export type FeedChanges = Partial<Pick<StoredFeed, 'name' | 'kind' | 'link'>>
 
 // Another feed has the link of a feed being added or changed: `feed`, when it's known.
 export class LinkTaken extends Error {

@@ -2384,10 +2384,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every calendar feed that the studio's occupations are read from, in the order they were added */
+        /** Every calendar feed that the studio's occupations and holds are read from, with its kind, in the order they were added */
         get: operations["list_calendar_feeds"];
         put?: never;
-        /** Adds a calendar feed, once its link gives a calendar */
+        /** Adds a calendar feed of occupations or holds, once its link gives a calendar */
         post: {
             parameters: {
                 query?: never;
@@ -2400,6 +2400,7 @@ export interface paths {
                     "application/json": {
                         /** @description Trimmed, then between 1 and 100 characters */
                         name: string;
+                        kind: components["schemas"]["CalendarFeedKind"];
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link: string;
                     };
@@ -2578,7 +2579,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Changes a calendar feed's name or link, once a new link gives a calendar */
+        /** Changes a calendar feed's name, kind or link, once a new link gives a calendar */
         patch: {
             parameters: {
                 query?: never;
@@ -2593,6 +2594,7 @@ export interface paths {
                     "application/json": {
                         /** @description Trimmed, then between 1 and 100 characters */
                         name?: string;
+                        kind?: components["schemas"]["CalendarFeedKind"];
                         /** @description Trimmed: an https or webcal link, without a user name or a password, of at most 2000 characters as the server keeps it: in https, without what comes after #, and with its characters that links can't have encoded */
                         link?: string;
                     };
@@ -2686,7 +2688,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, and the calendar feeds that occupations are read from, with their status, and, whatever the days, the conflicts of the next 365 days and the sessions without a date */
+        /** What takes the studio over the days from `from` to `to`, both included, in Québec: sessions and occupations, the holds that protect its time for sessions, and the calendar feeds that occupations and holds are read from, with their status, and, whatever the days, the conflicts and the sessions outside protected time of the next 365 days, and the sessions without a date */
         get: operations["get_calendar"];
         put?: never;
         post?: never;
@@ -3754,6 +3756,7 @@ export interface components {
         CalendarFeed: {
             id: string;
             name: string;
+            kind: components["schemas"]["CalendarFeedKind"];
             /** @description Its link, as the server keeps it */
             link: string;
             /** @description The email of the admin who added it */
@@ -3768,6 +3771,21 @@ export interface components {
             readAt: string | null;
             /** @description Why its last read failed, or null when it succeeded, or until it is read */
             error: string | null;
+        };
+        /**
+         * @description What its events are: occupations, which take the studio, or holds, which protect time for sessions
+         * @enum {string}
+         */
+        CalendarFeedKind: "occupations" | "holds";
+        CalendarHold: {
+            /** @description The id of the feed it's read from, one of `feeds` */
+            feedId: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @description Whether it takes whole days */
+            wholeDay: boolean;
         };
         CalendarOccupation: {
             /** @description The id of the feed it's read from, one of `feeds` */
@@ -3805,6 +3823,15 @@ export interface components {
             wholeDay: boolean;
             /** @description Its title, empty when it has none */
             title: string;
+        };
+        CalendarUnprotectedSession: {
+            id: string;
+            /** @description What the session is called: its name, or else the one its type gives it. Never empty */
+            title: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
         };
         ChatDiscord: {
             /** @constant */
@@ -7546,7 +7573,7 @@ export interface operations {
                         ok: true;
                         /**
                          * Format: date
-                         * @description The day the conflicts are counted from: today, in Québec
+                         * @description The day the conflicts and the sessions outside protected time are counted from: today, in Québec
                          */
                         today: string;
                         /** @description Every feed, in the order they were added, with when each was last read, and why that failed */
@@ -7555,8 +7582,12 @@ export interface operations {
                         sessions: components["schemas"]["Session"][];
                         /** @description The occupations that take some of the days, by start, then end */
                         occupations: components["schemas"]["CalendarOccupation"][];
+                        /** @description The holds that take some of the days, by start, then end */
+                        holds: components["schemas"]["CalendarHold"][];
                         /** @description The conflicts of the next 365 days, from today, whatever the days asked for */
                         conflicts: components["schemas"]["CalendarConflict"][];
+                        /** @description The sessions outside protected time, of the next 365 days, from today, by start, whatever the days asked for */
+                        unprotectedSessions: components["schemas"]["CalendarUnprotectedSession"][];
                         /** @description The sessions without a start that aren't cancelled, the most recently added first, whatever the days asked for */
                         undatedSessions: components["schemas"]["Session"][];
                     };
