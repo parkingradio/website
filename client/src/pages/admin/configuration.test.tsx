@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
-import App from './test-app'
+import App from '../../app'
 import { mockFetch } from '../../test-utils'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 // Who applications are emailed to, the SoundCloud app, the YouTube channel, the Discord bot, the calendar feeds and the
 // feature flags have their own tests, in configuration/recipients.test.tsx, configuration/soundcloud.test.tsx,

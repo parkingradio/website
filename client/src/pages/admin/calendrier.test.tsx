@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
-import App from './test-app'
+import App from '../../app'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
 import { held, mockFetch, requestsTo, shownTime, timeParts, typeTime, visibleText as shownText } from '../../test-utils'
 import type { Calendar, ConflictThing } from './calendrier/model'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 // Today is Thursday, November 19, 2026, in Québec.
 const NOW = new Date('2026-11-19T12:00:00-05:00')

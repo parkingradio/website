@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import App from './test-app'
+import App from '../../app'
 import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { browser } from '../../browser'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 const CLAUDE = 'https://claude.ai/oauth/mcp-oauth-client-metadata'

@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useNavigate } from 'react-router'
-import App from './pages/admin/test-app'
+import App from './app'
 import { UNAUTHORIZED, mockFetch } from './test-utils'
+
+// The admin pages load on demand (see AdminPage in pages/admin/shell.tsx): load them up front, so that no test waits
+// for them.
+beforeAll(() => import('./pages/admin/admin-pages'))
 
 describe('App', () => {
   it('renders the home page at /', () => {

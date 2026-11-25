@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import App from './test-app'
+import App from '../../app'
 import { mockFetch } from '../../test-utils'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 // Connecting Claude, the connected apps and the bookmarklet have their own tests, in integrations/connections.test.tsx and
 // integrations/ra-bookmarklet.test.tsx: these are for the section that gathers them.
