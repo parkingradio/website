@@ -54,7 +54,7 @@ What the bookmarklet sends to RA to create the session's event, as RA's `EventIn
 | `playerLinks` | list of objects | The event's media links on RA, Parking Radio's YouTube and SoundCloud, each a `sourceId`, its address: `[{"sourceId": "https://www.youtube.com/@parkingdotradio"}, {"sourceId": "https://soundcloud.com/parkingdotradio"}]` |
 | `submissionSource` | string | `"SUBMITEVENTPAGE"`, as RA's own form sends it |
 
-It's the same whatever the session's status, and whether it's announced or not.
+It's the same whether the session is announced or not.
 
 ## `POST /api/admin/sessions/:id/ra-publication` (admin)
 
@@ -79,4 +79,4 @@ The session's event, for the token in `Authorization`.
 | `event` | object | The session's event (see [The event](#the-event)) |
 
 Fails with 403 without a valid token, 404 when the session no longer exists, and 409 when it has no start, since RA
-needs one.
+needs one, or is cancelled, e.g. since the token was given.

@@ -152,8 +152,8 @@ describe('GET /api/ra-publication', () => {
     expect(sessionVersion).toHaveBeenLastCalledWith(TEST_ADMIN.id)
   })
 
-  it('responds 404 once the session is deleted, and 409 when it has no start', async () => {
-    rows.push(session({ id: 'session-2', startAt: null }))
+  it('responds 404 once the session is deleted, and 409 when it has no start, or is cancelled', async () => {
+    rows.push(session({ id: 'session-2', startAt: null }), session({ id: 'session-3' }))
     const app = await buildApp()
     const deleted = await tokenFor(app)
     rows.shift()
@@ -163,6 +163,12 @@ describe('GET /api/ra-publication', () => {
     const undated = await publication(app, await tokenFor(app, 'session-2'))
     expect(undated.statusCode).toBe(409)
     expect(undated.json()).toEqual({ ok: false, error: 'The session has no start' })
+    // Cancelled once the token was given.
+    const token = await tokenFor(app, 'session-3')
+    rows[rows.length - 1].status = 'cancelled'
+    const cancelled = await publication(app, token)
+    expect(cancelled.statusCode).toBe(409)
+    expect(cancelled.json()).toEqual({ ok: false, error: 'This session is cancelled' })
   })
 
   it("lets RA's pages, and only them, read its responses, errors included, after asking with a preflight", async () => {

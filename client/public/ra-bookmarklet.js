@@ -5,15 +5,25 @@
 //
 // RA has no public API, so this calls the GraphQL endpoint RA's own site calls, like the server does to read events
 // (see server/src/ra-events/routes.ts). The event comes from the site, with the token that the session's page put in the
-// address (see docs/design/server/ra-publication.md): this only calls RA. It can stop working whenever RA changes its
-// site: it then says so, and admins create the event on RA by hand, from the session's page.
+// address (see docs/design/server/ra-publication.md): the calls to RA are this script's, and only its. It can stop
+// working whenever RA changes its site: it then says so, and admins create the event on RA by hand, from the session's
+// page.
 //
 // What it shows comes from the site and from RA: it's only ever shown as text.
 ;(() => {
   'use strict'
 
-  // The site this was loaded from, which the bookmarklet was installed from.
-  const SITE = new URL(document.currentScript.src).origin
+  // The site this was loaded from, which the bookmarklet was installed from, or null when it can't tell. The script is
+  // read from the browser itself rather than from `document.currentScript`, which the page's content can replace, e.g.
+  // an element named currentScript.
+  const SITE = (() => {
+    const script = Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript').get.call(document)
+    try {
+      return script instanceof HTMLScriptElement ? new URL(script.src).origin : null
+    } catch {
+      return null
+    }
+  })()
   const PANEL_ID = 'parking-radio-ra'
   const CREATE_EVENT = 'mutation createEvent($eventInput: EventInput) { createEvent(eventInput: $eventInput) { id } }'
   // What it checks before showing what it would create, in one request that changes nothing: that the admin is logged
@@ -107,6 +117,7 @@
   async function main() {
     // RA's site in another language is on a subdomain, e.g. fr.ra.co.
     if (location.hostname !== 'ra.co' && !location.hostname.endsWith('.ra.co')) return fail('Ce favori s’utilise sur ra.co, sur la page qu’ouvre « Publier sur RA ».')
+    if (!SITE) return fail('Ce favori n’a pas pu savoir de quel site il vient.')
     const publishing = token()
     if (!publishing) return fail('Aucun événement à créer : cliquez sur « Publier sur RA » sur la page de la session, puis sur ce favori.')
     const LOG_IN = `Connectez-vous à RA, puis ${PUBLISH_AGAIN}.`

@@ -54,9 +54,12 @@ const toRa = () => fetch.mock.calls.filter(([url]) => url === '/graphql')
 const sentQueries = () => toRa().map(([, init]) => JSON.parse(init.body as string).query as string)
 const creations = () => sentQueries().filter((query) => query.startsWith('mutation'))
 
-function run({ token = TOKEN as string | null, from = SITE } = {}) {
+// Runs the script, as the bookmarklet adds it to RA's page, from `from`, or from nowhere the browser can tell when null.
+function run({ token = TOKEN as string | null, from = SITE as string | null } = {}) {
   location.hash = token === null ? '' : `#parking-radio=${token}`
-  Object.defineProperty(document, 'currentScript', { value: { src: `${from}/ra-bookmarklet.js?1794319166924` }, configurable: true })
+  const script = document.createElement('script')
+  script.src = `${from}/ra-bookmarklet.js?1794319166924`
+  vi.spyOn(Document.prototype, 'currentScript', 'get').mockReturnValue(from === null ? null : script)
   new Function(SCRIPT)()
 }
 
@@ -260,5 +263,20 @@ describe('The bookmarklet', () => {
     expect(await screen.findByText(`Quelque chose n’a pas fonctionné : ${SITE} a répondu 502.`)).toBeInTheDocument()
     expect(creations()).toEqual([])
     expect(toRa()).toEqual([])
+  })
+
+  it('only trusts the browser to say which site it was loaded from', async () => {
+    // An element of RA's page named currentScript, which `document.currentScript` would give.
+    Object.defineProperty(document, 'currentScript', { value: { src: 'https://elsewhere.example/ra-bookmarklet.js' }, configurable: true })
+    run()
+    expect(await screen.findByRole('button', { name: 'Créer sur RA' })).toBeInTheDocument()
+    expect(fetch.mock.calls[0][0]).toBe(`${SITE}/api/ra-publication`)
+
+    document.body.replaceChildren()
+    fetch.mockClear()
+    run({ from: null })
+    expect(screen.getByText('Ce favori n’a pas pu savoir de quel site il vient.')).toBeInTheDocument()
+    expect(fetch).not.toHaveBeenCalled()
+    delete (document as { currentScript?: unknown }).currentScript
   })
 })

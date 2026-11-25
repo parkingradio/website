@@ -46,8 +46,9 @@ The bookmarklet that creates a session's event on Resident Advisor from its page
 environment's stamp, e.g. « Parking Radio → RA [TEST] », so that admins tell their bookmarks apart (see
 [Environment](../architecture.md#environment)), to drag into the browser's bookmarks, whose code loads the bookmarklet's
 script from the site it's on (see [The bookmarklet](publier-sur-ra.md#the-bookmarklet)), and clicking it on this page
-does nothing. The section says how to use it: under a session's « Événement RA », click « créer », then « Publier sur
-RA », log in to RA if needed, then click the bookmark, which shows the event before creating it. It also says that the
+does nothing. The section says how to use it: log in to RA first, since logging in there loses what « Publier sur RA »
+gives it, then, under a session's « Événement RA », click « créer », then « Publier sur RA », then click the bookmark,
+which shows the event before creating it. It also says that the
 bookmark loads its code from the site each time, so that it never needs to be installed again.
 
 ## Endpoints

@@ -3,9 +3,9 @@
 Creating a session's event on Resident Advisor from its page, with a bookmarklet: a bookmark that runs Parking Radio's
 code on RA's site, as the admin logged in to RA there. RA has no public API, so the bookmarklet calls the GraphQL
 endpoint RA's own site calls, like the server already does to read events (see [RA events](../../server/ra-events.md)).
-What it creates comes from the server (see [Publishing on RA](../../server/ra-publication.md)): the bookmarklet only
-calls RA. It's a convenience that can stop working whenever RA changes its site, without warning: admins then create
-the event on RA by hand, from the session's page, and paste its link in the session (see
+What it creates comes from the server (see [Publishing on RA](../../server/ra-publication.md)): the calls to RA are the
+bookmarklet's, and only its. It's a convenience that can stop working whenever RA changes its site, without warning:
+admins then create the event on RA by hand, from the session's page, and paste its link in the session (see
 [Creating its event on RA](sessions.md#creating-its-event-on-ra)), while it gets fixed. Nothing else depends on it: a
 session's event on RA is its `raEvent`, which can always be set by hand.
 
@@ -52,7 +52,8 @@ Clicking the bookmarklet again replaces it.
 What the script does:
 
 - It only runs on `ra.co` or one of its subdomains, e.g. `fr.ra.co`, with a token in the fragment, as the session's
-  page puts it there: otherwise it says what's missing, and does nothing else. It removes the token from the address
+  page puts it there, and once it knows which site its script came from, which the page's content, e.g. an element
+  named `currentScript`, can't pass for: otherwise it says what's missing, and does nothing else. It removes the token from the address
   as soon as it reads it, so that it doesn't stay in RA's page's address, or its history: clicking it again on that
   page then says to click « Publier sur RA » again.
 - It reads the RA login of the browser, the `next_id_token` cookie, and sends every request to RA's GraphQL endpoint

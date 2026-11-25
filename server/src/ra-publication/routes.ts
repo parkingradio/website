@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { bearerToken } from '../api/bearer.js'
 import { ApiError, ById, zodRoutes } from '../api/schemas.js'
 import { NO_SUCH_SESSION_ERROR, sessionBody } from '../sessions/routes.js'
+import { SESSION_CANCELLED } from '../sessions/store.js'
 import type { SessionsStore } from '../sessions/store.js'
 import { raEventInput } from './event.js'
 import { signRaPublicationToken, verifyRaPublicationToken } from './token.js'
@@ -25,6 +26,7 @@ const fromRa = ({ headers: { origin } }: FastifyRequest) => origin !== undefined
 
 const INVALID_TOKEN: ApiError = { ok: false, error: "The token isn't valid, or has expired" }
 const NO_START: ApiError = { ok: false, error: 'The session has no start' }
+const CANCELLED: ApiError = { ok: false, error: SESSION_CANCELLED }
 
 const RaPublishedEvent = z
   .object({
@@ -46,7 +48,7 @@ const RaPublishedEvent = z
   })
   .meta({ id: 'RaPublishedEvent', description: "The session's event, as RA's `EventInput`" })
 
-const RaPublication = z
+const RaPublicationResponse = z
   .object({
     ok: z.literal(true),
     environment: z.string().meta({ description: "The server's environment, as GET /api/config gives it" }),
@@ -119,7 +121,7 @@ async function tokenRoutes(app: FastifyInstance, { store, environment }: Options
       schema: {
         summary: "The event that the bookmarklet creates on Resident Advisor for the session of the token in `Authorization: Bearer <token>`",
         tags: ['Publishing on RA'],
-        response: { 200: RaPublication, 403: ApiError, 404: ApiError, 409: ApiError },
+        response: { 200: RaPublicationResponse, 403: ApiError, 404: ApiError, 409: ApiError },
       },
     },
     async (request, reply) => {
@@ -127,6 +129,8 @@ async function tokenRoutes(app: FastifyInstance, { store, environment }: Options
       if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       const session = sessionBody(row)
       if (session.start === null || session.end === null) return reply.status(409).send(NO_START)
+      // E.g. since the token was given.
+      if (session.status === 'cancelled') return reply.status(409).send(CANCELLED)
       return { ok: true as const, environment, session: session.id, event: raEventInput(session, session.start, session.end) }
     },
   )
