@@ -3,6 +3,9 @@
 // docs/design/server/admin-calendars.md).
 
 const PRODUCT = '-//Parking Radio//Calendrier//FR'
+// The line every event of the site's calendars has, so that calendar apps leave the time it takes free, rather than busy,
+// as they make it by default: none of these calendars is about the subscriber's own time.
+export const TRANSPARENT = 'TRANSP:TRANSPARENT'
 // Lines are at most this many octets long, without their CRLF.
 const MAX_LINE_OCTETS = 75
 
