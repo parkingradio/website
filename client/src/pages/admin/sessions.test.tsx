@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../app'
 import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { CONFIG, jsonBody, mockFetch, moveWithKeyboard, requestsTo, shownTime, timeParts, typeTime, visibleText } from '../../test-utils'
+import { CONFIG, held, jsonBody, mockFetch, moveWithKeyboard, requestsTo, shownTime, timeParts, typeTime, visibleText } from '../../test-utils'
+import type { Body } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
 beforeAll(() => import('./admin-pages'))
@@ -493,35 +494,14 @@ describe('The default view of the list of sessions', () => {
   })
 })
 
-// The content of the event on RA of SESSION, as the server gives it.
-const RA_EVENT = {
-  title: 'ONDES TAKEOVER',
-  start: '2026-11-14T21:00:00-05:00',
-  end: '2026-11-15T01:00:00-05:00',
-  lineup: 'Aurore\nBrume\nCyan',
-  venueId: '288529',
-  promoterIds: ['183980'],
-  content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
-  promotionalLinks: [
-    { title: 'parking.radio', url: 'https://parking.radio' },
-    { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
-  ],
-  playerLinks: ['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'],
-}
-const RA_EVENT_CONTENT = {
-  '/api/admin/sessions/session-1/ra-event': { ok: true, event: RA_EVENT },
-}
 // With its takeover's collective, which its sets' forms load.
-const PAGE = { ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
+const PAGE = { ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
 const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
-// What the session's record, or the content of its event on RA, says for `label`.
-// Its own terms only, since the content of the event on RA is within the session's record.
-const recordValue = (record: string, label: string) =>
-  [...screen.getByLabelText(record).querySelectorAll(':scope > dt')].find((term) => term.textContent === label)!.nextElementSibling as HTMLElement
-const value = (label: string) => recordValue('Session', label)
-const raValue = (label: string) => recordValue("Contenu de l'événement RA", label)
+// What the session's record says for `label`.
+const value = (label: string) =>
+  [...screen.getByLabelText('Session').querySelectorAll(':scope > dt')].find((term) => term.textContent === label)!.nextElementSibling as HTMLElement
 
 describe("A session's page", () => {
   it('shows everything about the session and its sets', async () => {
@@ -729,7 +709,7 @@ describe("A session's page", () => {
     page.unmount()
 
     // Several, each on a line of its own.
-    mockFetch({ ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     const undated = renderAt('/admin/sessions/session-2')
     confirm.mockReturnValueOnce(false)
     fireEvent.click(await statusButton('jouée'))
@@ -783,7 +763,7 @@ describe("A session's page", () => {
   })
 
   it("can't announce a session without a date, which its button says", async () => {
-    mockFetch({ ...LOGGED_IN, ...RA_EVENT_CONTENT, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
     renderAt('/admin/sessions/session-2')
 
     const button = within(await screen.findByRole('group', { name: 'Annonce' })).getByRole('button', { name: 'annoncée' })
@@ -1513,32 +1493,36 @@ describe("A session's page", () => {
 })
 
 describe("A session's event on RA", () => {
-  const RA_URL = '/api/admin/sessions/session-1/ra-event'
+  const PUBLICATION_URL = '/api/admin/sessions/session-1/ra-publication'
   const UNPUBLISHED = { ...SESSION, raEvent: null }
   const UNPUBLISHED_PAGE = { ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: UNPUBLISHED } }
   const SAVED = { ...SESSION, raEvent: { id: '2400123', url: 'https://ra.co/events/2400123' } }
-  const writeText = vi.fn<(text: string) => Promise<void>>()
-
-  beforeEach(() => {
-    writeText.mockReset().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-  })
 
   async function openPanel() {
     fireEvent.click(within(await screen.findByLabelText('Session')).getByRole('button', { name: 'créer' }))
-    await waitFor(() => expect(raValue('Titre')).toBeInTheDocument())
+    await screen.findByRole('button', { name: 'Publier sur RA' })
   }
 
-  it('is only a link once the session has one, without its content', async () => {
+  // The session's page, its panel open, with the tab « Publier sur RA » opens, before it's sent to RA's form, and the
+  // server's answer to the token's request, `token`, e.g. held back.
+  async function openPanelWithTab(token: Body | Promise<Body>) {
+    mockFetch({ ...UNPUBLISHED_PAGE, [`POST ${PUBLICATION_URL}`]: token })
+    const tab = { opener: window as Window | null, closed: false, close: vi.fn(), location: { replace: vi.fn() } }
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window)
+    renderAt('/admin/sessions/session-1')
+    await openPanel()
+    return { tab, open }
+  }
+
+  it('is only a link once the session has one', async () => {
     mockFetch(PAGE)
     renderAt('/admin/sessions/session-1')
     await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
     expect(value('Événement RA')).toHaveTextContent(/^https:\/\/ra\.co\/events\/6683745$/)
     expect(screen.queryByRole('button', { name: 'créer' })).not.toBeInTheDocument()
-    expect(requestsTo('GET', RA_URL)).toHaveLength(0)
   })
 
-  it('shows its content under "Événement RA", with a button to copy each text, once "créer" is clicked', async () => {
+  it('opens a panel under "Événement RA", which says to log in to RA first, and where to create the event by hand', async () => {
     mockFetch(UNPUBLISHED_PAGE)
     renderAt('/admin/sessions/session-1')
     await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
@@ -1546,33 +1530,14 @@ describe("A session's event on RA", () => {
     await openPanel()
 
     expect(within(value('Événement RA')).getByRole('link', { name: 'sur RA' })).toHaveAttribute('href', 'https://ra.co/pro/event/create')
-    // Where the bookmarklet is.
-    expect(within(value('Événement RA')).getByRole('link', { name: 'Intégrations' })).toHaveAttribute('href', '/admin/integrations')
-    expect(raValue('Titre')).toHaveTextContent(/^ONDES TAKEOVERcopier$/)
-    expect(raValue('Quand')).toHaveTextContent('samedi 14 novembre 2026, de 21 h à 1 h le lendemain')
-    expect(within(raValue('Line-up')).getByText(/^Aurore/)).toHaveTextContent('Aurore Brume Cyan', { normalizeWhitespace: true })
-    expect(within(raValue('Salle')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
-    expect(within(raValue('Promoteur')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/promoters/183980')
-    expect(raValue('Description')).toHaveTextContent('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
-    const hrefs = (label: string) => within(raValue(label)).getAllByRole('link').map((link) => link.getAttribute('href'))
-    expect(hrefs('Liens promotionnels')).toEqual(['https://parking.radio', 'https://www.instagram.com/parking.radio'])
-    expect(raValue('Liens promotionnels')).toHaveTextContent(/^parking\.radio : https:\/\/parking\.radio/)
-    expect(hrefs('Liens média')).toEqual(['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'])
-
-    fireEvent.click(screen.getByRole('button', { name: 'copier le line-up' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'copier le line-up' })).toHaveTextContent('copié'))
-    expect(writeText).toHaveBeenCalledWith('Aurore\nBrume\nCyan')
-    fireEvent.click(screen.getByRole('button', { name: 'copier le titre' }))
-    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('ONDES TAKEOVER'))
-    fireEvent.click(screen.getByRole('button', { name: 'copier la description' }))
-    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC'))
-    // Links' addresses, but not their titles, which are short.
-    fireEvent.click(screen.getByRole('button', { name: 'copier https://www.instagram.com/parking.radio' }))
-    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('https://www.instagram.com/parking.radio'))
-
-    writeText.mockRejectedValue(new Error('Denied'))
-    fireEvent.click(screen.getByRole('button', { name: 'copier le titre' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'copier le titre' })).toHaveTextContent('échec de la copie'))
+    expect(value('Événement RA')).toHaveTextContent(
+      "« Publier sur RA » ouvre RA, où le favori « Parking Radio → RA » vous montre l'événement, puis le crée. Assurez-vous d'être connecté au bon compte RA avant de cliquer sur « Publier sur RA ». Si le favori ne fonctionne pas, créez l'événement sur RA à la main d'après la page de la session, puis collez son lien ci-dessous.",
+    )
+    expect(within(value('Événement RA')).getByText('avant').tagName).toBe('STRONG')
+    expect(within(value('Événement RA')).queryByRole('link', { name: 'Intégrations' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Attention/)).not.toBeInTheDocument()
+    // Nothing is asked of the server until « Publier sur RA » is clicked.
+    expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(0)
 
     // Closing it saves nothing.
     fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
@@ -1613,66 +1578,74 @@ describe("A session's event on RA", () => {
     expect(screen.getByRole('button', { name: 'enregistrer' })).toBeEnabled()
   })
 
-  it('shows a session without a date as such, and a missing description without a button', async () => {
-    mockFetch({ ...PAGE, '/api/admin/sessions/session-2': { ok: true, session: UNDATED }, '/api/admin/sessions/session-2/ra-event': { ok: true, event: { ...RA_EVENT, start: null, end: null, content: '' } } })
-    renderAt('/admin/sessions/session-2')
-    await openPanel()
-
-    expect(raValue('Quand')).toHaveTextContent('date à déterminer')
-    expect(raValue('Description')).toHaveTextContent(/^-$/)
-    expect(screen.queryByRole('button', { name: 'copier la description' })).not.toBeInTheDocument()
-  })
-
-  it('reads it again whenever the session changes, e.g. its sets', async () => {
-    const cancelled = { ...UNPUBLISHED, sets: [{ ...SET, status: 'cancelled' as const }, CYAN_SET, SESSION.sets[2]] }
-    mockFetch(UNPUBLISHED_PAGE)
-    renderAt('/admin/sessions/session-1')
-    await openPanel()
-
-    mockFetch({ ...UNPUBLISHED_PAGE, [RA_URL]: { ok: true, event: { ...RA_EVENT, lineup: 'Cyan' } }, 'PUT /api/admin/sets/set-1/status': { ok: true, session: cancelled } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Statut : Set de Aurore et Brume' }), { target: { value: 'cancelled' } })
-    await waitFor(() => expect(raValue('Line-up')).toHaveTextContent(/^Cyancopier$/))
-  })
-
-  it("opens RA's form with the event, for the bookmarklet, from the panel", async () => {
-    mockFetch(UNPUBLISHED_PAGE)
-    const open = vi.spyOn(window, 'open').mockReturnValue(null)
-    renderAt('/admin/sessions/session-1')
-    await openPanel()
+  it("opens a tab right away, then sends it to RA's form with a token for the session, once the server gives it", async () => {
+    const token = held()
+    const { tab, open } = await openPanelWithTab(token.body)
 
     fireEvent.click(screen.getByRole('button', { name: 'Publier sur RA' }))
-    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/ra\.co\/pro\/event\/create#parking-radio=/), '_blank', 'noopener')
-    const url = open.mock.calls[0][0] as string
-    expect(JSON.parse(decodeURIComponent(url.slice(url.indexOf('=') + 1)))).toEqual({ site: location.origin, environment: 'production', session: 'session-1', event: RA_EVENT })
-    expect(screen.queryByText(/^Attention/)).not.toBeInTheDocument()
-    open.mockRestore()
+    expect(open).toHaveBeenCalledWith('', '_blank')
+    // RA's page can't reach the session's.
+    expect(tab.opener).toBeNull()
+    await waitFor(() => expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Publier sur RA' })).toBeDisabled()
+    expect(tab.location.replace).not.toHaveBeenCalled()
+
+    await token.answer({ ok: true, token: 'the-token' })
+    expect(tab.location.replace).toHaveBeenCalledWith('https://ra.co/pro/event/create#parking-radio=the-token')
+    expect(screen.getByRole('button', { name: 'Publier sur RA' })).toBeEnabled()
+    expect(tab.close).not.toHaveBeenCalled()
+  })
+
+  it("closes the tab, and says why, when the server doesn't give a token", async () => {
+    const { tab } = await openPanelWithTab({ ok: false, error: 'No such session' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publier sur RA' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("La publication sur RA n'a pas pu être préparée : No such session")
+    expect(tab.close).toHaveBeenCalled()
+    expect(tab.location.replace).not.toHaveBeenCalled()
+  })
+
+  it('does nothing more once the tab is closed, and says when the browser opens none', async () => {
+    const token = held()
+    const { tab, open } = await openPanelWithTab(token.body)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publier sur RA' }))
+    await waitFor(() => expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(1))
+    tab.closed = true
+    await token.answer({ ok: true, token: 'the-token' })
+    expect(screen.getByRole('button', { name: 'Publier sur RA' })).toBeEnabled()
+    expect(tab.location.replace).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    open.mockReturnValue(null)
+    fireEvent.click(screen.getByRole('button', { name: 'Publier sur RA' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("RA n'a pas pu s'ouvrir dans un nouvel onglet.")
+    expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(1)
   })
 
   it("can't publish a session that has no date, or is cancelled", async () => {
     const expectUnavailable = async (session: Session, why: string) => {
-      mockFetch({ ...PAGE, [`/api/admin/sessions/${session.id}`]: { ok: true, session }, [`/api/admin/sessions/${session.id}/ra-event`]: { ok: true, event: RA_EVENT } })
+      mockFetch({ ...PAGE, [`/api/admin/sessions/${session.id}`]: { ok: true, session } })
       const page = renderAt(`/admin/sessions/${session.id}`)
       await openPanel()
       const button = screen.getByRole('button', { name: 'Publier sur RA' })
       expect(button).toHaveAccessibleDescription(why)
       expect(button).toHaveAttribute('aria-disabled', 'true')
+      fireEvent.click(button)
+      expect(requestsTo('POST', `/api/admin/sessions/${session.id}/ra-publication`)).toHaveLength(0)
       page.unmount()
     }
     await expectUnavailable(UNDATED, "La session n'a pas de date.")
     await expectUnavailable({ ...UNPUBLISHED, status: 'cancelled' }, 'La session est annulée.')
   })
 
-  it('publishes outside production too, warning that the event will be created on RA all the same', async () => {
+  it('warns, outside production, that the event will be created on RA all the same', async () => {
     mockFetch({ ...UNPUBLISHED_PAGE, '/api/config': { ...CONFIG, environment: 'test' } })
-    const open = vi.spyOn(window, 'open').mockReturnValue(null)
     renderAt('/admin/sessions/session-1')
     await openPanel()
-
     expect(await screen.findByText("Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST.")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Publier sur RA' }))
-    const url = open.mock.calls[0][0] as string
-    expect(JSON.parse(decodeURIComponent(url.slice(url.indexOf('=') + 1)))).toMatchObject({ environment: 'test' })
-    open.mockRestore()
+    // The bookmarklet's name, as Intégrations gives it.
+    expect(value('Événement RA')).toHaveTextContent('où le favori « Parking Radio → RA [TEST] » vous montre')
   })
 
   it('opens the panel with the event on RA the bookmarklet created, saving it only with « enregistrer »', async () => {
@@ -1702,13 +1675,6 @@ describe("A session's event on RA", () => {
     await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
     expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
     expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
-  })
-
-  it('says when its content could not be loaded', async () => {
-    mockFetch({ ...UNPUBLISHED_PAGE, [RA_URL]: { ok: false, error: 'Something went wrong' } })
-    renderAt('/admin/sessions/session-1')
-    fireEvent.click(within(await screen.findByLabelText('Session')).getByRole('button', { name: 'créer' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent("Le contenu de l'événement RA n'a pas pu être chargé : Something went wrong")
   })
 })
 

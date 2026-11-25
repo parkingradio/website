@@ -55,7 +55,7 @@ export function useEnvironmentStamp(): string | undefined {
  * The server's environment, e.g. "production" or "test" (see "Environment" in docs/design/client/architecture.md):
  * undefined until the configuration is fetched, or if it can't be.
  */
-export function useEnvironment(): string | undefined {
+function useEnvironment(): string | undefined {
   const state = use(ConfigContext)
   return state.kind === 'loaded' ? state.config.environment : undefined
 }

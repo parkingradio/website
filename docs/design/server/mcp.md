@@ -87,6 +87,8 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   feed again, are tools, without the links.
 - The endpoints of the token of admins' calendars (see [Admins' calendars](admin-calendars.md)), since the token is a
   secret. The feeds themselves aren't JSON, and aren't under `/api`.
+- `POST /api/admin/sessions/:id/ra-publication`, which gives a token for publishing a session's event on RA, since the
+  token is a secret, and only the bookmarklet uses it (see [Publishing on RA](ra-publication.md)).
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
   or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and

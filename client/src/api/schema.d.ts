@@ -1978,23 +1978,6 @@ export interface paths {
         patch: operations["update_session"];
         trace?: never;
     };
-    "/api/admin/sessions/{id}/ra-event": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The content of a session's event on Resident Advisor, which an admin creates there from it */
-        get: operations["get_session_ra_event"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/sessions/{id}/flyer": {
         parameters: {
             query?: never;
@@ -2285,6 +2268,161 @@ export interface paths {
         get?: never;
         /** Moves a set to another session, after its sets, without changing its status, and returns that session, and the one it was in, whose statuses this can change */
         put: operations["update_set_session"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/sessions/{id}/ra-publication": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A token for publishing a session's event on Resident Advisor with the bookmarklet, which lasts an hour */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RaPublicationToken"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ra-publication": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The event that the bookmarklet creates on Resident Advisor for the session of the token in `Authorization: Bearer <token>` */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RaPublication"];
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4127,19 +4265,41 @@ export interface components {
             url: string;
             flyer: string | null;
         };
-        RaEventContent: {
+        RaEvents: {
+            promoterUrl: string;
+            /** @description The soonest first */
+            upcoming: components["schemas"]["RaEvent"][];
+            /** @description The most recent first: without `from` and `to`, only the 20 most recent */
+            past: components["schemas"]["RaEvent"][];
+        };
+        RaPublication: {
+            /** @constant */
+            ok: true;
+            /** @description The server's environment, as GET /api/config gives it */
+            environment: string;
+            /** @description The session's id */
+            session: string;
+            event: components["schemas"]["RaPublishedEvent"];
+        };
+        RaPublicationToken: {
+            /** @constant */
+            ok: true;
+            token: string;
+        };
+        /** @description The session's event, as RA's `EventInput` */
+        RaPublishedEvent: {
             title: string;
-            /** @description The session's start, or null when it has none. RA takes it in Québec time, without its offset */
-            start: string | null;
-            /** @description The session's end, or null when it has no start. RA takes it in Québec time, without its offset */
-            end: string | null;
+            /** @description Its start, in Québec time without its offset, e.g. "2026-11-20T21:00:00.000" */
+            startTime: string;
+            /** @description Its end, in Québec time without its offset */
+            endTime: string;
             /** @description One performer per line: those of its sets that aren't cancelled, in order, each artist once, or else OPEN JAM for a synth meetup, or its title */
             lineup: string;
             /** @description Parking Radio's venue on RA */
             venueId: string;
             /** @description Parking Radio's promoter page on RA */
             promoterIds: string[];
-            /** @description Its effective description */
+            /** @description The session's effective description */
             content: string;
             /** @description The event's promotional links on RA: Parking Radio's site and Instagram, each with its title */
             promotionalLinks: {
@@ -4147,14 +4307,11 @@ export interface components {
                 url: string;
             }[];
             /** @description The event's media links on RA: Parking Radio's YouTube and SoundCloud */
-            playerLinks: string[];
-        };
-        RaEvents: {
-            promoterUrl: string;
-            /** @description The soonest first */
-            upcoming: components["schemas"]["RaEvent"][];
-            /** @description The most recent first: without `from` and `to`, only the 20 most recent */
-            past: components["schemas"]["RaEvent"][];
+            playerLinks: {
+                sourceId: string;
+            }[];
+            /** @constant */
+            submissionSource: "SUBMITEVENTPAGE";
         };
         Reference: {
             id: string;
@@ -6582,68 +6739,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConflictError"];
-                };
-            };
-            /** @description Default Response */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-        };
-    };
-    get_session_ra_event: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Default Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @enum {boolean} */
-                        ok: true;
-                        event: components["schemas"]["RaEventContent"];
-                    };
-                };
-            };
-            /** @description Default Response */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description Default Response */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description Default Response */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Default Response */

@@ -660,7 +660,7 @@ dl.admin-record {
   cursor: grab;
 }
 
-/* Creating a session's event on RA by hand, under its "Événement RA". */
+/* Creating a session's event on RA, under its "Événement RA". */
 .admin-ra-panel {
   margin-top: 0.5rem;
   padding: 1rem;
@@ -669,22 +669,6 @@ dl.admin-record {
 
 .admin-ra-panel > :first-child {
   margin-top: 0;
-}
-
-/* A text of a session's event on RA, with the button that copies it after its first line. */
-.admin-copyable {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.admin-copyable > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.admin-copy {
-  flex: none;
 }
 
 /* The forms for artists and applications have more to them than the login form, and longer text. */

@@ -149,27 +149,24 @@ page, or coming back to it, doesn't open it again.
 ## Creating its event on RA
 
 While a session has no event on Resident Advisor, "créer", after its "Événement RA", opens a panel under it, to create
-the event on RA, with the bookmarklet or by hand, from the content the server gives (see
-[Events on RA](../../server/sessions.md#events-on-ra)), and save it as the session's:
+the event on RA, with the bookmarklet or by hand, and save it as the session's:
 
-- « Publier sur RA », which opens RA's form, for the bookmarklet that creates the event (see
-  [Publier sur RA](publier-sur-ra.md)). It can't be used while the session has no date, saying « La session n'a pas de
-  date. », or is cancelled, saying « La session est annulée. » (see
-  [Controls that can't be used](layout.md#controls-that-cant-be-used)), and waits for the content to be read and for the
-  environment to be known. Outside production, a warning in red follows it: « Attention : l'événement sera vraiment créé
-  sur RA, à partir d'une session de TEST. », with the environment's stamp (see
-  [Environment](../architecture.md#environment)).
-- A sentence says that « Publier sur RA » opens RA, where the bookmarklet creates the event, linking to Intégrations
-  for it, or to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields, then
-  to paste its link below.
-- The event's title ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer
-  per line, Parking Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, its description
-  ("Description"), whole, with its line breaks, or "-" when it has none, its links ("Liens promotionnels"), one per
-  line, each its title then its address, and its media links ("Liens média"), one per line, each its address, every
-  address linking to it. A "copier" button, after the first line of the title, the lineup and the description, and
-  after each address, copies it, then says "copié", or "échec de la copie", for a moment: the times, the venue and the
-  promoter are picked in RA's form rather than typed, and the links' titles are short. The content is read when the
-  panel opens, and again whenever the session or its sets change, and the panel says when it can't be read.
+- « Publier sur RA », which gets a token for the session from the server, then opens RA's form with it, for the
+  bookmarklet that creates the event (see [Publier sur RA](publier-sur-ra.md)). Since browsers only let pages open a tab
+  right when they're clicked, it opens the tab first, then sends it to RA's form once the token is there. Until then,
+  the button is greyed out. When the token can't be had, it closes the tab, and the panel says why, « La publication
+  sur RA n'a pas pu être préparée : … ». When the browser doesn't open the tab, it says « RA n'a pas pu s'ouvrir dans
+  un nouvel onglet. », and when the admin closed it in the meantime, nothing. It can't be used while the session has no
+  date, saying « La session n'a pas de date. », or is cancelled, saying « La session est annulée. » (see
+  [Controls that can't be used](layout.md#controls-that-cant-be-used)). Outside production, a warning in red follows
+  it: « Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST. », with the environment's
+  stamp (see [Environment](../architecture.md#environment)).
+- A sentence says that « Publier sur RA » opens RA, where the bookmarklet, named as Intégrations names it (see
+  [Publier sur RA, in Intégrations](integrations.md#publier-sur-ra)), shows the event, then creates it, and to make
+  sure to be logged in to the right RA account **before** clicking « Publier sur RA », since logging in to RA loses
+  the token, with "avant" in bold. Another says that when the bookmarklet doesn't work, the event can be created on RA
+  by hand (linking to RA's form, `https://ra.co/pro/event/create`) from the session's page, then its link pasted
+  below.
 - "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
   [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's
   event on RA, which then shows in place of the panel, and "annuler" closes the panel. Saving only changes the session's
@@ -389,7 +386,7 @@ its sets in the way is named without a link.
   and `DELETE /api/admin/sessions/:id`, for a session's page.
 - `GET /api/admin/sessions/:id/flyer?width=1280`, for its flyer, on its page and in its form, which links to
   `GET /api/admin/sessions/:id/flyer`, the flyer as it was sent (see [Flyers](../../server/sessions.md#flyers)).
-- `GET /api/admin/sessions/:id/ra-event`, for the content of its event on RA, in the panel that creates it, and
+- `POST /api/admin/sessions/:id/ra-publication`, for « Publier sur RA », in the panel that creates its event on RA, and
   `PATCH /api/admin/sessions/:id`, to save the event as the session's too.
 - `POST /api/admin/sessions`, for "nouvelle session".
 - `POST /api/admin/sessions/:id/sets`, `PATCH /api/admin/sets/:id`, `PUT /api/admin/sets/:id/status`,

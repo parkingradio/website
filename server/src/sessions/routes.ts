@@ -28,7 +28,6 @@ import {
 } from './fields.js'
 import type { SessionFields } from './fields.js'
 import { raEventUrl, youtubeVideoUrl } from './links.js'
-import { raEventContent } from './ra-event.js'
 import { BrokenFields, Conflict, NoSuchReference, SESSION_CANCELLED } from './store.js'
 import type { NewSet, SessionChanges, SessionsStore, SetChanges, SetRow, StatusChangedBy, StoredSession, StoredSet } from './store.js'
 
@@ -116,25 +115,6 @@ const MovedSetResponse = z
   })
   .meta({ id: 'MovedSetResponse' })
 
-// The content of a session's event on RA (see sessions/ra-event.ts).
-const RaEventContent = z
-  .object({
-    title: z.string(),
-    start: Timestamp.nullable().meta({ description: "The session's start, or null when it has none. RA takes it in Québec time, without its offset" }),
-    end: Timestamp.nullable().meta({ description: "The session's end, or null when it has no start. RA takes it in Québec time, without its offset" }),
-    lineup: z.string().meta({
-      description:
-        "One performer per line: those of its sets that aren't cancelled, in order, each artist once, or else OPEN JAM for a synth meetup, or its title",
-    }),
-    venueId: z.string().meta({ description: "Parking Radio's venue on RA" }),
-    promoterIds: z.array(z.string()).meta({ description: "Parking Radio's promoter page on RA" }),
-    content: z.string().meta({ description: 'Its effective description' }),
-    promotionalLinks: z.array(z.object({ title: z.string(), url: z.string() })).meta({ description: "The event's promotional links on RA: Parking Radio's site and Instagram, each with its title" }),
-    playerLinks: z.array(z.string()).meta({ description: "The event's media links on RA: Parking Radio's YouTube and SoundCloud" }),
-  })
-  .meta({ id: 'RaEventContent' })
-export type RaEventContent = z.infer<typeof RaEventContent>
-
 // A session's flyer follows the rules of artists' photos (see `validatePhoto` in artists/store.ts), with errors in English.
 const FLYER_ERRORS: PhotoErrors = {
   wrongType: 'The flyer must be a JPEG, PNG or WebP image',
@@ -192,7 +172,7 @@ const NewSessionConflictError = ConflictError.extend({
   }),
 }).meta({ id: 'NewSessionConflictError' })
 
-const NO_SUCH_SESSION_ERROR: ApiError = { ok: false, error: NO_SUCH_SESSION }
+export const NO_SUCH_SESSION_ERROR: ApiError = { ok: false, error: NO_SUCH_SESSION }
 const NO_SUCH_SET: ApiError = { ok: false, error: 'No such set' }
 
 // Why a request failed, and what's in the way, when it's about a session or a set, and which of the sets added with a
@@ -462,25 +442,6 @@ export async function sessionsRoutes(app: FastifyInstance, { store, photos, reso
       const row = await store.get(request.params.id)
       if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       return { ok: true as const, session: sessionBody(row) }
-    },
-  )
-
-  api.get(
-    '/api/admin/sessions/:id/ra-event',
-    {
-      config: { admin: true, tool: { title: "Voir le contenu de l'événement RA d'une session" } },
-      schema: {
-        operationId: 'get_session_ra_event',
-        summary: "The content of a session's event on Resident Advisor, which an admin creates there from it",
-        tags: ['Sessions'],
-        params: ById,
-        response: { 200: z.object({ ok: z.literal(true), event: RaEventContent }), 404: ApiError },
-      },
-    },
-    async (request, reply) => {
-      const row = await store.get(request.params.id)
-      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
-      return { ok: true as const, event: raEventContent(sessionBody(row)) }
     },
   )
 

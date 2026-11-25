@@ -27,6 +27,7 @@ import { calendarRoutes } from './events/calendar.js'
 import { eventsRoutes } from './events/routes.js'
 import type { EventsStore } from './events/store.js'
 import { raEventsRoutes } from './ra-events/routes.js'
+import { raPublicationRoutes } from './ra-publication/routes.js'
 import { featuresRoutes } from './features/routes.js'
 import type { FeaturesStore } from './features/store.js'
 import type { OnAirStore } from './radio/on-air.js'
@@ -119,6 +120,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     sendEmail: deps.sendEmail,
   })
   await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
+  await app.register(raPublicationRoutes, { store: deps.sessions, environment: deps.environment })
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })

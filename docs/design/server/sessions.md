@@ -385,21 +385,9 @@ Responses give each one as an object, or null when there's none, with an `id` an
 ## Events on RA
 
 Parking Radio lists its sessions as events on Resident Advisor, under its promoter page (see
-[RA events](ra-events.md)). A session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA
-from the content the server gives for the session, whatever its status, and whether it's announced or not (see
-[`GET /api/admin/sessions/:id/ra-event`](#get-apiadminsessionsidra-event-admin)), then sets as its `raEvent`. The server
-never creates events on RA itself. The content is:
-
-| Field | Type | |
-|---|---|---|
-| `title` | string | The session's `title` |
-| `start`, `end` | string or null | The session's `start` and `end`, as it gives them, or null when it has no `start`. RA takes them in Québec time without their offset |
-| `lineup` | string | One performer per line: the names of the session's lineup, as its event gives it, or would once it's announced (see `lineup` in [Events](events.md#whats-public)): the performers of its sets that aren't cancelled, in the order of its `sets`, each set's in their order, each artist once, e.g. `"Aurore\nBrume"` for a set of Aurore and Brume. RA needs one, so a session without such performers has `"OPEN JAM"` for a `"synth-meetup"`, as Parking Radio's synth meetups do on RA, or else its `title` |
-| `venueId` | string | Parking Radio's venue on RA, `"288529"` (`https://ra.co/clubs/288529`) |
-| `promoterIds` | list of strings | Parking Radio's promoter page on RA, `["183980"]` (`https://ra.co/promoters/183980`) |
-| `content` | string | The session's `effectiveDescription` |
-| `promotionalLinks` | list of objects | The event's promotional links on RA, Parking Radio's site and Instagram, each a `title` and its `url`: `[{"title": "parking.radio", "url": "https://parking.radio"}, {"title": "instagram", "url": "https://www.instagram.com/parking.radio"}]` |
-| `playerLinks` | list of strings | The event's media links on RA, Parking Radio's YouTube and SoundCloud: `["https://www.youtube.com/@parkingdotradio", "https://soundcloud.com/parkingdotradio"]` |
+[RA events](ra-events.md)). A session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA,
+with the bookmarklet, from what the server gives for the session (see [Publishing on RA](ra-publication.md)), or by
+hand, then sets as its `raEvent`. The server never creates events on RA itself.
 
 ## `GET /api/admin/sessions` (admin)
 
@@ -428,15 +416,6 @@ or if `from` isn't before `to`.
 |---|---|---|
 | `ok` | `true` | |
 | `session` | session | |
-
-Fails with 404 when there's no such session.
-
-## `GET /api/admin/sessions/:id/ra-event` (admin)
-
-| Response field | Type | |
-|---|---|---|
-| `ok` | `true` | |
-| `event` | object | The content of the session's event on RA, as above (see [Events on RA](#events-on-ra)) |
 
 Fails with 404 when there's no such session.
 

@@ -8,7 +8,7 @@ import { config } from '../core/config.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user?: { id: string; email: string }
+    user?: AdminSession
   }
   interface FastifyInstance {
     // What requireAuth checks sessions against, so that sessions end when their admin is revoked or chooses a new
@@ -16,6 +16,9 @@ declare module 'fastify' {
     adminSessions: Pick<AdminsStore, 'sessionVersion'>
   }
 }
+
+// An admin, as their sessions have them, with the version their sessions have (see `sessionVersion` in db/schema.ts).
+export type AdminSession = { id: string; email: string; sessionVersion: number }
 
 export const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60
 
@@ -34,7 +37,7 @@ function jwtSecretKey(): Uint8Array {
 // A session for `user`, with the version their sessions have when it starts (see `sessionVersion` in db/schema.ts), which
 // lasts `seconds`, e.g. a short one for a request the server sends itself as them (see mcp/tools.ts).
 export async function signSessionToken(
-  user: { id: string; email: string; sessionVersion: number },
+  user: AdminSession,
   seconds = SESSION_DURATION_SECONDS,
 ): Promise<string> {
   return new SignJWT({ email: user.email, ver: user.sessionVersion })
@@ -47,7 +50,7 @@ export async function signSessionToken(
 
 // The admin a session token is for, and the version their sessions had when it started. Null if the token isn't one we
 // signed, or has expired. Sessions that started before there were versions have none, and are of the first one, 0.
-export async function verifySessionToken(token: string): Promise<{ id: string; email: string; sessionVersion: number } | null> {
+export async function verifySessionToken(token: string): Promise<AdminSession | null> {
   try {
     const { payload } = await jwtVerify(token, jwtSecretKey())
     if (typeof payload.sub !== 'string' || typeof payload.email !== 'string') return null
@@ -111,5 +114,5 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   if (!session || (await request.server.adminSessions.sessionVersion(session.id)) !== session.sessionVersion) {
     return reply.code(401).send(UNAUTHORIZED)
   }
-  request.user = { id: session.id, email: session.email }
+  request.user = session
 }
