@@ -1,5 +1,5 @@
 /* The admin pages' frame, which shows while they load, and the error in their place when they can't be (see shell.tsx),
-   with the public pages' styles. The rest is in admin.css. */
+   loaded with the public pages' styles. The rest is in admin.css. */
 .admin {
   flex: 1;
   padding: 2rem 1.5rem 4rem;

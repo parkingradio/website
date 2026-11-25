@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useNavigate } from 'react-router'
-import App from './app'
+import App from './pages/admin/test-app'
+import { UNAUTHORIZED, mockFetch } from './test-utils'
 
 describe('App', () => {
   it('renders the home page at /', () => {
@@ -52,13 +53,14 @@ describe('App', () => {
     )
   })
 
-  it('renders /accept-invite without crashing', () => {
-    const { container } = render(
+  it('renders /accept-invite', async () => {
+    mockFetch({ '/api/admin/me': UNAUTHORIZED })
+    render(
       <MemoryRouter initialEntries={['/accept-invite?token=abc']}>
         <App />
       </MemoryRouter>,
     )
-    expect(container).not.toBeEmptyDOMElement()
+    expect(await screen.findByRole('heading', { name: 'Choisir un mot de passe' })).toBeInTheDocument()
   })
 
   it.each(['/foo', '/admin/foo'])('renders a not found page, with the navbar, at %s', (path) => {
