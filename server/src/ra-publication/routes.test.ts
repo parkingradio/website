@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import sharp from 'sharp'
 import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
 import { TEST_ADMIN, sessionCookies } from '../admins/test-sessions.js'
 import type { AdminsStore } from '../admins/store.js'
 import type { SessionsStore, StoredSession } from '../sessions/store.js'
 import { storedSession, storedSet as set } from '../sessions/test-rows.js'
+import { memoryPhotos, testImage } from '../artists/test-photos.js'
 import { raPublicationRoutes } from './routes.js'
 import { signRaPublicationToken } from './token.js'
 
@@ -21,14 +23,20 @@ const store = { get: vi.fn(async (id: string) => rows.find((row) => row.id === i
 // The version of each admin's sessions, as the database has it: every admin's is 0, unless they were revoked (null).
 const versions = new Map<string, number | null>()
 const sessionVersion = vi.fn<AdminsStore['sessionVersion']>(async (id) => (versions.has(id) ? versions.get(id)! : 0))
+// Where the flyers are kept: FLYER_KEY is a PNG of 3000 × 1500 pixels.
+const photos = memoryPhotos()
+const FLYER_KEY = 'sessions/flyer.png'
+const withFlyer = (fields: Partial<StoredSession> = {}) => session({ flyerKey: FLYER_KEY, flyerType: 'image/png', ...fields })
 
-beforeEach(() => {
+beforeEach(async () => {
   process.env.JWT_SECRET = 'test-secret'
   rows = [session()]
+  photos.stored.set(FLYER_KEY, await testImage('png', 3000, 1500))
 })
 
 afterEach(() => {
   vi.clearAllMocks()
+  photos.reset()
   versions.clear()
   delete process.env.JWT_SECRET
 })
@@ -38,15 +46,18 @@ async function buildApp(environment = 'production') {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   app.decorate('adminSessions', { sessionVersion })
-  await app.register(raPublicationRoutes, { store: store as unknown as SessionsStore, environment })
+  await app.register(raPublicationRoutes, { store: store as unknown as SessionsStore, photos, environment })
   return app
 }
 type App = Awaited<ReturnType<typeof buildApp>>
 
 const issue = async (app: App, id = 'session-1') =>
   app.inject({ method: 'POST', url: `/api/admin/sessions/${id}/ra-publication`, cookies: await sessionCookies() })
-const publication = (app: App, token: string | null, headers: Record<string, string> = {}) =>
-  app.inject({ method: 'GET', url: '/api/ra-publication', headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), ...headers } })
+// A request to `url`, with `token`, if any, as the bookmarklet sends it.
+const withToken = (app: App, url: string, token: string | null, headers: Record<string, string> = {}) =>
+  app.inject({ method: 'GET', url, headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), ...headers } })
+const publication = (app: App, token: string | null, headers: Record<string, string> = {}) => withToken(app, '/api/ra-publication', token, headers)
+const flyer = (app: App, token: string | null, headers: Record<string, string> = {}) => withToken(app, '/api/ra-publication/flyer', token, headers)
 const tokenFor = async (app: App, id = 'session-1') => (await issue(app, id)).json().token as string
 
 describe('POST /api/admin/sessions/:id/ra-publication', () => {
@@ -75,6 +86,7 @@ describe('GET /api/ra-publication', () => {
       ok: true,
       environment: 'test',
       session: 'session-1',
+      hasFlyer: false,
       event: {
         title: 'LES ONDES TAKEOVER',
         startTime: '2026-11-14T21:00:00.000',
@@ -91,6 +103,12 @@ describe('GET /api/ra-publication', () => {
         submissionSource: 'SUBMITEVENTPAGE',
       },
     })
+  })
+
+  it('says whether the session has a flyer', async () => {
+    rows = [withFlyer()]
+    const app = await buildApp()
+    expect((await publication(app, await tokenFor(app))).json().hasFlyer).toBe(true)
   })
 
   it('gives its start and end in Québec time, without their offset, across the night the clocks go back', async () => {
@@ -171,18 +189,20 @@ describe('GET /api/ra-publication', () => {
     expect(cancelled.json()).toEqual({ ok: false, error: 'This session is cancelled' })
   })
 
-  it("lets RA's pages, and only them, read its responses, errors included, after asking with a preflight", async () => {
+  it.each(['/api/ra-publication', '/api/ra-publication/flyer'])("lets RA's pages, and only them, read the responses of %s, errors included, after asking with a preflight", async (url) => {
+    rows = [withFlyer()]
     const app = await buildApp()
     const token = await tokenFor(app)
+    const get = (token: string, headers: Record<string, string>) => withToken(app, url, token, headers)
     for (const origin of ['https://ra.co', 'https://fr.ra.co']) {
-      for (const response of [await publication(app, token, { origin }), await publication(app, 'not-a-token', { origin })]) {
+      for (const response of [await get(token, { origin }), await get('not-a-token', { origin })]) {
         expect(response.headers['access-control-allow-origin']).toBe(origin)
         expect(response.headers.vary).toBe('Origin')
         expect(response.headers['access-control-allow-credentials']).toBeUndefined()
       }
       const preflight = await app.inject({
         method: 'OPTIONS',
-        url: '/api/ra-publication',
+        url,
         headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization' },
       })
       expect(preflight.statusCode).toBe(204)
@@ -194,11 +214,61 @@ describe('GET /api/ra-publication', () => {
       })
     }
     for (const origin of ['https://notra.co', 'http://ra.co', 'https://ra.co.example', 'https://parking.radio', 'null']) {
-      expect((await publication(app, token, { origin })).headers['access-control-allow-origin']).toBeUndefined()
-      const preflight = await app.inject({ method: 'OPTIONS', url: '/api/ra-publication', headers: { origin, 'access-control-request-method': 'GET' } })
+      expect((await get(token, { origin })).headers['access-control-allow-origin']).toBeUndefined()
+      const preflight = await app.inject({ method: 'OPTIONS', url, headers: { origin, 'access-control-request-method': 'GET' } })
       expect(preflight.headers['access-control-allow-origin']).toBeUndefined()
       expect(preflight.headers['access-control-allow-headers']).toBeUndefined()
     }
-    expect((await publication(app, token)).headers['access-control-allow-origin']).toBeUndefined()
+    expect((await get(token, {})).headers['access-control-allow-origin']).toBeUndefined()
+  })
+})
+
+describe('GET /api/ra-publication/flyer', () => {
+  it("gives the session's flyer as a JPEG within RA's limits, never kept", async () => {
+    rows = [withFlyer()]
+    const app = await buildApp()
+    const response = await flyer(app, await tokenFor(app), { origin: 'https://ra.co' })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers).toMatchObject({
+      'content-type': 'image/jpeg',
+      'x-content-type-options': 'nosniff',
+      'cache-control': 'no-store',
+      'access-control-allow-origin': 'https://ra.co',
+    })
+    expect(await sharp(response.rawPayload).metadata()).toMatchObject({ format: 'jpeg', width: 2000, height: 1000 })
+    expect(photos.read).toHaveBeenCalledWith(FLYER_KEY)
+  })
+
+  it('refuses requests without a valid token, before anything else is read', async () => {
+    rows = [withFlyer()]
+    const app = await buildApp()
+    const token = await tokenFor(app)
+    store.get.mockClear()
+    versions.set(TEST_ADMIN.id, null)
+    for (const response of [await flyer(app, null), await flyer(app, 'not-a-token'), await flyer(app, token)]) {
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: "The token isn't valid, or has expired" })
+      expect(response.headers['cache-control']).toBe('no-store')
+    }
+    expect(store.get).not.toHaveBeenCalled()
+    expect(photos.read).not.toHaveBeenCalled()
+  })
+
+  it('responds 404 once the session is deleted, when it has no flyer, or when its flyer is missing', async () => {
+    rows = [session(), withFlyer({ id: 'session-2', flyerKey: 'sessions/missing.png' })]
+    const app = await buildApp()
+    const deleted = await tokenFor(app, 'session-1')
+    const missing = await tokenFor(app, 'session-2')
+    expect((await flyer(app, deleted)).json()).toEqual({ ok: false, error: 'This session has no flyer' })
+    rows.shift()
+    for (const [token, error] of [
+      [deleted, 'No such session'],
+      [missing, 'The flyer of this session is missing'],
+    ]) {
+      const response = await flyer(app, token)
+      expect(response.statusCode).toBe(404)
+      expect(response.json()).toEqual({ ok: false, error })
+      expect(response.headers['cache-control']).toBe('no-store')
+    }
   })
 })

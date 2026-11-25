@@ -3072,6 +3072,10 @@
             "type": "string",
             "description": "The session's id"
           },
+          "hasFlyer": {
+            "type": "boolean",
+            "description": "Whether the session has a flyer, which GET /api/ra-publication/flyer gives"
+          },
           "event": {
             "$ref": "#/components/schemas/RaPublishedEvent"
           }
@@ -3080,6 +3084,7 @@
           "ok",
           "environment",
           "session",
+          "hasFlyer",
           "event"
         ],
         "additionalProperties": false
@@ -10625,6 +10630,57 @@
             }
           },
           "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ra-publication/flyer": {
+      "get": {
+        "summary": "The flyer of the session of the token in `Authorization: Bearer <token>`, as a JPEG within RA's limits, which the bookmarklet uploads to Resident Advisor",
+        "tags": [
+          "Publishing on RA"
+        ],
+        "responses": {
+          "200": {
+            "description": "The session's flyer, as a JPEG of at most 2000 × 2000 pixels and 3,000,000 bytes. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
             "description": "Default Response",
             "content": {
               "application/json": {

@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import type { Sharp } from 'sharp'
 import { PHOTO_MAX_PIXELS } from './profile.js'
 
 // The sizes of photos and flyers that the server makes and serves (see "Photos" in docs/design/server/artists.md).
@@ -45,15 +46,19 @@ export class UnreadablePhoto extends Error {
   }
 }
 
-// The photo at `width`, or narrower when it is, as WebP, upright as its EXIF orientation says, and without any of its
-// metadata, which sharp drops unless told to keep it. Throws when the photo can't be read in full: `failOn: 'truncated'`
-// refuses one whose data ends early, which sharp would otherwise read, filling in what's missing, or that the decoder
-// can't get through, e.g. garbage after a JPEG's header, or a PNG's corrupt compressed data. It reads those that decode
-// in full with warnings, which browsers show too, e.g. JPEGs with corrupt scan data or quirks of their format, as some
-// phones make, or PNGs with a bad checksum, which sharp's default, 'warning', refuses.
+// The photo, read to be made into another image, upright as its EXIF orientation says, and without any of its metadata,
+// which sharp drops unless told to keep it. What's made from it throws when the photo can't be read in full:
+// `failOn: 'truncated'` refuses one whose data ends early, which sharp would otherwise read, filling in what's missing,
+// or that the decoder can't get through, e.g. garbage after a JPEG's header, or a PNG's corrupt compressed data. It reads
+// those that decode in full with warnings, which browsers show too, e.g. JPEGs with corrupt scan data or quirks of their
+// format, as some phones make, or PNGs with a bad checksum, which sharp's default, 'warning', refuses.
+export function readPhoto(photo: Buffer): Sharp {
+  return sharp(photo, { limitInputPixels: PHOTO_MAX_PIXELS, failOn: 'truncated' }).autoOrient()
+}
+
+// The photo at `width`, or narrower when it is, as WebP (see `readPhoto`).
 export async function resize(photo: Buffer, width: PhotoWidth): Promise<Buffer> {
-  return sharp(photo, { limitInputPixels: PHOTO_MAX_PIXELS, failOn: 'truncated' })
-    .autoOrient()
+  return readPhoto(photo)
     .resize({ width, height: WEBP_MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer()

@@ -12,7 +12,7 @@ These endpoints aren't tools of the [MCP server](mcp.md), since the token is a s
 
 The session's page asks for a token for the session
 ([`POST /api/admin/sessions/:id/ra-publication`](#post-apiadminsessionsidra-publication-admin)), which it hands to the
-bookmarklet. The token gives access to that session's event for publishing it, and to nothing else.
+bookmarklet. The token gives access to that session's event and its flyer for publishing them, and to nothing else.
 
 It's signed by the server, with a key it derives from its secret for this purpose only, so that it can never pass for
 another of its tokens, e.g. an admin's session. It holds the session, the admin who asked for it, and when it expires,
@@ -27,7 +27,7 @@ that doesn't quote it, before anything else is read. Not 401, which only admin e
 [Rate limits, in Conventions](README.md#conventions)): tokens can't be guessed.
 
 The bookmarklet gets the token through the fragment of RA's page's address, which RA's own scripts can read before the
-bookmarklet removes it: whoever has it can only read the event that's going to RA, for an hour at most.
+bookmarklet removes it: whoever has it can only read the event that's going to RA, and its flyer, for an hour at most.
 
 ## Reaching them from RA
 
@@ -54,7 +54,15 @@ What the bookmarklet sends to RA to create the session's event, as RA's `EventIn
 | `playerLinks` | list of objects | The event's media links on RA, Parking Radio's YouTube and SoundCloud, each a `sourceId`, its address: `[{"sourceId": "https://www.youtube.com/@parkingdotradio"}, {"sourceId": "https://soundcloud.com/parkingdotradio"}]` |
 | `submissionSource` | string | `"SUBMITEVENTPAGE"`, as RA's own form sends it |
 
-It's the same whether the session is announced or not.
+It's the same whether the session is announced or not. The bookmarklet adds the session's flyer to it, as `images`, once
+RA has it (see [The flyer](#the-flyer)).
+
+## The flyer
+
+The session's flyer (see [Flyers, in Sessions](sessions.md#flyers)), as the bookmarklet uploads it to RA: a JPEG of at
+most 2000 × 2000 pixels and 3,000,000 bytes, as RA takes them, with the flyer's proportions, never larger than it,
+upright and without any of its metadata, as photos' sizes are (see [Photos, in Artists](artists.md#photos)), in sRGB,
+with its transparent parts, if any, on white, lowering its quality only as far as it needs to fit.
 
 ## `POST /api/admin/sessions/:id/ra-publication` (admin)
 
@@ -76,7 +84,17 @@ The session's event, for the token in `Authorization`.
 | `ok` | `true` | |
 | `environment` | string | The server's environment, as [`GET /api/config`](README.md#get-apiconfig) gives it, so that the bookmarklet warns outside production |
 | `session` | string | The session's id, which the bookmarklet's link back to the session's page has |
+| `hasFlyer` | boolean | Whether the session has a flyer, which [`GET /api/ra-publication/flyer`](#get-apira-publicationflyer) gives |
 | `event` | object | The session's event (see [The event](#the-event)) |
 
 Fails with 403 without a valid token, 404 when the session no longer exists, and 409 when it has no start, since RA
 needs one, or is cancelled, e.g. since the token was given.
+
+## `GET /api/ra-publication/flyer`
+
+The session's flyer, for the token in `Authorization`, as the bookmarklet uploads it to RA (see
+[The flyer](#the-flyer)), as `image/jpeg` rather than JSON. Browsers are told not to guess another type
+(`X-Content-Type-Options: nosniff`).
+
+Fails with 403 without a valid token, and 404 when the session no longer exists, when it has no flyer, or when its flyer
+is missing.

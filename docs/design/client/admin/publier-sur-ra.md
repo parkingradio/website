@@ -25,13 +25,15 @@ session de TEST. ».
 2. The admin logs in to RA with their own account, if they aren't already, and clicks the bookmarklet, which shows a
    panel over RA's page. If logging in lost the fragment, or the token expired, it says to click « Publier sur RA »
    again.
-3. The bookmarklet gets the event from the site, checks RA, then shows the event: the RA account it's logged in as, the
-   title, the start and the end, the venue's name as RA has it, the lineup, the description, the links and the media
-   links, then, outside production, the warning that the event will be created on RA all the same. « Créer sur RA »
-   creates it, and « Annuler », or the panel's ×, closes it without creating anything.
+3. The bookmarklet gets the event and its flyer from the site, checks RA, then shows the event: the RA account it's
+   logged in as, the title, the start and the end, the venue's name as RA has it, the lineup, the description, the links
+   and the media links, the flyer, or « Pas de flyer » when the session has none, then, outside production, the warning
+   that the event will be created on RA all the same. « Créer sur RA » sends the flyer to RA and creates the event with
+   it, and « Annuler », or the panel's ×, closes it without creating anything.
 4. Once the event is created, the bookmarklet shows its link, a link to the session's page that saves it as the
-   session's event (see [Back to the session](#back-to-the-session)), and a reminder to add the flyer on RA by hand: the
-   session's page links to it as it was sent (see [A session's page](sessions.md#a-sessions-page)).
+   session's event (see [Back to the session](#back-to-the-session)), and, unless the flyer was sent with it, a reminder
+   to add the flyer on RA by hand: the session's page links to it as it was sent (see
+   [A session's page](sessions.md#a-sessions-page)).
 
 ## The bookmarklet
 
@@ -46,7 +48,8 @@ Each environment has its own bookmarklet, which loads the script from its own si
 event come from `http://localhost`: the browser may ask to allow RA's site to reach the local network, and the
 bookmarklet only works once that's allowed.
 
-The panel is in French, like the admin pages, and only ever shows what it's given, from the site or from RA, as text.
+The panel is in French, like the admin pages, and only ever shows what it's given, from the site or from RA, as text,
+and the flyer as the image the site sent.
 Clicking the bookmarklet again replaces it.
 
 What the script does:
@@ -63,14 +66,26 @@ What the script does:
   ([`GET /api/ra-publication`](../../server/ra-publication.md#get-apira-publication)). When the site refuses the token,
   e.g. once it expired, or when it comes from another environment's site, it says to click « Publier sur RA » on the
   session's page again, then the bookmarklet of that session's site. When the site can't be reached, it says so.
+- When the session has a flyer, it gets it from the same site, with the token
+  ([`GET /api/ra-publication/flyer`](../../server/ra-publication.md#get-apira-publicationflyer)), and only keeps it when
+  it's a JPEG. When it can't have it, it says so, and why, in place of the flyer, and that the event will be created
+  without it, to add by hand on RA: creating the event still works. When RA's page doesn't let it show the flyer, it
+  says that it can't be shown there, but will be sent all the same.
 - It then checks, in one request that changes nothing, that RA knows who's logged in (`user { username }`), that
   Parking Radio's venue is there (`venue`), and that RA still takes what it sends: that the `createEvent` mutation
-  exists, that every field of the event the site gives is one of `EventInput`'s, and that `EventInput` has no required
-  field (non-null, without a default) that the event doesn't have. When RA doesn't know who's logged in, it says to log
-  in again. When the rest doesn't hold, it says that RA changed, and what changed.
+  exists, that every field of the event the site gives is one of `EventInput`'s, `images` included when it has the
+  flyer, and that `EventInput` has no required field (non-null, without a default) that the event doesn't have. When it
+  has the flyer, it checks the same of `ImageInput`, for the flyer's fields, `filename` and `type`. When RA doesn't know
+  who's logged in, it says to log in again. When the rest doesn't hold, it says that RA changed, and what changed.
 - It sends the event as the site gives it, as `EventInput` (see
   [The event](../../server/ra-publication.md#the-event)). It only creates the event, once, when « Créer sur RA » is
   clicked, with the `createEvent` mutation, which gives the new event's `id`. It never tries again on its own.
+- When it has the flyer, it first uploads it, as RA's own form does: a `multipart/form-data` `POST` to
+  `https://image-uploader.ra.co/upload`, with the flyer in `data`, and the RA login as for RA's GraphQL endpoint. It
+  takes the flyer's address on RA from the answer's `filename`, and adds it to the event, as
+  `images: [{"filename": <it>, "type": "FLYERFRONT"}]`. When the upload fails, or RA doesn't answer within a minute, it
+  creates the event without the flyer, and says that the flyer couldn't be sent to RA, and why, and to add it by hand
+  on RA.
 - When RA refuses, it shows RA's messages as they come. When anything else goes wrong, it says that something didn't
   work, and why, e.g. the site's error.
 
@@ -83,12 +98,9 @@ that creates it, with that event's link in its field, under a notice that says i
 an event on RA, as a session's `raEvent` takes it, is ignored. It's removed from the page's address as
 [A session's page](sessions.md#a-sessions-page) says.
 
-## Later
-
-The flyer isn't sent to RA: admins add it to the event on RA by hand.
-
 ## Endpoints
 
 - `POST /api/admin/sessions/:id/ra-publication`, on the session's page, for « Publier sur RA » (see
   [Sessions](sessions.md#endpoints), where the page also saves the event).
 - `GET /api/ra-publication`, from the bookmarklet, for the event.
+- `GET /api/ra-publication/flyer`, from the bookmarklet, for the session's flyer.

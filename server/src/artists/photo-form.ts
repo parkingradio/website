@@ -155,7 +155,19 @@ const Photo = z.instanceof(Readable).meta({ type: 'string', format: 'binary' })
 type PhotoOf = 'artist' | 'collective' | 'session'
 const imageOf = (what: PhotoOf) => (what === 'session' ? 'flyer' : 'photo')
 
-const nosniff = 'Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)'
+export const nosniff = 'Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`)'
+
+// Responds that the artist, the collective or the session (as `what` says) has no photo, or flyer.
+export function sendNoPhoto(reply: FastifyReply, what: PhotoOf) {
+  return reply.status(404).send({ ok: false, error: `This ${what} has no ${imageOf(what)}` })
+}
+
+// Responds that their photo, or flyer, kept under `key`, is missing, which is logged as an error.
+export function sendMissingPhoto(reply: FastifyReply, key: string, what: PhotoOf) {
+  const error = `The ${imageOf(what)} of this ${what} is missing`
+  reply.log.error({ key }, error)
+  return reply.status(404).send({ ok: false, error })
+}
 
 // Admins' photos can be kept, only in the browser that asked, never in a shared cache, e.g. Cloudflare's, after checking
 // with the server.
@@ -223,7 +235,7 @@ export async function sendPhoto(
   // Only admins ever get a photo as it was sent: the public gets its sizes from `sendPublicSize`.
   if (reply.request.routeOptions.config.admin !== true) throw new Error('Photos are only served to admins as they were sent')
   const image = imageOf(what)
-  if (!row.photoKey) return reply.status(404).send({ ok: false, error: `This ${what} has no ${image}` })
+  if (!row.photoKey) return sendNoPhoto(reply, what)
   const etag = `"${width ? sizeKey(row.photoKey, width) : row.photoKey}"`
   if (hasEtag(reply.request.headers['if-none-match'], etag)) {
     return reply.status(304).header('ETag', etag).header('Cache-Control', ADMIN_CACHE_CONTROL).send()
@@ -235,11 +247,7 @@ export async function sendPhoto(
     // artists/backfill.ts).
     return reply.status(404).send({ ok: false, error: `The ${image} of this ${what} has no size ${width} pixels wide` })
   }
-  if (!photo) {
-    const error = `The ${image} of this ${what} is missing`
-    reply.log.error({ key: row.photoKey }, error)
-    return reply.status(404).send({ ok: false, error })
-  }
+  if (!photo) return sendMissingPhoto(reply, row.photoKey, what)
   // The type of the photo was checked from its contents when it was sent, and browsers mustn't guess another.
   return reply
     .header('Content-Type', width ? SIZE_TYPE : row.photoType!)

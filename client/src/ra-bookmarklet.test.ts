@@ -26,31 +26,50 @@ const EVENT_INPUT = {
   submissionSource: 'SUBMITEVENTPAGE',
 }
 
-const PUBLICATION = { ok: true, environment: 'production', session: 'session-1', event: EVENT_INPUT }
+const PUBLICATION = { ok: true, environment: 'production', session: 'session-1', hasFlyer: false, event: EVENT_INPUT }
+
+// The session's flyer, as the site gives it: a JPEG, which these tests never read.
+const FLYER = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
+const jpeg = () => new Response(FLYER, { headers: { 'Content-Type': 'image/jpeg' } })
+const UPLOADER = 'https://image-uploader.ra.co/upload'
+const FILENAME = 'https://images.ra.co/0123456789abcdef.jpg'
 
 const field = (name: string, kind = 'SCALAR', defaultValue: string | null = null) => ({ name, defaultValue, type: { kind } })
 // What RA says of itself when nothing changed: it takes every field sent, and others, some required but with a default.
 const FIELDS = [...Object.keys(EVENT_INPUT).map((name) => field(name)), field('images', 'LIST'), field('ticketed', 'NON_NULL', 'false')]
+// And of an event's images, which it only asks about when it sends the flyer.
+const IMAGE_FIELDS = [field('id'), field('filename', 'NON_NULL'), field('alt'), field('crop', 'INPUT_OBJECT'), field('type', 'ENUM')]
 function checks(changes: object = {}) {
   return {
     data: {
       user: { username: 'parkingradio' },
       venue: { name: 'Parking Radio' },
       input: { inputFields: FIELDS },
+      image: { inputFields: IMAGE_FIELDS },
       schema: { mutationType: { fields: [{ name: 'createEvent' }, { name: 'updateEvent' }] } },
       ...changes,
     },
   }
 }
 
-// The site's answer, then RA's: to the checks, then to creating the event.
-let answers: { publication: () => Response; checks: () => Response; create: () => Response }
+// The site's answers, to the event and the flyer, then RA's: to the checks, to uploading the flyer, then to creating the
+// event.
+let answers: { publication: () => Response; flyer: () => Response; checks: () => Response; upload: () => Response | Promise<Response>; create: () => Response }
 const fetch = vi.fn(async (url: string, init: RequestInit) => {
-  if (url !== '/graphql') return answers.publication()
+  if (url.endsWith('/api/ra-publication')) return answers.publication()
+  if (url.endsWith('/api/ra-publication/flyer')) return answers.flyer()
+  if (url === UPLOADER) return answers.upload()
   const { query } = JSON.parse(init.body as string)
   return query.startsWith('mutation createEvent') ? answers.create() : answers.checks()
 })
 const toRa = () => fetch.mock.calls.filter(([url]) => url === '/graphql')
+const uploads = () => fetch.mock.calls.filter(([url]) => url === UPLOADER)
+// The event that was created, as it was sent to RA.
+const created = () => JSON.parse(toRa().find(([, init]) => JSON.parse(init.body as string).query.startsWith('mutation'))![1].body as string).variables.eventInput
+// An answer that never comes, since the request fails.
+const throws = (error: Error) => () => {
+  throw error
+}
 const sentQueries = () => toRa().map(([, init]) => JSON.parse(init.body as string).query as string)
 const creations = () => sentQueries().filter((query) => query.startsWith('mutation'))
 
@@ -64,6 +83,12 @@ function run({ token = TOKEN as string | null, from = SITE as string | null } = 
 }
 
 const panel = () => screen.getByRole('dialog', { name: 'Parking Radio → RA' })
+const withFlyer = () => (answers.publication = () => Response.json({ ...PUBLICATION, hasFlyer: true }))
+// Clicks « Créer sur RA », once it's there, and waits for the event to be created.
+async function createOnRa() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
+  await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
+}
 
 // The page's address, as the environment's options above give it, which vitest's jsdom environment can change, e.g. to
 // RA's site in another language.
@@ -75,9 +100,14 @@ beforeEach(() => {
   fetch.mockClear()
   answers = {
     publication: () => Response.json(PUBLICATION),
+    flyer: jpeg,
     checks: () => Response.json(checks()),
+    upload: () => Response.json({ filename: FILENAME }),
     create: () => Response.json({ data: { createEvent: { id: '2400123' } } }),
   }
+  // The flyer's preview's address, which jsdom doesn't make.
+  URL.createObjectURL = vi.fn(() => 'blob:https://ra.co/flyer')
+  URL.revokeObjectURL = vi.fn()
   document.cookie = 'next_id_token=the-token'
 })
 
@@ -103,6 +133,7 @@ describe('The bookmarklet', () => {
     expect(panel()).toHaveTextContent('Line-upAurore Brume')
     expect(panel()).toHaveTextContent('Liens promotionnelsparking.radio : https://parking.radio instagram : https://www.instagram.com/parking.radio')
     expect(panel()).toHaveTextContent('Liens médiahttps://www.youtube.com/@parkingdotradio https://soundcloud.com/parkingdotradio')
+    expect(panel()).toHaveTextContent('FlyerPas de flyer')
     expect(panel()).not.toHaveTextContent('Attention')
     // The event, from the site it was loaded from, with the token in a header, without cookies, once the token is no
     // longer in the address.
@@ -114,13 +145,15 @@ describe('The bookmarklet', () => {
     expect(url).toBe('/graphql')
     expect(init).toMatchObject({ method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer the-token' } })
     expect(JSON.parse(init.body as string).variables).toEqual({ venue: '288529' })
+    expect(sentQueries()[0]).not.toContain('ImageInput')
     expect(creations()).toEqual([])
 
     fireEvent.click(screen.getByRole('button', { name: 'Créer sur RA' }))
     const link = await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
     expect(link).toHaveAttribute('href', `${SITE}/admin/sessions/session-1?raEvent=2400123`)
     expect(screen.getByRole('link', { name: 'https://ra.co/events/2400123' })).toHaveAttribute('href', 'https://ra.co/events/2400123')
-    expect(panel()).toHaveTextContent('Ajoutez le flyer à la main')
+    expect(panel()).toHaveTextContent('Ajoutez le flyer à la main, sur la page de l’événement sur RA.')
+    expect(uploads()).toEqual([])
     expect(toRa()).toHaveLength(2)
     expect(JSON.parse(toRa()[1][1].body as string)).toEqual({
       query: 'mutation createEvent($eventInput: EventInput) { createEvent(eventInput: $eventInput) { id } }',
@@ -246,9 +279,7 @@ describe('The bookmarklet', () => {
   })
 
   it("says when the site can't be reached, or fails", async () => {
-    answers.publication = () => {
-      throw new TypeError('Failed to fetch')
-    }
+    answers.publication = throws(new TypeError('Failed to fetch'))
     run()
     expect(await screen.findByText(`${SITE} n’a pas pu être joint.`)).toBeInTheDocument()
 
@@ -278,5 +309,120 @@ describe('The bookmarklet', () => {
     expect(screen.getByText('Ce favori n’a pas pu savoir de quel site il vient.')).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
     delete (document as { currentScript?: unknown }).currentScript
+  })
+
+  it('gets the flyer from its site, shows it, uploads it to RA once confirmed, then creates the event with it', async () => {
+    withFlyer()
+    run()
+    const image = await screen.findByRole('img', { name: 'Flyer' })
+    // From what the site sent, with the token, as for the event.
+    expect(fetch.mock.calls[1]).toEqual([`${SITE}/api/ra-publication/flyer`, { headers: { Authorization: `Bearer ${TOKEN}` }, credentials: 'omit', cache: 'no-store' }])
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(FLYER)
+    expect(image).toHaveAttribute('src', 'blob:https://ra.co/flyer')
+    fireEvent.load(image)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://ra.co/flyer')
+    // RA is asked whether it still takes the flyer's fields too.
+    expect(sentQueries()[0]).toContain('__type(name: "ImageInput")')
+    expect(uploads()).toEqual([])
+
+    await createOnRa()
+    expect(uploads()).toHaveLength(1)
+    const [, init] = uploads()[0]
+    expect(init).toMatchObject({ method: 'POST', credentials: 'omit', headers: { Authorization: 'Bearer the-token' } })
+    expect(init.signal).toBeInstanceOf(AbortSignal)
+    const sent = (init.body as FormData).get('data') as File
+    expect(new Uint8Array(await sent.arrayBuffer())).toEqual(FLYER)
+    expect(created()).toEqual({ ...EVENT_INPUT, images: [{ filename: FILENAME, type: 'FLYERFRONT' }] })
+    expect(panel()).not.toHaveTextContent('Ajoutez')
+  })
+
+  it.each<[string, () => Response]>([
+    ['RA a répondu 413', () => new Response('Too large', { status: 413 })],
+    ['RA n’a pas répondu comme prévu', () => Response.json({ filename: '' })],
+    ['RA n’a pas pu être joint', throws(new TypeError('Failed to fetch'))],
+    ['RA n’a pas répondu à temps', throws(new DOMException('The operation timed out.', 'TimeoutError'))],
+  ])('creates the event without the flyer when RA does not take it, and says to add it by hand: %s', async (why, upload) => {
+    withFlyer()
+    answers.upload = upload
+    run()
+    await createOnRa()
+    expect(created()).toEqual(EVENT_INPUT)
+    expect(panel()).toHaveTextContent(`Le flyer n’a pas pu être envoyé à RA : ${why}. Ajoutez-le à la main, sur la page de l’événement sur RA.`)
+  })
+
+  it.each<[string, () => Response]>([
+    ['The flyer of this session is missing', () => Response.json({ ok: false, error: 'The flyer of this session is missing' }, { status: 404 })],
+    [`${SITE} a répondu 502`, () => new Response('Bad gateway', { status: 502 })],
+    [`${SITE} n’a pas envoyé d’image JPEG`, () => new Response('<html>', { headers: { 'Content-Type': 'text/html' } })],
+    [`${SITE} n’a pas pu être joint`, throws(new TypeError('Failed to fetch'))],
+  ])("says when the flyer can't be had from the site, and creates the event without it: %s", async (why, flyer) => {
+    withFlyer()
+    answers.flyer = flyer
+    run()
+    expect(await screen.findByText(`Le flyer n’a pas pu être chargé : ${why}. L’événement sera créé sans flyer : ajoutez-le à la main sur RA.`)).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(sentQueries()[0]).not.toContain('ImageInput')
+    await createOnRa()
+    expect(uploads()).toEqual([])
+    expect(created()).toEqual(EVENT_INPUT)
+    expect(panel()).toHaveTextContent('Ajoutez le flyer à la main, sur la page de l’événement sur RA.')
+  })
+
+  it("says when the flyer can't be shown on RA's page, which still sends it", async () => {
+    withFlyer()
+    run()
+    fireEvent.error(await screen.findByRole('img', { name: 'Flyer' }))
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(panel()).toHaveTextContent('Aperçu impossible ici, mais le flyer sera tout de même envoyé.')
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://ra.co/flyer')
+    await createOnRa()
+    expect(created().images).toEqual([{ filename: FILENAME, type: 'FLYERFRONT' }])
+  })
+
+  it('says that RA changed when RA no longer takes the flyer, only when it sends one', async () => {
+    const inputFields = FIELDS.filter(({ name }) => name !== 'images')
+    answers.checks = () => Response.json(checks({ input: { inputFields }, image: { inputFields: [...IMAGE_FIELDS, field('width', 'NON_NULL')] } }))
+    withFlyer()
+    run()
+    expect(await screen.findByText('RA a changé : le champ images n’existe plus, le champ images.width est requis.')).toBeInTheDocument()
+
+    document.body.replaceChildren()
+    answers.checks = () => Response.json(checks({ image: { inputFields: IMAGE_FIELDS.filter(({ name }) => name !== 'type') } }))
+    run()
+    expect(await screen.findByText('RA a changé : le champ images.type n’existe plus.')).toBeInTheDocument()
+    expect(creations()).toEqual([])
+    expect(uploads()).toEqual([])
+
+    // Without a flyer, RA doesn't need to take one.
+    document.body.replaceChildren()
+    answers.publication = () => Response.json(PUBLICATION)
+    answers.checks = () => Response.json(checks({ input: { inputFields }, image: null }))
+    run()
+    await createOnRa()
+    expect(created()).toEqual(EVENT_INPUT)
+  })
+
+  it('leaves the panel as it is when clicked again while it creates the event, so that it creates it only once', async () => {
+    withFlyer()
+    // An upload that only ends when the test says.
+    let uploaded: (answer: Response) => void = () => {}
+    answers.upload = () => new Promise((resolve) => (uploaded = resolve))
+    run()
+    fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
+    await vi.waitFor(() => expect(uploads()).toHaveLength(1))
+    const busy = panel()
+    new Function(SCRIPT)()
+    expect(panel()).toBe(busy)
+    expect(busy).toHaveTextContent('Envoi du flyer…')
+    expect(screen.queryByText(/^Aucun événement à créer/)).not.toBeInTheDocument()
+
+    uploaded(Response.json({ filename: FILENAME }))
+    await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
+    expect(creations()).toHaveLength(1)
+    // Once it's done, clicking the bookmarklet again replaces the panel.
+    new Function(SCRIPT)()
+    expect(panel()).not.toBe(busy)
+    expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
   })
 })

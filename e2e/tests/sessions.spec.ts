@@ -759,6 +759,7 @@ test("a session's event on RA is published from the panel under its « Événeme
   expect(await publication.json()).toMatchObject({
     environment: 'development',
     session: id,
+    hasFlyer: false,
     event: { title: `E2E ${unique}`, startTime: `${day}T21:00:00.000`, lineup: `E2E ${unique}`, content: 'Une soirée.' },
   })
 
