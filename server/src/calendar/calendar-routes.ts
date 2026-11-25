@@ -22,7 +22,7 @@ import { unprotectedSessions } from './protected-time.js'
 const FIRST_DAY = '2000-01-01'
 const LAST_DAY = '2999-12-31'
 const MAX_DAYS = 400
-// The conflicts are those of the days from today.
+// The conflicts and the sessions outside protected time are those of the days from today.
 const CONFLICT_DAYS = 365
 
 // A day of the calendar, `from` or `to`, which are days, unlike the instants of the lists of sessions and of events.
@@ -75,7 +75,7 @@ const Conflict = z
 
 const CalendarResponse = z.object({
   ok: z.literal(true),
-  today: Day.meta({ description: 'The day the conflicts are counted from: today, in Québec' }),
+  today: Day.meta({ description: 'The day the conflicts and the sessions outside protected time are counted from: today, in Québec' }),
   feeds: z.array(Feed).meta({ description: 'Every feed, in the order they were added, with when each was last read, and why that failed' }),
   sessions: z.array(SessionBody).meta({ description: 'The sessions with a start that take some of the days, whatever their status, by start' }),
   occupations: z.array(Occupation).meta({ description: 'The occupations that take some of the days, by start, then end' }),

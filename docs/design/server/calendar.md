@@ -26,9 +26,9 @@ events are occupations, known by the feed's name, or `"holds"`, whose events are
 The titles of an `occupations` feed's events reach the admin pages, the apps connected to the site, and the calendar
 apps that admins subscribe to the occupations in, through their calendar of occupations (see
 [Admins' calendars](admin-calendars.md)), e.g. Google's or Apple's, whose servers then keep them: so a calendar whose
-titles have personal data, e.g. guests' names, shouldn't be an `occupations` feed, whether it's added as one or changed
-into one, which gives its titles from then on, since changing a feed's kind doesn't read it again (see
-[Reading the feeds](#reading-the-feeds)). The titles of a `holds` feed's events are never given.
+titles have personal data, e.g. guests' names, shouldn't be an `occupations` feed: neither added as one, nor changed
+into one, which gives what was already read from it, titles included (see [Reading the feeds](#reading-the-feeds)). The
+titles of a `holds` feed's events are never given.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a
@@ -166,9 +166,8 @@ days from `today` (see [Conflicts](#conflicts)), and that:
 - and aren't within protected time from their start, or from when the calendar is asked for if that's later, to their
   end: a session that's going on is only judged on what's left of it.
 
-While there's no `holds` feed, there are none. Holds are what the `holds` feeds' last reads gave, like occupations (see
-[The calendar](#the-calendar)): a `holds` feed whose last read failed still gives what it read before, and one that
-hasn't been read yet gives none, so that sessions can be outside protected time until it is.
+While there's no `holds` feed, there are none. A `holds` feed that hasn't been read yet gives no holds (see
+[The calendar](#the-calendar)), so that every session can be outside protected time until it is.
 
 Each session outside protected time has the session's `id`, `title`, `start` and `end`. They're by start.
 
@@ -191,7 +190,7 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | Response field | Type | |
 |---|---|---|
 | `ok` | `true` | |
-| `today` | string | Today in Québec, `YYYY-MM-DD`, which the conflicts are counted from |
+| `today` | string | Today in Québec, `YYYY-MM-DD`, which the conflicts and the sessions outside protected time are counted from |
 | `feeds` | list of feeds | Every feed, as [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them |
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |
@@ -252,8 +251,8 @@ Changes the fields of a feed it's sent, and leaves the others as they are (see
 
 When it's sent another link than the feed's, where a `webcal` link is the same as its `https` one, it reads that link
 first, as `POST /api/admin/calendar/feeds` does, and only changes the feed if that gives a calendar: that read is then
-the feed's, in place of what was read from its former link. Otherwise it doesn't read the feed: when its kind changes,
-what was read from it counts as its new kind's from then on (see [Reading the feeds](#reading-the-feeds)).
+the feed's, in place of what was read from its former link. Otherwise it doesn't read the feed (see
+[Reading the feeds](#reading-the-feeds)).
 
 Responds `{"ok": true, "feed": <the feed as it is then>}`. Fails with 400 when there's no field, or a field doesn't
 follow its rules, 404 when there's no such feed, or it's removed while its link is read, 409 when another feed has the

@@ -217,7 +217,11 @@ describe('GET /api/admin/calendar', () => {
 
   it("gives the holds of the `holds` feeds that take some of the days, without their titles, which are neither occupations nor in conflicts", async () => {
     listed = [...FEEDS, ...HOLDS_FEEDS]
-    rows = [session('in-hold', '2026-11-28T01:00:00Z', 120)]
+    rows = [
+      session('in-hold', '2026-11-28T01:00:00Z', 120),
+      // From 14:00 to 15:00 on November 28, which only the feed whose last read failed protects.
+      session('in-failed-feed', '2026-11-28T19:00:00Z', 60),
+    ]
     kept.set(TEAM, { events: [event('2026-11-28T00:00:00Z', '2026-11-28T02:00:00Z', 'Réparation')], readAt: NOW, error: null })
     kept.set(LOFT, {
       events: [
@@ -247,6 +251,8 @@ describe('GET /api/admin/calendar', () => {
     expect(body.occupations.map(({ feedId }: { feedId: string }) => feedId)).toEqual([TEAM])
     // Only the session and the repair conflict: holds overlap them, and each other, without conflicting.
     expect(body.conflicts.map(({ things }: { things: { kind: string }[] }) => things.map(({ kind }) => kind))).toEqual([['occupation', 'session']])
+    // What the feed whose last read failed read before still protects sessions.
+    expect(body.unprotectedSessions).toEqual([])
     expect(JSON.stringify(body)).not.toContain('Nuit bloquée')
     expect(JSON.stringify(body)).not.toContain('Jean Tremblay')
   })

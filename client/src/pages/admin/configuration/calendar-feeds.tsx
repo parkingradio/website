@@ -28,9 +28,8 @@ export function CalendarFeeds() {
     <>
       <p>
         Ce qui occupe le studio en dehors des sessions est lu dans des calendriers externes, au format iCal, de type
-        «&nbsp;Occupations&nbsp;», chaque occupation sous le nom de son calendrier. Le temps que les autres calendriers du
-        studio gardent pour les sessions est lu dans ceux de type «&nbsp;Plages protégées&nbsp;». Le serveur lit ces
-        calendriers toutes les 15 minutes.
+        «&nbsp;Occupations&nbsp;», chaque occupation sous le nom de son calendrier. Le temps protégé pour les sessions est
+        lu dans ceux de type «&nbsp;Plages protégées&nbsp;». Le serveur lit ces calendriers toutes les 15 minutes.
       </p>
       {loaded.kind === 'error' && (
         <p className="admin-error" role="alert">
@@ -247,7 +246,7 @@ function KindField({ kind, onChange }: { kind: FeedKind | null; onChange: (kind:
       <div className="admin-choices">
         {FEED_KINDS.map((value) => (
           <label key={value}>
-            <input type="radio" name={name} checked={kind === value} onChange={() => onChange(value)} required />
+            <input type="radio" name={name} checked={kind === value} onChange={() => onChange(value)} />
             {FEED_KIND_LABELS[value]}
           </label>
         ))}

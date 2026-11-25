@@ -11200,7 +11200,7 @@
                     "today": {
                       "type": "string",
                       "format": "date",
-                      "description": "The day the conflicts are counted from: today, in Québec"
+                      "description": "The day the conflicts and the sessions outside protected time are counted from: today, in Québec"
                     },
                     "feeds": {
                       "type": "array",
