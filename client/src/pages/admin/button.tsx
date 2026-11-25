@@ -53,8 +53,8 @@ export function Button({
       setPinned(false)
     }
     // Tapping something else hides it, since tapping a button doesn't focus it in every browser. A tap on the button or
-    // its tooltip is left to its click, once the tap is over: the button's toggles it, and the tooltip's hides it, rather
-    // than as the tap starts, which would let the tap land on what was under it.
+    // its tooltip is left to its click: the button's toggles it, and the tooltip's hides it once the tap is over, since
+    // hiding it as the tap starts would let the tap land on what's under it.
     const onPointerDown = (event: Event) => {
       if (!anchor.current!.contains(event.target as Node)) setPinned(false)
     }
