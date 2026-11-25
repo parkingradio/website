@@ -12,7 +12,10 @@ beforeAll(() => import('./admin-pages'))
 
 // Today is Thursday, November 19, 2026, in Québec.
 const NOW = new Date('2026-11-19T12:00:00-05:00')
-const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
+// The admin, and the token of the links to their calendars, which "S'abonner" reads once the page opens.
+const TOKEN = 'a'.repeat(64)
+const TOKEN_URL = '/api/admin/ics-subscription-token'
+const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' }, [TOKEN_URL]: { ok: true, token: TOKEN } }
 const NOVEMBER = '/api/admin/calendar?from=2026-11-01&to=2026-12-05'
 const DECEMBER = '/api/admin/calendar?from=2026-11-29&to=2027-01-02'
 const OCTOBER = '/api/admin/calendar?from=2026-09-27&to=2026-10-31'
@@ -1171,5 +1174,86 @@ describe('Calendrier', () => {
       expect(cellText('2026-11-26')).toBe("26+dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
     })
+  })
+})
+
+describe("Calendrier's S'abonner", () => {
+  const section = () => screen.getByRole('region', { name: "S'abonner" })
+  // A calendar's link, and what it links to.
+  const link = (noun: string) => within(section()).getByRole('link', { name: `s'abonner aux ${noun}` })
+  const webcal = (noun: string, token: string) => `webcal://${location.host}/${noun}.ics?token=${token}`
+  // Once the page, and its links, are loaded.
+  const subscribed = () => screen.findByRole('link', { name: "s'abonner aux sessions" })
+  const regenerate = () => within(section()).getByRole('button', { name: 'régénérer les liens' })
+  const NEW_TOKEN = 'b'.repeat(64)
+
+  it("links to each calendar's webcal link, in whichever view, read once", async () => {
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [LIST]: LIST_CALENDAR })
+    renderAt('/admin/calendrier?view=list')
+
+    await subscribed()
+    expect(link('sessions')).toHaveAttribute('href', webcal('sessions', TOKEN))
+    expect(link('occupations')).toHaveAttribute('href', webcal('occupations', TOKEN))
+    // The links aren't written out.
+    expect(section()).not.toHaveTextContent(TOKEN)
+
+    // Not read again when the view changes.
+    fireEvent.click(screen.getByRole('button', { name: 'mois' }))
+    await loaded()
+    expect(link('sessions')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'liste' }))
+    expect(link('sessions')).toBeInTheDocument()
+    expect(requestsTo('GET', TOKEN_URL)).toHaveLength(1)
+  })
+
+  it('regenerates the links once the admin confirms, greyed out meanwhile', async () => {
+    const answer = held()
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [`POST ${TOKEN_URL}`]: answer.body })
+    renderAt('/admin/calendrier')
+    await subscribed()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+
+    fireEvent.click(regenerate())
+    expect(confirm).toHaveBeenCalledWith('Régénérer vos liens ? Les calendriers abonnés avec les liens actuels ne seront plus mis à jour.')
+    expect(requestsTo('POST', TOKEN_URL)).toHaveLength(0)
+
+    fireEvent.click(regenerate())
+    await waitFor(() => expect(regenerate()).toHaveAttribute('aria-disabled', 'true'))
+    await answer.answer({ ok: true, token: NEW_TOKEN })
+    expect(requestsTo('POST', TOKEN_URL)).toHaveLength(1)
+    expect(regenerate()).not.toHaveAttribute('aria-disabled')
+    expect(link('sessions')).toHaveAttribute('href', webcal('sessions', NEW_TOKEN))
+    expect(within(section()).getByRole('status')).toHaveTextContent(
+      'Liens régénérés : abonnez-vous avec les nouveaux liens, puis retirez les anciens calendriers de votre application.',
+    )
+  })
+
+  it("says why the links couldn't be regenerated, keeping those it had", async () => {
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [`POST ${TOKEN_URL}`]: { ok: false, error: 'Internal server error' } })
+    renderAt('/admin/calendrier')
+    await subscribed()
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+
+    fireEvent.click(regenerate())
+    expect(await within(section()).findByRole('alert')).toHaveTextContent("Les liens n'ont pas pu être régénérés : Internal server error")
+    expect(link('sessions')).toHaveAttribute('href', webcal('sessions', TOKEN))
+  })
+
+  it("says why the links couldn't be loaded, without them, and can't regenerate them", async () => {
+    const answer = held()
+    mockFetch({ ...LOGGED_IN, [TOKEN_URL]: answer.body, [NOVEMBER]: CALENDAR })
+    renderAt('/admin/calendrier')
+    await loaded()
+    // Until they're loaded, each calendar only has its name and what it has.
+    expect(within(section()).getByText('Sessions')).toBeInTheDocument()
+    expect(within(section()).queryByRole('link')).toBeNull()
+    expect(regenerate()).toHaveAttribute('aria-disabled', 'true')
+
+    await answer.answer({ ok: false, error: 'Internal server error' })
+    expect(within(section()).getByRole('alert')).toHaveTextContent("Les liens n'ont pas pu être chargés : Internal server error")
+    expect(within(section()).queryByRole('link')).toBeNull()
+    const confirm = vi.spyOn(window, 'confirm')
+    fireEvent.click(regenerate())
+    expect(confirm).not.toHaveBeenCalled()
   })
 })

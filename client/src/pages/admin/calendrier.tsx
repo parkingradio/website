@@ -8,6 +8,7 @@ import { SESSION_STATUS_LABELS, formatMonth } from './describe'
 import { useQueryParams } from './list'
 import { ChosenDay } from './calendrier/day'
 import { NewSessionForm } from './calendrier/new-session'
+import { Subscribe } from './calendrier/subscribe'
 import { Issues } from './calendrier/issues'
 import { List } from './calendrier/list'
 import { Month } from './calendrier/month'
@@ -291,6 +292,7 @@ export function Calendrier() {
           )}
         </ChosenDay>
       )}
+      <Subscribe />
     </>
   )
 }

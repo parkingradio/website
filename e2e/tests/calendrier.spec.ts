@@ -316,3 +316,20 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
   await expect(page.getByRole('form', { name: 'Nouvelle session' })).toBeVisible()
   expect(await scrollsSideways(page)).toBe(false)
 })
+
+// Only reads the admin's links: "régénérer les liens" would replace them under the other tests, and Calendrier's unit
+// tests and the server's integration tests cover it.
+test("S'abonner links to the admin's own calendars", async ({ page, baseURL }) => {
+  await logIn(page, { at: '/admin/calendrier' })
+  const section = page.getByRole('region', { name: "S'abonner" })
+  for (const noun of ['sessions', 'occupations']) {
+    const link = new URL((await section.getByRole('link', { name: `s'abonner aux ${noun}` }).getAttribute('href'))!)
+    expect([link.protocol, link.host, link.pathname]).toEqual(['webcal:', new URL(baseURL!).host, `/${noun}.ics`])
+    // The calendar it stands for, which has the seed's sessions, announced or not.
+    const calendar = await page.request.get(`/${noun}.ics${link.search}`)
+    expect(calendar.status()).toBe(200)
+    const body = await calendar.text()
+    expect(body).toContain(`X-WR-CALNAME:Parking Radio (development) · ${noun}`)
+    if (noun === 'sessions') expect(body).toContain('SUMMARY:[UNANNOUNCED] ')
+  }
+})
