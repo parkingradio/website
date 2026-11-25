@@ -94,6 +94,9 @@ function isCrossOrigin(request: FastifyRequest): boolean {
   }
 }
 
+// What admin requests without a session get (see "Admin endpoints" in docs/design/server/README.md).
+export const UNAUTHORIZED: ApiError = { ok: false, error: 'Unauthorized' }
+
 // Refuses requests without an admin's session, and those from another origin's page. Routes with zod schemas get it with
 // `config: { admin: true }` (see api/schemas.ts). It returns the reply when it refuses a request, so that Fastify waits
 // for it to be sent.
@@ -106,7 +109,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   const session = token ? await verifySessionToken(token) : null
   // The session also has to be one that hasn't ended since, by its admin being revoked or choosing a new password.
   if (!session || (await request.server.adminSessions.sessionVersion(session.id)) !== session.sessionVersion) {
-    return reply.code(401).send({ ok: false, error: 'Unauthorized' } satisfies ApiError)
+    return reply.code(401).send(UNAUTHORIZED)
   }
   request.user = { id: session.id, email: session.email }
 }

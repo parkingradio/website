@@ -31,11 +31,6 @@ export function instructions(environment: string): string {
   return `${where} ${INSTRUCTIONS}`
 }
 
-// The server's name, which says which environment it is, outside production.
-export function serverName(environment: string): string {
-  return environment === 'production' ? 'Parking Radio' : `Parking Radio (${environment})`
-}
-
 // The areas whose rules `read_documentation` gives, by the name of their design document.
 export const AREAS = ['radio', 'video', 'artists', 'collectives', 'applications', 'sessions', 'events', 'ra-events', 'calendar'] as const
 export type Area = (typeof AREAS)[number]

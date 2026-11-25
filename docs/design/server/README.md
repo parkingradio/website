@@ -2,13 +2,15 @@
 
 The server provides the API under `/api`, which this directory specifies, and the [MCP server](mcp.md) at `/mcp`, which
 apps connect to through [OAuth](oauth.md), the calendar feed of the public events at
-[`/calendar.ics`](events.md#get-calendarics), and serves the client app.
+[`/calendar.ics`](events.md#get-calendarics), the admins' own calendar feeds at [`/sessions.ics`](subscriptions.md) and
+[`/occupations.ics`](subscriptions.md), and serves the client app.
 
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
-  is JSON, except for photos, flyers and the calendar feed ([`GET /calendar.ics`](events.md#get-calendarics)). A body of
-  a type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
+  is JSON, except for photos, flyers and the calendar feeds: [`GET /calendar.ics`](events.md#get-calendarics), and the
+  admins' own, [`GET /sessions.ics` and `GET /occupations.ics`](subscriptions.md). A body of a type the endpoint doesn't
+  take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
   are larger than any endpoint needs, with a 413. One exception: in
   production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
   collective's application with 5 photos.
@@ -93,8 +95,8 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, and those under `/api`, `/mcp`,
-`/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where the build's files are. The
+`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`,
+and those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where the build's files are. The
 app then shows the page for that path. This includes paths that aren't one of the app's pages (a "soft 404", see
 [Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has. Other requests for
 paths that don't exist, whatever their body, and paths that don't exist under `/assets` and `/.well-known`, e.g.
@@ -134,8 +136,9 @@ the request failing.
 
 ## Endpoints
 
-Endpoints are public, admin (see [Conventions](#conventions)), or for apps, which need a connection's token (see
-[Authorization](mcp.md#authorization)).
+Endpoints are public, admin (see [Conventions](#conventions)), for apps, which need a connection's token (see
+[Authorization](mcp.md#authorization)), or for an admin's calendar app, which needs the admin's token in its link (see
+[The token, in Subscriptions](subscriptions.md#the-token)).
 
 | Endpoint | Access | What it's for |
 |---|---|---|
@@ -218,6 +221,10 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
+| [`GET /sessions.ics`](subscriptions.md#get-sessionsics) | token | An admin's calendar feed of the sessions, announced or not, in iCalendar: the upcoming ones and those that started in the past year |
+| [`GET /occupations.ics`](subscriptions.md#get-occupationsics) | token | An admin's calendar feed of the occupations, in iCalendar, once every calendar feed has been read, and of the calendar feeds whose last read failed |
+| [`GET /api/admin/subscription-token`](subscriptions.md#get-apiadminsubscription-token-admin) | admin | The token of the admin's own calendar feeds' links |
+| [`POST /api/admin/subscription-token`](subscriptions.md#post-apiadminsubscription-token-admin) | admin | Replacing that token, which makes the previous links stop working |
 | [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) | admin | What takes the studio over a range of days, sessions and occupations, and the feeds that occupations are read from, with their status, and, whatever the range, the conflicts of the next 365 days and the sessions without a date |
 | [`GET /api/admin/calendar/feeds`](calendar.md#get-apiadmincalendarfeeds-admin) | admin | The calendar feeds that the studio's occupations are read from, with their links, and when each was last read, or why that failed |
 | [`POST /api/admin/calendar/feeds/refresh`](calendar.md#post-apiadmincalendarfeedsrefresh-admin) | admin | Reading every calendar feed now, and the feeds once each read has ended |

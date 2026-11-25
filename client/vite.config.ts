@@ -22,8 +22,10 @@ export default defineConfig({
     proxy: {
       '/healthz': server,
       '/api': server,
-      // The calendar feed of the public events, which calendar apps read from the dev server too.
+      // The calendar feeds, the public events' and admins' own, which calendar apps read from the dev server too.
       '/calendar.ics': server,
+      '/sessions.ics': server,
+      '/occupations.ics': server,
       // The metadata documents of OAuth, which apps read to connect to the dev server, whose address is the issuer, and the
       // MCP server they connect to.
       '/.well-known': server,

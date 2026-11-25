@@ -3,6 +3,9 @@ import { createHash, randomBytes } from 'node:crypto'
 // Random tokens that the server gives out, e.g. in invites, or to the apps admins connect, and keeps only the hashes of,
 // so that its database can't be used to act as whoever has them.
 
+// What every token looks like: 64 hexadecimal digits.
+export const TOKEN_FORMAT = /^[0-9a-f]{64}$/
+
 export function generateToken(): { token: string; tokenHash: string } {
   const token = randomBytes(32).toString('hex')
   return { token, tokenHash: hashToken(token) }

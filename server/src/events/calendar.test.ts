@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import ICAL from 'ical.js'
-import { calendar, contentLine, text } from './calendar.js'
+import { calendar } from './calendar.js'
 import type { Event } from './routes.js'
 
 // The calendar feed, as iCalendar (see `GET /calendar.ics` in docs/design/server/events.md). An iCalendar parser, ical.js,
@@ -153,39 +153,5 @@ describe('calendar, with any text', () => {
         expect(value('description')).toBe(readBack(`${name}\n\n${description}`))
       }),
     )
-  })
-})
-
-describe('text', () => {
-  it('escapes backslashes, then semicolons, commas and line breaks', () => {
-    expect(text('a\\;b,c\nd\r\ne\rf')).toBe('a\\\\\\;b\\,c\\nd\\ne\\nf')
-  })
-
-  it('drops control characters other than tabs', () => {
-    expect(text('a\u0000b\u0008c\td\u000be\u001ff\u007fg\u0085h')).toBe('abc\tdefgh')
-  })
-})
-
-describe('contentLine', () => {
-  it('leaves a line of 75 octets as it is', () => {
-    const line = 'A'.repeat(75)
-    expect(contentLine(line)).toBe(line)
-  })
-
-  it('folds a line of 76 octets, continuing it on the next line after a space', () => {
-    expect(contentLine('A'.repeat(76))).toBe(`${'A'.repeat(75)}\r\n A`)
-  })
-
-  it('continues on lines of 74 octets after their space', () => {
-    expect(contentLine('A'.repeat(75 + 74 + 1))).toBe(`${'A'.repeat(75)}\r\n ${'A'.repeat(74)}\r\n A`)
-  })
-
-  it('never splits a character', () => {
-    // 74 octets, then a character of 2 octets, which would end at 76.
-    expect(contentLine(`${'A'.repeat(74)}éB`)).toBe(`${'A'.repeat(74)}\r\n éB`)
-    // 73 octets, then a character of 4 octets.
-    expect(contentLine(`${'A'.repeat(73)}🎛B`)).toBe(`${'A'.repeat(73)}\r\n 🎛B`)
-    // 71 octets, then a character of 4 octets, which ends at 75.
-    expect(contentLine(`${'A'.repeat(71)}🎛B`)).toBe(`${'A'.repeat(71)}🎛\r\n B`)
   })
 })

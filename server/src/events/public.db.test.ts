@@ -343,10 +343,9 @@ describe('GET /calendar.ics', () => {
 
 describe('EventsStore.feed', () => {
   const now = new Date('2026-11-14T21:00-05:00')
-  const since = new Date('2025-11-14T21:00-05:00')
   const idsOf = (sessions: { id: string }[]) => sessions.map(({ id }) => id)
 
-  it('has the events that start at or after `since`, past and upcoming', async () => {
+  it('has the events that start at most a year before `now`, past and upcoming', async () => {
     await createSession('2025-11-14T20:59-05:00', [], { durationMinutes: 1 })
     const ids = [
       await createSession('2026-11-14T22:00-05:00'),
@@ -354,15 +353,14 @@ describe('EventsStore.feed', () => {
       await createSession('2026-06-01T21:00-04:00'),
     ].map(({ id }) => id)
     await createSession('2026-01-01T21:00-05:00', [], { announced: false })
-    expect(idsOf(await events.feed({ since, now })).toSorted()).toEqual(ids.toSorted())
+    expect(idsOf(await events.feed(now)).toSorted()).toEqual(ids.toSorted())
   })
 
-  it('has an event that started before `since` while it has not ended', async () => {
+  it('has an event that started more than a year before `now` while it has not ended', async () => {
     // Two years long, until January 1st, 2027, at 21:00.
     const { id } = await createSession('2025-01-01T21:00-05:00', [], { durationMinutes: 2 * 365 * 24 * 60 })
-    expect(idsOf(await events.feed({ since, now }))).toEqual([id])
-    const later = new Date('2027-02-01T00:00-05:00')
-    expect(idsOf(await events.feed({ since: new Date('2026-02-01T00:00-05:00'), now: later }))).toEqual([])
+    expect(idsOf(await events.feed(now))).toEqual([id])
+    expect(idsOf(await events.feed(new Date('2027-02-01T00:00-05:00')))).toEqual([])
   })
 })
 

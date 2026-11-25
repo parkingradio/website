@@ -1,4 +1,4 @@
-import { and, eq, exists, gte, lt, not, or, sql } from 'drizzle-orm'
+import { and, eq, exists, gte, isNotNull, lt, not, or, sql } from 'drizzle-orm'
 import type { AnyColumn, SQL } from 'drizzle-orm'
 import { RECENT_PAST_EVENTS } from '../api/formats.js'
 import { keyNamed } from '../artists/keys.js'
@@ -16,6 +16,14 @@ const isEvent = eq(sessions.announced, true)
 // Whether an event's end has passed at `now`. An event always has a start, and it's past from its end on, which its period
 // excludes.
 const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
+
+// Whether a session is one of a calendar feed's at `now`, the public events' or admins' own: it has a start, and it starts
+// at most a year before `now`, or its end hasn't passed then.
+export function inFeed(now: Date): SQL {
+  const since = new Date(now)
+  since.setUTCFullYear(since.getUTCFullYear() - 1)
+  return and(isNotNull(sessions.startAt), or(gte(sessions.startAt, since), not(hasEnded(now))))!
+}
 
 // Whether the collective whose id is `collectiveId` is public: it has a takeover that's an event.
 export function isPublicCollective(db: Queryable, collectiveId: AnyColumn): SQL {
@@ -51,9 +59,8 @@ export type EventsStore = {
   // when they were added, so that the order doesn't change from one request to the next: the first added first among
   // the upcoming ones, and last among the past ones.
   list(range: { from?: Date; to?: Date; now: Date }): Promise<{ upcoming: StoredSession[]; past: StoredSession[] }>
-  // The events of the calendar feed, in any order: those that start at or after `since`, and those whose end hasn't passed
-  // at `now`.
-  feed(window: { since: Date; now: Date }): Promise<StoredSession[]>
+  // The events of the calendar feed at `now`, in any order (see `inFeed`).
+  feed(now: Date): Promise<StoredSession[]>
   // The key of the flyer named `name` (see `photoName` in artists/keys.ts) that an event has, or null when none has it.
   getFlyer(name: string): Promise<string | null>
 }
@@ -71,9 +78,7 @@ export function eventsStore(db: Queryable): EventsStore {
       return { upcoming: upcoming.toReversed(), past }
     },
 
-    async feed({ since, now }) {
-      return sessionsWhere(db, and(isEvent, or(gte(sessions.startAt, since), not(hasEnded(now)))))
-    },
+    feed: (now) => sessionsWhere(db, and(isEvent, inFeed(now))),
 
     getFlyer: (name) => keyNamed(db, sessions.flyerKey, 'sessions', name, isEvent),
   }
