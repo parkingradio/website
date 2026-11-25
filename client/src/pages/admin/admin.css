@@ -999,7 +999,8 @@ tr[data-dragging] > td {
 
   /* At least 16px, or iOS zooms into the page when it gets focus, with its taller line overflowing too. */
   .admin-status-select,
-  .admin button.admin-status-select {
+  .admin button.admin-status-select,
+  .admin button.admin-status-select[aria-disabled='true']:hover {
     margin-block: calc(-4.5px - 1px - 2px);
     font-size: 16px;
     line-height: 20px;

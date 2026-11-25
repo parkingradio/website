@@ -451,7 +451,6 @@ describe('Announcing a session from the list', () => {
     undated.focus()
     expect(undated).toHaveFocus()
     fireEvent.click(undated)
-    fireEvent.keyDown(undated, { key: 'Enter' })
     expect(undated).toHaveFocus()
     expect(requestsTo('PUT', '/api/admin/sessions/session-2/announced')).toHaveLength(0)
   })
@@ -523,8 +522,10 @@ describe('Announcing a session from the list', () => {
     expect(changed).toHaveValue('false')
 
     mockFetch({ ...LIST, ...UNANNOUNCE_SOIREE })
-    fireEvent.change(await select('SOIRÉE, ven. 2 oct. 2026'), { target: { value: 'false' } })
+    const other = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(other, { target: { value: 'false' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(other).toBeEnabled())
   })
 })
 
