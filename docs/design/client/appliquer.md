@@ -6,7 +6,8 @@ links are reduced to profile names. The form checks the artist's profile and app
 [`POST /api/applications`](../server/applications.md#post-apiapplications) and [Applications](../server/applications.md)),
 for immediate feedback. The server checks them again, and its check is the one that counts: if it refuses what the form
 accepted, the form shows the server's message. On top of those, it sets limits of its own, which the server doesn't
-(admins can bring in applications that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`.
+(admins can bring in applications that don't follow them): they're listed in `client/src/pages/appliquer/choices.ts`,
+and the time slots it offers in `client/src/time-slots.ts`.
 
 The fields of an artist applying alone are (* means mandatory):
 

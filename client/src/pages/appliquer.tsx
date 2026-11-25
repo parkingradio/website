@@ -83,7 +83,7 @@ function sent(form: Form) {
         : { kind, name, country, city, genres: form.genres, bio: form.bio, links, email, phone },
     application: {
       dates: form.dates,
-      // As the times they start and end.
+      // Sent as the times they start and end.
       timeSlots: TIME_SLOTS.filter(({ id }) => form.timeSlots.includes(id)).map(({ start, end }) => ({ start, end })),
       performanceTypes: form.performanceTypes,
       otherPerformanceType: form.otherChecked ? form.otherPerformanceType : '',

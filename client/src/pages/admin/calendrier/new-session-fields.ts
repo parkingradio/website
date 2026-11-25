@@ -20,8 +20,8 @@ function sessionOnDay(day: string, { start, end, type, takeover, name }: NewSess
 }
 
 // Checks the new session on `day`, and returns what the server would be sent, or what's wrong with each field, along with
-// how long the session lasts and whether it ends the next day, once its times are valid, and the time slot that's picked. Equal times are refused, even on
-// the night the clocks go back, when the second one is an hour after the first.
+// how long the session lasts and whether it ends the next day, once its times are valid, and the time slot that's picked,
+// if any. Equal times are refused, even on the night the clocks go back, when the second one is an hour after the first.
 export function checkSessionOnDay(
   day: string,
   values: NewSessionOnDay,
