@@ -722,6 +722,13 @@ dl.admin-record {
   align-self: auto;
 }
 
+/* The programmation's time slots, as buttons side by side, which fill a session's times in. */
+.admin-form .admin-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 /* The hours and minutes of a duration. */
 .admin-form .admin-duration input {
   width: 5rem;

@@ -199,7 +199,8 @@ on its page, which its link on the chosen day leads to. Its fields are:
   « La fin doit être après le début. ». A time the clocks skip is refused, and one they show twice is the first one, or
   for the end, the first one after the start, as in the session form (see [Times, in Sessions](sessions.md#times)).
   Once they're valid, the form says how long the session lasts, e.g. « Dure 4 h. », or « Dure 4 h, jusqu'au
-  lendemain. ».
+  lendemain. ». Above them, the programmation's time slots, as in the session form (see
+  [The session form](sessions.md#the-session-form)), fill both in.
 - "Type", as in the session form (see [The session form](sessions.md#the-session-form)).
 - "Collectif", only for a takeover, as in the session form. When the collectives can't be loaded, the form says so, and
   none can be picked.

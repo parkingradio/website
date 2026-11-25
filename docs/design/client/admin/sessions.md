@@ -194,7 +194,12 @@ bottom, the form has:
   long after the start as the duration the form has, if it has one: the one "Durée" had, e.g. after un-checking "date à
   déterminer", or else the session's as the form opened. The form doesn't check that the session's sets still add up
   to no more than the session once it's shorter: the session's page then warns of it (see
-  [A session's page](#a-sessions-page)). While the session is announced, checking "date à déterminer" shows an error
+  [A session's page](#a-sessions-page)). Under "date à déterminer", the programmation's time slots, the ones artists
+  pick from on Appliquer (see [Appliquer](../appliquer.md)), e.g. "13 h – 17 h", are buttons under "Plages horaires":
+  picking one fills in the start's and the end's times with its own, and the end's date becomes the start's. The fields
+  can still be changed, e.g. for 19 h – 23 h. A slot shows as picked while the start's and the end's times are its own
+  and the end's date is the start's. With "date à déterminer" checked, picking a slot sets "Durée" to its length
+  instead, and none shows as picked. While the session is announced, checking "date à déterminer" shows an error
   right away, which screen readers announce, « Une session annoncée a une date : retirez d'abord son annonce. », and the
   form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio

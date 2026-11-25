@@ -11,7 +11,9 @@ import {
   minutesOf,
   newSetFormValues,
   sessionFormValues,
+  pickedSlot,
   sessionTimes,
+  slotChanges,
   startChanges,
   setFormValues,
   newSetDuration,
@@ -20,6 +22,7 @@ import {
   setsMinutes,
 } from './session-fields'
 import type { Session, SessionFormValues, SetFormValues, StudioSet } from './session-fields'
+import { TIME_SLOTS } from './time-slots'
 
 // The client's copies of the server's rules for sessions and sets, which must agree with them (see
 // server/src/sessions/fields.test.ts), and how the forms' times of day become what the server takes.
@@ -228,6 +231,36 @@ describe('startChanges', () => {
     // A session that's changed keeps lasting as long as it did when its form opened.
     const opened = { ...sessionFormValues(session('2026-11-15T02:00:00.000Z', 240)), end: '' }
     expect(startChanges(opened, { start: '22:00' })).toEqual({ start: '22:00', endDay: '2026-11-15', end: '02:00' })
+  })
+})
+
+describe("the programmation's time slots", () => {
+  const form = (changes: Partial<SessionFormValues>): SessionFormValues => ({ ...EMPTY_SESSION_FORM, ...changes })
+  const slot = TIME_SLOTS[1]
+
+  it("fill the start's and the end's times in, with the end on the start's day, or empty while the start has none", () => {
+    const overnight = form({ day: '2026-11-14', lastDay: '2026-11-14', start: '21:00', endDay: '2026-11-15', end: '01:00' })
+    expect(slotChanges(overnight, slot)).toEqual({ start: '13:00', end: '17:00', endDay: '2026-11-14' })
+    const noDay = form({ lastDay: '2026-11-14', endDay: '2026-11-15' })
+    const picked = { ...noDay, ...slotChanges(noDay, slot) }
+    expect(picked).toMatchObject({ start: '13:00', endDay: '', end: '17:00' })
+    // The end then takes the start's day once it has one.
+    expect(startChanges(picked, { day: '2026-11-21' })).toMatchObject({ endDay: '2026-11-21' })
+  })
+
+  it("set only the duration, to their length, while the session's date isn't known", () => {
+    const undated = form({ undated: true, day: '2026-11-14', start: '21:00', endDay: '2026-11-15', end: '01:00' })
+    expect(slotChanges(undated, slot)).toEqual({ duration: { hours: '4', minutes: '0' } })
+  })
+
+  it("show the one whose times are the start's and the end's, with the end on the start's day, as picked", () => {
+    const picked = form({ day: '2026-11-14', start: '18:00', endDay: '2026-11-14', end: '22:00' })
+    expect(pickedSlot(picked)).toBe('18-22')
+    // Before the start has a day, too.
+    expect(pickedSlot({ ...picked, day: '', endDay: '' })).toBe('18-22')
+    expect(pickedSlot({ ...picked, endDay: '2026-11-15' })).toBeNull()
+    expect(pickedSlot({ ...picked, end: '23:00' })).toBeNull()
+    expect(pickedSlot({ ...picked, undated: true })).toBeNull()
   })
 })
 

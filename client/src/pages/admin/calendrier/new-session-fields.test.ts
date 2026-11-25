@@ -12,10 +12,15 @@ describe('a new session on a day', () => {
     expect(on('2026-11-21', '19:00', '23:00')).toMatchObject({ fields: { start: '2026-11-21T19:00-05:00', durationMinutes: 240 }, durationMinutes: 240, endsNextDay: false })
     expect(on('2026-11-21', '21:00', '01:00')).toMatchObject({ fields: { start: '2026-11-21T21:00-05:00', durationMinutes: 240 }, durationMinutes: 240, endsNextDay: true })
     // Equal times are refused, as the session form refuses them.
-    expect(on('2026-11-21', '21:00', '21:00')).toEqual({ errors: { end: 'La fin doit être après le début.' }, durationMinutes: null, endsNextDay: false })
-    expect(on('2026-11-21', '', '')).toEqual({ errors: { start: "Indiquez l'heure de début.", end: "Indiquez l'heure de fin." }, durationMinutes: null, endsNextDay: false })
+    expect(on('2026-11-21', '21:00', '21:00')).toEqual({ errors: { end: 'La fin doit être après le début.' }, durationMinutes: null, endsNextDay: false, slot: null })
+    expect(on('2026-11-21', '', '')).toEqual({ errors: { start: "Indiquez l'heure de début.", end: "Indiquez l'heure de fin." }, durationMinutes: null, endsNextDay: false, slot: null })
     // How long it lasts once its times are valid, whatever else is wrong.
     expect(on('2026-11-21', '21:00', '01:00', { type: null })).toMatchObject({ durationMinutes: 240, endsNextDay: true })
+  })
+
+  it('picks the time slot whose times are its own', () => {
+    expect(on('2026-11-21', '18:00', '22:00').slot).toBe('18-22')
+    expect(on('2026-11-21', '18:00', '23:00').slot).toBeNull()
   })
 
   it('follows the clocks', () => {

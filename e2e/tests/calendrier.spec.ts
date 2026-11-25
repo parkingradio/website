@@ -101,7 +101,7 @@ test('a session is in its month, and on its day, where a new session is added', 
   const chosen = chosenDay(page, day)
   await expect(chosen.getByRole('listitem')).toHaveText([`session21 h – 1 hE2E ${unique}`])
 
-  // Its "+", after it, opens the form for a new session on it, with the focus on its heading, then its start.
+  // Its "+", after it, opens the form for a new session on it, with the focus on its heading, then the time slots.
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: `nouvelle session le ${longDay(day)}` })).toBeFocused()
   await page.keyboard.press('Enter')
@@ -110,12 +110,19 @@ test('a session is in its month, and on its day, where a new session is added', 
   await page.keyboard.press('Tab')
   const start = form.getByRole('group', { name: 'Début', exact: true })
   const end = form.getByRole('group', { name: 'Fin', exact: true })
-  await expect(start.getByRole('spinbutton').first()).toBeFocused()
+  const slots = form.getByRole('group', { name: 'Plages horaires' })
+  await expect(slots.getByRole('button', { name: '11 h – 15 h' })).toBeFocused()
+  // A time slot fills its times in, which can still be typed over.
+  await slots.getByRole('button', { name: '13 h – 17 h' }).click()
+  await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(start).toHaveText('\u206613 h 00\u2069')
+  await expect(end).toHaveText('\u206617 h 00\u2069')
   // In the 24-hour format, whatever the browser's settings, between marks that keep it left to right.
   await fillTime(start, '18:00')
   await fillTime(end, '22:00')
   await expect(start).toHaveText('\u206618 h 00\u2069')
   await expect(end).toHaveText('\u206622 h 00\u2069')
+  await expect(slots.getByRole('button', { name: '18 h – 22 h' })).toHaveAttribute('aria-pressed', 'true')
   await form.getByRole('radio', { name: 'Autre' }).check()
   await form.getByLabel('Nom').fill(`E2E NEW ${unique}`)
   // The server refuses it while it overlaps the other session, which it names.

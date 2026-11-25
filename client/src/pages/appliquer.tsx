@@ -8,8 +8,9 @@ import type { ApplicantErrors, ApplicantKind } from '../applicant'
 import { EMAIL_MAX_LENGTH, LINK_SITES, NAME_MAX_LENGTH, PHONE_MAX_LENGTH, parseLink, pickedPhotoError } from '../artist-profile'
 import type { LinkSiteId } from '../artist-profile'
 import { useTurnstileSiteKey } from '../config-context'
-import { MAX_MEMBERS, SLOT_HOURS, TIME_SLOTS, performanceTypesError, selectableDates } from './appliquer/choices'
-import type { TimeSlotId } from './appliquer/choices'
+import { TIME_SLOTS } from '../time-slots'
+import type { TimeSlotId } from '../time-slots'
+import { MAX_MEMBERS, SLOT_HOURS, performanceTypesError, selectableDates } from './appliquer/choices'
 import { DatePicker } from './appliquer/date-picker'
 import { emptyMember } from './appliquer/members'
 import type { Member, MemberErrors } from './appliquer/members'
@@ -82,6 +83,7 @@ function sent(form: Form) {
         : { kind, name, country, city, genres: form.genres, bio: form.bio, links, email, phone },
     application: {
       dates: form.dates,
+      // As the times they start and end.
       timeSlots: TIME_SLOTS.filter(({ id }) => form.timeSlots.includes(id)).map(({ start, end }) => ({ start, end })),
       performanceTypes: form.performanceTypes,
       otherPerformanceType: form.otherChecked ? form.otherPerformanceType : '',

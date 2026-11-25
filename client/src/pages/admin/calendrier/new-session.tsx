@@ -7,7 +7,7 @@ import { FieldError, FormActions, TimeInput } from '../fields'
 import { CollectivesFailure } from '../profile-details'
 import type { Session } from '../../../session-fields'
 import { failure } from '../session-errors'
-import { NameField, TakeoverField, TypeField } from '../session-form'
+import { NameField, SlotChoices, TakeoverField, TypeField } from '../session-form'
 import { checkSessionOnDay } from './new-session-fields'
 import type { NewSessionOnDay } from './new-session-fields'
 
@@ -52,6 +52,7 @@ export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSes
         Nouvelle session
       </h3>
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
+      <SlotChoices picked={checked.slot} onPick={({ start, end }) => update({ start, end })} />
       <div className="admin-row admin-times">
         <div className="admin-field">
           <TimeInput label="Début" value={values.start} invalid={!!startError} onChange={(start) => update({ start })} onBlur={leave('start', 'day')} />

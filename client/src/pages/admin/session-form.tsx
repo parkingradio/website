@@ -15,13 +15,18 @@ import {
   checkSession,
   durationOf,
   isCollectivesApplication,
+  pickedSlot,
   sessionTimes,
+  slotChanges,
   startChanges,
   typeName,
 } from '../../session-fields'
 import type { ListedSet, RaEventLink, Reference, SessionFields, SessionFormValues, SessionType } from '../../session-fields'
 import { raEventId } from '../../session-links'
+import { TIME_SLOTS } from '../../time-slots'
+import type { TimeSlot, TimeSlotId } from '../../time-slots'
 import { ApplicationField } from './application-field'
+import { Button } from './button'
 import { leaving, useCheckedForm } from './checked-form'
 import { SESSION_TYPE_LABELS, collectiveOption, formatDuration, formatQuebecDay } from './describe'
 import { DurationField, FieldError, FormActions, Labeled, TimeInput } from './fields'
@@ -235,6 +240,7 @@ function TimesField({
         </label>
       </div>
       <FieldError message={errors.undated} alert />
+      <SlotChoices picked={pickedSlot(form)} onPick={(slot) => onChange(slotChanges(form, slot))} />
       {form.undated ? (
         <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
       ) : (
@@ -265,6 +271,24 @@ function TimesField({
         </>
       )}
     </fieldset>
+  )
+}
+
+// The programmation's time slots, which fill a session's times in, with the one `picked`, if any, pressed (see "The
+// session form" in docs/design/client/admin/sessions.md).
+export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onPick: (slot: TimeSlot) => void }) {
+  const id = useId()
+  return (
+    <div className="admin-field">
+      <span id={id}>Plages horaires</span>
+      <div className="admin-slots admin-status-buttons" role="group" aria-labelledby={id}>
+        {TIME_SLOTS.map((slot) => (
+          <Button key={slot.id} aria-pressed={slot.id === picked} onClick={() => onPick(slot)}>
+            {slot.label}
+          </Button>
+        ))}
+      </div>
+    </div>
   )
 }
 
