@@ -35,6 +35,7 @@ import { discordCredentialsStore } from './chat/credentials.js'
 import { discord } from './chat/discord.js'
 import { discordStandIn } from './chat/stand-in.js'
 import { oauthStore } from './oauth/store.js'
+import { adminCalendarsStore } from './admin-calendars/store.js'
 
 // As a FastifyBaseLogger, so that `app` is the FastifyInstance that registerRoutes takes.
 const loggerInstance: FastifyBaseLogger = logger
@@ -93,6 +94,7 @@ await registerRoutes(app, {
   events: eventsStore(db),
   calendarFeeds,
   calendarReads: calendarFeedReads,
+  adminCalendars: adminCalendarsStore(db),
   discord: config.chatStandIn ? discordStandIn : discord,
   discordCredentials: discordCredentialsStore(db),
   oauth: oauthStore(db),

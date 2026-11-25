@@ -17,9 +17,10 @@ the sessions without a date (see [The calendar](#the-calendar)).
 
 A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
 the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", which its
-occupations are known by, and there can be several with the same name. Its events' titles reach the admin pages and
-the apps connected to the site, so a calendar whose titles have personal data, e.g. guests' names, shouldn't be added
-as a feed.
+occupations are known by, and there can be several with the same name. Its events' titles reach the admin pages, the
+apps connected to the site, and the calendar apps that admins subscribe to the occupations in, through their calendar of
+occupations (see [Admins' calendars](admin-calendars.md)), e.g. Google's or Apple's, whose servers then keep them: so a
+calendar whose titles have personal data, e.g. guests' names, shouldn't be added as a feed.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a

@@ -88,7 +88,9 @@ missing.
 
 The events as a calendar feed, in iCalendar (RFC 5545), which calendar apps subscribe to and read again on their own
 schedule, so that their calendar follows as events are announced, changed or cancelled. It's public, and it isn't JSON,
-so it isn't under `/api`, nor a tool of the [MCP server](mcp.md). It takes no parameters.
+so it isn't under `/api`, nor a tool of the [MCP server](mcp.md). It takes no parameters. Admins also have a private
+feed of every session, announced or not, which gives them as this one gives events
+([`GET /sessions.ics`](admin-calendars.md#get-sessionsics)).
 
 It responds with `Content-Type: text/calendar; charset=utf-8` and `Cache-Control: public, max-age=300`: browsers and
 calendar apps can keep it for 5 minutes. Unless it fails unexpectedly (see [Errors, in Conventions](README.md#conventions)),

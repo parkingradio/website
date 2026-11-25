@@ -2,16 +2,18 @@
 
 The server provides the API under `/api`, which this directory specifies, and the [MCP server](mcp.md) at `/mcp`, which
 apps connect to through [OAuth](oauth.md), the calendar feed of the public events at
-[`/calendar.ics`](events.md#get-calendarics), and serves the client app.
+[`/calendar.ics`](events.md#get-calendarics), the admins' calendars at [`/sessions.ics`](admin-calendars.md) and
+[`/occupations.ics`](admin-calendars.md), and serves the client app.
 
 ## Conventions
 
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
-  is JSON, except for photos, flyers and the calendar feed ([`GET /calendar.ics`](events.md#get-calendarics)). A body of
-  a type the endpoint doesn't take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
-  are larger than any endpoint needs, with a 413. One exception: in
-  production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
-  collective's application with 5 photos.
+  is JSON, except for photos, flyers, the calendar feed of the events
+  ([`GET /calendar.ics`](events.md#get-calendarics)), and the admins' calendars
+  ([`GET /sessions.ics` and `GET /occupations.ics`](admin-calendars.md)). A body of a type the endpoint doesn't take
+  fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that are larger than any endpoint
+  needs, with a 413. One exception: in production, nginx itself refuses requests whose body is over 52 MB, with a 413
+  that isn't JSON: that's room for a collective's application with 5 photos.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
   daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times in Québec
   time, with the offset from UTC in effect in Québec at that instant: since 2007, -05:00, or -04:00 from the second
@@ -63,7 +65,9 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by
   their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error.
   The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
-  their requests from their own servers, which share a few addresses.
+  their requests from their own servers, which share a few addresses. Neither do admins' calendars (see
+  [Admins' calendars](admin-calendars.md)), for the same reasons: calendar apps like Google's read them from their own
+  servers too.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -93,12 +97,12 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, and those under `/api`, `/mcp`,
-`/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where the build's files are. The
-app then shows the page for that path. This includes paths that aren't one of the app's pages (a "soft 404", see
-[Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has. Other requests for
-paths that don't exist, whatever their body, and paths that don't exist under `/assets` and `/.well-known`, e.g.
-`/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
+`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`, and
+those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where
+the build's files are. The app then shows the page for that path. This includes paths that aren't one of the app's pages
+(a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has.
+Other requests for paths that don't exist, whatever their body, and paths that don't exist under `/assets` and
+`/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
 
 Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors
 'none'`), so that they can't trick admins into clicking its buttons, e.g. to allow an app (see
@@ -134,8 +138,9 @@ the request failing.
 
 ## Endpoints
 
-Endpoints are public, admin (see [Conventions](#conventions)), or for apps, which need a connection's token (see
-[Authorization](mcp.md#authorization)).
+Endpoints are public, admin (see [Conventions](#conventions)), for apps, which need a connection's token (see
+[Authorization](mcp.md#authorization)), or for an admin's calendar app, which needs the admin's token in its link (see
+[The token, in Admins' calendars](admin-calendars.md#the-token)).
 
 | Endpoint | Access | What it's for |
 |---|---|---|
@@ -218,6 +223,10 @@ Endpoints are public, admin (see [Conventions](#conventions)), or for apps, whic
 | [`GET /api/events`](events.md#get-apievents) | public | The public schedule, the announced sessions, with their sets: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/events/flyers/:image/:size`](events.md#get-apieventsflyersimagesize) | public | One of the sizes of a flyer that an event has |
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
+| [`GET /sessions.ics`](admin-calendars.md#get-sessionsics) | token | An admin's calendar of the sessions, announced or not, in iCalendar: the upcoming ones and those that started in the past year |
+| [`GET /occupations.ics`](admin-calendars.md#get-occupationsics) | token | An admin's calendar of the occupations, in iCalendar, once every calendar feed has been read, and of the calendar feeds whose last read failed |
+| [`GET /api/admin/ics-subscription-token`](admin-calendars.md#get-apiadminics-subscription-token-admin) | admin | The token of the links of the admin's calendars |
+| [`POST /api/admin/ics-subscription-token`](admin-calendars.md#post-apiadminics-subscription-token-admin) | admin | Replacing that token, which makes the previous links stop working |
 | [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) | admin | What takes the studio over a range of days, sessions and occupations, and the feeds that occupations are read from, with their status, and, whatever the range, the conflicts of the next 365 days and the sessions without a date |
 | [`GET /api/admin/calendar/feeds`](calendar.md#get-apiadmincalendarfeeds-admin) | admin | The calendar feeds that the studio's occupations are read from, with their links, and when each was last read, or why that failed |
 | [`POST /api/admin/calendar/feeds/refresh`](calendar.md#post-apiadmincalendarfeedsrefresh-admin) | admin | Reading every calendar feed now, and the feeds once each read has ended |

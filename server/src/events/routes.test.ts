@@ -51,7 +51,7 @@ describe('GET /calendar.ics', () => {
     expect(response.headers['content-type']).toBe('text/calendar; charset=utf-8')
     expect(response.headers['cache-control']).toBe('public, max-age=300')
     expect(response.body).toMatch(/^BEGIN:VCALENDAR\r\n[^]*END:VCALENDAR\r\n$/)
-    expect(store.feed).toHaveBeenCalledWith({ since: new Date('2025-11-19T15:30:00Z'), now: new Date('2026-11-19T15:30:00Z') })
+    expect(store.feed).toHaveBeenCalledWith(new Date('2026-11-19T15:30:00Z'))
   })
 
   it('answers HEAD, without a body', async () => {

@@ -84,6 +84,8 @@ endpoints, `GET /api/radio`, `GET /api/ra-events`, and the public `GET /api/even
   its link, which is a secret (see [Calendar feeds' links](#results)), and a feed that's removed can only be added
   again with its link. `GET /api/admin/calendar/feeds` and `POST /api/admin/calendar/feeds/refresh`, which reads every
   feed again, are tools, without the links.
+- The endpoints of the token of admins' calendars (see [Admins' calendars](admin-calendars.md)), since the token is a
+  secret. The feeds themselves aren't JSON, and aren't under `/api`.
 - The endpoints of feature flags (see [Features](features.md)), which aren't needed.
 - The endpoints that serve photos and flyers, which aren't JSON, and those that only give an item a photo or a flyer,
   or replace it, `PUT /api/admin/artists/:id/photo`, `PUT /api/admin/collectives/:id/photo` and

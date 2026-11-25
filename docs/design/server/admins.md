@@ -28,6 +28,9 @@ Admins can also connect apps, e.g. Claude, which then act as them through the MC
 cookie (see [OAuth](oauth.md)). Their connections end along with their sessions, when they're revoked or choose a new
 password, but not when they log out.
 
+Their calendar apps read their calendars with the token in their links (see [Admins' calendars](admin-calendars.md)),
+which stop working when they're revoked, but not when they choose a new password, or log out.
+
 ## `POST /api/auth/login`
 
 | Request field | Type | |
@@ -102,5 +105,6 @@ An admin has:
 
 ## `DELETE /api/admin/admins/:id` (admin)
 
-Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, and their sessions and connections end. For
-an admin who hasn't accepted their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).
+Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, their sessions and connections end, and the
+links of their calendars stop working (see [Admins' calendars](admin-calendars.md)). For an admin who hasn't accepted
+their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).

@@ -48,6 +48,8 @@ import { collectToolRoutes } from './mcp/tools.js'
 import { oauthRoutes } from './oauth/routes.js'
 import type { OAuthStore } from './oauth/store.js'
 import { configRoutes } from './site/runtime-config.js'
+import { adminCalendarsRoutes } from './admin-calendars/routes.js'
+import type { AdminCalendarsStore } from './admin-calendars/store.js'
 
 // What the routes use to handle requests: the database, the stores built on it, and the services the server talks to.
 export type Dependencies = {
@@ -81,6 +83,8 @@ export type Dependencies = {
   calendarFeeds: CalendarFeedsStore
   // What was read from the calendar feeds.
   calendarReads: CalendarReads
+  // The tokens of admins' calendars, and their sessions.
+  adminCalendars: AdminCalendarsStore
   // Discord, or its stand-in (see chat/stand-in.ts).
   discord: Discord
   discordCredentials: DiscordCredentialsStore
@@ -119,6 +123,13 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })
   await app.register(adminCalendarRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads, sessions: deps.sessions })
+  await app.register(adminCalendarsRoutes, {
+    store: deps.adminCalendars,
+    feeds: deps.calendarFeeds,
+    reads: deps.calendarReads,
+    siteOrigin: deps.siteOrigin,
+    environment: deps.environment,
+  })
   await app.register(chatRoutes, { discord: deps.discord, credentials: deps.discordCredentials })
   await app.register(featuresRoutes, { store: deps.features })
   // The site is the authorization server's issuer.

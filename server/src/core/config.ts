@@ -1,3 +1,9 @@
+// What Parking Radio's MCP server and admins' calendars are named after, which says which environment `environment`
+// is, outside production, e.g. "Parking Radio (test)".
+export function serverName(environment: string): string {
+  return environment === 'production' ? 'Parking Radio' : `Parking Radio (${environment})`
+}
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`Missing required environment variable: ${name}`)

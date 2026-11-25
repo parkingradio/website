@@ -148,6 +148,13 @@
       "when": 1795552253803,
       "tag": "0020_discord_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795579419155,
+      "tag": "0021_ics_subscription_tokens",
+      "breakpoints": true
     }
   ]
 }
