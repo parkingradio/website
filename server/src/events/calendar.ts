@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { calendar as icalendar, dateTime, text } from '../core/icalendar.js'
+import { TRANSPARENT, calendar as icalendar, dateTime, text } from '../core/icalendar.js'
 import { SYNTH_MEETUP_LINEUP } from '../sessions/lineup.js'
 import { event } from './routes.js'
 import type { Event } from './routes.js'
@@ -17,9 +17,6 @@ const LOCATION = 'parking.radio'
 const CANCELLED = '[CANCELLED]'
 // How long browsers and calendar apps can keep the feed.
 const CACHE_CONTROL = 'public, max-age=300'
-// Every event leaves the time it takes free in calendar apps, rather than busy, as they make it by default: neither this
-// feed nor an admin's calendars (see admin-calendars/calendars.ts) are about the subscriber's own time.
-export const TRANSPARENT = 'TRANSP:TRANSPARENT'
 
 // The description of an event: the names of its lineup, one per line, then a blank line and its description, either of
 // which can be missing. A synth meetup without a lineup that isn't cancelled has OPEN JAM, as on Programmation.
