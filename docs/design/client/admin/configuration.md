@@ -76,18 +76,31 @@ says that what takes the studio outside sessions is read from some of these cale
 under its calendar's name, and the time protected for sessions from others, « Plages protégées », and that the server
 reads them every 15 minutes.
 
-It lists the feeds, in the order they were added, each with its name, its kind, « Occupations » or « Plages protégées »,
-its link, as text, which admin added it and when, when it was last read, or that it hasn't been read yet, and why its
-last read failed, if it did. While there are none, it says so. "retirer" removes a feed, once the admin confirms.
+It lists the feeds in a table, one per row, in the order they were added: "Nom", "Type" (« Occupations » or
+« Plages protégées »), "Dernière lecture", then "modifier" and "retirer". "Dernière lecture" is « échec », in the warnings' color
+(see [Warnings](layout.md#warnings)), when the feed's last read failed, and otherwise when it was last read
+successfully, or « pas encore lu » while it hasn't been read. A feed whose last read failed has a line under its row, in
+the warnings' color too, which says why: « La dernière lecture a échoué : <why>. », then when it was last read
+successfully, if it was: « Dernière lecture réussie le <date et heure>. ». The line is across the whole table, so that a
+long message doesn't widen a column. While there are no feeds, it says so, above "ajouter un calendrier", rather than
+showing an empty table. On narrow screens like phones, it scrolls sideways like the admin pages' other tables (see
+[Tables](layout.md#tables)).
 
-"modifier" replaces the feed with a form filled in with it: "Nom", which gets the focus, "Type", « Occupations » or
-« Plages protégées », one of which is picked, as radio buttons, and "Lien". "enregistrer" saves only what was changed,
-so that a form opened before another admin's change doesn't undo it, and closes the form; "annuler" closes it without
-saving. Either way, the focus goes back to "modifier".
+"retirer" removes a feed, once the admin confirms. When it can't be removed, the line under its row says why.
 
-Under the list, a form adds a feed, with the same fields, where no type is picked at first, so that it's always chosen
-(see [`POST /api/admin/calendar/feeds`](../../server/calendar.md#post-apiadmincalendarfeeds-admin)). "ajouter" adds it,
-and clears the form.
+"modifier" replaces the feed's row with a row across the whole table, holding a form filled in with it: "Nom", which
+gets the focus, "Type", « Occupations » or « Plages protégées », one of which is picked, as radio buttons, and "Lien",
+its link. Above the fields, it says which admin added the feed and when, « Ajouté par <email> le <date et heure>. », and
+which admin last changed it and when, if one did, « Modifié par <email> le <date et heure>. ». The line under the feed's
+row, if it has one, stays under the form. "enregistrer" saves only what was changed, so that a form opened before
+another admin's change doesn't undo it, and closes the form; "annuler" closes it without saving. Either way, the focus
+goes back to "modifier".
+
+Under the table, "ajouter un calendrier" opens, in its place, a form that adds a feed, with the same fields, empty,
+where no type is picked at first, so that it's always chosen (see
+[`POST /api/admin/calendar/feeds`](../../server/calendar.md#post-apiadmincalendarfeeds-admin)), and "Nom" gets the
+focus. "ajouter" adds the feed, which then shows in the table, and closes the form; "annuler" closes it without adding
+it, losing what was typed. Either way, the focus goes back to "ajouter un calendrier".
 
 "enregistrer" and "ajouter" need a name, a type and a link. When the link is new, the server reads it first (see
 [Reading the feeds](../../server/calendar.md#reading-the-feeds)), which can take a while, and the button can't be used

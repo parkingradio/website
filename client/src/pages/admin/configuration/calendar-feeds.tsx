@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { api } from '../../../api/client'
 import type { Schema } from '../../../api/client'
 import { useApi } from '../../../api/use-api'
@@ -41,35 +41,79 @@ export function CalendarFeeds() {
   )
 }
 
-// The feeds, as they're added, changed and removed, and the form that adds one.
+// The feeds, as they're added, changed and removed, in a table, one per row, then "ajouter un calendrier", which opens the
+// form that adds one in its place.
 function Feeds({ loaded }: { loaded: Feed[] }) {
   const [feeds, setFeeds] = useState(loaded)
+  const { open: adding, button: addButton, openForm: openAdd, close: closeAdd } = useFormOpenedBy()
 
   return (
     <>
       {feeds.length === 0 ? (
         <p className="admin-placeholder">Aucun calendrier externe pour le moment.</p>
       ) : (
-        <ul className="admin-list">
+        <table className="admin-table admin-table-controls" aria-label="Calendriers externes">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Type</th>
+              <th>Dernière lecture</th>
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
           {feeds.map((feed) => (
-            <FeedItem
+            <FeedRows
               key={feed.id}
               feed={feed}
               onChanged={(changed) => setFeeds((current) => current.map((other) => (other.id === changed.id ? changed : other)))}
               onRemoved={() => setFeeds((current) => current.filter(({ id }) => id !== feed.id))}
             />
           ))}
-        </ul>
+        </table>
       )}
-      <FeedForm
-        initial={{ name: '', kind: null, link: '' }}
-        action="ajouter"
-        failure="Le calendrier n'a pas pu être ajouté"
-        save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
-        onSaved={(feed) => setFeeds((current) => [...current, feed])}
-      />
+      {adding ? (
+        <FeedForm
+          initial={{ name: '', kind: null, link: '' }}
+          action="ajouter"
+          failure="Le calendrier n'a pas pu être ajouté"
+          save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
+          onSaved={(feed) => {
+            closeAdd()
+            setFeeds((current) => [...current, feed])
+          }}
+          onCancel={closeAdd}
+        />
+      ) : (
+        <div className="admin-toolbar">
+          <button ref={addButton} type="button" onClick={openAdd}>
+            ajouter un calendrier
+          </button>
+        </div>
+      )}
     </>
   )
+}
+
+// A form that a button opens, in place of something else, e.g. a feed's row, and which, once it's closed, saved or not,
+// gives the focus back to the button, in a layout effect (see LoadedSession in sessions.tsx), since it also closes once
+// the server answers.
+function useFormOpenedBy() {
+  const [open, setOpen] = useState(false)
+  const closed = useRef(false)
+  const button = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => {
+    if (!open && closed.current) button.current?.focus()
+    closed.current = false
+  }, [open])
+  return {
+    open,
+    button,
+    openForm: () => setOpen(true),
+    close: () => {
+      closed.current = true
+      setOpen(false)
+    },
+  }
 }
 
 // What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed
@@ -83,20 +127,23 @@ function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
   return changes
 }
 
-function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed: Feed) => void; onRemoved: () => void }) {
-  const [editing, setEditing] = useState(false)
-  // Whether the form was closed, which then gives the focus back to "modifier", in a layout effect (see LoadedSession in
-  // sessions.tsx), since the form also closes once the PATCH answers.
-  const closed = useRef(false)
-  const edit = useRef<HTMLButtonElement>(null)
-  useLayoutEffect(() => {
-    if (!editing && closed.current) edit.current?.focus()
-    closed.current = false
-  }, [editing])
-  const close = () => {
-    closed.current = true
-    setEditing(false)
-  }
+// A row across the table's four columns, e.g. the form that changes a feed. `headers` is the id of the header its cell
+// is under, rather than the columns'.
+function SpanRow({ headers, children }: { headers?: string; children: ReactNode }) {
+  return (
+    <tr>
+      <td colSpan={4} className="admin-table-span" headers={headers}>
+        <div>{children}</div>
+      </td>
+    </tr>
+  )
+}
+
+// A feed's rows, together: its row, or the form that changes it, then, under it, the line that says why its last read
+// failed, or why it couldn't be removed, if either did.
+function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed: Feed) => void; onRemoved: () => void }) {
+  const nameId = useId()
+  const { open: editing, button: editButton, openForm: edit, close } = useFormOpenedBy()
   const [busy, setBusy] = useState(false)
   // Why it couldn't be removed, if it couldn't.
   const [error, setError] = useState<string | null>(null)
@@ -110,57 +157,70 @@ function FeedItem({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
     else setError(result.error)
   }
 
-  if (editing) {
-    return (
-      <li>
-        <FeedForm
-          initial={feed}
-          action="enregistrer"
-          failure="Le calendrier n'a pas pu être enregistré"
-          save={async (fields) => {
-            const changes = changesOf(feed, fields)
-            if (Object.keys(changes).length === 0) return { ok: true, feed }
-            return api.PATCH('/api/admin/calendar/feeds/{id}', { params: { path: { id: feed.id } }, body: changes })
-          }}
-          onSaved={(changed) => {
-            close()
-            onChanged(changed)
-          }}
-          onCancel={close}
-        />
-      </li>
-    )
-  }
+  const failed = feed.error !== null
 
   return (
-    <li>
-      <p>
-        <b>{feed.name}</b> · {FEED_KIND_LABELS[feed.kind]}{' '}
-        <button ref={edit} type="button" disabled={busy} onClick={() => setEditing(true)}>
-          modifier
-        </button>{' '}
-        <button type="button" disabled={busy} onClick={remove}>
-          retirer
-        </button>
-      </p>
-      <p className="admin-feed-link">{feed.link}</p>
-      <p className="admin-meta">
-        {byWhom('Ajouté', feed.createdBy, feed.createdAt)} {feed.readAt ? `Lu le ${dateTimeFormat.format(new Date(feed.readAt))}.` : 'Pas encore lu.'}
-      </p>
-      {feed.error && <p className="admin-error">La dernière lecture a échoué&nbsp;: {feed.error}</p>}
-      {error && (
-        <p className="admin-error" role="alert">
-          Le calendrier n'a pas pu être retiré&nbsp;: {error}
-        </p>
+    <tbody>
+      {editing ? (
+        <SpanRow>
+          <p className="admin-meta">{byWhom('Ajouté', feed.createdBy, feed.createdAt)}</p>
+          {feed.updatedBy && <p className="admin-meta">{byWhom('Modifié', feed.updatedBy, feed.updatedAt)}</p>}
+          <FeedForm
+            initial={feed}
+            action="enregistrer"
+            failure="Le calendrier n'a pas pu être enregistré"
+            save={async (fields) => {
+              const changes = changesOf(feed, fields)
+              if (Object.keys(changes).length === 0) return { ok: true, feed }
+              return api.PATCH('/api/admin/calendar/feeds/{id}', { params: { path: { id: feed.id } }, body: changes })
+            }}
+            onSaved={(changed) => {
+              close()
+              onChanged(changed)
+            }}
+            onCancel={close}
+          />
+        </SpanRow>
+      ) : (
+        <tr>
+          <th scope="row" id={nameId}>
+            {feed.name}
+          </th>
+          <td>{FEED_KIND_LABELS[feed.kind]}</td>
+          <td>{failed ? <span className="admin-warning">échec</span> : feed.readAt ? dateTimeFormat.format(new Date(feed.readAt)) : 'pas encore lu'}</td>
+          <td>
+            <button ref={editButton} type="button" aria-label={`modifier : ${feed.name}`} disabled={busy} onClick={edit}>
+              modifier
+            </button>{' '}
+            <button type="button" aria-label={`retirer : ${feed.name}`} disabled={busy} onClick={remove}>
+              retirer
+            </button>
+          </td>
+        </tr>
       )}
-    </li>
+      {(failed || error) && (
+        // Across the table, so that a long message doesn't widen a column, and under its feed's name, while its row is
+        // shown.
+        <SpanRow headers={editing ? undefined : nameId}>
+          {failed && (
+            <p className="admin-warning">
+              La dernière lecture a échoué&nbsp;: {feed.error}.{feed.readAt && ` Dernière lecture réussie le ${dateTimeFormat.format(new Date(feed.readAt))}.`}
+            </p>
+          )}
+          {error && (
+            <p className="admin-error" role="alert">
+              Le calendrier n'a pas pu être retiré&nbsp;: {error}
+            </p>
+          )}
+        </SpanRow>
+      )}
+    </tbody>
   )
 }
 
 type Saved = { ok: true; feed: Feed } | { ok: false; error: string }
 
-// The form that adds a feed, cleared once it's added, or changes one, which closes once it's changed, and whose name gets
-// the focus when it opens.
+// The form that adds a feed or changes one, which closes once it's saved, and whose name gets the focus when it opens.
 function FeedForm({
   initial,
   action,
@@ -174,7 +234,7 @@ function FeedForm({
   failure: string
   save: (fields: FeedFields) => Promise<Saved>
   onSaved: (feed: Feed) => void
-  onCancel?: () => void
+  onCancel: () => void
 }) {
   const [name, setName] = useState(initial.name)
   const [kind, setKind] = useState(initial.kind)
@@ -198,9 +258,6 @@ function FeedForm({
       setError(result.error)
       return
     }
-    setName(initial.name)
-    setKind(initial.kind)
-    setLink(initial.link)
     onSaved(result.feed)
   }
 
@@ -209,7 +266,7 @@ function FeedForm({
       <form className="admin-form" onSubmit={submit}>
         <label>
           Nom
-          <input autoFocus={onCancel !== undefined} value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
+          <input autoFocus value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
         </label>
         <KindField kind={kind} onChange={setKind} />
         <label>
@@ -220,11 +277,9 @@ function FeedForm({
           <button type="submit" disabled={busy || !complete}>
             {action}
           </button>
-          {onCancel && (
-            <button type="button" disabled={busy} onClick={onCancel}>
-              annuler
-            </button>
-          )}
+          <button type="button" disabled={busy} onClick={onCancel}>
+            annuler
+          </button>
           {busy && reads && <span className="admin-meta">Lecture du calendrier…</span>}
         </div>
       </form>

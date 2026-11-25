@@ -75,6 +75,12 @@ button gives the same view. Without `sort`, a list is in the order its page give
 statuses. `sort` without `order` sorts that way when it names the column that order is by, and in ascending order
 otherwise.
 
+## Tables
+
+On narrow screens like phones, a list in a table that's too wide for the screen scrolls sideways on its own, rather
+than making the page scroll sideways. What's across a whole table, e.g. the line under a row, stays within the screen,
+wherever the table is scrolled to.
+
 ## Status colors
 
 Wherever the admin pages list applications, sessions or sets, or show them, e.g. in [Calendrier](calendrier.md), those
