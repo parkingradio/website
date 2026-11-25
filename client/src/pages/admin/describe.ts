@@ -228,11 +228,18 @@ export function collectiveEntry(collective: Collective, artists: Map<string, Art
 // Instants, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md).
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeZone: QUEBEC_TIME_ZONE })
 export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: QUEBEC_TIME_ZONE })
+// A space that lines never break at, as French typography has it between a number and its unit, e.g. "21 h", and within
+// a short day, e.g. "mer. 7 oct.", so that lines only break between times and days.
+const NBSP = '\u00a0'
+
+// `format`'s `format`, with non-breaking spaces (see `NBSP`).
+const unbroken = (format: Intl.DateTimeFormat) => (date: Date) => format.format(date).replaceAll(' ', NBSP)
+
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to be the same day wherever this
 // runs. The lists' search relies on the weekday, the day, the month and the year being next to each other, in that
 // order, with the weekday and the month written out (see search in list.ts).
 const dayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-const shortDayFormat = new Intl.DateTimeFormat('fr-CA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const shortDayFormat = unbroken(new Intl.DateTimeFormat('fr-CA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }))
 
 // E.g. "mercredi 7 octobre 2026".
 export function formatDay(day: string): string {
@@ -241,7 +248,7 @@ export function formatDay(day: string): string {
 
 // E.g. "7 oct. 2026".
 export function formatShortDay(day: string): string {
-  return shortDayFormat.format(new Date(day))
+  return shortDayFormat(new Date(day))
 }
 
 const monthFormat = new Intl.DateTimeFormat('fr-CA', { month: 'long', year: 'numeric', timeZone: 'UTC' })
@@ -251,18 +258,18 @@ export function formatMonth(month: string): string {
   return monthFormat.format(new Date(`${month}-01`))
 }
 
-const weekdayAndNumberFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
+const weekdayAndNumberFormat = unbroken(new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }))
 
 // E.g. "mar. 24", for a day as "YYYY-MM-DD", by its weekday and its number alone.
 export function formatWeekdayAndNumber(day: string): string {
-  return weekdayAndNumberFormat.format(new Date(day))
+  return weekdayAndNumberFormat(new Date(day))
 }
 
-const dayInYearFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+const dayInYearFormat = unbroken(new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }))
 
 // E.g. "mer. 7 oct.", like `formatQuebecDayInYear`, but for a day.
 export function formatDayInYear(day: string): string {
-  return dayInYearFormat.format(new Date(day))
+  return dayInYearFormat(new Date(day))
 }
 
 // E.g. "1 conflit" or "2 conflits".
@@ -315,20 +322,20 @@ export function addedBy(kind: string, { createdBy, createdAt }: { createdBy: str
 
 // Sessions' days and times, which are in Québec time, whatever the browser's time zone (see quebec-time.ts),
 // and their names (see docs/design/client/admin/sessions.md).
-const quebecDayFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE })
-const quebecDayInYearFormat = new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: QUEBEC_TIME_ZONE })
+const quebecDayFormat = unbroken(new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: QUEBEC_TIME_ZONE }))
+const quebecDayInYearFormat = unbroken(new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: QUEBEC_TIME_ZONE }))
 
 // What's shown in place of the day of a session whose date isn't known yet.
 const UNDATED = 'date à déterminer'
 
 // E.g. "sam. 14 nov. 2026", the day of `instant` (ISO 8601) in Québec.
 export function formatQuebecDay(instant: string): string {
-  return quebecDayFormat.format(new Date(instant))
+  return quebecDayFormat(new Date(instant))
 }
 
-// E.g. "21 h", or "21 h 30", for `minutes` (of a day, or of a duration).
+// E.g. "21 h", or "21 h 30", for `minutes` (of a day, or of a duration), with non-breaking spaces (see `NBSP`).
 function hoursAndMinutes(minutes: number): string {
-  return `${Math.floor(minutes / 60)} h${minutes % 60 === 0 ? '' : ` ${String(minutes % 60).padStart(2, '0')}`}`
+  return `${Math.floor(minutes / 60)}${NBSP}h${minutes % 60 === 0 ? '' : `${NBSP}${String(minutes % 60).padStart(2, '0')}`}`
 }
 
 // E.g. "21 h", or "21 h 30", for a time of day, "HH:MM".
@@ -339,7 +346,7 @@ export function formatTime(time: string): string {
 
 // E.g. "1 h", "1 h 30" or "45 min".
 export function formatDuration(minutes: number): string {
-  return minutes < 60 ? `${minutes} min` : hoursAndMinutes(minutes)
+  return minutes < 60 ? `${minutes}${NBSP}min` : hoursAndMinutes(minutes)
 }
 
 type SessionTimes = Pick<Session, 'start' | 'end' | 'durationMinutes'>
@@ -364,7 +371,7 @@ function startAndEnd(start: string, end: string) {
 
 // E.g. "dim. 15 nov.", the day of `instant` (ISO 8601) in Québec, without its year.
 export function formatQuebecDayInYear(instant: string): string {
-  return quebecDayInYearFormat.format(new Date(instant))
+  return quebecDayInYearFormat(new Date(instant))
 }
 
 // How long something that ends the next day, unless it ends at 00:00, can last for its times alone to say when it ends:

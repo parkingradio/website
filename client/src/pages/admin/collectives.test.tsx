@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective, CollectiveProfile } from '../../collective-profile'
 import type { Session } from '../../session-fields'
-import { jsonBody, mockFetch, mockListLayout, moveWithKeyboard, requestsTo } from '../../test-utils'
+import { jsonBody, mockFetch, mockListLayout, moveWithKeyboard, named, requestsTo } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
 beforeAll(() => import('./admin-pages'))
@@ -205,7 +205,7 @@ describe('A collective’s page', () => {
     renderAt('/admin/artistes/collectifs/collective-1')
 
     const table = await screen.findByRole('table', { name: 'Candidatures' })
-    expect(within(table).getByRole('link', { name: 'planifiée : ONDES TAKEOVER, sam. 12 sept. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(table).getByRole('link', { name: named('planifiée : ONDES TAKEOVER, sam. 12 sept. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
   })
 
   it('says when its applications could not be loaded', async () => {
@@ -722,7 +722,7 @@ describe('A collective’s page', () => {
     }
     mockFetch({ ...ONDES_PAGE, '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [session] } })
     renderAt('/admin/artistes/collectifs/collective-1')
-    expect(await screen.findByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(await screen.findByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
     const table = screen.getByRole('table', { name: 'Sessions' })
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut', 'Annonce'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
@@ -778,7 +778,7 @@ describe('A collective’s page', () => {
     fireEvent.click(remove)
     const alert = await screen.findByText(/^Le collectif n'a pas pu être supprimé/)
     expect(alert).toHaveTextContent(`Le collectif n'a pas pu être supprimé : ${error} (ONDES TAKEOVER, sam. 14 nov. 2026)`)
-    expect(within(alert).getByRole('link', { name: 'ONDES TAKEOVER, sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(within(alert).getByRole('link', { name: named('ONDES TAKEOVER, sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
   })
 
   it('deletes the collective and its applications once confirmed, but not its artists, and goes back to the list', async () => {

@@ -6,7 +6,7 @@ import type { Application } from '../../application-fields'
 import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
-import { CONFIG, held, jsonBody, mockFetch, moveWithKeyboard, requestsTo, shownTime, timeParts, typeTime, visibleText } from '../../test-utils'
+import { CONFIG, held, jsonBody, mockFetch, moveWithKeyboard, named, requestsTo, shownTime, spaced, timeParts, typeTime, visibleText } from '../../test-utils'
 import type { Body } from '../../test-utils'
 
 // The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
@@ -118,7 +118,7 @@ const options = () =>
     .queryAllByRole('option')
     // Not those of the sets' statuses.
     .filter((option) => !option.closest('select'))
-    .map((option) => option.textContent)
+    .map((option) => spaced(option.textContent))
 
 const TRACKED = {
   createdAt: '2026-10-01T16:00:00.000Z',
@@ -261,7 +261,7 @@ const rows = (table: HTMLElement | null = screen.queryByRole('table')) =>
       within(row)
         .getAllByRole('cell')
         .filter((cell) => !cell.querySelector('.admin-handle'))
-        .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? visibleText(cell)),
+        .map((cell) => cell.querySelector('select')?.selectedOptions[0].textContent ?? spaced(visibleText(cell))),
     )
 const days = () => rows().map((row) => row[0])
 
@@ -295,7 +295,7 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()[0].slice(0, 2)).toEqual(['ven. 13 nov. 2026', '18 h – dim. 15 nov., 2 h'])
-    fireEvent.click(screen.getByRole('link', { name: 'ven. 13 nov. 2026' }))
+    fireEvent.click(screen.getByRole('link', { name: named('ven. 13 nov. 2026') }))
     expect(await screen.findByText('du vendredi 13 novembre 2026 à 18 h au dimanche 15 novembre 2026 à 2 h')).toBeInTheDocument()
     expect(value('Durée')).toHaveTextContent(/^32 h$/)
   })
@@ -317,7 +317,7 @@ describe('The list of sessions', () => {
     expect(sessionRows[1]).toHaveClass('admin-status-planned')
     expect(sessionRows[2]).toHaveClass('admin-status-done')
     expect(sessionRows[3]).toHaveClass('admin-status-cancelled')
-    expect(screen.getByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
+    expect(screen.getByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
     expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2')
     expect(screen.getAllByRole('link', { name: 'Brume' })[0]).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'Takeover' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
@@ -498,7 +498,7 @@ describe('The default view of the list of sessions', () => {
 const PAGE = { ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: true, session: SESSION }, '/api/admin/collectives/collective-1': { ok: true, collective: ONDES } }
 const setsTable = () => screen.getByRole('table', { name: 'Sets' })
 // What the sets say when they add up to more than their session, if they do.
-const tooLong = () => screen.queryByText(/Les sets durent /)?.textContent ?? null
+const tooLong = () => spaced(screen.queryByText(/Les sets durent /)?.textContent ?? null)
 // What the session's record says for `label`.
 const value = (label: string) =>
   [...screen.getByLabelText('Session').querySelectorAll(':scope > dt')].find((term) => term.textContent === label)!.nextElementSibling as HTMLElement
@@ -889,7 +889,7 @@ describe("A session's page", () => {
     expect(screen.getByLabelText('Nom')).toHaveValue('')
     expect(screen.getByLabelText('Nom')).toHaveAttribute('placeholder', 'ONDES TAKEOVER')
     // Once RA's events are read, the session's is named by its title and its day.
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Événement RA' })).toHaveValue('HAUTE RIVE TAKEOVER, sam. 31 oct. 2026'))
+    await waitFor(() => expect(spaced(screen.getByRole<HTMLInputElement>('combobox', { name: 'Événement RA' }).value)).toBe('HAUTE RIVE TAKEOVER, sam. 31 oct. 2026'))
     // Offered once, by its title, rather than by its number too.
     fireEvent.click(screen.getByRole('combobox', { name: 'Événement RA' }))
     expect(options()).toEqual([
@@ -2543,7 +2543,7 @@ describe('Adding a session', () => {
     expect(found('https://ra.co/events/1234567')).toEqual([])
     expect(found(' 6683748 ')).toEqual(['PLUS TÔT, mar. 1 sept. 2026n° 6683748'])
     fireEvent.keyDown(picker, { key: 'Enter' })
-    expect(picker).toHaveValue('PLUS TÔT, mar. 1 sept. 2026')
+    expect(spaced((picker as HTMLInputElement).value)).toBe('PLUS TÔT, mar. 1 sept. 2026')
     expect(screen.getByRole('link', { name: 'https://ra.co/events/6683748' })).toHaveAttribute('href', 'https://ra.co/events/6683748')
 
     fireEvent.click(screen.getByRole('button', { name: 'ajouter la session' }))
