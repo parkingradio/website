@@ -4141,12 +4141,12 @@ export interface components {
             promoterIds: string[];
             /** @description Its effective description */
             content: string;
-            /** @description Parking Radio's links, each with its title */
+            /** @description The event's promotional links on RA: Parking Radio's site and Instagram, each with its title */
             promotionalLinks: {
                 title: string;
                 url: string;
             }[];
-            /** @description Parking Radio's media links */
+            /** @description The event's media links on RA: Parking Radio's YouTube and SoundCloud */
             playerLinks: string[];
         };
         RaEvents: {

@@ -398,8 +398,8 @@ never creates events on RA itself. The content is:
 | `venueId` | string | Parking Radio's venue on RA, `"288529"` (`https://ra.co/clubs/288529`) |
 | `promoterIds` | list of strings | Parking Radio's promoter page on RA, `["183980"]` (`https://ra.co/promoters/183980`) |
 | `content` | string | The session's `effectiveDescription` |
-| `promotionalLinks` | list of objects | Parking Radio's links, each a `title` and its `url`: `[{"title": "parking.radio", "url": "https://parking.radio"}, {"title": "instagram", "url": "https://www.instagram.com/parking.radio"}]` |
-| `playerLinks` | list of strings | Parking Radio's media links: `["https://www.youtube.com/@parkingdotradio", "https://soundcloud.com/parkingdotradio"]` |
+| `promotionalLinks` | list of objects | The event's promotional links on RA, Parking Radio's site and Instagram, each a `title` and its `url`: `[{"title": "parking.radio", "url": "https://parking.radio"}, {"title": "instagram", "url": "https://www.instagram.com/parking.radio"}]` |
+| `playerLinks` | list of strings | The event's media links on RA, Parking Radio's YouTube and SoundCloud: `["https://www.youtube.com/@parkingdotradio", "https://soundcloud.com/parkingdotradio"]` |
 
 ## `GET /api/admin/sessions` (admin)
 

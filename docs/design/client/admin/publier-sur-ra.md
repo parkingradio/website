@@ -62,8 +62,8 @@ What the script does:
   doesn't hold, it says that RA changed, and what changed.
 - It sends the event as `EventInput`: `title`, `startTime` and `endTime`, in Québec time without their offset, as
   `"2026-11-20T21:00:00.000"`, `lineup`, `venueId`, `promoterIds` and `content`, as the server gives them,
-  `promotionalLinks`, each link with only its `title` and its `url`, `playerLinks`, each media link as its `sourceId`,
-  and `submissionSource`, `"SUBMITEVENTPAGE"`. It only creates the event, once, when « Créer sur RA » is clicked, with
+  `promotionalLinks` (each with only its `title` and `url`, as text), `playerLinks` (each as `{sourceId}`), and
+  `submissionSource`, `"SUBMITEVENTPAGE"`. It only creates the event, once, when « Créer sur RA » is clicked, with
   the `createEvent` mutation, which gives the new event's `id`. It never tries again on its own.
 - When RA refuses, it shows RA's messages as they come. When anything else goes wrong, it says that something didn't
   work.

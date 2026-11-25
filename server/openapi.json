@@ -3096,14 +3096,14 @@
               ],
               "additionalProperties": false
             },
-            "description": "Parking Radio's links, each with its title"
+            "description": "The event's promotional links on RA: Parking Radio's site and Instagram, each with its title"
           },
           "playerLinks": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Parking Radio's media links"
+            "description": "The event's media links on RA: Parking Radio's YouTube and SoundCloud"
           }
         },
         "required": [

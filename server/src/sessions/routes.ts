@@ -129,8 +129,8 @@ const RaEventContent = z
     venueId: z.string().meta({ description: "Parking Radio's venue on RA" }),
     promoterIds: z.array(z.string()).meta({ description: "Parking Radio's promoter page on RA" }),
     content: z.string().meta({ description: 'Its effective description' }),
-    promotionalLinks: z.array(z.object({ title: z.string(), url: z.string() })).meta({ description: "Parking Radio's links, each with its title" }),
-    playerLinks: z.array(z.string()).meta({ description: "Parking Radio's media links" }),
+    promotionalLinks: z.array(z.object({ title: z.string(), url: z.string() })).meta({ description: "The event's promotional links on RA: Parking Radio's site and Instagram, each with its title" }),
+    playerLinks: z.array(z.string()).meta({ description: "The event's media links on RA: Parking Radio's YouTube and SoundCloud" }),
   })
   .meta({ id: 'RaEventContent' })
 export type RaEventContent = z.infer<typeof RaEventContent>

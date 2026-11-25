@@ -18,7 +18,7 @@ const EVENT = {
   promoterIds: ['183980'],
   content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
   promotionalLinks: [
-    // With a field of RA's that the bookmarklet doesn't send, since anyone can write the address.
+    // With a field the bookmarklet doesn't send, since anyone can write the address.
     { title: 'parking.radio', url: 'https://parking.radio', id: '7' },
     { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
   ],
@@ -217,6 +217,10 @@ describe('The bookmarklet', () => {
     expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
     document.body.replaceChildren()
     run({ payload: { site: SITE, session: 'session-1' } })
+    expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
+    // Without its links, e.g. in a tab opened before the session's page gave them.
+    document.body.replaceChildren()
+    run({ payload: { ...PAYLOAD, event: { ...EVENT, playerLinks: undefined } } })
     expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
     document.body.replaceChildren()
     run({ from: 'https://elsewhere.example' })

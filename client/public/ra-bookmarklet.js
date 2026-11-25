@@ -61,13 +61,14 @@
     return paragraph(`Attention : l’événement sera vraiment créé sur RA, à partir d’une session de ${stamp}.`, 'margin:12px 0 0;color:#b00020;font-weight:bold')
   }
 
-  // The session's event, as its page put it in the address: #parking-radio=<its JSON, URI-encoded>.
+  // The session's event, as its page put it in the address: #parking-radio=<its JSON, URI-encoded>. One without its
+  // links, e.g. in a tab opened before the session's page gave them, is none.
   function sent() {
     const match = /(?:^#|&)parking-radio=([^&]*)/.exec(location.hash)
     if (!match) return null
     try {
       const given = JSON.parse(decodeURIComponent(match[1]))
-      return typeof given?.event === 'object' && given.event !== null ? given : null
+      return Array.isArray(given?.event?.promotionalLinks) && Array.isArray(given.event.playerLinks) ? given : null
     } catch {
       return null
     }
