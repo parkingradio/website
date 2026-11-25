@@ -27,8 +27,8 @@ function soon(): string {
 // Why a test's feed's last read failed.
 const FAILED = "The link can't be read: its server fails (503)"
 
-// A test's own feed, of `kind`, read three days before `day`, or not yet, when `readAt` is null, its last read having
-// failed when it has an `error`.
+// A test's own feed, of `kind`, read three days before `day`, or not yet, without `read`, its last read having failed
+// when it has an `error`.
 function ownFeed(id: string, name: string, day: string, { kind = 'occupations', error = null, read = true }: { kind?: 'occupations' | 'holds'; error?: string | null; read?: boolean } = {}) {
   const readAt = at(addDays(day, -3), '00:00')
   return { id, name, kind, link: `https://example.com/${id}.ics`, createdBy: 'admin@example.com', createdAt: readAt, updatedBy: null, updatedAt: null, readAt: read ? readAt : null, error }

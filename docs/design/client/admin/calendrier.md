@@ -73,11 +73,10 @@ announce it as unavailable. It's closed by default.
 
 Under that row, the box warns (see [Warnings](layout.md#warnings)) about each feed whose last read failed, naming it,
 saying why, and that what it affects can be missing or out of date, and linking to Configuration, and about each feed
-that hasn't been read yet, naming it, and saying what can be missing, or there wrongly (see
-[The calendar](../../server/calendar.md#the-calendar)). An `occupations` feed affects conflicts, and while there's a
-`holds` feed, free time, and a `holds` feed affects free time and the sessions outside protected time, e.g. « ⚠ Le
-calendrier « Loft » n'a pas encore été lu : des plages disponibles peuvent manquer, et des sessions être signalées à
-tort hors plage protégée. »
+that hasn't been read yet, naming it, and saying what can be missing, or there wrongly. An `occupations` feed affects
+conflicts, and free time while there's a `holds` feed. A `holds` feed affects free time and the sessions outside
+protected time, e.g. « ⚠ Le calendrier « Loft » n'a pas encore été lu : des plages disponibles peuvent manquer, et des
+sessions être signalées à tort hors plage protégée. »
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag and a heading, then a row
 for each one, on one line: when it is, then what it is. The whole row is what's done about it, by clicking it, or with
@@ -153,10 +152,10 @@ unchooses it, the month having no links to sessions there.
 ### Free time
 
 Free time is the studio's protected time (see [Protected time](../../server/calendar.md#protected-time)) that nothing
-takes: no session that isn't cancelled, and no occupation, e.g. around a session. Only the 365 days that conflicts are
-found in (see [Conflicts](../../server/calendar.md#conflicts)) have some, each from 00:00, today's too, even what's
-over. Time that nothing takes but that isn't protected isn't free time, and the page says nothing of it: while there's
-no `holds` feed, there's no free time.
+takes: no session that isn't cancelled, and no occupation, so that a day with a session can have some too, around it.
+Only the 365 days that conflicts are found in (see [Conflicts](../../server/calendar.md#conflicts)) have some, each
+day's from 00:00 to 00:00, today's too, even what's over. Time that nothing takes but that isn't protected isn't free
+time, and the page says nothing of it: while there's no `holds` feed, there's none.
 
 The month shows the free time of its own days, not that of the months before and after. A day that's all free time is
 green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or "dispo

@@ -179,7 +179,10 @@ function FeedWarnings({ feeds }: { feeds: Feed[] }) {
       // What a failed read can make missing or out of date, and what a feed not read yet can make missing or wrong.
       const [affected, missing] =
         feed.kind === 'holds'
-          ? ['Des plages disponibles et des sessions hors plage protégée', 'des plages disponibles peuvent manquer, et des sessions être signalées à tort hors plage protégée']
+          ? [
+              'Des plages disponibles et des sessions hors plage protégée',
+              'des plages disponibles peuvent manquer, et des sessions être signalées à tort hors plage protégée',
+            ]
           : holds
             ? ['Des conflits et des plages disponibles', 'des conflits peuvent manquer, et des plages être indiquées disponibles à tort']
             : ['Des conflits', 'des conflits peuvent manquer']
