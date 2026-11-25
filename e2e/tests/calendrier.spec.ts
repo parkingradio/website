@@ -316,3 +316,24 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
   await expect(page.getByRole('form', { name: 'Nouvelle session' })).toBeVisible()
   expect(await scrollsSideways(page)).toBe(false)
 })
+
+// Only reads the admin's links: "régénérer les liens", on Intégrations, would replace them under the other tests, and its
+// unit tests and the server's integration tests cover it.
+test("the legend links to the admin's own calendars", async ({ page, baseURL }) => {
+  await logIn(page, { at: '/admin/calendrier' })
+  const legend = page.getByRole('list', { name: 'Légende' })
+  for (const calendar of ['sessions', 'occupations']) {
+    const icon = legend.getByRole('link', { name: `s'abonner au calendrier des ${calendar}` })
+    await expect(icon).toBeVisible()
+    const link = new URL((await icon.getAttribute('href'))!)
+    expect([link.protocol, link.host, link.pathname]).toEqual(['webcal:', new URL(baseURL!).host, `/${calendar}.ics`])
+    // The calendar it stands for, which has the seed's sessions, announced or not.
+    const response = await page.request.get(`/${calendar}.ics${link.search}`)
+    expect(response.status()).toBe(200)
+    const body = await response.text()
+    // The stack doesn't say which environment the server is, so it's development.
+    expect(body).toContain(`X-WR-CALNAME:Parking Radio (development) · ${calendar}`)
+    if (calendar === 'sessions') expect(body).toContain('SUMMARY:[UNANNOUNCED] ')
+  }
+  expect(await scrollsSideways(page)).toBe(false)
+})

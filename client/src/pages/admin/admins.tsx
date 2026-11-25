@@ -39,7 +39,7 @@ function AdminRow({ admin, onChange }: { admin: Schema<'Admin'>; onChange: () =>
     )
 
   const revoke = () => {
-    const question = pending ? `Révoquer l'invitation de ${admin.email} ?` : `Révoquer l'accès de ${admin.email} ? Ses sessions prendront fin aussitôt.`
+    const question = pending ? `Révoquer l'invitation de ${admin.email} ?` : `Révoquer l'accès de ${admin.email} ? Ses sessions et ses connexions prendront fin aussitôt, et les liens de ses calendriers ne marcheront plus.`
     if (!window.confirm(question)) return
     return act(
       () => api.DELETE('/api/admin/admins/{id}', { params: { path: { id: admin.id } } }),

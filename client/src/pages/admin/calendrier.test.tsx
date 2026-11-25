@@ -12,7 +12,10 @@ beforeAll(() => import('./admin-pages'))
 
 // Today is Thursday, November 19, 2026, in Québec.
 const NOW = new Date('2026-11-19T12:00:00-05:00')
-const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
+// The admin, and the token of the legend's links to their calendars, which the page reads once it opens.
+const TOKEN = 'a'.repeat(64)
+const TOKEN_URL = '/api/admin/ics-subscription-token'
+const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' }, [TOKEN_URL]: { ok: true, token: TOKEN } }
 const NOVEMBER = '/api/admin/calendar?from=2026-11-01&to=2026-12-05'
 const DECEMBER = '/api/admin/calendar?from=2026-11-29&to=2027-01-02'
 const OCTOBER = '/api/admin/calendar?from=2026-09-27&to=2026-10-31'
@@ -1171,5 +1174,51 @@ describe('Calendrier', () => {
       expect(cellText('2026-11-26')).toBe("26+dispo jusqu'à 10 h10 h – 16 hoccupation : RÉPARATION, calendrier Calendrier de l'équipedispo dès 16 h")
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
     })
+  })
+})
+
+describe("Calendrier's links to the admin's calendars", () => {
+  const legend = () => screen.getByRole('list', { name: 'Légende' })
+  const link = (calendar: string) => within(legend()).getByRole('link', { name: `s'abonner au calendrier des ${calendar}` })
+  const webcal = (calendar: string) => `webcal://${location.host}/${calendar}.ics?token=${TOKEN}`
+
+  it('are in the legend, after "session" and "occupation", read once whatever the view or the month', async () => {
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY, [LIST]: LIST_CALENDAR })
+    renderAt('/admin/calendrier')
+
+    await waitFor(() => link('sessions'))
+    expect(link('sessions')).toHaveAttribute('href', webcal('sessions'))
+    expect(link('sessions')).toHaveAttribute('title', "s'abonner au calendrier des sessions")
+    expect(link('occupations')).toHaveAttribute('href', webcal('occupations'))
+    expect(link('occupations')).toHaveAttribute('title', "s'abonner au calendrier des occupations")
+    // Only "session" and "occupation" have one.
+    expect(
+      within(legend())
+        .getAllByRole('listitem')
+        .map((item) => within(item).queryByRole('link') !== null),
+    ).toEqual([true, true, false, false, false, false])
+
+    // Not read again when the month or the view changes.
+    fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
+    await waitFor(() => expect(requestsTo('GET', DECEMBER)).toHaveLength(1))
+    expect(link('sessions')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'liste' }))
+    await waitFor(() => expect(requestsTo('GET', LIST)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'mois' }))
+    expect(link('occupations')).toHaveAttribute('href', webcal('occupations'))
+    expect(requestsTo('GET', TOKEN_URL)).toHaveLength(1)
+  })
+
+  it("aren't there until the token is read, nor when it can't be", async () => {
+    const answer = held()
+    mockFetch({ ...LOGGED_IN, [TOKEN_URL]: answer.body, [NOVEMBER]: CALENDAR })
+    renderAt('/admin/calendrier')
+    await loaded()
+    expect(within(legend()).getByText('session')).toBeInTheDocument()
+    expect(within(legend()).queryByRole('link')).toBeNull()
+
+    await answer.answer({ ok: false, error: 'Internal server error' })
+    expect(within(legend()).queryByRole('link')).toBeNull()
+    expect(screen.queryByText(/Internal server error/)).toBeNull()
   })
 })

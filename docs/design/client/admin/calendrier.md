@@ -2,8 +2,8 @@
 
 At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, and what needs settling (see
 [Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From top to bottom,
-the page has "À régler", the toolbar, then a legend, the month and the chosen day, or the list (see
-[The list](#the-list)).
+the page has "À régler", the toolbar, then a legend, with the links to the admin's calendars (see
+[Subscribing](#subscribing)), the month and the chosen day, or the list (see [The list](#the-list)).
 
 "Today" is the day it is in Québec, by the browser's clock.
 
@@ -222,6 +222,17 @@ As in "À régler", the whole row is one control, whose text has no links of its
 the month, with the focus on it, where the chosen day links to a session's page. Screen readers name the list by the
 toolbar's heading, "À venir".
 
+## Subscribing
+
+In the legend, "session" and "occupation" are each followed by a small icon, a calendar with a plus, in the legend's
+grey, which stands out when it's hovered or has the focus. It's a link to the admin's own calendar of the sessions, or
+of the occupations (see [Admins' calendars](../../server/admin-calendars.md)), which opens the calendar app, as
+Programmation's does: `webcal://<site's host>/sessions.ics?token=<token>` or `…/occupations.ics?token=<token>`. Screen
+readers name them « s'abonner au calendrier des sessions » and « s'abonner au calendrier des occupations », which the
+browser also shows when they're hovered. They're only there once the admin's token is read, and not at all when it
+can't be. Intégrations says that the links are personal, and replaces them (see
+[Calendriers, in Intégrations](integrations.md#calendriers)).
+
 ## Loading and errors
 
 When the calendar can't be read, the page says why at its top, until it's read again. Likewise, when the feeds can't be
@@ -241,3 +252,4 @@ to the list, shows it as it last showed it, while it's read again.
 - `POST /api/admin/calendar/feeds/refresh`, from "↻".
 - `GET /api/admin/collectives`, to pick a takeover's collective, each time the form for a new session opens, and
   `POST /api/admin/sessions`, to add the session.
+- `GET /api/admin/ics-subscription-token`, for the legend's links, when the page opens.
