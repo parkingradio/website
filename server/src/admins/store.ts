@@ -40,6 +40,9 @@ export type AdminsStore = {
   // The version of the admin's sessions (see `sessionVersion` in db/schema.ts), or null if there's no such admin, e.g.
   // once they were revoked. What requireAuth checks sessions against.
   sessionVersion(id: string): Promise<number | null>
+  // The admin's email, and the version of their sessions, or null if there's no such admin. What the tokens for
+  // publishing on RA are checked against, which say who changed what they change (see ra-publication/routes.ts).
+  emailAndSessionVersion(id: string): Promise<{ email: string; sessionVersion: number } | null>
 }
 
 // 'active' once the admin has chosen their password. Until then, 'invited' while their invite lasts, and 'expired' after.
@@ -53,6 +56,12 @@ export function adminStatus({ active, inviteExpiresAt }: Pick<StoredAdmin, 'acti
 }
 
 export function adminsStore(db: Queryable): AdminsStore {
+  async function emailAndSessionVersion(id: string) {
+    if (!isUuid(id)) return null
+    const [row] = await db.select({ email: users.email, sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, id))
+    return row ?? null
+  }
+
   return {
     async list() {
       // Admins only have more than one invite if two were sent at once, in which case the latest is the one that counts.
@@ -99,10 +108,10 @@ export function adminsStore(db: Queryable): AdminsStore {
     },
 
     async sessionVersion(id) {
-      if (!isUuid(id)) return null
-      const [row] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, id))
-      return row?.sessionVersion ?? null
+      return (await emailAndSessionVersion(id))?.sessionVersion ?? null
     },
+
+    emailAndSessionVersion,
   }
 }
 

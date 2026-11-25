@@ -726,7 +726,7 @@ test.describe('in another time zone', () => {
   })
 })
 
-test("a session's event on RA is published from the panel under its « Événement RA », then saved once the bookmarklet leads back to it", async ({ page }, testInfo) => {
+test("a session's event on RA is published from the panel under its « Événement RA », then saved by the bookmarklet with its token", async ({ page }, testInfo) => {
   const { unique, day } = own(testInfo)
   await logIn(page)
   await expect(adminMenu(page)).toBeVisible()
@@ -763,14 +763,15 @@ test("a session's event on RA is published from the panel under its « Événeme
     event: { title: `E2E ${unique}`, startTime: `${day}T21:00:00.000`, lineup: `E2E ${unique}`, content: 'Une soirée.' },
   })
 
-  // The bookmarklet leads back with the event it created, which is only saved with « enregistrer ».
-  await page.goto(`/admin/sessions/${id}?raEvent=2400123`)
-  await expect(page.getByText("L'événement RA n° 2400123 vient d'être créé sur RA : enregistrez-le dans la session.")).toBeVisible()
-  await expect(page.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveValue('https://ra.co/events/2400123')
-  await page.getByRole('button', { name: 'enregistrer' }).click()
-  await expect(page.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveCount(0)
+  // The bookmarklet then saves the event it created, with the same token, from RA's page, which the session's page shows
+  // once it's loaded again.
+  const saved = await page.request.put('/api/ra-publication/ra-event', {
+    headers: { Authorization: `Bearer ${token}`, Origin: 'https://ra.co' },
+    data: { raEvent: '2400123' },
+  })
+  expect(saved.status()).toBe(200)
+  await page.reload()
   await expect(value(page, 'Événement RA').getByRole('link')).toHaveAttribute('href', 'https://ra.co/events/2400123')
-  await expect(page).toHaveURL(new RegExp(`/admin/sessions/${id}$`))
   await expect(createButton()).toHaveCount(0)
 
   expect((await page.request.delete(`/api/admin/sessions/${id}`)).ok()).toBe(true)

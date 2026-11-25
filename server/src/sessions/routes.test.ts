@@ -103,6 +103,8 @@ const store: SessionsStore = {
   }),
   setStatus: vi.fn<SessionsStore['setStatus']>(async (id, change) => changeSession(id, change)),
   setAnnounced: vi.fn<SessionsStore['setAnnounced']>(async (id, change) => changeSession(id, change)),
+  // Only the bookmarklet sets it this way (see ra-publication/routes.ts).
+  setRaEvent: async (id, change) => changeSession(id, change),
   delete: async (id) => {
     const row = rows.find((session) => session.id === id)
     rows = rows.filter((session) => session.id !== id)

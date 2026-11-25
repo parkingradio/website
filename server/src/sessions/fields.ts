@@ -67,25 +67,31 @@ export function after(date: Date, minutes: number): Date {
 }
 const ENDS_BY_3000 = 'A session ends by the start of the year 3000, in UTC'
 
+// Turns what's sent, trimmed, into what's kept with `parse`, which gives null when it isn't one, which fails with
+// `message`, as a blank string does.
+function parsing<T>(parse: (sent: string) => T | null, message: string) {
+  return (sent: string, context: z.RefinementCtx): T => {
+    const trimmed = sent.trim()
+    // The NUL character is refused, rather than dropped, as parsing a link would at either end (see "Text" in
+    // docs/design/server/README.md): what's kept can't have it, but what's sent can't either.
+    const parsed = !trimmed || trimmed.includes('\0') ? null : parse(trimmed)
+    if (parsed === null) {
+      context.addIssue({ code: 'custom', message })
+      return z.NEVER
+    }
+    return parsed
+  }
+}
+
 // A value, or null, or a blank string, for none, that's sent as a string, which `parse` turns into what's kept, or null
 // when it isn't one, which fails with `message`. It's trimmed first.
 function orNone<T>(parse: (sent: string) => T | null, message: string, description: string) {
+  const kept = parsing(parse, message)
   return z
     .string({ error: message })
     .nullable()
     .meta({ description: `${description}. Null, or blank, for none` })
-    .transform((sent, context) => {
-      const trimmed = sent?.trim()
-      if (!trimmed) return null
-      // The NUL character is refused, rather than dropped, as parsing a link would at either end (see "Text" in
-      // docs/design/server/README.md): what's kept can't have it, but what's sent can't either.
-      const parsed = trimmed.includes('\0') ? null : parse(trimmed)
-      if (parsed === null) {
-        context.addIssue({ code: 'custom', message })
-        return z.NEVER
-      }
-      return parsed
-    })
+    .transform((sent, context) => (sent?.trim() ? kept(sent, context) : null))
 }
 
 // Ids are UUIDs, whatever their case, so they're lower-cased, as the database returns them, so that the same id in two
@@ -169,6 +175,13 @@ function checking<T>(broken: (value: T) => BrokenRule | null) {
   }
 }
 
+const RA_EVENT = 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"'
+const RA_EVENT_DESCRIPTION = "The event's id on RA, or a link to it"
+
+// An event on RA, which can't be none, e.g. the one the bookmarklet created for a session (see
+// docs/design/server/ra-publication.md), reduced to its id.
+export const SentRaEvent = z.string({ error: RA_EVENT }).meta({ description: RA_EVENT_DESCRIPTION }).transform(parsing(raEventId, RA_EVENT))
+
 // A session's fields, as admins send them, cleaned up as they're checked: links are reduced to what's kept (see
 // sessions/links.ts). Each one on its own, as a change can send some of them (see `changesTo` in api/schemas.ts), then,
 // when a session is added, together, in `NewSessionFields`, while a change's are checked together on the session as it
@@ -195,7 +208,7 @@ export const SESSION_FIELDS = {
   name: line(NAME_MAX_LENGTH, `The name must be text, up to ${NAME_MAX_LENGTH} characters`).meta({
     description: `Its own name, which replaces the one its type gives it, kept as sent, its case included: send back the session's \`name\`, not its \`title\`. A session of type other has one. Each run of spaces, tabs or line breaks becomes a single space, and it is trimmed, then up to ${NAME_MAX_LENGTH} characters. Empty for none`,
   }),
-  raEvent: orNone(raEventId, 'The RA event must be its id, or a link to it, e.g. "https://ra.co/events/6683745"', "The event's id on RA, or a link to it"),
+  raEvent: orNone(raEventId, RA_EVENT, RA_EVENT_DESCRIPTION),
   description,
 }
 

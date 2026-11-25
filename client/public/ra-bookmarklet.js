@@ -5,9 +5,9 @@
 //
 // RA has no public API, so this calls the GraphQL endpoint RA's own site calls, like the server does to read events
 // (see server/src/ra-events/routes.ts). The event comes from the site, with the token that the session's page put in the
-// address (see docs/design/server/ra-publication.md): the calls to RA are this script's, and only its. It can stop
-// working whenever RA changes its site: it then says so, and admins create the event on RA by hand, from the session's
-// page.
+// address, which it then saves the event with, as the session's (see docs/design/server/ra-publication.md): the calls
+// to RA are this script's, and only its. It can stop working whenever RA changes its site: it then says so, and admins
+// create the event on RA by hand, from the session's page.
 //
 // What it shows comes from the site and from RA: it's only ever shown as text, and the flyer as the image the site sent.
 ;(() => {
@@ -72,6 +72,14 @@
   document.body.append(panel)
 
   const paragraph = (content, style = 'margin:12px 0 0') => element('p', content, style)
+  // A link, which opens in a new tab.
+  const link = (text, href) => {
+    const node = element('a', text)
+    node.href = href
+    node.target = '_blank'
+    node.rel = 'noopener'
+    return node
+  }
   const inRed = (text) => paragraph(text, 'margin:12px 0 0;color:#b00020')
   const show = (...nodes) => body.replaceChildren(...nodes)
   const fail = (text) => show(inRed(text))
@@ -79,6 +87,8 @@
   const reason = (message) => message.replace(/\.$/, '')
   const SOMETHING_WRONG = 'Quelque chose n’a pas fonctionné'
   const PUBLISH_AGAIN = 'cliquez de nouveau sur « Publier sur RA » sur la page de la session'
+  // What the site says when the session already has an event on RA.
+  const HAS_RA_EVENT = 'This session already has an event on RA'
   // Outside production, that the event is created on RA all the same, naming the environment as the site's pages do.
   const warning = (environment) => {
     const stamp = environment === 'development' ? 'DEV' : String(environment).toUpperCase()
@@ -138,11 +148,13 @@
     return problems
   }
 
-  // Gets `path` from the site this was loaded from, and never another, with the token, `publishing`, in a header rather
-  // than in the address, which the servers in front of the site's log. Gives its response, or null when the site can't
-  // be reached.
-  const fromSite = (path, publishing) =>
-    fetch(`${SITE}${path}`, { headers: { Authorization: `Bearer ${publishing}` }, credentials: 'omit', cache: 'no-store' }).catch(() => null)
+  // Gets `path` from the site this was loaded from, and never another, or sends it what `init` says, with the token,
+  // `publishing`, in a header rather than in the address, which the servers in front of the site's log. Gives its
+  // response, or null when the site can't be reached.
+  const fromSite = (path, publishing, { headers, ...init } = {}) => {
+    const options = { ...init, headers: { Authorization: `Bearer ${publishing}`, ...headers }, credentials: 'omit', cache: 'no-store' }
+    return fetch(`${SITE}${path}`, options).catch(() => null)
+  }
 
   // The session's flyer, a JPEG, from the site, or throws, saying why it can't be had.
   async function getFlyer(publishing) {
@@ -205,6 +217,8 @@
     if (!response) return fail(`${SITE} n’a pas pu être joint.`)
     if (response.status === 403) return fail(`Ce lien de publication a expiré, ou ne vient pas de ${SITE} : ${PUBLISH_AGAIN}, puis sur le favori de ce site.`)
     const given = await response.json().catch(() => null)
+    // E.g. it was created from a session's page that was left open since.
+    if (given?.error === HAS_RA_EVENT) return fail('La session a déjà un événement RA : vérifiez « Événement RA » sur la page de la session.')
     if (!given?.ok) throw new Error(given?.error ?? `${SITE} a répondu ${response.status}`)
     // Sent to RA as the site gives it, with its flyer, once RA has it.
     const input = given.event
@@ -236,7 +250,7 @@
     create.addEventListener('click', () => {
       panel.dataset.busy = 'true'
       create.disabled = cancel.disabled = close.disabled = true
-      createEvent(login, input, given.session, flyer, create)
+      createEvent(login, publishing, input, given.session, flyer, create)
         .catch((error) => fail(`${SOMETHING_WRONG} : ${reason(error.message)}.`))
         .finally(() => {
           close.disabled = false
@@ -262,10 +276,37 @@
     )
   }
 
+  // Where to save the event in the session by hand, when it couldn't be saved, before the link to its page.
+  const PASTE = 'Collez son lien dans « Événement RA », sur la '
+  // Why the site refused to save the event in the session, and where to save it by hand, by its status.
+  const NOT_SAVED = {
+    403: { why: 'le lien de publication n’est plus valide', where: PASTE },
+    404: { why: 'la session n’existe plus', where: null },
+    409: { why: 'la session a déjà un événement RA', where: 'Vérifiez « Événement RA » sur la ' },
+  }
+
+  // Saves the event, `id`, as the session's, with the token, `publishing`. Gives null once it's saved, or else why it
+  // couldn't be, and where to save it by hand, if anywhere. Never throws: the event is on RA all the same.
+  async function save(publishing, id) {
+    try {
+      // So that a site that never answers doesn't keep the panel busy.
+      const signal = AbortSignal.timeout(30_000)
+      const init = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raEvent: id }), signal }
+      const response = await fromSite('/api/ra-publication/ra-event', publishing, init)
+      if (!response) return { why: signal.aborted ? `${SITE} n’a pas répondu à temps` : `${SITE} n’a pas pu être joint`, where: PASTE }
+      if (response.ok) return null
+      if (NOT_SAVED[response.status]) return NOT_SAVED[response.status]
+      return { why: (await response.json().catch(() => null))?.error ?? `${SITE} a répondu ${response.status}`, where: PASTE }
+    } catch {
+      // E.g. a browser without AbortSignal.timeout.
+      return { why: 'quelque chose n’a pas fonctionné', where: PASTE }
+    }
+  }
+
   // Creates the event, once, with `flyer`, if it's given and RA takes it, and says how it went, never trying again on its
-  // own, then leads back to `session`'s page. When the flyer can't be uploaded, the event is created without it. Says what
-  // it's doing on `button`.
-  async function createEvent(token, input, session, flyer, button) {
+  // own, then saves it as `session`'s event on RA, with the token, `publishing`. When the flyer can't be uploaded, the
+  // event is created without it. Says what it's doing on `button`.
+  async function createEvent(token, publishing, input, session, flyer, button) {
     let eventInput = input
     let notSent = null
     if (flyer) {
@@ -278,30 +319,32 @@
     }
     button.textContent = 'Création…'
     const answer = await graphql(token, CREATE_EVENT, { eventInput })
-    // Checked, since it goes in the link back to the session.
+    // Checked, since it's shown as a link, and saved in the session.
     const id = answer.data?.createEvent?.id
     if (!/^\d{1,20}$/.test(id)) {
       const refused = errors(answer)
       return fail(refused ? `RA a refusé de créer l’événement : ${refused}` : `${SOMETHING_WRONG}.`)
     }
-    const link = (text, href) => {
-      const node = element('a', text)
-      node.href = href
-      node.target = '_blank'
-      node.rel = 'noopener'
-      return node
-    }
     const eventUrl = `https://ra.co/events/${id}`
-    const back = `${SITE}/admin/sessions/${encodeURIComponent(session)}?raEvent=${id}`
+    // The event's link, as soon as it's created, then whether it's saved in the session.
+    const saving = paragraph('Enregistrement dans la session…')
     show(
       paragraph(['Événement créé sur RA : ', link(eventUrl, eventUrl)]),
-      paragraph([link('Enregistrer l’événement dans la session', back), ' (ou collez son lien dans « Événement RA » de la session).']),
+      saving,
       // Unless the flyer was sent with it.
       ...(notSent
         ? [inRed(`Le flyer n’a pas pu être envoyé à RA : ${reason(notSent)}. Ajoutez-le à la main, sur la page de l’événement sur RA.`)]
         : eventInput.images
           ? []
           : [paragraph('Ajoutez le flyer à la main, sur la page de l’événement sur RA.')]),
+    )
+    const notSaved = await save(publishing, id)
+    const sessionPage = (text) => link(text, `${SITE}/admin/sessions/${encodeURIComponent(session)}`)
+    if (!notSaved) return saving.replaceWith(paragraph(['Il est enregistré comme « Événement RA » de la ', sessionPage('session'), '.']))
+    const { why, where } = notSaved
+    saving.replaceWith(
+      inRed(`L’événement n’a pas pu être enregistré dans la session : ${reason(why)}.`),
+      ...(where ? [paragraph([where, sessionPage('page de la session'), '.'])] : []),
     )
   }
 

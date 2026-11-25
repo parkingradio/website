@@ -1,10 +1,11 @@
 # Publishing on RA
 
-What the bookmarklet that creates a session's event on Resident Advisor gets from the server (see
-[Publier sur RA](../client/admin/publier-sur-ra.md)). The bookmarklet runs on RA's site, as the admin logged in to RA
-there, since RA only takes their login from their own browser: it's the one that calls RA, and the server never does.
-Everything else, i.e. what the event is, comes from the server. A session's event on RA is its `raEvent` (see
-[Links, in Sessions](sessions.md#links)), which an admin sets once the event is created on RA.
+What the bookmarklet that creates a session's event on Resident Advisor gets from the server, and how it saves the event
+in the session (see [Publier sur RA](../client/admin/publier-sur-ra.md)). The bookmarklet runs on RA's site, as the
+admin logged in to RA there, since RA only takes their login from their own browser: it's the one that calls RA, and the
+server never does. Everything else, i.e. what the event is, comes from the server. A session's event on RA is its
+`raEvent` (see [Links, in Sessions](sessions.md#links)), which the bookmarklet sets once it created the event on RA, or
+an admin sets by hand.
 
 These endpoints aren't tools of the [MCP server](mcp.md), since the token is a secret.
 
@@ -12,7 +13,8 @@ These endpoints aren't tools of the [MCP server](mcp.md), since the token is a s
 
 The session's page asks for a token for the session
 ([`POST /api/admin/sessions/:id/ra-publication`](#post-apiadminsessionsidra-publication-admin)), which it hands to the
-bookmarklet. The token gives access to that session's event and its flyer for publishing them, and to nothing else.
+bookmarklet. The token gives access to that session's event and its flyer for publishing them, and to setting the
+session's event on RA while it has none, and to nothing else.
 
 It's signed by the server, with a key it derives from its secret for this purpose only, so that it can never pass for
 another of its tokens, e.g. an admin's session. It holds the session, the admin who asked for it, and when it expires,
@@ -27,15 +29,17 @@ that doesn't quote it, before anything else is read. Not 401, which only admin e
 [Rate limits, in Conventions](README.md#conventions)): tokens can't be guessed.
 
 The bookmarklet gets the token through the fragment of RA's page's address, which RA's own scripts can read before the
-bookmarklet removes it: whoever has it can only read the event that's going to RA, and its flyer, for an hour at most.
+bookmarklet removes it: whoever has it can only read the event that's going to RA, and its flyer, and set the session's
+event on RA, while it has none, for an hour at most.
 
 ## Reaching them from RA
 
 The bookmarklet calls the endpoints that take the token from RA's pages, i.e. from another site: they allow
 `https://ra.co` and its subdomains, e.g. `https://fr.ra.co`, to read their responses, errors included (CORS), without
 cookies, and no other site. Since requests send the `Authorization` header, browsers first ask whether they may, with an
-`OPTIONS` request to the same path (a preflight), which gets 204, allowing that header and the endpoint's methods to
-those sites. Every response, whether it succeeds or fails, has `Cache-Control: no-store`.
+`OPTIONS` request to the same path (a preflight), which gets 204, allowing that header, `Content-Type`, since one of them
+takes JSON, and their methods, `GET` and `PUT`, to those sites. Every response, whether it succeeds or fails, has
+`Cache-Control: no-store`.
 
 ## The event
 
@@ -83,12 +87,13 @@ The session's event, for the token in `Authorization`.
 |---|---|---|
 | `ok` | `true` | |
 | `environment` | string | The server's environment, as [`GET /api/config`](README.md#get-apiconfig) gives it, so that the bookmarklet warns outside production |
-| `session` | string | The session's id, which the bookmarklet's link back to the session's page has |
+| `session` | string | The session's id, which the bookmarklet's link to the session's page has |
 | `hasFlyer` | boolean | Whether the session has a flyer, which [`GET /api/ra-publication/flyer`](#get-apira-publicationflyer) gives |
 | `event` | object | The session's event (see [The event](#the-event)) |
 
 Fails with 403 without a valid token, 404 when the session no longer exists, and 409 when it has no start, since RA
-needs one, or is cancelled, e.g. since the token was given.
+needs one, is cancelled, e.g. since the token was given, or already has an event on RA, e.g. one the bookmarklet created
+since, so that it isn't created twice.
 
 ## `GET /api/ra-publication/flyer`
 
@@ -98,3 +103,17 @@ The session's flyer, for the token in `Authorization`, as the bookmarklet upload
 
 Fails with 403 without a valid token, and 404 when the session no longer exists, when it has no flyer, or when its flyer
 is missing.
+
+## `PUT /api/ra-publication/ra-event`
+
+Sets the session's `raEvent`, for the token in `Authorization`, once the bookmarklet created the event on RA. It's the
+only endpoint where the token, rather than an admin's session, changes something, and it only changes that: the
+session's `raEvent`, only while it has none. It counts as changing the session, by the admin the token is for, now
+(`updatedBy` and `updatedAt`), whatever the session's status or start, since the event is on RA all the same.
+
+| Request field | Type | |
+|---|---|---|
+| `raEvent` | string | The event, as a session's `raEvent` takes it (see [Links, in Sessions](sessions.md#links)), but never none |
+
+Responds `{"ok": true}`. Fails with 403 without a valid token, 400 when `raEvent` isn't an event on RA, 404 when the
+session no longer exists, and 409 when it already has an event on RA, even the same one.
