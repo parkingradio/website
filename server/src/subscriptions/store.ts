@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { TOKEN_FORMAT, generateToken } from '../core/tokens.js'
+import { TOKEN_FORMAT, randomToken } from '../core/tokens.js'
 import type { Queryable } from '../db/connection.js'
 import { users } from '../db/schema.js'
 import { isUuid } from '../db/uuid.js'
@@ -35,9 +35,9 @@ export function subscriptionsStore(db: Queryable): SubscriptionsStore {
 
   return {
     // In a single statement, so that two requests at once, e.g. from two tabs, both give the token that one of them keeps.
-    token: (adminId) => setToken(adminId, sql`coalesce(${users.subscriptionToken}, ${generateToken().token})`),
+    token: (adminId) => setToken(adminId, sql`coalesce(${users.subscriptionToken}, ${randomToken()})`),
 
-    replace: (adminId) => setToken(adminId, generateToken().token),
+    replace: (adminId) => setToken(adminId, randomToken()),
 
     async isToken(token) {
       if (!TOKEN_FORMAT.test(token)) return false

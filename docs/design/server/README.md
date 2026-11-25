@@ -10,10 +10,9 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
 - **JSON.** Requests with a body send JSON (`Content-Type: application/json`), unless said otherwise, and every response
   is JSON, except for photos, flyers and the calendar feeds: [`GET /calendar.ics`](events.md#get-calendarics), and the
   admins' own, [`GET /sessions.ics` and `GET /occupations.ics`](subscriptions.md). A body of a type the endpoint doesn't
-  take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that
-  are larger than any endpoint needs, with a 413. One exception: in
-  production, nginx itself refuses requests whose body is over 52 MB, with a 413 that isn't JSON: that's room for a
-  collective's application with 5 photos.
+  take fails with a 4xx, and the server refuses bodies other than `multipart/form-data` that are larger than any
+  endpoint needs, with a 413. One exception: in production, nginx itself refuses requests whose body is over 52 MB, with
+  a 413 that isn't JSON: that's room for a collective's application with 5 photos.
 - **Times.** Parking Radio is in Québec City, so times are in Québec time, the `America/Toronto` time zone, with
   daylight saving time. Instants, e.g. when something was created, or a session's start, are dates and times in Québec
   time, with the offset from UTC in effect in Québec at that instant: since 2007, -05:00, or -04:00 from the second
@@ -65,7 +64,9 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   production, requests only reach the server through Cloudflare, which sets it, and nginx. IPv6 addresses count by
   their /64 prefix, since a client is usually given a whole range of them. Over the limit, clients get a 429 error.
   The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
-  their requests from their own servers, which share a few addresses.
+  their requests from their own servers, which share a few addresses. Neither do admins' own calendar feeds (see
+  [Subscriptions](subscriptions.md)), for the same reasons: calendar apps like Google's read them from their own
+  servers too.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -95,12 +96,12 @@ Requests and responses are described field by field. A field whose type says "or
 ## Serving the client
 
 The server serves the client's build: its files as they are, and the app, with a 200 status, for any other `GET` or
-`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`,
-and those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where the build's files are. The
-app then shows the page for that path. This includes paths that aren't one of the app's pages (a "soft 404", see
-[Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has. Other requests for
-paths that don't exist, whatever their body, and paths that don't exist under `/assets` and `/.well-known`, e.g.
-`/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
+`HEAD` request, except for the server's own paths: `/healthz`, `/calendar.ics`, `/sessions.ics`, `/occupations.ics`, and
+those under `/api`, `/mcp`, `/.well-known`, where the metadata documents of [OAuth](oauth.md) are, and `/assets`, where
+the build's files are. The app then shows the page for that path. This includes paths that aren't one of the app's pages
+(a "soft 404", see [Page introuvable](../client/not-found.md)), since the server doesn't know which pages the app has.
+Other requests for paths that don't exist, whatever their body, and paths that don't exist under `/assets` and
+`/.well-known`, e.g. `/.well-known/openid-configuration`, get a 404 error (see [Conventions](#conventions)).
 
 Other sites can't show the app in a frame (`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors
 'none'`), so that they can't trick admins into clicking its buttons, e.g. to allow an app (see

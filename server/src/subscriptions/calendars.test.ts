@@ -42,8 +42,28 @@ function session(fields: Partial<StoredSession> = {}): StoredSession {
 }
 
 // A set of a session, with its performers, by name.
-const set = (names: string[], status: StoredSet['status'] = 'planned') =>
-  ({ status, performers: names.map((name) => ({ id: `artist-${name}`, name })) }) as StoredSet
+const set = (names: string[], status: StoredSet['status'] = 'planned'): StoredSet => ({
+  id: `set-${names.join('-')}`,
+  createdAt: new Date('2026-10-01T12:00:00Z'),
+  createdBy: 'admin@example.com',
+  sessionId: 'session-1',
+  position: 0,
+  durationMinutes: 60,
+  performanceTypes: ['dj'],
+  otherPerformanceType: '',
+  genres: [],
+  soundcloudTrackId: null,
+  soundcloudTrackUrl: null,
+  youtubeVideoId: null,
+  applicationId: null,
+  updatedBy: null,
+  updatedAt: null,
+  status,
+  statusUpdatedBy: null,
+  statusUpdatedAt: null,
+  performers: names.map((name) => ({ id: `artist-${name}`, name })),
+  application: null,
+})
 
 // The events of a calendar, as a parser reads them.
 function vevents(body: string) {
@@ -69,7 +89,7 @@ describe('sessionsCalendar', () => {
     expect(calendarName(sessionsCalendar([], { ...OPTIONS, environment: 'test' }))).toBe('Parking Radio (test) · sessions')
   })
 
-  it('has each session, with a UID of its own, its times in UTC, and a link to its admin page', () => {
+  it('has each session, with a UID of its own, its times in UTC, free rather than busy, and a link to its admin page', () => {
     const body = sessionsCalendar([session({ description: 'Une soirée.', sets: [set(['Ana', 'Brume']), set(['Cyan'], 'cancelled')] })], OPTIONS)
     expect(body).toContain(
       [
@@ -79,6 +99,7 @@ describe('sessionsCalendar', () => {
         'DTSTART:20261115T020000Z',
         'DTEND:20261115T040000Z',
         'SUMMARY:GUEST MIXES',
+        'TRANSP:TRANSPARENT',
         'LOCATION:parking.radio',
         'DESCRIPTION:Ana\\nBrume\\n\\nUne soirée.',
         'URL:https://parking.radio/admin/sessions/session-1',
@@ -133,6 +154,8 @@ describe('occupationsCalendar', () => {
     expect(untitled.value('summary')).toBe("Calendrier de l'équipe")
     expect(titled.vevent.getFirstProperty('dtstart')!.toICALString()).toBe('DTSTART:20261120T140000Z')
     expect(titled.vevent.getFirstProperty('dtend')!.toICALString()).toBe('DTEND:20261120T160000Z')
+    expect(titled.value('transp')).toBe('TRANSPARENT')
+    expect(untitled.value('transp')).toBe('TRANSPARENT')
     expect(titled.value('description')).toBeNull()
     expect(titled.value('url')).toBeNull()
   })
@@ -148,8 +171,8 @@ describe('occupationsCalendar', () => {
   })
 
   it('gives occupations UIDs made from what they are, the same from one read to the next, and different for those that are the same', () => {
-    const uids = (events: ReturnType<typeof occupation>[], id = 'feed-1') =>
-      vevents(occupationsCalendar([{ feed: feed({ id }), read: read({ events }) }], OPTIONS)).map(({ value }) => value('uid') as string)
+    const uids = (events: ReturnType<typeof occupation>[], fields: Partial<FeedWithRead['feed']> = {}) =>
+      vevents(occupationsCalendar([{ feed: feed(fields), read: read({ events }) }], OPTIONS)).map(({ value }) => value('uid') as string)
     const stay = occupation('2026-11-20T14:00:00Z', '2026-11-22T16:00:00Z', { title: 'Séjour' })
     const repair = occupation('2026-11-25T14:00:00Z', '2026-11-25T16:00:00Z', { title: 'Réparation' })
     const [first, second] = uids([stay, repair])
@@ -157,11 +180,12 @@ describe('occupationsCalendar', () => {
     expect(second).not.toBe(first)
     // Read again, in another order, or with the feed renamed: the same.
     expect(uids([repair, stay])).toEqual([second, first])
+    expect(uids([stay, repair], { name: 'Airbnb' })).toEqual([first, second])
     // Any change to the event makes it another one, and so does another feed.
     expect(uids([{ ...stay, title: 'Autre séjour' }])[0]).not.toBe(first)
     expect(uids([{ ...stay, end: new Date('2026-11-22T17:00:00Z') }])[0]).not.toBe(first)
     expect(uids([{ ...stay, wholeDay: true }])[0]).not.toBe(first)
-    expect(uids([stay], 'feed-2')[0]).not.toBe(first)
+    expect(uids([stay], { id: 'feed-2' })[0]).not.toBe(first)
     // Two stays with the same dates, on the same platform.
     const same = uids([stay, stay, stay])
     expect(new Set(same).size).toBe(3)
@@ -182,14 +206,15 @@ describe('occupationsCalendar', () => {
     expect(failedEvent.time('dtstart').toString()).toBe('2026-11-19')
     expect(failedEvent.time('dtend').toString()).toBe('2026-11-20')
     expect(failedEvent.value('description')).toBe(
-      'The last read of this calendar feed failed: The link answered with an error (404)\nIt was last read successfully on 2026-11-19 10:00, Québec time.',
+      'The last read of this calendar feed failed. The link answered with an error (404).\nIt was last read successfully on 2026-11-19 10:00, Québec time.',
     )
+    expect(failedEvent.value('transp')).toBe('TRANSPARENT')
     expect(failedEvent.value('url')).toBe('https://parking.radio/admin/calendrier')
 
     expect(neverEvent.value('uid')).toBe('feed-feed-3@parking.radio')
     expect(neverEvent.value('summary')).toBe('[NOT READ] Équipe')
     expect(neverEvent.value('description')).toBe(
-      "The last read of this calendar feed failed: The link's server can't be reached\nIt hasn't been read successfully since the server started.",
+      "The last read of this calendar feed failed. The link's server can't be reached.\nIt hasn't been read successfully since the server started.",
     )
   })
 

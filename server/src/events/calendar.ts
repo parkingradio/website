@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify'
 import { calendar as icalendar, dateTime, text } from '../core/icalendar.js'
-import type { SessionType } from '../sessions/fields.js'
 import { SYNTH_MEETUP_LINEUP } from '../sessions/lineup.js'
 import { event } from './routes.js'
 import type { Event } from './routes.js'
@@ -15,48 +14,51 @@ const REFRESH_INTERVAL = 'PT1H'
 const LOCATION = 'parking.radio'
 // How cancelled events are marked, as on Programmation (`CANCELLED` in client/src/public-events.ts), the way RA marks its
 // cancelled events.
-export const CANCELLED = '[CANCELLED]'
+const CANCELLED = '[CANCELLED]'
 // How long browsers and calendar apps can keep the feed.
 const CACHE_CONTROL = 'public, max-age=300'
 
-// The description of a session's event: the names of its lineup, one per line, then a blank line and its description,
-// either of which can be missing. A synth meetup without a lineup that isn't cancelled has OPEN JAM, as on Programmation.
-export function eventDescription({ lineup, type, cancelled, description }: { lineup: { name: string }[]; type: SessionType; cancelled: boolean; description: string }): string {
-  const names = lineup.length === 0 && type === 'synth-meetup' && !cancelled ? [SYNTH_MEETUP_LINEUP] : lineup.map((artist) => artist.name)
-  return [names.join('\n'), description].filter((part) => part !== '').join('\n\n')
+// The description of an event: the names of its lineup, one per line, then a blank line and its description, either of
+// which can be missing. A synth meetup without a lineup that isn't cancelled has OPEN JAM, as on Programmation.
+function description(event: Event): string {
+  const names = event.lineup.length === 0 && event.type === 'synth-meetup' && !event.cancelled ? [SYNTH_MEETUP_LINEUP] : event.lineup.map((artist) => artist.name)
+  return [names.join('\n'), event.description].filter((part) => part !== '').join('\n\n')
 }
 
-// A session's VEVENT, in the feed of the public events, or in an admin's own (see subscriptions/calendars.ts), which only
-// differ by their UID, SUMMARY and URL.
-export function sessionVevent(fields: { uid: string; now: Date; start: Date | string; end: Date | string; summary: string; cancelled: boolean; description: string; url: string }): string[] {
-  const { uid, now, start, end, summary, cancelled, description, url } = fields
+type VeventOptions = {
+  uid: string
+  url: string
+  // When the feed is made, which is every event's DTSTAMP.
+  now: Date
+  // What its title is marked with, after CANCELLED for a cancelled event.
+  marks?: string[]
+  // Whether it leaves the time it takes free in calendar apps (TRANSP:TRANSPARENT), rather than busy, as they make it by
+  // default.
+  transparent?: boolean
+}
+
+// An event's VEVENT, as this feed has it, or as an admin's own feed of sessions has it, with a UID, a URL and marks of its
+// own (see subscriptions/calendars.ts), so that both feeds give sessions the same way.
+export function eventVevent(event: Event, { uid, url, now, marks = [], transparent = false }: VeventOptions): string[] {
+  const about = description(event)
   return [
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${dateTime(now)}`,
-    `DTSTART:${dateTime(start)}`,
-    `DTEND:${dateTime(end)}`,
-    `SUMMARY:${text(summary)}`,
-    ...(cancelled ? ['STATUS:CANCELLED'] : []),
+    `DTSTART:${dateTime(event.start)}`,
+    `DTEND:${dateTime(event.end)}`,
+    `SUMMARY:${text([...(event.cancelled ? [CANCELLED] : []), ...marks, event.title].join(' '))}`,
+    ...(event.cancelled ? ['STATUS:CANCELLED'] : []),
+    ...(transparent ? ['TRANSP:TRANSPARENT'] : []),
     `LOCATION:${LOCATION}`,
-    ...(description === '' ? [] : [`DESCRIPTION:${text(description)}`]),
+    ...(about === '' ? [] : [`DESCRIPTION:${text(about)}`]),
     `URL:${url}`,
     'END:VEVENT',
   ]
 }
 
-function vevent(event: Event, { siteOrigin, now }: CalendarOptions): string[] {
-  return sessionVevent({
-    uid: `${event.id}@parking.radio`,
-    now,
-    start: event.start,
-    end: event.end,
-    summary: event.cancelled ? `${CANCELLED} ${event.title}` : event.title,
-    cancelled: event.cancelled,
-    description: eventDescription(event),
-    url: event.raEvent ?? `${siteOrigin}/programmation`,
-  })
-}
+const vevent = (event: Event, { siteOrigin, now }: CalendarOptions) =>
+  eventVevent(event, { uid: `${event.id}@parking.radio`, url: event.raEvent ?? `${siteOrigin}/programmation`, now })
 
 type CalendarOptions = {
   // Where the site is, whose Programmation page is the link of events without one on RA.

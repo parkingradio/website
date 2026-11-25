@@ -92,6 +92,15 @@ describe('the token', () => {
     expect((await sessionsFeed(replaced)).statusCode).toBe(200)
   })
 
+  it("refuses a token that isn't in the format of tokens, rather than failing, whatever it is", async () => {
+    const token = await tokenOf(await createAdmin())
+    for (const malformed of ['x', '%00', `${token.slice(0, 63)}%00`, token.toUpperCase(), `${token}a`, `%20${token}`, '%E2%82%AC'.repeat(30)]) {
+      const response = await sessionsFeed(malformed)
+      expect(response.statusCode, malformed).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: "The link's token isn't an admin's" })
+    }
+  })
+
   it('is the same for requests that ask for it at once, before the admin has one', async () => {
     const ana = await createAdmin()
     const tokens = await Promise.all(Array.from({ length: 5 }, () => tokenOf(ana)))

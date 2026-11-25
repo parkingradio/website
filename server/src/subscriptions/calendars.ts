@@ -2,12 +2,10 @@ import { createHash } from 'node:crypto'
 import { addDays, inQuebecTime, quebecDay } from '../api/formats.js'
 import type { StoredFeed } from '../calendar/feeds.js'
 import type { FeedRead } from '../calendar/reads.js'
-import { calendar, date, dateTime, text } from '../core/icalendar.js'
 import { serverName } from '../core/config.js'
-import { CANCELLED, eventDescription, sessionVevent } from '../events/calendar.js'
-import { effectiveDescription } from '../sessions/descriptions.js'
-import { after, sessionTitle } from '../sessions/fields.js'
-import { lineup } from '../sessions/lineup.js'
+import { calendar, date, dateTime, text } from '../core/icalendar.js'
+import { eventVevent } from '../events/calendar.js'
+import { event } from '../events/routes.js'
 import type { StoredSession } from '../sessions/store.js'
 
 // Admins' own calendar feeds, of the sessions and of the occupations, in iCalendar (see
@@ -15,10 +13,13 @@ import type { StoredSession } from '../sessions/store.js'
 
 // How often subscribers are asked to read them again: as often as the server reads the calendar feeds.
 const REFRESH_INTERVAL = 'PT15M'
-// How sessions that aren't announced are marked, after CANCELLED.
+// How sessions that aren't announced are marked, after `[CANCELLED]`.
 const UNANNOUNCED = '[UNANNOUNCED]'
 // How the calendar feeds whose last read failed are marked.
 const NOT_READ = '[NOT READ]'
+// Every event leaves the time it takes free in calendar apps, rather than busy, as they make it by default: these calendars
+// are about the studio, not the admin's own time.
+const TRANSPARENT = 'TRANSP:TRANSPARENT'
 
 export type CalendarOptions = {
   // Where the site is, which the events link to.
@@ -32,21 +33,17 @@ export type CalendarOptions = {
 // A calendar's name, e.g. "Parking Radio (test) · sessions" in the test environment.
 const calendarName = (what: string, environment: string) => `${serverName(environment)} · ${what}`
 
-// The feed of the sessions `rows`, which all have a start, in any order.
+// The feed of the sessions `rows`, which all have a start, in any order. Each one is the VEVENT of its event in
+// /calendar.ics, as if it were announced, with its own UID and URL.
 export function sessionsCalendar(rows: StoredSession[], { siteOrigin, environment, now }: CalendarOptions): string {
-  const vevent = (row: StoredSession): string[] => {
-    const cancelled = row.status === 'cancelled'
-    return sessionVevent({
+  const vevent = (row: StoredSession) =>
+    eventVevent(event(row), {
       uid: `session-${row.id}@parking.radio`,
-      now,
-      start: row.startAt!,
-      end: after(row.startAt!, row.durationMinutes),
-      summary: [cancelled && CANCELLED, !row.announced && UNANNOUNCED, sessionTitle(row)].filter(Boolean).join(' '),
-      cancelled,
-      description: eventDescription({ ...row, lineup: lineup(row.sets), cancelled, description: effectiveDescription(row) }),
       url: `${siteOrigin}/admin/sessions/${row.id}`,
+      now,
+      marks: row.announced ? [] : [UNANNOUNCED],
+      transparent: true,
     })
-  }
   return calendar({ name: calendarName('sessions', environment), refreshInterval: REFRESH_INTERVAL, components: rows.map(vevent) })
 }
 
@@ -79,6 +76,7 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
         time('DTSTART', start, wholeDay),
         time('DTEND', end, wholeDay),
         `SUMMARY:${text(title === '' ? feed.name : `${title} (${feed.name})`)}`,
+        TRANSPARENT,
         'END:VEVENT',
       ]
     }),
@@ -98,7 +96,8 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
         `DTSTART;VALUE=DATE:${date(today)}`,
         `DTEND;VALUE=DATE:${date(addDays(today, 1))}`,
         `SUMMARY:${text(`${NOT_READ} ${feed.name}`)}`,
-        `DESCRIPTION:${text(`The last read of this calendar feed failed: ${read.error}\n${since}`)}`,
+        TRANSPARENT,
+        `DESCRIPTION:${text(`The last read of this calendar feed failed. ${read.error}.\n${since}`)}`,
         `URL:${siteOrigin}/admin/calendrier`,
         'END:VEVENT',
       ]

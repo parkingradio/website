@@ -53,12 +53,14 @@ export function useApiErrors(app: FastifyInstance, options: ErrorOptions = {}) {
   })
 }
 
-// Logs why requests that fail with a 4xx failed: the message of their `ApiError`, however it's sent, e.g. by a route itself
-// rather than by the error handler (see Logs in docs/design/server/README.md). Errors sent in another format, e.g.
+// Logs why requests that fail with a 4xx, or a 5xx other than a 500, e.g. a 502 or a 503 that a route sends, failed: the
+// message of their `ApiError`, however it's sent, e.g. by a route itself rather than by the error handler (see Logs in
+// docs/design/server/README.md). Errors sent in another format, e.g.
 // OAuth's, are logged where they're sent. Once for the whole app, since its plugins have its hooks.
 export function logApiErrors(app: FastifyInstance) {
   app.addHook('preSerialization', async (request, reply, payload: unknown) => {
-    const failed = reply.statusCode >= 400 && reply.statusCode < 500 && typeof payload === 'object' && payload !== null
+    // Not a 500, whose error is logged where it's handled, while its message only says that something went wrong.
+    const failed = reply.statusCode >= 400 && reply.statusCode !== 500 && typeof payload === 'object' && payload !== null
     if (failed && 'ok' in payload && payload.ok === false && 'error' in payload && typeof payload.error === 'string') {
       logWithRequest(request, { error: payload.error })
     }

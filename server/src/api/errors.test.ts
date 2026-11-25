@@ -23,6 +23,7 @@ async function buildApp(logs: string[] = []) {
   app.post('/api/takes-json', async () => ({ ok: true }))
   // Errors that don't go through the error handler.
   app.get('/api/missing', async (_request, reply) => reply.status(404).send({ ok: false, error: 'No such thing', thing: 'secret' }))
+  app.get('/api/unavailable', async (_request, reply) => reply.status(503).send({ ok: false, error: 'Not ready yet' }))
   app.get('/api/guarded', { onRequest: async (_request, reply) => reply.status(401).send({ ok: false, error: 'Unauthorized' }) }, async () => ({ ok: true }))
   app.get('/api/things/:id', async () => ({ ok: true }))
   await app.register(notFoundRoutes, { prefix: '/api' })
@@ -71,7 +72,7 @@ describe("the app's error handler", () => {
     ])
   })
 
-  it('logs why a request failed with a 4xx, however its error is sent, without its other fields', async () => {
+  it('logs why a request failed with a 4xx, or a 5xx other than a 500, however its error is sent, without its other fields', async () => {
     const logs: string[] = []
     const app = await buildApp(logs)
     const failures = [
@@ -79,6 +80,7 @@ describe("the app's error handler", () => {
       ['/api/missing', 404, 'No such thing'],
       ['/api/guarded', 401, 'Unauthorized'],
       ['/api/nope', 404, 'Not found'],
+      ['/api/unavailable', 503, 'Not ready yet'],
     ] as const
     for (const [url, status, error] of failures) {
       await app.inject({ method: 'GET', url })

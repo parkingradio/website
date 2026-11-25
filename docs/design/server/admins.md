@@ -106,5 +106,5 @@ An admin has:
 ## `DELETE /api/admin/admins/:id` (admin)
 
 Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, their sessions and connections end, and the
-links of their calendar feeds stop working (see [Subscriptions](subscriptions.md)). For
-an admin who hasn't accepted their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).
+links of their calendar feeds stop working (see [Subscriptions](subscriptions.md)). For an admin who hasn't accepted
+their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).

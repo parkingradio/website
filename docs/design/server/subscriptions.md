@@ -1,6 +1,7 @@
 # Subscriptions
 
-Admins' own calendar feeds, which each admin subscribes to in their calendar app, so that it shows what takes the studio:
+Admins' own calendar feeds, which each admin subscribes to in their calendar app, so that it shows what takes the
+studio:
 
 - [`GET /sessions.ics`](#get-sessionsics): the sessions, announced or not (see [Sessions](sessions.md)).
 - [`GET /occupations.ics`](#get-occupationsics): the occupations, read from the calendar feeds (see
@@ -31,7 +32,8 @@ The links are only given to their admin. Whoever has them can read both feeds, u
 
 The token is in the links, so it can end up in logs other than the server's, e.g. a proxy's, or a calendar app's. The
 server's own logs never have it, since they leave out the values of query strings (see
-[Logs, in Conventions](README.md#conventions)). There's no rate limit (see [Conventions](README.md#conventions)).
+[Logs, in Conventions](README.md#conventions)). There's no rate limit (see
+[Rate limits, in Conventions](README.md#conventions)).
 
 ## The feeds
 
@@ -41,19 +43,22 @@ token, before anything else is read. Not 401, which only admin endpoints give (s
 [Admin endpoints, in Conventions](README.md#conventions)), and which some calendar apps take as a request for a user name
 and a password. Other query parameters are ignored.
 
-They respond with `Content-Type: text/calendar; charset=utf-8` and `Cache-Control: no-store`: unlike `/calendar.ics`,
-they're never kept, by browsers, calendar apps or what's between them and the server. Unless they fail, they respond with
-a calendar, even without any event. A calendar has `VERSION:2.0`, a `PRODID`, and its name, in both `NAME` and
-`X-WR-CALNAME`: "Parking Radio · sessions" or "Parking Radio · occupations", with the server's environment after
-"Parking Radio" outside production, as the [MCP server](mcp.md#the-endpoint)'s name has it, e.g. "Parking Radio (test) ·
-sessions", so that admins tell their environments' calendars apart. It asks apps to read it again every 15 minutes
-(`REFRESH-INTERVAL;VALUE=DURATION:PT15M` and `X-PUBLISHED-TTL:PT15M`), which some of them do, while others keep their
-own schedule, e.g. up to a day.
+Unless they fail, they respond with a calendar, even without any event, with `Content-Type: text/calendar;
+charset=utf-8`. Every response, whether they succeed or fail, has `Cache-Control: no-store`: unlike `/calendar.ics`,
+they're never kept, by browsers, calendar apps or what's between them and the server.
 
-Its events are `VEVENT`s, each with a `UID`, which stays the same as long as it's the same event, so that a change updates
-it in calendars rather than adding another one, a `DTSTAMP`, the time of the request, and a `DTSTART` and a `DTEND`. Times
-are in UTC, e.g. `20261115T020000Z`, and whole days are dates (`VALUE=DATE`), in Québec, e.g. `20261115`, with the day
-after the last one as `DTEND`. Text values are escaped and folded as in [`GET /calendar.ics`](events.md#get-calendarics).
+A calendar has `VERSION:2.0`, a `PRODID`, and its name, in both `NAME` and `X-WR-CALNAME`: "Parking Radio · sessions"
+or "Parking Radio · occupations", with the server's environment after "Parking Radio" outside production, as the
+[MCP server](mcp.md#the-endpoint)'s name has it, e.g. "Parking Radio (test) · sessions", so that admins tell their
+environments' calendars apart. It asks apps to read it again every 15 minutes (`REFRESH-INTERVAL;VALUE=DURATION:PT15M`
+and `X-PUBLISHED-TTL:PT15M`), which some of them do, while others keep their own schedule, e.g. up to a day.
+
+Its events are `VEVENT`s, each with a `UID`, which stays the same as long as it's the same event, so that a change
+updates it in calendars rather than adding another one, a `DTSTAMP`, the time of the request, a `DTSTART` and a `DTEND`,
+and `TRANSP:TRANSPARENT`, so that calendar apps don't show the admin as busy then: these calendars are about the studio,
+not the admin's own time. Times are in UTC, e.g. `20261115T020000Z`, and whole days are dates (`VALUE=DATE`), in Québec,
+e.g. `20261115`, with the day after the last one as `DTEND`. Text values are escaped and folded as in
+[`GET /calendar.ics`](events.md#get-calendarics).
 
 ## `GET /sessions.ics`
 
@@ -79,10 +84,11 @@ before, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) d
 succeeded. They cover what reads keep, from a year before them to two years after them (see
 [Events, in Calendar](calendar.md#events)).
 
-Until every feed has been read once since the server started, whether that read succeeded or failed, it fails with 503,
-rather than give a calendar without the occupations of the feeds that haven't been read yet: calendar apps keep what
-they had, rather than remove those occupations after the server restarts, e.g. after each deploy, and add them back once
-they read the feed again, which can take a day. Without any feed, it gives an empty calendar.
+Until every feed has been read with the link it has, since the server started, whether that read succeeded or failed, it
+fails with 503, rather than give a calendar without the occupations of the feeds that haven't been read yet: calendar
+apps keep what they had, rather than remove those occupations after the server restarts, e.g. after each deploy, and add
+them back once they read the feed again, which can take a day. A feed whose link changed, e.g. through another server,
+waits likewise for its new link to be read. Without any feed, it gives an empty calendar.
 
 Each occupation is a `VEVENT` with:
 
@@ -105,8 +111,8 @@ shows of them can be missing or out of date: each one is a whole-day `VEVENT` on
 
 ## `GET /api/admin/subscription-token` (admin)
 
-The logged-in admin's token (see [The token](#the-token)), which they get the first time they ask for it, and which stays
-the same until it's replaced.
+The logged-in admin's token (see [The token](#the-token)), which they get the first time they ask for it, and which
+stays the same until it's replaced.
 
 | Response field | Type | |
 |---|---|---|

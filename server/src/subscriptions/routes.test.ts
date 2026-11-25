@@ -72,6 +72,7 @@ describe('the feeds', () => {
         const response = await app.inject({ method: 'GET', url: `${path}${query}` })
         expect(response.statusCode, `${path}${query}`).toBe(403)
         expect(response.json()).toEqual({ ok: false, error: "The link's token isn't an admin's" })
+        expect(response.headers['cache-control']).toBe('no-store')
         expect(response.body).not.toContain(other)
       }
     }
@@ -96,6 +97,14 @@ describe('the feeds', () => {
 })
 
 describe('GET /sessions.ics', () => {
+  it('is never kept, even when it fails unexpectedly', async () => {
+    const app = await buildApp()
+    store.sessions.mockRejectedValueOnce(new Error('The database is gone'))
+    const response = await app.inject({ method: 'GET', url: `/sessions.ics?token=${TOKEN}` })
+    expect(response.statusCode).toBe(500)
+    expect(response.headers['cache-control']).toBe('no-store')
+  })
+
   it('has the sessions of the feed at the time of the request', async () => {
     const app = await buildApp()
     const before = Date.now()
@@ -110,12 +119,12 @@ describe('GET /occupations.ics', () => {
   const get = async () => (await buildApp()).inject({ method: 'GET', url: `/occupations.ics?token=${TOKEN}` })
   const occupation = { start: new Date('2026-11-20T14:00:00Z'), end: new Date('2026-11-20T16:00:00Z'), wholeDay: false, title: 'Réparation' }
 
-  it('fails with 503 until a read of every feed has ended since the server started', async () => {
+  it('fails with 503 until a read of every feed, with the link it has, has ended since the server started', async () => {
     read.set('feed-0', { events: [occupation], readAt: new Date(), error: null })
     const response = await get()
     expect(response.statusCode).toBe(503)
     expect(response.headers['cache-control']).toBe('no-store')
-    expect(response.json()).toEqual({ ok: false, error: "The calendar feeds haven't all been read yet since the server started" })
+    expect(response.json()).toEqual({ ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" })
   })
 
   it('gives the occupations once every feed has been read, even when a read failed, with an event about that feed', async () => {
