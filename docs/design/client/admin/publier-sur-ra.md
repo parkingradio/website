@@ -66,7 +66,9 @@ What the script does:
 - It gets the event from the site it was loaded from, and never from another one, with the token
   ([`GET /api/ra-publication`](../../server/ra-publication.md#get-apira-publication)). When the site refuses the token,
   e.g. once it expired, or when it comes from another environment's site, it says to click « Publier sur RA » on the
-  session's page again, then the bookmarklet of that session's site. When the site can't be reached, it says so.
+  session's page again, then the bookmarklet of that session's site. When the session already has an event on RA, e.g.
+  one created since from a session's page left open, it says so, and to check its « Événement RA » on the session's
+  page. When the site can't be reached, it says so.
 - When the session has a flyer, it gets it from the same site, with the token
   ([`GET /api/ra-publication/flyer`](../../server/ra-publication.md#get-apira-publicationflyer)), and only keeps it when
   it's a JPEG. When it can't have it, it says so, and why, in place of the flyer, and that the event will be created

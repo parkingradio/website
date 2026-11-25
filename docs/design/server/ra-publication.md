@@ -14,7 +14,7 @@ These endpoints aren't tools of the [MCP server](mcp.md), since the token is a s
 The session's page asks for a token for the session
 ([`POST /api/admin/sessions/:id/ra-publication`](#post-apiadminsessionsidra-publication-admin)), which it hands to the
 bookmarklet. The token gives access to that session's event and its flyer for publishing them, and to setting the
-session's event on RA, once, while it has none, and to nothing else.
+session's event on RA while it has none, and to nothing else.
 
 It's signed by the server, with a key it derives from its secret for this purpose only, so that it can never pass for
 another of its tokens, e.g. an admin's session. It holds the session, the admin who asked for it, and when it expires,
@@ -108,9 +108,8 @@ is missing.
 
 Sets the session's `raEvent`, for the token in `Authorization`, once the bookmarklet created the event on RA. It's the
 only endpoint where the token, rather than an admin's session, changes something, and it only changes that: the
-session's `raEvent`, only while it has none, so that a token can at most set it once. It counts as changing the session,
-by the admin the token is for, now (`updatedBy` and `updatedAt`), whatever the session's status or start, since the
-event is on RA all the same.
+session's `raEvent`, only while it has none. It counts as changing the session, by the admin the token is for, now
+(`updatedBy` and `updatedAt`), whatever the session's status or start, since the event is on RA all the same.
 
 | Request field | Type | |
 |---|---|---|

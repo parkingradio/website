@@ -62,9 +62,11 @@ expect_body "^\\{\"ok\":true,\"environment\":\"[a-z]+\",\"session\":\"${session}
 expect_body_contains '"playerLinks":[{"sourceId":"https://www.youtube.com/@parkingdotradio"},{"sourceId":"https://soundcloud.com/parkingdotradio"}],"submissionSource":"SUBMITEVENTPAGE"}}'
 expect_header Access-Control-Allow-Origin 'https://fr\.ra\.co$'
 expect_header Cache-Control 'no-store'
-for endpoint in "$URL" "${URL}/flyer" "$RA_EVENT"; do
-    request --request OPTIONS --header 'Origin: https://fr.ra.co' --header 'Access-Control-Request-Method: GET' \
-        --header 'Access-Control-Request-Headers: authorization' "$endpoint"
+# Each endpoint's, as browsers ask: the method, and the headers the bookmarklet sends.
+for preflight in "GET authorization ${URL}" "GET authorization ${URL}/flyer" "PUT authorization,content-type ${RA_EVENT}"; do
+    read -r method headers endpoint <<< "$preflight"
+    request --request OPTIONS --header 'Origin: https://fr.ra.co' --header "Access-Control-Request-Method: ${method}" \
+        --header "Access-Control-Request-Headers: ${headers}" "$endpoint"
     expect_status 204
     expect_header Access-Control-Allow-Origin 'https://fr\.ra\.co$'
     expect_header Access-Control-Allow-Headers 'Authorization, Content-Type$'
@@ -93,7 +95,7 @@ expect_header Access-Control-Allow-Origin 'https://ra\.co$'
 [ "$(image_format "${FILES}/flyer.jpg")" = 'jpeg 1000x2000' ] || fail "expected a JPEG of 1000x2000, not $(image_format "${FILES}/flyer.jpg")"
 if grep -q PLANTED "${FILES}/flyer.jpg"; then fail "expected the flyer to be without its EXIF"; fi
 
-echo "  a token sets its session's event on RA, from RA's pages, once, while it has none, as its admin"
+echo "  a token sets its session's event on RA, from RA's pages, only while it has none, as its admin"
 # Added by another admin, so that the change is the token's admin's.
 other_cookie="$(session_of "$ADMIN_EMAIL" "$ADMIN_PASSWORD")"
 request --header "Cookie: ${other_cookie}" --form-string \

@@ -220,11 +220,12 @@ describe('GET /api/ra-publication', () => {
 })
 
 describe('The endpoints that take the token', () => {
+  // Each endpoint, with the headers the bookmarklet sends it, which its preflight asks for.
   it.each([
-    ['GET', '/api/ra-publication'],
-    ['GET', '/api/ra-publication/flyer'],
-    ['PUT', '/api/ra-publication/ra-event'],
-  ] as const)("let RA's pages, and only them, read the responses of %s %s, errors included, after asking with a preflight", async (method, url) => {
+    ['GET', '/api/ra-publication', 'authorization'],
+    ['GET', '/api/ra-publication/flyer', 'authorization'],
+    ['PUT', '/api/ra-publication/ra-event', 'authorization,content-type'],
+  ] as const)("let RA's pages, and only them, read the responses of %s %s, errors included, after asking with a preflight", async (method, url, requested) => {
     rows = [withFlyer()]
     const app = await buildApp()
     const token = await tokenFor(app)
@@ -238,7 +239,7 @@ describe('The endpoints that take the token', () => {
       const preflight = await app.inject({
         method: 'OPTIONS',
         url,
-        headers: { origin, 'access-control-request-method': method, 'access-control-request-headers': 'authorization' },
+        headers: { origin, 'access-control-request-method': method, 'access-control-request-headers': requested },
       })
       expect(preflight.statusCode).toBe(204)
       expect(preflight.headers).toMatchObject({

@@ -87,6 +87,8 @@
   const reason = (message) => message.replace(/\.$/, '')
   const SOMETHING_WRONG = 'Quelque chose n’a pas fonctionné'
   const PUBLISH_AGAIN = 'cliquez de nouveau sur « Publier sur RA » sur la page de la session'
+  // What the site says when the session already has an event on RA.
+  const HAS_RA_EVENT = 'This session already has an event on RA'
   // Outside production, that the event is created on RA all the same, naming the environment as the site's pages do.
   const warning = (environment) => {
     const stamp = environment === 'development' ? 'DEV' : String(environment).toUpperCase()
@@ -215,6 +217,8 @@
     if (!response) return fail(`${SITE} n’a pas pu être joint.`)
     if (response.status === 403) return fail(`Ce lien de publication a expiré, ou ne vient pas de ${SITE} : ${PUBLISH_AGAIN}, puis sur le favori de ce site.`)
     const given = await response.json().catch(() => null)
+    // E.g. it was created from a session's page that was left open since.
+    if (given?.error === HAS_RA_EVENT) return fail('La session a déjà un événement RA : vérifiez « Événement RA » sur la page de la session.')
     if (!given?.ok) throw new Error(given?.error ?? `${SITE} a répondu ${response.status}`)
     // Sent to RA as the site gives it, with its flyer, once RA has it.
     const input = given.event
@@ -284,14 +288,19 @@
   // Saves the event, `id`, as the session's, with the token, `publishing`. Gives null once it's saved, or else why it
   // couldn't be, and where to save it by hand, if anywhere. Never throws: the event is on RA all the same.
   async function save(publishing, id) {
-    // So that a site that never answers doesn't keep the panel busy.
-    const signal = AbortSignal.timeout(30_000)
-    const init = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raEvent: id }), signal }
-    const response = await fromSite('/api/ra-publication/ra-event', publishing, init)
-    if (!response) return { why: signal.aborted ? `${SITE} n’a pas répondu à temps` : `${SITE} n’a pas pu être joint`, where: PASTE }
-    if (response.ok) return null
-    if (NOT_SAVED[response.status]) return NOT_SAVED[response.status]
-    return { why: (await response.json().catch(() => null))?.error ?? `${SITE} a répondu ${response.status}`, where: PASTE }
+    try {
+      // So that a site that never answers doesn't keep the panel busy.
+      const signal = AbortSignal.timeout(30_000)
+      const init = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raEvent: id }), signal }
+      const response = await fromSite('/api/ra-publication/ra-event', publishing, init)
+      if (!response) return { why: signal.aborted ? `${SITE} n’a pas répondu à temps` : `${SITE} n’a pas pu être joint`, where: PASTE }
+      if (response.ok) return null
+      if (NOT_SAVED[response.status]) return NOT_SAVED[response.status]
+      return { why: (await response.json().catch(() => null))?.error ?? `${SITE} a répondu ${response.status}`, where: PASTE }
+    } catch {
+      // E.g. a browser without AbortSignal.timeout.
+      return { why: 'quelque chose n’a pas fonctionné', where: PASTE }
+    }
   }
 
   // Creates the event, once, with `flyer`, if it's given and RA takes it, and says how it went, never trying again on its

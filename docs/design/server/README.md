@@ -142,9 +142,7 @@ the request failing.
 Endpoints are public, admin (see [Conventions](#conventions)), for apps, which need a connection's token (see
 [Authorization](mcp.md#authorization)), or need another token: an admin's calendar app needs the admin's token in its
 link (see [The token, in Admins' calendars](admin-calendars.md#the-token)), and the bookmarklet that publishes a
-session's event on RA needs a token for it (see [The token, in Publishing on RA](ra-publication.md#the-token)). Of the
-endpoints that need such a token, only one changes something: the one with which the bookmarklet sets the session's
-event on RA, once, while it has none.
+session's event on RA needs a token for it (see [The token, in Publishing on RA](ra-publication.md#the-token)).
 
 | Endpoint | Access | What it's for |
 |---|---|---|

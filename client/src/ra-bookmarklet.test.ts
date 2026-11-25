@@ -515,4 +515,23 @@ describe('The bookmarklet', () => {
     expect(panel()).toHaveTextContent(BY_HAND)
     timeoutSpy.mockRestore()
   })
+
+  it('still shows the event’s link when saving it fails otherwise, e.g. without AbortSignal.timeout', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      throw new TypeError('AbortSignal.timeout is not a function')
+    })
+    run()
+    await createOnRa()
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/2400123' })).toBeInTheDocument()
+    expect(screen.getByText('L’événement n’a pas pu être enregistré dans la session : quelque chose n’a pas fonctionné.')).toBeInTheDocument()
+    expect(panel()).toHaveTextContent(BY_HAND)
+    timeoutSpy.mockRestore()
+  })
+
+  it('says to check the session’s page when the session already has an event on RA, creating nothing', async () => {
+    answers.publication = () => Response.json({ ok: false, error: 'This session already has an event on RA' }, { status: 409 })
+    run()
+    expect(await screen.findByText('La session a déjà un événement RA : vérifiez « Événement RA » sur la page de la session.')).toBeInTheDocument()
+    expect(toRa()).toEqual([])
+  })
 })

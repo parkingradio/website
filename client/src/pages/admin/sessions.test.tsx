@@ -1539,7 +1539,8 @@ describe("A session's event on RA", () => {
     // Nothing is asked of the server until « Publier sur RA » is clicked.
     expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(0)
 
-    // Closing it saves nothing.
+    // Closing it saves nothing, even a link that was pasted.
+    fireEvent.change(screen.getByRole('textbox', { name: "Lien de l'événement RA" }), { target: { value: 'https://ra.co/events/2400123' } })
     fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
     expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
     expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
@@ -1646,16 +1647,6 @@ describe("A session's event on RA", () => {
     expect(await screen.findByText("Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST.")).toBeInTheDocument()
     // The bookmarklet's name, as Intégrations gives it.
     expect(value('Événement RA')).toHaveTextContent('où le favori « Parking Radio → RA [TEST] » vous montre')
-  })
-
-  it('saves nothing when the panel is cancelled', async () => {
-    mockFetch(UNPUBLISHED_PAGE)
-    renderAt('/admin/sessions/session-1')
-    await openPanel()
-    fireEvent.change(screen.getByRole('textbox', { name: "Lien de l'événement RA" }), { target: { value: 'https://ra.co/events/2400123' } })
-    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
-    expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
-    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
   })
 })
 
