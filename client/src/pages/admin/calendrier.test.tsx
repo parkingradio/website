@@ -1041,12 +1041,14 @@ describe('Calendrier', () => {
       const [conflict, later, undated] = within(box).getAllByRole('listitem')
       // One line each, a single control, without links of its own.
       expect(visibleText(conflict)).toBe('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER')
-      const showDay = within(conflict).getByRole('button', { name: named('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER') })
+      const showDay = within(conflict).getByRole('button')
+      expect(within(conflict).getByRole('button', { name: named('sam. 21 nov. 21 h – 1 h · Séjours et HAUTE RIVE TAKEOVER') })).toBe(showDay)
       expect(within(conflict).queryByRole('link')).not.toBeInTheDocument()
       expect(visibleText(later)).toBe('sam. 9 janv. 2027 → dim. 10 · Séjours et RÉPARATION')
       // Its duration after its sets' performers, which "·" separates.
       expect(visibleText(undated)).toBe('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h')
-      expect(within(undated).getByRole('link', { name: named('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h') })).toHaveAttribute('href', '/admin/sessions/session-4')
+      expect(within(undated).getByRole('link')).toBe(within(undated).getByRole('link', { name: named('à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h') }))
+      expect(within(undated).getByRole('link')).toHaveAttribute('href', '/admin/sessions/session-4')
 
       // A conflict shows its day, chosen, in its month, with the focus on it.
       fireEvent.click(showDay)
@@ -1070,7 +1072,8 @@ describe('Calendrier', () => {
       const [, evening, newYear] = within(box).getAllByRole('listitem')
       expect(visibleText(evening)).toBe('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE')
       expect(visibleText(newYear)).toBe('sam. 2 janv. 2027 21 h – 1 h · NOUVEL AN')
-      const showDay = within(evening).getByRole('button', { name: named('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE') })
+      const showDay = within(evening).getByRole('button')
+      expect(within(evening).getByRole('button', { name: named('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE') })).toBe(showDay)
       expect(within(evening).queryByRole('link')).not.toBeInTheDocument()
 
       // Its day, chosen, in its month, with the focus on it.

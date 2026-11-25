@@ -2,7 +2,7 @@ import type { Data, Schema } from '../../../api/client'
 import { isDay } from '../../../application-fields'
 import { addDays, daysBetween, quebecDayAndTime, quebecInstant } from '../../../quebec-time'
 import type { Session } from '../../../session-fields'
-import { endsByItsTime, formatDayInYear, formatQuebecDay, formatQuebecDayInYear, formatTime, formatWeekdayAndNumber, shortTimes } from '../describe'
+import { endsByItsTime, formatDayInYear, fromTo, formatQuebecDay, formatQuebecDayInYear, formatTime, formatWeekdayAndNumber, shortTimes } from '../describe'
 
 // What the Calendrier page shows of the calendar, worked out from what the server gives (see
 // docs/design/client/admin/calendrier.md), without React. Days are "YYYY-MM-DD" in Québec, and months "YYYY-MM", which
@@ -109,7 +109,7 @@ export function partOfDay({ start, end }: Times, day: string): string {
   const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
   if (from <= dayFrom && to >= dayTo) return WHOLE_DAY
   if (from <= dayFrom) return `jusqu'à ${timeOf(to)}`
-  if (to <= dayTo || endsByItsTime(start, end)) return `${timeOf(from)} – ${timeOf(to)}`
+  if (to <= dayTo || endsByItsTime(start, end)) return fromTo(timeOf(from), timeOf(to))
   return `dès ${timeOf(from)}`
 }
 
@@ -128,7 +128,7 @@ export function briefTimes(times: Times, day: string): string {
     if (last > day) return `→ ${lastDay()}`
     return to >= dayStart(addDays(day, 1)) ? 'journée' : `→ ${timeOf(to)}`
   }
-  return endsByItsTime(times.start, times.end) ? shortTimes(times) : `${timeOf(from)} → ${lastDay()}`
+  return endsByItsTime(times.start, times.end) ? shortTimes(times) : fromTo(timeOf(from), lastDay(), '→')
 }
 
 // Something's times in full, on `day`, e.g. "21 h – 1 h", "toute la journée", "du ven. 13 nov. au dim. 15 nov.",
@@ -198,7 +198,7 @@ function freeStretches(day: string, protectedPeriods: Period[], busy: Times[]): 
     if (from === dayFrom && to === dayTo) return WHOLE_DAY
     if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
     if (to === dayTo) return `dès ${timeOf(from)}`
-    return `${timeOf(from)} – ${timeOf(to)}`
+    return fromTo(timeOf(from), timeOf(to))
   }
   return stretches.map(([from, to]) => ({ start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && to === dayTo } }))
 }

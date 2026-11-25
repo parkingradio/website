@@ -1,18 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Session } from '../../../session-fields'
 import { spaced } from '../../../test-utils'
-import { addMonths, calendarDays, daysOf, freeTime, isFree, gridDays, gridRange, inSentence, listRange, listedMonths, nameOf, namedThing, readDay, readMonth, thingKey, thingsWithConflicts } from './model'
-import * as model from './model'
+import { addMonths, briefTimes, calendarDays, daysOf, freeTime, isFree, fullTimes, gridDays, gridRange, inSentence, listRange, listedMonths, nameOf, namedThing, partOfDay, readDay, readMonth, startDay, thingKey, thingsWithConflicts } from './model'
 import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } from './model'
 
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
 const times = (start: string, end: string) => ({ start, end })
-// What the page writes, with its non-breaking spaces as spaces (see describe.test.ts for where they are).
-const partOfDay = (...args: Parameters<typeof model.partOfDay>) => spaced(model.partOfDay(...args))
-const fullTimes = (...args: Parameters<typeof model.fullTimes>) => spaced(model.fullTimes(...args))
-const briefTimes = (...args: Parameters<typeof model.briefTimes>) => spaced(model.briefTimes(...args))
-const startDay = (...args: Parameters<typeof model.startDay>) => spaced(model.startDay(...args))
 // The parts of the day of `day`'s free time, the time `holds` protect outside `busy`.
 const parts = (day: string, holds: { start: string; end: string }[], busy: { start: string; end: string }[] = []) => freeTime(day, holds, busy).map(({ part }) => spaced(part))
 // What takes a day, and the parts of the day of its free time.
@@ -55,9 +49,9 @@ describe('the address', () => {
 
 describe("a thing's part of a day", () => {
   it('is its times within the day', () => {
-    expect(partOfDay(times('2026-11-14T21:00:00-05:00', '2026-11-14T23:00:00-05:00'), '2026-11-14')).toBe('21 h – 23 h')
+    expect(spaced(partOfDay(times('2026-11-14T21:00:00-05:00', '2026-11-14T23:00:00-05:00'), '2026-11-14'))).toBe('21 h – 23 h')
     // Up to 00:00, which doesn't take the next day.
-    expect(partOfDay(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('21 h – 0 h')
+    expect(spaced(partOfDay(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14'))).toBe('21 h – 0 h')
     expect(daysOf(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'))).toEqual(['2026-11-14'])
     // Or only those within some days.
     const long = times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00')
@@ -68,40 +62,40 @@ describe("a thing's part of a day", () => {
   it('writes the end of a thing of 12 hours or less that ends the next day, then what it takes of that day', () => {
     const overnight = times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00')
     expect(daysOf(overnight)).toEqual(['2026-11-14', '2026-11-15'])
-    expect(partOfDay(overnight, '2026-11-14')).toBe('21 h – 1 h')
-    expect(partOfDay(overnight, '2026-11-15')).toBe("jusqu'à 1 h")
+    expect(spaced(partOfDay(overnight, '2026-11-14'))).toBe('21 h – 1 h')
+    expect(spaced(partOfDay(overnight, '2026-11-15'))).toBe("jusqu'à 1 h")
   })
 
   it('writes where a longer thing starts and ends, and the days it takes whole', () => {
     const long = times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00')
-    expect(daysOf(long).map((day) => partOfDay(long, day))).toEqual(['dès 18 h', 'toute la journée', "jusqu'à 2 h"])
+    expect(daysOf(long).map((day) => spaced(partOfDay(long, day)))).toEqual(['dès 18 h', 'toute la journée', "jusqu'à 2 h"])
     // A thing that ends later the next day than it starts.
     const day = times('2026-11-14T21:00:00-05:00', '2026-11-15T22:00:00-05:00')
-    expect(daysOf(day).map((d) => partOfDay(day, d))).toEqual(['dès 21 h', "jusqu'à 22 h"])
+    expect(daysOf(day).map((d) => spaced(partOfDay(day, d)))).toEqual(['dès 21 h', "jusqu'à 22 h"])
     // Or earlier, more than 12 hours after it starts.
     const stay = times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00')
-    expect(daysOf(stay).map((d) => partOfDay(stay, d))).toEqual(['dès 15 h', "jusqu'à 11 h"])
+    expect(daysOf(stay).map((d) => spaced(partOfDay(stay, d)))).toEqual(['dès 15 h', "jusqu'à 11 h"])
   })
 
   it('takes a whole day from 00:00 to 00:00, whole-day or not, on the days the clocks change too', () => {
     // A timed thing from 00:00 to 00:00, on a 25-hour day and a 23-hour one.
-    expect(partOfDay(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01')).toBe('toute la journée')
-    expect(partOfDay(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('toute la journée')
+    expect(spaced(partOfDay(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01'))).toBe('toute la journée')
+    expect(spaced(partOfDay(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14'))).toBe('toute la journée')
     // Three whole days, around the clocks going back.
     const days = times('2026-10-31T00:00:00-04:00', '2026-11-03T00:00:00-05:00')
-    expect(daysOf(days).map((day) => partOfDay(days, day))).toEqual(['toute la journée', 'toute la journée', 'toute la journée'])
+    expect(daysOf(days).map((day) => spaced(partOfDay(days, day)))).toEqual(['toute la journée', 'toute la journée', 'toute la journée'])
     // From 00:00 over several days, and to 00:00.
     const fromMidnight = times('2027-03-14T00:00:00-05:00', '2027-03-15T10:00:00-04:00')
-    expect(daysOf(fromMidnight).map((day) => partOfDay(fromMidnight, day))).toEqual(['toute la journée', "jusqu'à 10 h"])
+    expect(daysOf(fromMidnight).map((day) => spaced(partOfDay(fromMidnight, day)))).toEqual(['toute la journée', "jusqu'à 10 h"])
     const toMidnight = times('2027-03-13T10:00:00-05:00', '2027-03-15T00:00:00-04:00')
-    expect(daysOf(toMidnight).map((day) => partOfDay(toMidnight, day))).toEqual(['dès 10 h', 'toute la journée'])
+    expect(daysOf(toMidnight).map((day) => spaced(partOfDay(toMidnight, day)))).toEqual(['dès 10 h', 'toute la journée'])
   })
 
   it('counts the hours of the days the clocks change', () => {
     // 1:30 happens twice on 2026-11-01: from 23 h to the second 1 h 30 is less than a day, but ends later than it starts.
-    expect(partOfDay(times('2026-10-31T23:00:00-04:00', '2026-11-01T01:30:00-05:00'), '2026-10-31')).toBe('23 h – 1 h 30')
+    expect(spaced(partOfDay(times('2026-10-31T23:00:00-04:00', '2026-11-01T01:30:00-05:00'), '2026-10-31'))).toBe('23 h – 1 h 30')
     // On 2027-03-14, 3 h comes right after 1 h 59.
-    expect(partOfDay(times('2027-03-14T01:00:00-05:00', '2027-03-14T04:00:00-04:00'), '2027-03-14')).toBe('1 h – 4 h')
+    expect(spaced(partOfDay(times('2027-03-14T01:00:00-05:00', '2027-03-14T04:00:00-04:00'), '2027-03-14'))).toBe('1 h – 4 h')
   })
 })
 
@@ -115,78 +109,78 @@ describe("a conflict's things", () => {
 
 describe("a thing's times in full", () => {
   it('are short on the day it starts, as sessions are', () => {
-    expect(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-14T23:00:00-05:00'), '2026-11-14')).toBe('21 h – 23 h')
-    expect(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h – 1 h')
-    expect(fullTimes(times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00'), '2026-11-13')).toBe('18 h – dim. 15 nov., 2 h')
-    expect(fullTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14')).toBe('15 h – dim. 15 nov., 11 h')
+    expect(spaced(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-14T23:00:00-05:00'), '2026-11-14'))).toBe('21 h – 23 h')
+    expect(spaced(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14'))).toBe('21 h – 1 h')
+    expect(spaced(fullTimes(times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00'), '2026-11-13'))).toBe('18 h – dim. 15 nov., 2 h')
+    expect(spaced(fullTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14'))).toBe('15 h – dim. 15 nov., 11 h')
   })
 
   it('say the day it starts on, on a later day', () => {
-    expect(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-15')).toBe('sam. 14 nov., 21 h – 1 h')
-    expect(fullTimes(times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00'), '2026-11-14')).toBe('ven. 13 nov., 18 h – dim. 15 nov., 2 h')
+    expect(spaced(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-15'))).toBe('sam. 14 nov., 21 h – 1 h')
+    expect(spaced(fullTimes(times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00'), '2026-11-14'))).toBe('ven. 13 nov., 18 h – dim. 15 nov., 2 h')
   })
 
   it('give whole days from the first to the last, whole-day or not, on the days the clocks change too', () => {
-    expect(fullTimes(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01')).toBe('toute la journée')
-    expect(fullTimes(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('toute la journée')
+    expect(spaced(fullTimes(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01'))).toBe('toute la journée')
+    expect(spaced(fullTimes(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14'))).toBe('toute la journée')
     const days = times('2026-10-30T00:00:00-04:00', '2026-11-02T00:00:00-05:00')
-    expect(fullTimes(days, '2026-10-30')).toBe('du ven. 30 oct. au dim. 1 nov.')
-    expect(fullTimes(days, '2026-11-01')).toBe('du ven. 30 oct. au dim. 1 nov.')
-    expect(fullTimes(times('2027-03-13T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('du sam. 13 mars au dim. 14 mars')
+    expect(spaced(fullTimes(days, '2026-10-30'))).toBe('du ven. 30 oct. au dim. 1 nov.')
+    expect(spaced(fullTimes(days, '2026-11-01'))).toBe('du ven. 30 oct. au dim. 1 nov.')
+    expect(spaced(fullTimes(times('2027-03-13T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14'))).toBe('du sam. 13 mars au dim. 14 mars')
   })
 
   it('from the start of its day, as the month writes it, when it starts at 00:00', () => {
-    expect(fullTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
-    expect(partOfDay(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe("jusqu'à 11 h")
+    expect(spaced(fullTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28'))).toBe("jusqu'à 11 h")
+    expect(spaced(partOfDay(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28'))).toBe("jusqu'à 11 h")
     const stay = times('2026-11-28T00:00:00-05:00', '2026-11-30T11:00:00-05:00')
-    expect(fullTimes(stay, '2026-11-28')).toBe("jusqu'au lun. 30 nov., 11 h")
-    expect(fullTimes(stay, '2026-11-29')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
-    expect(fullTimes(stay, '2026-11-30')).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
+    expect(spaced(fullTimes(stay, '2026-11-28'))).toBe("jusqu'au lun. 30 nov., 11 h")
+    expect(spaced(fullTimes(stay, '2026-11-29'))).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
+    expect(spaced(fullTimes(stay, '2026-11-30'))).toBe("du sam. 28 nov. jusqu'au lun. 30 nov., 11 h")
   })
 })
 
 describe("a thing's times in brief", () => {
   it('are its times when they say when it ends: the same day, or the next day, at 00:00 or within 12 hours', () => {
-    expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-14T21:00:00-05:00'), '2026-11-14')).toBe('18 h – 21 h')
-    expect(briefTimes(times('2026-11-14T21:30:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h 30 – 1 h')
-    expect(briefTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('21 h – 0 h')
-    expect(briefTimes(times('2026-11-14T10:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('10 h – 0 h')
+    expect(spaced(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-14T21:00:00-05:00'), '2026-11-14'))).toBe('18 h – 21 h')
+    expect(spaced(briefTimes(times('2026-11-14T21:30:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14'))).toBe('21 h 30 – 1 h')
+    expect(spaced(briefTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14'))).toBe('21 h – 0 h')
+    expect(spaced(briefTimes(times('2026-11-14T10:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14'))).toBe('10 h – 0 h')
     // Over the night the clocks go back, a 25-hour day.
-    expect(briefTimes(times('2026-10-31T22:00:00-04:00', '2026-11-01T02:00:00-05:00'), '2026-10-31')).toBe('22 h – 2 h')
+    expect(spaced(briefTimes(times('2026-10-31T22:00:00-04:00', '2026-11-01T02:00:00-05:00'), '2026-10-31'))).toBe('22 h – 2 h')
   })
 
   it('are its start, then the last day it takes, when it ends on a later day, in another month or year too', () => {
-    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
-    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-25T00:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
+    expect(spaced(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00'), '2026-11-21'))).toBe('15 h → mar. 24')
+    expect(spaced(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-25T00:00:00-05:00'), '2026-11-21'))).toBe('15 h → mar. 24')
     // The next day at a later time than it starts, or more than 12 hours after it starts.
-    expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-15T21:00:00-05:00'), '2026-11-14')).toBe('18 h → dim. 15')
-    expect(briefTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14')).toBe('15 h → dim. 15')
-    expect(briefTimes(times('2026-12-30T20:00:00-05:00', '2027-01-01T11:00:00-05:00'), '2026-12-30')).toBe('20 h → ven. 1')
+    expect(spaced(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-15T21:00:00-05:00'), '2026-11-14'))).toBe('18 h → dim. 15')
+    expect(spaced(briefTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14'))).toBe('15 h → dim. 15')
+    expect(spaced(briefTimes(times('2026-12-30T20:00:00-05:00', '2027-01-01T11:00:00-05:00'), '2026-12-30'))).toBe('20 h → ven. 1')
     // With its month, four weeks or more after the day, when its weekday and number could be another day's.
-    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-18T11:00:00-05:00'), '2026-11-21')).toBe('15 h → ven. 18')
-    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-19T11:00:00-05:00'), '2026-11-21')).toBe('15 h → sam. 19 déc.')
-    expect(briefTimes(times('2026-11-18T15:00:00-05:00', '2027-01-02T11:00:00-05:00'), '2026-11-19')).toBe('→ sam. 2 janv.')
+    expect(spaced(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-18T11:00:00-05:00'), '2026-11-21'))).toBe('15 h → ven. 18')
+    expect(spaced(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-19T11:00:00-05:00'), '2026-11-21'))).toBe('15 h → sam. 19 déc.')
+    expect(spaced(briefTimes(times('2026-11-18T15:00:00-05:00', '2027-01-02T11:00:00-05:00'), '2026-11-19'))).toBe('→ sam. 2 janv.')
   })
 
   it('take the day from its start, after an earlier day or from 00:00', () => {
     const stay = times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00')
-    expect(briefTimes(stay, '2026-11-23')).toBe('→ mar. 24')
-    expect(briefTimes(stay, '2026-11-24')).toBe('→ 11 h')
-    expect(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28')).toBe('→ 11 h')
-    expect(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-30T11:00:00-05:00'), '2026-11-28')).toBe('→ lun. 30')
+    expect(spaced(briefTimes(stay, '2026-11-23'))).toBe('→ mar. 24')
+    expect(spaced(briefTimes(stay, '2026-11-24'))).toBe('→ 11 h')
+    expect(spaced(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-28T11:00:00-05:00'), '2026-11-28'))).toBe('→ 11 h')
+    expect(spaced(briefTimes(times('2026-11-28T00:00:00-05:00', '2026-11-30T11:00:00-05:00'), '2026-11-28'))).toBe('→ lun. 30')
     // Over the end of the month.
-    expect(briefTimes(times('2026-11-28T15:00:00-05:00', '2026-12-01T11:00:00-05:00'), '2026-11-29')).toBe('→ mar. 1')
+    expect(spaced(briefTimes(times('2026-11-28T15:00:00-05:00', '2026-12-01T11:00:00-05:00'), '2026-11-29'))).toBe('→ mar. 1')
   })
 
   it('are a whole day, or the last of several, on the days the clocks change too', () => {
-    expect(briefTimes(times('2026-11-26T00:00:00-05:00', '2026-11-27T00:00:00-05:00'), '2026-11-26')).toBe('journée')
-    expect(briefTimes(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01')).toBe('journée')
-    expect(briefTimes(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14')).toBe('journée')
+    expect(spaced(briefTimes(times('2026-11-26T00:00:00-05:00', '2026-11-27T00:00:00-05:00'), '2026-11-26'))).toBe('journée')
+    expect(spaced(briefTimes(times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00'), '2026-11-01'))).toBe('journée')
+    expect(spaced(briefTimes(times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00'), '2027-03-14'))).toBe('journée')
     const closed = times('2026-12-02T00:00:00-05:00', '2026-12-04T00:00:00-05:00')
-    expect(briefTimes(closed, '2026-12-02')).toBe('→ jeu. 3')
-    expect(briefTimes(closed, '2026-12-03')).toBe('journée')
+    expect(spaced(briefTimes(closed, '2026-12-02'))).toBe('→ jeu. 3')
+    expect(spaced(briefTimes(closed, '2026-12-03'))).toBe('journée')
     // Starting before the day, to its end.
-    expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T00:00:00-05:00'), '2026-11-23')).toBe('journée')
+    expect(spaced(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T00:00:00-05:00'), '2026-11-23'))).toBe('journée')
   })
 })
 
@@ -475,8 +469,8 @@ describe('the list', () => {
   })
 
   it("says the day an overlap starts, with its year when it isn't that of the day it's near", () => {
-    expect(startDay(times('2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00'), '2026-11-19')).toBe('sam. 21 nov.')
-    expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2026-11-19')).toBe('sam. 2 janv. 2027')
-    expect(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2027-01-01')).toBe('sam. 2 janv.')
+    expect(spaced(startDay(times('2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00'), '2026-11-19'))).toBe('sam. 21 nov.')
+    expect(spaced(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2026-11-19'))).toBe('sam. 2 janv. 2027')
+    expect(spaced(startDay(times('2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00'), '2027-01-01'))).toBe('sam. 2 janv.')
   })
 })

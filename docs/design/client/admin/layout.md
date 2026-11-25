@@ -43,7 +43,9 @@ The admin pages show "-" in place of what an admin left out of an artist's or a 
 the country, when the other one is, and in place of a collective's genres when its artists have none.
 
 The admin pages show dates and times in Québec time, whatever the browser's time zone, since that's where Parking Radio
-is (see [Times, in Conventions](../../server/README.md#conventions)), and take them in Québec time too.
+is (see [Times, in Conventions](../../server/README.md#conventions)), and take them in Québec time too. Times, durations
+and short days never break across lines, e.g. "11 h 30", "45 min" or "mer. 2 déc.": lines only break between them, and
+"–" and "→" stay with what comes before them, as in "15 h – mer. 2 déc., 11 h".
 
 ## Searching lists
 

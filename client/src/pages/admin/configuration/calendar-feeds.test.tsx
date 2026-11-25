@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { jsonBody, mockFetch, requestsTo } from '../../../test-utils'
+import { jsonBody, mockFetch, requestsTo, spaced } from '../../../test-utils'
 import { CalendarFeeds } from './calendar-feeds'
 
 const URL = '/api/admin/calendar/feeds'
@@ -77,7 +77,7 @@ describe('The calendar feeds', () => {
     expect(within(table()).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument()
     expect(within(table()).getAllByRole('rowheader').map((header) => header.textContent)).toEqual(["Calendrier de l'équipe", 'Séjours', 'Répétitions'])
     // The cells of each feed's rows, but its name.
-    const cells = (name: string) => [...feedOf(name).querySelectorAll('td')].map((cell) => cell.textContent)
+    const cells = (name: string) => [...feedOf(name).querySelectorAll('td')].map((cell) => spaced(cell.textContent))
     expect(cells("Calendrier de l'équipe")).toEqual(['Occupations', '22 novembre 2026 à 12 h 15', 'modifier retirer'])
     // Its buttons are named after it.
     button('modifier', "Calendrier de l'équipe")

@@ -60,7 +60,7 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   // The one over three days, which says the day it ends on, in the list and on its page.
   await search.fill('marathon modulaire')
   const marathon = rowsOf(page, 'MARATHON MODULAIRE')
-  await expect(marathon).toContainText(/18\sh – \S+\.\s\d+\s\S+, \d+\sh/)
+  await expect(marathon).toContainText(/18\sh\s– \S+\.\s\d+\s\S+, \d+\sh/)
   await marathon.getByRole('link').first().click()
   await expect(value(page, 'Quand')).toHaveText(/^du .+ à 18\sh au .+ à \d+\sh$/)
   await expect(value(page, 'Durée')).toHaveText('31 h')

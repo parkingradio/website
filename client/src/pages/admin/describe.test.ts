@@ -4,6 +4,7 @@ import type { Collective } from '../../collective-profile'
 import {
   collectiveOption,
   deletedWith,
+  dateTimeFormat,
   formatDayInYear,
   formatDuration,
   formatQuebecDay,
@@ -130,14 +131,16 @@ describe("sessions' days and times", () => {
 })
 
 describe('times and short days', () => {
-  it('never break within a time, a duration or a short day, only between them', () => {
+  it('never break within a time, a duration or a short day, only between them, with "–" kept with the start', () => {
     const nb = '\u00a0'
-    expect(shortTimes({ start: '2026-12-01T15:00:00-05:00', end: '2026-12-02T11:30:00-05:00' })).toBe(`15${nb}h – mer.${nb}2${nb}déc., 11${nb}h${nb}30`)
+    expect(shortTimes({ start: '2026-12-01T15:00:00-05:00', end: '2026-12-02T11:30:00-05:00' })).toBe(`15${nb}h${nb}– mer.${nb}2${nb}déc., 11${nb}h${nb}30`)
     expect(formatDuration(45)).toBe(`45${nb}min`)
     expect(formatQuebecDay('2026-11-14T21:00:00-05:00')).toBe(`sam.${nb}14${nb}nov.${nb}2026`)
     expect(formatShortDay('2026-10-07')).toBe(`7${nb}oct.${nb}2026`)
     expect(formatDayInYear('2026-10-07')).toBe(`mer.${nb}7${nb}oct.`)
     expect(formatWeekdayAndNumber('2026-11-24')).toBe(`mar.${nb}24`)
+    // In a long day too, its time.
+    expect(dateTimeFormat.format(new Date('2026-10-05T23:30:00-04:00'))).toBe(`5 octobre 2026 à 23${nb}h${nb}30`)
   })
 })
 
@@ -151,7 +154,7 @@ describe('dates and times', () => {
     vi.resetModules()
     const { byWhom, dateFormat } = await import('./describe')
     expect(dateFormat.format(new Date('2026-10-05T23:30:00-04:00'))).toBe('5 octobre 2026')
-    expect(byWhom('Modifiée', 'admin@example.com', '2026-10-05T23:30:00-04:00')).toBe('Modifiée par admin@example.com le 5 octobre 2026 à 23 h 30.')
+    expect(spaced(byWhom('Modifiée', 'admin@example.com', '2026-10-05T23:30:00-04:00'))).toBe('Modifiée par admin@example.com le 5 octobre 2026 à 23 h 30.')
   })
 })
 

@@ -227,13 +227,26 @@ export function collectiveEntry(collective: Collective, artists: Map<string, Art
 
 // Instants, in Québec time, like everything the admin pages show (see docs/design/client/admin/layout.md).
 export const dateFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeZone: QUEBEC_TIME_ZONE })
-export const dateTimeFormat = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: QUEBEC_TIME_ZONE })
 // A space that lines never break at, as French typography has it between a number and its unit, e.g. "21 h", and within
-// a short day, e.g. "mer. 7 oct.", so that lines only break between times and days.
+// a short day, e.g. "mer. 7 oct.", so that lines only break between times and days, and before "–" or "→", which stay
+// with what comes before them (see "Admin" in docs/design/client/admin/layout.md).
 const NBSP = '\u00a0'
 
 // `format`'s `format`, with non-breaking spaces (see `NBSP`).
 const unbroken = (format: Intl.DateTimeFormat) => (date: Date) => format.format(date).replaceAll(' ', NBSP)
+
+// E.g. "21 h – 1 h", or "15 h → mar. 24" with "→", whose sign stays with `start` (see `NBSP`).
+export const fromTo = (start: string, end: string, sign: '–' | '→' = '–') => `${start}${NBSP}${sign} ${end}`
+
+const dateTimeParts = new Intl.DateTimeFormat('fr-CA', { dateStyle: 'long', timeStyle: 'short', timeZone: QUEBEC_TIME_ZONE })
+// E.g. "5 octobre 2026 à 23 h 30", whose time has non-breaking spaces (see `NBSP`).
+export const dateTimeFormat = {
+  format(date: Date): string {
+    const parts = dateTimeParts.formatToParts(date)
+    const time = parts.findIndex(({ type }) => type === 'hour')
+    return parts.map(({ value }, i) => (i < time ? value : value.replaceAll(' ', NBSP))).join('')
+  },
+}
 
 // Days are "YYYY-MM-DD", which are read as midnight UTC, so they're formatted in UTC to be the same day wherever this
 // runs. The lists' search relies on the weekday, the day, the month and the year being next to each other, in that
@@ -392,7 +405,7 @@ export const endsByItsTime = (start: string, end: string) => timesSayEnd(startAn
 export function shortTimes({ start, end }: { start: string; end: string }): string {
   const times = startAndEnd(start, end)
   const endDay = timesSayEnd(times) ? '' : `${formatQuebecDayInYear(end)}, `
-  return `${formatTime(times.from.time)} – ${endDay}${formatTime(times.to.time)}`
+  return fromTo(formatTime(times.from.time), `${endDay}${formatTime(times.to.time)}`)
 }
 
 // A session's times in short (see `shortTimes`), or how long a session without a date lasts, e.g. "4 h".

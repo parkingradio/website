@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Schema } from '../../../api/client'
-import { mockFetch, requestsTo } from '../../../test-utils'
+import { mockFetch, requestsTo, spaced } from '../../../test-utils'
 import { dateTimeFormat } from '../describe'
 import { ConnectClaude, ConnectedApps } from './connections'
 
@@ -63,8 +63,8 @@ describe('The connected apps', () => {
     render(<ConnectedApps />)
 
     const claude = await appRow('Claude')
-    expect(claude.getByText(dateTimeFormat.format(new Date(createdAt)))).toBeInTheDocument()
-    expect(claude.getByText(dateTimeFormat.format(new Date(lastUsedAt)))).toBeInTheDocument()
+    expect(claude.getByText(spaced(dateTimeFormat.format(new Date(createdAt))))).toBeInTheDocument()
+    expect(claude.getByText(spaced(dateTimeFormat.format(new Date(lastUsedAt))))).toBeInTheDocument()
     expect((await appRow('Claude Code')).getByRole('button', { name: 'déconnecter' })).toBeInTheDocument()
     fireEvent.click(claude.getByRole('button', { name: 'déconnecter' }))
 
