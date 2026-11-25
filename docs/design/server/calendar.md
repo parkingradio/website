@@ -26,9 +26,8 @@ events are occupations, known by the feed's name, or `"holds"`, whose events are
 The titles of an `occupations` feed's events reach the admin pages, the apps connected to the site, and the calendar
 apps that admins subscribe to the occupations in, through their calendar of occupations (see
 [Admins' calendars](admin-calendars.md)), e.g. Google's or Apple's, whose servers then keep them: so a calendar whose
-titles have personal data, e.g. guests' names, shouldn't be an `occupations` feed: neither added as one, nor changed
-into one, which gives what was already read from it, titles included (see [Reading the feeds](#reading-the-feeds)). The
-titles of a `holds` feed's events are never given.
+titles have personal data, e.g. guests' names, shouldn't be an `occupations` feed. The titles of a `holds` feed's
+events are never given.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a
@@ -55,7 +54,7 @@ The server reads every feed when it starts, then every 15 minutes, and when it's
 added, or when its link changes: adding it, or changing its link, waits for that read, so that a link that doesn't give
 a calendar is refused. Apart from these and asking for every feed to be read (see its endpoint), nothing waits for a
 read: the server keeps what it read in memory, and gives what it read last. Changing a feed's kind doesn't read it: what
-was read from it counts as its new kind's from then on, e.g. its occupations become holds.
+was read from it counts as its new kind's from then on.
 
 During a read of every feed, the feeds are read one at a time, and reads of every feed don't overlap: one asked for
 while another is under way starts once that one ends, once for every request made meanwhile.
@@ -141,21 +140,15 @@ There's one conflict for each pair of things that overlap. Conflicts are by star
 
 ## Protected time
 
-Holds are time that the studio's other calendars keep for sessions, e.g. blocked on the platforms the studio is rented
-on, so that it isn't booked otherwise. How a calendar works out its holds is up to it: the server only reads them. Holds
-don't take the studio, and never conflict with anything: something can still take the studio during a hold, e.g. a
-repair, which is then a conflict with a session there.
+Holds are time that the studio's other calendars keep for sessions. How a calendar works out its holds is up to it: the
+server only reads them. Holds don't take the studio, and never conflict with anything.
 
 Time is **protected** when some hold takes it, of any `holds` feed: several feeds' holds count together, and holds that
 follow each other count as one, e.g. one until 15:00 and one from 15:00. A session is within protected time when every
 moment of it, from its start, included, to its end, excluded, is protected.
 
-Sessions are meant to be within protected time. While there's a `holds` feed, apps that add a session with a start, give
-a session a start, change its start or its duration, or un-cancel it should ask for the calendar of every day the
-session takes, since holds are only given for the days asked for, and tell the admin when it wouldn't be within
-protected time (see [Rules, in Sessions](sessions.md#rules)). The server doesn't refuse it: it's something to settle.
-Once it's saved, whether the calendar gives it among the sessions outside protected time is the server's answer. While
-there's no `holds` feed, nothing is known to be protected, and there's nothing to tell.
+Sessions are meant to be within protected time (see [Rules, in Sessions](sessions.md#rules)). To check a session, apps
+should ask for the calendar of every day it takes, since holds are only given for the days asked for.
 
 **The sessions outside protected time** need settling, like conflicts. They're the sessions that take some of the 365
 days from `today` (see [Conflicts](#conflicts)), and that:
@@ -166,10 +159,8 @@ days from `today` (see [Conflicts](#conflicts)), and that:
 - and aren't within protected time from their start, or from when the calendar is asked for if that's later, to their
   end: a session that's going on is only judged on what's left of it.
 
-While there's no `holds` feed, there are none. A `holds` feed that hasn't been read yet gives no holds (see
-[The calendar](#the-calendar)), so that every session can be outside protected time until it is.
-
-Each session outside protected time has the session's `id`, `title`, `start` and `end`. They're by start.
+While there's no `holds` feed, there are none. Each one has the session's `id`, `title`, `start` and `end`, and they're
+by start.
 
 ## Sessions without a date
 
