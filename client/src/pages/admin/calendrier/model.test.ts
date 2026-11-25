@@ -6,8 +6,8 @@ import type { Calendar, CalendarDay, Conflict, ConflictThing, DayThing, Feed } f
 // Québec's clocks go back on 2026-11-01, a 25-hour day, and forward on 2027-03-14, a 23-hour day.
 
 const times = (start: string, end: string) => ({ start, end })
-// The parts of the day of `day`'s free time, outside `busy`.
-const parts = (day: string, busy: { start: string; end: string }[]) => freeTime(day, busy).map(({ part }) => part)
+// The parts of the day of `day`'s free time, the time `holds` protect outside `busy`.
+const parts = (day: string, holds: { start: string; end: string }[], busy: { start: string; end: string }[] = []) => freeTime(day, holds, busy).map(({ part }) => part)
 // What takes a day, and the parts of the day of its free time.
 const thingsOn = (entries: CalendarDay) => entries.filter((entry): entry is DayThing => !isFree(entry))
 const freeOf = (entries: CalendarDay) => entries.filter(isFree).map(({ part }) => part)
@@ -178,20 +178,53 @@ describe("a thing's times in brief", () => {
 })
 
 describe('free time', () => {
-  it("is the day's time outside what takes it", () => {
-    expect(parts('2026-11-20', [])).toEqual(['toute la journée'])
+  // Holds over the whole week of the 20th.
+  const week = [times('2026-11-16T00:00:00-05:00', '2026-11-23T00:00:00-05:00')]
+
+  it("is the day's protected time outside what takes it", () => {
+    expect(parts('2026-11-20', week)).toEqual(['toute la journée'])
     // A stay that ends at 11 h, and another that starts at 15 h.
     const stays = [times('2026-11-18T15:00:00-05:00', '2026-11-20T11:00:00-05:00'), times('2026-11-20T15:00:00-05:00', '2026-11-22T11:00:00-05:00')]
-    expect(parts('2026-11-20', stays)).toEqual(['11 h – 15 h'])
-    expect(parts('2026-11-20', stays.slice(0, 1))).toEqual(['dès 11 h'])
-    expect(parts('2026-11-20', stays.slice(1))).toEqual(["jusqu'à 15 h"])
-    expect(parts('2026-11-19', stays)).toEqual([])
+    expect(parts('2026-11-20', week, stays)).toEqual(['11 h – 15 h'])
+    expect(parts('2026-11-20', week, stays.slice(0, 1))).toEqual(['dès 11 h'])
+    expect(parts('2026-11-20', week, stays.slice(1))).toEqual(["jusqu'à 15 h"])
+    expect(parts('2026-11-19', week, stays)).toEqual([])
+  })
+
+  it("is none of the time that isn't protected, even when nothing takes it", () => {
+    expect(parts('2026-11-20', [])).toEqual([])
+    const afternoon = [times('2026-11-20T11:00:00-05:00', '2026-11-20T18:00:00-05:00')]
+    expect(parts('2026-11-20', afternoon)).toEqual(['11 h – 18 h'])
+    // A session within the hold, and an occupation that starts before it.
+    const session = times('2026-11-20T13:00:00-05:00', '2026-11-20T15:00:00-05:00')
+    expect(parts('2026-11-20', afternoon, [session])).toEqual(['11 h – 13 h', '15 h – 18 h'])
+    expect(parts('2026-11-20', afternoon, [times('2026-11-20T09:00:00-05:00', '2026-11-20T12:00:00-05:00'), session])).toEqual(['12 h – 13 h', '15 h – 18 h'])
+    expect(parts('2026-11-21', afternoon)).toEqual([])
+  })
+
+  it('counts the holds of every feed together, those that overlap or follow each other as one', () => {
+    const [noon, afternoon, evening] = [times('2026-11-20T11:00:00-05:00', '2026-11-20T15:00:00-05:00'), times('2026-11-20T15:00:00-05:00', '2026-11-20T18:00:00-05:00'), times('2026-11-20T17:00:00-05:00', '2026-11-20T20:00:00-05:00')]
+    expect(parts('2026-11-20', [evening, noon, afternoon])).toEqual(['11 h – 20 h'])
+    // Within another.
+    expect(parts('2026-11-20', [noon, times('2026-11-20T12:00:00-05:00', '2026-11-20T13:00:00-05:00')])).toEqual(['11 h – 15 h'])
+    // Following each other at midnight, from two feeds, each day's from 00:00 to 00:00, and the whole day between.
+    const holds = [times('2026-11-20T15:00:00-05:00', '2026-11-21T00:00:00-05:00'), times('2026-11-21T00:00:00-05:00', '2026-11-23T11:00:00-05:00')]
+    expect(parts('2026-11-20', holds)).toEqual(['dès 15 h'])
+    expect(parts('2026-11-22', holds)).toEqual(['toute la journée'])
+    expect(parts('2026-11-23', holds)).toEqual(["jusqu'à 11 h"])
+    // Over midnight.
+    expect(parts('2026-11-21', [times('2026-11-20T20:00:00-05:00', '2026-11-21T02:00:00-05:00')])).toEqual(["jusqu'à 2 h"])
   })
 
   it('is measured on the days the clocks change', () => {
-    expect(parts('2026-11-01', [times('2026-11-01T11:00:00-05:00', '2026-11-02T00:00:00-05:00')])).toEqual(["jusqu'à 11 h"])
-    expect(parts('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-14T11:00:00-04:00')])).toEqual(['dès 11 h'])
-    expect(parts('2027-03-14', [times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00')])).toEqual([])
+    const fall = [times('2026-11-01T00:00:00-04:00', '2026-11-02T00:00:00-05:00')]
+    expect(parts('2026-11-01', fall)).toEqual(['toute la journée'])
+    expect(parts('2026-11-01', fall, [times('2026-11-01T11:00:00-05:00', '2026-11-02T00:00:00-05:00')])).toEqual(["jusqu'à 11 h"])
+    // A whole-day hold of 23 hours.
+    const spring = [times('2027-03-14T00:00:00-05:00', '2027-03-15T00:00:00-04:00')]
+    expect(parts('2027-03-14', spring)).toEqual(['toute la journée'])
+    expect(parts('2027-03-14', spring, [times('2027-03-14T00:00:00-05:00', '2027-03-14T11:00:00-04:00')])).toEqual(['dès 11 h'])
+    expect(parts('2027-03-14', spring, spring)).toEqual([])
   })
 })
 
@@ -218,8 +251,8 @@ describe('things', () => {
   })
 })
 
-function feed(id: string, name: string): Feed {
-  return { id, name, kind: 'occupations', link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
+function feed(id: string, name: string, kind: Feed['kind'] = 'occupations'): Feed {
+  return { id, name, kind, link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
 }
 
 // A session of the calendar, with what the page shows of it.
@@ -227,11 +260,17 @@ function session(id: string, start: string, end: string, status: Session['status
   return { id, title: id.toUpperCase(), start, end, status, sets: [] } as unknown as Session
 }
 
+// A hold over the 365 days from the calendars' today, and beyond.
+const ALWAYS = { feedId: 'h', start: '2026-10-01T00:00:00-04:00', end: '2028-01-01T00:00:00-05:00', wholeDay: true }
+
 function calendar(fields: Partial<Calendar>): Calendar {
-  return { ok: true, today: '2026-11-19', feeds: [feed('q', 'Séjours'), feed('o', 'Équipe')], sessions: [], occupations: [], holds: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
+  const feeds = [feed('q', 'Séjours'), feed('o', 'Équipe'), feed('h', 'Loft', 'holds')]
+  return { ok: true, today: '2026-11-19', feeds, sessions: [], occupations: [], holds: [ALWAYS], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
 }
 
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
+// A session, as the server gives it among the sessions outside protected time.
+const unprotected = ({ id, title, start, end }: Session) => ({ id, title, start: start!, end: end! })
 
 describe('the days of the month', () => {
   // A stay, without a title, a session during it, and a repair over three whole days.
@@ -287,7 +326,7 @@ describe('the days of the month', () => {
     expect(lines).toEqual([["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours", 'la session LATE'], ["l'occupation Séjours"]])
   })
 
-  it('have free time from today on, where no session starts, outside what takes them', () => {
+  it('have free time from today on, outside what takes them', () => {
     const free = (day: string) => freeOf(days.get(day)!)
     // Before today.
     expect(free('2026-11-18')).toEqual([])
@@ -297,7 +336,7 @@ describe('the days of the month', () => {
     expect(freeOf(calendarDays(calendar({}), gridDays('2026-12')).get('2026-12-01')!)).toEqual(['toute la journée'])
     // The stay starts at 15 h.
     expect(free('2026-11-20')).toEqual(["jusqu'à 15 h"])
-    // A session starts.
+    // The stay takes all of it.
     expect(free('2026-11-21')).toEqual([])
     // The session's tail, and the stay, end.
     expect(free('2026-11-22')).toEqual(['dès 11 h'])
@@ -324,9 +363,41 @@ describe('the days of the month', () => {
     expect(thingsOn(shown.get('2026-11-23')!)).toHaveLength(1)
   })
 
-  it("have free time only in the 365 days from the server's today", () => {
-    expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-18')!)).toEqual(['toute la journée'])
-    expect(freeOf(calendarDays(calendar({}), gridDays('2027-11')).get('2027-11-19')!)).toEqual([])
+  it('have free time around a session', () => {
+    const evening = session('evening', '2026-11-23T20:00:00-05:00', '2026-11-23T22:00:00-05:00')
+    const shown = calendarDays(calendar({ sessions: [evening] }), gridDays('2026-11'))
+    expect(shown.get('2026-11-23')!.map(({ part }) => part)).toEqual(["jusqu'à 20 h", '20 h – 22 h', 'dès 22 h'])
+  })
+
+  it('have free time only where it is protected, and none without holds', () => {
+    // Protected from 11 h to 15 h, then from 15 h the day after to 11 h the day after that, by two feeds.
+    const holds = [
+      { feedId: 'h', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T15:00:00-05:00', wholeDay: false },
+      { feedId: 'i', start: '2026-11-24T15:00:00-05:00', end: '2026-11-25T00:00:00-05:00', wholeDay: false },
+      { feedId: 'h', start: '2026-11-25T00:00:00-05:00', end: '2026-11-25T11:00:00-05:00', wholeDay: false },
+    ]
+    const shown = calendarDays(calendar({ holds }), gridDays('2026-11'))
+    expect(freeOf(shown.get('2026-11-22')!)).toEqual([])
+    expect(freeOf(shown.get('2026-11-23')!)).toEqual(['11 h – 15 h'])
+    expect(freeOf(shown.get('2026-11-24')!)).toEqual(['dès 15 h'])
+    expect(freeOf(shown.get('2026-11-25')!)).toEqual(["jusqu'à 11 h"])
+    expect([...calendarDays(calendar({ holds: [] }), gridDays('2026-11')).values()].flat().filter(isFree)).toEqual([])
+  })
+
+  it("have free time only in the 365 days from the server's today, a hold over them being cut to them", () => {
+    // The hold starts before today, which free time starts with (see above), and ends after the last of the days.
+    const shown = calendarDays(calendar({}), gridDays('2027-11'))
+    expect(freeOf(shown.get('2027-11-18')!)).toEqual(['toute la journée'])
+    expect(freeOf(shown.get('2027-11-19')!)).toEqual([])
+  })
+
+  it('say which sessions are outside protected time, on every day they take', () => {
+    const unprotectedSessions = [unprotected(late)]
+    const shown = calendarDays(calendar({ sessions: [late], unprotectedSessions }), gridDays('2026-11'))
+    const flags = (day: string) => thingsOn(shown.get(day)!).map(({ thing }) => thing.kind === 'session' && thing.unprotected)
+    expect(flags('2026-11-21')).toEqual([true])
+    expect(flags('2026-11-22')).toEqual([true])
+    expect(thingsOn(days.get('2026-11-21')!).map(({ thing }) => thing.kind === 'session' && thing.unprotected)).toEqual([false, false])
   })
 })
 
@@ -374,6 +445,15 @@ describe('the list', () => {
     ])
     expect(met.conflicts.map(({ other, elsewhere }) => [nameOf(other), elsewhere])).toEqual([['Séjours', false]])
     expect(played.conflicts.map(({ other, elsewhere }) => [nameOf(other), elsewhere])).toEqual([['Séjours', false]])
+  })
+
+  it('says which sessions are outside protected time', () => {
+    const unprotectedSessions = [unprotected(marathon)]
+    const listed = listedMonths(calendar({ sessions: [late, marathon], unprotectedSessions }), from, to).flatMap(({ things }) => things)
+    expect(listed.map(({ thing }) => thing.kind === 'session' && [thing.title, thing.unprotected])).toEqual([
+      ['LATE', false],
+      ['MARATHON', true],
+    ])
   })
 
   it('leaves out what the calendar has outside its days', () => {

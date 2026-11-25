@@ -17,9 +17,10 @@ export type Feed = Calendar['feeds'][number]
 // in for its title then (see "What's shown" in docs/design/client/admin/calendrier.md).
 export type OccupationName = { title: string | null; calendar: string }
 
-// Something that takes the studio, as the page shows it: a session, with a start, or an occupation.
+// Something that takes the studio, as the page shows it: a session, with a start, and whether it's one of the sessions
+// outside protected time, or an occupation.
 export type Thing =
-  | ({ kind: 'session' } & Omit<Session, 'start' | 'end'> & { start: string; end: string })
+  | ({ kind: 'session' } & Omit<Session, 'start' | 'end'> & { start: string; end: string; unprotected: boolean })
   | ({ kind: 'occupation'; start: string; end: string } & OccupationName)
 
 // What the page names a conflict's thing by: a session, by its title, or an occupation.
@@ -31,7 +32,7 @@ export const LAST_DAY = '2999-12-31'
 export const FIRST_MONTH = FIRST_DAY.slice(0, 7)
 export const LAST_MONTH = LAST_DAY.slice(0, 7)
 
-// How many days from today conflicts are found in, and free time and the list shown in.
+// How many days from today conflicts are found in, and the free time and the list are shown in.
 const HORIZON_DAYS = 365
 
 // `value` if it's a month the page shows, from 2000-01 to 2999-12, or else null.
@@ -98,7 +99,7 @@ function takesSomeOf({ start, end }: Times, day: string): boolean {
   return Date.parse(start) < dayStart(addDays(day, 1)) && Date.parse(end) > dayStart(day)
 }
 
-// What a thing takes of a day when that's all of it, and what free time a day has when nothing takes it.
+// What a thing takes of a day when that's all of it, and the free time of a day that's all free time.
 const WHOLE_DAY = 'toute la journée'
 
 // The part of `day` something takes, as the month writes it, e.g. "21 h – 23 h", "dès 18 h", "jusqu'à 1 h" or "toute la
@@ -162,21 +163,37 @@ export const nameOf = (thing: NamedThing) => (thing.kind === 'session' ? thing.t
 // "11 h – 15 h", and whether it's the whole day.
 export type FreeStretch = { part: string; wholeDay: boolean }
 
-// The free time of `day` outside what takes some of it, `busy`, stretch by stretch, each with when it starts, in
-// milliseconds, or nothing when it's all taken.
-function freeStretches(day: string, busy: Times[]): { start: number; stretch: FreeStretch }[] {
-  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
-  const taken = busy
-    .map(({ start, end }) => [Math.max(Date.parse(start), dayFrom), Math.min(Date.parse(end), dayTo)])
-    .filter(([from, to]) => from < to)
-    .sort(([a], [b]) => a - b)
-  const stretches: [number, number][] = []
-  let free = dayFrom
-  for (const [from, to] of taken) {
-    if (from > free) stretches.push([free, from])
-    free = Math.max(free, to)
+// A stretch of time, in milliseconds.
+type Period = [number, number]
+
+// The time that `holds` protect, of any feeds, as periods that don't overlap or follow each other, by start: holds that
+// overlap or follow each other are one (see "Protected time" in docs/design/server/calendar.md).
+function protectedTime(holds: Times[]): Period[] {
+  const merged: Period[] = []
+  for (const [from, to] of holds.map(({ start, end }): Period => [Date.parse(start), Date.parse(end)]).sort(([a], [b]) => a - b)) {
+    const last = merged.at(-1)
+    if (last && from <= last[1]) last[1] = Math.max(last[1], to)
+    else merged.push([from, to])
   }
-  if (free < dayTo) stretches.push([free, dayTo])
+  return merged
+}
+
+// The free time of `day`, the time `protectedPeriods` protect that nothing of `busy` takes, stretch by stretch, each with
+// when it starts, or nothing when it has none.
+function freeStretches(day: string, protectedPeriods: Period[], busy: Times[]): { start: number; stretch: FreeStretch }[] {
+  const [dayFrom, dayTo] = [dayStart(day), dayStart(addDays(day, 1))]
+  const within = (periods: Period[]) => periods.map(([from, to]): Period => [Math.max(from, dayFrom), Math.min(to, dayTo)]).filter(([from, to]) => from < to)
+  const taken = within(busy.map(({ start, end }): Period => [Date.parse(start), Date.parse(end)])).sort(([a], [b]) => a - b)
+  const stretches: Period[] = []
+  for (const [protectedFrom, protectedTo] of within(protectedPeriods)) {
+    let free = protectedFrom
+    for (const [from, to] of taken) {
+      if (from >= protectedTo) break
+      if (from > free) stretches.push([free, from])
+      free = Math.max(free, to)
+    }
+    if (free < protectedTo) stretches.push([free, protectedTo])
+  }
   const part = (from: number, to: number) => {
     if (from === dayFrom && to === dayTo) return WHOLE_DAY
     if (from === dayFrom) return `jusqu'à ${timeOf(to)}`
@@ -186,9 +203,9 @@ function freeStretches(day: string, busy: Times[]): { start: number; stretch: Fr
   return stretches.map(([from, to]) => ({ start: from, stretch: { part: part(from, to), wholeDay: from === dayFrom && to === dayTo } }))
 }
 
-// The free time of `day` outside what takes some of it, `busy`, stretch by stretch, or nothing when it's all taken.
-export function freeTime(day: string, busy: Times[]): FreeStretch[] {
-  return freeStretches(day, busy).map(({ stretch }) => stretch)
+// The free time of `day`, the time `holds` protect that nothing of `busy` takes, stretch by stretch.
+export function freeTime(day: string, holds: Times[], busy: Times[]): FreeStretch[] {
+  return freeStretches(day, protectedTime(holds), busy).map(({ stretch }) => stretch)
 }
 
 // What tells things apart, the way the server does: a session by its id, and an occupation by all it's given with (see
@@ -218,11 +235,12 @@ export function inSentence(thing: NamedThing): string {
 }
 
 // Every thing of the calendar, sessions and occupations, with their keys.
-function thingsOf({ sessions, occupations, feeds }: Calendar): { key: string; thing: Thing }[] {
+function thingsOf({ sessions, occupations, feeds, unprotectedSessions }: Calendar): { key: string; thing: Thing }[] {
+  const unprotected = new Set(unprotectedSessions.map(({ id }) => id))
   return [
     ...sessions.flatMap(({ start, end, ...session }) => {
       if (start === null || end === null) return []
-      const thing = { kind: 'session' as const, ...session, start, end }
+      const thing = { kind: 'session' as const, ...session, start, end, unprotected: unprotected.has(session.id) }
       return [{ key: thingKey(thing), thing }]
     }),
     ...occupations.map((occupation) => {
@@ -275,29 +293,29 @@ export const isFree = (entry: DayEntry): entry is FreeStretch => !('thing' in en
 // The days of a grid, `days`, as they're shown with `calendar`, read for them.
 export function calendarDays(calendar: Calendar, days: string[]): Map<string, CalendarDay> {
   const byDay = new Map(days.map((day): [string, DayThing[]] => [day, []]))
+  const protectedPeriods = protectedTime(calendar.holds)
   for (const { thing, conflicts } of thingsWithConflicts(calendar)) {
     for (const day of daysOf(thing, [days[0], days.at(-1)!])) {
       byDay.get(day)!.push({ thing, part: partOfDay(thing, day), conflicts: conflicts.filter(({ conflict }) => takesSomeOf(conflict, day)) })
     }
   }
-  return new Map([...byDay].map(([day, dayThings]) => [day, withFreeTime(day, dayThings, calendar.today)]))
+  return new Map([...byDay].map(([day, dayThings]) => [day, withFreeTime(day, dayThings, protectedPeriods, calendar.today)]))
 }
 
-// What takes some of `day`, `dayThings`, with the stretches of its free time among them, if it has any, on the server's
-// `today` (see "Free time" in docs/design/client/admin/calendrier.md).
-function withFreeTime(day: string, dayThings: DayThing[], today: string): CalendarDay {
+// What takes some of `day`, `dayThings`, with the stretches of its free time among them, if it has any: the time
+// `protectedPeriods` protect that nothing takes, in the 365 days from the server's `today` (see "Free time" in
+// docs/design/client/admin/calendrier.md).
+function withFreeTime(day: string, dayThings: DayThing[], protectedPeriods: Period[], today: string): CalendarDay {
   // The days conflicts are found in, from the server's today.
   if (day < today || day >= addDays(today, HORIZON_DAYS)) return dayThings
   // Cancelled sessions don't take the studio.
   const taking = dayThings.map(({ thing }) => thing).filter((thing) => thing.kind !== 'session' || thing.status !== 'cancelled')
   const dayFrom = dayStart(day)
-  // A day on which a session starts has no free time.
-  if (taking.some((thing) => thing.kind === 'session' && Date.parse(thing.start) >= dayFrom)) return dayThings
   // By when each entry starts on the day, the things that started earlier at 00:00, and a thing before a stretch that
   // starts when it does, e.g. a cancelled session.
   const entries: [number, DayEntry][] = [
     ...dayThings.map((entry): [number, DayEntry] => [Math.max(Date.parse(entry.thing.start), dayFrom), entry]),
-    ...freeStretches(day, taking).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
+    ...freeStretches(day, protectedPeriods, taking).map(({ start, stretch }): [number, DayEntry] => [start, stretch]),
   ]
   return entries.sort(([a], [b]) => a - b).map(([, entry]) => entry)
 }

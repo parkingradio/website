@@ -1,8 +1,8 @@
 # Calendrier
 
-At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, and what needs settling (see
-[Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From top to bottom,
-the page has "À régler", the toolbar, then a legend, with the links to the admin's calendars (see
+At `/admin/calendrier`: what takes the studio, i.e. sessions and occupations, its free time, and what needs settling
+(see [Calendar](../../server/calendar.md)). Days and times are in Québec time (see [Admin](layout.md)). From top to
+bottom, the page has "À régler", the toolbar, then a legend, with the links to the admin's calendars (see
 [Subscribing](#subscribing)), the month and the chosen day, or the list (see [The list](#the-list)).
 
 "Today" is the day it is in Québec, by the browser's clock.
@@ -20,6 +20,9 @@ something else that tells them apart:
   l'équipe ». Its title is cut short in the month, after two lines.
 - Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
 - Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
+
+In the legend, "disponible" has a tooltip (see [Tooltips](layout.md#tooltips)): « Plage disponible au studio, protégée
+des occupations. »
 
 On narrow screens like phones, the month shows them as marks instead (see [On phones](#on-phones)).
 
@@ -63,14 +66,18 @@ was.
 ## À régler
 
 One box under the title, about what needs settling (see [The calendar](../../server/calendar.md#the-calendar)). Its
-first row has "À régler", then, for each kind there are some of, how many in a tag, e.g. "2 conflits", in red, and "1
-sans date", and a chevron: the row is a button that opens the box and closes it. While there's nothing to settle, the
-row says "rien" instead, which says why it does nothing: it's greyed out, and screen readers announce it as unavailable.
-It's closed by default.
+first row has "À régler", then, for each kind there are some of, how many in a tag, e.g. "2 conflits", in red, "1 hors
+plage protégée" and "1 sans date", and a chevron: the row is a button that opens the box and closes it. While there's
+nothing to settle, the row says "rien" instead, which says why it does nothing: it's greyed out, and screen readers
+announce it as unavailable. It's closed by default.
 
 Under that row, the box warns (see [Warnings](layout.md#warnings)) about each feed whose last read failed, naming it,
-saying why, and that conflicts can be missing or out of date, and linking to Configuration, and about each feed that
-hasn't been read yet, naming it, and saying that conflicts can be missing.
+saying why, and that what it affects can be missing or out of date, and linking to Configuration, and about each feed
+that hasn't been read yet, naming it, and saying what can be missing, or there wrongly (see
+[The calendar](../../server/calendar.md#the-calendar)). An `occupations` feed affects conflicts, and while there's a
+`holds` feed, free time, and a `holds` feed affects free time and the sessions outside protected time, e.g. « ⚠ Le
+calendrier « Loft » n'a pas encore été lu : des plages disponibles peuvent manquer, et des sessions être signalées à
+tort hors plage protégée. »
 
 Opened, it has a group for each kind of thing to settle, each under a divider, with its tag and a heading, then a row
 for each one, on one line: when it is, then what it is. The whole row is what's done about it, by clicking it, or with
@@ -82,6 +89,10 @@ links of its own.
   day (see [What's shown](#whats-shown)), then "·" and the two things' names, joined by "et": a session's title, and an
   occupation's, or its calendar's name when it has none, e.g. « sam. 21 nov. 21 h – 1 h · Airbnb et HAUTE RIVE TAKEOVER
   ». It shows that day, chosen, in the month, with the focus on it, whichever view is shown.
+- The sessions outside protected time (see [Protected time](../../server/calendar.md#protected-time)): "hors plage
+  protégée", "sessions à protéger ou à déplacer", then each one, in the server's order. Its row has the day the session
+  starts, without its year unless it's another year than today's, then its times in brief on that day, "·" and its
+  title, e.g. « sam. 21 nov. 21 h – 1 h · HAUTE RIVE TAKEOVER ». It shows that day, as a conflict's row does.
 - The sessions without a date: "sans date", "sessions à placer", then each one, the most recently added first. Its row
   has "à déterminer" as when it is, then its title, "·", its sets' performers, set by set, the sets separated by "·",
   and its duration, e.g. « à déterminer LES SŒURS ONDES TAKEOVER · Ondine · Écume, 3 h ». It opens the session's page.
@@ -141,12 +152,13 @@ unchooses it, the month having no links to sessions there.
 
 ### Free time
 
-A day has free time when it's in the 365 days that conflicts are found in (see
-[Conflicts](../../server/calendar.md#conflicts)), and no session that isn't cancelled starts on it. Its free time is the
-parts of the day, from 00:00 to 00:00, that nothing takes, cancelled sessions aside. Today's stretches count from 00:00
-too, even those that are over.
+Free time is the studio's protected time (see [Protected time](../../server/calendar.md#protected-time)) that nothing
+takes: no session that isn't cancelled, and no occupation, e.g. around a session. Only the 365 days that conflicts are
+found in (see [Conflicts](../../server/calendar.md#conflicts)) have some, each from 00:00, today's too, even what's
+over. Time that nothing takes but that isn't protected isn't free time, and the page says nothing of it: while there's
+no `holds` feed, there's no free time.
 
-The month shows the free time of its own days, not that of the months before and after. A day that nothing takes is
+The month shows the free time of its own days, not that of the months before and after. A day that's all free time is
 green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or "dispo
 11 h – 15 h".
 
@@ -164,6 +176,7 @@ A thing's row has:
 - its kind: "session" or "occupation";
 - its times, in full on that day (see [What's shown](#whats-shown));
 - for a session, its title, linking to its page, its sets' performers, and its status; for an occupation, its name;
+- for a session outside protected time (see [À régler](#à-régler)), on each day it takes, "hors plage protégée";
 - for each other thing it's in conflict with, during some of the day, "conflit avec" that thing, e.g. « conflit avec la
   session HAUTE RIVE TAKEOVER », « conflit avec l'occupation RÉPARATION (Calendrier de l'équipe) ».
 
@@ -209,14 +222,16 @@ color and with its shape, framed in red when it's in a conflict; its times in br
 [What's shown](#whats-shown)); then what it is, which goes under the rest on narrow screens like phones:
 
 - for a session, its title, then its status, unless it's planned, in the [status colors](layout.md#status-colors), then
-  "·" and its sets' performers, set by set, the sets separated by "·"; for an occupation, its title, then its calendar,
-  or its calendar's name alone (see [What's shown](#whats-shown));
+  "·" and its sets' performers, set by set, the sets separated by "·", then for a session outside protected time (see
+  [À régler](#à-régler)), "·" and "hors plage protégée"; for an occupation, its title, then its calendar, or its
+  calendar's name alone (see [What's shown](#whats-shown));
 - for each other thing it's in conflict with, "·" and, in red, "conflit avec" that thing's name, as in "À régler", and,
   when their overlap doesn't take some of the row's day, the day it starts, without its year unless it's another year
   than the row's day's.
 
 E.g. « mar. 1 déc. | occupation | 15 h – 11 h | Airbnb Séjours · conflit avec SYNTH MEETUPS · conflit avec Calendrier
-de l'équipe (mer. 2 déc.) ».
+de l'équipe (mer. 2 déc.) », or « sam. 21 nov. | session | 21 h – 1 h | HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan ·
+hors plage protégée ».
 
 As in "À régler", the whole row is one control, whose text has no links of its own: it shows the row's day, chosen, in
 the month, with the focus on it, where the chosen day links to a session's page. Screen readers name the list by the

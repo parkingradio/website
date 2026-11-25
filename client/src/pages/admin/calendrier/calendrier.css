@@ -240,6 +240,18 @@
   background: #f2f2f2;
 }
 
+/* "disponible", whose tooltip says what free time is: the legend's text (see admin.css), with a dotted underline that
+   hints at it, in a target as large as a finger needs, which overlaps what's around it, as the links to the admin's
+   calendars do. */
+.admin .calendar-legend .calendar-legend-tip,
+.admin .calendar-legend .calendar-legend-tip:hover {
+  margin: -5px;
+  padding: 5px;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
 .calendar-swatch {
   display: inline-block;
   width: 14px;
@@ -321,8 +333,8 @@
 }
 
 /* The focus of the page's own controls: the days' numbers, their "+", the rows of "À régler" and of the list, and the
-   legend's links. */
-.admin :is(.calendar-number, .calendar-add, .calendar-line, .calendar-subscribe):focus-visible {
+   legend's links and "disponible". */
+.admin :is(.calendar-number, .calendar-add, .calendar-line, .calendar-subscribe, .calendar-legend-tip):focus-visible {
   outline: 2px solid #1d4fa3;
 }
 
@@ -471,7 +483,8 @@
   color: #b3261e;
 }
 
-.calendar-conflict-line {
+.calendar-conflict-line,
+.calendar-unprotected-line {
   display: block;
 }
 

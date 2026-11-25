@@ -26,6 +26,8 @@ function session(id: string, title: string, start: string | null, end: string | 
   return { id, title, start, end, durationMinutes, status: 'planned', sets: [], createdAt: '2026-10-01T12:00:00Z', ...fields } as Session
 }
 
+// A session, as the server gives it among the sessions outside protected time.
+const unprotected = ({ id, title, start, end }: Session) => ({ id, title, start: start!, end: end! })
 const performers = (...names: string[]) => ({ performers: names.map((name) => ({ id: name, name })) })
 const TEAM = {
   id: 'team',
@@ -41,6 +43,9 @@ const TEAM = {
 }
 // A feed of the guests' stays, whose last read failed.
 const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', error: "The link can't be read: its server fails (503)" }
+// A feed of the time protected for sessions, with a hold over the 365 days from today, and beyond.
+const LOFT = { ...TEAM, id: 'loft', name: 'Loft', kind: 'holds' as const, link: 'https://example.com/loft.ics' }
+const ALWAYS = { feedId: 'loft', start: '2026-10-01T00:00:00-04:00', end: '2028-01-01T00:00:00-05:00', wholeDay: true }
 
 const TAKEOVER = session('session-1', 'HAUTE RIVE TAKEOVER', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00', { sets: [performers('Aurore', 'Brume'), performers('Cyan')] as Session['sets'] })
 const PLAYED = session('session-2', 'SOIRÉE', '2026-11-07T20:00:00-05:00', '2026-11-07T23:00:00-05:00', { status: 'done' })
@@ -63,10 +68,10 @@ const CONFLICT = {
 const CALENDAR: Calendar = {
   ok: true,
   today: '2026-11-19',
-  feeds: [TEAM, STAYS],
+  feeds: [TEAM, STAYS, LOFT],
   sessions: [PLAYED, TAKEOVER, CANCELLED],
   occupations: [STAY, REPAIR, CLOSED],
-  holds: [],
+  holds: [ALWAYS],
   conflicts: [CONFLICT],
   unprotectedSessions: [],
   undatedSessions: [UNDATED],
@@ -279,6 +284,40 @@ describe('Calendrier', () => {
       expect(free('2026-12-05')).toEqual([])
       expect(cell('2026-12-05')).not.toHaveClass('calendar-available')
     })
+
+    it('shows free time only where it is protected, around a session too, and none without a holds feed', async () => {
+      // Protected from 11 h to 18 h on the 23rd, around a session, and nowhere else.
+      const tea = session('session-7', 'APÉRO', '2026-11-23T13:00:00-05:00', '2026-11-23T15:00:00-05:00')
+      const holds = [{ feedId: 'loft', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T18:00:00-05:00', wholeDay: false }]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], holds } })
+      const first = renderAt('/admin/calendrier')
+      await loaded()
+
+      expect(cellText('2026-11-23')).toBe('23+dispo 11 h – 13 h13 h – 15 hsession : APÉROdispo 15 h – 18 h')
+      expect(cell('2026-11-23').querySelectorAll('.calendar-mark-free')).toHaveLength(1)
+      // Nothing takes it, but it isn't protected: no color, no mention, no mark.
+      expect(cellText('2026-11-24')).toBe('24+')
+      expect(cell('2026-11-24')).not.toHaveClass('calendar-available')
+      expect(cell('2026-11-24').querySelector('.calendar-marks')).toBeNull()
+      first.unmount()
+
+      // Nothing's protected without a holds feed.
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], holds: [] } })
+      renderAt('/admin/calendrier')
+      await loaded()
+      expect(document.querySelectorAll('.calendar-month .calendar-free, .calendar-month .calendar-mark-free, .calendar-available')).toHaveLength(0)
+    })
+
+    it('says what free time is in the legend, in a tooltip, which does nothing else', async () => {
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      renderAt('/admin/calendrier')
+      await loaded()
+
+      const available = within(screen.getByRole('list', { name: 'Légende' })).getByRole('button', { name: 'disponible' })
+      expect(available).toHaveAccessibleDescription('Plage disponible au studio, protégée des occupations.')
+      fireEvent.click(available)
+      expect(path()).toBe('/admin/calendrier')
+    })
   })
 
   describe('choosing a day', () => {
@@ -398,6 +437,22 @@ describe('Calendrier', () => {
         "sessionsam. 21 nov., 21 h – 1 hHAUTE RIVE TAKEOVER Aurore, Brume · Cyanconflit avec l'occupation Séjours",
         'disponibledès 11 h',
       ])
+    })
+
+    it('says when a session is outside protected time, on each day it takes, and the month does not', async () => {
+      const unprotectedSessions = [unprotected(TAKEOVER)]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, unprotectedSessions } })
+      renderAt('/admin/calendrier?day=2026-11-21')
+      await loaded()
+
+      expect(visibleText(within(chosenDay()!).getAllByRole('listitem')[1])).toBe(
+        "session21 h – 1 hHAUTE RIVE TAKEOVER Aurore, Brume · Cyanhors plage protégéeconflit avec l'occupation Séjours",
+      )
+      fireEvent.click(dayButton('2026-11-22'))
+      expect(visibleText(within(chosenDay()!).getAllByRole('listitem')[1])).toBe(
+        "sessionsam. 21 nov., 21 h – 1 hHAUTE RIVE TAKEOVER Aurore, Brume · Cyanhors plage protégéeconflit avec l'occupation Séjours",
+      )
+      expect(cellText('2026-11-21')).not.toContain('protégée')
     })
 
     it('says when nothing takes it', async () => {
@@ -793,6 +848,16 @@ describe('Calendrier', () => {
       expect(within(list()).queryByText(/dispo/)).not.toBeInTheDocument()
     })
 
+    it('says which sessions are outside protected time', async () => {
+      const unprotectedSessions = [unprotected(TAKEOVER)]
+      mockFetch({ ...LOGGED_IN, [LIST]: { ...LIST_CALENDAR, unprotectedSessions } })
+      renderAt('/admin/calendrier?view=list')
+      await loaded()
+
+      expect(visibleText(listRow(/^sam\. 21 nov\. session/))).toBe('sam. 21 nov. session 21 h – 1 h HAUTE RIVE TAKEOVER · Aurore, Brume · Cyan · hors plage protégée · conflit avec Séjours')
+      expect(visibleText(listRow(/^mar\. 15 déc\. session/))).toBe('mar. 15 déc. session 20 h – 22 h SOIRÉE DE DÉCEMBRE')
+    })
+
     it("says a conflict's day with its year when it isn't the row's day's", async () => {
       const asThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })
       // A stay until January, and another over January, each in conflict with a session in January.
@@ -929,14 +994,15 @@ describe('Calendrier', () => {
 
   describe('À régler', () => {
     it('counts what needs settling, closed until it is opened, which the address keeps', async () => {
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
+      const unprotectedSessions = [unprotected(TAKEOVER)]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, unprotectedSessions } })
       renderAt('/admin/calendrier')
       await loaded()
 
       const box = screen.getByRole('region', { name: 'À régler' })
       // Its first row, a button in its heading, whose chevron screen readers don't read.
       const toggle = within(within(box).getByRole('heading', { level: 2, name: /^À régler/ })).getByRole('button', { expanded: false })
-      expect(toggle).toHaveAccessibleName('À régler 1 conflit 1 sans date')
+      expect(toggle).toHaveAccessibleName('À régler 1 conflit 1 hors plage protégée 1 sans date')
       expect(within(box).queryByRole('link', { name: 'LES SŒURS ONDES TAKEOVER' })).not.toBeInTheDocument()
       fireEvent.click(toggle)
       expect(path()).toBe('/admin/calendrier?issues=open')
@@ -982,6 +1048,43 @@ describe('Calendrier', () => {
       expect(dayButton('2026-11-21')).toHaveAttribute('aria-pressed', 'true')
     })
 
+    it('lists the sessions outside protected time, between the conflicts and the sessions without a date, each row of which shows its day', async () => {
+      // In the month after the one shown, and next year.
+      const nextYear = session('session-8', 'NOUVEL AN', '2027-01-02T21:00:00-05:00', '2027-01-03T01:00:00-05:00')
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, unprotectedSessions: [unprotected(EVENING), unprotected(nextYear)] }, [DECEMBER]: EMPTY })
+      renderAt('/admin/calendrier?issues=open')
+      const box = await loaded()
+
+      expect([...box.querySelectorAll('h3')].map(visibleText)).toEqual([
+        'conflits chevauchements à résoudre',
+        'hors plage protégée sessions à protéger ou à déplacer',
+        'sans date sessions à placer',
+      ])
+      const [, evening, newYear] = within(box).getAllByRole('listitem')
+      expect(visibleText(evening)).toBe('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE')
+      expect(visibleText(newYear)).toBe('sam. 2 janv. 2027 21 h – 1 h · NOUVEL AN')
+      const showDay = within(evening).getByRole('button')
+      expect(showDay).toHaveAccessibleName('mar. 15 déc. 20 h – 22 h · SOIRÉE DE DÉCEMBRE')
+      expect(within(evening).queryByRole('link')).not.toBeInTheDocument()
+
+      // Its day, chosen, in its month, with the focus on it.
+      fireEvent.click(showDay)
+      expect(path()).toBe('/admin/calendrier?issues=open&month=2026-12&day=2026-12-15')
+      await waitFor(() => expect(document.activeElement).toBe(dayButton('2026-12-15')))
+      expect(dayButton('2026-12-15')).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('is to be opened when the only thing to settle is a session outside protected time', async () => {
+      const unprotectedSessions = [unprotected(TAKEOVER)]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, conflicts: [], undatedSessions: [], unprotectedSessions } })
+      renderAt('/admin/calendrier')
+      const box = await loaded()
+
+      const toggle = within(box).getByRole('button', { name: 'À régler 1 hors plage protégée' })
+      expect(toggle).not.toHaveAttribute('aria-disabled')
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    })
+
     it('shows a session that is done or cancelled in its status colors on the chosen day, and its title alone in its conflicts', async () => {
       // A session today, already played, during a repair.
       const morning = session('session-5', 'MATINALE', '2026-11-19T09:00:00-05:00', '2026-11-19T11:00:00-05:00', { status: 'done' })
@@ -998,7 +1101,9 @@ describe('Calendrier', () => {
       const first = renderAt('/admin/calendrier?day=2026-11-19&issues=open')
       await loaded()
 
-      const [played] = within(chosenDay()!).getAllByRole('listitem')
+      // After the free time before it.
+      const [before, played] = within(chosenDay()!).getAllByRole('listitem')
+      expect(visibleText(before)).toBe("disponiblejusqu'à 9 h")
       expect(played).toHaveClass('calendar-row', 'admin-status-done')
       expect(played).toHaveTextContent('MATINALE jouée')
       const box = screen.getByRole('region', { name: 'À régler' })
@@ -1013,7 +1118,7 @@ describe('Calendrier', () => {
       expect(cancelled).toHaveClass('calendar-row', 'admin-status-cancelled')
     })
 
-    it('says when there is nothing to settle, and warns of the feeds that were not read', async () => {
+    it('says when there is nothing to settle, and warns of the feeds that were not read, about conflicts alone without a holds feed', async () => {
       const notRead = { ...TEAM, id: 'new', name: 'Nouveau', readAt: null }
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds: [TEAM, STAYS, notRead], conflicts: [], undatedSessions: [] } })
       renderAt('/admin/calendrier')
@@ -1028,6 +1133,22 @@ describe('Calendrier', () => {
         "⚠ Le calendrier « Nouveau » n'a pas encore été lu : des conflits peuvent manquer.",
       ])
       expect(within(box.querySelector('.admin-warning')!).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
+    })
+
+    it('warns of the holds feeds that were not read, and of free time with the occupations feeds then', async () => {
+      const failed = "The link can't be read: its server fails (503)"
+      const feeds = [TEAM, STAYS, { ...TEAM, id: 'new', name: 'Nouveau', readAt: null }, { ...LOFT, error: failed }, { ...LOFT, id: 'blocks', name: 'Blocages', readAt: null }]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...CALENDAR, feeds } })
+      renderAt('/admin/calendrier')
+      const box = await loaded()
+
+      expect([...box.querySelectorAll('.admin-warning')].map(visibleText)).toEqual([
+        `⚠ Des conflits et des plages disponibles peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Séjours » a échoué : ${failed}. Voir Configuration.`,
+        "⚠ Le calendrier « Nouveau » n'a pas encore été lu : des conflits peuvent manquer, et des plages être indiquées disponibles à tort.",
+        `⚠ Des plages disponibles et des sessions hors plage protégée peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « Loft » a échoué : ${failed}. Voir Configuration.`,
+        "⚠ Le calendrier « Blocages » n'a pas encore été lu : des plages disponibles peuvent manquer, et des sessions être signalées à tort hors plage protégée.",
+      ])
+      expect(within(box.querySelectorAll<HTMLElement>('.admin-warning')[2]).getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
     })
 
     it('has no notice when there are no feeds: with nothing to settle, it only has its row', async () => {

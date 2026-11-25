@@ -44,8 +44,8 @@ export function List({ nameId, to, months, onShowDay }: ListProps) {
   )
 }
 
-// A thing's row, in columns: its day, its kind, its times in brief on that day, then what it is, and each of its
-// conflicts, with the day it starts when it's on another day, which alone wraps.
+// A thing's row, in columns: its day, its kind, its times in brief on that day, then what it is, whether it's a session
+// outside protected time, and each of its conflicts, with the day it starts when it's on another day, which alone wraps.
 function ListedText({ listed: { day, thing, conflicts } }: { listed: ListedThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
@@ -58,6 +58,7 @@ function ListedText({ listed: { day, thing, conflicts } }: { listed: ListedThing
             <strong>{thing.title}</strong>
             <SessionStatus status={thing.status} />
             {performers && ` · ${performers}`}
+            {thing.unprotected && ' · hors plage protégée'}
           </>
         ) : (
           <OccupationLabel title={thing.title} calendar={thing.calendar} />

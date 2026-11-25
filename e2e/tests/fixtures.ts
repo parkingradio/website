@@ -109,19 +109,25 @@ export function adminMenu(page: Page) {
 
 type Schemas = components['schemas']
 
-// What `withCalendar` adds to the studio's calendar.
+// What `withCalendar` adds to the studio's calendar: occupations, holds and conflicts, as if they were read from feeds,
+// and sessions, with those of them that are outside protected time.
 export type CalendarExtra = {
   feeds: Schemas['CalendarFeed'][]
   occupations: Schemas['CalendarOccupation'][]
   conflicts: Schemas['CalendarConflict'][]
+  holds?: Schemas['CalendarHold'][]
+  sessions?: Schemas['Session'][]
+  unprotectedSessions?: Schemas['CalendarUnprotectedSession'][]
 }
 
 // Has the page see the studio's calendar (GET /api/admin/calendar) with `extra` added to what the server answers, as if
 // it had read them from feeds, which the server under test has none of: it only reads https links, and couldn't reach a
-// feed of the tests' own. Like the server, it gives only the occupations that take some of the days asked for, but every
-// conflict, whatever the days, and the occupations in its order, by start, then end. `extra` has to follow the server's
-// other rules (see docs/design/server/calendar.md), e.g. the conflicts' order, since they're added after the server's,
-// which has none.
+// feed of the tests' own. It also adds sessions, which the server would refuse where another test's are. Like the
+// server, it gives only the sessions, occupations and holds that take some of the days asked for, in its order, by
+// start, then end, but every conflict and session outside protected time, whatever the days. `extra` has to follow the
+// server's other rules (see docs/design/server/calendar.md), e.g. the conflicts' order, since they're added after the
+// server's, which has none, and the sessions outside protected time's, which the server, without a holds feed, has
+// none of either.
 export async function withCalendar(page: Page, extra: CalendarExtra) {
   await page.route(
     (url) => url.pathname === '/api/admin/calendar',
@@ -130,15 +136,19 @@ export async function withCalendar(page: Page, extra: CalendarExtra) {
       const query = new URL(route.request().url()).searchParams
       const from = quebecInstant(query.get('from')!, '00:00')!.getTime()
       const to = quebecInstant(addDays(query.get('to')!, 1), '00:00')!.getTime()
-      const within = ({ start, end }: { start: string; end: string }) => Date.parse(start) < to && Date.parse(end) > from
+      // What the calendar has with a start and an end, which the sessions it gives have too.
+      type Timed = { start: string | null; end: string | null }
+      const within = ({ start, end }: Timed) => Date.parse(start!) < to && Date.parse(end!) > from
+      const byTime = (a: Timed, b: Timed) => Date.parse(a.start!) - Date.parse(b.start!) || Date.parse(a.end!) - Date.parse(b.end!)
       await route.fulfill({
         json: {
           ...calendar,
           feeds: [...calendar.feeds, ...extra.feeds],
-          occupations: [...calendar.occupations, ...extra.occupations.filter(within)].sort(
-            (a, b) => Date.parse(a.start) - Date.parse(b.start) || Date.parse(a.end) - Date.parse(b.end),
-          ),
+          sessions: [...calendar.sessions, ...(extra.sessions ?? []).filter(within)].sort(byTime),
+          occupations: [...calendar.occupations, ...extra.occupations.filter(within)].sort(byTime),
+          holds: [...calendar.holds, ...(extra.holds ?? []).filter(within)].sort(byTime),
           conflicts: [...calendar.conflicts, ...extra.conflicts],
+          unprotectedSessions: [...calendar.unprotectedSessions, ...(extra.unprotectedSessions ?? [])],
         },
       })
     },
