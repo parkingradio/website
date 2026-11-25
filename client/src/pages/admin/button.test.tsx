@@ -122,14 +122,24 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it('keeps its tooltip when the tooltip itself is tapped, but not once the button loses the focus', () => {
+  it('hides its tooltip once the tooltip itself is tapped, but not as the tap starts', () => {
+    render(<Button tip="Pourquoi.">⚠</Button>)
+    const button = screen.getByRole('button')
+    // Without the focus, which jsdom's events don't move, like Safari's taps.
+    tap(button)
+    // As the tap starts, it stays, so that the tap doesn't land on what's under it.
+    fireEvent.pointerDown(tooltip(), { pointerType: 'touch' })
+    expect(tooltip()).toBeVisible()
+    fireEvent.click(tooltip())
+    expect(tooltip()).not.toBeVisible()
+  })
+
+  it('hides its tooltip once the button loses the focus, as when something else is tapped in Chrome', () => {
     render(<Button tip="Pourquoi.">⚠</Button>)
     const button = screen.getByRole('button')
     act(() => button.focus())
     tap(button)
-    fireEvent.pointerDown(tooltip())
     expect(tooltip()).toBeVisible()
-
     act(() => button.blur())
     expect(tooltip()).not.toBeVisible()
   })

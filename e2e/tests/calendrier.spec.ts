@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { addDays, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
 import { test, expect, adminMenu, fillTime, logIn, longDay, NARROW, own, scrollsSideways, withCalendar } from './fixtures.ts'
 import type { CalendarExtra } from './fixtures.ts'
+import { centerOf } from './drag.ts'
 
 // The studio's calendar: a session of the test's own, in the month and on its day, and occupations and conflicts,
 // which the tests fake, since the server under test has no feeds (see `withCalendar`). The browser is in
@@ -430,6 +431,18 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
       await button.tap()
       await expect(tooltip).toHaveCount(0)
     }
+  }
+
+  // On phones, tapping a tooltip only hides it, even where it covers another word, e.g. session's, over "conflit".
+  if (isMobile) {
+    const conflit = legend.getByRole('button', { name: 'conflit' })
+    await conflit.evaluate((word) => word.addEventListener('click', () => (word.dataset.clicked = '')))
+    await legend.getByRole('button', { name: 'session' }).tap()
+    const [tip, center] = [(await tooltip.boundingBox())!, await centerOf(conflit)]
+    expect(overlap(tip, { ...center, width: 0, height: 0 }), 'the tooltip covers "conflit"').toBe(true)
+    await tooltip.tap({ position: { x: center.x - tip.x, y: center.y - tip.y } })
+    await expect(tooltip).toHaveCount(0)
+    await expect(conflit).not.toHaveAttribute('data-clicked')
   }
 
   // On phones, its words and links are targets as large as a finger needs, none of which overlaps another, even on the

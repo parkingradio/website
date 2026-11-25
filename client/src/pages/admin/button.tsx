@@ -52,7 +52,9 @@ export function Button({
       setFocused(false)
       setPinned(false)
     }
-    // Tapping something else hides it, since tapping a button doesn't focus it in every browser.
+    // Tapping something else hides it, since tapping a button doesn't focus it in every browser. A tap on the button or
+    // its tooltip is left to its click: the button's toggles it, and the tooltip's hides it once the tap is over, since
+    // hiding it as the tap starts would let the tap land on what's under it.
     const onPointerDown = (event: Event) => {
       if (!anchor.current!.contains(event.target as Node)) setPinned(false)
     }
@@ -98,7 +100,7 @@ export function Button({
       {lines.length > 0 && (
         // Hidden rather than left out, so that it's the button's description for screen readers, where a space keeps
         // the lines' sentences apart.
-        <span ref={tooltip} id={id} role="tooltip" className="admin-tooltip" hidden={!shown}>
+        <span ref={tooltip} id={id} role="tooltip" className="admin-tooltip" hidden={!shown} onClick={() => setPinned(false)}>
           {lines.map((line, i) => (
             <Fragment key={i}>
               {i > 0 && ' '}
