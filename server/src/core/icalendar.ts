@@ -1,5 +1,6 @@
-// Writing calendars in iCalendar (RFC 5545), for the calendar feeds that calendar apps subscribe to: the public events'
-// (see `GET /calendar.ics` in docs/design/server/events.md) and admins' own (see docs/design/server/subscriptions.md).
+// Writing calendars in iCalendar (RFC 5545), for the calendars that calendar apps subscribe to: the public events' feed
+// (see `GET /calendar.ics` in docs/design/server/events.md) and admins' calendars (see
+// docs/design/server/admin-calendars.md).
 
 const PRODUCT = '-//Parking Radio//Calendrier//FR'
 // Lines are at most this many octets long, without their CRLF.

@@ -2703,7 +2703,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The token of the admin's own calendar feeds' links, which they get the first time they ask for it */
+        /** The token of the links of the admin's calendars, which they get the first time they ask for it */
         get: {
             parameters: {
                 query?: never;
@@ -2743,7 +2743,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Replaces the token of the admin's own calendar feeds' links, which makes the previous links stop working */
+        /** Replaces the token of the links of the admin's calendars, which makes the previous links stop working */
         post: {
             parameters: {
                 query?: never;
@@ -3946,7 +3946,7 @@ export interface components {
         IcsSubscriptionToken: {
             /** @constant */
             ok: true;
-            /** @description The token of the admin's calendar feeds' links */
+            /** @description The token of the links of the admin's calendars */
             token: string;
         };
         LeftOutTrack: {

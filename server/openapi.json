@@ -2302,7 +2302,7 @@
           },
           "token": {
             "type": "string",
-            "description": "The token of the admin's calendar feeds' links"
+            "description": "The token of the links of the admin's calendars"
           }
         },
         "required": [
@@ -11213,9 +11213,9 @@
     },
     "/api/admin/ics-subscription-token": {
       "get": {
-        "summary": "The token of the admin's own calendar feeds' links, which they get the first time they ask for it",
+        "summary": "The token of the links of the admin's calendars, which they get the first time they ask for it",
         "tags": [
-          "Subscriptions"
+          "Admins' calendars"
         ],
         "responses": {
           "200": {
@@ -11251,9 +11251,9 @@
         }
       },
       "post": {
-        "summary": "Replaces the token of the admin's own calendar feeds' links, which makes the previous links stop working",
+        "summary": "Replaces the token of the links of the admin's calendars, which makes the previous links stop working",
         "tags": [
-          "Subscriptions"
+          "Admins' calendars"
         ],
         "responses": {
           "200": {

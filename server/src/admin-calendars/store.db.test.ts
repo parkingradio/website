@@ -17,17 +17,17 @@ import { testDatabase } from '../db/test-database.js'
 import type { TestDatabase } from '../db/test-database.js'
 import { sessionsRoutes } from '../sessions/routes.js'
 import { sessionsStore } from '../sessions/store.js'
-import { subscriptionsRoutes } from './routes.js'
-import { subscriptionsStore } from './store.js'
-import type { SubscriptionsStore } from './store.js'
+import { adminCalendarsRoutes } from './routes.js'
+import { adminCalendarsStore } from './store.js'
+import type { AdminCalendarsStore } from './store.js'
 
-// Admins' own calendar feeds, against a real database: their tokens, and the sessions of the feed of sessions (see
-// docs/design/server/subscriptions.md). The occupations, which are only in memory, are tested without one (see
+// Admins' calendars, against a real database: their tokens, and the sessions of the calendar of sessions (see
+// docs/design/server/admin-calendars.md). The occupations, which are only in memory, are tested without one (see
 // routes.test.ts).
 
 let database: TestDatabase
 let app: FastifyInstance
-let store: SubscriptionsStore
+let store: AdminCalendarsStore
 
 beforeAll(async () => {
   process.env.JWT_SECRET = 'test-secret'
@@ -39,10 +39,10 @@ beforeAll(async () => {
   acceptSessions(app)
   const photos = memoryPhotos((count) => count.toString(16).padStart(64, '0'))
   await app.register(sessionsRoutes, { store: sessionsStore(database.db), photos, resolveTrack: async (link: string) => `track:${link}` })
-  store = subscriptionsStore(database.db)
+  store = adminCalendarsStore(database.db)
   const feeds = { list: async () => [] } as unknown as CalendarFeedsStore
   const reads = { of: () => undefined } as unknown as CalendarReads
-  await app.register(subscriptionsRoutes, { store, feeds, reads, siteOrigin: 'https://parking.radio', environment: 'production' })
+  await app.register(adminCalendarsRoutes, { store, feeds, reads, siteOrigin: 'https://parking.radio', environment: 'production' })
 })
 
 afterAll(async () => {
@@ -139,7 +139,7 @@ async function change(url: string, payload: object) {
   expect(response.statusCode, response.body).toBe(200)
 }
 
-describe('SubscriptionsStore.sessions', () => {
+describe('AdminCalendarsStore.sessions', () => {
   const now = new Date('2026-11-14T21:00-05:00')
   const idsOf = async (at = now) => (await store.sessions(at)).map(({ id }) => id).toSorted()
 

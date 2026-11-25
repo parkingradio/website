@@ -41,7 +41,7 @@ design: when they disagree, these documents still win.
 | [Sessions](server/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings on SoundCloud and YouTube |
 | [Events](server/events.md) | The public schedule: the announced sessions, as events, with their sets, and their calendar feed |
 | [Calendar](server/calendar.md) | The studio's calendar, with its conflicts, and what takes the studio besides sessions: occupations, and the calendar feeds they're read from |
-| [Subscriptions](server/subscriptions.md) | Admins' own calendar feeds of the sessions and of the occupations, which they subscribe to in their calendar apps, and the token in their links |
+| [Admins' calendars](server/admin-calendars.md) | Admins' calendars of the sessions and of the occupations, which they subscribe to in their calendar apps, and the token in their links |
 | [Admins](server/admins.md) | Admins, invites and sessions |
 | [OAuth](server/oauth.md) | Apps that act as an admin, e.g. Claude: connecting them, and their connections |
 | [MCP server](server/mcp.md) | What connected apps can do: the API's endpoints, as tools |

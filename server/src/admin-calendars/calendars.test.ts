@@ -4,7 +4,7 @@ import type { StoredSession, StoredSet } from '../sessions/store.js'
 import { occupationsCalendar, sessionsCalendar } from './calendars.js'
 import type { CalendarOptions, FeedWithRead } from './calendars.js'
 
-// Admins' own calendar feeds, as iCalendar (see docs/design/server/subscriptions.md). An iCalendar parser, ical.js, reads
+// Admins' calendars, as iCalendar (see docs/design/server/admin-calendars.md). An iCalendar parser, ical.js, reads
 // them back, as calendar apps would.
 
 const SITE = 'https://parking.radio'
@@ -77,7 +77,7 @@ function vevents(body: string) {
 
 const calendarName = (body: string) => new ICAL.Component(ICAL.parse(body)).getFirstPropertyValue('x-wr-calname')
 
-// The one event of the feed of a session with `fields`, as a parser reads it.
+// The one event of the calendar of a session with `fields`, as a parser reads it.
 const onlyEvent = (fields: Partial<StoredSession>) => vevents(sessionsCalendar([session(fields)], OPTIONS))[0]
 
 describe('sessionsCalendar', () => {

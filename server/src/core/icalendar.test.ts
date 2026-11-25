@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { calendar, contentLine, date, dateTime, text } from './icalendar.js'
 
-// Writing iCalendar. The feeds themselves are tested with their routes, e.g. events/calendar.test.ts, which read them back
-// with a parser, ical.js, as calendar apps would.
+// Writing iCalendar. The calendars themselves are tested with their routes, e.g. events/calendar.test.ts, which read them
+// back with a parser, ical.js, as calendar apps would.
 
 describe('calendar', () => {
   it('has its name, escaped, its refresh interval, and its components, in lines that end in CRLF', () => {

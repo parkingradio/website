@@ -2,8 +2,8 @@ import { createHash, randomBytes } from 'node:crypto'
 
 // Random tokens that the server gives out, e.g. in invites, or to the apps admins connect, which can't be guessed. The
 // server keeps only their hashes, so that its database can't be used to act as whoever has them, except for the tokens of
-// admins' own calendar feeds, which it keeps as they are, so that the admin pages can show their links again (see
-// subscriptions/store.ts).
+// admins' calendars, which it keeps as they are, so that the admin pages can show their links again (see
+// admin-calendars/store.ts).
 
 // What every token looks like: 64 hexadecimal digits.
 export const TOKEN_FORMAT = /^[0-9a-f]{64}$/

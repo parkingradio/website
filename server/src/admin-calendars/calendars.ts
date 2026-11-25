@@ -8,8 +8,8 @@ import { eventVevent } from '../events/calendar.js'
 import { event } from '../events/routes.js'
 import type { StoredSession } from '../sessions/store.js'
 
-// Admins' own calendar feeds, of the sessions and of the occupations, in iCalendar (see
-// docs/design/server/subscriptions.md).
+// Admins' calendars, of the sessions and of the occupations, in iCalendar (see
+// docs/design/server/admin-calendars.md).
 
 // How often subscribers are asked to read them again: as often as the server reads the calendar feeds.
 const REFRESH_INTERVAL = 'PT15M'
@@ -33,7 +33,7 @@ export type CalendarOptions = {
 // A calendar's name, e.g. "Parking Radio (test) · sessions" in the test environment.
 const calendarName = (what: string, environment: string) => `${serverName(environment)} · ${what}`
 
-// The feed of the sessions `rows`, which all have a start, in any order. Each one is the VEVENT of its event in
+// The calendar of the sessions `rows`, which all have a start, in any order. Each one is the VEVENT of its event in
 // /calendar.ics, as if it were announced, with its own UID and URL.
 export function sessionsCalendar(rows: StoredSession[], { siteOrigin, environment, now }: CalendarOptions): string {
   const vevent = (row: StoredSession) =>
@@ -54,7 +54,7 @@ export type FeedWithRead = { feed: Pick<StoredFeed, 'id' | 'name'>; read: FeedRe
 const time = (property: 'DTSTART' | 'DTEND', instant: Date, wholeDay: boolean) =>
   wholeDay ? `${property};VALUE=DATE:${date(quebecDay(instant))}` : `${property}:${dateTime(instant)}`
 
-// The feed of the occupations of `feeds`, as they were read, and of the feeds whose last read failed, in the order of
+// The calendar of the occupations of `feeds`, as they were read, and of the feeds whose last read failed, in the order of
 // `feeds`.
 export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environment, now }: CalendarOptions): string {
   const stamp = `DTSTAMP:${dateTime(now)}`

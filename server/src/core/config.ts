@@ -1,4 +1,4 @@
-// What Parking Radio's MCP server and admins' own calendar feeds are named after, which says which environment `environment`
+// What Parking Radio's MCP server and admins' calendars are named after, which says which environment `environment`
 // is, outside production, e.g. "Parking Radio (test)".
 export function serverName(environment: string): string {
   return environment === 'production' ? 'Parking Radio' : `Parking Radio (${environment})`

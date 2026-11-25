@@ -31,8 +31,8 @@ export const users = pgTable(
     // Only the sessions that started with this version are valid. Sessions get it when they start, and choosing a new
     // password increments it, which ends the sessions that started with the old one.
     sessionVersion: integer('session_version').notNull().default(0),
-    // The token in the links of the admin's own calendar feeds, or null until they first ask for it (see
-    // subscriptions/store.ts). Unlike other tokens, it's kept as it is, rather than hashed, so that the admin pages can
+    // The token in the links of the admin's calendars, or null until they first ask for it (see
+    // admin-calendars/store.ts). Unlike other tokens, it's kept as it is, rather than hashed, so that the admin pages can
     // show the links again, like calendar feeds' links.
     icsSubscriptionToken: text('ics_subscription_token').unique(),
   },

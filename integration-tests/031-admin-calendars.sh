@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Admins' own calendar feeds, in the server's Docker image (see docs/design/server/subscriptions.md):
+# Admins' calendars, in the server's Docker image (see docs/design/server/admin-calendars.md):
 # - the token's endpoints require a session, and give the admin the same token until it's replaced
-# - the feeds refuse requests without an admin's token, with a 403 that doesn't quote it
-# - the feed of sessions has the sessions, announced or not, marked, and is never kept
-# - the feed of occupations is empty without feeds, fails with 503 until a feed that's added behind the server's back has
+# - the calendars refuse requests without an admin's token, with a 403 that doesn't quote it
+# - the calendar of sessions has the sessions, announced or not, marked, and is never kept
+# - the calendar of occupations is empty without feeds, fails with 503 until a feed that's added behind the server's back has
 #   been read, and then has that feed, whose read failed
 # - replacing the token, or revoking the admin, makes the links stop working
 # - the tokens are never logged
-# What the feeds give is tested by the server's own tests (server/src/subscriptions).
+# What the calendars give is tested by the server's own tests (server/src/admin-calendars).
 
 source "$(dirname "$0")/lib.sh"
 
@@ -36,7 +36,7 @@ token="$(token)"
 [[ "$token" =~ ^[0-9a-f]{64}$ ]] || fail "expected a token of 64 hexadecimal digits, got: ${token}"
 [ "$(token)" = "$token" ] || fail "expected the same token again"
 
-echo "  the feeds refuse requests without an admin's token"
+echo "  the calendars refuse requests without an admin's token"
 readonly OTHER="$(openssl rand -hex 32)"
 for feed in sessions occupations; do
     for query in '' '?token=' "?token=${OTHER}" "?token=${token}&token=${token}"; do
@@ -48,7 +48,7 @@ for feed in sessions occupations; do
     done
 done
 
-echo "  the feed of sessions has every session, announced or not, marked, and is never kept"
+echo "  the calendar of sessions has every session, announced or not, marked, and is never kept"
 # Years from now, so that the sessions of other tests are in neither.
 readonly ANNOUNCED='5b7e2c1d-3a4f-4b6c-8d9e-0f1a2b3c4d01'
 readonly CANCELLED='5b7e2c1d-3a4f-4b6c-8d9e-0f1a2b3c4d02'
@@ -67,7 +67,7 @@ expect_body_contains 'SUMMARY:[CANCELLED] [UNANNOUNCED] Annulée'
 expect_body_lacks 'Sans date'
 sql "delete from sessions where id::text like '5b7e2c1d-3a4f-4b6c-8d9e-0f1a2b3c4d0%'"
 
-echo "  the feed of occupations is empty without feeds"
+echo "  the calendar of occupations is empty without feeds"
 request "${BASE_URL}/occupations.ics?token=${token}"
 expect_status 200
 expect_header cache-control 'no-store'

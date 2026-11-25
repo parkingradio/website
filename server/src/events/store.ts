@@ -17,8 +17,8 @@ const isEvent = eq(sessions.announced, true)
 // excludes.
 const hasEnded = (now: Date) => sql`upper(session_period(${sessions.startAt}, ${sessions.durationMinutes})) <= ${now.toISOString()}::timestamptz`
 
-// Whether a session is one of a calendar feed's at `now`, the public events' or admins' own: it has a start, and it starts
-// at most a year before `now`, or its end hasn't passed then.
+// Whether a session is in a calendar of sessions at `now`, the public events' feed or an admin's calendar: it has a
+// start, and it starts at most a year before `now`, or its end hasn't passed then.
 export function inFeed(now: Date): SQL {
   const since = new Date(now)
   since.setUTCFullYear(since.getUTCFullYear() - 1)

@@ -5,20 +5,20 @@ import { useZodSchemas } from '../api/schemas.js'
 import { acceptSessions, sessionCookies } from '../admins/test-sessions.js'
 import type { CalendarFeedsStore, StoredFeed } from '../calendar/feeds.js'
 import type { CalendarReads, FeedRead } from '../calendar/reads.js'
-import { subscriptionsRoutes } from './routes.js'
-import type { SubscriptionsStore } from './store.js'
+import { adminCalendarsRoutes } from './routes.js'
+import type { AdminCalendarsStore } from './store.js'
 
-// Admins' own calendar feeds' routes, without a database: what's refused before anything is read, and when the feed of
-// occupations is given (see docs/design/server/subscriptions.md). The tokens and the sessions are tested against a real
+// Admins' calendars' routes, without a database: what's refused before anything is read, and when the calendar of
+// occupations is given (see docs/design/server/admin-calendars.md). The tokens and the sessions are tested against a real
 // database (see store.db.test.ts), and the calendars themselves in calendars.test.ts.
 
 const TOKEN = 'a'.repeat(64)
 
 const store = {
-  token: vi.fn<SubscriptionsStore['token']>(async () => TOKEN),
-  replace: vi.fn<SubscriptionsStore['replace']>(async () => TOKEN),
-  isToken: vi.fn<SubscriptionsStore['isToken']>(async (token) => token === TOKEN),
-  sessions: vi.fn<SubscriptionsStore['sessions']>(async () => []),
+  token: vi.fn<AdminCalendarsStore['token']>(async () => TOKEN),
+  replace: vi.fn<AdminCalendarsStore['replace']>(async () => TOKEN),
+  isToken: vi.fn<AdminCalendarsStore['isToken']>(async (token) => token === TOKEN),
+  sessions: vi.fn<AdminCalendarsStore['sessions']>(async () => []),
 }
 
 const FEEDS: StoredFeed[] = ['Séjours', 'Airbnb'].map((name, index) => ({
@@ -51,8 +51,8 @@ async function buildApp() {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   acceptSessions(app)
-  await app.register(subscriptionsRoutes, {
-    store: store as SubscriptionsStore,
+  await app.register(adminCalendarsRoutes, {
+    store: store as AdminCalendarsStore,
     feeds: feeds as unknown as CalendarFeedsStore,
     reads: reads as unknown as CalendarReads,
     siteOrigin: 'https://parking.radio',
@@ -61,13 +61,13 @@ async function buildApp() {
   return app
 }
 
-const FEED_PATHS = ['/sessions.ics', '/occupations.ics']
+const PATHS = ['/sessions.ics', '/occupations.ics']
 
-describe('the feeds', () => {
+describe('the calendars', () => {
   it("refuse requests whose token isn't an admin's, before anything else is read, without quoting the token", async () => {
     const app = await buildApp()
     const other = 'b'.repeat(64)
-    for (const path of FEED_PATHS) {
+    for (const path of PATHS) {
       for (const query of ['', '?token=', `?token=${other}`, `?token=${TOKEN}&token=${TOKEN}`, `?other=${TOKEN}`]) {
         const response = await app.inject({ method: 'GET', url: `${path}${query}` })
         expect(response.statusCode, `${path}${query}`).toBe(403)
@@ -84,7 +84,7 @@ describe('the feeds', () => {
     const app = await buildApp()
     read.set('feed-0', { events: [], readAt: new Date(), error: null })
     read.set('feed-1', { events: [], readAt: new Date(), error: null })
-    for (const path of FEED_PATHS) {
+    for (const path of PATHS) {
       for (const method of ['GET', 'HEAD'] as const) {
         const response = await app.inject({ method, url: `${path}?token=${TOKEN}&other=1` })
         expect(response.statusCode, `${method} ${path}`).toBe(200)
@@ -105,7 +105,7 @@ describe('GET /sessions.ics', () => {
     expect(response.headers['cache-control']).toBe('no-store')
   })
 
-  it('has the sessions of the feed at the time of the request', async () => {
+  it('has the sessions of the calendar at the time of the request', async () => {
     const app = await buildApp()
     const before = Date.now()
     await app.inject({ method: 'GET', url: `/sessions.ics?token=${TOKEN}` })

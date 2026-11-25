@@ -37,8 +37,8 @@ type VeventOptions = {
   transparent?: boolean
 }
 
-// An event's VEVENT, as this feed has it, or as an admin's own feed of sessions has it, with a UID, a URL and marks of its
-// own (see subscriptions/calendars.ts), so that both feeds give sessions the same way.
+// An event's VEVENT, as this feed has it, or as an admin's calendar of sessions has it, with a UID, a URL and marks of its
+// own (see admin-calendars/calendars.ts), so that both give sessions the same way.
 export function eventVevent(event: Event, { uid, url, now, marks = [], transparent = false }: VeventOptions): string[] {
   const about = description(event)
   return [

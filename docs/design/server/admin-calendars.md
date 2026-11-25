@@ -1,13 +1,12 @@
-# Subscriptions
+# Admins' calendars
 
-Admins' own calendar feeds, which each admin subscribes to in their calendar app, so that it shows what takes the
-studio:
+Admins' calendars, which each admin subscribes to in their calendar app, so that it shows what takes the studio:
 
 - [`GET /sessions.ics`](#get-sessionsics): the sessions, announced or not (see [Sessions](sessions.md)).
 - [`GET /occupations.ics`](#get-occupationsics): the occupations, read from the calendar feeds (see
   [Calendar](calendar.md)).
 
-They're two feeds rather than one, so that calendar apps show, hide and color them separately: a subscription is one
+They're two calendars rather than one, so that calendar apps show, hide and color them separately: a subscription is one
 calendar in every app. Like the calendar feed of the public events ([`GET /calendar.ics`](events.md#get-calendarics)),
 they aren't JSON, so they aren't under `/api`. Calendar apps can't log in, so it's a token in their link that gives
 access to them, rather than an admin's session. They aren't tools of the [MCP server](mcp.md), nor are the endpoints of
@@ -15,13 +14,13 @@ the token, since their links are secrets.
 
 ## The token
 
-Each admin has one token, for both feeds, which is in their links: `<site>/sessions.ics?token=<token>` and
+Each admin has one token, for both calendars, which is in their links: `<site>/sessions.ics?token=<token>` and
 `<site>/occupations.ics?token=<token>`, where `<site>` is the site's address, e.g. `https://parking.radio`. Tokens are
 random, so they can't be guessed. Unlike the other tokens the server gives out, e.g. those of apps (see
 [OAuth](oauth.md#connections)), the server keeps the token itself, so that the admin pages can show the links again
 whenever the admin asks for them ([`GET /api/admin/ics-subscription-token`](#get-apiadminics-subscription-token-admin)).
 
-The links are only given to their admin. Whoever has them can read both feeds, until the token is replaced:
+The links are only given to their admin. Whoever has them can read both calendars, until the token is replaced:
 
 - **Replacing it**, e.g. when a link was shared by mistake
   ([`POST /api/admin/ics-subscription-token`](#post-apiadminics-subscription-token-admin)), makes the previous links
@@ -35,11 +34,11 @@ server's own logs never have it, since they leave out the values of query string
 [Logs, in Conventions](README.md#conventions)). There's no rate limit (see
 [Rate limits, in Conventions](README.md#conventions)).
 
-## The feeds
+## The calendars
 
-Both feeds are in iCalendar (RFC 5545), and take one query parameter, `token`, the admin's token. Their requests fail
-with 403, and an error that doesn't quote the token, when `token` is missing, given more than once, or isn't an admin's
-token, before anything else is read. Not 401, which only admin endpoints give (see
+Both calendars are in iCalendar (RFC 5545), and take one query parameter, `token`, the admin's token. Their requests
+fail with 403, and an error that doesn't quote the token, when `token` is missing, given more than once, or isn't an
+admin's token, before anything else is read. Not 401, which only admin endpoints give (see
 [Admin endpoints, in Conventions](README.md#conventions)), and which some calendar apps take as a request for a user
 name and a password. Other query parameters are ignored.
 
@@ -71,7 +70,7 @@ Sessions without a start aren't in it. Each one is a `VEVENT` with:
 | `UID` | `session-<id>@parking.radio`, from its `id`: not the `UID` of its event in `/calendar.ics`, which is another calendar's |
 | `DTSTART`, `DTEND` | Its `start` and `end` |
 | `SUMMARY` | Its `title`, after `[UNANNOUNCED] ` for a session that isn't announced, and before that, `[CANCELLED] ` for a cancelled one, e.g. `[CANCELLED] [UNANNOUNCED] GUEST MIXES` |
-| `STATUS` | `CANCELLED` for a cancelled session, which stays in the feed. Other sessions don't have one |
+| `STATUS` | `CANCELLED` for a cancelled session, which stays in the calendar. Other sessions don't have one |
 | `LOCATION` | `parking.radio` |
 | `DESCRIPTION` | As in `/calendar.ics`: the names of its lineup (see [What's public, in Events](events.md#whats-public)), then its `effectiveDescription`, with "OPEN JAM" for a synth meetup without a lineup that isn't cancelled |
 | `URL` | Its page on the admin pages, `<site>/admin/sessions/<id>` |
@@ -87,7 +86,7 @@ succeeded. They cover what reads keep, from a year before them to two years afte
 Until every feed has been read with the link it has, since the server started, whether that read succeeded or failed, it
 fails with 503, rather than give a calendar without the occupations of the feeds that haven't been read yet: calendar
 apps keep what they had, rather than remove those occupations after the server restarts, e.g. after each deploy, and add
-them back once they read the feed again, which can take a day. A feed whose link changed, e.g. through another server,
+them back once they read it again, which can take a day. A feed whose link changed, e.g. through another server,
 waits likewise for its new link to be read. Without any feed, it gives an empty calendar.
 
 Each occupation is a `VEVENT` with:
