@@ -130,14 +130,13 @@ export function Month({ month, grid, nameId, today, chosen, days, onChoose, onAd
   )
 }
 
-// What's on a day, as marks, which narrow screens show in place of its words: a mark for each thing, in order, then a
-// circle when it has free time, and a "!" when something on it is in a conflict, drawn by the CSS. Screen readers leave
-// them out, since the words describe the day.
+// What's on a day, as marks, which narrow screens show in place of its words: a mark for each thing, in order, framed
+// when the thing is in a conflict, then a circle when it has free time. Screen readers leave them out, since the words
+// describe the day.
 function DayMarks({ entries }: { entries: CalendarDay }) {
   const things = entries.filter((entry): entry is DayThing => !isFree(entry))
-  const conflict = things.some(({ conflicts }) => conflicts.length > 0)
   return (
-    <span className={conflict ? 'calendar-marks calendar-marks-conflict' : 'calendar-marks'} aria-hidden="true">
+    <span className="calendar-marks" aria-hidden="true">
       {things.map(({ thing, conflicts }, i) => {
         const classes = [`calendar-mark calendar-mark-${thing.kind}`, thing.kind === 'session' && `calendar-mark-${thing.status}`, conflicts.length > 0 && 'calendar-mark-conflict']
         return <span key={i} className={classes.filter(Boolean).join(' ')} />

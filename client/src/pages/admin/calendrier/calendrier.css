@@ -206,10 +206,12 @@
   margin: 0;
 }
 
+/* Its rows, when it wraps, far enough apart that the targets of its words, which reach 6px above and below their line
+   (see below), don't overlap those of the row above. */
 .calendar-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  gap: 12px 1rem;
   margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
@@ -240,9 +242,9 @@
   background: #f2f2f2;
 }
 
-/* "disponible", whose tooltip says what free time is: the legend's text (see admin.css), with a dotted underline that
-   hints at it, in a target as large as a finger needs, whatever the font, which overlaps what's around it, as the
-   links to the admin's calendars do, and whose focus is drawn within it, clear of the swatch. */
+/* The legend's words, whose tooltips say what each kind is: the legend's text (see admin.css), with a dotted underline
+   that hints at them, in a target as large as a finger needs, whatever the font, which overlaps what's around it, as
+   the links to the admin's calendars do, and whose focus is drawn within it, clear of the swatch. */
 .admin .calendar-legend .calendar-legend-tip,
 .admin .calendar-legend .calendar-legend-tip:hover {
   margin: -6px -5px;
@@ -334,7 +336,7 @@
 }
 
 /* The focus of the page's own controls: the days' numbers, their "+", the rows of "À régler" and of the list, and the
-   legend's links and "disponible". */
+   legend's links and words. */
 .admin :is(.calendar-number, .calendar-add, .calendar-line, .calendar-subscribe, .calendar-legend-tip):focus-visible {
   outline: 2px solid #1d4fa3;
 }
@@ -602,26 +604,10 @@
     box-shadow: none;
   }
 
-  /* Drawn, not read: the day's description and the legend's words say it. */
-  .calendar-marks-conflict::after,
-  .calendar-legend .calendar-conflict::after {
-    content: '!';
-    content: '!' / '';
-    color: #c62828;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 12px;
-  }
-
-  /* The legend's conflict, as a day's marks have it: a frame, then a "!". */
+  /* The frame reaches 3px past the legend's swatch, which leaves room for it, so that "conflit"'s focus is drawn clear
+     of it. */
   .calendar-legend .calendar-conflict {
-    position: relative;
-    margin-right: 10px;
-  }
-
-  .calendar-legend .calendar-conflict::after {
-    position: absolute;
-    left: 17px;
+    margin-right: 3px;
   }
 
   .calendar-row {

@@ -298,28 +298,27 @@ export function Calendrier() {
   )
 }
 
-// What each color is, and on narrow screens, what each mark is (see calendrier.css), with the links to the admin's
-// calendars of the sessions and of the occupations once their token is known, and what free time is, in a tooltip.
+// What each kind of thing is, in a tooltip, with its color, and on narrow screens, its mark (see calendrier.css), and
+// the links to the admin's calendars of the sessions and of the occupations once their token is known.
+const LEGEND = [
+  { kind: 'session', name: 'session', tip: 'Toutes les sessions qui ont une date.', calendar: 'sessions' },
+  { kind: 'occupation', name: 'occupation', tip: "Période où le studio n'est pas disponible pour des sessions.", calendar: 'occupations' },
+  { kind: 'free', name: 'disponible', tip: 'Plage disponible au studio, protégée des occupations.', calendar: null },
+  { kind: 'conflict', name: 'conflit', tip: 'Une session ou une occupation qui chevauche une plage indisponible.', calendar: null },
+] as const
+
 function Legend({ token }: { token: string | null }) {
   return (
     <ul className="calendar-legend" aria-label="Légende">
-      <li>
-        <span className="calendar-swatch calendar-session" /> session
-        {token !== null && <SubscribeLink calendar="sessions" token={token} />}
-      </li>
-      <li>
-        <span className="calendar-swatch calendar-occupation" /> occupation
-        {token !== null && <SubscribeLink calendar="occupations" token={token} />}
-      </li>
-      <li>
-        <span className="calendar-swatch calendar-free" />
-        <Button className="calendar-legend-tip" tip="Plage disponible au studio, protégée des occupations.">
-          disponible
-        </Button>
-      </li>
-      <li>
-        <span className="calendar-swatch calendar-conflict" /> conflit
-      </li>
+      {LEGEND.map(({ kind, name, tip, calendar }) => (
+        <li key={kind}>
+          <span className={`calendar-swatch calendar-${kind}`} />
+          <Button className="calendar-legend-tip" tip={tip}>
+            {name}
+          </Button>
+          {calendar !== null && token !== null && <SubscribeLink calendar={calendar} token={token} />}
+        </li>
+      ))}
       {/* Which only narrow screens need, whose month doesn't write sessions' status. */}
       {(['done', 'cancelled'] as const).map((status) => (
         <li key={status} className="calendar-legend-narrow">

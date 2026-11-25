@@ -308,15 +308,25 @@ describe('Calendrier', () => {
       expect(document.querySelectorAll('.calendar-month .calendar-free, .calendar-month .calendar-mark-free, .calendar-available')).toHaveLength(0)
     })
 
-    it('says what free time is in the legend, in a tooltip, which does nothing else', async () => {
+    it('says what each kind is in the legend, in a tooltip, which does nothing else', async () => {
       mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR })
       renderAt('/admin/calendrier')
       await loaded()
 
-      const available = within(screen.getByRole('list', { name: 'Légende' })).getByRole('button', { name: 'disponible' })
-      expect(available).toHaveAccessibleDescription('Plage disponible au studio, protégée des occupations.')
-      fireEvent.click(available)
-      expect(path()).toBe('/admin/calendrier')
+      const legend = screen.getByRole('list', { name: 'Légende' })
+      const tips = {
+        session: 'Toutes les sessions qui ont une date.',
+        occupation: "Période où le studio n'est pas disponible pour des sessions.",
+        disponible: 'Plage disponible au studio, protégée des occupations.',
+        conflit: 'Une session ou une occupation qui chevauche une plage indisponible.',
+      }
+      expect(within(legend).getAllByRole('button').map((button) => button.textContent)).toEqual(Object.keys(tips))
+      for (const [name, tip] of Object.entries(tips)) {
+        const button = within(legend).getByRole('button', { name })
+        expect(button).toHaveAccessibleDescription(tip)
+        fireEvent.click(button)
+        expect(path()).toBe('/admin/calendrier')
+      }
     })
   })
 
@@ -965,14 +975,13 @@ describe('Calendrier', () => {
       const conflicting = (day: string) => [...marks(day)!.children].map((mark) => mark.classList.contains('calendar-mark-conflict'))
       expect(marks('2026-11-21')).toHaveAttribute('aria-hidden', 'true')
       expect(marks('2026-11-21')).toHaveTextContent(/^$/)
-      // Both in a conflict, which the day says.
+      // Both in a conflict, each framed.
       expect(kinds('2026-11-21')).toEqual(['occupation', 'session'])
       expect(conflicting('2026-11-21')).toEqual([true, true])
-      expect(marks('2026-11-21')).toHaveClass('calendar-marks-conflict')
       // Free time once, after the things, whatever its stretches.
       expect(kinds('2026-11-22')).toEqual(['occupation', 'session', 'free'])
       expect(kinds('2026-11-26')).toEqual(['occupation', 'free'])
-      expect(marks('2026-11-26')).not.toHaveClass('calendar-marks-conflict')
+      expect(conflicting('2026-11-26')).toEqual([false, false])
       // A day free all day.
       expect(kinds('2026-11-19')).toEqual(['free'])
       // Done and cancelled sessions.
