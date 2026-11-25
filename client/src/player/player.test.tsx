@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockInstance } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useNavigate } from 'react-router'
 import type { Schema } from '../api/client'
 import App from '../app'
-import { mockFetch, requestsTo } from '../test-utils'
+import { UNAUTHORIZED, held, mockFetch, requestsTo } from '../test-utils'
 import type { Body } from '../test-utils'
 import { positionAt, rediffusion, untilEnd } from './radio'
 import { loadVolume, toggledMute } from './volume'
@@ -499,6 +499,58 @@ describe("the home page's video", () => {
     expect(play).not.toHaveBeenCalled()
     expect(video()).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'écouter la radio en ondes' })).toBeInTheDocument()
+  })
+})
+
+describe('the admin pages', () => {
+  afterEach(() => {
+    vi.doUnmock('../pages/admin/admin-pages')
+    vi.resetModules()
+  })
+
+  it('load under the navigation bar, while the radio keeps playing', async () => {
+    // The admin pages are held back until `loaded` is answered, to see the site while they load. An App module loads them
+    // once, hence a new one.
+    const { body: loading, answer: loaded } = held()
+    vi.resetModules()
+    vi.doMock('../pages/admin/admin-pages', async (importOriginal) => {
+      await loading
+      return importOriginal()
+    })
+    const { default: App } = await import('../app')
+    function ToAdmin() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate('/admin')}>admin</button>
+    }
+    mockFetch({ [RADIO_URL]: onAir(KRAKA, 60), ...streamOf(KRAKA), '/api/admin/me': UNAUTHORIZED })
+    render(
+      <MemoryRouter initialEntries={['/contribuer']}>
+        <App />
+        <ToAdmin />
+      </MemoryRouter>,
+    )
+    await startRadio()
+    await waitFor(() => expect(audio()?.src).toBe('https://cdn.test/1.m3u8'))
+    fire('playing')
+    const playing = audio()
+    const pause = vi.mocked(HTMLMediaElement.prototype.pause)
+    pause.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'admin' }))
+    await act(() => Promise.resolve())
+    expect(screen.queryByTitle('Parking Radio Contribuer')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'archives' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'lecteur' })).toHaveTextContent('KRAKA')
+    expect(screen.getByRole('button', { name: 'pause' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Connexion' })).not.toBeInTheDocument()
+
+    await loaded({})
+    expect(await screen.findByRole('heading', { name: 'Connexion' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'pause' })).toBeInTheDocument()
+    expect(audio()).toBe(playing)
+    expect(audio()!.src).toBe('https://cdn.test/1.m3u8')
+    expect(play).toHaveBeenCalledOnce()
+    expect(pause).not.toHaveBeenCalled()
   })
 })
 

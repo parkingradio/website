@@ -1,15 +1,6 @@
 /* The admin pages, and the forms that lead to them (logging in, setting a password from an invite). They
-   follow the programmation page: monospace text, bold uppercase headings, black pills. */
-.admin {
-  flex: 1;
-  padding: 2rem 1.5rem 4rem;
-  background: #fff;
-  color: #1c1c1c;
-  font-family: 'Overpass Mono', ui-monospace, monospace;
-  font-weight: 300;
-  font-size: 13px;
-}
-
+   follow the programmation page: monospace text, bold uppercase headings, black pills. Their frame, which shows while
+   they load, is in shell.css. */
 .admin h1,
 .admin h2 {
   margin: 0;
@@ -164,12 +155,6 @@
   margin: 0;
 }
 
-/* The login and password forms stand alone in the middle of the page. */
-.admin-auth {
-  max-width: 360px;
-  margin: 2rem auto 0;
-}
-
 .admin-form {
   display: flex;
   flex-direction: column;
@@ -231,7 +216,6 @@
   color: #9a4a00;
 }
 
-.admin-error,
 .radio-track-left-out {
   color: #b3261e;
 }
@@ -313,8 +297,8 @@
   font-weight: 300;
 }
 
-/* Tracks left out of the rotation are in red (see .admin-error), and say why when hovered, or clicked on
-   phones. */
+/* Tracks left out of the rotation are in red, like .admin-error (see shell.css), and say why when hovered, or clicked
+   on phones. */
 .admin .radio-track-left-out button {
   cursor: help;
 }
@@ -962,10 +946,6 @@ tr[data-dragging] > td {
 
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */
 @media (max-width: 700px) {
-  .admin {
-    padding-inline: 1rem;
-  }
-
   .admin-inner {
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;

@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, useNavigate } from 'react-router'
 import App from './app'
 
 describe('App', () => {
@@ -69,5 +69,44 @@ describe('App', () => {
     )
     expect(screen.getByRole('heading', { name: 'Page introuvable' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'archives' })).toBeInTheDocument()
+  })
+})
+
+describe("when the admin pages can't be loaded", () => {
+  afterEach(() => {
+    vi.doUnmock('./pages/admin/admin-pages')
+    vi.resetModules()
+  })
+
+  it('says so in their place, under the navbar, until the page is reloaded', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // An App module loads them once, hence a new one.
+    vi.resetModules()
+    vi.doMock('./pages/admin/admin-pages', () => {
+      throw new Error('Failed to fetch dynamically imported module')
+    })
+    const { default: App } = await import('./app')
+    function ToSessions() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate('/admin/sessions')}>sessions</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/admin/calendrier']}>
+        <App />
+        <ToSessions />
+      </MemoryRouter>,
+    )
+    const failed = "La page n'a pas pu être chargée. Rechargez la page pour réessayer."
+    expect(await screen.findByRole('alert')).toHaveTextContent(failed)
+    expect(screen.getByRole('link', { name: 'archives' })).toBeInTheDocument()
+    expect(error).toHaveBeenCalledExactlyOnceWith(expect.any(Error))
+
+    fireEvent.click(screen.getByRole('button', { name: 'sessions' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(failed)
+
+    // The public pages still work.
+    fireEvent.click(screen.getByRole('link', { name: 'archives' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Parking Radio Archives')).toBeInTheDocument()
   })
 })
