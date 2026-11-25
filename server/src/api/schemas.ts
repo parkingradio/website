@@ -103,6 +103,8 @@ export { Day, Timestamp } from './formats.js'
 // 400 for a request that matches its schema but is still refused, so that the handler's types allow it. Errors that
 // Fastify sends before routes are reached, e.g. 413 for a body that's too large, aren't declared.
 function addGenericErrors(route: RouteOptions) {
+  // CORS preflights aren't part of the API: they have no schema, and answer without a body.
+  if (route.method === 'OPTIONS') return
   const where = `${route.method} ${route.url}`
   // Admin routes say so with `config.admin`, rather than with requireAuth itself, so that the same option both checks the
   // session and declares the errors that come with it.

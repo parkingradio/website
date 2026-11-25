@@ -42,7 +42,7 @@ const SYNTH_MEETUP_LINEUP = 'OPEN JAM'
 
 // The event's lineup, as the server gives it, or else OPEN JAM for a synth meetup that isn't cancelled, as the calendar feed
 // has it (`description` in server/src/events/calendar.ts). Unlike the lineup of a session's event on RA (`raLineup` in
-// server/src/sessions/ra-event.ts), other events without one have none, rather than their title.
+// server/src/ra-publication/event.ts), other events without one have none, rather than their title.
 function lineup(event: Schema<'Event'>): string[] {
   if (event.lineup.length > 0) return event.lineup.map((artist) => artist.name)
   return event.type === 'synth-meetup' && !event.cancelled ? [SYNTH_MEETUP_LINEUP] : []

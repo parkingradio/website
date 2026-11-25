@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { McpServer, ProtocolErrorCode, WebStandardStreamableHTTPServerTransport, fromJsonSchema } from '@modelcontextprotocol/server'
 import type { AuthInfo, ScopeChallengeHandler, jsonSchemaValidator } from '@modelcontextprotocol/server'
+import { bearerToken } from '../api/bearer.js'
 import { INTERNAL_ERROR, useApiErrors, withoutValues } from '../api/errors.js'
 import { serverName } from '../core/config.js'
 import { logWithRequest } from '../core/logger.js'
@@ -120,7 +121,7 @@ export async function mcpRoutes(app: FastifyInstance, { store, issuer, routes, e
     // site's address is an origin (see config.siteOrigin).
     const sentFrom = request.headers.origin
     if (sentFrom !== undefined && sentFrom !== issuer) return sendError(reply, 403, -32000, 'Requests from another origin are refused')
-    const token = /^Bearer (\S+)$/i.exec(request.headers.authorization ?? '')?.[1]
+    const token = bearerToken(request)
     if (!token) return unauthorized(reply, false)
     const grant = await store.findAccessToken(token)
     if (!grant) return unauthorized(reply, true)

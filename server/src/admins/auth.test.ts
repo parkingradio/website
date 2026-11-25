@@ -141,7 +141,7 @@ describe('requireAuth', () => {
   it('calls the handler with request.user set when the session cookie is valid', async () => {
     const response = await getProtected(buildApp())
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual({ user: { id: 'user-1', email: 'admin@example.com' } })
+    expect(response.json()).toEqual({ user: { id: 'user-1', email: 'admin@example.com', sessionVersion: 0 } })
     expect(sessionVersion).toHaveBeenCalledWith('user-1')
   })
 

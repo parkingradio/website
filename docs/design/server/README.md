@@ -67,7 +67,8 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
   their requests from their own servers, which share a few addresses. Neither do admins' calendars (see
   [Admins' calendars](admin-calendars.md)), for the same reasons: calendar apps like Google's read them from their own
-  servers too.
+  servers too. Nor does [`GET /api/ra-publication`](ra-publication.md#get-apira-publication), whose tokens can't be
+  guessed either.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -139,8 +140,9 @@ the request failing.
 ## Endpoints
 
 Endpoints are public, admin (see [Conventions](#conventions)), for apps, which need a connection's token (see
-[Authorization](mcp.md#authorization)), or for an admin's calendar app, which needs the admin's token in its link (see
-[The token, in Admins' calendars](admin-calendars.md#the-token)).
+[Authorization](mcp.md#authorization)), or need another token: an admin's calendar app needs the admin's token in its
+link (see [The token, in Admins' calendars](admin-calendars.md#the-token)), and the bookmarklet that publishes a
+session's event on RA needs a token for it (see [The token, in Publishing on RA](ra-publication.md#the-token)).
 
 | Endpoint | Access | What it's for |
 |---|---|---|
@@ -205,7 +207,6 @@ Endpoints are public, admin (see [Conventions](#conventions)), for apps, which n
 | [`PUT /api/admin/applications/recipients`](applications.md#put-apiadminapplicationsrecipients-admin) | admin | Choosing who applications from artists are emailed to |
 | [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) | admin | Every session, or those with a set an artist played, or a collective's takeovers, only those that start in a time range when one is given, with their sets |
 | [`GET /api/admin/sessions/:id`](sessions.md#get-apiadminsessionsid-admin) | admin | A session, with its sets |
-| [`GET /api/admin/sessions/:id/ra-event`](sessions.md#get-apiadminsessionsidra-event-admin) | admin | The content of a session's event on Resident Advisor |
 | [`GET /api/admin/sessions/:id/flyer`](sessions.md#get-apiadminsessionsidflyer-admin) | admin | A session's flyer, as it was sent, or one of its sizes |
 | [`PUT /api/admin/sessions/:id/flyer`](sessions.md#put-apiadminsessionsidflyer-admin) | admin | Giving a session a flyer, or replacing its flyer |
 | [`DELETE /api/admin/sessions/:id/flyer`](sessions.md#delete-apiadminsessionsidflyer-admin) | admin | Removing a session's flyer |
@@ -233,6 +234,8 @@ Endpoints are public, admin (see [Conventions](#conventions)), for apps, which n
 | [`POST /api/admin/calendar/feeds`](calendar.md#post-apiadmincalendarfeeds-admin) | admin | Adding a calendar feed of occupations or holds, once its link gives a calendar |
 | [`PATCH /api/admin/calendar/feeds/:id`](calendar.md#patch-apiadmincalendarfeedsid-admin) | admin | Changing a calendar feed's name, kind or link, once a new link gives a calendar |
 | [`DELETE /api/admin/calendar/feeds/:id`](calendar.md#delete-apiadmincalendarfeedsid-admin) | admin | Removing a calendar feed, and forgetting what was read from it |
+| [`POST /api/admin/sessions/:id/ra-publication`](ra-publication.md#post-apiadminsessionsidra-publication-admin) | admin | A token for publishing a session's event on Resident Advisor with the bookmarklet, which lasts an hour |
+| [`GET /api/ra-publication`](ra-publication.md#get-apira-publication) | token | The event that the bookmarklet creates on Resident Advisor for a token's session |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/chat/discord`](chat.md#get-apiadminchatdiscord-admin) | admin | The Discord bot the server reaches the chat through, and its channel |
 | [`PUT /api/admin/chat/discord`](chat.md#put-apiadminchatdiscord-admin) | admin | Entering the bot's token and the channel, once they pass the check with Discord |

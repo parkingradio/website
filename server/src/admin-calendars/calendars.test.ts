@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import ICAL from 'ical.js'
-import type { StoredSession, StoredSet } from '../sessions/store.js'
+import type { StoredSession } from '../sessions/store.js'
+import { storedSession as session, storedSet as set } from '../sessions/test-rows.js'
 import { occupationsCalendar, sessionsCalendar } from './calendars.js'
 import type { CalendarOptions, FeedWithRead } from './calendars.js'
 
@@ -10,60 +11,6 @@ import type { CalendarOptions, FeedWithRead } from './calendars.js'
 const SITE = 'https://parking.radio'
 const NOW = new Date('2026-11-19T15:30:00Z')
 const OPTIONS: CalendarOptions = { siteOrigin: SITE, environment: 'production', now: NOW }
-
-function session(fields: Partial<StoredSession> = {}): StoredSession {
-  return {
-    id: 'session-1',
-    createdAt: new Date('2026-10-01T12:00:00Z'),
-    createdBy: 'admin@example.com',
-    startAt: new Date('2026-11-15T02:00:00Z'),
-    durationMinutes: 120,
-    type: 'guest-mixes',
-    name: '',
-    takeoverId: null,
-    applicationId: null,
-    raEventId: null,
-    description: '',
-    flyerKey: null,
-    flyerType: null,
-    updatedBy: null,
-    updatedAt: null,
-    status: 'planned',
-    statusUpdatedBy: null,
-    statusUpdatedAt: null,
-    announced: true,
-    announcedUpdatedBy: null,
-    announcedUpdatedAt: null,
-    takeover: null,
-    application: null,
-    sets: [],
-    ...fields,
-  }
-}
-
-// A set of a session, with its performers, by name.
-const set = (names: string[], status: StoredSet['status'] = 'planned'): StoredSet => ({
-  id: `set-${names.join('-')}`,
-  createdAt: new Date('2026-10-01T12:00:00Z'),
-  createdBy: 'admin@example.com',
-  sessionId: 'session-1',
-  position: 0,
-  durationMinutes: 60,
-  performanceTypes: ['dj'],
-  otherPerformanceType: '',
-  genres: [],
-  soundcloudTrackId: null,
-  soundcloudTrackUrl: null,
-  youtubeVideoId: null,
-  applicationId: null,
-  updatedBy: null,
-  updatedAt: null,
-  status,
-  statusUpdatedBy: null,
-  statusUpdatedAt: null,
-  performers: names.map((name) => ({ id: `artist-${name}`, name })),
-  application: null,
-})
 
 // The events of a calendar, as a parser reads them.
 function vevents(body: string) {

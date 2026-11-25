@@ -4,10 +4,11 @@
 // and holds no secrets.
 //
 // RA has no public API, so this calls the GraphQL endpoint RA's own site calls, like the server does to read events
-// (see server/src/ra-events/routes.ts). It can stop working whenever RA changes its site: it then says so, and admins
-// create the event by hand, with the copy buttons of the session's page.
+// (see server/src/ra-events/routes.ts). The event comes from the site, with the token that the session's page put in the
+// address (see docs/design/server/ra-publication.md): this only calls RA. It can stop working whenever RA changes its
+// site: it then says so, and admins create the event on RA by hand, from the session's page.
 //
-// What it shows comes from the page's address, which anyone can write, and from RA: it's only ever shown as text.
+// What it shows comes from the site and from RA: it's only ever shown as text.
 ;(() => {
   'use strict'
 
@@ -55,29 +56,23 @@
   const show = (...nodes) => body.replaceChildren(...nodes)
   const fail = (text) => show(paragraph(text, 'margin:12px 0 0;color:#b00020'))
   const SOMETHING_WRONG = 'Quelque chose n’a pas fonctionné'
+  const PUBLISH_AGAIN = 'cliquez de nouveau sur « Publier sur RA » sur la page de la session'
   // Outside production, that the event is created on RA all the same, naming the environment as the site's pages do.
   const warning = (environment) => {
     const stamp = environment === 'development' ? 'DEV' : String(environment).toUpperCase()
     return paragraph(`Attention : l’événement sera vraiment créé sur RA, à partir d’une session de ${stamp}.`, 'margin:12px 0 0;color:#b00020;font-weight:bold')
   }
 
-  // The session's event, as its page put it in the address: #parking-radio=<its JSON, URI-encoded>. One without its
-  // links, e.g. in a tab opened before the session's page gave them, is none.
-  function sent() {
+  // The token that the session's page put in the address, #parking-radio=<token>, which it removes from it right away,
+  // so that it doesn't stay in the page's address, or its history.
+  function token() {
     const match = /(?:^#|&)parking-radio=([^&]*)/.exec(location.hash)
-    if (!match) return null
-    try {
-      const given = JSON.parse(decodeURIComponent(match[1]))
-      return Array.isArray(given?.event?.promotionalLinks) && Array.isArray(given.event.playerLinks) ? given : null
-    } catch {
-      return null
-    }
+    if (match) history.replaceState(history.state, '', location.pathname + location.search)
+    return match?.[1] || null
   }
 
-  // RA takes times in Québec time, without their offset, which the session's page gives them with.
-  const local = (instant) => `${instant.slice(0, 19)}.000`
-  const when = (instant) =>
-    new Date(instant).toLocaleString('fr-CA', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })
+  // A time in Québec time, without its offset, as RA takes it, in words, whatever the browser's time zone.
+  const when = (time) => new Date(`${time}Z`).toLocaleString('fr-CA', { timeZone: 'UTC', dateStyle: 'full', timeStyle: 'short' })
 
   // Sends a request to RA's GraphQL endpoint, as the admin logged in to RA, whose token RA's site keeps in a cookie, and
   // returns its answer, whatever its status, since RA's errors come with it, or throws when there's none.
@@ -112,29 +107,26 @@
   async function main() {
     // RA's site in another language is on a subdomain, e.g. fr.ra.co.
     if (location.hostname !== 'ra.co' && !location.hostname.endsWith('.ra.co')) return fail('Ce favori s’utilise sur ra.co, sur la page qu’ouvre « Publier sur RA ».')
-    const given = sent()
-    if (!given) return fail('Aucun événement à créer : cliquez sur « Publier sur RA » sur la page de la session, puis sur ce favori.')
-    if (given.site !== SITE) return fail(`Cet événement vient de ${given.site}, et ce favori de ${SITE}.`)
-    const { event } = given
-    // It only sends the fields it lists, since anyone can write the address, and each link with only its title and address.
-    const input = {
-      title: event.title,
-      startTime: local(event.start),
-      endTime: local(event.end),
-      lineup: event.lineup,
-      venueId: event.venueId,
-      promoterIds: event.promoterIds,
-      content: event.content,
-      promotionalLinks: event.promotionalLinks.map((link) => ({ title: String(link.title), url: String(link.url) })),
-      playerLinks: event.playerLinks.map((url) => ({ sourceId: String(url) })),
-      submissionSource: 'SUBMITEVENTPAGE',
-    }
-    const LOG_IN = 'Connectez-vous à RA, puis cliquez de nouveau sur « Publier sur RA » sur la page de la session.'
-    const token = /(?:^|;\s*)next_id_token=([^;]*)/.exec(document.cookie)?.[1]
-    if (!token) return fail(`Vous n’êtes pas connecté à RA. ${LOG_IN}`)
+    const publishing = token()
+    if (!publishing) return fail('Aucun événement à créer : cliquez sur « Publier sur RA » sur la page de la session, puis sur ce favori.')
+    const LOG_IN = `Connectez-vous à RA, puis ${PUBLISH_AGAIN}.`
+    const login = /(?:^|;\s*)next_id_token=([^;]*)/.exec(document.cookie)?.[1]
+    if (!login) return fail(`Vous n’êtes pas connecté à RA. ${LOG_IN}`)
+
+    // The event, from the site this was loaded from, and never another, with the token, in a header rather than in the
+    // address, which the servers in front of the site's log.
+    show(paragraph('Chargement de l’événement…'))
+    const headers = { Authorization: `Bearer ${publishing}` }
+    const response = await fetch(`${SITE}/api/ra-publication`, { headers, credentials: 'omit', cache: 'no-store' }).catch(() => null)
+    if (!response) return fail(`${SITE} n’a pas pu être joint.`)
+    if (response.status === 403) return fail(`Ce lien de publication a expiré, ou ne vient pas de ${SITE} : ${PUBLISH_AGAIN}, puis sur le favori de ce site.`)
+    const given = await response.json().catch(() => null)
+    if (!given?.ok) throw new Error(given?.error ?? `${SITE} a répondu ${response.status}`)
+    // Sent to RA as the site gives it.
+    const input = given.event
 
     show(paragraph('Vérification auprès de RA…'))
-    const answer = await graphql(token, CHECKS, { venue: event.venueId })
+    const answer = await graphql(login, CHECKS, { venue: input.venueId })
     const checks = answer.data
     if (!checks) throw new Error(errors(answer) || 'RA n’a pas répondu comme prévu')
     if (!checks.user) return fail(`RA ne reconnaît pas votre connexion. ${LOG_IN}`)
@@ -148,7 +140,7 @@
     create.addEventListener('click', () => {
       create.disabled = cancel.disabled = close.disabled = true
       create.textContent = 'Création…'
-      createEvent(token, input, given.session).catch((error) => {
+      createEvent(login, input, given.session).catch((error) => {
         close.disabled = false
         fail(`${SOMETHING_WRONG} : ${error.message.replace(/\.$/, '')}.`)
       })
@@ -158,7 +150,7 @@
     show(
       paragraph(`Connecté à RA en tant que ${checks.user.username}. Vérifiez l’événement avant de le créer :`),
       paragraph([label(input.title)]),
-      paragraph(`${when(event.start)} → ${when(event.end)}`),
+      paragraph(`${when(input.startTime)} → ${when(input.endTime)}`),
       paragraph(checks.venue.name),
       paragraph([label('Line-up'), lines(input.lineup)]),
       paragraph([label('Description'), lines(input.content || '-')]),
@@ -179,8 +171,6 @@
       const refused = errors(answer)
       return fail(refused ? `RA a refusé de créer l’événement : ${refused}` : `${SOMETHING_WRONG}.`)
     }
-    // So that clicking the bookmarklet again on this page doesn't offer to create it again.
-    history.replaceState(history.state, '', location.pathname + location.search)
     const link = (text, href) => {
       const node = element('a', text)
       node.href = href

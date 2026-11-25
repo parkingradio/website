@@ -2,7 +2,7 @@ import type { Reference } from '../api/schemas.js'
 import type { Status } from './fields.js'
 
 // The lineup of a session, which its public event gives (see docs/design/server/events.md), and its event on RA uses
-// (see "Events on RA" in docs/design/server/sessions.md).
+// (see "The event" in docs/design/server/ra-publication.md).
 
 // What a synth meetup without performers has as its lineup where one is shown, as Parking Radio's synth meetups do on RA.
 export const SYNTH_MEETUP_LINEUP = 'OPEN JAM'

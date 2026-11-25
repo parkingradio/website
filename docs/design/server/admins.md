@@ -31,6 +31,10 @@ password, but not when they log out.
 Their calendar apps read their calendars with the token in their links (see [Admins' calendars](admin-calendars.md)),
 which stop working when they're revoked, but not when they choose a new password, or log out.
 
+The tokens with which the bookmarklet publishes sessions' events on RA, which last an hour, end along with their
+sessions, when they're revoked or choose a new password, but not when they log out (see
+[Publishing on RA](ra-publication.md)).
+
 ## `POST /api/auth/login`
 
 | Request field | Type | |
@@ -59,7 +63,7 @@ session is only in the cookie. The admin's connections stay (see [Sessions](#ses
 | `password` | string | At least 8 characters |
 
 Sets the password of the admin `token` invites, and responds `{"ok": true}`. The invite can't be used again, and the
-admin's sessions and connections end, e.g. when the invite resets their password. It also clears the session cookie, as
+admin's sessions, connections and tokens to publish on RA end, e.g. when the invite resets their password. It also clears the session cookie, as
 logging out does, so that whoever accepts it in someone else's browser, e.g. that of the admin who sent the invite, then
 logs in as themselves; that admin stays logged in in other browsers. Fails with 400, which changes nothing: missing
 fields, a password that's too short, or an invalid or expired invite.
@@ -105,6 +109,7 @@ An admin has:
 
 ## `DELETE /api/admin/admins/:id` (admin)
 
-Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, their sessions and connections end, and the
-links of their calendars stop working (see [Admins' calendars](admin-calendars.md)). For an admin who hasn't accepted
+Revokes the admin, and responds `{"ok": true}`: they can't log in anymore, their sessions, connections and tokens to
+publish on RA end (see [Publishing on RA](ra-publication.md)), and the links of their calendars stop working (see
+[Admins' calendars](admin-calendars.md)). For an admin who hasn't accepted
 their invite, this cancels it. Fails with 404 (no such admin) or 409 (the admin who asks).

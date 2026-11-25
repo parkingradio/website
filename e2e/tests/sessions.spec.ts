@@ -11,14 +11,12 @@ const rowsOf = (within: Page | Locator, text: string) => within.getByRole('row')
 // A set's duration and its status, in its row, whose first cell has the handle that reorders the sets.
 const durationOf = (row: Locator) => row.getByRole('cell').nth(1)
 const statusOf = (row: Locator) => row.getByRole('cell').nth(6)
-// What the session's record, or the content of its event on RA, which is within it, says for `label`.
-const recordValue = (page: Page, record: string, label: string) =>
-  page.getByLabel(record, { exact: true }).locator(':scope > dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
-const value = (page: Page, label: string) => recordValue(page, 'Session', label)
+// What the session's record says for `label`.
+const value = (page: Page, label: string) =>
+  page.getByLabel('Session', { exact: true }).locator(':scope > dt', { hasText: new RegExp(`^${label}$`) }).locator('+ dd')
 // The date a session starts or ends on, in its form, and its time (see `fillTime`).
 const dayInput = (page: Page, when: 'Début' | 'Fin') => page.getByRole('group', { name: when, exact: true }).getByLabel('date', { exact: true })
 const timeField = (page: Page, when: 'Début' | 'Fin') => page.getByRole('group', { name: when, exact: true }).getByRole('group', { name: 'heure', exact: true })
-const raValue = (page: Page, label: string) => recordValue(page, "Contenu de l'événement RA", label)
 // Holds back the server's answers to the requests to `url`, until what this returns is called, and lets the requests go
 // through as usual afterwards.
 async function holdBack(page: Page, url: string): Promise<() => Promise<void>> {
@@ -85,10 +83,6 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(value(page, 'Description')).toContainText('Rencontres hebdomadaires de création sonore et audiovisuelle')
   // At the server's 1280-pixel size, which doesn't enlarge it.
   await expect(value(page, 'Flyer').getByRole('img', { name: 'Flyer de SYNTH MEETUPS' })).toHaveJSProperty('naturalWidth', 640)
-  // Its event on RA has a lineup, though it has no sets.
-  await value(page, 'Événement RA').getByRole('button', { name: 'créer' }).click()
-  await expect(raValue(page, 'Line-up')).toHaveText(/^OPEN JAM/)
-  await page.getByRole('button', { name: 'annuler' }).click()
   // The form shows the same one, from the client's copy of the server's.
   const described = await value(page, 'Description').textContent()
   await page.getByRole('button', { name: 'modifier' }).click()
@@ -123,22 +117,6 @@ test('the seeded sessions are listed, searched and filtered, and on the pages of
   await expect(page.getByRole('table', { name: 'Sessions' }).locator(`a[href="${sessionPage}"]`)).toBeVisible()
   // Which keeps it from being deleted.
   await expect(page.getByRole('button', { name: 'supprimer le collectif' })).toHaveAttribute('aria-disabled', 'true')
-})
-
-test("a seeded session's page shows the content of its event on RA, its performers from its sets that aren't cancelled, once asked", async ({ page }) => {
-  await logIn(page, { at: '/admin/sessions' })
-  await page.getByRole('searchbox', { name: 'Rechercher' }).fill('guest mixes')
-  // The soonest, which is the seeded one.
-  await rowsOf(page, 'GUEST MIXES').first().getByRole('link').first().click()
-  await expect(page.getByRole('heading', { level: 1, name: 'GUEST MIXES' })).toBeVisible()
-  await value(page, 'Événement RA').getByRole('button', { name: 'créer' }).click()
-  await expect(raValue(page, 'Titre')).toHaveText(/^GUEST MIXES/)
-  await expect(raValue(page, 'Quand')).toHaveText(await value(page, 'Quand').innerText())
-  await expect(raValue(page, 'Line-up').locator('span')).toHaveText('Clémentine Brûlée\nClément Brûlé\nKwame Asante')
-  await expect(raValue(page, 'Salle').getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
-  await expect(raValue(page, 'Liens média').getByRole('link').first()).toHaveAttribute('href', 'https://www.youtube.com/@parkingdotradio')
-  await expect(raValue(page, 'Description')).toHaveText(/^LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC/)
-  await expect(page.getByRole('button', { name: 'copier le line-up' })).toBeVisible()
 })
 
 test('a seeded session says when its sets add up to more than it', async ({ page }) => {
@@ -763,19 +741,26 @@ test("a session's event on RA is published from the panel under its « Événeme
   await page.goto(`/admin/sessions/${id}`)
   await createButton().click()
   await expect(page.getByText("Attention : l'événement sera vraiment créé sur RA, à partir d'une session de DEV.")).toBeVisible()
-  await expect(raValue(page, 'Line-up').locator('span')).toHaveText(`E2E ${unique}`)
-  // RA's form opens in a new tab, with the event in its fragment, which these tests only read, since they never reach RA.
+  // RA's form opens in a new tab, with a token in its fragment, which these tests only read, since they never reach RA.
   await page.evaluate(() => {
-    window.open = (url) => {
-      document.body.dataset.opened = String(url)
-      return null
+    window.open = () => {
+      const location = { replace: (url: string) => (document.body.dataset.opened = url) }
+      return { closed: false, opener: window, close: () => {}, location } as unknown as Window
     }
   })
   await page.getByRole('button', { name: 'Publier sur RA' }).click()
+  await expect(page.locator('body')).toHaveAttribute('data-opened', /^https:\/\/ra\.co\/pro\/event\/create#parking-radio=/)
   const opened = new URL((await page.locator('body').getAttribute('data-opened'))!)
-  expect(opened.origin + opened.pathname).toBe('https://ra.co/pro/event/create')
-  const sent = JSON.parse(decodeURIComponent(opened.hash.slice('#parking-radio='.length)))
-  expect(sent).toMatchObject({ site: new URL(page.url()).origin, environment: 'development', session: id, event: { title: `E2E ${unique}`, start: `${day}T21:00:00-04:00`, content: 'Une soirée.' } })
+  const token = opened.hash.slice('#parking-radio='.length)
+  // Which gives the event to RA's pages, as the bookmarklet asks for it.
+  const publication = await page.request.get('/api/ra-publication', { headers: { Authorization: `Bearer ${token}`, Origin: 'https://ra.co' } })
+  expect(publication.status()).toBe(200)
+  expect(publication.headers()['access-control-allow-origin']).toBe('https://ra.co')
+  expect(await publication.json()).toMatchObject({
+    environment: 'development',
+    session: id,
+    event: { title: `E2E ${unique}`, startTime: `${day}T21:00:00.000`, lineup: `E2E ${unique}`, content: 'Une soirée.' },
+  })
 
   // The bookmarklet leads back with the event it created, which is only saved with « enregistrer ».
   await page.goto(`/admin/sessions/${id}?raEvent=2400123`)
