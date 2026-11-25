@@ -29,11 +29,6 @@ export function RaBookmarklet() {
           Parking Radio → RA{stamp && ` [${stamp}]`}
         </a>
       </p>
-      <p>
-        Pour publier, connectez-vous d'abord à RA, puisque s'y connecter perd ce que «&nbsp;Publier sur RA&nbsp;» lui
-        transmet. Puis, sous «&nbsp;Événement RA&nbsp;» d'une session, cliquez sur «&nbsp;créer&nbsp;», puis sur
-        «&nbsp;Publier sur RA&nbsp;», et cliquez sur ce favori&nbsp;: il vous montre l'événement avant de le créer. Il charge son code depuis ce site à chaque fois, et n'a donc jamais besoin d'être réinstallé.
-      </p>
     </>
   )
 }

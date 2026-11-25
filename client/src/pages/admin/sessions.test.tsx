@@ -1522,7 +1522,7 @@ describe("A session's event on RA", () => {
     expect(screen.queryByRole('button', { name: 'créer' })).not.toBeInTheDocument()
   })
 
-  it('opens a panel under "Événement RA", which says where the bookmarklet is, and where to create the event by hand', async () => {
+  it('opens a panel under "Événement RA", which says to log in to RA first, and where to create the event by hand', async () => {
     mockFetch(UNPUBLISHED_PAGE)
     renderAt('/admin/sessions/session-1')
     await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
@@ -1530,8 +1530,11 @@ describe("A session's event on RA", () => {
     await openPanel()
 
     expect(within(value('Événement RA')).getByRole('link', { name: 'sur RA' })).toHaveAttribute('href', 'https://ra.co/pro/event/create')
-    expect(within(value('Événement RA')).getByRole('link', { name: 'Intégrations' })).toHaveAttribute('href', '/admin/integrations')
-    expect(value('Événement RA')).toHaveTextContent("S'il ne fonctionne pas, créez-le sur RA à la main d'après la page de la session")
+    expect(value('Événement RA')).toHaveTextContent(
+      "« Publier sur RA » ouvre RA, où le favori « Parking Radio → RA » vous montre l'événement, puis le crée. Assurez-vous d'être connecté au bon compte RA avant de cliquer sur « Publier sur RA ». Si le favori ne fonctionne pas, créez l'événement sur RA à la main d'après la page de la session, puis collez son lien ci-dessous.",
+    )
+    expect(within(value('Événement RA')).getByText('avant').tagName).toBe('STRONG')
+    expect(within(value('Événement RA')).queryByRole('link', { name: 'Intégrations' })).not.toBeInTheDocument()
     expect(screen.queryByText(/^Attention/)).not.toBeInTheDocument()
     // Nothing is asked of the server until « Publier sur RA » is clicked.
     expect(requestsTo('POST', PUBLICATION_URL)).toHaveLength(0)
@@ -1641,6 +1644,8 @@ describe("A session's event on RA", () => {
     renderAt('/admin/sessions/session-1')
     await openPanel()
     expect(await screen.findByText("Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST.")).toBeInTheDocument()
+    // The bookmarklet's name, as Intégrations gives it.
+    expect(value('Événement RA')).toHaveTextContent('où le favori « Parking Radio → RA [TEST] » vous montre')
   })
 
   it('opens the panel with the event on RA the bookmarklet created, saving it only with « enregistrer »', async () => {

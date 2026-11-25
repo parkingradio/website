@@ -161,9 +161,12 @@ the event on RA, with the bookmarklet or by hand, and save it as the session's:
   [Controls that can't be used](layout.md#controls-that-cant-be-used)). Outside production, a warning in red follows
   it: « Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST. », with the environment's
   stamp (see [Environment](../architecture.md#environment)).
-- A sentence says that « Publier sur RA » opens RA, where the bookmarklet creates the event, linking to Intégrations
-  for it, and that when it doesn't work, the event can be created on RA by hand (linking to RA's form,
-  `https://ra.co/pro/event/create`) from the session's page, then its link pasted below.
+- A sentence says that « Publier sur RA » opens RA, where the bookmarklet, named as Intégrations names it (see
+  [Publier sur RA, in Intégrations](integrations.md#publier-sur-ra)), shows the event, then creates it, and to make
+  sure to be logged in to the right RA account **before** clicking « Publier sur RA », since logging in to RA loses
+  the token, with "avant" in bold. Another says that when the bookmarklet doesn't work, the event can be created on RA
+  by hand (linking to RA's form, `https://ra.co/pro/event/create`) from the session's page, then its link pasted
+  below.
 - "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
   [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's
   event on RA, which then shows in place of the panel, and "annuler" closes the panel. Saving only changes the session's

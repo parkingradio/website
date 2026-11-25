@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Link } from 'react-router'
 import { api } from '../../api/client'
 import { useEnvironmentStamp } from '../../config-context'
 import type { Session } from '../../session-fields'
@@ -36,7 +35,7 @@ export function RaEventPanel({
   onSaved: (session: Session) => void
   onCancel: () => void
 }) {
-  // Outside production, the event is created on RA all the same.
+  // Outside production, the event is created on RA all the same, and the bookmarklet's name has the stamp too.
   const stamp = useEnvironmentStamp()
   const [link, setLink] = useState(created ? raEventUrl(created) : '')
   const [linkError, setLinkError] = useState<string | null>(null)
@@ -106,8 +105,9 @@ export function RaEventPanel({
         </p>
       )}
       <p>
-        «&nbsp;Publier sur RA&nbsp;» ouvre RA, où le favori «&nbsp;Parking Radio → RA&nbsp;» (voir{' '}
-        <Link to="/admin/integrations">Intégrations</Link>) crée l'événement. S'il ne fonctionne pas, créez-le{' '}
+        «&nbsp;Publier sur RA&nbsp;» ouvre RA, où le favori «&nbsp;Parking Radio → RA{stamp && ` [${stamp}]`}&nbsp;» vous
+        montre l'événement, puis le crée. Assurez-vous d'être connecté au bon compte RA <strong>avant</strong> de cliquer
+        sur «&nbsp;Publier sur RA&nbsp;». Si le favori ne fonctionne pas, créez l'événement{' '}
         <a href={RA_CREATE_EVENT} target="_blank" rel="noreferrer">
           sur RA
         </a>{' '}
