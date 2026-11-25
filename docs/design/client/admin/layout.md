@@ -12,14 +12,12 @@ a notice saying that the session ended. Logging in then shows the page again, lo
 whether there's a session, e.g. because the server can't be reached, they say so in place of the page, rather than
 showing the login form.
 
-The admin pages keep the site's navigation bar. The public pages don't load the admin pages, nor the pages at
-`/accept-invite` and `/autoriser` (see [Admins](admins.md) and [Autoriser une application](autoriser.md)): they're
-loaded all at once, the first time one of them opens. Until then, nothing shows under the navigation bar, and the
-[player](../player.md) keeps playing. When they can't be loaded, e.g. because the network is down, they say so in their
-place, « La page n'a pas pu être chargée. Rechargez la page pour réessayer. », until the page is reloaded.
+The public pages don't load the admin pages, nor the pages at `/accept-invite` and `/autoriser`, which load together the
+first time one of them opens. When they can't be loaded, they say so in their place: « La page n'a pas pu être chargée.
+Rechargez la page pour réessayer. »
 
-Under the navigation bar, a menu lists the sections, in this order, followed by the logged-in admin's email and a
-"se déconnecter" button:
+The admin pages keep the site's navigation bar. Under it, a menu lists the sections, in this order, followed by the
+logged-in admin's email and a "se déconnecter" button:
 
 - [Calendrier](calendrier.md)
 - [Rotation radio](rotation.md)
