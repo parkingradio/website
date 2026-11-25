@@ -1,11 +1,13 @@
 # Intégrations
 
-At `/admin/integrations`: what lets other apps and sites work with the admin pages, i.e. Claude and Resident Advisor.
-From top to bottom, it shows:
+At `/admin/integrations`: what lets other apps and sites work with the admin pages, i.e. Claude, calendar apps and
+Resident Advisor. From top to bottom, it shows:
 
 - "Connecter Claude": how to let Claude do what the admin does on the admin pages, as them (see
   [MCP server](../../server/mcp.md)).
 - "Vos applications connectées": the apps the admin connected (see [Connections](../../server/oauth.md#connections)).
+- "Calendriers": about the links to the admin's calendars, which it replaces (see
+  [Admins' calendars](../../server/admin-calendars.md)).
 - "Publier sur RA": the bookmarklet that creates sessions' events on Resident Advisor.
 
 ## Connecter Claude
@@ -24,6 +26,19 @@ The admin's own connections, the most recently used first, each with its app's n
 connected and when it was last used, and "déconnecter", which ends it right away: the app has to be connected again to
 be used. While there are none, it says so. Admins only see their own connections.
 
+## Calendriers
+
+One line, saying that the links to the admin's calendars in the legend of Calendrier, which it links to (see
+[Subscribing, in Calendrier](calendrier.md#subscribing)), are personal, so that whoever has them sees these calendars,
+and that regenerating them stops the calendars subscribed with the current ones from being updated. Then "régénérer les
+liens", which replaces them (see
+[`POST /api/admin/ics-subscription-token`](../../server/admin-calendars.md#post-apiadminics-subscription-token-admin)),
+once the admin confirms « Régénérer vos liens ? Les calendriers abonnés avec les liens actuels ne seront plus mis à
+jour. ». The section then says « Liens régénérés : abonnez-vous à nouveau depuis la légende du Calendrier, puis retirez
+les anciens calendriers de votre application. ». While the links are replaced, and only then, the button is greyed out
+(see [Controls that can't be used](layout.md#controls-that-cant-be-used)). When replacing them fails, the section says
+why, « Les liens n'ont pas pu être régénérés : … ». Either message stays until "régénérer les liens" is used again.
+
 ## Publier sur RA
 
 The bookmarklet that creates a session's event on Resident Advisor from its page (see
@@ -39,3 +54,4 @@ bookmark loads its code from the site each time, so that it never needs to be in
 
 - `GET /api/admin/connections`, for "Vos applications connectées".
 - `DELETE /api/admin/connections/:id`, for "déconnecter".
+- `POST /api/admin/ics-subscription-token`, for "régénérer les liens".

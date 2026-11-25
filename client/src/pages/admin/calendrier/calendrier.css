@@ -223,6 +223,23 @@
   gap: 0.35rem;
 }
 
+/* A link to one of the admin's calendars, after "session" and "occupation": an icon as large as the legend's text, in its
+   grey, in a target as large as a finger needs, which overlaps what's around it rather than spacing the legend out. */
+.admin .calendar-subscribe {
+  display: inline-flex;
+  margin: -5px -5px -5px 0;
+  padding: 5px;
+  color: inherit;
+}
+
+.admin .calendar-subscribe:is(:hover, :focus-visible) {
+  color: #000;
+}
+
+.admin .calendar-subscribe:hover {
+  background: #f2f2f2;
+}
+
 .calendar-swatch {
   display: inline-block;
   width: 14px;
@@ -303,8 +320,9 @@
   color: #fff;
 }
 
-/* The focus of the page's own controls: the days' numbers, their "+" and the rows of "À régler" and of the list. */
-.admin :is(.calendar-number, .calendar-add, .calendar-line):focus-visible {
+/* The focus of the page's own controls: the days' numbers, their "+", the rows of "À régler" and of the list, and the
+   legend's links. */
+.admin :is(.calendar-number, .calendar-add, .calendar-line, .calendar-subscribe):focus-visible {
   outline: 2px solid #1d4fa3;
 }
 

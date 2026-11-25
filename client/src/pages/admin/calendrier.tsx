@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../api/client'
+import { useApi } from '../../api/use-api'
 import { quebecDayAndTime } from '../../quebec-time'
 import { Button } from './button'
 import { useTabShownCount } from '../../api/use-tab-shown'
@@ -8,7 +9,6 @@ import { SESSION_STATUS_LABELS, formatMonth } from './describe'
 import { useQueryParams } from './list'
 import { ChosenDay } from './calendrier/day'
 import { NewSessionForm } from './calendrier/new-session'
-import { Subscribe } from './calendrier/subscribe'
 import { Issues } from './calendrier/issues'
 import { List } from './calendrier/list'
 import { Month } from './calendrier/month'
@@ -98,6 +98,8 @@ export function Calendrier() {
   const changed = () => setChanges((count) => count + 1)
   const reads = useCalendar(from, to, changes)
   const feeds = useFeedsRefresh(changed)
+  // The token of the legend's links to the admin's calendars, read once, rather than each time the legend is shown again.
+  const subscription = useApi('/api/admin/ics-subscription-token')
   // Only a calendar read for the view's days is shown in it, with, for the month, the grid of its own, which depends on
   // the month alone, unlike `grid`, which is made again on each render.
   const days = useMemo(() => (view === 'month' && reads.shown ? calendarDays(reads.shown, gridDays(month)) : null), [view, reads.shown, month])
@@ -234,7 +236,7 @@ export function Calendrier() {
         <List nameId={headingId} to={to} months={months} onShowDay={goToDay} />
       ) : (
         <>
-          <Legend />
+          <Legend token={subscription.kind === 'loaded' ? subscription.value.token : null} />
           <Month
             key={month}
             month={month}
@@ -292,20 +294,22 @@ export function Calendrier() {
           )}
         </ChosenDay>
       )}
-      <Subscribe />
     </>
   )
 }
 
-// What each color is, and on narrow screens, what each mark is (see calendrier.css).
-function Legend() {
+// What each color is, and on narrow screens, what each mark is (see calendrier.css), with the links to the admin's
+// calendars of the sessions and of the occupations once their token is known.
+function Legend({ token }: { token: string | null }) {
   return (
     <ul className="calendar-legend" aria-label="Légende">
       <li>
         <span className="calendar-swatch calendar-session" /> session
+        {token !== null && <SubscribeLink calendar="sessions" token={token} />}
       </li>
       <li>
         <span className="calendar-swatch calendar-occupation" /> occupation
+        {token !== null && <SubscribeLink calendar="occupations" token={token} />}
       </li>
       <li>
         <span className="calendar-swatch calendar-free" /> disponible
@@ -320,5 +324,19 @@ function Legend() {
         </li>
       ))}
     </ul>
+  )
+}
+
+// A link to one of the admin's calendars, which opens the calendar app (see docs/design/server/admin-calendars.md): a
+// calendar with a plus.
+function SubscribeLink({ calendar, token }: { calendar: 'sessions' | 'occupations'; token: string }) {
+  const name = `s'abonner au calendrier des ${calendar}`
+  return (
+    <a className="calendar-subscribe" href={`webcal://${window.location.host}/${calendar}.ics?token=${token}`} aria-label={name} title={name}>
+      <svg aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="1.75" y="3" width="12.5" height="11.25" rx="1" />
+        <path d="M1.75 6.5h12.5M5 1.5v3M11 1.5v3M8 8.25v4.5M5.75 10.5h4.5" />
+      </svg>
+    </a>
   )
 }
