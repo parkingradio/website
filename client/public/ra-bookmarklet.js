@@ -49,7 +49,11 @@
     return node
   }
 
-  document.getElementById(PANEL_ID)?.remove()
+  // A panel that's creating the event stays as it is, and clicking the bookmarklet again then does nothing else, so that
+  // the event isn't created twice. Otherwise, clicking it again replaces the panel.
+  const previous = document.getElementById(PANEL_ID)
+  if (previous?.dataset.busy) return
+  previous?.remove()
   const body = element('div', [])
   const close = element('button', '×', 'float:right;border:0;background:none;font-size:20px;line-height:1;cursor:pointer;color:inherit')
   close.type = 'button'
@@ -159,7 +163,7 @@
     // E.g. when RA's page doesn't allow images from blob: addresses.
     image.addEventListener('error', () => {
       URL.revokeObjectURL(url)
-      image.replaceWith(element('div', 'Aperçu impossible ici ; le flyer sera tout de même envoyé.'))
+      image.replaceWith(element('div', 'Aperçu impossible ici, mais le flyer sera tout de même envoyé.'))
     })
     image.src = url
     return image
@@ -230,11 +234,14 @@
     create.type = cancel.type = 'button'
     cancel.addEventListener('click', () => panel.remove())
     create.addEventListener('click', () => {
+      panel.dataset.busy = 'true'
       create.disabled = cancel.disabled = close.disabled = true
-      createEvent(login, input, given.session, flyer, create).catch((error) => {
-        close.disabled = false
-        fail(`${SOMETHING_WRONG} : ${reason(error.message)}.`)
-      })
+      createEvent(login, input, given.session, flyer, create)
+        .catch((error) => fail(`${SOMETHING_WRONG} : ${reason(error.message)}.`))
+        .finally(() => {
+          close.disabled = false
+          delete panel.dataset.busy
+        })
     })
     const label = (text) => element('strong', text)
     const lines = (text) => element('div', text, 'white-space:pre-wrap')
@@ -273,7 +280,6 @@
     const answer = await graphql(token, CREATE_EVENT, { eventInput })
     // Checked, since it goes in the link back to the session.
     const id = answer.data?.createEvent?.id
-    close.disabled = false
     if (!/^\d{1,20}$/.test(id)) {
       const refused = errors(answer)
       return fail(refused ? `RA a refusé de créer l’événement : ${refused}` : `${SOMETHING_WRONG}.`)

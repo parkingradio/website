@@ -54,7 +54,7 @@ function checks(changes: object = {}) {
 
 // The site's answers, to the event and the flyer, then RA's: to the checks, to uploading the flyer, then to creating the
 // event.
-let answers: { publication: () => Response; flyer: () => Response; checks: () => Response; upload: () => Response; create: () => Response }
+let answers: { publication: () => Response; flyer: () => Response; checks: () => Response; upload: () => Response | Promise<Response>; create: () => Response }
 const fetch = vi.fn(async (url: string, init: RequestInit) => {
   if (url.endsWith('/api/ra-publication')) return answers.publication()
   if (url.endsWith('/api/ra-publication/flyer')) return answers.flyer()
@@ -374,7 +374,7 @@ describe('The bookmarklet', () => {
     run()
     fireEvent.error(await screen.findByRole('img', { name: 'Flyer' }))
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(panel()).toHaveTextContent('Aperçu impossible ici ; le flyer sera tout de même envoyé.')
+    expect(panel()).toHaveTextContent('Aperçu impossible ici, mais le flyer sera tout de même envoyé.')
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://ra.co/flyer')
     await createOnRa()
     expect(created().images).toEqual([{ filename: FILENAME, type: 'FLYERFRONT' }])
@@ -401,5 +401,28 @@ describe('The bookmarklet', () => {
     run()
     await createOnRa()
     expect(created()).toEqual(EVENT_INPUT)
+  })
+
+  it('leaves the panel as it is when clicked again while it creates the event, so that it creates it only once', async () => {
+    withFlyer()
+    // An upload that only ends when the test says.
+    let uploaded: (answer: Response) => void = () => {}
+    answers.upload = () => new Promise((resolve) => (uploaded = resolve))
+    run()
+    fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
+    await vi.waitFor(() => expect(uploads()).toHaveLength(1))
+    const busy = panel()
+    new Function(SCRIPT)()
+    expect(panel()).toBe(busy)
+    expect(busy).toHaveTextContent('Envoi du flyer…')
+    expect(screen.queryByText(/^Aucun événement à créer/)).not.toBeInTheDocument()
+
+    uploaded(Response.json({ filename: FILENAME }))
+    await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
+    expect(creations()).toHaveLength(1)
+    // Once it's done, clicking the bookmarklet again replaces the panel.
+    new Function(SCRIPT)()
+    expect(panel()).not.toBe(busy)
+    expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
   })
 })

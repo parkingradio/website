@@ -38,9 +38,20 @@ describe('raFlyer', () => {
     }
   })
 
-  it('is in sRGB, converted from the profile of the flyer', async () => {
+  it('is in sRGB, converted from the profile of the flyer, 16-bit ones included', async () => {
     // `testImage` makes its colour, (228, 87, 46) in sRGB, in Display P3, where it's about (212, 96, 59).
-    await expectColour(await raFlyer(await testImage('png', 64, 64)), [228, 87, 46], 3)
+    const p3 = await testImage('png', 64, 64)
+    const srgb = () => sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 228, g: 87, b: 46 } } })
+    const flyers = {
+      p3,
+      'p3 16-bit': await sharp(p3).keepIccProfile().toColourspace('rgb16').png().toBuffer(),
+      'sRGB 16-bit, with its profile': await srgb().toColourspace('rgb16').withIccProfile('srgb').png().toBuffer(),
+      'sRGB 16-bit, without a profile': await srgb().toColourspace('rgb16').png().toBuffer(),
+    }
+    for (const [name, flyer] of Object.entries(flyers)) {
+      expect((await sharp(flyer).metadata()).icc === undefined, name).toBe(name.endsWith('without a profile'))
+      await expectColour(await raFlyer(flyer), [228, 87, 46], 3)
+    }
   })
 
   it('puts the transparent parts of the flyer on white', async () => {
