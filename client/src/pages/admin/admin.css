@@ -66,8 +66,7 @@
 }
 
 /* A status button that isn't pressed is only grey when hovered, so that only the status its entry has is black, even
-   while the one just clicked is still hovered, e.g. when saving it fails (see list-controls.tsx). Likewise for the time
-   slots that fill a session's times in (see session-form.tsx). */
+   while the one just clicked is still hovered, e.g. when saving it fails (see list-controls.tsx). */
 .admin .admin-status-buttons button:not([aria-pressed='true']):hover {
   background: #ddd;
   color: #1c1c1c;
@@ -723,11 +722,44 @@ dl.admin-record {
   align-self: auto;
 }
 
-/* The programmation's time slots, as buttons side by side, which fill a session's times in. */
+/* A session's start and end, each a day and a time, side by side where there's room. */
+.admin-form .admin-session-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+/* The programmation's time slots, under a session's times, as suggestions: small grey text, side by side, but for the
+   one that's picked, which is black and underlined, so that it's clear when it applies. */
 .admin-form .admin-slots {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0 1rem;
+  font-size: 12px;
+}
+
+/* As close to the times as in the session form's "Quand", e.g. in Calendrier's form for a new session. */
+.admin-form > .admin-slots {
+  margin-top: -0.5rem;
+}
+
+.admin .admin-slots button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #666;
+}
+
+.admin .admin-slots button:hover {
+  background: none;
+  color: #1c1c1c;
+}
+
+.admin .admin-slots button[aria-pressed='true'] {
+  background: none;
+  color: #000;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 /* The hours and minutes of a duration. */

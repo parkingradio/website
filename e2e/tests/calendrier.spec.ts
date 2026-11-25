@@ -101,7 +101,7 @@ test('a session is in its month, and on its day, where a new session is added', 
   const chosen = chosenDay(page, day)
   await expect(chosen.getByRole('listitem')).toHaveText([`session21 h – 1 hE2E ${unique}`])
 
-  // Its "+", after it, opens the form for a new session on it, with the focus on its heading, then the time slots.
+  // Its "+", after it, opens the form for a new session on it, with the focus on its heading, then its start.
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: `nouvelle session le ${longDay(day)}` })).toBeFocused()
   await page.keyboard.press('Enter')
@@ -111,8 +111,8 @@ test('a session is in its month, and on its day, where a new session is added', 
   const start = form.getByRole('group', { name: 'Début', exact: true })
   const end = form.getByRole('group', { name: 'Fin', exact: true })
   const slots = form.getByRole('group', { name: 'Plages horaires' })
-  await expect(slots.getByRole('button', { name: '11 h – 15 h' })).toBeFocused()
-  // A time slot fills its times in, which can still be typed over.
+  await expect(start.getByRole('spinbutton').first()).toBeFocused()
+  // A time slot, under its times, fills them in, and they can still be typed over.
   await slots.getByRole('button', { name: '13 h – 17 h' }).click()
   await expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')
   await expect(start).toHaveText('\u206613 h 00\u2069')

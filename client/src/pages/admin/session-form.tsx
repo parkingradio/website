@@ -240,11 +240,10 @@ function TimesField({
         </label>
       </div>
       <FieldError message={errors.undated} alert />
-      <SlotChoices picked={pickedSlot(form)} onPick={(slot) => onChange(slotChanges(form, slot))} />
       {form.undated ? (
         <DurationField label="Durée" value={form.duration} onChange={(duration) => onChange({ duration })} error={errors.duration} />
       ) : (
-        <>
+        <div className="admin-session-times">
           <DayAndTime
             label="Début"
             day={form.day}
@@ -263,31 +262,29 @@ function TimesField({
             dayError={errors.endDay}
             timeError={errors.end}
           />
-          {lasts !== null && (
-            <p className="admin-hint" role="status">
-              Dure {formatDuration(lasts)}.
-            </p>
-          )}
-        </>
+        </div>
+      )}
+      <SlotChoices picked={pickedSlot(form)} onPick={(slot) => onChange(slotChanges(form, slot))} />
+      {lasts !== null && (
+        <p className="admin-hint" role="status">
+          Dure {formatDuration(lasts)}.
+        </p>
       )}
     </fieldset>
   )
 }
 
-// The programmation's time slots, which fill a session's times in, with the one `picked`, if any, pressed (see "The
-// session form" in docs/design/client/admin/sessions.md).
+// The programmation's time slots, as suggestions under a session's times, which they fill in, with the one `picked`, if
+// any, pressed (see "The session form" in docs/design/client/admin/sessions.md). Clicking or tapping one leaves the focus
+// where it is, e.g. in a time, which leaving would say what's wrong with, moving the slots down before the click lands.
 export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onPick: (slot: TimeSlot) => void }) {
-  const id = useId()
   return (
-    <div className="admin-field">
-      <span id={id}>Plages horaires</span>
-      <div className="admin-slots admin-status-buttons" role="group" aria-labelledby={id}>
-        {TIME_SLOTS.map((slot) => (
-          <Button key={slot.id} aria-pressed={slot.id === picked} onClick={() => onPick(slot)}>
-            {slot.label}
-          </Button>
-        ))}
-      </div>
+    <div className="admin-slots" role="group" aria-label="Plages horaires">
+      {TIME_SLOTS.map((slot) => (
+        <Button key={slot.id} aria-pressed={slot.id === picked} onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(slot)}>
+          {slot.label}
+        </Button>
+      ))}
     </div>
   )
 }

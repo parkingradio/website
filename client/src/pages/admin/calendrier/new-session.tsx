@@ -52,7 +52,6 @@ export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSes
         Nouvelle session
       </h3>
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
-      <SlotChoices picked={checked.slot} onPick={({ start, end }) => update({ start, end })} />
       <div className="admin-row admin-times">
         <div className="admin-field">
           <TimeInput label="Début" value={values.start} invalid={!!startError} onChange={(start) => update({ start })} onBlur={leave('start', 'day')} />
@@ -63,6 +62,7 @@ export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSes
           <FieldError message={endError} />
         </div>
       </div>
+      <SlotChoices picked={checked.slot} onPick={({ start, end }) => update({ start, end })} />
       {checked.durationMinutes !== null && (
         <p className="admin-hint" role="status">
           Dure {formatDuration(checked.durationMinutes)}
