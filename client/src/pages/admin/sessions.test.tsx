@@ -502,6 +502,11 @@ const RA_EVENT = {
   venueId: '288529',
   promoterIds: ['183980'],
   content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+  promotionalLinks: [
+    { title: 'parking.radio', url: 'https://parking.radio' },
+    { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
+  ],
+  playerLinks: ['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'],
 }
 const RA_EVENT_CONTENT = {
   '/api/admin/sessions/session-1/ra-event': { ok: true, event: RA_EVENT },
@@ -1549,6 +1554,10 @@ describe("A session's event on RA", () => {
     expect(within(raValue('Salle')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
     expect(within(raValue('Promoteur')).getByRole('link')).toHaveAttribute('href', 'https://ra.co/promoters/183980')
     expect(raValue('Description')).toHaveTextContent('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC')
+    const hrefs = (label: string) => within(raValue(label)).getAllByRole('link').map((link) => link.getAttribute('href'))
+    expect(hrefs('Liens promotionnels')).toEqual(['https://parking.radio', 'https://www.instagram.com/parking.radio'])
+    expect(raValue('Liens promotionnels')).toHaveTextContent(/^parking\.radio : https:\/\/parking\.radio/)
+    expect(hrefs('Liens média')).toEqual(['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'])
 
     fireEvent.click(screen.getByRole('button', { name: 'copier le line-up' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'copier le line-up' })).toHaveTextContent('copié'))
@@ -1557,6 +1566,9 @@ describe("A session's event on RA", () => {
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('ONDES TAKEOVER'))
     fireEvent.click(screen.getByRole('button', { name: 'copier la description' }))
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC'))
+    // Links' addresses, but not their titles, which are short.
+    fireEvent.click(screen.getByRole('button', { name: 'copier https://www.instagram.com/parking.radio' }))
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('https://www.instagram.com/parking.radio'))
 
     writeText.mockRejectedValue(new Error('Denied'))
     fireEvent.click(screen.getByRole('button', { name: 'copier le titre' }))

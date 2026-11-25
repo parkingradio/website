@@ -163,10 +163,12 @@ the event on RA, with the bookmarklet or by hand, from the content the server gi
   for it, or to create the event on RA (linking to RA's form, `https://ra.co/pro/event/create`) with these fields, then
   to paste its link below.
 - The event's title ("Titre"), when it is ("Quand"), written like the session's, its lineup ("Line-up"), one performer
-  per line, Parking Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, and its
-  description ("Description"), whole, with its line breaks, or "-" when it has none. A "copier" button, after the first
-  line of the title, the lineup and the description, copies it, then says "copié", or "échec de la copie", for a
-  moment: the times, the venue and the promoter are picked in RA's form rather than typed. The content is read when the
+  per line, Parking Radio's venue ("Salle") and promoter page ("Promoteur") on RA, each linking to it, its description
+  ("Description"), whole, with its line breaks, or "-" when it has none, its links ("Liens promotionnels"), one per
+  line, each its title then its address, and its media links ("Liens média"), one per line, each its address, every
+  address linking to it. A "copier" button, after the first line of the title, the lineup and the description, and
+  after each address, copies it, then says "copié", or "échec de la copie", for a moment: the times, the venue and the
+  promoter are picked in RA's form rather than typed, and the links' titles are short. The content is read when the
   panel opens, and again whenever the session or its sets change, and the panel says when it can't be read.
 - "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
   [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's

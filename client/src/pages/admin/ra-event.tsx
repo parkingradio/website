@@ -67,6 +67,28 @@ function Copyable({ text, label, multiline = false }: { text: string; label: str
   )
 }
 
+// Links, one per line, each with its title, if it has one, and its address, with a button to copy the address: the
+// titles are short.
+function CopyableLinks({ links }: { links: { title?: string; url: string }[] }) {
+  return (
+    <dd>
+      <ul>
+        {links.map(({ title, url }) => (
+          <li key={url} className="admin-copyable">
+            <span>
+              {title && <>{title}&nbsp;: </>}
+              <a href={url} target="_blank" rel="noreferrer">
+                {url}
+              </a>
+            </span>
+            <CopyButton text={url} label={url} />
+          </li>
+        ))}
+      </ul>
+    </dd>
+  )
+}
+
 function RaLink({ path }: { path: string }) {
   const url = `https://ra.co/${path}`
   return (
@@ -99,6 +121,10 @@ function RaEventRecord({ session, event }: { session: Session; event: RaEventCon
       </dd>
       <dt>Description</dt>
       <Copyable text={event.content} label="la description" multiline />
+      <dt>Liens promotionnels</dt>
+      <CopyableLinks links={event.promotionalLinks} />
+      <dt>Liens média</dt>
+      <CopyableLinks links={event.playerLinks.map((url) => ({ url }))} />
     </dl>
   )
 }

@@ -26,9 +26,9 @@ session de TEST. ».
 2. The admin logs in to RA with their own account, if they aren't already, and clicks the bookmarklet, which shows a
    panel over RA's page. If logging in lost the fragment, it says to click « Publier sur RA » again.
 3. The bookmarklet checks RA, then shows the event: the RA account it's logged in as, the title, the start and the end,
-   the venue's name as RA has it, the lineup and the description, then, outside production, the warning that the event
-   will be created on RA all the same. « Créer sur RA » creates it, and « Annuler », or the panel's ×, closes it without
-   creating anything.
+   the venue's name as RA has it, the lineup, the description, the links and the media links, then, outside production,
+   the warning that the event will be created on RA all the same. « Créer sur RA » creates it, and « Annuler », or the
+   panel's ×, closes it without creating anything.
 4. Once the event is created, the bookmarklet shows its link, a link to the session's page that saves it as the
    session's event (see [Back to the session](#back-to-the-session)), and a reminder to add the flyer on RA by hand: the
    session's page links to it as it was sent (see [A session's page](sessions.md#a-sessions-page)).
@@ -61,9 +61,10 @@ What the script does:
   without a default) that it doesn't send. When RA doesn't know who's logged in, it says to log in again. When the rest
   doesn't hold, it says that RA changed, and what changed.
 - It sends the event as `EventInput`: `title`, `startTime` and `endTime`, in Québec time without their offset, as
-  `"2026-11-20T21:00:00.000"`, `lineup`, `venueId`, `promoterIds` and `content`, as the server gives them, and
-  `submissionSource`, `"SUBMITEVENTPAGE"`. It only creates the event, once, when « Créer sur RA » is clicked, with the
-  `createEvent` mutation, which gives the new event's `id`. It never tries again on its own.
+  `"2026-11-20T21:00:00.000"`, `lineup`, `venueId`, `promoterIds` and `content`, as the server gives them,
+  `promotionalLinks`, each link with only its `title` and its `url`, `playerLinks`, each media link as its `sourceId`,
+  and `submissionSource`, `"SUBMITEVENTPAGE"`. It only creates the event, once, when « Créer sur RA » is clicked, with
+  the `createEvent` mutation, which gives the new event's `id`. It never tries again on its own.
 - When RA refuses, it shows RA's messages as they come. When anything else goes wrong, it says that something didn't
   work.
 

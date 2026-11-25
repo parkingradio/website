@@ -3077,6 +3077,33 @@
           "content": {
             "type": "string",
             "description": "Its effective description"
+          },
+          "promotionalLinks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Parking Radio's links, each with its title"
+          },
+          "playerLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Parking Radio's media links"
           }
         },
         "required": [
@@ -3086,7 +3113,9 @@
           "lineup",
           "venueId",
           "promoterIds",
-          "content"
+          "content",
+          "promotionalLinks",
+          "playerLinks"
         ],
         "additionalProperties": false
       },

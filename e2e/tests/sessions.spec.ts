@@ -136,6 +136,7 @@ test("a seeded session's page shows the content of its event on RA, its performe
   await expect(raValue(page, 'Quand')).toHaveText(await value(page, 'Quand').innerText())
   await expect(raValue(page, 'Line-up').locator('span')).toHaveText('Clémentine Brûlée\nClément Brûlé\nKwame Asante')
   await expect(raValue(page, 'Salle').getByRole('link')).toHaveAttribute('href', 'https://ra.co/clubs/288529')
+  await expect(raValue(page, 'Liens média').getByRole('link').first()).toHaveAttribute('href', 'https://www.youtube.com/@parkingdotradio')
   await expect(raValue(page, 'Description')).toHaveText(/^LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC/)
   await expect(page.getByRole('button', { name: 'copier le line-up' })).toBeVisible()
 })
