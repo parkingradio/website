@@ -36,7 +36,8 @@ const feedOf = (name: string) => screen.getByRole('rowheader', { name }).closest
 const button = (action: 'modifier' | 'retirer', name: string) => screen.getByRole('button', { name: `${action} : ${name}` })
 // The form that changes a feed, the only one open.
 const editForm = () => screen.getByRole('button', { name: 'enregistrer' }).closest('form')!
-// The form that adds a feed, which comes after the list.
+// The button that opens the form that adds a feed, under the table, and that form, once it's open.
+const openAdd = () => screen.getByRole('button', { name: 'ajouter un calendrier' })
 const addForm = () => screen.getByRole('button', { name: 'ajouter' }).closest('form')!
 const nameField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Nom' })
 const linkField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Lien' })
@@ -61,6 +62,9 @@ describe('The calendar feeds', () => {
 
     await screen.findByText('Aucun calendrier externe pour le moment.')
     expect(screen.queryByRole('table')).toBeNull()
+    // Under it, the button that opens the form that adds a feed.
+    expect(openAdd()).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 
   it('lists the feeds in a table, one per row, with their type and when they were last read, but not their link nor who added them', async () => {
@@ -113,16 +117,20 @@ describe('The calendar feeds', () => {
     mockFetch(list())
     render(<CalendarFeeds />)
 
-    await waitFor(() => expect(linkField()).toBeInTheDocument())
+    fireEvent.click(await screen.findByRole('button', { name: 'ajouter un calendrier' }))
     expect(linkField()).toHaveAttribute('autocomplete', 'off')
   })
 
-  it('adds a feed once its name, its type and its link are filled in, then clears the form and lists it', async () => {
+  it('adds a feed, in the form "ajouter un calendrier" opens, once its name, its type and its link are filled in, then lists it', async () => {
     const added = { ...TEAM, id: 'feed-3', name: 'Nouveau', kind: 'holds', link: 'https://example.com/secret.ics', readAt: '2026-11-22T12:20:00-05:00' }
     mockFetch({ ...list(TEAM), [`POST ${URL}`]: { ok: true, feed: added } })
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(feeds()).toHaveLength(1))
+    // The form opens in the button's place, with the focus on its name.
+    fireEvent.click(openAdd())
+    expect(screen.queryByRole('button', { name: 'ajouter un calendrier' })).toBeNull()
+    expect(nameField()).toHaveFocus()
     expect(addButton()).toBeDisabled()
     // No type is picked at first, so that it's always chosen.
     expect(kindChoice('Occupations')).not.toBeChecked()
@@ -141,10 +149,30 @@ describe('The calendar feeds', () => {
     expect(feeds()[1]).toBe(feedOf('Nouveau'))
     expect(feedOf('Nouveau').querySelector('td')).toHaveTextContent('Plages protégées')
     expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', kind: 'holds', link: 'webcal://example.com/secret.ics' }])
+    // The form is closed, and the focus is back on the button, which opens it empty.
+    expect(screen.queryByRole('button', { name: 'ajouter' })).toBeNull()
+    expect(openAdd()).toHaveFocus()
+    fireEvent.click(openAdd())
     expect(nameField()).toHaveValue('')
     expect(kindChoice('Plages protégées')).not.toBeChecked()
     expect(linkField()).toHaveValue('')
-    expect(addButton()).toBeDisabled()
+  })
+
+  it('closes the form that adds a feed with "annuler", without adding it, and loses what was typed', async () => {
+    mockFetch(list(TEAM))
+    render(<CalendarFeeds />)
+
+    await waitFor(() => expect(feeds()).toHaveLength(1))
+    fireEvent.click(openAdd())
+    fill()
+    fireEvent.click(within(addForm()).getByRole('button', { name: 'annuler' }))
+    expect(screen.queryByRole('button', { name: 'ajouter' })).toBeNull()
+    expect(openAdd()).toHaveFocus()
+    expect(requestsTo('POST', URL)).toHaveLength(0)
+    expect(feeds()).toHaveLength(1)
+
+    fireEvent.click(openAdd())
+    expect(nameField()).toHaveValue('')
   })
 
   it("says why a feed couldn't be added, and keeps what was typed", async () => {
@@ -152,6 +180,7 @@ describe('The calendar feeds', () => {
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(feeds()).toHaveLength(1))
+    fireEvent.click(openAdd())
     fill()
     fireEvent.click(addButton())
 
@@ -191,8 +220,6 @@ describe('The calendar feeds', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'enregistrer' })).toBeNull())
     expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ name: 'Équipe', link: 'https://example.com/new.ics' }])
     expect(feedOf('Équipe')).toBeInTheDocument()
-    // The add form is as it was.
-    expect(nameField()).toHaveValue('')
 
     // Who changed it is in its form.
     fireEvent.click(button('modifier', 'Équipe'))

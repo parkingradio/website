@@ -41,9 +41,11 @@ export function CalendarFeeds() {
   )
 }
 
-// The feeds, as they're added, changed and removed, in a table, one per row, and the form that adds one.
+// The feeds, as they're added, changed and removed, in a table, one per row, then "ajouter un calendrier", which opens the
+// form that adds one in its place.
 function Feeds({ loaded }: { loaded: Feed[] }) {
   const [feeds, setFeeds] = useState(loaded)
+  const { open: adding, button: addButton, openForm: openAdd, close: closeAdd } = useFormOpenedBy()
 
   return (
     <>
@@ -69,15 +71,49 @@ function Feeds({ loaded }: { loaded: Feed[] }) {
           ))}
         </table>
       )}
-      <FeedForm
-        initial={{ name: '', kind: null, link: '' }}
-        action="ajouter"
-        failure="Le calendrier n'a pas pu être ajouté"
-        save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
-        onSaved={(feed) => setFeeds((current) => [...current, feed])}
-      />
+      {adding ? (
+        <FeedForm
+          initial={{ name: '', kind: null, link: '' }}
+          action="ajouter"
+          failure="Le calendrier n'a pas pu être ajouté"
+          save={(fields) => api.POST('/api/admin/calendar/feeds', { body: fields })}
+          onSaved={(feed) => {
+            closeAdd()
+            setFeeds((current) => [...current, feed])
+          }}
+          onCancel={closeAdd}
+        />
+      ) : (
+        <div className="admin-toolbar">
+          <button ref={addButton} type="button" onClick={openAdd}>
+            ajouter un calendrier
+          </button>
+        </div>
+      )}
     </>
   )
+}
+
+// A form that a button opens, in place of something else, e.g. a feed's row, and which, once it's closed, saved or not,
+// gives the focus back to the button, in a layout effect (see LoadedSession in sessions.tsx), since it also closes once
+// the server answers.
+function useFormOpenedBy() {
+  const [open, setOpen] = useState(false)
+  const closed = useRef(false)
+  const button = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => {
+    if (!open && closed.current) button.current?.focus()
+    closed.current = false
+  }, [open])
+  return {
+    open,
+    button,
+    openForm: () => setOpen(true),
+    close: () => {
+      closed.current = true
+      setOpen(false)
+    },
+  }
 }
 
 // What's changed in `fields`, the form's, from `feed`, and only that, so that a form opened before another admin changed
@@ -107,19 +143,7 @@ function SpanRow({ headers, children }: { headers?: string; children: ReactNode 
 // failed, or why it couldn't be removed, if either did.
 function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed: Feed) => void; onRemoved: () => void }) {
   const nameId = useId()
-  const [editing, setEditing] = useState(false)
-  // Whether the form was closed, which then gives the focus back to "modifier", in a layout effect (see LoadedSession in
-  // sessions.tsx), since the form also closes once the PATCH answers.
-  const closed = useRef(false)
-  const edit = useRef<HTMLButtonElement>(null)
-  useLayoutEffect(() => {
-    if (!editing && closed.current) edit.current?.focus()
-    closed.current = false
-  }, [editing])
-  const close = () => {
-    closed.current = true
-    setEditing(false)
-  }
+  const { open: editing, button: editButton, openForm: edit, close } = useFormOpenedBy()
   const [busy, setBusy] = useState(false)
   // Why it couldn't be removed, if it couldn't.
   const [error, setError] = useState<string | null>(null)
@@ -165,7 +189,7 @@ function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
           <td>{FEED_KIND_LABELS[feed.kind]}</td>
           <td>{failed ? <span className="admin-warning">échec</span> : feed.readAt ? dateTimeFormat.format(new Date(feed.readAt)) : 'pas encore lu'}</td>
           <td>
-            <button ref={edit} type="button" aria-label={`modifier : ${feed.name}`} disabled={busy} onClick={() => setEditing(true)}>
+            <button ref={editButton} type="button" aria-label={`modifier : ${feed.name}`} disabled={busy} onClick={edit}>
               modifier
             </button>{' '}
             <button type="button" aria-label={`retirer : ${feed.name}`} disabled={busy} onClick={remove}>
@@ -196,8 +220,7 @@ function FeedRows({ feed, onChanged, onRemoved }: { feed: Feed; onChanged: (feed
 
 type Saved = { ok: true; feed: Feed } | { ok: false; error: string }
 
-// The form that adds a feed, cleared once it's added, or changes one, which closes once it's changed, and whose name gets
-// the focus when it opens.
+// The form that adds a feed or changes one, which closes once it's saved, and whose name gets the focus when it opens.
 function FeedForm({
   initial,
   action,
@@ -211,7 +234,7 @@ function FeedForm({
   failure: string
   save: (fields: FeedFields) => Promise<Saved>
   onSaved: (feed: Feed) => void
-  onCancel?: () => void
+  onCancel: () => void
 }) {
   const [name, setName] = useState(initial.name)
   const [kind, setKind] = useState(initial.kind)
@@ -235,9 +258,6 @@ function FeedForm({
       setError(result.error)
       return
     }
-    setName(initial.name)
-    setKind(initial.kind)
-    setLink(initial.link)
     onSaved(result.feed)
   }
 
@@ -246,7 +266,7 @@ function FeedForm({
       <form className="admin-form" onSubmit={submit}>
         <label>
           Nom
-          <input autoFocus={onCancel !== undefined} value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
+          <input autoFocus value={name} maxLength={NAME_MAX_LENGTH} onChange={(event) => setName(event.target.value)} required />
         </label>
         <KindField kind={kind} onChange={setKind} />
         <label>
@@ -257,11 +277,9 @@ function FeedForm({
           <button type="submit" disabled={busy || !complete}>
             {action}
           </button>
-          {onCancel && (
-            <button type="button" disabled={busy} onClick={onCancel}>
-              annuler
-            </button>
-          )}
+          <button type="button" disabled={busy} onClick={onCancel}>
+            annuler
+          </button>
           {busy && reads && <span className="admin-meta">Lecture du calendrier…</span>}
         </div>
       </form>
