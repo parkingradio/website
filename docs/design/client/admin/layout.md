@@ -107,9 +107,10 @@ like the pages' other notices, so that it isn't told by color alone either.
 Some controls have a tooltip, under them, or above them when there's no room below, e.g. to say why they can't be used
 (see [Controls that can't be used](#controls-that-cant-be-used)). It shows while the control is hovered with a mouse, or
 has the keyboard's focus, and stays while the pointer moves onto it. On touch screens, tapping the control, with a finger
-or a pen, shows it until the control is tapped again, or something else is, or the focus leaves it. Escape hides it, even
-while the control is hovered or focused. Screen readers read it as the control's description. Only controls that do
-nothing else when they're clicked have one.
+or a pen, shows it until the next tap, wherever it lands, the control and the tooltip included, or until the focus leaves
+the control. Tapping the tooltip only hides it: what's under it isn't tapped. Escape hides it, even while the control is
+hovered or focused. Screen readers read it as the control's description. Only controls that do nothing else when
+they're clicked have one.
 
 ## Controls that can't be used
 
