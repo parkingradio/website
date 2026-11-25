@@ -21,8 +21,13 @@ something else that tells them apart:
 - Free time says "disponible" or "dispo …" (see [Free time](#free-time)).
 - Conflicts have a red frame, which doesn't hide a session's bar or an occupation's dashed border, and "conflit".
 
-In the legend, "disponible" has a tooltip (see [Tooltips](layout.md#tooltips)): « Plage disponible au studio, protégée
-des occupations. »
+In the legend, "session", "occupation", "disponible" and "conflit" each have a tooltip that says what it is (see
+[Tooltips](layout.md#tooltips)):
+
+- "session": « Toutes les sessions qui ont une date. »
+- "occupation": « Période où le studio n'est pas disponible pour des sessions. »
+- "disponible": « Plage disponible au studio, protégée des occupations. »
+- "conflit": « Une session ou une occupation qui chevauche une plage indisponible. »
 
 On narrow screens like phones, the month shows them as marks instead (see [On phones](#on-phones)).
 
@@ -144,9 +149,9 @@ On narrow screens like phones, each day of the month shows its number, its "+", 
 what's on it: a small square for each thing, in the month's order, which looks like the thing does on wider screens, as
 the legend shows (a session's bar, an occupation's dashed border), with a red frame when the thing has "conflit" on the
 day; a session that's done is filled grey, and one that's cancelled hollow, which the legend shows too, as "jouée" and
-"annulée". Then a green circle when the day has free time, and a red "!" when something on it has "conflit". Screen
-readers still read the day's words, as its description, and the chosen day writes them. Tapping a day chooses it, or
-unchooses it, the month having no links to sessions there.
+"annulée". Then a green circle when the day has free time. Screen readers still read the day's words, as its
+description, and the chosen day writes them. Tapping a day chooses it, or unchooses it, the month having no links to
+sessions there.
 
 
 ### Free time

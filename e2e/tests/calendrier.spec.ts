@@ -59,6 +59,11 @@ const busy = (unique: string, day: string) =>
 const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
 const weekdayAndNumber = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day))
 
+// Whether a target is as large as a finger needs, and whether two targets overlap, by their boxes.
+type Box = { x: number; y: number; width: number; height: number }
+const fingerSized = (box: Box) => box.width >= 24 && box.height >= 24
+const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
 // Where the navigation bar, which stays at the top of the screen, ends.
 async function underTheBar(page: Page): Promise<number> {
   const bar = (await page.locator('.navbar').boundingBox())!
@@ -258,19 +263,6 @@ test('free time is the protected time that nothing takes, and the sessions outsi
   await expect(dayCell(page, addDays(day, -1)).locator('.calendar-free, .calendar-mark-free')).toHaveCount(0)
   if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-free')).toBeVisible()
 
-  // The legend says what free time is, in a tooltip, in a target as large as a finger needs. Once the links to the
-  // admin's calendars, which move it, are there.
-  const legend = page.getByRole('list', { name: 'Légende' })
-  await expect(legend.getByRole('link', { name: "s'abonner au calendrier des occupations" })).toBeVisible()
-  const available = legend.getByRole('button', { name: 'disponible' })
-  await (isMobile ? available.tap() : available.hover())
-  await expect(page.getByRole('tooltip')).toHaveText('Plage disponible au studio, protégée des occupations.')
-  if (isMobile) {
-    const box = (await available.boundingBox())!
-    expect(box.width).toBeGreaterThanOrEqual(24)
-    expect(box.height).toBeGreaterThanOrEqual(24)
-  }
-
   // The holds feeds' warnings, and the session outside protected time, the only one, since the server under test has no
   // holds feed, whose row shows its day.
   const issues = page.getByRole('region', { name: 'À régler' })
@@ -388,13 +380,8 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
     const today = quebecDayAndTime(new Date()).day
     const twoDigits = Array.from({ length: 19 }, (_, i) => `${month}-${10 + i}`).find((each) => each >= today && new Date(each).getUTCDay() !== 6)!
     const plus = (await page.getByRole('button', { name: `nouvelle session le ${longDay(twoDigits)}` }).boundingBox())!
-    expect(plus.width).toBeGreaterThanOrEqual(24)
-    expect(plus.height).toBeGreaterThanOrEqual(24)
-    for (const number of [twoDigits, addDays(twoDigits, 1)]) {
-      const box = (await dayButton(page, number).boundingBox())!
-      const overlaps = plus.x < box.x + box.width && box.x < plus.x + plus.width && plus.y < box.y + box.height && box.y < plus.y + plus.height
-      expect(overlaps).toBe(false)
-    }
+    expect(fingerSized(plus)).toBe(true)
+    for (const number of [twoDigits, addDays(twoDigits, 1)]) expect(overlap(plus, (await dayButton(page, number).boundingBox())!)).toBe(false)
   } else {
     await expect(marks).toBeHidden()
   }
@@ -420,9 +407,39 @@ test('on phones, the month marks what takes each day, with a "+" as large as a f
 
 // Only reads the admin's links: "régénérer les liens", on Intégrations, would replace them under the other tests, and its
 // unit tests and the server's integration tests cover it.
-test("the legend links to the admin's own calendars", async ({ page, baseURL }) => {
+test("the legend says what each kind is, in tooltips, and links to the admin's own calendars", async ({ page, baseURL, isMobile }) => {
+  if (isMobile) await page.setViewportSize(NARROW)
   await logIn(page, { at: '/admin/calendrier' })
   const legend = page.getByRole('list', { name: 'Légende' })
+  const tooltip = page.getByRole('tooltip')
+
+  // Once the links to the admin's calendars, which move the words, are there.
+  await expect(legend.getByRole('link')).toHaveCount(2)
+  const tips = {
+    session: 'Toutes les sessions qui ont une date.',
+    occupation: "Période où le studio n'est pas disponible pour des sessions.",
+    disponible: 'Plage disponible au studio, protégée des occupations.',
+    conflit: 'Une session ou une occupation qui chevauche une plage indisponible.',
+  }
+  for (const [name, tip] of Object.entries(tips)) {
+    const button = legend.getByRole('button', { name })
+    await (isMobile ? button.tap() : button.hover())
+    await expect(tooltip).toHaveText(tip)
+    // Tapped again, it hides its tooltip, which could cover the next one, on the legend's next row.
+    if (isMobile) {
+      await button.tap()
+      await expect(tooltip).toHaveCount(0)
+    }
+  }
+
+  // On phones, its words and links are targets as large as a finger needs, none of which overlaps another, even on the
+  // legend's next row.
+  if (isMobile) {
+    const boxes = await Promise.all((await legend.locator('button, a').all()).map(async (target) => (await target.boundingBox())!))
+    expect(boxes.map(fingerSized)).toEqual(Array(6).fill(true))
+    for (const [i, box] of boxes.entries()) for (const other of boxes.slice(i + 1)) expect(overlap(box, other)).toBe(false)
+  }
+
   for (const calendar of ['sessions', 'occupations']) {
     const icon = legend.getByRole('link', { name: `s'abonner au calendrier des ${calendar}` })
     await expect(icon).toBeVisible()
