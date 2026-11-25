@@ -276,7 +276,7 @@ async function expectSearch(query: string, found: string[]) {
 const dayInput = (when: 'Début' | 'Fin') => within(screen.getByRole('group', { name: when })).getByLabelText('date')
 const timeField = (when: 'Début' | 'Fin') => within(screen.getByRole('group', { name: when })).getByRole('group', { name: 'heure' })
 const timeHour = (when: 'Début' | 'Fin') => timeParts(timeField(when))[0]
-// One of the programmation's time slots, under "Plages horaires", e.g. "18 h – 22 h".
+// One of the programmation's time slots, in the group named "Plages horaires", e.g. "18 h – 22 h".
 const slot = (label: string) => within(screen.getByRole('group', { name: 'Plages horaires' })).getByRole('button', { name: label })
 // How long the session form says the session lasts, rather than what's said of the sets' handles after their table.
 const lasts = () => within(screen.getByRole('group', { name: 'Quand' })).queryByRole('status')

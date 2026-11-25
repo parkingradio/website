@@ -194,13 +194,14 @@ the focus on its heading. It adds the session with only what's needed to add one
 fields empty (see [`POST /api/admin/sessions`](../../server/sessions.md#post-apiadminsessions-admin)): the rest is added
 on its page, which its link on the chosen day leads to. Its fields are:
 
-- "Début" and "Fin", each a time of day, in Québec time. The session starts on the chosen day, and ends on that day when
-  the end's time is after the start's, or else the next day, e.g. "21 h – 1 h". An end at the start's time is refused,
-  « La fin doit être après le début. ». A time the clocks skip is refused, and one they show twice is the first one, or
-  for the end, the first one after the start, as in the session form (see [Times, in Sessions](sessions.md#times)).
-  Once they're valid, the form says how long the session lasts, e.g. « Dure 4 h. », or « Dure 4 h, jusqu'au
-  lendemain. ». Under them, the programmation's time slots, as in the session form (see
-  [The session form](sessions.md#the-session-form)), fill both in.
+- The start and the end, each a time of day, in Québec time, with « à » between them and no visible label (screen
+  readers name them "Début" and "Fin"), then right under them the programmation's time slots, as in the session form
+  (see [The session form](sessions.md#the-session-form)), which fill both in, then how long the session lasts (see
+  below). The session starts on the chosen day, and ends on that day when the end's time is after the start's, or else
+  the next day, e.g. "21 h – 1 h". An end at the start's time is refused, « La fin doit être après le début. ». A time
+  the clocks skip is refused, and one they show twice is the first one, or for the end, the first one after the start,
+  as in the session form (see [Times, in Sessions](sessions.md#times)). Once they're valid, the form says how long the
+  session lasts, e.g. « Dure 4 h. », or « Dure 4 h, jusqu'au lendemain. ».
 - "Type", as in the session form (see [The session form](sessions.md#the-session-form)).
 - "Collectif", only for a takeover, as in the session form. When the collectives can't be loaded, the form says so, and
   none can be picked.

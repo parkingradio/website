@@ -184,25 +184,27 @@ collective's page leads to it as its takeover, with "Takeover" and the collectiv
 isn't one of the collectives loaded, e.g. when they can't be loaded, in which case nothing is picked. From top to
 bottom, the form has:
 
-- "Quand": "Début" and "Fin", side by side where there's room, each a "date" and an "heure", in Québec time (see
-  [Times](#times)), then how long the session lasts, e.g. « Dure 4 h. », once they're valid. The end's date keeps its
-  distance in days from the start's: when the start's date changes to another day, the end's moves by as many days, from
-  the last day the start had, even if its date was cleared in between, e.g. while it's typed. When the start's date
-  changes while the end has none, the end takes it. Changing the end's date only changes that distance. Or, with "date à
-  déterminer" checked, only "Durée". Checking it fills the duration in from the times, when they're valid. Once the
-  start has both its date and its time, whichever is entered last, and the clocks show that time, an empty end time is
-  filled in, with its date, as long after the start as the duration the form has, if it has one: the one "Durée" had,
-  e.g. after un-checking "date à déterminer", or else the session's as the form opened. The form doesn't check that the
-  session's sets still add up to no more than the session once it's shorter: the session's page then warns of it (see [A
-  session's page](#a-sessions-page)). Under "Début" and "Fin", or under "Durée", the programmation's time slots, the
-  ones artists pick from on Appliquer (see [Appliquer](../appliquer.md)), e.g. "13 h – 17 h", are offered as
-  suggestions, without a label of their own, which screen readers name « Plages horaires »: picking one fills in the
-  start's and the end's times with its own, and the end's date becomes the start's. The fields can still be changed,
-  e.g. for 19 h – 23 h. A slot shows as picked, so that it's clear it applies, while the start's and the end's times are
-  its own and the end's date is the start's. With "date à déterminer" checked, picking a slot sets "Durée" to its length
-  instead, and none shows as picked. While the session is announced, checking "date à déterminer" shows an error right
-  away, which screen readers announce, « Une session annoncée a une date : retirez d'abord son annonce. », and the form
-  can't be sent until it's un-checked.
+- "Quand": the start and the end, each a "date" and an "heure", in Québec time (see [Times](#times)), side by side
+  where there's room, with « à » between them and no visible label (screen readers name them "Début" and "Fin"), then
+  right under them the programmation's time slots (see below), then how long the
+  session lasts, e.g. « Dure 4 h. », once they're valid. The end's date keeps its distance in days from the start's:
+  when the start's date changes to another day, the end's moves by as many days, from the last day the start had, even
+  if its date was cleared in between, e.g. while it's typed. When the start's date changes while the end has none, the
+  end takes it. Changing the end's date only changes that distance. Or, with "date à déterminer" checked, only
+  "Durée". Checking it fills the duration in from the times, when they're valid. Once the start has both its date and
+  its time, whichever is entered last, and the clocks show that time, an empty end time is filled in, with its date, as
+  long after the start as the duration the form has, if it has one: the one "Durée" had, e.g. after un-checking "date à
+  déterminer", or else the session's as the form opened. The form doesn't check that the session's sets still add up
+  to no more than the session once it's shorter: the session's page then warns of it (see
+  [A session's page](#a-sessions-page)). The time slots, under the start and the end, or under "Durée", are the ones
+  artists pick from on Appliquer (see [Appliquer](../appliquer.md)), e.g. "13 h – 17 h", offered as small buttons with
+  no visible label (screen readers name them « Plages horaires »): picking one fills in the start's and the end's times
+  with its own, and the end's date becomes the start's. The fields can still be changed, e.g. for 19 h – 23 h. A slot
+  shows as picked while the start's and the end's times are its own and the end's date is the start's. With "date à
+  déterminer" checked, picking a slot sets "Durée" to its length instead, and none shows as picked.
+  While the session is announced, checking "date à déterminer" shows an error
+  right away, which screen readers announce, « Une session annoncée a une date : retirez d'abord son annonce. », and the
+  form can't be sent until it's un-checked.
 - "Type": "Guest mixes", "Live performance", "Takeover", "Synth meetup" or "Autre", one of which is picked, as radio
   buttons, in this order.
 - "Collectif", only for a takeover, which has to have one: the collective whose takeover the session is, picked from the

@@ -253,6 +253,7 @@ function TimesField({
             dayError={errors.day}
             timeError={errors.start}
           />
+          <To />
           <DayAndTime
             label="Fin"
             day={form.endDay}
@@ -274,12 +275,15 @@ function TimesField({
   )
 }
 
+// What goes between a session's start and its end, which screen readers name "Début" and "Fin", rather than labels.
+export const To = () => <span className="admin-times-to">à</span>
+
 // The programmation's time slots, as suggestions under a session's times, which they fill in, with the one `picked`, if
 // any, pressed (see "The session form" in docs/design/client/admin/sessions.md). Clicking or tapping one leaves the focus
 // where it is, e.g. in a time, which leaving would say what's wrong with, moving the slots down before the click lands.
 export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onPick: (slot: TimeSlot) => void }) {
   return (
-    <div className="admin-slots" role="group" aria-label="Plages horaires">
+    <div className="admin-slots admin-status-buttons" role="group" aria-label="Plages horaires">
       {TIME_SLOTS.map((slot) => (
         <Button key={slot.id} aria-pressed={slot.id === picked} onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(slot)}>
           {slot.label}
@@ -289,7 +293,7 @@ export function SlotChoices({ picked, onPick }: { picked: TimeSlotId | null; onP
   )
 }
 
-// A day and a time, in Québec time, under `label`, with what's wrong with either.
+// A day and a time, in Québec time, which screen readers name `label`, with what's wrong with either under them.
 function DayAndTime({
   label,
   day,
@@ -307,16 +311,11 @@ function DayAndTime({
   dayError: string | undefined
   timeError: string | undefined
 }) {
-  const id = useId()
   return (
     <div className="admin-field">
-      <span id={id}>{label}</span>
-      <div className="admin-row admin-times" role="group" aria-labelledby={id}>
-        <label>
-          date
-          <input type="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
-        </label>
-        <TimeInput label="heure" value={time} invalid={!!timeError} onChange={onTime} />
+      <div className="admin-row admin-times" role="group" aria-label={label}>
+        <input type="date" aria-label="date" value={day} aria-invalid={dayError ? true : undefined} onChange={(event) => onDay(event.target.value)} />
+        <TimeInput aria-label="heure" value={time} invalid={!!timeError} onChange={onTime} />
       </div>
       <FieldError message={dayError ?? timeError} />
     </div>

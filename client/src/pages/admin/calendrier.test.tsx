@@ -684,9 +684,7 @@ describe('Calendrier', () => {
       const form = newSession()!
       const slots = within(within(form).getByRole('group', { name: 'Plages horaires' }))
 
-      // Pressing one leaves the focus in the start's time, which would otherwise say what's wrong with it as it's left,
-      // moving the slots down before the click lands.
-      act(() => timeParts(timeField('Début'))[0].focus())
+      // Pressing one doesn't take the focus (see `SlotChoices`).
       expect(fireEvent.mouseDown(slots.getByRole('button', { name: '13 h – 17 h' }))).toBe(false)
       fireEvent.click(slots.getByRole('button', { name: '13 h – 17 h' }))
       expect(slots.getByRole('button', { name: '13 h – 17 h' })).toHaveAttribute('aria-pressed', 'true')

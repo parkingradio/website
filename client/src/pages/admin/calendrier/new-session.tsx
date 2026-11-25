@@ -7,7 +7,7 @@ import { FieldError, FormActions, TimeInput } from '../fields'
 import { CollectivesFailure } from '../profile-details'
 import type { Session } from '../../../session-fields'
 import { failure } from '../session-errors'
-import { NameField, SlotChoices, TakeoverField, TypeField } from '../session-form'
+import { NameField, SlotChoices, TakeoverField, To, TypeField } from '../session-form'
 import { checkSessionOnDay } from './new-session-fields'
 import type { NewSessionOnDay } from './new-session-fields'
 
@@ -52,15 +52,15 @@ export function NewSessionForm({ day, focusRequests, onCancel, onAdded }: NewSes
         Nouvelle session
       </h3>
       {collectives.kind === 'error' && <CollectivesFailure message={collectives.message} />}
-      <div className="admin-row admin-times">
-        <div className="admin-field">
-          <TimeInput label="Début" value={values.start} invalid={!!startError} onChange={(start) => update({ start })} onBlur={leave('start', 'day')} />
-          <FieldError message={startError} />
+      <div className="admin-field">
+        <div className="admin-session-times">
+          <TimeInput aria-label="Début" value={values.start} invalid={!!startError} onChange={(start) => update({ start })} onBlur={leave('start', 'day')} />
+          <To />
+          <TimeInput aria-label="Fin" value={values.end} invalid={!!endError} onChange={(end) => update({ end })} onBlur={leave('end', 'endDay')} />
         </div>
-        <div className="admin-field">
-          <TimeInput label="Fin" value={values.end} invalid={!!endError} onChange={(end) => update({ end })} onBlur={leave('end', 'endDay')} />
-          <FieldError message={endError} />
-        </div>
+        {/* Under both times, rather than each under its own, which would push « à » away from the start. */}
+        <FieldError message={startError} />
+        <FieldError message={endError} />
       </div>
       <SlotChoices picked={checked.slot} onPick={({ start, end }) => update({ start, end })} />
       {checked.durationMinutes !== null && (
