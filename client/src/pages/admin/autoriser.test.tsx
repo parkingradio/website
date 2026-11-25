@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import App from '../../app'
+import App from './test-app'
 import { UNAUTHORIZED, jsonBody, mockFetch, requestsTo } from '../../test-utils'
 import { browser } from '../../browser'
 

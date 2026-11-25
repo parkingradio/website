@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import App from '../../app'
+import App from './test-app'
 import { mockFetch } from '../../test-utils'
 
 // Connecting Claude, the connected apps and the bookmarklet have their own tests, in integrations/connections.test.tsx and

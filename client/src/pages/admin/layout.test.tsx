@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
-import App from '../../app'
+import App from './test-app'
 import { api } from '../../api/client'
 import { UNAUTHORIZED, held, mockFetch, requestsTo } from '../../test-utils'
 

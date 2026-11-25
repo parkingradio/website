@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
-import App from '../../app'
+import App from './test-app'
 import { mockFetch } from '../../test-utils'
 
 // Who applications are emailed to, the SoundCloud app, the YouTube channel, the Discord bot, the calendar feeds and the

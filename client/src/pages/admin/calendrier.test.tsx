@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
-import App from '../../app'
+import App from './test-app'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
 import { held, mockFetch, requestsTo, shownTime, timeParts, typeTime, visibleText as shownText } from '../../test-utils'
