@@ -693,7 +693,7 @@ describe('A collective’s page', () => {
     expect(screen.getByRole('button', { name: 'supprimer le collectif' })).not.toHaveAttribute('aria-disabled')
   })
 
-  it("lists the sessions of its takeovers, without their type, and can't be deleted while it has some", async () => {
+  it("lists the sessions of its takeovers, without their type, only showing whether they're announced, and can't be deleted while it has some", async () => {
     const session: Session = {
       id: 'session-1',
       start: '2026-11-15T02:00:00.000Z',
@@ -716,7 +716,7 @@ describe('A collective’s page', () => {
       status: 'done',
       statusUpdatedBy: null,
       statusUpdatedAt: null,
-      announced: false,
+      announced: true,
       announcedUpdatedBy: null,
       announcedUpdatedAt: null,
     }
@@ -727,6 +727,8 @@ describe('A collective’s page', () => {
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut', 'Annonce'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
     expect(within(table).getAllByRole('cell')[2]).toHaveTextContent('ONDES TAKEOVER')
+    expect(within(table).getAllByRole('cell').at(-1)).toHaveTextContent(/^annoncée$/)
+    expect(within(table).queryByRole('combobox')).not.toBeInTheDocument()
 
     const confirm = vi.spyOn(window, 'confirm')
     const remove = screen.getByRole('button', { name: 'supprimer le collectif' })

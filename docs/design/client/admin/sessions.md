@@ -56,13 +56,20 @@ Durations are entered in hours and minutes, as two numbers.
 The section lists the sessions, each with its day ("Date"), linking to its page, its times, in short ("Heure", see
 [Times](#times)), its title ("Nom"), its type ("Type"), which for a takeover links to its collective, its sets'
 performers ("Artistes"), set by set in their order, the sets separated by "·", each artist linking to their page, its
-status, and "annoncée" for an announced session ("Annonce").
+status ("Statut"), and whether it's announced ("Annonce"), as a dropdown, "non annoncée" or "annoncée", that announces it
+or un-announces it as soon as the other value is picked, without confirming. A session without a date can't be announced:
+its dropdown can't be used, and says « La session n'a pas de date. » (see
+[Controls that can't be used](layout.md#controls-that-cant-be-used)).
 Buttons above the list show only the sessions with a status, or all of them ("toutes"), with how many there are of each.
 It opens on "planifiées", its default view (see [Searching lists](layout.md#searching-lists)), by date, the earliest
 first, past ones included, then those without a date, the first added first. With another status or "toutes", those
 without a date come first, the most recently added first, then the others, the latest first. Another group of buttons,
 "Annonce", shows only the sessions that are announced ("annoncées"), or those that aren't ("non annoncées"), or both
 ("toutes"), which it opens on, and which its address leaves out (`announced=true`, `announced=false`, or nothing).
+While it shows only the announced sessions, or only those that aren't, a session changed to the other value leaves the
+list as soon as that's saved. With "toutes", it stays. Only its own dropdown is locked while it's saved. When whether a
+session is announced can't be changed, the list says why above it, naming the session (see [Names](#names)), and its
+row keeps its value.
 
 A field above the list searches the sessions (see [Searching lists](layout.md#searching-lists)) by their title, their
 type, their takeover's collective, their sets' performers, and their day, written out (e.g. "samedi 14 novembre 2026",
@@ -375,7 +382,8 @@ its sets in the way is named without a link.
 
 ## Endpoints
 
-- `GET /api/admin/sessions`, for the list.
+- `GET /api/admin/sessions`, for the list, and `PUT /api/admin/sessions/:id/announced`, to announce a session or
+  un-announce it from the list.
 - `GET /api/admin/sessions/:id`, `PATCH /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/flyer`,
   `DELETE /api/admin/sessions/:id/flyer`, `PUT /api/admin/sessions/:id/status`, `PUT /api/admin/sessions/:id/announced`
   and `DELETE /api/admin/sessions/:id`, for a session's page.

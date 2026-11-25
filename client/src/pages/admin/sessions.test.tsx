@@ -306,10 +306,10 @@ describe('The list of sessions', () => {
 
     await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument())
     expect(rows()).toEqual([
-      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée', ''],
-      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée', ''],
+      ['date à déterminer', '3 h', 'GUEST MIXES', 'Guest mixes', 'Brume · Cyan', 'planifiée', 'non annoncée'],
+      ['sam. 14 nov. 2026', '21 h – 1 h', 'ONDES TAKEOVER', 'Takeover', 'Aurore, Brume · Cyan', 'planifiée', 'non annoncée'],
       ['ven. 2 oct. 2026', '20 h – 21 h', 'SOIRÉE', 'Autre', 'Brume', 'jouée', 'annoncée'],
-      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée', ''],
+      ['lun. 31 août 2026', '20 h – 21 h', 'LIVE PERFORMANCE', 'Live performance', '', 'annulée', 'non annoncée'],
     ])
     // Done sessions are greyed out, and cancelled ones faded out in their own color.
     const sessionRows = screen.getAllByRole('row').slice(1)
@@ -410,6 +410,121 @@ describe('The list of sessions', () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions': { ok: false, error: 'Boom' } })
     renderAt('/admin/sessions')
     expect(await screen.findByRole('alert')).toHaveTextContent("Les sessions n'ont pas pu être chargées : Boom")
+  })
+})
+
+describe('Announcing a session from the list', () => {
+  const LIST = { ...LOGGED_IN, '/api/admin/sessions': { ok: true, sessions: SESSIONS } }
+  const PUT = 'PUT /api/admin/sessions/session-1/announced'
+  const ANNOUNCED = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
+  // SOIRÉE, which is announced, un-announced.
+  const UNANNOUNCE_SOIREE = { 'PUT /api/admin/sessions/session-3/announced': { ok: true, session: { ...SESSIONS[2], announced: false } } }
+  const select = (of: string) => screen.findByRole('combobox', { name: `Annonce : ${of}` })
+  const counts = (name: string) => within(screen.getByRole('group', { name })).getAllByRole('button').map((button) => button.textContent)
+
+  it('offers « non annoncée » and « annoncée », by a name that tells the sessions apart', async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const planned = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    expect(planned).toHaveValue('false')
+    expect(within(planned).getAllByRole('option').map((option) => option.textContent)).toEqual(['non annoncée', 'annoncée'])
+    expect(await select('SOIRÉE, ven. 2 oct. 2026')).toHaveValue('true')
+    expect(screen.getAllByRole('combobox').map((each) => each.getAttribute('aria-label'))).toEqual([
+      'Annonce : GUEST MIXES, date à déterminer',
+      'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026',
+      'Annonce : SOIRÉE, ven. 2 oct. 2026',
+      'Annonce : LIVE PERFORMANCE, lun. 31 août 2026',
+    ])
+  })
+
+  it("can't announce a session without a date, whose dropdown is greyed out, saying why, but keeps the focus", async () => {
+    mockFetch(LIST)
+    renderAt('/admin/sessions?status=all')
+
+    const undated = await select('GUEST MIXES, date à déterminer')
+    expect(undated).toHaveTextContent(/^non annoncée$/)
+    expect(undated).toHaveAttribute('aria-disabled', 'true')
+    expect(undated).toHaveAttribute('aria-expanded', 'false')
+    expect(undated).not.toBeDisabled()
+    expect(undated).toHaveAccessibleDescription("La session n'a pas de date.")
+    undated.focus()
+    expect(undated).toHaveFocus()
+    fireEvent.click(undated)
+    fireEvent.keyDown(undated, { key: 'Enter' })
+    expect(undated).toHaveFocus()
+    expect(requestsTo('PUT', '/api/admin/sessions/session-2/announced')).toHaveLength(0)
+  })
+
+  it('takes a session out of the announced ones once it is un-announced, without loading the list again', async () => {
+    mockFetch({ ...LIST, ...UNANNOUNCE_SOIREE })
+    renderAt('/admin/sessions?status=all&announced=true')
+
+    fireEvent.change(await select('SOIRÉE, ven. 2 oct. 2026'), { target: { value: 'false' } })
+
+    await waitFor(() => expect(rows()).toEqual([]))
+    expect(screen.getByText('Aucune session ne correspond à ces filtres.')).toBeInTheDocument()
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-3/announced')[0])).toEqual({ announced: false })
+    expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(1)
+    expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (0)', 'non annoncées (4)'])
+    expect(counts('Statut')).toEqual(['toutes (0)', 'planifiées (0)', 'jouées (0)', 'annulées (0)'])
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&announced=true$/)
+  })
+
+  it('takes a session out of those that are not announced once it is announced', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all&announced=false')
+
+    fireEvent.change(await select('ONDES TAKEOVER, sam. 14 nov. 2026'), { target: { value: 'true' } })
+
+    await waitFor(() => expect(days()).toEqual(['date à déterminer', 'lun. 31 août 2026']))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
+    expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (2)', 'non annoncées (2)'])
+  })
+
+  it('keeps a session listed among all of them, with its new value', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    await waitFor(() => expect(counts('Annonce')).toEqual(['toutes (4)', 'annoncées (2)', 'non annoncées (2)']))
+    expect(changed).toHaveValue('true')
+    expect(rows()).toHaveLength(4)
+  })
+
+  it('shows the value picked and keeps only that session from being changed while it is saved', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    const other = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    expect(changed).toBeDisabled()
+    expect(changed).toHaveValue('true')
+    expect(other).toBeEnabled()
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('true')
+  })
+
+  it('says why it could not be changed, above the list, naming the session, which keeps its value, until the next change', async () => {
+    mockFetch({ ...LIST, [PUT]: { ok: false, error: 'No such session' } })
+    renderAt('/admin/sessions?status=all')
+
+    const changed = await select('ONDES TAKEOVER, sam. 14 nov. 2026')
+    fireEvent.change(changed, { target: { value: 'true' } })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("L'annonce de « ONDES TAKEOVER, sam. 14 nov. 2026 » n'a pas pu être changée : No such session")
+    expect(Boolean(alert.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('false')
+
+    mockFetch({ ...LIST, ...UNANNOUNCE_SOIREE })
+    fireEvent.change(await select('SOIRÉE, ven. 2 oct. 2026'), { target: { value: 'false' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 
