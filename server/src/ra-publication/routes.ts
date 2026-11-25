@@ -1,11 +1,15 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { buffer } from 'node:stream/consumers'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { bearerToken } from '../api/bearer.js'
 import { ApiError, ById, zodRoutes } from '../api/schemas.js'
 import { NO_SUCH_SESSION_ERROR, sessionBody } from '../sessions/routes.js'
 import { SESSION_CANCELLED } from '../sessions/store.js'
 import type { SessionsStore } from '../sessions/store.js'
+import type { Photos } from '../artists/store.js'
+import { nosniff, sendMissingPhoto, sendNoPhoto } from '../artists/photo-form.js'
 import { raEventInput } from './event.js'
+import { RA_FLYER_MAX_BYTES, RA_FLYER_MAX_DIMENSION, raFlyer } from './flyer.js'
 import { signRaPublicationToken, verifyRaPublicationToken } from './token.js'
 import type { RaPublication } from './token.js'
 
@@ -53,17 +57,20 @@ const RaPublicationResponse = z
     ok: z.literal(true),
     environment: z.string().meta({ description: "The server's environment, as GET /api/config gives it" }),
     session: z.string().meta({ description: "The session's id" }),
+    hasFlyer: z.boolean().meta({ description: 'Whether the session has a flyer, which GET /api/ra-publication/flyer gives' }),
     event: RaPublishedEvent,
   })
   .meta({ id: 'RaPublication' })
 
 type Options = {
   store: SessionsStore
+  // Where sessions' flyers are kept.
+  photos: Pick<Photos, 'read'>
   // The server's environment, which the bookmarklet warns about outside production.
   environment: string
 }
 
-export async function raPublicationRoutes(app: FastifyInstance, { store, environment }: Options) {
+export async function raPublicationRoutes(app: FastifyInstance, options: Options) {
   zodRoutes(app).post(
     '/api/admin/sessions/:id/ra-publication',
     {
@@ -76,17 +83,17 @@ export async function raPublicationRoutes(app: FastifyInstance, { store, environ
       },
     },
     async (request, reply) => {
-      if (!(await store.get(request.params.id))) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
+      if (!(await options.store.get(request.params.id))) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
       const { id: admin, sessionVersion } = request.user!
       return { ok: true as const, token: await signRaPublicationToken({ session: request.params.id, admin, sessionVersion }) }
     },
   )
 
-  await app.register(tokenRoutes, { store, environment })
+  await app.register(tokenRoutes, options)
 }
 
 // The endpoints that take the token, which the bookmarklet calls from RA's pages.
-async function tokenRoutes(app: FastifyInstance, { store, environment }: Options) {
+async function tokenRoutes(app: FastifyInstance, { store, photos, environment }: Options) {
   app.decorateRequest('raPublication', null)
 
   // Every response, whether it succeeds or fails, unexpectedly too, is never kept, and RA's pages can read it, without
@@ -110,10 +117,12 @@ async function tokenRoutes(app: FastifyInstance, { store, environment }: Options
   })
 
   // Browsers ask whether RA's pages may send the token, since it's in a header (a preflight).
-  app.options('/api/ra-publication', async (request, reply) => {
+  const preflight = async (request: FastifyRequest, reply: FastifyReply) => {
     if (fromRa(request)) reply.header('access-control-allow-methods', 'GET').header('access-control-allow-headers', 'Authorization')
     return reply.code(204).send()
-  })
+  }
+  app.options('/api/ra-publication', preflight)
+  app.options('/api/ra-publication/flyer', preflight)
 
   zodRoutes(app).get(
     '/api/ra-publication',
@@ -131,7 +140,36 @@ async function tokenRoutes(app: FastifyInstance, { store, environment }: Options
       if (session.start === null || session.end === null) return reply.status(409).send(NO_START)
       // E.g. since the token was given.
       if (session.status === 'cancelled') return reply.status(409).send(CANCELLED)
-      return { ok: true as const, environment, session: session.id, event: raEventInput(session, session.start, session.end) }
+      return { ok: true as const, environment, session: session.id, hasFlyer: session.hasFlyer, event: raEventInput(session, session.start, session.end) }
+    },
+  )
+
+  zodRoutes(app).get(
+    '/api/ra-publication/flyer',
+    {
+      schema: {
+        summary: "The flyer of the session of the token in `Authorization: Bearer <token>`, as a JPEG within RA's limits, which the bookmarklet uploads to Resident Advisor",
+        tags: ['Publishing on RA'],
+        response: {
+          200: {
+            description: `The session's flyer, as a JPEG of at most ${RA_FLYER_MAX_DIMENSION} × ${RA_FLYER_MAX_DIMENSION} pixels and ${RA_FLYER_MAX_BYTES.toLocaleString('en')} bytes. ${nosniff}`,
+            content: { 'image/jpeg': { schema: z.instanceof(Buffer).meta({ type: 'string', format: 'binary' }) } },
+          },
+          403: ApiError,
+          404: ApiError,
+        },
+      },
+    },
+    async (request, reply) => {
+      const row = await store.get(request.raPublication!.session)
+      if (!row) return reply.status(404).send(NO_SUCH_SESSION_ERROR)
+      if (!row.flyerKey) return sendNoPhoto(reply, 'session')
+      const flyer = await photos.read(row.flyerKey)
+      if (!flyer) return sendMissingPhoto(reply, row.flyerKey, 'session')
+      return reply
+        .header('Content-Type', 'image/jpeg')
+        .header('X-Content-Type-Options', 'nosniff')
+        .send(await raFlyer(await buffer(flyer)))
     },
   )
 }

@@ -67,8 +67,8 @@ apps connect to through [OAuth](oauth.md), the calendar feed of the public event
   The endpoints that apps call for OAuth and MCP have none: their tokens can't be guessed, and apps like Claude send
   their requests from their own servers, which share a few addresses. Neither do admins' calendars (see
   [Admins' calendars](admin-calendars.md)), for the same reasons: calendar apps like Google's read them from their own
-  servers too. Nor does [`GET /api/ra-publication`](ra-publication.md#get-apira-publication), whose tokens can't be
-  guessed either.
+  servers too. Nor do the endpoints that take a token for publishing on RA (see [Publishing on RA](ra-publication.md)),
+  whose tokens can't be guessed either.
 - **Emails.** The server sends emails from `noreply@<MAIL_DOMAIN>`. When `MAIL_DOMAIN` isn't set, e.g. in development,
   it doesn't send any.
 - **Lists.** A field that takes one of a list of values, e.g. an artist's genres, only ever holds values of that list,
@@ -236,6 +236,7 @@ session's event on RA needs a token for it (see [The token, in Publishing on RA]
 | [`DELETE /api/admin/calendar/feeds/:id`](calendar.md#delete-apiadmincalendarfeedsid-admin) | admin | Removing a calendar feed, and forgetting what was read from it |
 | [`POST /api/admin/sessions/:id/ra-publication`](ra-publication.md#post-apiadminsessionsidra-publication-admin) | admin | A token for publishing a session's event on Resident Advisor with the bookmarklet, which lasts an hour |
 | [`GET /api/ra-publication`](ra-publication.md#get-apira-publication) | token | The event that the bookmarklet creates on Resident Advisor for a token's session |
+| [`GET /api/ra-publication/flyer`](ra-publication.md#get-apira-publicationflyer) | token | The flyer of a token's session, as the bookmarklet uploads it to Resident Advisor |
 | [`GET /api/ra-events`](ra-events.md#get-apira-events) | public | Parking Radio's events, from Resident Advisor: the upcoming ones and the 20 most recent past ones, or every one that starts in a time range when one is given |
 | [`GET /api/admin/chat/discord`](chat.md#get-apiadminchatdiscord-admin) | admin | The Discord bot the server reaches the chat through, and its channel |
 | [`PUT /api/admin/chat/discord`](chat.md#put-apiadminchatdiscord-admin) | admin | Entering the bot's token and the channel, once they pass the check with Discord |

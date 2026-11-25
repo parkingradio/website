@@ -2430,6 +2430,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ra-publication/flyer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The flyer of the session of the token in `Authorization: Bearer <token>`, as a JPEG within RA's limits, which the bookmarklet uploads to Resident Advisor */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The session's flyer, as a JPEG of at most 2000 × 2000 pixels and 3,000,000 bytes. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": Blob;
+                    };
+                };
+                /** @description Default Response */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -4279,6 +4342,8 @@ export interface components {
             environment: string;
             /** @description The session's id */
             session: string;
+            /** @description Whether the session has a flyer, which GET /api/ra-publication/flyer gives */
+            hasFlyer: boolean;
             event: components["schemas"]["RaPublishedEvent"];
         };
         RaPublicationToken: {

@@ -96,7 +96,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   - "Description": its description, with its line breaks, faded out when it's the one its type gives it. "-" when it has
     none.
   - "Flyer": its flyer, at its 1280-pixel size, linking to the flyer as it was sent, in a new tab, e.g. to download it
-    and add it to the session's event on RA (see [Publier sur RA](publier-sur-ra.md)). When it has none, "Pas de flyer"
+    and add it to the session's event on RA by hand, when the bookmarklet couldn't (see
+    [Publier sur RA](publier-sur-ra.md)). When it has none, "Pas de flyer"
     is shown instead, so that the team notices.
   - "Événement RA": its event on RA, linking to it, or "-" when it has none. "créer" opens a panel under it that creates
     the event (see [Creating its event on RA](#creating-its-event-on-ra)).
