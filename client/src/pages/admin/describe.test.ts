@@ -89,6 +89,8 @@ describe("sessions' days and times", () => {
     // 12 hours as they pass, over the night the clocks go back.
     expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T08:00:00-05:00')[0]).toBe('21 h – 8 h')
     expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T09:00:00-05:00')[0]).toBe('21 h – dim. 1 nov., 9 h')
+    // And over the night they spring forward, 13 hours on the clock.
+    expect(times('2027-03-13T21:00:00-05:00', '2027-03-14T10:00:00-04:00')[0]).toBe('21 h – 10 h')
     // The next day, at the same time or later.
     expect(times(at(14, '21:00'), at(15, '21:00'))).toEqual(['21 h – dim. 15 nov., 21 h', 'samedi 14 novembre 2026, de 21 h à 21 h le lendemain'])
     expect(times(at(14, '18:00'), at(15, '20:00'))).toEqual(['18 h – dim. 15 nov., 20 h', 'samedi 14 novembre 2026, de 18 h à 20 h le lendemain'])

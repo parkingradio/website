@@ -367,8 +367,8 @@ export function formatQuebecDayInYear(instant: string): string {
   return quebecDayInYearFormat.format(new Date(instant))
 }
 
-// How long something that ends the next day can last for its times alone to say when it ends: longer, e.g. from 15 h to
-// 11 h, "15 h – 11 h" would read as a stretch within its day.
+// How long something that ends the next day, unless it ends at 00:00, can last for its times alone to say when it ends:
+// longer, e.g. from 15 h to 11 h, "15 h – 11 h" would read as a stretch within its day.
 const OVERNIGHT_MS = 12 * 60 * 60 * 1000
 
 // Whether the times alone say when something ends, as `startAndEnd` gives them: the day it starts, or the next one at an

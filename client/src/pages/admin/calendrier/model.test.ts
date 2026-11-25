@@ -139,7 +139,7 @@ describe("a thing's times in full", () => {
 })
 
 describe("a thing's times in brief", () => {
-  it('are its times when they say when it ends: the same day, or the next day, by 00:00 or within 12 hours', () => {
+  it('are its times when they say when it ends: the same day, or the next day, at 00:00 or within 12 hours', () => {
     expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-14T21:00:00-05:00'), '2026-11-14')).toBe('18 h – 21 h')
     expect(briefTimes(times('2026-11-14T21:30:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h 30 – 1 h')
     expect(briefTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('21 h – 0 h')
