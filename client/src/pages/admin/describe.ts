@@ -1,4 +1,4 @@
-import type { FeatureId } from '../../api/client'
+import type { FeatureId, Schema } from '../../api/client'
 import { performanceTypeName } from '../../application-fields'
 import type { Application, ApplicationStatus } from '../../application-fields'
 import { countryName, countryOptions, genreName } from '../../artist-profile'
@@ -54,6 +54,9 @@ export const FEATURE_LABELS: Record<FeatureId, { name: string; description: stri
     description: 'Les pages « Programmation » et « Synth Meetups » montrent les sessions annoncées plutôt que les événements de Resident Advisor.',
   },
 }
+
+// What a calendar feed's events are, as Configuration names its kinds (see docs/design/client/admin/configuration.md).
+export const FEED_KIND_LABELS: Record<Schema<'CalendarFeedKind'>, string> = { occupations: 'Occupations', holds: 'Plages protégées' }
 
 // What each thing that takes the studio is, in the calendar (see docs/design/client/admin/calendrier.md).
 export const THING_KIND_LABELS: Record<'session' | 'occupation', string> = { session: 'session', occupation: 'occupation' }

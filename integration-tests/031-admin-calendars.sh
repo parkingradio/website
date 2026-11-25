@@ -4,8 +4,8 @@
 # - the token's endpoints require a session, and give the admin the same token until it's replaced
 # - the calendars refuse requests without an admin's token, with a 403 that doesn't quote it
 # - the calendar of sessions has the sessions, announced or not, marked, and is never kept
-# - the calendar of occupations is empty without feeds, fails with 503 until a feed that's added behind the server's back has
-#   been read, and then has that feed, whose read failed
+# - the calendar of occupations is empty without feeds, fails with 503 until a feed of occupations that's added behind the
+#   server's back has been read, and then has that feed, whose read failed, but never waits for or has a feed of holds
 # - replacing the token, or revoking the admin, makes the links stop working
 # - the tokens are never logged
 # What the calendars give is tested by the server's own tests (server/src/admin-calendars).
@@ -74,11 +74,17 @@ expect_header cache-control 'no-store'
 expect_body_contains 'X-WR-CALNAME:Parking Radio (development) · occupations'
 expect_body_lacks 'BEGIN:VEVENT'
 
-echo "  it fails with 503 until a feed added behind the server's back has been read, then has that feed, whose read failed"
+echo "  a feed of holds doesn't count; it fails with 503 until a feed of occupations added behind the server's back has been read, then has it"
 readonly FEED='7a2d4e6f-8b1c-4d3e-9f5a-6b7c8d9e0f12'
 readonly SECRET='private-5d1e8a3c9b7f'
-sql "insert into calendar_feeds (id, name, link, created_by)
-     values ('${FEED}', 'Séjours', 'https://calendar.invalid/${SECRET}.ics', '${ADMIN_EMAIL}')"
+readonly HOLDS='7a2d4e6f-8b1c-4d3e-9f5a-6b7c8d9e0f13'
+sql "insert into calendar_feeds (id, name, kind, link, created_by)
+     values ('${HOLDS}', 'Loft', 'holds', 'https://calendar.invalid/${SECRET}-loft.ics', '${ADMIN_EMAIL}')"
+request "${BASE_URL}/occupations.ics?token=${token}"
+expect_status 200
+expect_body_lacks 'BEGIN:VEVENT'
+sql "insert into calendar_feeds (id, name, kind, link, created_by)
+     values ('${FEED}', 'Séjours', 'occupations', 'https://calendar.invalid/${SECRET}.ics', '${ADMIN_EMAIL}')"
 request "${BASE_URL}/occupations.ics?token=${token}"
 expect_status 503
 expect_header cache-control 'no-store'
@@ -92,7 +98,10 @@ expect_body_contains "UID:feed-${FEED}@parking.radio"
 expect_body_contains 'SUMMARY:[REFRESH ERROR] Séjours'
 expect_body_contains "can't be found"
 expect_body_lacks "$SECRET"
+expect_body_lacks 'Loft'
 json DELETE "${BASE_URL}/api/admin/calendar/feeds/${FEED}"
+expect_status 200
+json DELETE "${BASE_URL}/api/admin/calendar/feeds/${HOLDS}"
 expect_status 200
 
 echo "  replacing the token makes the previous links stop working"

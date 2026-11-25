@@ -24,6 +24,7 @@ const store = {
 const FEEDS: StoredFeed[] = ['Séjours', 'Airbnb'].map((name, index) => ({
   id: `feed-${index}`,
   name,
+  kind: 'occupations',
   link: `https://calendar.example/${name}.ics`,
   createdBy: 'admin@example.com',
   createdAt: new Date('2026-10-01T12:00:00Z'),
@@ -42,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks()
+  feeds.list.mockImplementation(async () => FEEDS)
   read.clear()
   delete process.env.JWT_SECRET
 })
@@ -119,12 +121,12 @@ describe('GET /occupations.ics', () => {
   const get = async () => (await buildApp()).inject({ method: 'GET', url: `/occupations.ics?token=${TOKEN}` })
   const occupation = { start: new Date('2026-11-20T14:00:00Z'), end: new Date('2026-11-20T16:00:00Z'), wholeDay: false, title: 'Réparation' }
 
-  it('fails with 503 until a read of every feed, with the link it has, has ended since the server started', async () => {
+  it('fails with 503 until a read of every `occupations` feed, with the link it has, has ended since the server started', async () => {
     read.set('feed-0', { events: [occupation], readAt: new Date(), error: null })
     const response = await get()
     expect(response.statusCode).toBe(503)
     expect(response.headers['cache-control']).toBe('no-store')
-    expect(response.json()).toEqual({ ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" })
+    expect(response.json()).toEqual({ ok: false, error: "The calendar feeds of occupations haven't all been read yet, with their links, since the server started" })
   })
 
   it('gives the occupations once every feed has been read, even when a read failed, with an event about that feed', async () => {
@@ -135,6 +137,37 @@ describe('GET /occupations.ics', () => {
     expect(response.body).toContain('SUMMARY:Réparation (Séjours)\r\n')
     expect(response.body).toContain('SUMMARY:[REFRESH ERROR] Airbnb\r\n')
     expect(response.body).not.toContain('calendar.example')
+  })
+
+  it("leaves out the `holds` feeds, whose holds aren't occupations, and which it doesn't wait for, even when they fail", async () => {
+    const loft: StoredFeed = { ...FEEDS[0], id: 'feed-loft', name: 'Loft', kind: 'holds', link: 'https://calendar.example/loft.ics' }
+    feeds.list.mockResolvedValue([...FEEDS, loft])
+    read.set('feed-0', { events: [occupation], readAt: new Date(), error: null })
+    read.set('feed-1', { events: [], readAt: new Date(), error: null })
+    // Not read yet: no 503.
+    let response = await get()
+    expect(response.statusCode).toBe(200)
+    read.set('feed-loft', { events: [{ ...occupation, title: 'Gardé' }], readAt: null, error: "The link's server can't be reached" })
+    response = await get()
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('SUMMARY:Réparation (Séjours)\r\n')
+    expect(response.body).not.toContain('Gardé')
+    expect(response.body).not.toContain('Loft')
+  })
+
+  it('counts a feed whose kind changed to `occupations` with what was read from it, and waits for it when it was not read', async () => {
+    const changed = (kind: StoredFeed['kind']) => FEEDS.map((feed, index) => (index === 1 ? { ...feed, kind } : feed))
+    read.set('feed-0', { events: [occupation], readAt: new Date(), error: null })
+    // A `holds` feed that hasn't been read doesn't count, until it's an `occupations` feed.
+    feeds.list.mockResolvedValue(changed('holds'))
+    expect((await get()).statusCode).toBe(200)
+    feeds.list.mockResolvedValue(changed('occupations'))
+    expect((await get()).statusCode).toBe(503)
+    // Read as a `holds` feed, what was read counts as occupations.
+    read.set('feed-1', { events: [{ ...occupation, title: 'Gardé' }], readAt: new Date(), error: null })
+    const response = await get()
+    expect(response.statusCode).toBe(200)
+    expect(response.body).toContain('SUMMARY:Gardé (Airbnb)\r\n')
   })
 
   it('gives an empty calendar without any feed', async () => {

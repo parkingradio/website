@@ -8,6 +8,7 @@ const TEAM_LINK = 'https://calendar.google.com/calendar/ical/team%40group.calend
 const TEAM = {
   id: 'feed-1',
   name: "Calendrier de l'équipe",
+  kind: 'occupations',
   link: TEAM_LINK,
   createdBy: 'admin@example.com',
   createdAt: '2026-11-07T16:30:00-05:00',
@@ -20,6 +21,7 @@ const STAYS = {
   ...TEAM,
   id: 'feed-2',
   name: 'Séjours',
+  kind: 'holds',
   link: 'https://example.com/stays.ics',
   readAt: null,
   error: "The link can't be read: its server fails (503)",
@@ -31,10 +33,13 @@ const items = () => screen.queryAllByRole('listitem').filter((item) => item.clos
 const addForm = () => screen.getByRole('button', { name: 'ajouter' }).closest('form')!
 const nameField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Nom' })
 const linkField = (form = addForm()) => within(form).getByRole('textbox', { name: 'Lien' })
+const kindGroup = (form = addForm()) => within(form).getByRole('group', { name: 'Type' })
+const kindChoice = (name: 'Occupations' | 'Plages protégées', form = addForm()) => within(kindGroup(form)).getByRole('radio', { name })
 const addButton = () => screen.getByRole('button', { name: 'ajouter' })
 
 function fill() {
   fireEvent.change(nameField(), { target: { value: 'Nouveau' } })
+  fireEvent.click(kindChoice('Plages protégées'))
   fireEvent.change(linkField(), { target: { value: 'webcal://example.com/secret.ics' } })
 }
 
@@ -50,18 +55,18 @@ describe('The calendar feeds', () => {
     await screen.findByText('Aucun calendrier externe pour le moment.')
   })
 
-  it('lists each feed with its link, who added it, and when it was last read, or why that failed', async () => {
+  it('lists each feed with its kind, its link, who added it, and when it was last read, or why that failed', async () => {
     mockFetch(list(TEAM, STAYS))
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(items()).toHaveLength(2))
     const [team, stays] = items()
-    expect(team).toHaveTextContent("Calendrier de l'équipe modifier retirer")
+    expect(team).toHaveTextContent("Calendrier de l'équipe · Occupations modifier retirer")
     expect(within(team).getByText(TEAM_LINK)).toBeInTheDocument()
     expect(within(team).queryByRole('link')).toBeNull()
     expect(within(team).getByText(/^Ajouté par admin@example.com le 7 novembre 2026/)).toHaveTextContent(/Lu le 22 novembre 2026 à 12 h 15\.$/)
     expect(team).not.toHaveTextContent('a échoué')
-    expect(stays).toHaveTextContent('Séjours')
+    expect(stays).toHaveTextContent('Séjours · Plages protégées modifier retirer')
     expect(stays).toHaveTextContent('https://example.com/stays.ics')
     expect(stays).toHaveTextContent('Pas encore lu.')
     expect(within(stays).getByText(/^La dernière lecture a échoué/)).toHaveTextContent("La dernière lecture a échoué : The link can't be read: its server fails (503)")
@@ -75,14 +80,20 @@ describe('The calendar feeds', () => {
     expect(linkField()).toHaveAttribute('autocomplete', 'off')
   })
 
-  it('adds a feed once its name and link are filled in, then clears the form and lists it', async () => {
-    const added = { ...TEAM, id: 'feed-3', name: 'Nouveau', link: 'https://example.com/secret.ics', readAt: '2026-11-22T12:20:00-05:00' }
+  it('adds a feed once its name, its type and its link are filled in, then clears the form and lists it', async () => {
+    const added = { ...TEAM, id: 'feed-3', name: 'Nouveau', kind: 'holds', link: 'https://example.com/secret.ics', readAt: '2026-11-22T12:20:00-05:00' }
     mockFetch({ ...list(TEAM), [`POST ${URL}`]: { ok: true, feed: added } })
     render(<CalendarFeeds />)
 
     await waitFor(() => expect(items()).toHaveLength(1))
     expect(addButton()).toBeDisabled()
-    fill()
+    // No type is picked at first, so that it's always chosen.
+    expect(kindChoice('Occupations')).not.toBeChecked()
+    expect(kindChoice('Plages protégées')).not.toBeChecked()
+    fireEvent.change(nameField(), { target: { value: 'Nouveau' } })
+    fireEvent.change(linkField(), { target: { value: 'webcal://example.com/secret.ics' } })
+    expect(addButton()).toBeDisabled()
+    fireEvent.click(kindChoice('Plages protégées'))
     expect(addButton()).toBeEnabled()
     fireEvent.click(addButton())
     // The server reads the link first, which takes a while.
@@ -90,9 +101,10 @@ describe('The calendar feeds', () => {
     expect(screen.getByText('Lecture du calendrier…')).toBeInTheDocument()
 
     await waitFor(() => expect(items()).toHaveLength(2))
-    expect(items()[1]).toHaveTextContent('Nouveau')
-    expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', link: 'webcal://example.com/secret.ics' }])
+    expect(items()[1]).toHaveTextContent('Nouveau · Plages protégées')
+    expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', kind: 'holds', link: 'webcal://example.com/secret.ics' }])
     expect(nameField()).toHaveValue('')
+    expect(kindChoice('Plages protégées')).not.toBeChecked()
     expect(linkField()).toHaveValue('')
     expect(addButton()).toBeDisabled()
   })
@@ -122,6 +134,7 @@ describe('The calendar feeds', () => {
     fireEvent.click(within(items()[0]).getByRole('button', { name: 'modifier' }))
     const form = within(items()[0]).getByRole('button', { name: 'enregistrer' }).closest('form')!
     expect(nameField(form)).toHaveValue("Calendrier de l'équipe")
+    expect(kindChoice('Occupations', form)).toBeChecked()
     expect(linkField(form)).toHaveValue(TEAM_LINK)
     fireEvent.change(nameField(form), { target: { value: 'Équipe' } })
     fireEvent.change(linkField(form), { target: { value: 'https://example.com/new.ics' } })
@@ -163,6 +176,21 @@ describe('The calendar feeds', () => {
     fireEvent.click(modifier())
     fireEvent.click(within(items()[0]).getByRole('button', { name: 'annuler' }))
     expect(modifier()).toHaveFocus()
+  })
+
+  it("changes only the type, without the server reading the link", async () => {
+    mockFetch({ ...list(TEAM), [`PATCH ${URL}/feed-1`]: { ok: true, feed: { ...TEAM, kind: 'holds' } } })
+    render(<CalendarFeeds />)
+
+    await waitFor(() => expect(items()).toHaveLength(1))
+    fireEvent.click(within(items()[0]).getByRole('button', { name: 'modifier' }))
+    const form = within(items()[0]).getByRole('button', { name: 'enregistrer' }).closest('form')!
+    fireEvent.click(kindChoice('Plages protégées', form))
+    fireEvent.click(within(form).getByRole('button', { name: 'enregistrer' }))
+    expect(within(form).queryByText('Lecture du calendrier…')).toBeNull()
+
+    await waitFor(() => expect(items()[0]).toHaveTextContent("Calendrier de l'équipe · Plages protégées"))
+    expect(requestsTo('PATCH', `${URL}/feed-1`).map(jsonBody)).toEqual([{ kind: 'holds' }])
   })
 
   it("says why a feed couldn't be changed, and keeps its form open, until it's cancelled", async () => {

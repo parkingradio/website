@@ -3,7 +3,7 @@
 Admins' calendars, which each admin subscribes to in their calendar app, so that it shows what takes the studio:
 
 - [`GET /sessions.ics`](#get-sessionsics): the sessions, announced or not (see [Sessions](sessions.md)).
-- [`GET /occupations.ics`](#get-occupationsics): the occupations, read from the calendar feeds (see
+- [`GET /occupations.ics`](#get-occupationsics): the occupations, read from the `occupations` calendar feeds (see
   [Calendar](calendar.md)).
 
 They're two calendars rather than one, so that calendar apps show, hide and color them separately: a subscription is one
@@ -78,17 +78,18 @@ Sessions without a start aren't in it. Each one is a `VEVENT` with:
 
 ## `GET /occupations.ics`
 
-The occupations, as the server has them from the last reads of the calendar feeds (see
+The occupations, as the server has them from the last reads of the `occupations` calendar feeds (see
 [Reading the feeds, in Calendar](calendar.md#reading-the-feeds)): a feed whose last read failed still gives what it read
 before, as [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) does, and nothing when no read of it
 succeeded. They cover what reads keep, from a year before them to two years after them (see
 [Events, in Calendar](calendar.md#events)).
 
-Until every feed has been read with the link it has, since the server started, whether that read succeeded or failed, it
-fails with 503, rather than give a calendar without the occupations of the feeds that haven't been read yet: calendar
-apps keep what they had, rather than remove those occupations after the server restarts, e.g. after each deploy, and add
-them back once they read it again, which can take a day. A feed whose link changed, e.g. through another server,
-waits likewise for its new link to be read. Without any feed, it gives an empty calendar.
+Until every `occupations` feed has been read with the link it has, since the server started, whether that read
+succeeded or failed, it fails with 503, rather than give a calendar without the occupations of the feeds that haven't
+been read yet: calendar apps keep what they had, rather than remove those occupations after the server restarts, e.g.
+after each deploy, and add them back once they read it again, which can take a day. A feed whose link changed, e.g.
+through another server, waits likewise for its new link to be read. Without any `occupations` feed, it gives an empty
+calendar. `holds` feeds don't count: their holds aren't in it, and neither are their failed reads.
 
 Each occupation is a `VEVENT` with:
 
@@ -98,8 +99,8 @@ Each occupation is a `VEVENT` with:
 | `DTSTART`, `DTEND` | Its `start` and `end`: dates for a whole-day occupation, which stays whole-day, and times otherwise |
 | `SUMMARY` | What it is, as the admin pages name it: its title, then its feed's name in parentheses, e.g. `Réparation (Calendrier de l'équipe)`, or its feed's name alone when it has no title |
 
-Feeds whose last read failed are in it too, so that admins who only look at their calendar app find out that what it
-shows of them can be missing or out of date: each one is a whole-day `VEVENT` on today, in Québec, with:
+`occupations` feeds whose last read failed are in it too, so that admins who only look at their calendar app find out
+that what it shows of them can be missing or out of date: each one is a whole-day `VEVENT` on today, in Québec, with:
 
 | Property | Value |
 |---|---|

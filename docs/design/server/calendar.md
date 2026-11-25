@@ -7,20 +7,28 @@ Parking Radio has one studio, which holds one thing at a time. Two kinds of thin
   studio. They're read from calendars (see [Feeds](#feeds)), e.g. a Google Calendar the team shares, or a calendar of
   the guests' stays, and each one is known by the name of the calendar it's read from, e.g. "Séjours".
 
-Occupations can't be changed on the site, or with the tools: only in their own calendars. The feeds they're read from
-are added, changed and removed on the admin pages, not with the tools, since their links are secrets.
+Some of the studio's time is also **protected** for sessions: time that the studio's other calendars keep for them. It's
+read from calendars too, as **holds**, which don't take the studio (see [Protected time](#protected-time)).
 
-The server gives the studio's calendar: what takes it over a range of days, and what needs settling, its conflicts and
-the sessions without a date (see [The calendar](#the-calendar)).
+Occupations and holds can't be changed on the site, or with the tools: only in their own calendars. The feeds they're
+read from are added, changed and removed on the admin pages, not with the tools, since their links are secrets.
+
+The server gives the studio's calendar: what takes it over a range of days, and its holds, and what needs settling: its
+conflicts, the sessions outside protected time, and the sessions without a date (see [The calendar](#the-calendar)).
 
 ## Feeds
 
 A feed is a calendar that the server reads, in iCalendar (RFC 5545), from its link: an `https` or a `webcal` link, e.g.
-the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", which its
-occupations are known by, and there can be several with the same name. Its events' titles reach the admin pages, the
-apps connected to the site, and the calendar apps that admins subscribe to the occupations in, through their calendar of
-occupations (see [Admins' calendars](admin-calendars.md)), e.g. Google's or Apple's, whose servers then keep them: so a
-calendar whose titles have personal data, e.g. guests' names, shouldn't be added as a feed.
+the "secret address in iCal format" of a Google Calendar. Each one has a name, e.g. "Calendrier de l'équipe", and there
+can be several with the same name. Each one also has a kind, which says what its events are: `"occupations"`, whose
+events are occupations, known by the feed's name, or `"holds"`, whose events are holds (see [Events](#events)).
+
+The titles of an `occupations` feed's events reach the admin pages, the apps connected to the site, and the calendar
+apps that admins subscribe to the occupations in, through their calendar of occupations (see
+[Admins' calendars](admin-calendars.md)), e.g. Google's or Apple's, whose servers then keep them: so a calendar whose
+titles have personal data, e.g. guests' names, shouldn't be an `occupations` feed, whether it's added as one or changed
+into one, which gives its titles from then on, since changing a feed's kind doesn't read it again (see
+[Reading the feeds](#reading-the-feeds)). The titles of a `holds` feed's events are never given.
 
 A feed's link is a secret, since anyone who has it can read the calendar: the admin pages show it, but it never appears
 in the logs, in any error, or in what the [MCP server](mcp.md)'s tools give. Two feeds can't have the same link, where a
@@ -32,6 +40,7 @@ A feed has these fields:
 |---|---|---|
 | `id` | string | |
 | `name` | string | |
+| `kind` | `"occupations"` or `"holds"` | What its events are: occupations or holds (see [Events](#events)) |
 | `link` | string | Its link, as an `https` link when it was given as a `webcal` one |
 | `createdBy` | string | The email of the admin who added it |
 | `createdAt` | string | When it was added |
@@ -45,7 +54,8 @@ The server reads every feed when it starts, then every 15 minutes, and when it's
 ([`POST /api/admin/calendar/feeds/refresh`](#post-apiadmincalendarfeedsrefresh-admin)). It also reads a feed when it's
 added, or when its link changes: adding it, or changing its link, waits for that read, so that a link that doesn't give
 a calendar is refused. Apart from these and asking for every feed to be read (see its endpoint), nothing waits for a
-read: the server keeps what it read in memory, and gives what it read last.
+read: the server keeps what it read in memory, and gives what it read last. Changing a feed's kind doesn't read it: what
+was read from it counts as its new kind's from then on, e.g. its occupations become holds.
 
 During a read of every feed, the feeds are read one at a time, and reads of every feed don't overlap: one asked for
 while another is under way starts once that one ends, once for every request made meanwhile.
@@ -61,25 +71,26 @@ What's given always matches the feed's current link: what was read from its form
 
 ## Events
 
-What a read keeps of a feed is its events, read as RFC 5545 says, each of which is an occupation, which takes the
-studio from its start, included, to its end, excluded, so that an event that ends when another starts doesn't overlap
-it. Beyond RFC 5545:
+What a read keeps of a feed is its events, read as RFC 5545 says, each of which is from its start, included, to its
+end, excluded, so that an event that ends when another starts doesn't overlap it. An `occupations` feed's events are
+occupations, which take the studio then, and a `holds` feed's are holds, which protect that time for sessions (see
+[Protected time](#protected-time)). Beyond RFC 5545:
 
-- A whole-day event takes its whole days in Québec time, and is given as whole-day, unlike a timed one, even from 00:00
-  to 00:00. Times without a time zone, or with one that's neither an IANA time zone nor defined in the feed, are in
-  Québec time.
+- A whole-day event is its whole days in Québec time, and is given as whole-day, unlike a timed one, even from 00:00 to
+  00:00. Times without a time zone, or with one that's neither an IANA time zone nor defined in the feed, are in Québec
+  time.
 - A feed has to define the time zones it names (`VTIMEZONE`), as RFC 5545 requires and Google's feeds do: otherwise, an
   occurrence can be missed, e.g. one that was cancelled is kept.
 - An event or an occurrence that's cancelled (`STATUS:CANCELLED`) is left out. Whether an event says it's busy or free
-  (`TRANSP`) doesn't matter: e.g. Google makes whole-day events free unless told otherwise, and they still take the
-  studio.
+  (`TRANSP`) doesn't matter: e.g. Google makes whole-day events free unless told otherwise, and they're still
+  occupations, or holds.
 - A read keeps the events and the occurrences that take some of the time from a year before it to two years after it.
 - An event that can't be read, e.g. one without a `DTSTART`, is left out, without failing the read, while a calendar
   that isn't valid iCalendar fails it. A read with too many events fails, rather than leave some out without anyone
   knowing.
 
 An occupation is known by its feed's name, and has a title, from its event's `SUMMARY`, on one line, cut to 200
-characters, or `""` when it has none. No event's description or location is ever kept.
+characters, or `""` when it has none. A hold has no title. No event's description or location is ever kept.
 
 ## The calendar
 
@@ -88,22 +99,28 @@ day after its last, e.g. a month:
 
 - the sessions with a start that take some of that time, by start, whatever their status (cancelled ones included),
 - the occupations that take some of it, by start, then end,
-- every feed, with when it was last read (`readAt`) and why that failed (`error`),
+- the holds that take some of it, by start, then end,
+- every feed, with its kind, when it was last read (`readAt`) and why that failed (`error`),
 - and, whatever the range, what needs settling: the [conflicts](#conflicts) of the 365 days from `today`, the day in
-  Québec when it's asked for, and the [sessions without a date](#sessions-without-a-date).
+  Québec when it's asked for, the [sessions outside protected time](#protected-time), and the
+  [sessions without a date](#sessions-without-a-date).
 
-Its occupations are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can be out
-of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read yet,
-e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or when
-it hasn't been read yet. Apps can have every feed read again first when they need the occupations to be up to date,
-e.g. right after the admin changed an event, but not before every calendar they ask for, since that waits for every
-read. Occupations also only cover what a read keeps, from a year before it to two years after it (see
-[Events](#events)), so the calendar of days outside that can lack occupations.
+Its occupations and holds are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can
+be out of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read
+yet, e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or
+when it hasn't been read yet: for an `occupations` feed, conflicts can then be missing or out of date, and for a `holds`
+feed, sessions can wrongly be, or not be, outside protected time. Apps can have every feed read again first when they
+need the calendar to be up to date, e.g. right after the admin changed an event, but not before every calendar they ask
+for, since that waits for every read. Occupations and holds also only cover what a read keeps, from a year before it to
+two years after it (see [Events](#events)), so the calendar of days outside that can lack them.
 
 An occupation has `feedId`, the id of its feed, one of the calendar's feeds, whose name is how the occupation is
 known, its `start` and `end`, whether it takes whole days (`wholeDay`), and its `title` (see [Events](#events)).
 Occupations have no id, and two of them can be the same in all of these, e.g. two stays with the same dates, booked
 on the same platform.
+
+A hold has `feedId`, the id of its feed, its `start` and `end`, and whether it takes whole days (`wholeDay`), but no
+title. Holds are given as they were read: they can overlap, or follow each other, e.g. those of two feeds.
 
 ## Conflicts
 
@@ -121,6 +138,39 @@ There's one conflict for each pair of things that overlap. Conflicts are by star
 - `start` and `end`: the time its two things overlap, all of it, even outside the 365 days,
 - `things`: the two things, by start, then end, each with its `kind`: `"session"`, with the session's `id`, `title`,
   `start`, `end` and `status`, or `"occupation"`, with the occupation's fields.
+
+## Protected time
+
+Holds are time that the studio's other calendars keep for sessions, e.g. blocked on the platforms the studio is rented
+on, so that it isn't booked otherwise. How a calendar works out its holds is up to it: the server only reads them. Holds
+don't take the studio, and never conflict with anything: something can still take the studio during a hold, e.g. a
+repair, which is then a conflict with a session there.
+
+Time is **protected** when some hold takes it, of any `holds` feed: several feeds' holds count together, and holds that
+follow each other count as one, e.g. one until 15:00 and one from 15:00. A session is within protected time when every
+moment of it, from its start, included, to its end, excluded, is protected.
+
+Sessions are meant to be within protected time. While there's a `holds` feed, apps that add a session with a start, give
+a session a start, change its start or its duration, or un-cancel it should ask for the calendar of every day the
+session takes, since holds are only given for the days asked for, and tell the admin when it wouldn't be within
+protected time (see [Rules, in Sessions](sessions.md#rules)). The server doesn't refuse it: it's something to settle.
+Once it's saved, whether the calendar gives it among the sessions outside protected time is the server's answer. While
+there's no `holds` feed, nothing is known to be protected, and there's nothing to tell.
+
+**The sessions outside protected time** need settling, like conflicts. They're the sessions that take some of the 365
+days from `today` (see [Conflicts](#conflicts)), and that:
+
+- are planned (not done or cancelled),
+- have a start,
+- haven't ended when the calendar is asked for,
+- and aren't within protected time from their start, or from when the calendar is asked for if that's later, to their
+  end: a session that's going on is only judged on what's left of it.
+
+While there's no `holds` feed, there are none. Holds are what the `holds` feeds' last reads gave, like occupations (see
+[The calendar](#the-calendar)): a `holds` feed whose last read failed still gives what it read before, and one that
+hasn't been read yet gives none, so that sessions can be outside protected time until it is.
+
+Each session outside protected time has the session's `id`, `title`, `start` and `end`. They're by start.
 
 ## Sessions without a date
 
@@ -145,7 +195,9 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | `feeds` | list of feeds | Every feed, as [`GET /api/admin/calendar/feeds`](#get-apiadmincalendarfeeds-admin) gives them |
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |
+| `holds` | list of holds | The holds that take some of the days, by start, then end |
 | `conflicts` | list of conflicts | The conflicts of the 365 days from `today`, whatever the days asked for |
+| `unprotectedSessions` | list | The [sessions outside protected time](#protected-time), by start, whatever the days asked for, each with its `id`, `title`, `start` and `end` |
 | `undatedSessions` | list of sessions | The sessions without a date, as `GET /api/admin/sessions` gives them, the most recently added first, whatever the days asked for |
 
 Fails with 400 when `from` or `to` is missing, is given more than once, or isn't a day from 2000-01-01 to 2999-12-31,
@@ -181,6 +233,7 @@ Fails with 502 when the server shuts down meanwhile.
 | Request field | Type | |
 |---|---|---|
 | `name` | string | Trimmed, then between 1 and 100 characters |
+| `kind` | `"occupations"` or `"holds"` | What its events are (see [Feeds](#feeds)). There's no default, so that it's always chosen |
 | `link` | string | Trimmed: an `https` or `webcal` link, without a user name or a password, of at most 2,000 characters |
 
 Reads the link (see [Reading the feeds](#reading-the-feeds)), and only if that gives a calendar, adds the feed, with
@@ -199,7 +252,8 @@ Changes the fields of a feed it's sent, and leaves the others as they are (see
 
 When it's sent another link than the feed's, where a `webcal` link is the same as its `https` one, it reads that link
 first, as `POST /api/admin/calendar/feeds` does, and only changes the feed if that gives a calendar: that read is then
-the feed's, in place of what was read from its former link. Otherwise it doesn't read the feed.
+the feed's, in place of what was read from its former link. Otherwise it doesn't read the feed: when its kind changes,
+what was read from it counts as its new kind's from then on (see [Reading the feeds](#reading-the-feeds)).
 
 Responds `{"ok": true, "feed": <the feed as it is then>}`. Fails with 400 when there's no field, or a field doesn't
 follow its rules, 404 when there's no such feed, or it's removed while its link is read, 409 when another feed has the

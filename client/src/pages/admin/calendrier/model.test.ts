@@ -219,7 +219,7 @@ describe('things', () => {
 })
 
 function feed(id: string, name: string): Feed {
-  return { id, name, link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
+  return { id, name, kind: 'occupations', link: `https://example.com/${id}.ics`, createdBy: 'a@example.com', createdAt: '2026-11-01T12:00:00Z', updatedBy: null, updatedAt: null, readAt: null, error: null }
 }
 
 // A session of the calendar, with what the page shows of it.
@@ -228,7 +228,7 @@ function session(id: string, start: string, end: string, status: Session['status
 }
 
 function calendar(fields: Partial<Calendar>): Calendar {
-  return { ok: true, today: '2026-11-19', feeds: [feed('q', 'Séjours'), feed('o', 'Équipe')], sessions: [], occupations: [], conflicts: [], undatedSessions: [], ...fields }
+  return { ok: true, today: '2026-11-19', feeds: [feed('q', 'Séjours'), feed('o', 'Équipe')], sessions: [], occupations: [], holds: [], conflicts: [], unprotectedSessions: [], undatedSessions: [], ...fields }
 }
 
 const sessionThing = ({ id, title, start, end, status }: Session): ConflictThing => ({ kind: 'session', id, title, start: start!, end: end!, status })

@@ -31,6 +31,7 @@ function ownCalendar(unique: string, day: string) {
   const feed = (id: string, name: string, error: string | null) => ({
     id,
     name,
+    kind: 'occupations' as const,
     link: `https://example.com/${id}.ics`,
     createdBy: 'admin@example.com',
     createdAt: readAt,
