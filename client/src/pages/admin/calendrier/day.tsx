@@ -60,7 +60,8 @@ export function ChosenDay({ day, today, entries, onClose, children }: ChosenDayP
   )
 }
 
-// A thing on the chosen day: its kind, its times in full, what it is, and its conflicts on that day.
+// A thing on the chosen day: its kind, its times in full, what it is, whether it's a session outside protected time, and
+// its conflicts on that day.
 function ThingRow({ day, dayThing: { thing, conflicts } }: { day: string; dayThing: DayThing }) {
   const performers = thing.kind === 'session' && sessionPerformers(thing)
   return (
@@ -76,6 +77,7 @@ function ThingRow({ day, dayThing: { thing, conflicts } }: { day: string; dayThi
         ) : (
           <OccupationLabel title={thing.title} calendar={thing.calendar} />
         )}
+        {thing.kind === 'session' && thing.unprotected && <span className="calendar-unprotected-line">hors plage protégée</span>}
         {conflicts.map(({ other }, i) => (
           <span key={i} className="calendar-conflict-line">
             conflit avec {inSentence(other)}

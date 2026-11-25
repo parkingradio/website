@@ -24,28 +24,25 @@ function soon(): string {
   return addDays(third, 1).slice(0, 7) === third.slice(0, 7) ? third : addDays(third, 1)
 }
 
+// Why a test's feed's last read failed.
+const FAILED = "The link can't be read: its server fails (503)"
+
+// A test's own feed, of `kind`, read three days before `day`, or not yet, without `read`, its last read having failed
+// when it has an `error`.
+function ownFeed(id: string, name: string, day: string, { kind = 'occupations', error = null, read = true }: { kind?: 'occupations' | 'holds'; error?: string | null; read?: boolean } = {}) {
+  const readAt = at(addDays(day, -3), '00:00')
+  return { id, name, kind, link: `https://example.com/${id}.ics`, createdBy: 'admin@example.com', createdAt: readAt, updatedBy: null, updatedAt: null, readAt: read ? readAt : null, error }
+}
+
 // A test's own feeds, read three days before `day`, the second one having failed its last read, and a repair and a stay
 // on `day` that overlap, with their conflict, the stay without a title.
 function ownCalendar(unique: string, day: string) {
-  const readAt = at(addDays(day, -3), '00:00')
-  const feed = (id: string, name: string, error: string | null) => ({
-    id,
-    name,
-    kind: 'occupations' as const,
-    link: `https://example.com/${id}.ics`,
-    createdBy: 'admin@example.com',
-    createdAt: readAt,
-    updatedBy: null,
-    updatedAt: null,
-    readAt,
-    error,
-  })
   const team = `Équipe ${unique}`
   const stays = `Séjours ${unique}`
   const repair = { feedId: `team-${unique}`, start: at(day, '10:00'), end: at(day, '16:00'), wholeDay: false, title: `RÉPARATION ${unique}` }
   const stay = { feedId: `stays-${unique}`, start: at(day, '12:00'), end: at(addDays(day, 1), '11:00'), wholeDay: false, title: '' }
   const extra: CalendarExtra = {
-    feeds: [feed(`team-${unique}`, team, null), feed(`stays-${unique}`, stays, "The link can't be read: its server fails (503)")],
+    feeds: [ownFeed(`team-${unique}`, team, day), ownFeed(`stays-${unique}`, stays, day, { error: FAILED })],
     occupations: [repair, stay],
     // The repair and the stay, in the order of things: by start.
     conflicts: [{ start: stay.start, end: repair.end, things: [{ kind: 'occupation', ...repair }, { kind: 'occupation', ...stay }] }],
@@ -161,13 +158,14 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await withCalendar(page, extra)
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
-  // In the month, each "conflit" on the day they overlap, and the stay's end the next day, without it, then free time.
+  // In the month, each "conflit" on the day they overlap, and the stay's end the next day, without it, and no free time,
+  // without a holds feed.
   const cell = dayCell(page, day)
   await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}, calendrier ${team}conflit`)
   await expect(cell).toContainText(`12 h – 11 hoccupation : ${stays}conflit`)
   const next = dayCell(page, addDays(day, 1))
   await expect(next.locator('.calendar-occupation')).toHaveText(`jusqu'à 11 hoccupation : ${stays}`)
-  await expect(next.locator('.calendar-free')).toHaveText('dispo dès 11 h')
+  await expect(next.locator('.calendar-free')).toHaveCount(0)
   // Which the day's button reads, as its description, whose spaces can be non-breaking ones, and where the browser can
   // put one before the separator's comma.
   const description = new RegExp(`10 h – 16 h occupation : RÉPARATION ${unique}, calendrier ${team} conflit`.replaceAll(' ', '\\s').replace(',', '\\s?,'), 'i')
@@ -181,7 +179,7 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   ])
 
   const issues = page.getByRole('region', { name: 'À régler' })
-  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : The link can't be read: its server fails (503). Voir Configuration.`)
+  await expect(issues).toContainText(`⚠ Des conflits peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${stays} » a échoué : ${FAILED}. Voir Configuration.`)
   await expect(issues.getByRole('link', { name: 'Configuration' })).toHaveAttribute('href', '/admin/configuration')
   await issues.getByRole('button', { name: /1 conflit/ }).click()
   await expect(page).toHaveURL(/[?&]issues=open/)
@@ -198,6 +196,114 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await expect(calendar).toHaveAttribute('href', '/admin/calendrier?issues=open')
   await calendar.click()
   await expect(issues.getByRole('button', { name: /1 conflit/ })).toHaveAttribute('aria-expanded', 'true')
+})
+
+// A session of a test's own, planned, from `start` to `end`, which the tests fake, as the server would refuse one where
+// another test, run alongside, has its own.
+function ownSession(id: string, title: string, start: string, end: string): NonNullable<CalendarExtra['sessions']>[number] {
+  const durationMinutes = (Date.parse(end) - Date.parse(start)) / 60000
+  return {
+    id,
+    start,
+    end,
+    durationMinutes,
+    type: 'other',
+    takeover: null,
+    application: null,
+    name: title,
+    title,
+    raEvent: null,
+    description: '',
+    effectiveDescription: '',
+    hasFlyer: false,
+    sets: [],
+    createdAt: start,
+    createdBy: 'admin@example.com',
+    updatedBy: null,
+    updatedAt: null,
+    status: 'planned',
+    statusUpdatedBy: null,
+    statusUpdatedAt: null,
+    announced: false,
+    announcedUpdatedBy: null,
+    announcedUpdatedAt: null,
+  }
+}
+
+test('free time is the protected time that nothing takes, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
+  const { unique } = own(testInfo)
+  if (isMobile) await page.setViewportSize(NARROW)
+  // Two days in the same month, a week or more before the nearest seeded session (see seed-data.ts), so that only the
+  // test's own things take them.
+  const day = soon()
+  const next = addDays(day, 1)
+  const [loft, blocks, team] = [`Loft ${unique}`, `Blocages ${unique}`, `Équipe ${unique}`]
+  // Protected from 11 h to 18 h on `day`, around a meeting and a session, and from 15 h on the next day, by two holds
+  // feeds, one whose last read failed and one not read yet, where a session from 13 h to 17 h is outside protected time.
+  const inside = ownSession(`inside-${unique}`, `E2E ${unique}`, at(day, '15:00'), at(day, '17:00'))
+  const outside = ownSession(`outside-${unique}`, `E2E OUT ${unique}`, at(next, '13:00'), at(next, '17:00'))
+  await withCalendar(page, {
+    feeds: [ownFeed(`loft-${unique}`, loft, day, { kind: 'holds', error: FAILED }), ownFeed(`blocks-${unique}`, blocks, day, { kind: 'holds', read: false }), ownFeed(`team-${unique}`, team, day)],
+    holds: [
+      { feedId: `loft-${unique}`, start: at(day, '11:00'), end: at(day, '18:00'), wholeDay: false },
+      { feedId: `blocks-${unique}`, start: at(next, '15:00'), end: at(addDays(next, 1), '00:00'), wholeDay: false },
+    ],
+    occupations: [{ feedId: `team-${unique}`, start: at(day, '12:00'), end: at(day, '13:00'), wholeDay: false, title: `RÉUNION ${unique}` }],
+    sessions: [inside, outside],
+    conflicts: [],
+    unprotectedSessions: [{ id: outside.id, title: outside.title, start: outside.start!, end: outside.end! }],
+  })
+  await logIn(page, { at: `/admin/calendrier?month=${day.slice(0, 7)}` })
+
+  // Free time around what takes the protected time, and none where it isn't protected, even where nothing takes it, on
+  // a day with a session too. The month says nothing of the session outside protected time.
+  const free = (day: string) => dayCell(page, day).locator('.calendar-free')
+  await expect(free(day)).toHaveText(['dispo 11 h – 12 h', 'dispo 13 h – 15 h', 'dispo 17 h – 18 h'])
+  await expect(free(next)).toHaveText(['dispo dès 17 h'])
+  await expect(dayCell(page, next)).not.toContainText('protégée')
+  await expect(dayCell(page, addDays(day, -1)).locator('.calendar-free, .calendar-mark-free')).toHaveCount(0)
+  if (isMobile) await expect(dayCell(page, day).locator('.calendar-mark-free')).toBeVisible()
+
+  // The legend says what free time is, in a tooltip, in a target as large as a finger needs. Once the links to the
+  // admin's calendars, which move it, are there.
+  const legend = page.getByRole('list', { name: 'Légende' })
+  await expect(legend.getByRole('link', { name: "s'abonner au calendrier des occupations" })).toBeVisible()
+  const available = legend.getByRole('button', { name: 'disponible' })
+  await (isMobile ? available.tap() : available.hover())
+  await expect(page.getByRole('tooltip')).toHaveText('Plage disponible au studio, protégée des occupations.')
+  if (isMobile) {
+    const box = (await available.boundingBox())!
+    expect(box.width).toBeGreaterThanOrEqual(24)
+    expect(box.height).toBeGreaterThanOrEqual(24)
+  }
+
+  // The holds feeds' warnings, and the session outside protected time, the only one, since the server under test has no
+  // holds feed, whose row shows its day.
+  const issues = page.getByRole('region', { name: 'À régler' })
+  await expect(issues).toContainText(
+    `⚠ Des plages disponibles et des sessions hors plage protégée peuvent manquer, ou ne plus être à jour, car la dernière lecture du calendrier « ${loft} » a échoué : ${FAILED}. Voir Configuration.`,
+  )
+  await expect(issues).toContainText(`⚠ Le calendrier « ${blocks} » n'a pas encore été lu : des plages disponibles peuvent manquer, et des sessions être signalées à tort hors plage protégée.`)
+  await issues.getByRole('button', { name: /1 hors plage protégée/ }).click()
+  const row = issues.getByRole('listitem').filter({ hasText: outside.title }).getByRole('button')
+  await expect(row).toContainText(dayInYear(next))
+  await expect(row).toContainText(`13 h – 17 h · ${outside.title}`)
+  await (isMobile ? row.tap() : row.click())
+  await expect(page).toHaveURL(new RegExp(`[?&]day=${next}`))
+  await expect(dayButton(page, next)).toBeFocused()
+  await expect(chosenDay(page, next).getByRole('listitem').filter({ hasText: unique })).toHaveText([`session13 h – 17 h${outside.title}hors plage protégée`])
+  await dayButton(page, day).click()
+  await expect(chosenDay(page, day).getByRole('listitem').filter({ hasText: unique })).toHaveText([
+    `occupation12 h – 13 hRÉUNION ${unique}, calendrier ${team}`,
+    `session15 h – 17 h${inside.title}`,
+  ])
+
+  // The list says so too.
+  await page.getByRole('button', { name: 'liste' }).click()
+  await expect(page.getByRole('region', { name: 'À venir' }).getByRole('button').filter({ hasText: outside.title })).toHaveText(
+    `${dayInYear(next)} session 13 h – 17 h ${outside.title} · hors plage protégée`,
+  )
+  expect(await scrollsSideways(page)).toBe(false)
 })
 
 test('the list has each thing once, from today, in columns, which shows its day in the month', async ({ page, isMobile }, testInfo) => {

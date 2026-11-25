@@ -299,7 +299,7 @@ export function Calendrier() {
 }
 
 // What each color is, and on narrow screens, what each mark is (see calendrier.css), with the links to the admin's
-// calendars of the sessions and of the occupations once their token is known.
+// calendars of the sessions and of the occupations once their token is known, and what free time is, in a tooltip.
 function Legend({ token }: { token: string | null }) {
   return (
     <ul className="calendar-legend" aria-label="Légende">
@@ -312,7 +312,10 @@ function Legend({ token }: { token: string | null }) {
         {token !== null && <SubscribeLink calendar="occupations" token={token} />}
       </li>
       <li>
-        <span className="calendar-swatch calendar-free" /> disponible
+        <span className="calendar-swatch calendar-free" />
+        <Button className="calendar-legend-tip" tip="Plage disponible au studio, protégée des occupations.">
+          disponible
+        </Button>
       </li>
       <li>
         <span className="calendar-swatch calendar-conflict" /> conflit

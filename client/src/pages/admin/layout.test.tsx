@@ -256,7 +256,9 @@ describe("The menu's badge on calendrier", () => {
     await waitFor(() => expect(link()).toHaveAccessibleName('calendrier, 1 conflit'))
     second.unmount()
 
-    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: calendar(0) })
+    // Only conflicts count, not the sessions outside protected time.
+    const unprotected = { id: 'session-1', title: 'SOIRÉE', start: '2027-06-05T21:00:00-04:00', end: '2027-06-05T23:00:00-04:00' }
+    mockFetch({ ...LOGGED_IN, ...ADMINS, [TODAY]: { ...calendar(0), unprotectedSessions: [unprotected] } })
     renderAt('/admin/admins')
     await waitFor(() => expect(requestsTo('GET', TODAY)).toHaveLength(1))
     await screen.findByRole('heading', { level: 1, name: 'Admins' })
