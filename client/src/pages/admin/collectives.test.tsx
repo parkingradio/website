@@ -693,42 +693,42 @@ describe('A collective’s page', () => {
     expect(screen.getByRole('button', { name: 'supprimer le collectif' })).not.toHaveAttribute('aria-disabled')
   })
 
-  it("lists the sessions of its takeovers, without their type, only showing whether they're announced, and can't be deleted while it has some", async () => {
-    const session: Session = {
-      id: 'session-1',
-      start: '2026-11-15T02:00:00.000Z',
-      end: '2026-11-15T05:00:00.000Z',
-      durationMinutes: 180,
-      type: 'takeover',
-      takeover: { id: 'collective-1', name: 'Ondes' },
-      application: null,
-      name: '',
-      title: 'ONDES TAKEOVER',
-      raEvent: null,
-      description: '',
-      effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
-      hasFlyer: false,
-      sets: [],
-      createdAt: '2026-10-01T16:00:00.000Z',
-      createdBy: 'admin@example.com',
-      updatedBy: null,
-      updatedAt: null,
-      status: 'done',
-      statusUpdatedBy: null,
-      statusUpdatedAt: null,
-      announced: true,
-      announcedUpdatedBy: null,
-      announcedUpdatedAt: null,
-    }
-    mockFetch({ ...ONDES_PAGE, '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [session] } })
+  const TAKEOVER: Session = {
+    id: 'session-1',
+    start: '2026-11-15T02:00:00.000Z',
+    end: '2026-11-15T05:00:00.000Z',
+    durationMinutes: 180,
+    type: 'takeover',
+    takeover: { id: 'collective-1', name: 'Ondes' },
+    application: null,
+    name: '',
+    title: 'ONDES TAKEOVER',
+    raEvent: null,
+    description: '',
+    effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+    hasFlyer: false,
+    sets: [],
+    createdAt: '2026-10-01T16:00:00.000Z',
+    createdBy: 'admin@example.com',
+    updatedBy: null,
+    updatedAt: null,
+    status: 'done',
+    statusUpdatedBy: null,
+    statusUpdatedAt: null,
+    announced: false,
+    announcedUpdatedBy: null,
+    announcedUpdatedAt: null,
+  }
+  const TAKEOVERS = { '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [TAKEOVER] } }
+
+  it("lists the sessions of its takeovers, without their type, and can't be deleted while it has some", async () => {
+    mockFetch({ ...ONDES_PAGE, ...TAKEOVERS })
     renderAt('/admin/artistes/collectifs/collective-1')
     expect(await screen.findByRole('link', { name: 'sam. 14 nov. 2026' })).toHaveAttribute('href', '/admin/sessions/session-1')
     const table = screen.getByRole('table', { name: 'Sessions' })
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Date', 'Heure', 'Nom', 'Artistes', 'Statut', 'Annonce'])
     expect(within(table).getAllByRole('row')[1]).toHaveClass('admin-status-done')
     expect(within(table).getAllByRole('cell')[2]).toHaveTextContent('ONDES TAKEOVER')
-    expect(within(table).getAllByRole('cell').at(-1)).toHaveTextContent(/^annoncée$/)
-    expect(within(table).queryByRole('combobox')).not.toBeInTheDocument()
 
     const confirm = vi.spyOn(window, 'confirm')
     const remove = screen.getByRole('button', { name: 'supprimer le collectif' })
@@ -739,33 +739,36 @@ describe('A collective’s page', () => {
     expect(requestsTo('DELETE', '/api/admin/collectives/collective-1')).toHaveLength(0)
   })
 
+  it('announces a session of its takeovers from its row, which keeps it with its new value', async () => {
+    mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: { ...TAKEOVER, announced: true } } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const announced = await screen.findByRole('combobox', { name: 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026' })
+    expect(announced).toHaveValue('false')
+    fireEvent.change(announced, { target: { value: 'true' } })
+
+    await waitFor(() => expect(announced).toBeEnabled())
+    expect(announced).toHaveValue('true')
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
+    expect(within(screen.getByRole('table', { name: 'Sessions' })).getAllByRole('row')).toHaveLength(2)
+  })
+
+  it('says why a session of its takeovers could not be announced, above them, naming it, which keeps its value', async () => {
+    mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: false, error: 'No such session' } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const announced = await screen.findByRole('combobox', { name: 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026' })
+    fireEvent.change(announced, { target: { value: 'true' } })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("L'annonce de « ONDES TAKEOVER, sam. 14 nov. 2026 » n'a pas pu être changée : No such session")
+    expect(Boolean(alert.compareDocumentPosition(screen.getByRole('table', { name: 'Sessions' })) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await waitFor(() => expect(announced).toBeEnabled())
+    expect(announced).toHaveValue('false')
+  })
+
   it("shows the server's refusal when its sessions could not be loaded and it has takeovers, linking to the one in the way", async () => {
-    const takeover: Session = {
-      id: 'session-1',
-      start: '2026-11-15T02:00:00.000Z',
-      end: '2026-11-15T05:00:00.000Z',
-      durationMinutes: 180,
-      type: 'takeover',
-      takeover: { id: 'collective-1', name: 'Ondes' },
-      application: null,
-      name: '',
-      title: 'ONDES TAKEOVER',
-      raEvent: null,
-      description: '',
-      effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
-      hasFlyer: false,
-      sets: [],
-      createdAt: '2026-10-01T16:00:00.000Z',
-      createdBy: 'admin@example.com',
-      updatedBy: null,
-      updatedAt: null,
-      status: 'planned',
-      statusUpdatedBy: null,
-      statusUpdatedAt: null,
-      announced: false,
-      announcedUpdatedBy: null,
-      announcedUpdatedAt: null,
-    }
+    const takeover: Session = { ...TAKEOVER, status: 'planned' }
     const error = 'This collective has takeovers: give them another collective, or another type, first'
     mockFetch({
       ...ONDES_PAGE,

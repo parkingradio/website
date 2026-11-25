@@ -489,6 +489,8 @@
   color: inherit;
   font: inherit;
   line-height: 16px;
+  /* For its stand-in, which would otherwise wrap in a narrow column, where a select doesn't. */
+  white-space: nowrap;
 }
 
 /* Only the dropdown itself, since its stand-in is always greyed out. */

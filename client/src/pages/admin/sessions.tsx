@@ -120,7 +120,7 @@ function SessionTypeName({ session }: { session: Session }) {
 
 // Sessions, as listed in this section, or on a collective's page, under the heading whose id is `labelledBy`, where the
 // type is left out since they're all its takeovers. The columns sort the list when there's `sorting`, and whether
-// they're announced is a dropdown that changes it when there's `announce`.
+// they're announced is a dropdown that changes it with `announce` (see `useAnnouncing`).
 function SessionsTable({
   sessions,
   sorting,
@@ -130,7 +130,7 @@ function SessionsTable({
 }: {
   sessions: Session[]
   sorting?: Sorting<SessionColumn>
-  announce?: (session: Session, announced: Announced) => Promise<void>
+  announce: (session: Session, announced: Announced) => Promise<void>
   labelledBy?: string
   withType?: boolean
 }) {
@@ -173,18 +173,14 @@ function SessionsTable({
             </td>
             <td>{SESSION_STATUS_LABELS[session.status]}</td>
             <td>
-              {announce ? (
-                <StatusSelect
-                  label={`Annonce : ${sessionName(session)}`}
-                  statuses={ANNOUNCED_CHOICES}
-                  labels={ANNOUNCED_LABELS}
-                  status={announcedOf(session)}
-                  unavailable={cantAnnounce(session)}
-                  onChange={(announced) => announce(session, announced)}
-                />
-              ) : (
-                session.announced && ANNOUNCED_LABELS.true
-              )}
+              <StatusSelect
+                label={`Annonce : ${sessionName(session)}`}
+                statuses={ANNOUNCED_CHOICES}
+                labels={ANNOUNCED_LABELS}
+                status={announcedOf(session)}
+                unavailable={cantAnnounce(session)}
+                onChange={(announced) => announce(session, announced)}
+              />
             </td>
           </tr>
         ))}
@@ -193,9 +189,28 @@ function SessionsTable({
   )
 }
 
+// Announcing sessions of a list, or un-announcing them, from their rows: `current` gives the sessions loaded as the
+// changes left them, `announce` changes one, and `error` says why the last change couldn't be made, if it couldn't.
+function useAnnouncing() {
+  // The sessions as the server answered each change, which replace the ones loaded.
+  const [changed, setChanged] = useState<Record<string, Session>>({})
+  const [error, setError] = useState<ReactNode>(null)
+  return {
+    current: (sessions: Session[]) => sessions.map((session) => changed[session.id] ?? session),
+    error,
+    async announce(session: Session, announced: Announced) {
+      setError(null)
+      const result = await api.PUT('/api/admin/sessions/{id}/announced', { params: { path: { id: session.id } }, body: { announced: announced === 'true' } })
+      if (result.ok) setChanged((changed) => ({ ...changed, [session.id]: result.session }))
+      else setError(failure(`L'annonce de «\u00a0${sessionName(session)}\u00a0» n'a pas pu être changée`, result, session.id))
+    },
+  }
+}
+
 // The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one.
 export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions: Session[] }>; newPath: string }) {
   const headingId = useId()
+  const { current, error, announce } = useAnnouncing()
   return (
     <>
       <h2 id={headingId}>Sessions</h2>
@@ -205,11 +220,12 @@ export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions
         </Link>
       </div>
       {sessions.kind === 'error' && <SessionsFailure message={sessions.message} />}
+      <ErrorMessage error={error} />
       {sessions.kind === 'loaded' &&
         (sessions.value.sessions.length === 0 ? (
           <p className="admin-placeholder">Aucune session.</p>
         ) : (
-          <SessionsTable sessions={sessions.value.sessions} labelledBy={headingId} withType={false} />
+          <SessionsTable sessions={current(sessions.value.sessions)} announce={announce} labelledBy={headingId} withType={false} />
         ))}
     </>
   )
@@ -311,8 +327,7 @@ export function ApplicationSets({ application }: { application: Application }) {
   )
 }
 
-// The sessions that come from a collective's application, on its page, linking to them, where they're only shown, like
-// the collective's sessions on its page (see `OwnSessions`).
+// The sessions that come from a collective's application, on its page, linking to them, where they're only shown.
 // "créer une session" adds another one, as the collective's takeover.
 export function ApplicationSessions({ application }: { application: Application }) {
   const headingId = useId()
@@ -384,21 +399,12 @@ function SessionsList({ query }: { query: string }) {
   const [status, setStatus] = useStatusFilter(STATUSES, DEFAULT_STATUS)
   const [announced, setAnnounced] = useQueryFilter('announced', ANNOUNCED_FILTERS)
   const sorting = useSort(sessionColumns(status), 'date')
-  // The sessions as announcing them, or un-announcing them, left them, which replace the ones loaded.
-  const [changed, setChanged] = useState<Record<string, Session>>({})
-  const [announceError, setAnnounceError] = useState<ReactNode>(null)
+  const { current, error, announce } = useAnnouncing()
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
   if (sessions.kind === 'loading') return null
 
-  const announce = async (session: Session, announced: Announced) => {
-    setAnnounceError(null)
-    const result = await api.PUT('/api/admin/sessions/{id}/announced', { params: { path: { id: session.id } }, body: { announced: announced === 'true' } })
-    if (result.ok) setChanged((changed) => ({ ...changed, [session.id]: result.session }))
-    else setAnnounceError(failure(`L'annonce de «\u00a0${sessionName(session)}\u00a0» n'a pas pu être changée`, result, session.id))
-  }
-
-  const all = sessions.value.sessions.map((session) => changed[session.id] ?? session)
+  const all = current(sessions.value.sessions)
   const found = search(all, query, sessionSearchFields)
   const withStatus = (sessions: Session[], shown = status) => (shown ? sessions.filter((session) => session.status === shown) : sessions)
   const withAnnounced = (sessions: Session[], shown = announced) => (shown ? sessions.filter((session) => announcedOf(session) === shown) : sessions)
@@ -428,7 +434,7 @@ function SessionsList({ query }: { query: string }) {
         count={(announced) => withAnnounced(foundWithStatus, announced).length}
         onChange={setAnnounced}
       />
-      <ErrorMessage error={announceError} />
+      <ErrorMessage error={error} />
       {listed.length === 0 ? (
         <p className="admin-placeholder">{empty}</p>
       ) : (

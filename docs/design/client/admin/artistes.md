@@ -52,8 +52,9 @@ and is saved the same way. The artists it adds by name are created with its prof
 the form from then on, so that sending it again doesn't create them twice.
 Under it, its applications are listed like an artist's, with a button to create another one, then the sessions of its
 takeovers, like in [Sessions](sessions.md) but without their type, with a button to add another one as its takeover
-("nouvelle session"), and the list can't be searched, filtered or sorted either. Whether they're announced isn't a
-dropdown there: it's only shown, "annoncée" or nothing. At the bottom, the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its artists stay, and so do their
+("nouvelle session"), and the list can't be searched, filtered or sorted either. Whether they're announced is changed
+from their rows, as in [Sessions](sessions.md#the-list). At the bottom, the collective can be
+deleted for good, with its photo, if it has one, and applications, after confirming. Its artists stay, and so do their
 own applications. A collective that has takeovers can't be deleted (see [Types and
 names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used, saying
 « Un collectif avec des takeovers ne peut pas être supprimé. » (see [Controls that can't be
@@ -115,7 +116,8 @@ one is either:
   `GET /api/admin/collectives/:id/photo`, the photo as it was sent.
 - `GET /api/admin/artists?collective=<id>`, for its genres, again each time it's saved.
 - `GET /api/admin/applications?collective=<id>`, for its applications.
-- `GET /api/admin/sessions?takeover=<id>`, for the sessions of its takeovers.
+- `GET /api/admin/sessions?takeover=<id>`, for the sessions of its takeovers, and `PUT /api/admin/sessions/:id/announced`,
+  to announce one or un-announce it.
 - `GET /api/admin/artists`, in a collective's form and in "ajouter un collectif", to pick its artists, each time the
   form opens.
 - `POST /api/admin/collectives`, for "ajouter un collectif".
