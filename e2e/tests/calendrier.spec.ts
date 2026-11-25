@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { addDays, quebecDayAndTime, quebecInstant } from '../../client/src/quebec-time.ts'
-import { test, expect, adminMenu, fillTime, logIn, longDay, own, withCalendar } from './fixtures.ts'
+import { test, expect, adminMenu, fillTime, logIn, longDay, NARROW, own, scrollsSideways, withCalendar } from './fixtures.ts'
 import type { CalendarExtra } from './fixtures.ts'
 
 // The studio's calendar: a session of the test's own, in the month and on its day, and occupations and conflicts,
@@ -58,12 +58,6 @@ const busy = (unique: string, day: string) =>
 // E.g. "ven. 13 nov.", as the page writes a day in a list's row, and "ven. 13", in a thing's times in brief.
 const dayInYear = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(day))
 const weekdayAndNumber = (day: string) => new Intl.DateTimeFormat('fr-CA', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(day))
-
-// Whether the page scrolls sideways, which it shouldn't, on phones too.
-const scrollsSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
-
-// The narrowest phones the admin pages are made for, which the mobile project's is wider than.
-const NARROW = { width: 360, height: 800 }
 
 // Where the navigation bar, which stays at the top of the screen, ends.
 async function underTheBar(page: Page): Promise<number> {

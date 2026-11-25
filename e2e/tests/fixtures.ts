@@ -88,6 +88,12 @@ export async function fillTime(field: Locator, time: string) {
   await field.getByRole('spinbutton').first().pressSequentially(time.replace(':', ''))
 }
 
+// Whether the page scrolls sideways, which it shouldn't, on phones too.
+export const scrollsSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
+
+// The narrowest phones the admin pages are made for, which the mobile project's is wider than.
+export const NARROW = { width: 360, height: 800 }
+
 // Goes to a page of the admin pages, `/admin` unless told otherwise, and sends the login form shown in its place, as the
 // admin unless told otherwise.
 export async function logIn(page: Page, { at = '/admin', email = admin.email, password = admin.password } = {}) {
@@ -107,7 +113,7 @@ export function adminMenu(page: Page) {
   return page.getByRole('navigation', { name: 'admin' })
 }
 
-type Schemas = components['schemas']
+export type Schemas = components['schemas']
 
 // What `withCalendar` adds to the studio's calendar: occupations, holds and conflicts, as if they were read from feeds,
 // and sessions, with those of them that are outside protected time.

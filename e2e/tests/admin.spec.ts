@@ -1,5 +1,7 @@
+import type { Locator, Page } from '@playwright/test'
 import { centerOf, drag, swipe } from './drag.ts'
-import { test, expect, admin, adminMenu, logIn, submitLogin, PHOTO } from './fixtures.ts'
+import { test, expect, admin, adminMenu, logIn, NARROW, scrollsSideways, submitLogin, PHOTO } from './fixtures.ts'
+import type { Schemas } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
 // photo, the database, the private bucket and back, then removing the photo, searching the seeded artists and
@@ -356,4 +358,104 @@ test("Discord's credentials are verified, then saved, and the token is never sho
   await expect(botToken).toHaveValue('')
   await expect(page.getByText(`Bot « stand-in » → #chat. Changés par ${admin.email}`)).toBeVisible()
   await expect(page.locator('body')).not.toContainText(token)
+})
+
+// How many lines `element`'s text takes.
+const linesOf = (element: Locator) =>
+  element.evaluate((element) => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    return new Set([...range.getClientRects()].map(({ top }) => Math.round(top))).size
+  })
+
+// Whether `element` is within the screen's width.
+const withinScreen = (element: Locator) =>
+  element.evaluate((element) => {
+    const { left, right } = element.getBoundingClientRect()
+    return left >= 0 && right <= document.documentElement.clientWidth
+  })
+
+// Whether `element`'s focus ring, 3px around it (see `.admin-form input:focus-visible` in admin.css), is within its table,
+// which would cut it off, give or take a fraction of a pixel, which a table scrolled to its end can be off by.
+const ringWithinTable = (element: Locator) =>
+  element.evaluate((element) => {
+    const { left, right } = element.getBoundingClientRect()
+    const table = element.closest('table')!.getBoundingClientRect()
+    return left - 3 > table.left - 0.5 && right + 3 < table.right + 0.5
+  })
+
+// Configuration, with calendar feeds, which the server under test has none of, since it can't read a feed of the tests'
+// own (see `withCalendar`): the page is given three, one read, one whose last read failed, with a long message, and one
+// not read yet, which leaves the server as it is for other tests. Gives their table, and the line under the failed one.
+async function withFeeds(page: Page) {
+  const added = { createdBy: admin.email, createdAt: '2026-11-07T16:30:00-05:00', updatedBy: null, updatedAt: null }
+  const read = '2026-11-22T12:15:00-05:00'
+  const feeds: Schemas['CalendarFeed'][] = [
+    { ...added, id: 'e2e-team', name: "Calendrier de l'équipe", kind: 'occupations', link: 'https://example.com/team.ics', readAt: read, error: null },
+    {
+      ...added,
+      id: 'e2e-stays',
+      name: 'Séjours',
+      kind: 'holds',
+      link: 'https://example.com/stays.ics',
+      readAt: read,
+      error: `The link can't be read: ${'its server fails (503), '.repeat(12)}and gives up`,
+    },
+    { ...added, id: 'e2e-rehearsals', name: 'Répétitions', kind: 'occupations', link: 'https://example.com/rehearsals.ics', readAt: null, error: null },
+  ]
+  await page.route(
+    (url) => url.pathname === '/api/admin/calendar/feeds',
+    (route) => (route.request().method() === 'GET' ? route.fulfill({ json: { ok: true, total: feeds.length, feeds } }) : route.fallback()),
+  )
+  await logIn(page, { at: '/admin/configuration' })
+  const table = page.getByRole('table', { name: 'Calendriers externes' })
+  const line = table.getByText(/^La dernière lecture a échoué/)
+  await expect(line).toHaveText(/Dernière lecture réussie le 22 novembre 2026 à 12 h 15\.$/)
+  return { table, line }
+}
+
+test("a calendar feed's failed read, and its form, don't widen the columns of Configuration's table", async ({ page, isMobile }) => {
+  test.skip(isMobile, 'On phones, the columns are as narrow as they get, and the table scrolls sideways.')
+  const { table } = await withFeeds(page)
+  const lastRead = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: "Calendrier de l'équipe" }) }).getByRole('cell').nth(1)
+  await expect(lastRead).toHaveText('22 novembre 2026 à 12 h 15')
+
+  // Squeezed by a wider column, it would take several lines.
+  expect(await linesOf(lastRead)).toBe(1)
+  await page.getByRole('button', { name: 'modifier : Séjours' }).click()
+  await expect(table.getByRole('textbox', { name: 'Nom' })).toBeFocused()
+  expect(await linesOf(lastRead)).toBe(1)
+  expect(await table.evaluate((table) => table.getBoundingClientRect().right <= table.parentElement!.getBoundingClientRect().right)).toBe(true)
+})
+
+test("Configuration's table of calendar feeds scrolls sideways on phones, with a failed read's line and the form within the screen", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Only phones are too narrow for the table.')
+  await page.setViewportSize(NARROW)
+  const { table, line } = await withFeeds(page)
+
+  // The table is too wide for the screen, and scrolls sideways on its own, rather than the page, while what's across it
+  // stays within the screen, wherever it's scrolled to, with room in the table for the focus ring of the form's fields
+  // and buttons.
+  expect(await table.evaluate((table) => table.scrollWidth > table.clientWidth)).toBe(true)
+  const fitInScreen = async (elements: Locator[], focusable: Locator[] = []) => {
+    // To its end, which the browser stops it at, then back to its start.
+    for (const scrollLeft of [Number.MAX_SAFE_INTEGER, 0]) {
+      await table.evaluate((table, scrollLeft) => (table.scrollLeft = scrollLeft), scrollLeft)
+      const all = [...elements, ...focusable]
+      expect(await Promise.all(all.map(withinScreen))).toEqual(all.map(() => true))
+      expect(await Promise.all(focusable.map(ringWithinTable))).toEqual(focusable.map(() => true))
+    }
+    expect(await scrollsSideways(page)).toBe(false)
+  }
+  await fitInScreen([line])
+
+  await page.getByRole('button', { name: 'modifier : Séjours' }).click()
+  await expect(table.getByRole('textbox', { name: 'Nom' })).toBeFocused()
+  await fitInScreen(
+    [line],
+    [table.getByRole('textbox', { name: 'Nom' }), table.getByRole('textbox', { name: 'Lien' }), table.getByRole('button', { name: 'enregistrer' }), table.getByRole('button', { name: 'annuler' })],
+  )
 })
