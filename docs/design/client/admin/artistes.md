@@ -51,11 +51,10 @@ and who last changed it. A button changes the collective in a form in its place,
 and is saved the same way. The artists it adds by name are created with its profile, and are the collective's artists in
 the form from then on, so that sending it again doesn't create them twice.
 Under it, its applications are listed like an artist's, with a button to create another one, then the sessions of its
-takeovers, like in [Sessions](sessions.md) but without their type, with a button to add another one as its takeover
-("nouvelle session"), and the list can't be searched, filtered or sorted either. Whether they're announced is changed
-from their rows, as in [Sessions](sessions.md#the-list). At the bottom, the collective can be
-deleted for good, with its photo, if it has one, and applications, after confirming. Its artists stay, and so do their
-own applications. A collective that has takeovers can't be deleted (see [Types and
+takeovers, like in [Sessions](sessions.md), announced from their rows, but without their type, with a button to add
+another one as its takeover ("nouvelle session"), and the list can't be searched, filtered or sorted either. At the
+bottom, the collective can be deleted for good, with its photo, if it has one, and applications, after confirming. Its
+artists stay, and so do their own applications. A collective that has takeovers can't be deleted (see [Types and
 names](../../server/sessions.md#types-and-names)): while it has some, « supprimer le collectif » can't be used, saying
 « Un collectif avec des takeovers ne peut pas être supprimé. » (see [Controls that can't be
 used](layout.md#controls-that-cant-be-used)). When its sessions can't be loaded, it can be used, and the server's

@@ -65,6 +65,8 @@ import { Performers, SetLinks, SetsTooLong } from './set-cells'
 import { SetFormWithChoices } from './set-form'
 import type { InitialSet, TakeoverCollective } from './set-form'
 import { DragHandle, SortableList } from './sortable'
+import { useAnnouncing } from './use-announcing'
+import type { Announcing } from './use-announcing'
 import { arrayMove, useSortableItem } from './use-sortable'
 
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
@@ -189,28 +191,18 @@ function SessionsTable({
   )
 }
 
-// Announcing sessions of a list, or un-announcing them, from their rows: `current` gives the sessions loaded as the
-// changes left them, `announce` changes one, and `error` says why the last change couldn't be made, if it couldn't.
-function useAnnouncing() {
-  // The sessions as the server answered each change, which replace the ones loaded.
-  const [changed, setChanged] = useState<Record<string, Session>>({})
-  const [error, setError] = useState<ReactNode>(null)
-  return {
-    current: (sessions: Session[]) => sessions.map((session) => changed[session.id] ?? session),
-    error,
-    async announce(session: Session, announced: Announced) {
-      setError(null)
-      const result = await api.PUT('/api/admin/sessions/{id}/announced', { params: { path: { id: session.id } }, body: { announced: announced === 'true' } })
-      if (result.ok) setChanged((changed) => ({ ...changed, [session.id]: result.session }))
-      else setError(failure(`L'annonce de «\u00a0${sessionName(session)}\u00a0» n'a pas pu être changée`, result, session.id))
-    },
-  }
-}
-
-// The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one.
-export function OwnSessions({ sessions, newPath }: { sessions: Loaded<{ sessions: Session[] }>; newPath: string }) {
+// The sessions of a collective's takeovers, on its page, with a link to `newPath`, which adds another one. They're
+// announced with `announcing`, which the page keeps, since this unmounts while the collective's form is open.
+export function OwnSessions({
+  sessions,
+  announcing: { current, error, announce },
+  newPath,
+}: {
+  sessions: Loaded<{ sessions: Session[] }>
+  announcing: Announcing
+  newPath: string
+}) {
   const headingId = useId()
-  const { current, error, announce } = useAnnouncing()
   return (
     <>
       <h2 id={headingId}>Sessions</h2>

@@ -76,6 +76,35 @@ const ONDES_PAGE = {
   '/api/admin/artists': { ok: true, artists: ARTISTS },
 }
 
+// Its takeover, which isn't announced, and the list of its takeovers that has it.
+const TAKEOVER: Session = {
+  id: 'session-1',
+  start: '2026-11-15T02:00:00.000Z',
+  end: '2026-11-15T05:00:00.000Z',
+  durationMinutes: 180,
+  type: 'takeover',
+  takeover: { id: 'collective-1', name: 'Ondes' },
+  application: null,
+  name: '',
+  title: 'ONDES TAKEOVER',
+  raEvent: null,
+  description: '',
+  effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+  hasFlyer: false,
+  sets: [],
+  createdAt: '2026-10-01T16:00:00.000Z',
+  createdBy: 'admin@example.com',
+  updatedBy: null,
+  updatedAt: null,
+  status: 'done',
+  statusUpdatedBy: null,
+  statusUpdatedAt: null,
+  announced: false,
+  announcedUpdatedBy: null,
+  announcedUpdatedAt: null,
+}
+const TAKEOVERS = { '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [TAKEOVER] } }
+
 const APPLICATION: Application = {
   id: 'application-1',
   artistId: null,
@@ -693,34 +722,6 @@ describe('A collective’s page', () => {
     expect(screen.getByRole('button', { name: 'supprimer le collectif' })).not.toHaveAttribute('aria-disabled')
   })
 
-  const TAKEOVER: Session = {
-    id: 'session-1',
-    start: '2026-11-15T02:00:00.000Z',
-    end: '2026-11-15T05:00:00.000Z',
-    durationMinutes: 180,
-    type: 'takeover',
-    takeover: { id: 'collective-1', name: 'Ondes' },
-    application: null,
-    name: '',
-    title: 'ONDES TAKEOVER',
-    raEvent: null,
-    description: '',
-    effectiveDescription: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
-    hasFlyer: false,
-    sets: [],
-    createdAt: '2026-10-01T16:00:00.000Z',
-    createdBy: 'admin@example.com',
-    updatedBy: null,
-    updatedAt: null,
-    status: 'done',
-    statusUpdatedBy: null,
-    statusUpdatedAt: null,
-    announced: false,
-    announcedUpdatedBy: null,
-    announcedUpdatedAt: null,
-  }
-  const TAKEOVERS = { '/api/admin/sessions?takeover=collective-1': { ok: true, sessions: [TAKEOVER] } }
-
   it("lists the sessions of its takeovers, without their type, and can't be deleted while it has some", async () => {
     mockFetch({ ...ONDES_PAGE, ...TAKEOVERS })
     renderAt('/admin/artistes/collectifs/collective-1')
@@ -751,6 +752,21 @@ describe('A collective’s page', () => {
     expect(announced).toHaveValue('true')
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
     expect(within(screen.getByRole('table', { name: 'Sessions' })).getAllByRole('row')).toHaveLength(2)
+  })
+
+  it('keeps a session of its takeovers announced once its form is opened, then cancelled', async () => {
+    mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: { ...TAKEOVER, announced: true } } })
+    renderAt('/admin/artistes/collectifs/collective-1')
+
+    const name = 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026'
+    const announced = await screen.findByRole('combobox', { name })
+    fireEvent.change(announced, { target: { value: 'true' } })
+    await waitFor(() => expect(announced).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'modifier' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'annuler' }))
+
+    expect(await screen.findByRole('combobox', { name })).toHaveValue('true')
+    expect(requestsTo('GET', '/api/admin/sessions?takeover=collective-1')).toHaveLength(1)
   })
 
   it('says why a session of its takeovers could not be announced, above them, naming it, which keeps its value', async () => {
