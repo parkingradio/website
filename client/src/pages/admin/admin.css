@@ -1026,7 +1026,8 @@ tr[data-dragging] > td {
   }
 
   /* A cell across a table's columns is as wide as the table's visible part, and in view wherever it's scrolled to. Only
-     the tables that have one are containers, so that the others are left as they are. */
+     the tables that have one are containers, since a container can be the containing block of what's positioned in it,
+     e.g. a dragged row or a tooltip. */
   .admin-table:has(.admin-table-span) {
     container-type: inline-size;
   }
@@ -1035,6 +1036,11 @@ tr[data-dragging] > td {
     position: sticky;
     left: 0;
     width: 100cqw;
+  }
+
+  /* With room for the focus ring of its fields and buttons, which the table, scrolling, would cut off at its edges. */
+  .admin-table-span .admin-form {
+    margin-inline: 3px;
   }
 
   .admin-record dl,

@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { centerOf, drag, swipe } from './drag.ts'
 import { test, expect, admin, adminMenu, logIn, NARROW, scrollsSideways, submitLogin, PHOTO } from './fixtures.ts'
+import type { Schemas } from './fixtures.ts'
 
 // The admin pages: logging in and out, managing artists and collectives, which goes through every layer: a form with a
 // photo, the database, the private bucket and back, then removing the photo, searching the seeded artists and
@@ -374,13 +375,22 @@ const withinScreen = (element: Locator) =>
     return left >= 0 && right <= document.documentElement.clientWidth
   })
 
+// Whether `element`'s focus ring, 3px around it (see `.admin-form input:focus-visible` in admin.css), is within its table,
+// which would cut it off, give or take a fraction of a pixel, which a table scrolled to its end can be off by.
+const ringWithinTable = (element: Locator) =>
+  element.evaluate((element) => {
+    const { left, right } = element.getBoundingClientRect()
+    const table = element.closest('table')!.getBoundingClientRect()
+    return left - 3 > table.left - 0.5 && right + 3 < table.right + 0.5
+  })
+
 // Configuration, with calendar feeds, which the server under test has none of, since it can't read a feed of the tests'
 // own (see `withCalendar`): the page is given three, one read, one whose last read failed, with a long message, and one
 // not read yet, which leaves the server as it is for other tests. Gives their table, and the line under the failed one.
 async function withFeeds(page: Page) {
   const added = { createdBy: admin.email, createdAt: '2026-11-07T16:30:00-05:00', updatedBy: null, updatedAt: null }
   const read = '2026-11-22T12:15:00-05:00'
-  const feeds = [
+  const feeds: Schemas['CalendarFeed'][] = [
     { ...added, id: 'e2e-team', name: "Calendrier de l'équipe", kind: 'occupations', link: 'https://example.com/team.ics', readAt: read, error: null },
     {
       ...added,
@@ -393,8 +403,9 @@ async function withFeeds(page: Page) {
     },
     { ...added, id: 'e2e-rehearsals', name: 'Répétitions', kind: 'occupations', link: 'https://example.com/rehearsals.ics', readAt: null, error: null },
   ]
-  await page.route('**/api/admin/calendar/feeds', (route) =>
-    route.request().method() === 'GET' ? route.fulfill({ json: { ok: true, total: feeds.length, feeds } }) : route.fallback(),
+  await page.route(
+    (url) => url.pathname === '/api/admin/calendar/feeds',
+    (route) => (route.request().method() === 'GET' ? route.fulfill({ json: { ok: true, total: feeds.length, feeds } }) : route.fallback()),
   )
   await logIn(page, { at: '/admin/configuration' })
   const table = page.getByRole('table', { name: 'Calendriers externes' })
@@ -426,13 +437,16 @@ test("Configuration's table of calendar feeds scrolls sideways on phones, with a
   const { table, line } = await withFeeds(page)
 
   // The table is too wide for the screen, and scrolls sideways on its own, rather than the page, while what's across it
-  // stays within the screen, wherever it's scrolled to.
+  // stays within the screen, wherever it's scrolled to, with room in the table for the focus ring of the form's fields
+  // and buttons.
   expect(await table.evaluate((table) => table.scrollWidth > table.clientWidth)).toBe(true)
-  const fitInScreen = async (elements: Locator[]) => {
+  const fitInScreen = async (elements: Locator[], focusable: Locator[] = []) => {
     // To its end, which the browser stops it at, then back to its start.
     for (const scrollLeft of [Number.MAX_SAFE_INTEGER, 0]) {
       await table.evaluate((table, scrollLeft) => (table.scrollLeft = scrollLeft), scrollLeft)
-      expect(await Promise.all(elements.map(withinScreen))).toEqual(elements.map(() => true))
+      const all = [...elements, ...focusable]
+      expect(await Promise.all(all.map(withinScreen))).toEqual(all.map(() => true))
+      expect(await Promise.all(focusable.map(ringWithinTable))).toEqual(focusable.map(() => true))
     }
     expect(await scrollsSideways(page)).toBe(false)
   }
@@ -440,5 +454,8 @@ test("Configuration's table of calendar feeds scrolls sideways on phones, with a
 
   await page.getByRole('button', { name: 'modifier : Séjours' }).click()
   await expect(table.getByRole('textbox', { name: 'Nom' })).toBeFocused()
-  await fitInScreen([line, table.getByRole('textbox', { name: 'Lien' }), table.getByRole('button', { name: 'annuler' })])
+  await fitInScreen(
+    [line],
+    [table.getByRole('textbox', { name: 'Nom' }), table.getByRole('textbox', { name: 'Lien' }), table.getByRole('button', { name: 'enregistrer' }), table.getByRole('button', { name: 'annuler' })],
+  )
 })

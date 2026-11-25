@@ -94,7 +94,7 @@ describe('The calendar feeds', () => {
     expect(row).toHaveTextContent('Séjours')
     const cell = within(line).getByRole('cell')
     expect(cell).toHaveAttribute('colspan', '4')
-    // Its feed's, rather than the first column's.
+    // Its feed's, rather than the columns'.
     expect(cell).toHaveAttribute('headers', screen.getByRole('rowheader', { name: 'Séjours' }).id)
     expect(cell).toHaveTextContent(
       "La dernière lecture a échoué : The link can't be read: its server fails (503). Dernière lecture réussie le 22 novembre 2026 à 12 h 15.",
@@ -138,7 +138,8 @@ describe('The calendar feeds', () => {
     expect(screen.getByText('Lecture du calendrier…')).toBeInTheDocument()
 
     await waitFor(() => expect(feeds()).toHaveLength(2))
-    expect(feeds()[1]).toHaveTextContent('NouveauPlages protégées')
+    expect(feeds()[1]).toBe(feedOf('Nouveau'))
+    expect(feedOf('Nouveau').querySelector('td')).toHaveTextContent('Plages protégées')
     expect(requestsTo('POST', URL).map(jsonBody)).toEqual([{ name: 'Nouveau', kind: 'holds', link: 'webcal://example.com/secret.ics' }])
     expect(nameField()).toHaveValue('')
     expect(kindChoice('Plages protégées')).not.toBeChecked()
@@ -280,7 +281,7 @@ describe('The calendar feeds', () => {
 
     await waitFor(() => expect(feeds()).toHaveLength(2))
     fireEvent.click(button('retirer', "Calendrier de l'équipe"))
-    expect(confirm).toHaveBeenCalledWith("Retirer le calendrier « Calendrier de l'équipe » ?")
+    expect(confirm).toHaveBeenCalledWith("Retirer le calendrier «\u00a0Calendrier de l'équipe\u00a0» ?")
     expect(requestsTo('DELETE', `${URL}/feed-1`)).toHaveLength(0)
 
     fireEvent.click(button('retirer', "Calendrier de l'équipe"))

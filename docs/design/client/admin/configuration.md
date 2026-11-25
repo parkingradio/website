@@ -77,23 +77,23 @@ under its calendar's name, and the time protected for sessions from others, « P
 reads them every 15 minutes.
 
 It lists the feeds in a table, one per row, in the order they were added: "Nom", "Type" (« Occupations » or
-« Plages protégées »), "Dernière lecture", then "modifier" and "retirer". "Dernière lecture" is when the feed was last
-read successfully, « pas encore lu » while it hasn't been read, or « échec », in the warnings' color (see
-[Warnings](layout.md#warnings)), when its last read failed. A feed whose last read failed has a line under its row,
-across the whole table, so that a long message doesn't widen a column, which says why, in the warnings' color too:
-« La dernière lecture a échoué : <why>. », then when it was last read successfully, if it was: « Dernière lecture
-réussie le <date et heure>. ». While there are no feeds, it says so rather than showing an empty table. On narrow
-screens like phones, it scrolls sideways like the admin pages' other tables (see [Tables](layout.md#tables)).
+« Plages protégées »), "Dernière lecture", then "modifier" and "retirer". "Dernière lecture" is « échec », in the
+warnings' color (see [Warnings](layout.md#warnings)), when the feed's last read failed, and otherwise when it was last
+read successfully, or « pas encore lu » while it hasn't been read. A feed whose last read failed has a line under its
+row, in the warnings' color too, which says why: « La dernière lecture a échoué : <why>. », then when it was last read
+successfully, if it was: « Dernière lecture réussie le <date et heure>. ». The line is across the whole table, so that a
+long message doesn't widen a column. While there are no feeds, it says so rather than showing an empty table. On
+narrow screens like phones, it scrolls sideways like the admin pages' other tables (see [Tables](layout.md#tables)).
 
 "retirer" removes a feed, once the admin confirms. When it can't be removed, the line under its row says why.
 
 "modifier" replaces the feed's row with a row across the whole table, holding a form filled in with it: "Nom", which
 gets the focus, "Type", « Occupations » or « Plages protégées », one of which is picked, as radio buttons, and "Lien",
-its link. Above the fields, it says which admin added the feed and when, « Ajouté par <email> le <date et heure>. »,
-and which admin last changed it and when, if one did, « Modifié par <email> le <date et heure>. ». The line under the
-row of a feed whose last read failed stays under the form. "enregistrer" saves only what was changed, so that a form
-opened before another admin's change doesn't undo it, and closes the form; "annuler" closes it without saving. Either
-way, the focus goes back to "modifier".
+its link. Above the fields, it says which admin added the feed and when, « Ajouté par <email> le <date et heure>. », and
+which admin last changed it and when, if one did, « Modifié par <email> le <date et heure>. ». The line under the feed's
+row, if it has one, stays under the form. "enregistrer" saves only what was changed, so that a form opened before
+another admin's change doesn't undo it, and closes the form; "annuler" closes it without saving. Either way, the focus
+goes back to "modifier".
 
 Under the table, a form adds a feed, with the same fields, where no type is picked at first, so that it's always chosen
 (see [`POST /api/admin/calendar/feeds`](../../server/calendar.md#post-apiadmincalendarfeeds-admin)). "ajouter" adds it,

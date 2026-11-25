@@ -113,7 +113,7 @@ export function adminMenu(page: Page) {
   return page.getByRole('navigation', { name: 'admin' })
 }
 
-type Schemas = components['schemas']
+export type Schemas = components['schemas']
 
 // What `withCalendar` adds to the studio's calendar: occupations, holds and conflicts, as if they were read from feeds,
 // and sessions, with those of them that are outside protected time.

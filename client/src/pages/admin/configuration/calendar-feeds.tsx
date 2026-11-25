@@ -92,7 +92,7 @@ function changesOf(feed: Feed, fields: FeedFields): Partial<FeedFields> {
 }
 
 // A row across the table's four columns, e.g. the form that changes a feed. `headers` is the id of the header its cell
-// is under, rather than the first column's.
+// is under, rather than the columns'.
 function SpanRow({ headers, children }: { headers?: string; children: ReactNode }) {
   return (
     <tr>
