@@ -187,7 +187,7 @@ describe('rules', () => {
     expect(sessions).toMatch(/or be outside protected time, while\s+there's a `holds` feed/)
     expect(calendar).toContain('## Conflicts')
     expect(calendar).toContain('## Protected time')
-    expect(calendar).toContain('Sessions are meant to be within protected time.')
+    expect(calendar).toContain('Sessions are meant to be within protected time (see Rules, in Sessions (read_documentation, area `sessions`)).')
     expect(calendar).toMatch(/apps\s+should ask for the calendar of every day it takes/)
     expect(calendar).not.toContain('## `')
   })
