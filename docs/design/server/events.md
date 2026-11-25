@@ -111,6 +111,7 @@ event is a `VEVENT` with:
 | `DTSTART`, `DTEND` | Its `start` and `end`, in UTC, e.g. `20261115T020000Z` |
 | `SUMMARY` | Its `title`, or, for a cancelled event, `[CANCELLED] ` then its title, as on [Programmation](../client/programmation.md) |
 | `STATUS` | `CANCELLED` for a cancelled event, which stays in the feed. Other events don't have one |
+| `TRANSP` | `TRANSPARENT`, for every event, so that calendar apps don't show subscribers as busy then, nor warn of a conflict when they add something at the same time: the feed is about what's on at Parking Radio, not the subscriber's own time |
 | `LOCATION` | `parking.radio` |
 | `DESCRIPTION` | The names of its `lineup`, one per line, then a blank line and its `description`. With an empty lineup, it starts with "OPEN JAM" instead for a synth meetup that isn't cancelled, as on Programmation, and otherwise only has its description. Either can be empty, which leaves out the blank line, and an event without either has no `DESCRIPTION` |
 | `URL` | Its `raEvent`, or else the site's Programmation page, e.g. `https://parking.radio/programmation` |

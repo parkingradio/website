@@ -4,7 +4,7 @@ import type { StoredFeed } from '../calendar/feeds.js'
 import type { FeedRead } from '../calendar/reads.js'
 import { serverName } from '../core/config.js'
 import { calendar, date, dateTime, text } from '../core/icalendar.js'
-import { eventVevent } from '../events/calendar.js'
+import { TRANSPARENT, eventVevent } from '../events/calendar.js'
 import { event } from '../events/routes.js'
 import type { StoredSession } from '../sessions/store.js'
 
@@ -17,9 +17,6 @@ const REFRESH_INTERVAL = 'PT15M'
 const UNANNOUNCED = '[UNANNOUNCED]'
 // How the calendar feeds whose last read failed are marked.
 const REFRESH_ERROR = '[REFRESH ERROR]'
-// Every event leaves the time it takes free in calendar apps, rather than busy, as they make it by default: these calendars
-// are about the studio, not the admin's own time.
-const TRANSPARENT = 'TRANSP:TRANSPARENT'
 
 export type CalendarOptions = {
   // Where the site is, which the events link to.
@@ -42,7 +39,6 @@ export function sessionsCalendar(rows: StoredSession[], { siteOrigin, environmen
       url: `${siteOrigin}/admin/sessions/${row.id}`,
       now,
       marks: row.announced ? [] : [UNANNOUNCED],
-      transparent: true,
     })
   return calendar({ name: calendarName('sessions', environment), refreshInterval: REFRESH_INTERVAL, components: rows.map(vevent) })
 }

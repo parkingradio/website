@@ -333,7 +333,7 @@ describe('GET /calendar.ics', () => {
     const vevents = response.body.match(/BEGIN:VEVENT[^]*?END:VEVENT/g)
     expect(vevents).toHaveLength(1)
     expect(vevents![0]).toContain(`UID:${session.id}@parking.radio\r\n`)
-    expect(vevents![0]).toContain('DTSTART:29900111T020000Z\r\nDTEND:29900111T040000Z\r\nSUMMARY:GUEST MIXES\r\n')
+    expect(vevents![0]).toContain('DTSTART:29900111T020000Z\r\nDTEND:29900111T040000Z\r\nSUMMARY:GUEST MIXES\r\nTRANSP:TRANSPARENT\r\n')
     expect(vevents![0]).toContain('DESCRIPTION:Ana\\nBrume\\n\\nUne soirée\r\nURL:https://parking.radio/programmation\r\n')
 
     await announce(session.id, false)

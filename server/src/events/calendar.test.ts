@@ -78,6 +78,7 @@ describe('calendar', () => {
         'DTSTART:20261115T020000Z',
         'DTEND:20261115T040000Z',
         'SUMMARY:GUEST MIXES',
+        'TRANSP:TRANSPARENT',
         'LOCATION:parking.radio',
         'DESCRIPTION:Ana\\nBrume\\n\\nUne soirée.',
         'URL:https://ra.co/events/6683745',
@@ -98,6 +99,13 @@ describe('calendar', () => {
     const { value } = parsedEvent({ cancelled: true })
     expect(value('summary')).toBe('[CANCELLED] GUEST MIXES')
     expect(value('status')).toBe('CANCELLED')
+  })
+
+  it('leaves the time of every event free rather than busy, cancelled ones included', () => {
+    const events = [event(), event({ id: 'session-2', cancelled: true }), event({ id: 'session-3', type: 'synth-meetup', raEvent: 'https://ra.co/events/1' })]
+    const vevents = parsed(events).getAllSubcomponents('vevent')
+    expect(vevents).toHaveLength(3)
+    for (const vevent of vevents) expect(vevent.getFirstPropertyValue('transp')).toBe('TRANSPARENT')
   })
 
   it("links an event without an event on RA to the site's Programmation page", () => {

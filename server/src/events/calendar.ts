@@ -17,6 +17,9 @@ const LOCATION = 'parking.radio'
 const CANCELLED = '[CANCELLED]'
 // How long browsers and calendar apps can keep the feed.
 const CACHE_CONTROL = 'public, max-age=300'
+// Every event leaves the time it takes free in calendar apps, rather than busy, as they make it by default: neither this
+// feed nor an admin's calendars (see admin-calendars/calendars.ts) are about the subscriber's own time.
+export const TRANSPARENT = 'TRANSP:TRANSPARENT'
 
 // The description of an event: the names of its lineup, one per line, then a blank line and its description, either of
 // which can be missing. A synth meetup without a lineup that isn't cancelled has OPEN JAM, as on Programmation.
@@ -32,14 +35,11 @@ type VeventOptions = {
   now: Date
   // What its title is marked with, after CANCELLED for a cancelled event.
   marks?: string[]
-  // Whether it leaves the time it takes free in calendar apps (TRANSP:TRANSPARENT), rather than busy, as they make it by
-  // default.
-  transparent?: boolean
 }
 
 // An event's VEVENT, as this feed has it, or as an admin's calendar of sessions has it, with a UID, a URL and marks of its
 // own (see admin-calendars/calendars.ts), so that both give sessions the same way.
-export function eventVevent(event: Event, { uid, url, now, marks = [], transparent = false }: VeventOptions): string[] {
+export function eventVevent(event: Event, { uid, url, now, marks = [] }: VeventOptions): string[] {
   const about = description(event)
   return [
     'BEGIN:VEVENT',
@@ -49,7 +49,7 @@ export function eventVevent(event: Event, { uid, url, now, marks = [], transpare
     `DTEND:${dateTime(event.end)}`,
     `SUMMARY:${text([...(event.cancelled ? [CANCELLED] : []), ...marks, event.title].join(' '))}`,
     ...(event.cancelled ? ['STATUS:CANCELLED'] : []),
-    ...(transparent ? ['TRANSP:TRANSPARENT'] : []),
+    TRANSPARENT,
     `LOCATION:${LOCATION}`,
     ...(about === '' ? [] : [`DESCRIPTION:${text(about)}`]),
     `URL:${url}`,
