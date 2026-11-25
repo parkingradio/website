@@ -64,8 +64,9 @@ function run({ payload = PAYLOAD as object | null, from = SITE } = {}) {
 
 const panel = () => screen.getByRole('dialog', { name: 'Parking Radio → RA' })
 
-// The page's address, which vitest's jsdom environment can change, e.g. to RA's site in another language.
-const RA_PAGE = 'https://ra.co/pro/event/create'
+// The page's address, as the environment's options above give it, which vitest's jsdom environment can change, e.g. to
+// RA's site in another language.
+const RA_PAGE = location.href
 const goTo = (url: string) => (globalThis as unknown as { jsdom: { reconfigure(options: { url: string }): void } }).jsdom.reconfigure({ url })
 
 beforeEach(() => {
