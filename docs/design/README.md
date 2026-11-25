@@ -65,11 +65,11 @@ design: when they disagree, these documents still win.
 | [Page introuvable](client/not-found.md) | Any URL that isn't one of the site's pages |
 | [Admin](client/admin/layout.md) | What every admin page shares: logging in, the menu |
 | [Calendrier](client/admin/calendrier.md) | The studio's calendar: sessions and occupations, its free time, their conflicts, the sessions outside protected time, and the sessions without a date |
-| [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Candidatures](client/admin/candidatures.md) | Going through applications |
 | [Sessions](client/admin/sessions.md) | Sessions at the studio and their sets: who played, when, and their recordings |
 | [Publier sur RA](client/admin/publier-sur-ra.md) | Creating a session's event on Resident Advisor, with a bookmarklet |
 | [Artistes](client/admin/artistes.md) | The artists and collectives Parking Radio knows of |
+| [Rotation radio](client/admin/rotation.md) | Choosing the radio's playlist |
 | [Intégrations](client/admin/integrations.md) | Connecting Claude, the admin's connected apps, and the RA bookmarklet |
 | [Autoriser une application](client/admin/autoriser.md) | Allowing an app, e.g. Claude, to act as the admin |
 | [Admins](client/admin/admins.md) | Who can access the admin pages |
