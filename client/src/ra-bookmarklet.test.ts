@@ -17,6 +17,12 @@ const EVENT = {
   venueId: '288529',
   promoterIds: ['183980'],
   content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+  promotionalLinks: [
+    // With a field the bookmarklet doesn't send, since anyone can write the address.
+    { title: 'parking.radio', url: 'https://parking.radio', id: '7' },
+    { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
+  ],
+  playerLinks: ['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'],
 }
 const PAYLOAD = { site: SITE, environment: 'production', session: 'session-1', event: EVENT }
 
@@ -29,6 +35,11 @@ const EVENT_INPUT = {
   venueId: '288529',
   promoterIds: ['183980'],
   content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+  promotionalLinks: [
+    { title: 'parking.radio', url: 'https://parking.radio' },
+    { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
+  ],
+  playerLinks: [{ sourceId: 'https://www.youtube.com/@parkingdotradio' }, { sourceId: 'https://soundcloud.com/parkingdotradio' }],
   submissionSource: 'SUBMITEVENTPAGE',
 }
 
@@ -90,6 +101,8 @@ describe('The bookmarklet', () => {
     expect(panel()).toHaveTextContent('vendredi 20 novembre 2026 à 21 h 00 → samedi 21 novembre 2026 à 01 h 00')
     expect(panel()).toHaveTextContent('Parking Radio')
     expect(panel()).toHaveTextContent('Line-upAurore Brume')
+    expect(panel()).toHaveTextContent('Liens promotionnelsparking.radio : https://parking.radio instagram : https://www.instagram.com/parking.radio')
+    expect(panel()).toHaveTextContent('Liens médiahttps://www.youtube.com/@parkingdotradio https://soundcloud.com/parkingdotradio')
     expect(panel()).not.toHaveTextContent('Attention')
     // One request, as the admin logged in to RA, that changes nothing.
     expect(fetch).toHaveBeenCalledTimes(1)
@@ -130,9 +143,11 @@ describe('The bookmarklet', () => {
   })
 
   it('shows what it is given as text', async () => {
-    run({ payload: { ...PAYLOAD, event: { ...EVENT, title: '<img src=x onerror=alert(1)>' } } })
+    const promotionalLinks = [{ title: '<img src=x onerror=alert(2)>', url: 'javascript:alert(3)' }]
+    run({ payload: { ...PAYLOAD, event: { ...EVENT, title: '<img src=x onerror=alert(1)>', promotionalLinks } } })
     expect(await screen.findByText('<img src=x onerror=alert(1)>')).toBeInTheDocument()
-    expect(panel().querySelector('img')).toBeNull()
+    expect(panel()).toHaveTextContent('<img src=x onerror=alert(2)> : javascript:alert(3)')
+    expect(panel().querySelector('img, a')).toBeNull()
   })
 
   it('says that RA changed, and to create the event by hand, when RA no longer takes what it sends', async () => {
@@ -202,6 +217,10 @@ describe('The bookmarklet', () => {
     expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
     document.body.replaceChildren()
     run({ payload: { site: SITE, session: 'session-1' } })
+    expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
+    // Without its links, e.g. in a tab opened before the session's page gave them.
+    document.body.replaceChildren()
+    run({ payload: { ...PAYLOAD, event: { ...EVENT, playerLinks: undefined } } })
     expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
     document.body.replaceChildren()
     run({ from: 'https://elsewhere.example' })

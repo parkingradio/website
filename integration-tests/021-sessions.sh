@@ -421,10 +421,11 @@ expect_body_contains '"performanceTypes":["dj","live-performance"],"otherPerform
 expect_body_contains '"youtubeVideo":{"id":"dQw4w9WgXcQ","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
 expect_body_contains "\"createdBy\":\"${ADMIN_EMAIL}\",\"updatedBy\":null,\"updatedAt\":null,\"status\":\"planned\""
 
-echo "  the content of a session's event on RA has its title, its times in Québec time, and its sets' performers"
+echo "  the content of a session's event on RA has its title, its times in Québec time, its sets' performers, and Parking Radio's links"
 json GET "${SESSIONS}/${first}/ra-event"
 expect_status 200
 expect_body_contains '"event":{"title":"HAUTE RIVE TAKEOVER","start":"2026-11-14T21:00:00-05:00","end":"2026-11-15T01:00:00-05:00","lineup":"Brume\nAna","venueId":"288529","promoterIds":["183980"]'
+expect_body_contains '"promotionalLinks":[{"title":"parking.radio","url":"https://parking.radio"},{"title":"instagram","url":"https://www.instagram.com/parking.radio"}],"playerLinks":["https://www.youtube.com/@parkingdotradio","https://soundcloud.com/parkingdotradio"]}'
 
 echo "  performers have to be artists who exist, a set's session has to exist, and nothing is saved otherwise"
 for performer in "$NOBODY" not-a-uuid "$ondes"; do

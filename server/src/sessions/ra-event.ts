@@ -14,6 +14,13 @@ function raLineup(session: SessionBody): string {
   return session.type === 'synth-meetup' ? SYNTH_MEETUP_LINEUP : session.title
 }
 
+// Parking Radio's links, and its media links, which every one of its events on RA has.
+const RA_PROMOTIONAL_LINKS = [
+  { title: 'parking.radio', url: 'https://parking.radio' },
+  { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
+]
+const RA_PLAYER_LINKS = ['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio']
+
 // The content of the event of `session`, as the endpoints return it.
 export function raEventContent(session: SessionBody): RaEventContent {
   return {
@@ -24,5 +31,7 @@ export function raEventContent(session: SessionBody): RaEventContent {
     venueId: RA_VENUE_ID,
     promoterIds: [RA_PROMOTER_ID],
     content: session.effectiveDescription,
+    promotionalLinks: RA_PROMOTIONAL_LINKS,
+    playerLinks: RA_PLAYER_LINKS,
   }
 }

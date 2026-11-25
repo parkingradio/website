@@ -61,13 +61,14 @@
     return paragraph(`Attention : l’événement sera vraiment créé sur RA, à partir d’une session de ${stamp}.`, 'margin:12px 0 0;color:#b00020;font-weight:bold')
   }
 
-  // The session's event, as its page put it in the address: #parking-radio=<its JSON, URI-encoded>.
+  // The session's event, as its page put it in the address: #parking-radio=<its JSON, URI-encoded>. One without its
+  // links, e.g. in a tab opened before the session's page gave them, is none.
   function sent() {
     const match = /(?:^#|&)parking-radio=([^&]*)/.exec(location.hash)
     if (!match) return null
     try {
       const given = JSON.parse(decodeURIComponent(match[1]))
-      return typeof given?.event === 'object' && given.event !== null ? given : null
+      return Array.isArray(given?.event?.promotionalLinks) && Array.isArray(given.event.playerLinks) ? given : null
     } catch {
       return null
     }
@@ -115,6 +116,7 @@
     if (!given) return fail('Aucun événement à créer : cliquez sur « Publier sur RA » sur la page de la session, puis sur ce favori.')
     if (given.site !== SITE) return fail(`Cet événement vient de ${given.site}, et ce favori de ${SITE}.`)
     const { event } = given
+    // It only sends the fields it lists, since anyone can write the address, and each link with only its title and address.
     const input = {
       title: event.title,
       startTime: local(event.start),
@@ -123,6 +125,8 @@
       venueId: event.venueId,
       promoterIds: event.promoterIds,
       content: event.content,
+      promotionalLinks: event.promotionalLinks.map((link) => ({ title: String(link.title), url: String(link.url) })),
+      playerLinks: event.playerLinks.map((url) => ({ sourceId: String(url) })),
       submissionSource: 'SUBMITEVENTPAGE',
     }
     const LOG_IN = 'Connectez-vous à RA, puis cliquez de nouveau sur « Publier sur RA » sur la page de la session.'
@@ -150,13 +154,16 @@
       })
     })
     const label = (text) => element('strong', text)
+    const lines = (text) => element('div', text, 'white-space:pre-wrap')
     show(
       paragraph(`Connecté à RA en tant que ${checks.user.username}. Vérifiez l’événement avant de le créer :`),
       paragraph([label(input.title)]),
       paragraph(`${when(event.start)} → ${when(event.end)}`),
       paragraph(checks.venue.name),
-      paragraph([label('Line-up'), element('div', input.lineup, 'white-space:pre-wrap')]),
-      paragraph([label('Description'), element('div', input.content || '-', 'white-space:pre-wrap')]),
+      paragraph([label('Line-up'), lines(input.lineup)]),
+      paragraph([label('Description'), lines(input.content || '-')]),
+      paragraph([label('Liens promotionnels'), lines(input.promotionalLinks.map(({ title, url }) => `${title} : ${url}`).join('\n'))]),
+      paragraph([label('Liens média'), lines(input.playerLinks.map(({ sourceId }) => sourceId).join('\n'))]),
       ...(given.environment === 'production' ? [] : [warning(given.environment)]),
       element('div', [create, cancel]),
     )

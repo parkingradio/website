@@ -1086,6 +1086,11 @@ describe('sessions routes', () => {
           venueId: '288529',
           promoterIds: ['183980'],
           content: 'LIVE STREAMING FROM QUÉBEC CITY. SPACE OPEN TO PUBLIC',
+          promotionalLinks: [
+            { title: 'parking.radio', url: 'https://parking.radio' },
+            { title: 'instagram', url: 'https://www.instagram.com/parking.radio' },
+          ],
+          playerLinks: ['https://www.youtube.com/@parkingdotradio', 'https://soundcloud.com/parkingdotradio'],
         },
       })
     })
