@@ -53,17 +53,26 @@ function checks(changes: object = {}) {
 }
 
 // The site's answers, to the event and the flyer, then RA's: to the checks, to uploading the flyer, then to creating the
-// event.
-let answers: { publication: () => Response; flyer: () => Response; checks: () => Response; upload: () => Response | Promise<Response>; create: () => Response }
+// event, then the site's, to saving it in the session.
+let answers: {
+  publication: () => Response
+  flyer: () => Response
+  checks: () => Response
+  upload: () => Response | Promise<Response>
+  create: () => Response
+  save: () => Response | Promise<Response>
+}
 const fetch = vi.fn(async (url: string, init: RequestInit) => {
   if (url.endsWith('/api/ra-publication')) return answers.publication()
   if (url.endsWith('/api/ra-publication/flyer')) return answers.flyer()
+  if (url.endsWith('/api/ra-publication/ra-event')) return answers.save()
   if (url === UPLOADER) return answers.upload()
   const { query } = JSON.parse(init.body as string)
   return query.startsWith('mutation createEvent') ? answers.create() : answers.checks()
 })
 const toRa = () => fetch.mock.calls.filter(([url]) => url === '/graphql')
 const uploads = () => fetch.mock.calls.filter(([url]) => url === UPLOADER)
+const saves = () => fetch.mock.calls.filter(([url]) => url.endsWith('/api/ra-publication/ra-event'))
 // The event that was created, as it was sent to RA.
 const created = () => JSON.parse(toRa().find(([, init]) => JSON.parse(init.body as string).query.startsWith('mutation'))![1].body as string).variables.eventInput
 // An answer that never comes, since the request fails.
@@ -84,10 +93,16 @@ function run({ token = TOKEN as string | null, from = SITE as string | null } = 
 
 const panel = () => screen.getByRole('dialog', { name: 'Parking Radio → RA' })
 const withFlyer = () => (answers.publication = () => Response.json({ ...PUBLICATION, hasFlyer: true }))
-// Clicks « Créer sur RA », once it's there, and waits for the event to be created.
+const SAVING = 'Enregistrement dans la session…'
+// Waits for the event to be created, and for saving it in the session to end.
+async function eventCreated() {
+  await screen.findByRole('link', { name: /^https:\/\/ra\.co\/events\// })
+  await vi.waitFor(() => expect(panel()).not.toHaveTextContent(SAVING))
+}
+// Clicks « Créer sur RA », once it's there, and waits for the event to be created, and saved in the session.
 async function createOnRa() {
   fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
-  await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
+  await eventCreated()
 }
 
 // The page's address, as the environment's options above give it, which vitest's jsdom environment can change, e.g. to
@@ -104,6 +119,7 @@ beforeEach(() => {
     checks: () => Response.json(checks()),
     upload: () => Response.json({ filename: FILENAME }),
     create: () => Response.json({ data: { createEvent: { id: '2400123' } } }),
+    save: () => Response.json({ ok: true }),
   }
   // The flyer's preview's address, which jsdom doesn't make.
   URL.createObjectURL = vi.fn(() => 'blob:https://ra.co/flyer')
@@ -118,7 +134,7 @@ afterEach(() => {
 })
 
 describe('The bookmarklet', () => {
-  it('gets the event from its site, checks RA, shows the event, and creates it only once confirmed, then leads back to the session', async () => {
+  it('gets the event from its site, checks RA, shows the event, and creates it only once confirmed, then saves it in the session', async () => {
     // The address when the site is asked for the event.
     let address = ''
     fetch.mockImplementationOnce(async () => {
@@ -148,11 +164,26 @@ describe('The bookmarklet', () => {
     expect(sentQueries()[0]).not.toContain('ImageInput')
     expect(creations()).toEqual([])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Créer sur RA' }))
-    const link = await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
-    expect(link).toHaveAttribute('href', `${SITE}/admin/sessions/session-1?raEvent=2400123`)
+    expect(saves()).toEqual([])
+    await createOnRa()
     expect(screen.getByRole('link', { name: 'https://ra.co/events/2400123' })).toHaveAttribute('href', 'https://ra.co/events/2400123')
+    expect(panel()).toHaveTextContent('Il est enregistré comme « Événement RA » de la session.')
+    expect(screen.getByRole('link', { name: 'session' })).toHaveAttribute('href', `${SITE}/admin/sessions/session-1`)
     expect(panel()).toHaveTextContent('Ajoutez le flyer à la main, sur la page de l’événement sur RA.')
+    // Saved with the token, on the site it was loaded from, without cookies.
+    expect(saves()).toEqual([
+      [
+        `${SITE}/api/ra-publication/ra-event`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: '{"raEvent":"2400123"}',
+          signal: expect.any(AbortSignal),
+          credentials: 'omit',
+          cache: 'no-store',
+        },
+      ],
+    ])
     expect(uploads()).toEqual([])
     expect(toRa()).toHaveLength(2)
     expect(JSON.parse(toRa()[1][1].body as string)).toEqual({
@@ -202,6 +233,7 @@ describe('The bookmarklet', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
     expect(await screen.findByText('RA a refusé de créer l’événement : You cannot post events for this promoter.')).toBeInTheDocument()
     expect(creations()).toHaveLength(1)
+    expect(saves()).toEqual([])
 
     document.body.replaceChildren()
     answers.create = () => Response.json({ errors: [{ message: 'Variable "$eventInput" got invalid value.' }] }, { status: 400 })
@@ -418,11 +450,69 @@ describe('The bookmarklet', () => {
     expect(screen.queryByText(/^Aucun événement à créer/)).not.toBeInTheDocument()
 
     uploaded(Response.json({ filename: FILENAME }))
-    await screen.findByRole('link', { name: 'Enregistrer l’événement dans la session' })
+    await eventCreated()
     expect(creations()).toHaveLength(1)
     // Once it's done, clicking the bookmarklet again replaces the panel.
     new Function(SCRIPT)()
     expect(panel()).not.toBe(busy)
     expect(screen.getByText(/^Aucun événement à créer/)).toBeInTheDocument()
+  })
+
+  it('shows the event’s link as soon as it is created, while it saves it in the session, and leaves the panel as it is until then', async () => {
+    // Saving, which only ends when the test says.
+    let saved: (answer: Response) => void = () => {}
+    answers.save = () => new Promise((resolve) => (saved = resolve))
+    run()
+    fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
+    await vi.waitFor(() => expect(saves()).toHaveLength(1))
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/2400123' })).toBeInTheDocument()
+    expect(panel()).toHaveTextContent(SAVING)
+    const busy = panel()
+    new Function(SCRIPT)()
+    expect(panel()).toBe(busy)
+
+    saved(Response.json({ ok: true }))
+    expect(await screen.findByRole('link', { name: 'session' })).toBeInTheDocument()
+    expect(panel()).not.toHaveTextContent(SAVING)
+    new Function(SCRIPT)()
+    expect(panel()).not.toBe(busy)
+  })
+
+  const BY_HAND = 'Collez son lien dans « Événement RA », sur la page de la session.'
+  it.each<[string, () => Response, string | null]>([
+    ['le lien de publication n’est plus valide', () => Response.json({ ok: false, error: "The token isn't valid, or has expired" }, { status: 403 }), BY_HAND],
+    ['la session a déjà un événement RA', () => Response.json({ ok: false, error: 'This session already has an event on RA' }, { status: 409 }), 'Vérifiez « Événement RA » sur la page de la session.'],
+    ['la session n’existe plus', () => Response.json({ ok: false, error: 'No such session' }, { status: 404 }), null],
+    ['Something went wrong', () => Response.json({ ok: false, error: 'Something went wrong' }, { status: 500 }), BY_HAND],
+    [`${SITE} a répondu 502`, () => new Response('Bad gateway', { status: 502 }), BY_HAND],
+    [`${SITE} n’a pas pu être joint`, throws(new TypeError('Failed to fetch')), BY_HAND],
+  ])('shows the event’s link when it can’t be saved in the session, says why, and where to save it by hand: %s', async (why, save, byHand) => {
+    answers.save = save
+    run()
+    await createOnRa()
+    expect(screen.getByRole('link', { name: 'https://ra.co/events/2400123' })).toBeInTheDocument()
+    expect(screen.getByText(`L’événement n’a pas pu être enregistré dans la session : ${why}.`)).toBeInTheDocument()
+    expect(panel()).not.toHaveTextContent('Il est enregistré')
+    if (byHand) {
+      expect(panel()).toHaveTextContent(byHand)
+      expect(screen.getByRole('link', { name: 'page de la session' })).toHaveAttribute('href', `${SITE}/admin/sessions/session-1`)
+    } else expect(screen.queryByRole('link', { name: 'page de la session' })).not.toBeInTheDocument()
+    expect(saves()).toHaveLength(1)
+    expect(creations()).toHaveLength(1)
+  })
+
+  it('gives up saving it in the session after 30 seconds without an answer', async () => {
+    // The timeout's signal, which the test aborts, as the browser would after 30 seconds.
+    const timeout = new AbortController()
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal)
+    answers.save = () => new Promise((_, reject) => timeout.signal.addEventListener('abort', () => reject(timeout.signal.reason)))
+    run()
+    fireEvent.click(await screen.findByRole('button', { name: 'Créer sur RA' }))
+    await vi.waitFor(() => expect(saves()).toHaveLength(1))
+    expect(timeoutSpy).toHaveBeenCalledWith(30_000)
+    timeout.abort(new DOMException('The operation timed out.', 'TimeoutError'))
+    expect(await screen.findByText(`L’événement n’a pas pu être enregistré dans la session : ${SITE} n’a pas répondu à temps.`)).toBeInTheDocument()
+    expect(panel()).toHaveTextContent(BY_HAND)
+    timeoutSpy.mockRestore()
   })
 })

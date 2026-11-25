@@ -120,7 +120,7 @@ export async function registerRoutes(app: FastifyInstance, deps: Dependencies) {
     sendEmail: deps.sendEmail,
   })
   await app.register(sessionsRoutes, { store: deps.sessions, photos: deps.photos, resolveTrack: soundcloud.resolveTrack })
-  await app.register(raPublicationRoutes, { store: deps.sessions, photos: deps.photos, environment: deps.environment })
+  await app.register(raPublicationRoutes, { store: deps.sessions, admins: deps.admins, photos: deps.photos, environment: deps.environment })
   await app.register(eventsRoutes, { store: deps.events, photos: deps.photos })
   await app.register(calendarRoutes, { store: deps.events, siteOrigin: deps.siteOrigin })
   await app.register(calendarFeedsRoutes, { feeds: deps.calendarFeeds, reads: deps.calendarReads })

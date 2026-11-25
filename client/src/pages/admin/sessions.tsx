@@ -5,7 +5,6 @@ import { api, formData } from '../../api/client'
 import { useApi } from '../../api/use-api'
 import type { Loaded } from '../../api/use-api'
 import type { Application } from '../../application-fields'
-import { raEventId } from '../../session-links'
 import {
   EMPTY_SESSION_FORM,
   STATUSES,
@@ -445,21 +444,14 @@ function SessionById({ id }: { id: string }) {
 // docs/design/client/admin/sessions.md), or the panel that moves a set to another session, by the set's id.
 type OpenForm = { kind: 'session' } | { kind: 'raEvent' } | { kind: 'set'; id: string | null; application?: string } | { kind: 'move'; id: string } | null
 
-// What the address of a session's page opens, until a form opens or closes.
-const OPENING_PARAMS = ['raEvent', 'application']
-
 function LoadedSession({ loaded }: { loaded: Session }) {
   // The session as the last change left it, which replaces the one loaded.
   const [session, setSession] = useState(loaded)
-  // The event on RA that the bookmarklet just created for the session, from the address it led back to (see
-  // docs/design/client/admin/publier-sur-ra.md), while it has none. It opens the panel of its event on RA with it, until
-  // a form opens or closes: only saving it saves it. Or else the application a new set is filled in from, unless the
-  // session is cancelled.
+  // The application a new set is filled in from, unless the session is cancelled, from the page's address, until a form
+  // opens or closes.
   const [searchParams, setSearchParams] = useSearchParams()
-  const created = session.raEvent ? null : raEventId(searchParams.get('raEvent') ?? '')
   const [open, setOpen] = useState<OpenForm>(() => {
     const application = searchParams.get('application')
-    if (created) return { kind: 'raEvent' }
     return application && session.status !== 'cancelled' ? { kind: 'set', id: null, application } : null
   })
   const [busy, setBusy] = useState(false)
@@ -489,9 +481,9 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   // Opens `form`, or closes the one that's open, after which the address doesn't open anything anymore.
   const showForm = (form: OpenForm) => {
     setOpen(form)
-    if (!OPENING_PARAMS.some((name) => searchParams.has(name))) return
+    if (!searchParams.has('application')) return
     const params = new URLSearchParams(searchParams)
-    for (const name of OPENING_PARAMS) params.delete(name)
+    params.delete('application')
     setSearchParams(params, { replace: true })
   }
   // Opening a form, or closing one once it's saved, also clears what the page said went wrong, or that a set was moved.
@@ -716,7 +708,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
                 <>
                   {MISSING}{' '}
                   {open?.kind === 'raEvent' ? (
-                    <RaEventPanel session={session} created={created} onSaved={changed} onCancel={() => openForm(null)} />
+                    <RaEventPanel session={session} onSaved={changed} onCancel={() => openForm(null)} />
                   ) : (
                     <button type="button" onClick={() => openForm({ kind: 'raEvent' })}>
                       créer

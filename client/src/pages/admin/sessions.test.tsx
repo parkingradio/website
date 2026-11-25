@@ -1531,7 +1531,7 @@ describe("A session's event on RA", () => {
 
     expect(within(value('Événement RA')).getByRole('link', { name: 'sur RA' })).toHaveAttribute('href', 'https://ra.co/pro/event/create')
     expect(value('Événement RA')).toHaveTextContent(
-      "« Publier sur RA » ouvre RA, où le favori « Parking Radio → RA » vous montre l'événement, puis le crée. Assurez-vous d'être connecté au bon compte RA avant de cliquer sur « Publier sur RA ». Si le favori ne fonctionne pas, créez l'événement sur RA à la main d'après la page de la session, puis collez son lien ci-dessous.",
+      "« Publier sur RA » ouvre RA, où le favori « Parking Radio → RA » vous montre l'événement, puis le crée et l'enregistre dans la session. Assurez-vous d'être connecté au bon compte RA avant de cliquer sur « Publier sur RA ». Si le favori ne fonctionne pas, créez l'événement sur RA à la main d'après la page de la session, puis collez son lien ci-dessous.",
     )
     expect(within(value('Événement RA')).getByText('avant').tagName).toBe('STRONG')
     expect(within(value('Événement RA')).queryByRole('link', { name: 'Intégrations' })).not.toBeInTheDocument()
@@ -1648,31 +1648,12 @@ describe("A session's event on RA", () => {
     expect(value('Événement RA')).toHaveTextContent('où le favori « Parking Radio → RA [TEST] » vous montre')
   })
 
-  it('opens the panel with the event on RA the bookmarklet created, saving it only with « enregistrer »', async () => {
-    mockFetch({ ...UNPUBLISHED_PAGE, 'PATCH /api/admin/sessions/session-1': { ok: true, session: SAVED } })
-    renderAt('/admin/sessions/session-1?raEvent=2400123')
-
-    const notice = "L'événement RA n° 2400123 vient d'être créé sur RA : enregistrez-le dans la session."
-    expect(await screen.findByText(notice, { normalizer: (text) => text.replace(/\s+/g, ' ') })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: "Lien de l'événement RA" })).toHaveValue('https://ra.co/events/2400123')
-    expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
-
-    fireEvent.click(screen.getByRole('button', { name: 'enregistrer' }))
-    await waitFor(() => expect(value('Événement RA')).toHaveTextContent(/^https:\/\/ra\.co\/events\/2400123$/))
-    expect(jsonBody(requestsTo('PATCH', '/api/admin/sessions/session-1')[0])).toEqual({ raEvent: '2400123' })
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
-  })
-
-  it('saves nothing when the panel is cancelled, and ignores what is not an event on RA', async () => {
+  it('saves nothing when the panel is cancelled', async () => {
     mockFetch(UNPUBLISHED_PAGE)
-    const first = renderAt('/admin/sessions/session-1?raEvent=2400123')
-    fireEvent.click(await screen.findByRole('button', { name: 'annuler' }))
-    expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
-    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1$/)
-    first.unmount()
-
-    renderAt('/admin/sessions/session-1?raEvent=javascript:alert(1)')
-    await screen.findByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })
+    renderAt('/admin/sessions/session-1')
+    await openPanel()
+    fireEvent.change(screen.getByRole('textbox', { name: "Lien de l'événement RA" }), { target: { value: 'https://ra.co/events/2400123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'annuler' }))
     expect(value('Événement RA')).toHaveTextContent(/^- créer$/)
     expect(requestsTo('PATCH', '/api/admin/sessions/session-1')).toHaveLength(0)
   })
@@ -2990,7 +2971,7 @@ describe('From an application', () => {
 
     it('removes it from the address once the form is cancelled, or another one opens, which starts empty', async () => {
       mockFetch(SET_PAGE)
-      const first = renderAt('/admin/sessions/session-1?application=application-3&raEvent=x')
+      const first = renderAt('/admin/sessions/session-1?application=application-3')
       await screen.findByRole('heading', { name: 'Nouveau set' })
       fireEvent.click(newSet().getByRole('button', { name: 'annuler' }))
       expect(screen.queryByRole('heading', { name: 'Nouveau set' })).not.toBeInTheDocument()

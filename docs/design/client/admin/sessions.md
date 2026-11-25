@@ -142,10 +142,9 @@ Only one form is open at a time on a session's page, the session's, the panel of
 [Moving a set to another session](#moving-a-set-to-another-session)): opening one closes the other, losing what wasn't
 saved. Deleting a set closes its form, or its panel, if it's open.
 
-What the page's address opens, `?raEvent` (see [Creating its event on RA](#creating-its-event-on-ra)) or `?application`
-(see [From an application](#from-an-application)), stays in it until the admin opens a form or closes one, the one it
-opened included, whether it's saved or cancelled. It's then removed from the address, in place, so that reloading the
-page, or coming back to it, doesn't open it again.
+The page's address's `?application` (see [From an application](#from-an-application)) stays in it until the admin opens
+a form or closes one, the one it opened included, whether it's saved or cancelled. It's then removed from the address,
+in place, so that reloading the page, or coming back to it, doesn't open it again.
 
 ## Creating its event on RA
 
@@ -163,11 +162,11 @@ the event on RA, with the bookmarklet or by hand, and save it as the session's:
   it: « Attention : l'événement sera vraiment créé sur RA, à partir d'une session de TEST. », with the environment's
   stamp (see [Environment](../architecture.md#environment)).
 - A sentence says that « Publier sur RA » opens RA, where the bookmarklet, named as Intégrations names it (see
-  [Publier sur RA, in Intégrations](integrations.md#publier-sur-ra)), shows the event, then creates it, and to make
-  sure to be logged in to the right RA account **before** clicking « Publier sur RA », since logging in to RA loses
-  the token, with "avant" in bold. Another says that when the bookmarklet doesn't work, the event can be created on RA
-  by hand (linking to RA's form, `https://ra.co/pro/event/create`) from the session's page, then its link pasted
-  below.
+  [Publier sur RA, in Intégrations](integrations.md#publier-sur-ra)), shows the event, then creates it and saves it in
+  the session, and to make sure to be logged in to the right RA account **before** clicking « Publier sur RA », since
+  logging in to RA loses the token, with "avant" in bold. Another says that when the bookmarklet doesn't work, the event
+  can be created on RA by hand (linking to RA's form, `https://ra.co/pro/event/create`) from the session's page, then
+  its link pasted below.
 - "Lien de l'événement RA": the event's link, or its number, as a session's `raEvent` takes it (see
   [Links](../../server/sessions.md#links)), with or without its `https://`. "enregistrer" saves it as the session's
   event on RA, which then shows in place of the panel, and "annuler" closes the panel. Saving only changes the session's
@@ -176,11 +175,6 @@ the event on RA, with the bookmarklet or by hand, and save it as the session's:
   says so, and sends nothing.
 
 Once the session has its event on RA, its "Événement RA" only links to it: "modifier" still changes it.
-
-When the bookmarklet leads back to the session's page with the event it created on RA, `?raEvent=<id>`, the page opens
-the panel, while the session has no event on RA, with the event's link in its field, under a notice, « L'événement RA n°
-<id> vient d'être créé sur RA : enregistrez-le dans la session. ». Only « enregistrer » saves it (see
-[Back to the session](publier-sur-ra.md#back-to-the-session)).
 
 ## The session form
 

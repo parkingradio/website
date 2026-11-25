@@ -108,6 +108,7 @@ export class Conflict extends Refused {
 
 export const SESSION_CANCELLED = 'This session is cancelled'
 export const ANNOUNCED_HAS_START = 'An announced session has a start'
+export const HAS_RA_EVENT = 'This session already has an event on RA'
 
 // The rules of sessions that the database enforces, by the constraint that enforces each one, with how to find what's
 // in the way of the session or the set that broke it, as it would have been saved.
@@ -167,6 +168,10 @@ export type SessionsStore = {
   setStatus(id: string, change: StatusChange): Promise<StoredSession | null>
   // Announces the session, or un-announces it. Throws a BrokenFields when it's announced without a start.
   setAnnounced(id: string, change: AnnouncedChange): Promise<StoredSession | null>
+  // Sets the session's event on RA, only while it has none, as a change to the session, by `updatedBy`, at `updatedAt`.
+  // Throws a Conflict, without a session in the way, when it already has one, even the same. Returns the session as the
+  // database keeps it, without its sets.
+  setRaEvent(id: string, change: { raEventId: string; updatedBy: string; updatedAt: Date }): Promise<SessionRow | null>
   // Returns the session as it was, so that its flyer can be deleted too, or null if it didn't exist. Its sets are deleted
   // with it, but not their performers.
   delete(id: string): Promise<SessionRow | null>
@@ -664,6 +669,18 @@ export function sessionsStore(db: Queryable): SessionsStore {
         checkAnnounced({ ...before, ...change })
         await tx.update(sessions).set(change).where(eq(sessions.id, id))
         return sessionWithId(tx, id)
+      })
+    },
+
+    async setRaEvent(id, change) {
+      if (!isUuid(id)) return null
+      return db.transaction(async (tx) => {
+        await lockSessions(tx)
+        const before = await sessionRow(tx, id)
+        if (!before) return null
+        if (before.raEventId !== null) throw new Conflict(HAS_RA_EVENT, null)
+        const [after] = await tx.update(sessions).set(change).where(eq(sessions.id, id)).returning()
+        return after
       })
     },
 

@@ -22,6 +22,7 @@ const store: AdminsStore = {
     return deleted ? { email: deleted.email } : null
   }),
   sessionVersion: async () => 0,
+  emailAndSessionVersion: async () => null,
 }
 const send = vi.fn<SendEmail>(async () => {})
 

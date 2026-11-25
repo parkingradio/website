@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { api } from '../../api/client'
 import { useEnvironmentStamp } from '../../config-context'
 import type { Session } from '../../session-fields'
-import { raEventId, raEventUrl } from '../../session-links'
+import { raEventId } from '../../session-links'
 import { Button } from './button'
 import { FormActions, Labeled } from './fields'
 import { failure } from './session-errors'
@@ -22,22 +22,11 @@ function whyNotPublished(session: Session): string | null {
 }
 
 // The panel that opens under the session's "Événement RA" while it has none: « Publier sur RA », and the field the
-// event's link is pasted in, which saves it as the session's event. `created` is the event the bookmarklet just created,
-// which fills the field in.
-export function RaEventPanel({
-  session,
-  created,
-  onSaved,
-  onCancel,
-}: {
-  session: Session
-  created: string | null
-  onSaved: (session: Session) => void
-  onCancel: () => void
-}) {
+// event's link is pasted in, which saves it as the session's event.
+export function RaEventPanel({ session, onSaved, onCancel }: { session: Session; onSaved: (session: Session) => void; onCancel: () => void }) {
   // Outside production, the event is created on RA all the same, and the bookmarklet's name has the stamp too.
   const stamp = useEnvironmentStamp()
-  const [link, setLink] = useState(created ? raEventUrl(created) : '')
+  const [link, setLink] = useState('')
   const [linkError, setLinkError] = useState<string | null>(null)
   const [error, setError] = useState<ReactNode>(null)
   const [busy, setBusy] = useState(false)
@@ -84,11 +73,6 @@ export function RaEventPanel({
 
   return (
     <div className="admin-ra-panel">
-      {created && (
-        <p className="admin-notice" role="status">
-          L'événement RA n°&nbsp;{created} vient d'être créé sur RA&nbsp;: enregistrez-le dans la session.
-        </p>
-      )}
       <div className="admin-toolbar">
         <Button unavailable={whyNotPublished(session)} disabled={publishing} onClick={publish}>
           Publier sur RA
@@ -106,8 +90,9 @@ export function RaEventPanel({
       )}
       <p>
         «&nbsp;Publier sur RA&nbsp;» ouvre RA, où le favori «&nbsp;Parking Radio → RA{stamp && ` [${stamp}]`}&nbsp;» vous
-        montre l'événement, puis le crée. Assurez-vous d'être connecté au bon compte RA <strong>avant</strong> de cliquer
-        sur «&nbsp;Publier sur RA&nbsp;». Si le favori ne fonctionne pas, créez l'événement{' '}
+        montre l'événement, puis le crée et l'enregistre dans la session. Assurez-vous d'être connecté au bon compte RA{' '}
+        <strong>avant</strong> de cliquer sur «&nbsp;Publier sur RA&nbsp;». Si le favori ne fonctionne pas, créez
+        l'événement{' '}
         <a href={RA_CREATE_EVENT} target="_blank" rel="noreferrer">
           sur RA
         </a>{' '}

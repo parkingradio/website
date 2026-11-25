@@ -5,6 +5,7 @@ import fastifyCookie from '@fastify/cookie'
 import { useZodSchemas } from '../api/schemas.js'
 import { TEST_ADMIN, sessionCookies } from '../admins/test-sessions.js'
 import type { AdminsStore } from '../admins/store.js'
+import { Conflict, HAS_RA_EVENT } from '../sessions/store.js'
 import type { SessionsStore, StoredSession } from '../sessions/store.js'
 import { storedSession, storedSet as set } from '../sessions/test-rows.js'
 import { memoryPhotos, testImage } from '../artists/test-photos.js'
@@ -19,10 +20,25 @@ const session = (fields: Partial<StoredSession> = {}) =>
   storedSession({ durationMinutes: 240, type: 'takeover', takeoverId: 'collective-1', takeover: { id: 'collective-1', name: 'Les Ondes' }, announced: false, ...fields })
 
 let rows: StoredSession[] = []
-const store = { get: vi.fn(async (id: string) => rows.find((row) => row.id === id) ?? null) }
+const find = (id: string) => rows.find((row) => row.id === id) ?? null
+const store = {
+  get: vi.fn(async (id: string) => find(id)),
+  // As the database does it.
+  setRaEvent: vi.fn<SessionsStore['setRaEvent']>(async (id, change) => {
+    const row = find(id)
+    if (!row) return null
+    if (row.raEventId !== null) throw new Conflict(HAS_RA_EVENT, null)
+    return Object.assign(row, change)
+  }),
+}
 // The version of each admin's sessions, as the database has it: every admin's is 0, unless they were revoked (null).
 const versions = new Map<string, number | null>()
 const sessionVersion = vi.fn<AdminsStore['sessionVersion']>(async (id) => (versions.has(id) ? versions.get(id)! : 0))
+// Every admin is TEST_ADMIN, by their email.
+const emailAndSessionVersion = vi.fn<AdminsStore['emailAndSessionVersion']>(async (id) => {
+  const version = await sessionVersion(id)
+  return version === null ? null : { email: TEST_ADMIN.email, sessionVersion: version }
+})
 // Where the flyers are kept: FLYER_KEY is a PNG of 3000 × 1500 pixels.
 const photos = memoryPhotos()
 const FLYER_KEY = 'sessions/flyer.png'
@@ -46,19 +62,28 @@ async function buildApp(environment = 'production') {
   useZodSchemas(app)
   await app.register(fastifyCookie)
   app.decorate('adminSessions', { sessionVersion })
-  await app.register(raPublicationRoutes, { store: store as unknown as SessionsStore, photos, environment })
+  await app.register(raPublicationRoutes, { store: store as unknown as SessionsStore, admins: { emailAndSessionVersion }, photos, environment })
   return app
 }
 type App = Awaited<ReturnType<typeof buildApp>>
 
 const issue = async (app: App, id = 'session-1') =>
   app.inject({ method: 'POST', url: `/api/admin/sessions/${id}/ra-publication`, cookies: await sessionCookies() })
-// A request to `url`, with `token`, if any, as the bookmarklet sends it.
-const withToken = (app: App, url: string, token: string | null, headers: Record<string, string> = {}) =>
-  app.inject({ method: 'GET', url, headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), ...headers } })
+// A request to `url`, with `token`, if any, as the bookmarklet sends it: a GET, unless it sends a `payload`.
+const withToken = (app: App, url: string, token: string | null, headers: Record<string, string> = {}, payload?: unknown) =>
+  app.inject({
+    method: payload === undefined ? 'GET' : 'PUT',
+    url,
+    payload: payload as object | undefined,
+    headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), ...headers },
+  })
 const publication = (app: App, token: string | null, headers: Record<string, string> = {}) => withToken(app, '/api/ra-publication', token, headers)
 const flyer = (app: App, token: string | null, headers: Record<string, string> = {}) => withToken(app, '/api/ra-publication/flyer', token, headers)
 const tokenFor = async (app: App, id = 'session-1') => (await issue(app, id)).json().token as string
+// Saving an event as the session's, with `token`, as the bookmarklet does once it created it.
+const SAVED = { raEvent: '2400123' }
+const save = (app: App, token: string | null, payload: unknown = SAVED, headers: Record<string, string> = {}) =>
+  withToken(app, '/api/ra-publication/ra-event', token, headers, payload)
 
 describe('POST /api/admin/sessions/:id/ra-publication', () => {
   it('requires a session', async () => {
@@ -167,11 +192,11 @@ describe('GET /api/ra-publication', () => {
     const token = await tokenFor(app)
     versions.set(TEST_ADMIN.id, null)
     expect((await publication(app, token)).statusCode).toBe(403)
-    expect(sessionVersion).toHaveBeenLastCalledWith(TEST_ADMIN.id)
+    expect(emailAndSessionVersion).toHaveBeenLastCalledWith(TEST_ADMIN.id)
   })
 
-  it('responds 404 once the session is deleted, and 409 when it has no start, or is cancelled', async () => {
-    rows.push(session({ id: 'session-2', startAt: null }), session({ id: 'session-3' }))
+  it('responds 404 once the session is deleted, and 409 when it has no start, is cancelled, or has an event on RA', async () => {
+    rows.push(session({ id: 'session-2', startAt: null }), session({ id: 'session-3' }), session({ id: 'session-4', raEventId: '2400123' }))
     const app = await buildApp()
     const deleted = await tokenFor(app)
     rows.shift()
@@ -183,17 +208,27 @@ describe('GET /api/ra-publication', () => {
     expect(undated.json()).toEqual({ ok: false, error: 'The session has no start' })
     // Cancelled once the token was given.
     const token = await tokenFor(app, 'session-3')
-    rows[rows.length - 1].status = 'cancelled'
+    find('session-3')!.status = 'cancelled'
     const cancelled = await publication(app, token)
     expect(cancelled.statusCode).toBe(409)
     expect(cancelled.json()).toEqual({ ok: false, error: 'This session is cancelled' })
+    const published = await publication(app, await tokenFor(app, 'session-4'))
+    expect(published.statusCode).toBe(409)
+    expect(published.json()).toEqual({ ok: false, error: 'This session already has an event on RA' })
   })
 
-  it.each(['/api/ra-publication', '/api/ra-publication/flyer'])("lets RA's pages, and only them, read the responses of %s, errors included, after asking with a preflight", async (url) => {
+})
+
+describe('The endpoints that take the token', () => {
+  it.each([
+    ['GET', '/api/ra-publication'],
+    ['GET', '/api/ra-publication/flyer'],
+    ['PUT', '/api/ra-publication/ra-event'],
+  ] as const)("let RA's pages, and only them, read the responses of %s %s, errors included, after asking with a preflight", async (method, url) => {
     rows = [withFlyer()]
     const app = await buildApp()
     const token = await tokenFor(app)
-    const get = (token: string, headers: Record<string, string>) => withToken(app, url, token, headers)
+    const get = (token: string, headers: Record<string, string>) => withToken(app, url, token, headers, method === 'PUT' ? SAVED : undefined)
     for (const origin of ['https://ra.co', 'https://fr.ra.co']) {
       for (const response of [await get(token, { origin }), await get('not-a-token', { origin })]) {
         expect(response.headers['access-control-allow-origin']).toBe(origin)
@@ -203,19 +238,19 @@ describe('GET /api/ra-publication', () => {
       const preflight = await app.inject({
         method: 'OPTIONS',
         url,
-        headers: { origin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization' },
+        headers: { origin, 'access-control-request-method': method, 'access-control-request-headers': 'authorization' },
       })
       expect(preflight.statusCode).toBe(204)
       expect(preflight.headers).toMatchObject({
         'access-control-allow-origin': origin,
-        'access-control-allow-methods': 'GET',
-        'access-control-allow-headers': 'Authorization',
+        'access-control-allow-methods': 'GET, PUT',
+        'access-control-allow-headers': 'Authorization, Content-Type',
         'cache-control': 'no-store',
       })
     }
     for (const origin of ['https://notra.co', 'http://ra.co', 'https://ra.co.example', 'https://parking.radio', 'null']) {
       expect((await get(token, { origin })).headers['access-control-allow-origin']).toBeUndefined()
-      const preflight = await app.inject({ method: 'OPTIONS', url, headers: { origin, 'access-control-request-method': 'GET' } })
+      const preflight = await app.inject({ method: 'OPTIONS', url, headers: { origin, 'access-control-request-method': method } })
       expect(preflight.headers['access-control-allow-origin']).toBeUndefined()
       expect(preflight.headers['access-control-allow-headers']).toBeUndefined()
     }
@@ -270,5 +305,76 @@ describe('GET /api/ra-publication/flyer', () => {
       expect(response.json()).toEqual({ ok: false, error })
       expect(response.headers['cache-control']).toBe('no-store')
     }
+  })
+})
+
+describe('PUT /api/ra-publication/ra-event', () => {
+  it("saves the event as the session's, as the token's admin, now, only while it has none, and never kept", async () => {
+    const app = await buildApp()
+    const token = await tokenFor(app)
+    const before = Date.now()
+    const response = await save(app, token, { raEvent: '2400123' }, { origin: 'https://ra.co' })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({ ok: true })
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(store.setRaEvent).toHaveBeenCalledWith('session-1', { raEventId: '2400123', updatedBy: TEST_ADMIN.email, updatedAt: expect.any(Date) })
+    expect(find('session-1')!.updatedAt!.getTime()).toBeGreaterThanOrEqual(before)
+    expect(find('session-1')!.raEventId).toBe('2400123')
+
+    // Not again, whatever it's sent, the same event included.
+    for (const raEvent of ['2400124', '2400123']) {
+      const again = await save(app, token, { raEvent })
+      expect(again.statusCode).toBe(409)
+      expect(again.json()).toEqual({ ok: false, error: 'This session already has an event on RA' })
+      expect(again.headers['cache-control']).toBe('no-store')
+    }
+    expect(find('session-1')!.raEventId).toBe('2400123')
+  })
+
+  it("takes the event as a session's raEvent does, an id or a link to it, and nothing else", async () => {
+    rows = [session(), session({ id: 'session-2' })]
+    const app = await buildApp()
+    expect((await save(app, await tokenFor(app), { raEvent: ' https://fr.ra.co/events/2400123/ ' })).statusCode).toBe(200)
+    expect(find('session-1')!.raEventId).toBe('2400123')
+    const token = await tokenFor(app, 'session-2')
+    for (const payload of [{}, { raEvent: null }, { raEvent: '' }, { raEvent: '  ' }, { raEvent: 2400123 }, { raEvent: 'abc' }, { raEvent: 'https://example.com/events/1' }, { raEvent: '\u0000https://ra.co/events/1' }]) {
+      const response = await save(app, token, payload)
+      expect(response.statusCode).toBe(400)
+    }
+    expect(find('session-2')!.raEventId).toBeNull()
+  })
+
+  it("saves it whatever the session's status or start, since the event is on RA already", async () => {
+    rows = [session({ status: 'cancelled' }), session({ id: 'session-2', startAt: null })]
+    const app = await buildApp()
+    expect((await save(app, await tokenFor(app, 'session-1'))).statusCode).toBe(200)
+    expect((await save(app, await tokenFor(app, 'session-2'))).statusCode).toBe(200)
+  })
+
+  it('refuses requests without a valid token, before anything else is read, the body included', async () => {
+    const app = await buildApp()
+    const token = await tokenFor(app)
+    const invalid = { 'content-type': 'application/json' }
+    const requests = [
+      save(app, null),
+      save(app, 'not-a-token'),
+      app.inject({ method: 'PUT', url: '/api/ra-publication/ra-event', payload: '{not json', headers: { ...invalid, authorization: 'Bearer not-a-token' } }),
+    ]
+    for (const response of await Promise.all(requests)) {
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({ ok: false, error: "The token isn't valid, or has expired" })
+    }
+    versions.set(TEST_ADMIN.id, null)
+    expect((await save(app, token)).statusCode).toBe(403)
+    expect(store.setRaEvent).not.toHaveBeenCalled()
+  })
+
+  it('responds 404 once the session is deleted', async () => {
+    const app = await buildApp()
+    const token = await tokenFor(app)
+    rows = []
+    const response = await save(app, token)
+    expect(response.statusCode).toBe(404)
+    expect(response.json()).toEqual({ ok: false, error: 'No such session' })
   })
 })

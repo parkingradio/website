@@ -30,9 +30,9 @@ session de TEST. ».
    and the media links, the flyer, or « Pas de flyer » when the session has none, then, outside production, the warning
    that the event will be created on RA all the same. « Créer sur RA » sends the flyer to RA and creates the event with
    it, and « Annuler », or the panel's ×, closes it without creating anything.
-4. Once the event is created, the bookmarklet shows its link, a link to the session's page that saves it as the
-   session's event (see [Back to the session](#back-to-the-session)), and, unless the flyer was sent with it, a reminder
-   to add the flyer on RA by hand: the session's page links to it as it was sent (see
+4. Once the event is created, the bookmarklet shows its link, saves it as the session's event (see
+   [Saving it in the session](#saving-it-in-the-session)), and, unless the flyer was sent with it, reminds to add the
+   flyer on RA by hand: the session's page links to it as it was sent (see
    [A session's page](sessions.md#a-sessions-page)).
 
 ## The bookmarklet
@@ -50,7 +50,8 @@ bookmarklet only works once that's allowed.
 
 The panel is in French, like the admin pages, and only ever shows what it's given, from the site or from RA, as text,
 and the flyer as the image the site sent.
-Clicking the bookmarklet again replaces it.
+Clicking the bookmarklet again replaces it, except while it creates the event, from sending the flyer to saving the
+event in the session: it then leaves it as it is, so that the event isn't created twice.
 
 What the script does:
 
@@ -89,14 +90,16 @@ What the script does:
 - When RA refuses, it shows RA's messages as they come. When anything else goes wrong, it says that something didn't
   work, and why, e.g. the site's error.
 
-## Back to the session
+## Saving it in the session
 
-The link back to the session is `<site>/admin/sessions/<session>?raEvent=<id>`. A link can't change anything on its own,
-since anyone could write one: on the session's page, while the session has no event on RA, `raEvent` opens the panel
-that creates it, with that event's link in its field, under a notice that says it was just created on RA, and only
-« enregistrer » saves it (see [Creating its event on RA](sessions.md#creating-its-event-on-ra)). A `raEvent` that isn't
-an event on RA, as a session's `raEvent` takes it, is ignored. It's removed from the page's address as
-[A session's page](sessions.md#a-sessions-page) says.
+Once the event is created, the bookmarklet shows its link right away, then saves it as the session's `raEvent`, with
+the token ([`PUT /api/ra-publication/ra-event`](../../server/ra-publication.md#put-apira-publicationra-event)), once,
+giving up after 30 seconds without an answer. When it's saved, it says that it's the session's « Événement RA »,
+linking to the session's page. Otherwise, the event is on RA all the same: it says that it couldn't be saved in the
+session, and why, e.g. that the token is no longer valid, or that the site can't be reached, and links to the session's
+page, to paste the event's link in its « Événement RA » (see
+[Creating its event on RA](sessions.md#creating-its-event-on-ra)). When the session already has an event on RA, it
+says to check it there instead, and when the session no longer exists, there's no page to link to.
 
 ## Endpoints
 
@@ -104,3 +107,4 @@ an event on RA, as a session's `raEvent` takes it, is ignored. It's removed from
   [Sessions](sessions.md#endpoints), where the page also saves the event).
 - `GET /api/ra-publication`, from the bookmarklet, for the event.
 - `GET /api/ra-publication/flyer`, from the bookmarklet, for the session's flyer.
+- `PUT /api/ra-publication/ra-event`, from the bookmarklet, to save the event it created as the session's.
