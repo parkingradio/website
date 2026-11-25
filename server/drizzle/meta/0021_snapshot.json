@@ -1,5 +1,5 @@
 {
-  "id": "23e07618-352d-46ad-82e9-80bb7ffa8d16",
+  "id": "119726e9-2c99-48bb-a36e-d7ee23612189",
   "prevId": "c3f439da-afa4-4179-94f8-af583b7885f1",
   "version": "7",
   "dialect": "postgresql",
@@ -1863,8 +1863,8 @@
           "notNull": true,
           "default": 0
         },
-        "subscription_token": {
-          "name": "subscription_token",
+        "ics_subscription_token": {
+          "name": "ics_subscription_token",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1890,11 +1890,11 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "users_subscription_token_unique": {
-          "name": "users_subscription_token_unique",
+        "users_ics_subscription_token_unique": {
+          "name": "users_ics_subscription_token_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "subscription_token"
+            "ics_subscription_token"
           ]
         }
       },

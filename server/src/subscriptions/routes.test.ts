@@ -133,7 +133,7 @@ describe('GET /occupations.ics', () => {
     const response = await get()
     expect(response.statusCode).toBe(200)
     expect(response.body).toContain('SUMMARY:Réparation (Séjours)\r\n')
-    expect(response.body).toContain('SUMMARY:[NOT READ] Airbnb\r\n')
+    expect(response.body).toContain('SUMMARY:[REFRESH ERROR] Airbnb\r\n')
     expect(response.body).not.toContain('calendar.example')
   })
 
@@ -149,17 +149,17 @@ describe('the token', () => {
   it("is the logged-in admin's, and replacing it gives the new one", async () => {
     const app = await buildApp()
     const cookies = await sessionCookies()
-    expect((await app.inject({ method: 'GET', url: '/api/admin/subscription-token', cookies })).json()).toEqual({ ok: true, token: TOKEN })
+    expect((await app.inject({ method: 'GET', url: '/api/admin/ics-subscription-token', cookies })).json()).toEqual({ ok: true, token: TOKEN })
     expect(store.token).toHaveBeenCalledWith('admin-id')
     store.replace.mockResolvedValueOnce('c'.repeat(64))
-    expect((await app.inject({ method: 'POST', url: '/api/admin/subscription-token', cookies })).json()).toEqual({ ok: true, token: 'c'.repeat(64) })
+    expect((await app.inject({ method: 'POST', url: '/api/admin/ics-subscription-token', cookies })).json()).toEqual({ ok: true, token: 'c'.repeat(64) })
     expect(store.replace).toHaveBeenCalledWith('admin-id')
   })
 
   it('requires a session', async () => {
     const app = await buildApp()
     for (const method of ['GET', 'POST'] as const) {
-      const response = await app.inject({ method, url: '/api/admin/subscription-token' })
+      const response = await app.inject({ method, url: '/api/admin/ics-subscription-token' })
       expect(response.statusCode).toBe(401)
     }
     expect(store.token).not.toHaveBeenCalled()

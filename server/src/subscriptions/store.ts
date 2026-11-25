@@ -29,19 +29,19 @@ export function subscriptionsStore(db: Queryable): SubscriptionsStore {
   // Sets the admin's token to `value`, and returns it as it is then.
   async function setToken(adminId: string, value: SQL | string): Promise<string | null> {
     if (!isUuid(adminId)) return null
-    const [row] = await db.update(users).set({ subscriptionToken: value }).where(eq(users.id, adminId)).returning({ token: users.subscriptionToken })
+    const [row] = await db.update(users).set({ icsSubscriptionToken: value }).where(eq(users.id, adminId)).returning({ token: users.icsSubscriptionToken })
     return row?.token ?? null
   }
 
   return {
     // In a single statement, so that two requests at once, e.g. from two tabs, both give the token that one of them keeps.
-    token: (adminId) => setToken(adminId, sql`coalesce(${users.subscriptionToken}, ${randomToken()})`),
+    token: (adminId) => setToken(adminId, sql`coalesce(${users.icsSubscriptionToken}, ${randomToken()})`),
 
     replace: (adminId) => setToken(adminId, randomToken()),
 
     async isToken(token) {
       if (!TOKEN_FORMAT.test(token)) return false
-      const [row] = await db.select({ id: users.id }).from(users).where(eq(users.subscriptionToken, token))
+      const [row] = await db.select({ id: users.id }).from(users).where(eq(users.icsSubscriptionToken, token))
       return row !== undefined
     },
 

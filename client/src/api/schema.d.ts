@@ -2696,7 +2696,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/subscription-token": {
+    "/api/admin/ics-subscription-token": {
         parameters: {
             query?: never;
             header?: never;
@@ -2719,7 +2719,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["SubscriptionToken"];
+                        "application/json": components["schemas"]["IcsSubscriptionToken"];
                     };
                 };
                 /** @description Default Response */
@@ -2759,7 +2759,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["SubscriptionToken"];
+                        "application/json": components["schemas"]["IcsSubscriptionToken"];
                     };
                 };
                 /** @description Default Response */
@@ -3943,6 +3943,12 @@ export interface components {
         FeatureId: "evenements-publics";
         /** @enum {string} */
         GenreId: "house" | "deep-house" | "tech-house" | "afro-house" | "amapiano" | "disco" | "nu-disco" | "italo" | "techno" | "hard-techno" | "minimal" | "acid" | "electro" | "trance" | "ebm-industrial" | "drum-and-bass" | "jungle" | "breakbeat" | "uk-garage" | "dubstep" | "bass" | "footwork-juke" | "baile-funk" | "hip-hop" | "rap" | "trap" | "rnb" | "funk-soul" | "jazz" | "reggae-dub" | "dancehall" | "reggaeton-latin" | "afrobeat" | "cumbia" | "ambient" | "downtempo" | "experimental" | "noise" | "leftfield" | "pop" | "indie-rock" | "punk" | "synthwave" | "hardcore-gabber";
+        IcsSubscriptionToken: {
+            /** @constant */
+            ok: true;
+            /** @description The token of the admin's calendar feeds' links */
+            token: string;
+        };
         LeftOutTrack: {
             /** @constant */
             kind: "left-out";
@@ -4225,12 +4231,6 @@ export interface components {
         SetSession: {
             /** @description The id of the session to move the set to, after that session's sets */
             session: string;
-        };
-        SubscriptionToken: {
-            /** @constant */
-            ok: true;
-            /** @description The token of the admin's calendar feeds' links */
-            token: string;
         };
         /** @description In Québec time, ending later the same day */
         TimeSlot: {

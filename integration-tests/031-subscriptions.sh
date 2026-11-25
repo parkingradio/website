@@ -13,7 +13,7 @@
 source "$(dirname "$0")/lib.sh"
 
 readonly IP=198.51.100.31
-readonly URL="${BASE_URL}/api/admin/subscription-token"
+readonly URL="${BASE_URL}/api/admin/ics-subscription-token"
 since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "  the token's endpoints require a session"
@@ -89,7 +89,7 @@ expect_body_contains "\"readAt\":null,\"error\":\"The link can't be read: its se
 request "${BASE_URL}/occupations.ics?token=${token}"
 expect_status 200
 expect_body_contains "UID:feed-${FEED}@parking.radio"
-expect_body_contains 'SUMMARY:[NOT READ] Séjours'
+expect_body_contains 'SUMMARY:[REFRESH ERROR] Séjours'
 expect_body_contains "can't be found"
 expect_body_lacks "$SECRET"
 json DELETE "${BASE_URL}/api/admin/calendar/feeds/${FEED}"

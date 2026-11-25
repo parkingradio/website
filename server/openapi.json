@@ -2293,6 +2293,24 @@
           "hardcore-gabber"
         ]
       },
+      "IcsSubscriptionToken": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "token": {
+            "type": "string",
+            "description": "The token of the admin's calendar feeds' links"
+          }
+        },
+        "required": [
+          "ok",
+          "token"
+        ],
+        "additionalProperties": false
+      },
       "LeftOutTrack": {
         "type": "object",
         "properties": {
@@ -3639,24 +3657,6 @@
         },
         "required": [
           "session"
-        ],
-        "additionalProperties": false
-      },
-      "SubscriptionToken": {
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "const": true
-          },
-          "token": {
-            "type": "string",
-            "description": "The token of the admin's calendar feeds' links"
-          }
-        },
-        "required": [
-          "ok",
-          "token"
         ],
         "additionalProperties": false
       },
@@ -11211,7 +11211,7 @@
         }
       }
     },
-    "/api/admin/subscription-token": {
+    "/api/admin/ics-subscription-token": {
       "get": {
         "summary": "The token of the admin's own calendar feeds' links, which they get the first time they ask for it",
         "tags": [
@@ -11223,7 +11223,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SubscriptionToken"
+                  "$ref": "#/components/schemas/IcsSubscriptionToken"
                 }
               }
             }
@@ -11261,7 +11261,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SubscriptionToken"
+                  "$ref": "#/components/schemas/IcsSubscriptionToken"
                 }
               }
             }

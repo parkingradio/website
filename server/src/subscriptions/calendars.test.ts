@@ -202,7 +202,7 @@ describe('occupationsCalendar', () => {
     expect(occupationOf.value('summary')).toBe('Réparation (Airbnb)')
 
     expect(failedEvent.value('uid')).toBe('feed-feed-2@parking.radio')
-    expect(failedEvent.value('summary')).toBe('[NOT READ] Airbnb')
+    expect(failedEvent.value('summary')).toBe('[REFRESH ERROR] Airbnb')
     expect(failedEvent.time('dtstart').toString()).toBe('2026-11-19')
     expect(failedEvent.time('dtend').toString()).toBe('2026-11-20')
     expect(failedEvent.value('description')).toBe(
@@ -212,7 +212,7 @@ describe('occupationsCalendar', () => {
     expect(failedEvent.value('url')).toBe('https://parking.radio/admin/calendrier')
 
     expect(neverEvent.value('uid')).toBe('feed-feed-3@parking.radio')
-    expect(neverEvent.value('summary')).toBe('[NOT READ] Équipe')
+    expect(neverEvent.value('summary')).toBe('[REFRESH ERROR] Équipe')
     expect(neverEvent.value('description')).toBe(
       "The last read of this calendar feed failed. The link's server can't be reached.\nIt hasn't been read successfully since the server started.",
     )

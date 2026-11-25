@@ -19,13 +19,13 @@ Each admin has one token, for both feeds, which is in their links: `<site>/sessi
 `<site>/occupations.ics?token=<token>`, where `<site>` is the site's address, e.g. `https://parking.radio`. Tokens are
 random, so they can't be guessed. Unlike the other tokens the server gives out, e.g. those of apps (see
 [OAuth](oauth.md#connections)), the server keeps the token itself, so that the admin pages can show the links again
-whenever the admin asks for them ([`GET /api/admin/subscription-token`](#get-apiadminsubscription-token-admin)).
+whenever the admin asks for them ([`GET /api/admin/ics-subscription-token`](#get-apiadminics-subscription-token-admin)).
 
 The links are only given to their admin. Whoever has them can read both feeds, until the token is replaced:
 
 - **Replacing it**, e.g. when a link was shared by mistake
-  ([`POST /api/admin/subscription-token`](#post-apiadminsubscription-token-admin)), makes the previous links stop
-  working. Calendar apps subscribed with them keep what they already have, but get nothing new.
+  ([`POST /api/admin/ics-subscription-token`](#post-apiadminics-subscription-token-admin)), makes the previous links
+  stop working. Calendar apps subscribed with them keep what they already have, but get nothing new.
 - **Revoking the admin** makes their links stop working (see [Admins](admins.md)). Choosing a new password doesn't:
   unlike their sessions and connections, their links keep working, since every calendar app they subscribed in would
   otherwise have to subscribe again.
@@ -40,8 +40,8 @@ server's own logs never have it, since they leave out the values of query string
 Both feeds are in iCalendar (RFC 5545), and take one query parameter, `token`, the admin's token. Their requests fail
 with 403, and an error that doesn't quote the token, when `token` is missing, given more than once, or isn't an admin's
 token, before anything else is read. Not 401, which only admin endpoints give (see
-[Admin endpoints, in Conventions](README.md#conventions)), and which some calendar apps take as a request for a user name
-and a password. Other query parameters are ignored.
+[Admin endpoints, in Conventions](README.md#conventions)), and which some calendar apps take as a request for a user
+name and a password. Other query parameters are ignored.
 
 Unless they fail, they respond with a calendar, even without any event, with `Content-Type: text/calendar;
 charset=utf-8`. Every response, whether they succeed or fail, has `Cache-Control: no-store`: unlike `/calendar.ics`,
@@ -105,11 +105,11 @@ shows of them can be missing or out of date: each one is a whole-day `VEVENT` on
 |---|---|
 | `UID` | `feed-<id>@parking.radio`, from the feed's id, so that calendar apps move it from one day to the next, rather than keep one for each day |
 | `DTSTART`, `DTEND` | Today, in Québec |
-| `SUMMARY` | `[NOT READ] `, then the feed's name |
+| `SUMMARY` | `[REFRESH ERROR] `, then the feed's name |
 | `DESCRIPTION` | That its last read failed, why (the feed's `error`, which never has its link, see [Feeds, in Calendar](calendar.md#feeds)), and when it was last read successfully, in Québec time, or that it hasn't been since the server started |
 | `URL` | The Calendrier page, `<site>/admin/calendrier` |
 
-## `GET /api/admin/subscription-token` (admin)
+## `GET /api/admin/ics-subscription-token` (admin)
 
 The logged-in admin's token (see [The token](#the-token)), which they get the first time they ask for it, and which
 stays the same until it's replaced.
@@ -119,7 +119,7 @@ stays the same until it's replaced.
 | `ok` | `true` | |
 | `token` | string | The token of the admin's links |
 
-## `POST /api/admin/subscription-token` (admin)
+## `POST /api/admin/ics-subscription-token` (admin)
 
 Takes no body. Replaces the logged-in admin's token with a new one, which makes their previous links stop working, and
-responds with the new one, as [`GET /api/admin/subscription-token`](#get-apiadminsubscription-token-admin) does.
+responds with the new one, as [`GET /api/admin/ics-subscription-token`](#get-apiadminics-subscription-token-admin) does.

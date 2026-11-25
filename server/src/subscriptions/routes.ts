@@ -21,12 +21,12 @@ const noStore = async (_request: FastifyRequest, reply: FastifyReply) => {
 
 const NOT_AN_ADMINS_TOKEN: ApiError = { ok: false, error: "The link's token isn't an admin's" }
 const NOT_READ_YET: ApiError = { ok: false, error: "The calendar feeds haven't all been read yet, with their links, since the server started" }
-const SubscriptionToken = z
+const IcsSubscriptionToken = z
   .object({ ok: z.literal(true), token: z.string().meta({ description: "The token of the admin's calendar feeds' links" }) })
-  .meta({ id: 'SubscriptionToken' })
+  .meta({ id: 'IcsSubscriptionToken' })
 // What the token's endpoints respond: also 401 when the admin is revoked after their session was checked, since their
 // session has then ended.
-const TOKEN_RESPONSE = { 200: SubscriptionToken, 401: ApiError }
+const TOKEN_RESPONSE = { 200: IcsSubscriptionToken, 401: ApiError }
 
 type Options = {
   store: SubscriptionsStore
@@ -75,7 +75,7 @@ export async function subscriptionsRoutes(app: FastifyInstance, { store, feeds, 
   const api = zodRoutes(app)
 
   api.get(
-    '/api/admin/subscription-token',
+    '/api/admin/ics-subscription-token',
     {
       config: { admin: true, tool: null },
       schema: {
@@ -91,7 +91,7 @@ export async function subscriptionsRoutes(app: FastifyInstance, { store, feeds, 
   )
 
   api.post(
-    '/api/admin/subscription-token',
+    '/api/admin/ics-subscription-token',
     {
       config: { admin: true, tool: null },
       schema: {
@@ -103,7 +103,7 @@ export async function subscriptionsRoutes(app: FastifyInstance, { store, feeds, 
     async (request, reply) => {
       const token = await store.replace(request.user!.id)
       if (token === null) return reply.code(401).send(UNAUTHORIZED)
-      request.log.info({ by: request.user!.email }, "Replaced an admin's subscription token")
+      request.log.info({ by: request.user!.email }, "Replaced an admin's ICS subscription token")
       return { ok: true as const, token }
     },
   )

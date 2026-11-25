@@ -16,7 +16,7 @@ const REFRESH_INTERVAL = 'PT15M'
 // How sessions that aren't announced are marked, after `[CANCELLED]`.
 const UNANNOUNCED = '[UNANNOUNCED]'
 // How the calendar feeds whose last read failed are marked.
-const NOT_READ = '[NOT READ]'
+const REFRESH_ERROR = '[REFRESH ERROR]'
 // Every event leaves the time it takes free in calendar apps, rather than busy, as they make it by default: these calendars
 // are about the studio, not the admin's own time.
 const TRANSPARENT = 'TRANSP:TRANSPARENT'
@@ -83,7 +83,7 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
   )
 
   const today = quebecDay(now)
-  const notRead = feeds
+  const refreshErrors = feeds
     .filter(({ read }) => read.error !== null)
     .map(({ feed, read }) => {
       const since = read.readAt
@@ -95,7 +95,7 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
         stamp,
         `DTSTART;VALUE=DATE:${date(today)}`,
         `DTEND;VALUE=DATE:${date(addDays(today, 1))}`,
-        `SUMMARY:${text(`${NOT_READ} ${feed.name}`)}`,
+        `SUMMARY:${text(`${REFRESH_ERROR} ${feed.name}`)}`,
         TRANSPARENT,
         `DESCRIPTION:${text(`The last read of this calendar feed failed. ${read.error}.\n${since}`)}`,
         `URL:${siteOrigin}/admin/calendrier`,
@@ -103,5 +103,5 @@ export function occupationsCalendar(feeds: FeedWithRead[], { siteOrigin, environ
       ]
     })
 
-  return calendar({ name: calendarName('occupations', environment), refreshInterval: REFRESH_INTERVAL, components: [...occupations, ...notRead] })
+  return calendar({ name: calendarName('occupations', environment), refreshInterval: REFRESH_INTERVAL, components: [...occupations, ...refreshErrors] })
 }

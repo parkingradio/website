@@ -34,7 +34,7 @@ export const users = pgTable(
     // The token in the links of the admin's own calendar feeds, or null until they first ask for it (see
     // subscriptions/store.ts). Unlike other tokens, it's kept as it is, rather than hashed, so that the admin pages can
     // show the links again, like calendar feeds' links.
-    subscriptionToken: text('subscription_token').unique(),
+    icsSubscriptionToken: text('ics_subscription_token').unique(),
   },
   (table) => [uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`)],
 )

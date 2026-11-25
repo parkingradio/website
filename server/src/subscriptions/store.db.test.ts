@@ -63,7 +63,7 @@ async function createAdmin(email = 'ana@example.com'): Promise<Admin> {
 }
 
 async function tokenRequest(method: 'GET' | 'POST', admin: Admin) {
-  return app.inject({ method, url: '/api/admin/subscription-token', cookies: await sessionCookies(admin) })
+  return app.inject({ method, url: '/api/admin/ics-subscription-token', cookies: await sessionCookies(admin) })
 }
 
 // The admin's token, which has to be given.

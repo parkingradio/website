@@ -224,8 +224,8 @@ Endpoints are public, admin (see [Conventions](#conventions)), for apps, which n
 | [`GET /calendar.ics`](events.md#get-calendarics) | public | The calendar feed of the events, in iCalendar, for calendar apps: the upcoming ones and those that started in the past year |
 | [`GET /sessions.ics`](subscriptions.md#get-sessionsics) | token | An admin's calendar feed of the sessions, announced or not, in iCalendar: the upcoming ones and those that started in the past year |
 | [`GET /occupations.ics`](subscriptions.md#get-occupationsics) | token | An admin's calendar feed of the occupations, in iCalendar, once every calendar feed has been read, and of the calendar feeds whose last read failed |
-| [`GET /api/admin/subscription-token`](subscriptions.md#get-apiadminsubscription-token-admin) | admin | The token of the admin's own calendar feeds' links |
-| [`POST /api/admin/subscription-token`](subscriptions.md#post-apiadminsubscription-token-admin) | admin | Replacing that token, which makes the previous links stop working |
+| [`GET /api/admin/ics-subscription-token`](subscriptions.md#get-apiadminics-subscription-token-admin) | admin | The token of the admin's own calendar feeds' links |
+| [`POST /api/admin/ics-subscription-token`](subscriptions.md#post-apiadminics-subscription-token-admin) | admin | Replacing that token, which makes the previous links stop working |
 | [`GET /api/admin/calendar`](calendar.md#get-apiadmincalendar-admin) | admin | What takes the studio over a range of days, sessions and occupations, and the feeds that occupations are read from, with their status, and, whatever the range, the conflicts of the next 365 days and the sessions without a date |
 | [`GET /api/admin/calendar/feeds`](calendar.md#get-apiadmincalendarfeeds-admin) | admin | The calendar feeds that the studio's occupations are read from, with their links, and when each was last read, or why that failed |
 | [`POST /api/admin/calendar/feeds/refresh`](calendar.md#post-apiadmincalendarfeedsrefresh-admin) | admin | Reading every calendar feed now, and the feeds once each read has ended |
