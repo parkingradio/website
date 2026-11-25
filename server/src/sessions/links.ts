@@ -16,11 +16,13 @@ function siteOf(url: URL): string {
 
 const RA_EVENT_ID = /^\d{1,20}$/
 
-// An event on RA, by its id, e.g. "6683745", or a link to its page, e.g. "https://ra.co/events/6683745".
+// An event on RA, by its id, e.g. "6683745", or a link to its page, on ra.co or one of its subdomains, e.g.
+// "https://ra.co/events/6683745" or "https://fr.ra.co/events/6683745".
 export function raEventId(sent: string): string | null {
   if (RA_EVENT_ID.test(sent)) return sent
   const url = address(sent)
-  const id = url && siteOf(url) === 'ra.co' ? /^\/events\/([^/]+)\/?$/.exec(url.pathname)?.[1] : undefined
+  const onRa = url && (url.hostname === 'ra.co' || url.hostname.endsWith('.ra.co'))
+  const id = onRa ? /^\/events\/([^/]+)\/?$/.exec(url.pathname)?.[1] : undefined
   return id && RA_EVENT_ID.test(id) ? id : null
 }
 

@@ -359,7 +359,8 @@ Requests send each of these as a string, or null, or a blank string, when there'
 
 - A session's `raEvent`: the event's id on RA, which is only digits, up to 20, as
   [`GET /api/ra-events`](ra-events.md#get-apira-events) gives it, e.g. `"6683745"`, or a link to its page,
-  `https://ra.co/events/<id>`. It isn't checked against RA, so any event can be given, e.g. another promoter's. Several sessions can have the same one.
+  `https://ra.co/events/<id>`, on `ra.co` or one of its subdomains, e.g. `fr.ra.co`. It isn't checked against RA, so
+  any event can be given, e.g. another promoter's. Several sessions can have the same one.
 - A set's `soundcloudTrack`: a link to the track on soundcloud.com, e.g.
   `https://soundcloud.com/parkingdotradio/3tons`, or a private track's private link, which ends with its secret, e.g.
   `https://soundcloud.com/parkingdotradio/3tons/s-AbC123`. Other links, e.g. the `on.soundcloud.com` ones that

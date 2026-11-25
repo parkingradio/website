@@ -191,7 +191,8 @@ const SITES: Record<LinkSiteId, Omit<LinkSite, 'id'>> = {
   ra: {
     name: 'Resident Advisor',
     prefix: 'ra.co/dj/',
-    host: /^(www\.)?(ra\.co|residentadvisor\.net)$/,
+    // ra.co's subdomains include its site in other languages, e.g. fr.ra.co.
+    host: /^([a-z0-9-]+\.)*ra\.co$|^(www\.)?residentadvisor\.net$/,
     path: /^\/dj\/([^/]+)/i,
     profile: /^[a-z0-9-]{2,}$/i,
     url: (value) => `https://ra.co/dj/${value}`,

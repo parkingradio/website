@@ -201,7 +201,7 @@ expect_status 400
 expect_body_contains '"error":"A session ends by the start of the year 3000, in UTC"'
 
 echo "  a session is added, as planned, without sets, and read back with its takeover, its start and end in Québec time and its RA event reduced"
-session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://ra.co/events/6683745\"")"
+session_form POST "$SESSIONS" "$(session_json '"2026-11-14T21:00-05:00"' 240 "\"type\":\"takeover\",\"takeover\":\"${ondes}\",\"raEvent\":\"https://fr.ra.co/events/6683745\"")"
 expect_status 200
 first="$(first_id)"
 json GET "${SESSIONS}/${first}"
