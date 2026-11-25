@@ -212,10 +212,14 @@
 }
 
 /* A warning, about something that doesn't prevent anything, after a ⚠ (see "Warnings" in
-   docs/design/client/admin/layout.md): in brown, between the black of notices and the red of errors. */
+   docs/design/client/admin/layout.md): in brown, between the black of notices and the red of errors. The warnings' color
+   is also used on its own, e.g. a calendar feed's « échec ». */
+.admin-warning {
+  color: #9a4a00;
+}
+
 .admin-notice.admin-warning {
   border-left-color: #9a4a00;
-  color: #9a4a00;
 }
 
 .radio-track-left-out {
@@ -404,19 +408,54 @@
   text-decoration: underline;
 }
 
-.admin-table td:first-child {
+.admin-table td:first-child:not(.admin-table-span) {
   white-space: nowrap;
 }
 
 /* A table whose rows have buttons, e.g. a set's "modifier": their text is in line with the row's, since their vertical
    padding and border (see `.admin button`) overflow into the cell's padding. */
-.admin-table-controls td button {
+.admin-table-controls td:not(.admin-table-span) button {
   margin-block: calc(-4.5px - 1px);
 }
 
 /* A row's last buttons, e.g. "modifier" and "×", side by side. */
-.admin-table-controls td:last-child {
+.admin-table-controls td:last-child:not(.admin-table-span) {
   white-space: nowrap;
+}
+
+/* A row's header, e.g. a calendar feed's name, which looks like the row's other cells, and wraps, unlike the first column
+   of the tables whose rows have none. */
+.admin-table th[scope='row'] {
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* A cell across a table's columns, under a row that it continues, e.g. the line under a calendar feed's row that says why
+   its last read failed, or the form that changes it, in place of the row. Its text wraps, unlike the first and the last
+   columns', and its buttons are a form's, rather than a row's (see above). Its content is in a single element, which
+   doesn't count towards the columns' widths, or a long message would widen them, and squeeze the others. */
+.admin-table td.admin-table-span {
+  padding-right: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-table-span > * {
+  contain: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-table-span > * > :is(p, form) {
+  margin: 0;
+}
+
+.admin-table tr:has(+ tr > .admin-table-span) > * {
+  border-bottom: none;
+}
+
+.admin-table tr + tr > .admin-table-span {
+  padding-top: 0;
 }
 
 /* An application's days, in the list, wrap between them rather than within one. */
@@ -910,9 +949,7 @@ tr[data-dragging] > td {
   gap: 6px;
 }
 
-/* A list of settings, e.g. feature flags, each a switch with its name, then what it does and who last switched it, or
-   calendar feeds, each with its name, its link, then who added it and when it was last read, or the form that changes
-   it. */
+/* A list of settings, e.g. feature flags, each a switch with its name, then what it does and who last switched it. */
 .admin-list {
   margin: 1.5rem 0 0;
   padding: 0;
@@ -933,17 +970,6 @@ tr[data-dragging] > td {
 
 .admin-list p {
   margin: 0.25rem 0 0;
-}
-
-/* A calendar feed's link, which is long, and has no spaces. */
-.admin-feed-link {
-  overflow-wrap: anywhere;
-  font-family: monospace;
-  font-size: 0.85rem;
-}
-
-.admin-list li > .admin-form {
-  margin-top: 0;
 }
 
 /* On phones the menu goes above the section, as a row of pills with the session at its end. */
@@ -992,10 +1018,23 @@ tr[data-dragging] > td {
     margin-left: 0;
   }
 
-  /* Too wide for phones, tables scroll sideways rather than squeezing their columns. */
+  /* Too wide for phones, tables scroll sideways on their own, rather than the page (see "Tables" in
+     docs/design/client/admin/layout.md). */
   .admin-table {
     display: block;
     overflow-x: auto;
+  }
+
+  /* A cell across a table's columns is as wide as the table's visible part, and in view wherever it's scrolled to. Only
+     the tables that have one are containers, so that the others are left as they are. */
+  .admin-table:has(.admin-table-span) {
+    container-type: inline-size;
+  }
+
+  .admin-table-span > * {
+    position: sticky;
+    left: 0;
+    width: 100cqw;
   }
 
   .admin-record dl,
