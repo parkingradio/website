@@ -20,10 +20,10 @@ The admin pages keep the site's navigation bar. Under it, a menu lists the secti
 logged-in admin's email and a "se déconnecter" button:
 
 - [Calendrier](calendrier.md)
-- [Rotation radio](rotation.md)
 - [Candidatures](candidatures.md)
 - [Sessions](sessions.md)
 - [Artistes](artistes.md)
+- [Rotation radio](rotation.md)
 - [Intégrations](integrations.md)
 - [Admins](admins.md)
 - [Configuration](configuration.md)
