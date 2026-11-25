@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from '../../application-fields'
 import App from '../../app'
@@ -7,6 +7,9 @@ import type { Artist, Profile } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session, StudioSet } from '../../session-fields'
 import { jsonBody, mockFetch, requestsTo } from '../../test-utils'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 // Logged in, and without collectives, unless a test says otherwise.
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' }, '/api/admin/collectives': { ok: true, collectives: [] } }

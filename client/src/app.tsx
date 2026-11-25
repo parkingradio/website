@@ -8,19 +8,7 @@ import { SynthMeetups } from './pages/synth-meetups'
 import { Appliquer } from './pages/appliquer'
 import { Contribuer } from './pages/contribuer'
 import { NotFound } from './pages/not-found'
-import { AdminShell } from './pages/admin/shell'
-import { AcceptInvite } from './pages/admin/accept-invite'
-import { Autoriser } from './pages/admin/autoriser'
-import { AdminLayout } from './pages/admin/layout'
-import { Admins } from './pages/admin/admins'
-import { Calendrier } from './pages/admin/calendrier'
-import { Rotation } from './pages/admin/rotation'
-import { ApplicationPage, ApplicationsPage, NewApplicationPage } from './pages/admin/applications'
-import { ArtistPage, ArtistsPage, NewArtistPage } from './pages/admin/artists'
-import { CollectivePage, NewCollectivePage } from './pages/admin/collectives'
-import { NewSessionPage, SessionPage, SessionsPage } from './pages/admin/sessions'
-import { Integrations } from './pages/admin/integrations'
-import { Configuration } from './pages/admin/configuration'
+import { AdminPage, AdminShell } from './pages/admin/shell'
 
 function App() {
   return (
@@ -36,29 +24,29 @@ function App() {
           {/* Logging in happens on the admin pages themselves. This keeps older links working. */}
           <Route path="login" element={<Navigate to="/admin" replace />} />
           <Route element={<AdminShell />}>
-            <Route path="accept-invite" element={<AcceptInvite />} />
+            <Route path="accept-invite" element={<AdminPage page="AcceptInvite" />} />
             {/* Where apps, e.g. Claude, send admins to allow them. */}
-            <Route path="autoriser" element={<Autoriser />} />
-            <Route path="admin" element={<AdminLayout />}>
+            <Route path="autoriser" element={<AdminPage page="Autoriser" />} />
+            <Route path="admin" element={<AdminPage page="AdminLayout" />}>
               <Route index element={<Navigate to="/admin/calendrier" replace />} />
-              <Route path="admins" element={<Admins />} />
-              <Route path="calendrier" element={<Calendrier />} />
-              <Route path="rotation" element={<Rotation />} />
-              <Route path="candidatures" element={<ApplicationsPage />} />
-              <Route path="candidatures/nouvelle" element={<NewApplicationPage />} />
-              <Route path="candidatures/:id" element={<ApplicationPage />} />
-              <Route path="sessions" element={<SessionsPage />} />
-              <Route path="sessions/nouvelle" element={<NewSessionPage />} />
-              <Route path="sessions/:id" element={<SessionPage />} />
-              <Route path="artistes" element={<ArtistsPage />} />
-              <Route path="artistes/nouveau" element={<NewArtistPage />} />
-              <Route path="artistes/:id" element={<ArtistPage />} />
+              <Route path="admins" element={<AdminPage page="Admins" />} />
+              <Route path="calendrier" element={<AdminPage page="Calendrier" />} />
+              <Route path="rotation" element={<AdminPage page="Rotation" />} />
+              <Route path="candidatures" element={<AdminPage page="ApplicationsPage" />} />
+              <Route path="candidatures/nouvelle" element={<AdminPage page="NewApplicationPage" />} />
+              <Route path="candidatures/:id" element={<AdminPage page="ApplicationPage" />} />
+              <Route path="sessions" element={<AdminPage page="SessionsPage" />} />
+              <Route path="sessions/nouvelle" element={<AdminPage page="NewSessionPage" />} />
+              <Route path="sessions/:id" element={<AdminPage page="SessionPage" />} />
+              <Route path="artistes" element={<AdminPage page="ArtistsPage" />} />
+              <Route path="artistes/nouveau" element={<AdminPage page="NewArtistPage" />} />
+              <Route path="artistes/:id" element={<AdminPage page="ArtistPage" />} />
               {/* Collectives are listed with the artists. This keeps the address of their pages from being an artist's. */}
               <Route path="artistes/collectifs" element={<Navigate to="/admin/artistes" replace />} />
-              <Route path="artistes/collectifs/nouveau" element={<NewCollectivePage />} />
-              <Route path="artistes/collectifs/:id" element={<CollectivePage />} />
-              <Route path="integrations" element={<Integrations />} />
-              <Route path="configuration" element={<Configuration />} />
+              <Route path="artistes/collectifs/nouveau" element={<AdminPage page="NewCollectivePage" />} />
+              <Route path="artistes/collectifs/:id" element={<AdminPage page="CollectivePage" />} />
+              <Route path="integrations" element={<AdminPage page="Integrations" />} />
+              <Route path="configuration" element={<AdminPage page="Configuration" />} />
               {/* The feature flags moved to the configuration section. This keeps older links working. */}
               <Route path="features" element={<Navigate to="/admin/configuration" replace />} />
             </Route>

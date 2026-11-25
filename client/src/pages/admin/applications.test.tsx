@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
 import type { Application } from '../../application-fields'
 import App from '../../app'
@@ -7,6 +7,9 @@ import type { Artist } from '../../artist-profile'
 import type { Collective } from '../../collective-profile'
 import type { Session } from '../../session-fields'
 import { jsonBody, mockFetch, requestsTo, timeParts, typeTime } from '../../test-utils'
+
+// The admin pages load on demand (see AdminPage in shell.tsx): load them up front, so that no test waits for them.
+beforeAll(() => import('./admin-pages'))
 
 const LOGGED_IN = { '/api/admin/me': { ok: true, email: 'admin@example.com' } }
 
