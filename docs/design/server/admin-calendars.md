@@ -29,8 +29,9 @@ The links are only given to their admin. Whoever has them can read both calendar
   unlike their sessions and connections, their links keep working, since every calendar app they subscribed in would
   otherwise have to subscribe again.
 
-The token is in the links, so it can end up in logs other than the server's, e.g. a proxy's, or a calendar app's. The
-server's own logs never have it, since they leave out the values of query strings (see
+The token is in the links, so it can end up in logs other than the server's, e.g. a proxy's, or a calendar app's, and
+a calendar app that reads a `webcal` link over http sends it unencrypted until it's redirected to https. The server's
+own logs never have it, since they leave out the values of query strings (see
 [Logs, in Conventions](README.md#conventions)). There's no rate limit (see
 [Rate limits, in Conventions](README.md#conventions)).
 
