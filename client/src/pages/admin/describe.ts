@@ -354,11 +354,12 @@ export function sessionLongDay({ start }: Pick<Session, 'start'>): string {
   return start === null ? UNDATED : formatLongQuebecDay(start)
 }
 
-// When a session starts and ends, in Québec, as days and times, and how many days after the day it starts on it ends on.
+// When a session starts and ends, in Québec, as days and times, how many days after the day it starts on it ends on, and
+// how long it lasts, in milliseconds.
 function startAndEnd(start: string, end: string) {
   const from = quebecDayAndTime(new Date(start))
   const to = quebecDayAndTime(new Date(end))
-  return { from, to, days: daysBetween(from.day, to.day) }
+  return { from, to, days: daysBetween(from.day, to.day), lasts: Date.parse(end) - Date.parse(start) }
 }
 
 // E.g. "dim. 15 nov.", the day of `instant` (ISO 8601) in Québec, without its year.
@@ -366,15 +367,20 @@ export function formatQuebecDayInYear(instant: string): string {
   return quebecDayInYearFormat.format(new Date(instant))
 }
 
+// How long something that ends the next day can last for its times alone to say when it ends: longer, e.g. from 15 h to
+// 11 h, "15 h – 11 h" would read as a stretch within its day.
+const OVERNIGHT_MS = 12 * 60 * 60 * 1000
+
 // Whether the times alone say when something ends, as `startAndEnd` gives them: the day it starts, or the next one at an
-// earlier time.
-const timesSayEnd = ({ from, to, days }: ReturnType<typeof startAndEnd>) => days === 0 || (days === 1 && to.time < from.time)
+// earlier time, at 00:00 or at most 12 hours after it starts (see "Times" in docs/design/client/admin/sessions.md).
+const timesSayEnd = ({ from, to, days, lasts }: ReturnType<typeof startAndEnd>) =>
+  days === 0 || (days === 1 && to.time < from.time && (to.time === '00:00' || lasts <= OVERNIGHT_MS))
 
 // Whether the times alone say when something that starts at `start` ends at `end` (ISO 8601).
 export const endsByItsTime = (start: string, end: string) => timesSayEnd(startAndEnd(start, end))
 
 // E.g. "21 h – 1 h", when the times alone say when it ends (see `endsByItsTime`), or else with the day it ends, without its
-// year, e.g. "18 h – dim. 15 nov., 2 h", or "21 h – dim. 15 nov., 21 h": a session's times in short, or those of anything
+// year, e.g. "15 h – dim. 15 nov., 11 h", or "21 h – dim. 15 nov., 21 h": a session's times in short, or those of anything
 // else that takes the studio (see docs/design/client/admin/calendrier.md).
 export function shortTimes({ start, end }: { start: string; end: string }): string {
   const times = startAndEnd(start, end)

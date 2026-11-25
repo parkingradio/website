@@ -33,9 +33,10 @@ A session's times are written:
 - in full, e.g. on its page: "samedi 14 novembre 2026, de 21 h à 23 h", or "samedi 14 novembre 2026, de 21 h à 1 h le
   lendemain" when it ends the next day, at any time, or else "du vendredi 13 novembre 2026 à 18 h au dimanche 15
   novembre 2026 à 2 h";
-- in short, e.g. in lists, after its day: "21 h – 1 h", when it ends the day it starts, or the next day at an earlier
-  time than it starts, or else with the day it ends, without its year, e.g. "18 h – dim. 15 nov., 2 h", or
-  "21 h – dim. 15 nov., 21 h" for a session of 24 hours.
+- in short, e.g. in lists, after its day: "21 h – 1 h", or "10 h – 0 h", when it ends the day it starts, or the next
+  day at an earlier time than it starts, at 00:00 or at most 12 hours after it starts; or else with the day it ends,
+  without its year, e.g. "15 h – dim. 15 nov., 11 h", "18 h – dim. 15 nov., 2 h", or "21 h – dim. 15 nov., 21 h" for a
+  session of 24 hours.
 
 The forms take a session's start and its end each as a day and a time of day, in the 24-hour format (see
 [Architecture](../architecture.md)), and turn them into what the server takes (see

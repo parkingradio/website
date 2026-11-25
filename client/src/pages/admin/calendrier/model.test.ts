@@ -58,7 +58,7 @@ describe("a thing's part of a day", () => {
     expect(daysOf(long, ['2026-11-16', '2026-11-20'])).toEqual([])
   })
 
-  it('writes the end of a thing of less than a day that ends earlier the next day, then what it takes of that day', () => {
+  it('writes the end of a thing of 12 hours or less that ends the next day, then what it takes of that day', () => {
     const overnight = times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00')
     expect(daysOf(overnight)).toEqual(['2026-11-14', '2026-11-15'])
     expect(partOfDay(overnight, '2026-11-14')).toBe('21 h – 1 h')
@@ -71,6 +71,9 @@ describe("a thing's part of a day", () => {
     // A thing that ends later the next day than it starts.
     const day = times('2026-11-14T21:00:00-05:00', '2026-11-15T22:00:00-05:00')
     expect(daysOf(day).map((d) => partOfDay(day, d))).toEqual(['dès 21 h', "jusqu'à 22 h"])
+    // Or earlier, more than 12 hours after it starts.
+    const stay = times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00')
+    expect(daysOf(stay).map((d) => partOfDay(stay, d))).toEqual(['dès 15 h', "jusqu'à 11 h"])
   })
 
   it('takes a whole day from 00:00 to 00:00, whole-day or not, on the days the clocks change too', () => {
@@ -108,6 +111,7 @@ describe("a thing's times in full", () => {
     expect(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-14T23:00:00-05:00'), '2026-11-14')).toBe('21 h – 23 h')
     expect(fullTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h – 1 h')
     expect(fullTimes(times('2026-11-13T18:00:00-05:00', '2026-11-15T02:00:00-05:00'), '2026-11-13')).toBe('18 h – dim. 15 nov., 2 h')
+    expect(fullTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14')).toBe('15 h – dim. 15 nov., 11 h')
   })
 
   it('say the day it starts on, on a later day', () => {
@@ -135,10 +139,11 @@ describe("a thing's times in full", () => {
 })
 
 describe("a thing's times in brief", () => {
-  it('are its times when they say when it ends: the same day, or the next night', () => {
+  it('are its times when they say when it ends: the same day, or the next day, by 00:00 or within 12 hours', () => {
     expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-14T21:00:00-05:00'), '2026-11-14')).toBe('18 h – 21 h')
     expect(briefTimes(times('2026-11-14T21:30:00-05:00', '2026-11-15T01:00:00-05:00'), '2026-11-14')).toBe('21 h 30 – 1 h')
     expect(briefTimes(times('2026-11-14T21:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('21 h – 0 h')
+    expect(briefTimes(times('2026-11-14T10:00:00-05:00', '2026-11-15T00:00:00-05:00'), '2026-11-14')).toBe('10 h – 0 h')
     // Over the night the clocks go back, a 25-hour day.
     expect(briefTimes(times('2026-10-31T22:00:00-04:00', '2026-11-01T02:00:00-05:00'), '2026-10-31')).toBe('22 h – 2 h')
   })
@@ -146,8 +151,9 @@ describe("a thing's times in brief", () => {
   it('are its start, then the last day it takes, when it ends on a later day, in another month or year too', () => {
     expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-24T11:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
     expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-11-25T00:00:00-05:00'), '2026-11-21')).toBe('15 h → mar. 24')
-    // The next day at a later time than it starts.
+    // The next day at a later time than it starts, or more than 12 hours after it starts.
     expect(briefTimes(times('2026-11-14T18:00:00-05:00', '2026-11-15T21:00:00-05:00'), '2026-11-14')).toBe('18 h → dim. 15')
+    expect(briefTimes(times('2026-11-14T15:00:00-05:00', '2026-11-15T11:00:00-05:00'), '2026-11-14')).toBe('15 h → dim. 15')
     expect(briefTimes(times('2026-12-30T20:00:00-05:00', '2027-01-01T11:00:00-05:00'), '2026-12-30')).toBe('20 h → ven. 1')
     // With its month, four weeks or more after the day, when its weekday and number could be another day's.
     expect(briefTimes(times('2026-11-21T15:00:00-05:00', '2026-12-18T11:00:00-05:00'), '2026-11-21')).toBe('15 h → ven. 18')

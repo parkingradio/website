@@ -80,9 +80,20 @@ describe("sessions' days and times", () => {
     }
     expect(times(at(14, '21:00'), at(14, '23:00'))).toEqual(['21 h – 23 h', 'samedi 14 novembre 2026, de 21 h à 23 h'])
     expect(times(at(14, '21:00'), at(15, '01:00'))).toEqual(['21 h – 1 h', 'samedi 14 novembre 2026, de 21 h à 1 h le lendemain'])
+    // The next day at an earlier time, at most 12 hours after it starts, or at 00:00.
+    expect(times(at(14, '21:00'), at(15, '09:00'))).toEqual(['21 h – 9 h', 'samedi 14 novembre 2026, de 21 h à 9 h le lendemain'])
+    expect(times(at(14, '10:00'), at(15, '00:00'))).toEqual(['10 h – 0 h', 'samedi 14 novembre 2026, de 10 h à 0 h le lendemain'])
+    // Or later than 12 hours after it starts, which only the full form says without the day it ends.
+    expect(times(at(14, '21:00'), at(15, '09:30'))).toEqual(['21 h – dim. 15 nov., 9 h 30', 'samedi 14 novembre 2026, de 21 h à 9 h 30 le lendemain'])
+    expect(times(at(14, '15:00'), at(15, '11:00'))).toEqual(['15 h – dim. 15 nov., 11 h', 'samedi 14 novembre 2026, de 15 h à 11 h le lendemain'])
+    // 12 hours as they pass, over the night the clocks go back.
+    expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T08:00:00-05:00')[0]).toBe('21 h – 8 h')
+    expect(times('2026-10-31T21:00:00-04:00', '2026-11-01T09:00:00-05:00')[0]).toBe('21 h – dim. 1 nov., 9 h')
     // The next day, at the same time or later.
     expect(times(at(14, '21:00'), at(15, '21:00'))).toEqual(['21 h – dim. 15 nov., 21 h', 'samedi 14 novembre 2026, de 21 h à 21 h le lendemain'])
     expect(times(at(14, '18:00'), at(15, '20:00'))).toEqual(['18 h – dim. 15 nov., 20 h', 'samedi 14 novembre 2026, de 18 h à 20 h le lendemain'])
+    // From 00:00 to 00:00, which isn't earlier.
+    expect(times(at(14, '00:00'), at(15, '00:00'))[0]).toBe('0 h – dim. 15 nov., 0 h')
     // Later.
     expect(times(at(13, '18:00'), at(15, '02:00'))).toEqual([
       '18 h – dim. 15 nov., 2 h',

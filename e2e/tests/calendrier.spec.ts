@@ -158,11 +158,11 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   await withCalendar(page, extra)
   await logIn(page, { at: `/admin/calendrier?day=${day}` })
 
-  // In the month, each "conflit" on the day they overlap, and the stay's end the next day, without it, and no free time,
-  // without a holds feed.
+  // In the month, each "conflit" on the day they overlap, the stay from its start, as it lasts more than 12 hours, and its
+  // end the next day, without it, and no free time, without a holds feed.
   const cell = dayCell(page, day)
   await expect(cell).toContainText(`10 h – 16 hoccupation : RÉPARATION ${unique}, calendrier ${team}conflit`)
-  await expect(cell).toContainText(`12 h – 11 hoccupation : ${stays}conflit`)
+  await expect(cell).toContainText(`dès 12 hoccupation : ${stays}conflit`)
   const next = dayCell(page, addDays(day, 1))
   await expect(next.locator('.calendar-occupation')).toHaveText(`jusqu'à 11 hoccupation : ${stays}`)
   await expect(next.locator('.calendar-free')).toHaveCount(0)
@@ -175,7 +175,7 @@ test('occupations and their conflicts are shown in the month, on their day, in "
   // By start, among the test's own things, whatever else takes the day.
   await expect(chosen.getByRole('listitem').filter({ hasText: unique })).toHaveText([
     `occupation10 h – 16 hRÉPARATION ${unique}, calendrier ${team}conflit avec l'occupation ${stays}`,
-    `occupation12 h – 11 h${stays}conflit avec l'occupation RÉPARATION ${unique} (${team})`,
+    `occupation12 h – ${dayInYear(addDays(day, 1))}, 11 h${stays}conflit avec l'occupation RÉPARATION ${unique} (${team})`,
   ])
 
   const issues = page.getByRole('region', { name: 'À régler' })
@@ -316,7 +316,7 @@ test('the list has each thing once, from today, in columns, which shows its day 
   const rows = list.getByRole('button')
   await expect(rows.filter({ hasText: unique }).filter({ hasNotText: 'OCCUPÉ' })).toHaveText([
     `${dayInYear(day)} occupation 10 h – 16 h RÉPARATION ${unique}, calendrier ${team} · conflit avec ${stays}`,
-    `${dayInYear(day)} occupation 12 h – 11 h ${stays} · conflit avec RÉPARATION ${unique}`,
+    `${dayInYear(day)} occupation 12 h → ${weekdayAndNumber(addDays(day, 1))} ${stays} · conflit avec RÉPARATION ${unique}`,
     `${dayInYear(closed)} occupation → ${weekdayAndNumber(addDays(closed, 2))} FERMÉ ${unique}, calendrier ${team}`,
     `${dayInYear(far)} occupation 10 h – 12 h ${link}, calendrier ${team}`,
   ])
