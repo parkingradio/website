@@ -64,6 +64,11 @@ function run({ payload = PAYLOAD as object | null, from = SITE } = {}) {
 
 const panel = () => screen.getByRole('dialog', { name: 'Parking Radio → RA' })
 
+// The page's address, as the environment's options above give it, which vitest's jsdom environment can change, e.g. to
+// RA's site in another language.
+const RA_PAGE = location.href
+const goTo = (url: string) => (globalThis as unknown as { jsdom: { reconfigure(options: { url: string }): void } }).jsdom.reconfigure({ url })
+
 beforeEach(() => {
   vi.stubGlobal('fetch', fetch)
   fetch.mockClear()
@@ -74,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   document.body.replaceChildren()
   document.cookie = 'next_id_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  goTo(RA_PAGE)
 })
 
 describe('The bookmarklet', () => {
@@ -173,6 +179,21 @@ describe('The bookmarklet', () => {
     fetch.mockClear()
     run()
     expect(screen.getByText(/^Vous n’êtes pas connecté à RA\. Connectez-vous à RA/)).toBeInTheDocument()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it("runs on ra.co's subdomains, e.g. RA's site in French", async () => {
+    goTo('https://fr.ra.co/pro/event/create')
+    document.cookie = 'next_id_token=the-token'
+    run()
+    expect(await screen.findByRole('button', { name: 'Créer sur RA' })).toBeInTheDocument()
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/graphql'])
+  })
+
+  it.each(['https://notra.co/pro/event/create', 'https://example.com/'])('only runs on RA\'s site, not on %s', (page) => {
+    goTo(page)
+    run()
+    expect(screen.getByText('Ce favori s’utilise sur ra.co, sur la page qu’ouvre « Publier sur RA ».')).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
   })
 

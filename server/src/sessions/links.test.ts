@@ -9,6 +9,7 @@ describe('raEventId', () => {
     ['https://ra.co/events/6683745', '6683745'],
     ['https://www.ra.co/events/6683745/', '6683745'],
     ['http://ra.co/events/6683745?utm=x#top', '6683745'],
+    ['https://fr.ra.co/events/6683745', '6683745'],
   ])('reduces %s to its id', (sent, id) => {
     expect(raEventId(sent)).toBe(id)
   })
@@ -19,6 +20,8 @@ describe('raEventId', () => {
     ['a link to another page of RA', 'https://ra.co/promoters/183980'],
     ['a link to an event with another id', 'https://ra.co/events/abc'],
     ['a link to another site', 'https://example.com/events/6683745'],
+    ['a link to a site whose name ends like RA\'s', 'https://notra.co/events/6683745'],
+    ['a link to a subdomain of another site', 'https://ra.co.example.com/events/6683745'],
     ['a link that is not http', 'ftp://ra.co/events/6683745'],
     ['a link to a page under the event', 'https://ra.co/events/6683745/tickets'],
   ])('refuses %s', (_, sent) => {

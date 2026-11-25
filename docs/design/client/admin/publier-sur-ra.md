@@ -42,7 +42,7 @@ bookmarklet changes that script, and never requires reinstalling it. The script 
 [Serving the client](../../server/README.md#serving-the-client)). It relies on RA's pages letting it load the script:
 should RA ever send a Content-Security-Policy that doesn't, the bookmarklet stops working, and admins publish by hand.
 Each environment has its own bookmarklet, which loads the script from its own site. In development, the script comes
-from `http://localhost`: the browser may ask to allow ra.co to reach the local network, and the bookmarklet only works
+from `http://localhost`: the browser may ask to allow RA's site to reach the local network, and the bookmarklet only works
 once that's allowed.
 
 The panel is in French, like the admin pages, and only ever shows what it's given, from the address or from RA, as text.
@@ -50,8 +50,8 @@ Clicking the bookmarklet again replaces it.
 
 What the script does:
 
-- It only runs on `ra.co`, with an event in the fragment, as the session's page puts it there, from the site it was
-  loaded from: otherwise it says what's missing, and does nothing else.
+- It only runs on `ra.co` or one of its subdomains, e.g. `fr.ra.co`, with an event in the fragment, as the session's
+  page puts it there, from the site it was loaded from: otherwise it says what's missing, and does nothing else.
 - It reads the RA login of the browser, the `next_id_token` cookie, and sends every request to RA's GraphQL endpoint
   (`/graphql`, on RA's site) with it, as `Authorization: Bearer <token>`. Without it, it says to log in to RA, then to
   click « Publier sur RA » again.

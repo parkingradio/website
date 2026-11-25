@@ -33,6 +33,7 @@ describe('parseLink', () => {
     expect(parse('mixcloud', 'https://www.mixcloud.com/djx/some-mix/')).toEqual({ value: 'djx' })
     expect(parse('ra', 'https://ra.co/dj/robinthepark')).toEqual({ value: 'robinthepark' })
     expect(parse('ra', 'https://www.residentadvisor.net/dj/robinthepark')).toEqual({ value: 'robinthepark' })
+    expect(parse('ra', 'https://fr.ra.co/dj/robinthepark')).toEqual({ value: 'robinthepark' })
     expect(parse('youtube', 'https://www.youtube.com/@parkingradio')).toEqual({ value: 'parkingradio' })
     expect(parse('spotify', 'https://open.spotify.com/intl-fr/artist/4Z8W4fKeB5YxbusRsdQVPb?si=abc')).toEqual({
       value: '4Z8W4fKeB5YxbusRsdQVPb',
@@ -73,6 +74,7 @@ describe('parseLink', () => {
 
   it("explains what's wrong", () => {
     expect(parse('soundcloud', 'https://instagram.com/foo').error).toBe("ce n'est pas une adresse SoundCloud")
+    expect(parse('ra', 'https://notra.co/dj/robinthepark').error).toBe("ce n'est pas une adresse Resident Advisor")
     expect(parse('soundcloud', 'https://on.soundcloud.com/AbC12').error).toContain('lien court')
     expect(parse('soundcloud', 'soundcloud.com').error).toBe('il manque le nom de profil')
     expect(parse('instagram', 'bad name!').error).toBe("ce nom de profil Instagram n'est pas valide")

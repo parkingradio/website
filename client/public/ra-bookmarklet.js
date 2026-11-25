@@ -109,7 +109,8 @@
   }
 
   async function main() {
-    if (location.hostname !== 'ra.co') return fail('Ce favori s’utilise sur ra.co, sur la page qu’ouvre « Publier sur RA ».')
+    // RA's site in another language is on a subdomain, e.g. fr.ra.co.
+    if (location.hostname !== 'ra.co' && !location.hostname.endsWith('.ra.co')) return fail('Ce favori s’utilise sur ra.co, sur la page qu’ouvre « Publier sur RA ».')
     const given = sent()
     if (!given) return fail('Aucun événement à créer : cliquez sur « Publier sur RA » sur la page de la session, puis sur ce favori.')
     if (given.site !== SITE) return fail(`Cet événement vient de ${given.site}, et ce favori de ${SITE}.`)
