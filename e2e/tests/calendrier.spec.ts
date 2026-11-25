@@ -329,6 +329,7 @@ test("S'abonner links to the admin's own calendars", async ({ page, baseURL }) =
     const calendar = await page.request.get(`/${noun}.ics${link.search}`)
     expect(calendar.status()).toBe(200)
     const body = await calendar.text()
+    // The stack doesn't say which environment the server is, so it's development.
     expect(body).toContain(`X-WR-CALNAME:Parking Radio (development) · ${noun}`)
     if (noun === 'sessions') expect(body).toContain('SUMMARY:[UNANNOUNCED] ')
   }

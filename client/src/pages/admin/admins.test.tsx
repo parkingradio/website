@@ -121,7 +121,7 @@ describe('Admins', () => {
 
     fireEvent.click((await row('other@example.com')).getByRole('button', { name: 'révoquer' }))
 
-    expect(confirm).toHaveBeenCalledWith("Révoquer l'accès de other@example.com ? Ses sessions prendront fin aussitôt.")
+    expect(confirm).toHaveBeenCalledWith("Révoquer l'accès de other@example.com ? Ses sessions et ses connexions prendront fin aussitôt, et les liens de ses calendriers ne marcheront plus.")
     await waitFor(() => expect(requestsTo('DELETE', '/api/admin/admins/other')).toHaveLength(1))
     await waitFor(() => expect(requestsTo('GET', '/api/admin/admins')).toHaveLength(2))
   })

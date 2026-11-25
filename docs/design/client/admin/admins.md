@@ -8,8 +8,9 @@ At `/admin/admins`: manages who can access the admin pages (see [Admins](../../s
   invite said, until the field changes.
 - "Admins existants": lists the admins by email, with "(vous)" next to the admin's own, their status ("actif",
   "invitation envoyée" with when it expires, or "invitation expirée"), and when they were added and by whom. "révoquer"
-  revokes another admin after confirming, which ends their sessions and connections, or cancels their invite if they
-  haven't accepted it. Those who haven't can be invited again with "renvoyer".
+  revokes another admin after confirming, which ends their sessions and connections, and makes the links to their
+  calendars stop working (see [Admins' calendars](../../server/admin-calendars.md#the-token)), or cancels their invite if
+  they haven't accepted it. Those who haven't can be invited again with "renvoyer".
 
 ## Accepting an invite
 

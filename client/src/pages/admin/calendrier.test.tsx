@@ -1188,7 +1188,7 @@ describe("Calendrier's S'abonner", () => {
   const NEW_TOKEN = 'b'.repeat(64)
 
   it("links to each calendar's webcal link, in whichever view, read once", async () => {
-    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [LIST]: LIST_CALENDAR })
+    mockFetch({ ...LOGGED_IN, [NOVEMBER]: CALENDAR, [DECEMBER]: EMPTY, [LIST]: LIST_CALENDAR })
     renderAt('/admin/calendrier?view=list')
 
     await subscribed()
@@ -1197,9 +1197,12 @@ describe("Calendrier's S'abonner", () => {
     // The links aren't written out.
     expect(section()).not.toHaveTextContent(TOKEN)
 
-    // Not read again when the view changes.
+    // Not read again when the view or the month changes.
     fireEvent.click(screen.getByRole('button', { name: 'mois' }))
     await loaded()
+    expect(link('sessions')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
+    await waitFor(() => expect(requestsTo('GET', DECEMBER)).toHaveLength(1))
     expect(link('sessions')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'liste' }))
     expect(link('sessions')).toBeInTheDocument()

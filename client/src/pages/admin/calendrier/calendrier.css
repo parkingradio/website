@@ -614,8 +614,3 @@
     grid-column: 1 / -1;
   }
 }
-
-/* "S'abonner": at the page's end, a row for each calendar (see .admin-list). */
-.calendar-subscribe {
-  margin-top: 2rem;
-}

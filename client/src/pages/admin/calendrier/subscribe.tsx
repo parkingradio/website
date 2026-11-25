@@ -5,17 +5,17 @@ import { useApi } from '../../../api/use-api'
 // "S'abonner": the admin's links to their calendars of the sessions and of the occupations, which their calendar app
 // subscribes to (see docs/design/client/admin/calendrier.md, and docs/design/server/admin-calendars.md).
 
-const FEEDS = [
+const CALENDARS = [
   {
-    // What the feed is of, which its path and its link's name for screen readers are made from.
+    // What the calendar is of, which its path and its link's name for screen readers are made from.
     noun: 'sessions',
     name: 'Sessions',
-    has: "les sessions datées de l'année passée et à venir, annoncées ou non, y compris les annulées, avec « [UNANNOUNCED] » et « [CANCELLED] » devant leur titre.",
+    has: "les sessions datées depuis un an, et à venir, annoncées ou non, y compris les annulées, avec « [UNANNOUNCED] » et « [CANCELLED] » devant leur titre.",
   },
   {
     noun: 'occupations',
     name: 'Occupations',
-    has: "les occupations des calendriers externes, nommées comme ici, et aujourd'hui, « [REFRESH ERROR] » suivi du nom de chaque calendrier externe dont la dernière lecture a échoué.",
+    has: "les occupations des calendriers externes, nommées comme ici, et, aujourd'hui, un événement « [REFRESH ERROR] » suivi du nom de chaque calendrier externe dont la dernière lecture a échoué.",
   },
 ] as const
 
@@ -40,7 +40,7 @@ export function Subscribe() {
   // used" in docs/design/client/admin/layout.md).
   const unusable = token === null || replacing.kind === 'sending'
   return (
-    <section className="calendar-subscribe" aria-labelledby={headingId}>
+    <section aria-labelledby={headingId}>
       <h2 id={headingId}>S'abonner</h2>
       <p>
         Ajoutez à votre application de calendrier ce qui prend le studio. Ces liens sont personnels&nbsp;: quiconque les a voit
@@ -53,14 +53,14 @@ export function Subscribe() {
         </p>
       )}
       <ul className="admin-list">
-        {FEEDS.map((feed) => (
-          <li key={feed.noun}>
+        {CALENDARS.map((calendar) => (
+          <li key={calendar.noun}>
             <p>
-              <strong>{feed.name}</strong>&nbsp;: {feed.has}
+              <strong>{calendar.name}</strong>&nbsp;: {calendar.has}
             </p>
             {token !== null && (
               <p>
-                <a href={`webcal://${window.location.host}/${feed.noun}.ics?token=${token}`} aria-label={`s'abonner aux ${feed.noun}`}>
+                <a href={`webcal://${window.location.host}/${calendar.noun}.ics?token=${token}`} aria-label={`s'abonner aux ${calendar.noun}`}>
                   s'abonner
                 </a>
               </p>

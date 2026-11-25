@@ -230,12 +230,12 @@ which their calendar app reads again on its own schedule, so that it shows what 
 has them sees these calendars, and that Google Agenda takes a link with « À partir de l'URL », then reads it again on
 its own schedule, up to a day later. Then a row for each calendar, with its name and what it has:
 
-- « Sessions » : the sessions with a date, from the past year on, announced or not, cancelled ones included, whose
-  titles are marked "[UNANNOUNCED]" and "[CANCELLED]".
-- « Occupations » : the occupations of the external calendars, named as on this page, and an event today for each
+- « Sessions » : the sessions with a date, over the past year and to come, announced or not, cancelled ones included,
+  whose titles are marked "[UNANNOUNCED]" and "[CANCELLED]".
+- « Occupations » : the occupations of the external calendars, named as on this page, and, today, an event for each
   external calendar whose last read failed, "[REFRESH ERROR]" followed by its name.
 
-Each row has "s'abonner", a link to the calendar's `webcal` link, which opens the calendar app:
+Each row has "s'abonner", a `webcal` link to the calendar, which opens the calendar app:
 `webcal://<site's host>/sessions.ics?token=<token>` or `…/occupations.ics?token=<token>`. Screen readers name it after
 its calendar, e.g. « s'abonner aux sessions ».
 
@@ -244,11 +244,12 @@ Then "régénérer les liens", which replaces both links (see
 once the admin confirms « Régénérer vos liens ? Les calendriers abonnés avec les liens actuels ne seront plus mis à
 jour. ». The rows then have the new links, and the section says « Liens régénérés : abonnez-vous avec les nouveaux
 liens, puis retirez les anciens calendriers de votre application. ». While the links are replaced, the button is greyed
-out (see [Controls that can't be used](layout.md#controls-that-cant-be-used)). When they can't be, the section says
-why, « Les liens n'ont pas pu être régénérés : … », and the rows keep the links they had.
+out (see [Controls that can't be used](layout.md#controls-that-cant-be-used)). When replacing them fails, the section
+says why, « Les liens n'ont pas pu être régénérés : … », and the rows keep the links they had. Either message stays
+until "régénérer les liens" is used again.
 
 Until the links are read, the rows only have their names and what they have, and "régénérer les liens" is greyed out
-too. When the links can't be read, the section says why, « Les liens n'ont pas pu être chargés : … », in their place.
+too. When the links can't be read, the section says why above the rows, « Les liens n'ont pas pu être chargés : … ».
 
 ## Loading and errors
 
