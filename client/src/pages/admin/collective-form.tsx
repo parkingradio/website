@@ -192,7 +192,7 @@ function MembersField({
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Artistes du collectif</legend>
-      <p className="admin-hint">Dans leur ordre de présentation. Les genres du collectif sont ceux de ses artistes.</p>
+      <p className="admin-hint">Les genres du collectif sont ceux de ses artistes.</p>
       <OrderedList
         items={members}
         keyOf={keyOf}

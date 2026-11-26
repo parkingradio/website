@@ -232,7 +232,6 @@ function PerformersField({
   return (
     <fieldset className="admin-fields" onBlur={leaving(onLeave)}>
       <legend>Artistes</legend>
-      <p className="admin-hint">Dans leur ordre de présentation.</p>
       <OrderedList items={performers} keyOf={(performer) => performer.id} label={(performer) => performer.name} onChange={onChange} nextFocus={pickerId} />
       <div className="admin-field">
         <label htmlFor={pickerId}>Ajouter un artiste</label>

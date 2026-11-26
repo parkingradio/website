@@ -149,10 +149,11 @@ replaced by its value, written out, and the list says why once, above it, rather
 ## Reordering
 
 Some lists whose order counts, e.g. a set's performers, are reordered by dragging their items by a handle, a block of
-dots at the start of each item: with a mouse, or on a touch screen once it's held for a moment. Only the handle starts a
-drag, so that elsewhere the items' links and buttons work as usual, and swiping scrolls the page. The item moves to
-where it's dropped, and the others make room for it, but the list's order only changes once it's dropped. Escape puts it
-back. Dragging with a mouse or a finger doesn't scroll the page, since the lists are short.
+dots at the start of each item: with a mouse, or on a touch screen once it's held for a moment. A set's performers and
+a collective's artists are also numbered. Only the handle starts a drag, so that elsewhere the items' links and buttons
+work as usual, and swiping scrolls the page. The item moves to where it's dropped, and the others make room for it, but
+the list's order only changes once it's dropped. Escape puts it back. Dragging with a mouse or a finger doesn't scroll
+the page, since the lists are short.
 
 The handle also works with the keyboard: Space or Enter picks the item up, the up and down arrows move it one place, and
 Space, Enter or Tab drops it, while moving the focus elsewhere, e.g. by clicking, puts it back. The focus stays on the
