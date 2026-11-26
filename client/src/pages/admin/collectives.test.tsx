@@ -744,7 +744,7 @@ describe('A collective’s page', () => {
     mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: { ...TAKEOVER, announced: true } } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    const announced = await screen.findByRole('combobox', { name: 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026' })
+    const announced = await screen.findByRole('combobox', { name: named('Annonce : ONDES TAKEOVER, sam. 14 nov. 2026') })
     expect(announced).toHaveValue('false')
     fireEvent.change(announced, { target: { value: 'true' } })
 
@@ -758,7 +758,7 @@ describe('A collective’s page', () => {
     mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: { ...TAKEOVER, announced: true } } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    const name = 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026'
+    const name = named('Annonce : ONDES TAKEOVER, sam. 14 nov. 2026')
     const announced = await screen.findByRole('combobox', { name })
     fireEvent.change(announced, { target: { value: 'true' } })
     await waitFor(() => expect(announced).toBeEnabled())
@@ -773,7 +773,7 @@ describe('A collective’s page', () => {
     mockFetch({ ...ONDES_PAGE, ...TAKEOVERS, 'PUT /api/admin/sessions/session-1/announced': { ok: false, error: 'No such session' } })
     renderAt('/admin/artistes/collectifs/collective-1')
 
-    const announced = await screen.findByRole('combobox', { name: 'Annonce : ONDES TAKEOVER, sam. 14 nov. 2026' })
+    const announced = await screen.findByRole('combobox', { name: named('Annonce : ONDES TAKEOVER, sam. 14 nov. 2026') })
     fireEvent.change(announced, { target: { value: 'true' } })
 
     const alert = await screen.findByRole('alert')
