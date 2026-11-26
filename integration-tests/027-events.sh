@@ -32,7 +32,7 @@ expect_status 200
 session="$(first_id)"
 
 echo "  a session that isn't announced, its artist and its collective aren't public"
-for url in "/api/artists/${aube}" "/api/collectives/${marees}" "${flyer}/w320.webp" "${flyer}/w1280.webp"; do
+for url in "/api/artists/${aube}" "/api/collectives/${marees}" "${flyer}/w320.v2.webp" "${flyer}/w1280.v2.webp"; do
     request "${BASE_URL}${url}"
     expect_status 404
 done
@@ -49,7 +49,7 @@ expect_status 200
 request "${BASE_URL}/api/events?from=2990-03-01T00:00-05:00&to=2990-03-02T00:00-05:00"
 expect_status 200
 expect_body_contains "\"upcoming\":[{\"id\":\"${session}\",\"title\":\"LES MARÉES TAKEOVER\""
-expect_body_contains "\"flyer\":{\"320\":\"${flyer}/w320.webp\",\"1280\":\"${flyer}/w1280.webp\"}"
+expect_body_contains "\"flyer\":{\"320\":\"${flyer}/w320.v2.webp\",\"1280\":\"${flyer}/w1280.v2.webp\"}"
 expect_body_contains "\"lineup\":[{\"id\":\"${aube}\",\"name\":\"Aube\"}]"
 request "${BASE_URL}/api/artists/${aube}"
 expect_status 200
@@ -58,7 +58,7 @@ request "${BASE_URL}/api/collectives/${marees}"
 expect_status 200
 expect_body_contains "\"members\":[{\"id\":\"${aube}\",\"name\":\"Aube\"}]"
 expect_body_lacks 'marees@events.test'
-curl --silent --output "${FILES}/served" "${BASE_URL}${flyer}/w1280.webp"
+curl --silent --output "${FILES}/served" "${BASE_URL}${flyer}/w1280.v2.webp"
 [ "$(image_format "${FILES}/served")" = 'webp 100x200' ] || fail "expected the flyer's size, upright, as WebP"
 
 echo "  the calendar feed has it, as iCalendar, which can be kept for 5 minutes"

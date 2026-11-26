@@ -90,8 +90,8 @@ the public endpoints fail with 404 for a private collective, as for one that doe
 A collective's public profile has its `id`, `name`, `country`, `city`, `description` and `links`, as the admin endpoints
 give them, `members`, its members, in order, each with their `id` and `name`, and `photo`, where the public gets the
 sizes of its photo, by width, like an artist's (see [Public profiles, in Artists](artists.md#public-profiles)), e.g.
-`/api/collectives/photos/<sha256>/w320.webp`, or null when it has none. Never its contact's email or phone, or who added
-or changed it.
+`/api/collectives/photos/<sha256>/w320.v2.webp`, or null when it has none. Never its contact's email or phone, or who
+added or changed it.
 
 ## `GET /api/admin/collectives` (admin)
 

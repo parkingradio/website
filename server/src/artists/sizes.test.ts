@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import sharp from 'sharp'
-import { UnreadablePhoto, makeSizes, resize, sizeKey } from './sizes.js'
-import { testImage } from './test-photos.js'
+import { PHOTO_WIDTHS, UnreadablePhoto, makeSizes, resize, sizeKey, sizeName, widthNamed } from './sizes.js'
+import { TEST_COLOUR, colourTestImages, expectColour, testImage, wideGamutTestImages } from './test-photos.js'
 
 // What photos and flyers are served as, made from real images (see "Photos" in docs/design/server/artists.md).
 
 // For the tests that go through the largest images: in CI, alongside the other test files, they can take about as long
 // as vitest's default timeout of 5 s.
 const LARGE_IMAGES_TIMEOUT_MS = 20_000
+
+// The colour profile that sharp embeds for Display P3, which is its own, as `testImage` has it.
+const P3_PROFILE = (await sharp(await testImage('png', 1, 1)).metadata()).icc
 
 describe('resize', () => {
   it('makes a WebP image of that width, keeping its proportions', async () => {
@@ -44,8 +47,24 @@ describe('resize', () => {
       for (const planted of ['PLANTED-MAKE', 'PLANTED-GPS']) expect(resized.includes(planted), format).toBe(false)
       const size = await sharp(resized).metadata()
       expect(size.exif, format).toBeUndefined()
-      expect(size.icc, format).toBeUndefined()
       expect(size.xmp, format).toBeUndefined()
+    }
+  })
+
+  it('keeps its colours: in Display P3, with a profile of its own, when the photo has a profile, and as they are otherwise', async () => {
+    for (const [name, photo] of Object.entries(await colourTestImages())) {
+      const size = await resize(photo, 320)
+      await expectColour(size, TEST_COLOUR, 4, name)
+      // Never the photo's, e.g. sRGB's.
+      const profiled = (await sharp(photo).metadata()).icc !== undefined
+      expect((await sharp(size).metadata()).icc, name).toEqual(profiled ? P3_PROFILE : undefined)
+    }
+  })
+
+  it('keeps the colours of a photo in Display P3 that are outside sRGB, 8-bit ones included', async () => {
+    for (const [name, photo] of Object.entries(await wideGamutTestImages())) {
+      await expectColour(photo, [0, 255, 0], 0, `${name}, sent`, { stored: true })
+      await expectColour(await resize(photo, 320), [0, 255, 0], 4, name, { stored: true })
     }
   })
 
@@ -101,6 +120,17 @@ describe('makeSizes', () => {
   it("throws an UnreadablePhoto when the photo can't be read", async () => {
     const photo = await testImage('png', 640, 480)
     await expect(makeSizes(photo.subarray(0, photo.length / 2))).rejects.toBeInstanceOf(UnreadablePhoto)
+  })
+})
+
+describe('sizeName', () => {
+  it('names each width, as widthNamed reads it, but never as the sizes made before were', () => {
+    for (const width of PHOTO_WIDTHS) {
+      expect(widthNamed(sizeName(width))).toBe(width)
+      // Those are no longer served, and are deleted by hand, by the end of their keys (see `sizeName`).
+      expect(widthNamed(`w${width}.webp`)).toBeUndefined()
+      expect(sizeKey('artists/a.jpg', width)).not.toMatch(/\.w\d+\.webp$/)
+    }
   })
 })
 

@@ -197,7 +197,7 @@ export function photoRoute(what: PhotoOf, { summary, tags }: { summary: string; 
             `The ${image}, with the type it was checked to have, or, with \`width\`, its size at that width, as WebP. ${nosniff}, ` +
             'and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with ' +
             `the server before showing it again (\`Cache-Control: ${ADMIN_CACHE_CONTROL}\`). The ${image} and each of its sizes ` +
-            `have an \`ETag\` of their own, which changes whenever the ${image} does`,
+            `have an \`ETag\` of their own, which changes whenever the ${image} does, or, for a size, how sizes are made`,
           content: Object.fromEntries(PHOTO_TYPES.map((type) => [type, { schema: Photo }])),
         },
         // Without a body, which @fastify/swagger documents for a schema of type null.
@@ -223,8 +223,8 @@ function hasEtag(ifNoneMatch: string | undefined, etag: string): boolean {
 // declared with `photoRoute`, as it was sent, or its size at `width`, or a 404 when they have none, when it's missing,
 // or when it has no such size (see artists/backfill.ts). The ETag of a photo is its key, and that of a size the key it's
 // kept under, which are only ever that photo's, wherever it's used (see `photoKey` in keys.ts): it changes exactly when
-// the photo does. So a request that already has it gets a 304 without anything being read, even when the photo is
-// missing.
+// the photo does, and, for a size, when how sizes are made does (see `sizeName` in sizes.ts). So a request that already
+// has it gets a 304 without anything being read, even when the photo is missing.
 export async function sendPhoto(
   reply: FastifyReply,
   photos: Photos,

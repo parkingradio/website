@@ -66,10 +66,12 @@ stays in the bucket's previous versions for as long as the database's backups ar
 gone for good after that.
 
 The server also keeps each photo at two sizes, 320 and 1280 pixels wide, made when it's sent: WebP images, upright as
-its EXIF orientation says, without any of its metadata, e.g. where it was taken, never larger than the photo, nor taller
-than WebP allows. They're deleted with it. When it starts, the server makes, in the background, the sizes that the
-photos it keeps don't have: until then, and for good for a photo it can't read, the endpoints fail with 404 for a size
-that isn't there.
+its EXIF orientation says, never larger than the photo, nor taller than WebP allows. They keep none of its metadata,
+e.g. where it was taken, nor its colour profile, but they keep its colours: those of a photo with a colour profile are
+in Display P3, with a Display P3 profile of the server's own, never the photo's, and those of a photo without one are
+as they are, without a profile. They're deleted with it.
+When it starts, the server makes, in the background, the sizes that the photos it keeps don't have: until then, and for
+good for a photo it can't read, the endpoints fail with 404 for a size that isn't there.
 
 The public only ever gets the sizes of a public artist's photo, never the photo itself, so that it and its metadata stay
 private. Anyone can keep those sizes for good, browsers and Cloudflare's cache included: so a size that was already
@@ -91,7 +93,7 @@ endpoints give them, and `photo`, where the public gets the sizes of their photo
 or their collectives, which could name collectives that aren't public.
 
 Clients take the URLs of sizes from the responses that give them, and never build them. Each one names the photo, by its
-content, and the size, e.g. `/api/artists/photos/<sha256>/w320.webp` (see
+content, and the size, e.g. `/api/artists/photos/<sha256>/w320.v2.webp` (see
 [`GET /api/artists/photos/:image/:size`](#get-apiartistsphotosimagesize)): so it's the same for every artist who has the
 same photo, and it changes whenever what it serves would, when the photo changes, or how its sizes are made.
 
@@ -126,10 +128,11 @@ Responds with the photo itself, with the type it was checked to have, or with it
 JSON. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only
 in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again
 (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes
-whenever the photo does, and a request with it in `If-None-Match` gets a 304 without the photo, even when the photo is
-missing. Otherwise, fails with 400 when `width` is anything else, or is given more than once, and 404 when there's no
-such artist, when they have no photo, or when what's asked for is missing: the photo, or, with `width`, that size of it,
-e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still be had as it was sent, and replaced.
+whenever the photo does, or, for a size, how sizes are made, and a request with it in `If-None-Match` gets a 304 without
+the photo, even when the photo is missing. Otherwise, fails with 400 when `width` is anything else, or is given more
+than once, and 404 when there's no such artist, when they have no photo, or when what's asked for is missing: the photo,
+or, with `width`, that size of it, e.g. one it doesn't have yet (see [Photos](#photos)), though the photo can still be
+had as it was sent, and replaced.
 
 ## `PUT /api/admin/artists/:id/photo` (admin)
 

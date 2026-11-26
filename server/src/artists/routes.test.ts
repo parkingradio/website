@@ -610,7 +610,7 @@ describe('artists routes', () => {
       await create(app, profile(), JPEG)
       publicIds.add('artist-1')
       for (const width of [320, 1280] as const) {
-        const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w${width}.webp` })
+        const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w${width}.v2.webp` })
         expect(response.statusCode, `${width}`).toBe(200)
         expect(response.rawPayload).toEqual(photos.size('artists/photo-1.jpg', width))
         expect(response.headers).toMatchObject({
@@ -629,15 +629,17 @@ describe('artists routes', () => {
       await create(app, profile({ email: null }), PNG)
       publicIds.add('artist-1')
       for (const url of [
-        `${PHOTOS}/w640.webp`,
+        `${PHOTOS}/w640.v2.webp`,
+        // As the sizes made before were named.
+        `${PHOTOS}/w320.webp`,
         `${PHOTOS}/w320.png`,
         `${PHOTOS}/320.webp`,
         // The other artist's, who's private.
-        '/api/artists/photos/photo-2/w320.webp',
-        '/api/artists/photos/photo-3/w320.webp',
+        '/api/artists/photos/photo-2/w320.v2.webp',
+        '/api/artists/photos/photo-3/w320.v2.webp',
         // Not a name, nor a key.
-        '/api/artists/photos/photo-1.jpg/w320.webp',
-        '/api/artists/photos/artists%2Fphoto-1/w320.webp',
+        '/api/artists/photos/photo-1.jpg/w320.v2.webp',
+        '/api/artists/photos/artists%2Fphoto-1/w320.v2.webp',
       ]) {
         const response = await app.inject({ method: 'GET', url })
         expect(response.statusCode, url).toBe(404)
@@ -652,7 +654,7 @@ describe('artists routes', () => {
       await create(app, profile(), JPEG)
       publicIds.add('artist-1')
       stored.delete(sizeKey('artists/photo-1.jpg', 1280))
-      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w1280.webp` })
+      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w1280.v2.webp` })
       expect(response.statusCode).toBe(404)
       expect(response.json()).toEqual({ ok: false, error: 'This photo has no size 1280 pixels wide' })
       expect(response.headers['cache-control']).toBe('no-store')
@@ -664,7 +666,7 @@ describe('artists routes', () => {
       await create(app, profile(), JPEG)
       publicIds.add('artist-1')
       photos.readSize.mockRejectedValueOnce(new Error('The bucket failed'))
-      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w320.webp` })
+      const response = await app.inject({ method: 'GET', url: `${PHOTOS}/w320.v2.webp` })
       expect(response.statusCode).toBe(500)
       expect(response.headers['cache-control']).toBe('no-store')
     })

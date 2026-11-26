@@ -86,7 +86,7 @@ function get(url: string, headers: Record<string, string> = {}) {
 }
 
 // The URLs of the sizes of the photo or flyer at `url`, e.g. `/api/events/flyers/<name>`, as the public gets them.
-const sizes = (url: string) => ({ 320: `${url}/w320.webp`, 1280: `${url}/w1280.webp` })
+const sizes = (url: string) => ({ 320: `${url}/w320.v2.webp`, 1280: `${url}/w1280.v2.webp` })
 
 const artistStatus = async (id: string) => (await get(`/api/artists/${id}`)).statusCode
 const collectiveStatus = async (id: string) => (await get(`/api/collectives/${id}`)).statusCode
@@ -609,7 +609,7 @@ describe('the photos and flyers of what is public', () => {
     stored.clear()
     await expectNotFound([photo[1280]], 'This photo has no size 1280 pixels wide')
     await expectNotFound([flyer[320]], 'This flyer has no size 320 pixels wide')
-    await expectNotFound(['/api/artists/photos/photo-9/w320.webp', `/api/artists/photos/${'0'.repeat(64)}/w320.webp`], 'No such photo')
-    await expectNotFound([`/api/events/flyers/${'0'.repeat(64)}/w320.webp`], 'No such flyer')
+    await expectNotFound(['/api/artists/photos/photo-9/w320.v2.webp', `/api/artists/photos/${'0'.repeat(64)}/w320.v2.webp`], 'No such photo')
+    await expectNotFound([`/api/events/flyers/${'0'.repeat(64)}/w320.v2.webp`], 'No such flyer')
   })
 })

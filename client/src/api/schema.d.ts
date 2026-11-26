@@ -1162,7 +1162,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does, or, for a size, how sizes are made */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1349,7 +1349,7 @@ export interface paths {
                 path: {
                     /** @description The photo's name, as the URL of its size gives it */
                     image: string;
-                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    /** @description The size's name, as its URL gives it, e.g. `w320.v2.webp` */
                     size: string;
                 };
                 cookie?: never;
@@ -1461,7 +1461,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does */
+                /** @description The photo, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The photo and each of its sizes have an `ETag` of their own, which changes whenever the photo does, or, for a size, how sizes are made */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1648,7 +1648,7 @@ export interface paths {
                 path: {
                     /** @description The photo's name, as the URL of its size gives it */
                     image: string;
-                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    /** @description The size's name, as its URL gives it, e.g. `w320.v2.webp` */
                     size: string;
                 };
                 cookie?: never;
@@ -2000,7 +2000,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The flyer, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The flyer and each of its sizes have an `ETag` of their own, which changes whenever the flyer does */
+                /** @description The flyer, with the type it was checked to have, or, with `width`, its size at that width, as WebP. Browsers are told not to guess another type (`X-Content-Type-Options: nosniff`), and that they can keep it, only in the browser that asked for it, never in a shared cache, but have to check with the server before showing it again (`Cache-Control: private, no-cache`). The flyer and each of its sizes have an `ETag` of their own, which changes whenever the flyer does, or, for a size, how sizes are made */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2613,7 +2613,7 @@ export interface paths {
                 path: {
                     /** @description The flyer's name, as the URL of its size gives it */
                     image: string;
-                    /** @description The size's name, as its URL gives it, e.g. `w320.webp` */
+                    /** @description The size's name, as its URL gives it, e.g. `w320.v2.webp` */
                     size: string;
                 };
                 cookie?: never;
