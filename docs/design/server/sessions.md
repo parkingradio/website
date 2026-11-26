@@ -387,8 +387,9 @@ Responses give each one as an object, or null when there's none, with an `id` an
 Parking Radio lists its sessions as events on Resident Advisor, under its promoter page (see
 [RA events](ra-events.md)). A session's event there is its `raEvent` (see [Links](#links)), which an admin creates on RA,
 either with the bookmarklet, from what the server gives for the session, which then sets it as its `raEvent` (see
-[Publishing on RA](ra-publication.md)), or by hand, then sets it as its `raEvent`. The server never creates events on RA
-itself.
+[Publishing on RA](ra-publication.md)), or by hand, then sets it as its `raEvent`. The server never creates, changes or
+removes events on RA itself: a session's `raEvent` is only a link, so un-announcing, cancelling or deleting the session
+leaves its event as it is, to be changed or removed on RA.
 
 ## `GET /api/admin/sessions` (admin)
 

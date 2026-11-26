@@ -447,6 +447,11 @@ export function sessionName(session: Pick<Session, 'title' | 'start'>): string {
   return `${session.title}, ${sessionDay(session)}`
 }
 
+// What a confirmation says of a session's event on RA, which un-announcing, cancelling or deleting the session leaves as
+// it is (see "Events on RA" in docs/design/server/sessions.md), and that line for a session that has one, or nothing.
+export const RA_EVENT_KEPT = "L'événement sur RA ne sera pas modifié."
+export const raEventKept = (session: Pick<Session, 'raEvent'>) => (session.raEvent ? `${RA_EVENT_KEPT}\n` : '')
+
 // How long a set lasts, e.g. "1 h 30", or "à déterminer" when that isn't known.
 export function setDuration({ durationMinutes }: Pick<StudioSet, 'durationMinutes'>): string {
   return durationMinutes === null ? 'à déterminer' : formatDuration(durationMinutes)

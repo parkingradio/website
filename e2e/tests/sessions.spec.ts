@@ -651,8 +651,14 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await expect(row).toHaveCount(0)
   await announced.getByRole('button', { name: /^annoncées/ }).click()
   await expect(row).toHaveCount(1)
-  // Un-announced from its row, which takes it out of the announced sessions, then announced again from its row among
-  // those that aren't.
+  // Un-announced from its row, once confirmed, since it has an event on RA: not confirmed, its row keeps its value. That
+  // takes it out of the announced sessions, then it's announced again from its row among those that aren't.
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await rowAnnounced.selectOption('false')
+  await expect(rowAnnounced).toBeEnabled()
+  await expect(rowAnnounced).toHaveValue('true')
+  await expect(row).toHaveCount(1)
+  page.once('dialog', (dialog) => dialog.accept())
   await rowAnnounced.selectOption('false')
   await expect(row).toHaveCount(0)
   await announced.getByRole('button', { name: /^non annoncées/ }).click()
@@ -677,11 +683,11 @@ test("a collective's takeover is added from its page, overnight, with its sets, 
   await page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' }).click()
   await expect(page.getByRole('group', { name: 'Statut', exact: true }).getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true')
   await expect(statusOf(sets.getByRole('row').nth(1))).toHaveText('annulé')
-  // It stays announced, until it's un-announced.
+  // It stays announced, until it's un-announced, once confirmed.
   await expect(announcement.getByRole('button', { name: 'annoncée', exact: true })).toHaveAttribute('aria-pressed', 'true')
   // Tapped on phones, since clicking leaves the mouse where it was, over what the page later scrolls under it.
   const unannounce = announcement.getByRole('button', { name: 'non annoncée' })
-  await (isMobile ? unannounce.tap() : unannounce.click())
+  await Promise.all([page.waitForEvent('dialog').then((dialog) => dialog.accept()), isMobile ? unannounce.tap() : unannounce.click()])
   await expect(announcement.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true')
   // Its set can't be un-cancelled, which the page says above the sets, its status written out, and sets can't be added
   // to it, which the button says, greyed out.

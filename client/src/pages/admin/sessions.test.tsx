@@ -475,6 +475,26 @@ describe('Announcing a session from the list', () => {
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=all&announced=true$/)
   })
 
+  it('asks first when un-announcing a session with an event on RA, which keeps its value when it is not confirmed', async () => {
+    const soiree = { ...SESSIONS[2], raEvent: SESSION.raEvent }
+    mockFetch({ ...LIST, '/api/admin/sessions': { ok: true, sessions: [SESSIONS[0], SESSIONS[1], soiree, SESSIONS[3]] }, ...UNANNOUNCE_SOIREE })
+    renderAt('/admin/sessions?status=all&announced=true')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const changed = await select('SOIRÉE, ven. 2 oct. 2026')
+    fireEvent.change(changed, { target: { value: 'false' } })
+    expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nRetirer l'annonce de la session ?")
+    await waitFor(() => expect(changed).toBeEnabled())
+    expect(changed).toHaveValue('true')
+    expect(rows()).toHaveLength(1)
+    expect(requestsTo('PUT', '/api/admin/sessions/session-3/announced')).toHaveLength(0)
+
+    fireEvent.change(changed, { target: { value: 'false' } })
+    expect(confirm).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(rows()).toEqual([]))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-3/announced')[0])).toEqual({ announced: false })
+  })
+
   it('takes a session out of those that are not announced once it is announced', async () => {
     mockFetch({ ...LIST, [PUT]: { ok: true, session: ANNOUNCED } })
     renderAt('/admin/sessions?status=all&announced=false')
@@ -737,7 +757,7 @@ describe("A session's page", () => {
     expect(await screen.findByText('La session et ses sets seront supprimés pour de bon. Le collectif de son takeover reste.')).toBeInTheDocument()
   })
 
-  it('changes the status, asking first when cancelling it cancels sets', async () => {
+  it('changes the status, asking first when cancelling it cancels sets, saying that its event on RA stays', async () => {
     const cancelled = { ...SESSION, status: 'cancelled', statusUpdatedBy: 'admin@example.com', statusUpdatedAt: '2026-11-15T04:00:00.000Z' }
     cancelled.sets = SESSION.sets.map((set) => ({ ...set, status: 'cancelled' }))
     const reordered = { ...cancelled, sets: [cancelled.sets[1], cancelled.sets[0], cancelled.sets[2]] }
@@ -747,8 +767,10 @@ describe("A session's page", () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     const statuses = within(await screen.findByRole('group', { name: 'Statut' }))
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
-    // Those that aren't cancelled, saying which were played.
-    expect(confirm).toHaveBeenLastCalledWith('Ces sets seront aussi annulés\u00a0:\n• Set de Aurore et Brume\n• Set de Cyan (joué)\nAnnuler la session ?')
+    // Those that aren't cancelled, saying which were played, then its event on RA.
+    expect(confirm).toHaveBeenLastCalledWith(
+      "Ces sets seront aussi annulés\u00a0:\n• Set de Aurore et Brume\n• Set de Cyan (joué)\nL'événement sur RA ne sera pas modifié.\nAnnuler la session ?",
+    )
     expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
 
     fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
@@ -797,7 +819,7 @@ describe("A session's page", () => {
   })
 
   it('names the one set that cancelling a played session cancels, saying that it was played', async () => {
-    const played: Session = { ...SESSION, status: 'done', sets: [CYAN_SET, SESSION.sets[2]] }
+    const played: Session = { ...SESSION, raEvent: null, status: 'done', sets: [CYAN_SET, SESSION.sets[2]] }
     mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: played } })
     renderAt('/admin/sessions/session-1')
 
@@ -805,6 +827,27 @@ describe("A session's page", () => {
     fireEvent.click(within(await screen.findByRole('group', { name: 'Statut' })).getByRole('button', { name: 'annulée' }))
     expect(confirm).toHaveBeenLastCalledWith('Ce set sera aussi annulé\u00a0:\n• Set de Cyan (joué)\nAnnuler la session ?')
     expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+  })
+
+  it('asks first when cancelling a session with an event on RA, even without sets to cancel, but not once it is cancelled', async () => {
+    const empty: Session = { ...SESSION, sets: [] }
+    const cancelled: Session = { ...empty, status: 'cancelled' }
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: empty }, 'PUT /api/admin/sessions/session-1/status': { ok: true, session: cancelled } })
+    renderAt('/admin/sessions/session-1')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const statuses = within(await screen.findByRole('group', { name: 'Statut' }))
+    fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
+    expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nAnnuler la session ?")
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(0)
+    fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
+    await waitFor(() => expect(statuses.getByRole('button', { name: 'annulée' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/status')[0])).toEqual({ status: 'cancelled' })
+
+    // Cancelled already, it has nothing to ask.
+    fireEvent.click(statuses.getByRole('button', { name: 'annulée' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1/status')).toHaveLength(2))
+    expect(confirm).toHaveBeenCalledTimes(2)
   })
 
   it('asks first when marking it jouée marks planned sets, naming them, and not when none is', async () => {
@@ -852,6 +895,7 @@ describe("A session's page", () => {
     const announced = { ...SESSION, announced: true, announcedUpdatedBy: 'admin@example.com', announcedUpdatedAt: '2026-11-15T04:00:00.000Z' }
     mockFetch({ ...PAGE, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: announced } })
     renderAt('/admin/sessions/session-1')
+    const confirm = vi.spyOn(window, 'confirm')
 
     const group = within(await screen.findByRole('group', { name: 'Annonce' }))
     expect(group.getAllByRole('button').map((button) => button.textContent)).toEqual(['non annoncée', 'annoncée'])
@@ -865,10 +909,33 @@ describe("A session's page", () => {
     fireEvent.click(group.getByRole('button', { name: 'annoncée' }))
     await waitFor(() => expect(group.getByRole('button', { name: 'annoncée' })).toHaveAttribute('aria-pressed', 'true'))
     expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: true })
+    // Without asking, though it has an event on RA.
+    expect(confirm).not.toHaveBeenCalled()
     expect(screen.getByText(/^Annonce changée par admin@example.com le/)).toBeInTheDocument()
     // Neither the status, nor who changed it.
     expect(screen.queryByText(/^Statut changé par/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Modifiée par/)).not.toBeInTheDocument()
+  })
+
+  it('asks first when un-announcing a session with an event on RA, but not when it is not announced', async () => {
+    const announced: Session = { ...SESSION, announced: true }
+    mockFetch({ ...PAGE, '/api/admin/sessions/session-1': { ok: true, session: announced }, 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: SESSION } })
+    renderAt('/admin/sessions/session-1')
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const group = within(await screen.findByRole('group', { name: 'Annonce' }))
+    fireEvent.click(group.getByRole('button', { name: 'non annoncée' }))
+    expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nRetirer l'annonce de la session ?")
+    expect(requestsTo('PUT', '/api/admin/sessions/session-1/announced')).toHaveLength(0)
+    expect(group.getByRole('button', { name: 'annoncée' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(group.getByRole('button', { name: 'non annoncée' }))
+    await waitFor(() => expect(group.getByRole('button', { name: 'non annoncée' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(jsonBody(requestsTo('PUT', '/api/admin/sessions/session-1/announced')[0])).toEqual({ announced: false })
+
+    // Not announced anymore, it has nothing to ask.
+    fireEvent.click(group.getByRole('button', { name: 'non annoncée' }))
+    await waitFor(() => expect(requestsTo('PUT', '/api/admin/sessions/session-1/announced')).toHaveLength(2))
+    expect(confirm).toHaveBeenCalledTimes(2)
   })
 
   it("says why it couldn't be announced, under its buttons", async () => {
@@ -1651,14 +1718,24 @@ describe("A session's page", () => {
 
   it('deletes the session once confirmed, and goes back to the list', async () => {
     mockFetch({ ...PAGE, 'DELETE /api/admin/sessions/session-1': { ok: true }, '/api/admin/sessions': { ok: true, sessions: [] } })
-    renderAt('/admin/sessions/session-1')
+    const page = renderAt('/admin/sessions/session-1')
 
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     fireEvent.click(await screen.findByRole('button', { name: 'supprimer la session' }))
     expect(requestsTo('DELETE', '/api/admin/sessions/session-1')).toHaveLength(0)
     fireEvent.click(screen.getByRole('button', { name: 'supprimer la session' }))
-    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement cette session et ses 3 sets ?')
+    // Saying that its event on RA stays.
+    expect(confirm).toHaveBeenLastCalledWith("L'événement sur RA ne sera pas modifié.\nSupprimer définitivement cette session et ses 3 sets ?")
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions$/))
+    page.unmount()
+
+    // Without an event on RA, only the question.
+    mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-2': { ok: true, session: UNDATED } })
+    renderAt('/admin/sessions/session-2')
+    confirm.mockReturnValueOnce(false)
+    fireEvent.click(await screen.findByRole('button', { name: 'supprimer la session' }))
+    expect(confirm).toHaveBeenLastCalledWith('Supprimer définitivement cette session et ses 2 sets ?')
+    expect(requestsTo('DELETE', '/api/admin/sessions/session-2')).toHaveLength(0)
   })
 
   it('says when the session could not be loaded', async () => {
