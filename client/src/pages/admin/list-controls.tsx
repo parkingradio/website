@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigationType } from 'react-router'
 import { Button } from './button'
 import type { Sorting } from './list'
 
@@ -134,7 +134,7 @@ function Select<S extends string>({ label, statuses, labels, status, disabled = 
   useLayoutEffect(() => {
     if (locked || !refocus.current) return
     refocus.current = false
-    if (document.activeElement === null || document.activeElement === document.body) select.current?.focus()
+    if (nothingFocused()) select.current?.focus()
   }, [locked])
   return (
     <select
@@ -163,7 +163,12 @@ function Select<S extends string>({ label, statuses, labels, status, disabled = 
 // Précédente and suivante on the page of the entry whose id is `id`, through `listed`, its list, and where it is in it
 // (see "Going through a list" in docs/design/client/admin/layout.md). Until the list is there, neither can be used, and
 // when it can't be loaded, `failure` says so in their place. The first one's précédente and the last one's suivante are
-// only greyed out, since its place next to them says why.
+// only greyed out, since its place next to them says why. Screen readers read that place as both links' description.
+//
+// The page is built afresh for each entry, so the link that was used is gone: the one it leads to is told which one it
+// was, in the location's state, and gives the focus to its own once the list is there, or to the other one if it can't
+// be used, so that going through the list with the keyboard takes one key each time. Only for a link that was followed,
+// not when the browser goes back or forward to the page, or loads it again, nor once something else has the focus.
 export function ListPager<T extends { id: string }>({
   id,
   listed,
@@ -175,6 +180,21 @@ export function ListPager<T extends { id: string }>({
   failure?: string
   path: (entry: T) => string
 }) {
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const placeId = useId()
+  const links = useRef<Record<Arrow, HTMLAnchorElement | null>>({ previous: null, next: null })
+  // The arrow that led here, used up once the list is there, whether the focus moved or not, so that no later render can
+  // move the focus. The effect runs when the list comes, rather than on each render, which gives a new `listed`.
+  const arrived = useRef(navigationType === 'PUSH' ? (location.state as PagerState | null)?.pager : undefined)
+  const loaded = listed !== undefined
+  useLayoutEffect(() => {
+    const used = arrived.current
+    if (!loaded || !used) return
+    arrived.current = undefined
+    if (nothingFocused()) (links.current[used] ?? links.current[OTHER[used]])?.focus({ preventScroll: true })
+  }, [loaded])
+
   if (failure) {
     return (
       <p className="admin-error" role="alert">
@@ -183,29 +203,48 @@ export function ListPager<T extends { id: string }>({
     )
   }
   const at = listed ? listed.findIndex((each) => each.id === id) : -1
-  // A link to `to`, or, without one, a button that can't be used.
-  const link = (to: T | undefined, label: string) =>
-    to ? (
-      <Link to={path(to)} className="admin-button">
-        {label}
+  // A link to the entry before or after this one, or, without one, a button that can't be used.
+  const link = (arrow: Arrow) => {
+    const to = listed?.[arrow === 'next' ? at + 1 : at - 1]
+    return to ? (
+      <Link
+        ref={(element) => {
+          links.current[arrow] = element
+        }}
+        to={path(to)}
+        state={{ pager: arrow } satisfies PagerState}
+        className="admin-button"
+        aria-describedby={placeId}
+      >
+        {ARROW_LABELS[arrow]}
       </Link>
     ) : (
-      <Button disabled>{label}</Button>
+      <Button disabled>{ARROW_LABELS[arrow]}</Button>
     )
+  }
   return (
     <div className="admin-pager">
-      {link(listed?.[at - 1], '← précédente')}
+      {link('previous')}
       {listed && (
         <span>
           <span aria-hidden="true">
             {at + 1} / {listed.length}
           </span>
-          <span className="visually-hidden">
+          <span id={placeId} className="visually-hidden">
             {at + 1} sur {listed.length}
           </span>
         </span>
       )}
-      {link(listed?.[at + 1], 'suivante →')}
+      {link('next')}
     </div>
   )
 }
+
+type Arrow = 'previous' | 'next'
+const ARROW_LABELS: Record<Arrow, string> = { previous: '← précédente', next: 'suivante →' }
+const OTHER: Record<Arrow, Arrow> = { previous: 'next', next: 'previous' }
+// What précédente and suivante tell the page they lead to.
+type PagerState = { pager?: Arrow }
+
+// Whether the focus is on no control, as when the one that had it was disabled or removed.
+const nothingFocused = () => document.activeElement === null || document.activeElement === document.body

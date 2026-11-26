@@ -1787,13 +1787,14 @@ describe('Going through the list from a session’s page', () => {
     )
   })
 
-  it('goes from one session to the next, keeping the list’s parameters', async () => {
+  it('goes from one session to the next, keeping the list’s parameters, and the focus on the arrows', async () => {
     mockFetch(pages())
     renderAt('/admin/sessions/session-1?status=planned')
 
     expect(await position()).toHaveTextContent('2 / 3')
-    // Read as "2 sur 3".
+    // Read as "2 sur 3", which also describes the arrows.
     expect(screen.getByText('2 sur 3')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'suivante →' })).toHaveAccessibleDescription('2 sur 3')
     expect(href('← précédente')).toBe('/admin/sessions/session-5?status=planned')
     expect(href('suivante →')).toBe('/admin/sessions/session-2?status=planned')
     expect(href('← sessions')).toBe('/admin/sessions?status=planned')
@@ -1804,8 +1805,9 @@ describe('Going through the list from a session’s page', () => {
     expect(await position()).toHaveTextContent('3 / 3')
     expect(href('← précédente')).toBe('/admin/sessions/session-1?status=planned')
     expect(href('← sessions')).toBe('/admin/sessions?status=planned')
-    // The last one has no next one: its suivante is only greyed out, without a tooltip, since its place says why, and
-    // clicking it does nothing.
+    // The last one has no next one: the focus goes to its précédente. Its suivante is only greyed out, without a tooltip,
+    // since its place says why, and clicking it does nothing.
+    await waitFor(() => expect(screen.getByRole('link', { name: '← précédente' })).toHaveFocus())
     const next = screen.getByRole('button', { name: 'suivante →' })
     expect(next).toBeDisabled()
     expect(next).not.toHaveAccessibleDescription()

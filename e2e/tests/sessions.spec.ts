@@ -139,18 +139,23 @@ test("a session's page goes through the list it was opened from, with its status
   await rowsOf(page, 'MARATHON MODULAIRE').getByRole('link').first().click()
   await title('MARATHON MODULAIRE')
   await expect(page.getByText('2 / 3')).toBeVisible()
-  await page.getByRole('link', { name: '← précédente' }).click()
+  // With the keyboard, one key for each session: the focus stays on the arrow used, or goes to the other one at an end.
+  await page.getByRole('link', { name: '← précédente' }).focus()
+  await page.keyboard.press('Enter')
   await title('LES SŒURS ONDES TAKEOVER')
   await expect(page.getByText('1 / 3')).toBeVisible()
   // The ends are only greyed out, without a tooltip, since the session's place says why.
   await expect(page.getByRole('button', { name: '← précédente' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '← précédente' })).not.toHaveAccessibleDescription(/./)
-  await page.getByRole('link', { name: 'suivante →' }).click()
+  await expect(page.getByRole('link', { name: 'suivante →' })).toBeFocused()
+  await page.keyboard.press('Enter')
   await title('MARATHON MODULAIRE')
-  await page.getByRole('link', { name: 'suivante →' }).click()
+  await expect(page.getByRole('link', { name: 'suivante →' })).toBeFocused()
+  await page.keyboard.press('Enter')
   await title('SOIRÉE À REVOIR')
   await expect(page.getByText('3 / 3')).toBeVisible()
   await expect(page.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+  await expect(page.getByRole('link', { name: '← précédente' })).toBeFocused()
   const sessionPage = new URL(page.url()).pathname
 
   // Back to the list as it was.
