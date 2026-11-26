@@ -26,8 +26,8 @@ In the legend, "session", "occupation", "disponible" and "conflit" each have a t
 
 - "session": « Toutes les sessions qui ont une date. »
 - "occupation": « Période où le studio n'est pas disponible pour des sessions. »
-- "disponible": « Plage disponible au studio, protégée des occupations. »
-- "conflit": « Une session ou une occupation qui chevauche une plage indisponible. »
+- "disponible": « Plage protégée pour les sessions, que ni session ni occupation ne prend. »
+- "conflit": « Une session et une occupation, ou deux occupations, qui se chevauchent. »
 
 On narrow screens like phones, the month shows them as marks instead (see [On phones](#on-phones)).
 
@@ -162,11 +162,10 @@ sessions there.
 
 ### Free time
 
-Free time is the studio's protected time (see [Protected time](../../server/calendar.md#protected-time)) that nothing
-takes: no session that isn't cancelled, and no occupation, so that a day with a session can have some too, around it.
-Only the 365 days that conflicts are found in (see [Conflicts](../../server/calendar.md#conflicts)) have some, each
-day's from 00:00 to 00:00, today's too, even what's over. Time that nothing takes but that isn't protected isn't free
-time, and the page says nothing of it: while there's no `holds` feed, there's none.
+Free time is the studio's protected time that nothing takes, as the calendar gives it (see
+[Free time](../../server/calendar.md#free-time)), so that a day with a session can have some too, around it. The page
+cuts its stretches at each midnight: each day has its own, from 00:00 to 00:00. The page says nothing of the time that
+nothing takes but that isn't protected.
 
 The month shows the free time of its own days, not that of the months before and after. A day that's all free time is
 green, and says "disponible". Otherwise, each stretch has a green tag: "dispo jusqu'à 15 h", "dispo dès 11 h" or "dispo

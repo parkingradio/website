@@ -43,9 +43,11 @@ const TEAM = {
 }
 // A feed of the guests' stays, whose last read failed.
 const STAYS = { ...TEAM, id: 'stays', name: 'Séjours', link: 'https://example.com/stays.ics', error: "The link can't be read: its server fails (503)" }
-// A feed of the time protected for sessions, with a hold over the 365 days from today, and beyond.
+// A feed of the time protected for sessions, with a hold over the 365 days from today, and beyond, which are free time
+// where nothing takes them.
 const LOFT = { ...TEAM, id: 'loft', name: 'Loft', kind: 'holds' as const, link: 'https://example.com/loft.ics' }
 const ALWAYS = { feedId: 'loft', start: '2026-10-01T00:00:00-04:00', end: '2028-01-01T00:00:00-05:00', wholeDay: true }
+const [TODAY, LAST] = ['2026-11-19T00:00:00-05:00', '2027-11-19T00:00:00-05:00']
 
 const TAKEOVER = session('session-1', 'HAUTE RIVE TAKEOVER', '2026-11-21T21:00:00-05:00', '2026-11-22T01:00:00-05:00', { sets: [performers('Aurore', 'Brume'), performers('Cyan')] as Session['sets'] })
 const PLAYED = session('session-2', 'SOIRÉE', '2026-11-07T20:00:00-05:00', '2026-11-07T23:00:00-05:00', { status: 'done' })
@@ -72,11 +74,23 @@ const CALENDAR: Calendar = {
   sessions: [PLAYED, TAKEOVER, CANCELLED],
   occupations: [STAY, REPAIR, CLOSED],
   holds: [ALWAYS],
+  // Around the stay, which the takeover is within, the repair, and the closed days, but not the cancelled session.
+  freeTime: [
+    { start: TODAY, end: STAY.start },
+    { start: STAY.end, end: REPAIR.start },
+    { start: REPAIR.end, end: CLOSED.start },
+    { start: CLOSED.end, end: LAST },
+  ],
   conflicts: [CONFLICT],
   unprotectedSessions: [],
   undatedSessions: [UNDATED],
 }
-const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [] }
+// The free time with the closed days alone.
+const AROUND_CLOSED = [
+  { start: TODAY, end: CLOSED.start },
+  { start: CLOSED.end, end: LAST },
+]
+const EMPTY: Calendar = { ...CALENDAR, sessions: [], occupations: [], freeTime: [{ start: TODAY, end: LAST }] }
 
 // The list's days, from today to 364 days later, and what the server gives for them: a two-week stay that's going on,
 // with conflicts today and on later days, a cancelled session, a session over three days, a whole-day occupation over
@@ -297,11 +311,15 @@ describe('Calendrier', () => {
       expect(cell('2026-12-05')).not.toHaveClass('calendar-available')
     })
 
-    it('shows free time only where it is protected, around a session too, and none without a holds feed', async () => {
+    it('shows the free time the server gives, around a session too, and none when it gives none', async () => {
       // Protected from 11 h to 18 h on the 23rd, around a session, and nowhere else.
       const tea = session('session-7', 'APÉRO', '2026-11-23T13:00:00-05:00', '2026-11-23T15:00:00-05:00')
       const holds = [{ feedId: 'loft', start: '2026-11-23T11:00:00-05:00', end: '2026-11-23T18:00:00-05:00', wholeDay: false }]
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], holds } })
+      const freeTime = [
+        { start: holds[0].start, end: tea.start! },
+        { start: tea.end!, end: holds[0].end },
+      ]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [tea], holds, freeTime } })
       const first = renderAt('/admin/calendrier')
       await loaded()
 
@@ -314,7 +332,7 @@ describe('Calendrier', () => {
       first.unmount()
 
       // Nothing's protected without a holds feed.
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], holds: [] } })
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, feeds: [TEAM, STAYS], holds: [], freeTime: [] } })
       renderAt('/admin/calendrier')
       await loaded()
       expect(document.querySelectorAll('.calendar-month .calendar-free, .calendar-month .calendar-mark-free, .calendar-available')).toHaveLength(0)
@@ -329,8 +347,8 @@ describe('Calendrier', () => {
       const tips = {
         session: 'Toutes les sessions qui ont une date.',
         occupation: "Période où le studio n'est pas disponible pour des sessions.",
-        disponible: 'Plage disponible au studio, protégée des occupations.',
-        conflit: 'Une session ou une occupation qui chevauche une plage indisponible.',
+        disponible: 'Plage protégée pour les sessions, que ni session ni occupation ne prend.',
+        conflit: 'Une session et une occupation, ou deux occupations, qui se chevauchent.',
       }
       expect(within(legend).getAllByRole('button').map((button) => button.textContent)).toEqual(Object.keys(tips))
       for (const [name, tip] of Object.entries(tips)) {
@@ -1118,7 +1136,11 @@ describe('Calendrier', () => {
           { kind: 'occupation', ...repair },
         ],
       } as Calendar['conflicts'][number]
-      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [morning, CANCELLED], occupations: [repair], conflicts: [conflict] } })
+      const freeTime = [
+        { start: TODAY, end: morning.start! },
+        { start: repair.end, end: LAST },
+      ]
+      mockFetch({ ...LOGGED_IN, [NOVEMBER]: { ...EMPTY, sessions: [morning, CANCELLED], occupations: [repair], conflicts: [conflict], freeTime } })
       const first = renderAt('/admin/calendrier?day=2026-11-19&issues=open')
       await loaded()
 
@@ -1269,7 +1291,7 @@ describe('Calendrier', () => {
       // December 2, whose occupation November's calendar has.
       expect(cellText('2026-12-02')).toBe('2+')
       expect(screen.getByRole('region', { name: 'À régler' })).toBeInTheDocument()
-      await december.answer({ ...EMPTY, occupations: [CLOSED] })
+      await december.answer({ ...EMPTY, occupations: [CLOSED], freeTime: AROUND_CLOSED })
       expect(cellText('2026-12-02')).toBe("2+toute la journéeoccupation : Calendrier de l'équipe")
     })
 
@@ -1283,7 +1305,7 @@ describe('Calendrier', () => {
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       fireEvent.click(screen.getByRole('button', { name: 'mois suivant' }))
       await waitFor(() => expect(requestsTo('GET', january)).toHaveLength(1))
-      await december.answer({ ...EMPTY, occupations: [CLOSED], undatedSessions: [] })
+      await december.answer({ ...EMPTY, occupations: [CLOSED], freeTime: AROUND_CLOSED, undatedSessions: [] })
       expect(screen.getByRole('heading', { name: 'janvier 2027' })).toBeInTheDocument()
       // January's: December's answer came too late.
       expect(screen.getByRole('region', { name: 'À régler' })).toHaveTextContent('1 sans date')

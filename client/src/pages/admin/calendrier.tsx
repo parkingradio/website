@@ -302,8 +302,8 @@ export function Calendrier() {
 const LEGEND = [
   { kind: 'session', name: 'session', tip: 'Toutes les sessions qui ont une date.', calendar: 'sessions' },
   { kind: 'occupation', name: 'occupation', tip: "Période où le studio n'est pas disponible pour des sessions.", calendar: 'occupations' },
-  { kind: 'free', name: 'disponible', tip: 'Plage disponible au studio, protégée des occupations.', calendar: null },
-  { kind: 'conflict', name: 'conflit', tip: 'Une session ou une occupation qui chevauche une plage indisponible.', calendar: null },
+  { kind: 'free', name: 'disponible', tip: 'Plage protégée pour les sessions, que ni session ni occupation ne prend.', calendar: null },
+  { kind: 'conflict', name: 'conflit', tip: 'Une session et une occupation, ou deux occupations, qui se chevauchent.', calendar: null },
 ] as const
 
 // What sessions, occupations, free time and conflicts are, in tooltips, with their colors, and on narrow screens their

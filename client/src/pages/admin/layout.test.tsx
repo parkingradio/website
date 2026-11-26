@@ -223,6 +223,7 @@ describe("The menu's badge on calendrier", () => {
     sessions: [],
     occupations: [],
     holds: [],
+    freeTime: [],
     unprotectedSessions: [],
     undatedSessions: [],
     conflicts: Array.from({ length: conflicts }, (_, i) => ({

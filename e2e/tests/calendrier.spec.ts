@@ -245,7 +245,7 @@ function ownSession(id: string, title: string, start: string, end: string): NonN
   }
 }
 
-test('free time is the protected time that nothing takes, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
+test('free time shows where nothing takes the protected time, and the sessions outside it need settling', async ({ page, isMobile }, testInfo) => {
   const { unique } = own(testInfo)
   if (isMobile) await page.setViewportSize(NARROW)
   // Two days in the same month, a week or more before the nearest seeded session (see seed-data.ts), so that only the
@@ -265,6 +265,12 @@ test('free time is the protected time that nothing takes, and the sessions outsi
     ],
     occupations: [{ feedId: `team-${unique}`, start: at(day, '12:00'), end: at(day, '13:00'), wholeDay: false, title: `RÉUNION ${unique}` }],
     sessions: [inside, outside],
+    freeTime: [
+      { start: at(day, '11:00'), end: at(day, '12:00') },
+      { start: at(day, '13:00'), end: at(day, '15:00') },
+      { start: at(day, '17:00'), end: at(day, '18:00') },
+      { start: at(next, '17:00'), end: at(addDays(next, 1), '00:00') },
+    ],
     conflicts: [],
     unprotectedSessions: [{ id: outside.id, title: outside.title, start: outside.start!, end: outside.end! }],
   })
@@ -437,8 +443,8 @@ test("the legend says what each kind is, in tooltips, and links to the admin's o
   const tips = {
     session: 'Toutes les sessions qui ont une date.',
     occupation: "Période où le studio n'est pas disponible pour des sessions.",
-    disponible: 'Plage disponible au studio, protégée des occupations.',
-    conflit: 'Une session ou une occupation qui chevauche une plage indisponible.',
+    disponible: 'Plage protégée pour les sessions, que ni session ni occupation ne prend.',
+    conflit: 'Une session et une occupation, ou deux occupations, qui se chevauchent.',
   }
   for (const [name, tip] of Object.entries(tips)) {
     const button = legend.getByRole('button', { name })

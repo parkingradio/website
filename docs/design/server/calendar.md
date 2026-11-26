@@ -13,8 +13,9 @@ read from calendars too, as **holds**, which don't take the studio (see [Protect
 Occupations and holds can't be changed on the site, or with the tools: only in their own calendars. The feeds they're
 read from are added, changed and removed on the admin pages, not with the tools, since their links are secrets.
 
-The server gives the studio's calendar: what takes it over a range of days, and its holds, and what needs settling: its
-conflicts, the sessions outside protected time, and the sessions without a date (see [The calendar](#the-calendar)).
+The server gives the studio's calendar: what takes it over a range of days, its holds and its
+[free time](#free-time), and what needs settling: its conflicts, the sessions outside protected time, and the sessions
+without a date (see [The calendar](#the-calendar)).
 
 ## Feeds
 
@@ -99,6 +100,7 @@ day after its last, e.g. a month:
 - the sessions with a start that take some of that time, by start, whatever their status (cancelled ones included),
 - the occupations that take some of it, by start, then end,
 - the holds that take some of it, by start, then end,
+- the stretches of [free time](#free-time) that take some of it, by start,
 - every feed, with its kind, when it was last read (`readAt`) and why that failed (`error`),
 - and, whatever the range, what needs settling: the [conflicts](#conflicts) of the 365 days from `today`, the day in
   Québec when it's asked for, the [sessions outside protected time](#protected-time), and the
@@ -107,8 +109,9 @@ day after its last, e.g. a month:
 Its occupations and holds are what the feeds' last reads gave (see [Reading the feeds](#reading-the-feeds)), so they can
 be out of date or missing: a feed whose last read failed still gives what it read before, and one that hasn't been read
 yet, e.g. right after the server restarts, gives nothing. Apps should tell the admin when a feed's last read failed, or
-when it hasn't been read yet: for an `occupations` feed, conflicts can then be missing or out of date, and for a `holds`
-feed, sessions can wrongly be, or not be, outside protected time. Apps can have every feed read again first when they
+when it hasn't been read yet: for an `occupations` feed, conflicts can then be missing or out of date, and so can free
+time, and for a `holds` feed, free time can be missing or out of date, and sessions can wrongly be, or not be, outside
+protected time. Apps can have every feed read again first when they
 need the calendar to be up to date, e.g. right after the admin changed an event, but not before every calendar they ask
 for, since that waits for every read. Occupations and holds also only cover what a read keeps, from a year before it to
 two years after it (see [Events](#events)), so the calendar of days outside that can lack them.
@@ -162,6 +165,17 @@ days from `today` (see [Conflicts](#conflicts)), and that:
 While there's no `holds` feed, there are none. Each one has the session's `id`, `title`, `start` and `end`, and they're
 by start.
 
+## Free time
+
+**Free time** is the protected time that nothing takes: no session that isn't cancelled, done ones included, and no
+occupation. It's that of the 365 days from `today` (see [Conflicts](#conflicts)), from 00:00 today, what's over today
+included, to 00:00 on the day 365 days later. It's in stretches, each from when it starts to when it ends, e.g. across
+midnight, only cut where these 365 days start and end: two stretches never overlap or follow each other. Time that
+nothing takes but that isn't protected isn't free time: while there's no `holds` feed, there's none.
+
+A stretch has its `start` and `end`. The calendar gives those that take some of the days asked for, whole, like holds,
+e.g. one that goes on after the last day.
+
 ## Sessions without a date
 
 The sessions without a start that aren't cancelled need a date: the calendar gives them, the most recently added first,
@@ -186,6 +200,7 @@ from Sunday to Saturday, `from=2026-11-01&to=2026-12-05`, or today alone, `from`
 | `sessions` | list of sessions | The sessions with a start that take some of the days, whatever their status, as [`GET /api/admin/sessions`](sessions.md#get-apiadminsessions-admin) gives them, by start |
 | `occupations` | list of occupations | The occupations that take some of the days, by start, then end |
 | `holds` | list of holds | The holds that take some of the days, by start, then end |
+| `freeTime` | list | The stretches of [free time](#free-time) that take some of the days, by start, each with its `start` and `end` |
 | `conflicts` | list of conflicts | The conflicts of the 365 days from `today`, whatever the days asked for |
 | `unprotectedSessions` | list | The [sessions outside protected time](#protected-time), by start, whatever the days asked for, each with its `id`, `title`, `start` and `end` |
 | `undatedSessions` | list of sessions | The sessions without a date, as `GET /api/admin/sessions` gives them, the most recently added first, whatever the days asked for |

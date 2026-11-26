@@ -138,14 +138,14 @@ request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2031-03-10"
 expect_status 200
 expect_body_contains '"feeds":[],"sessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445566"'
 expect_body_contains '"start":"2031-03-10T23:00:00-04:00","end":"2031-03-11T00:00:00-04:00"'
-expect_body_contains '"occupations":[],"holds":[],"conflicts":'
+expect_body_contains '"occupations":[],"holds":[],"freeTime":[],"conflicts":'
 expect_body_contains '"unprotectedSessions":[],"undatedSessions":[{"id":"8a6d1f0e-2b3c-4d5e-8f70-112233445567"'
 request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2032-04-13"
 expect_status 400
 expect_body_contains '{"ok":false,"error":"The calendar has at most 400 days, `from` and `to` included"}'
 sql "delete from sessions where id in ('8a6d1f0e-2b3c-4d5e-8f70-112233445566', '8a6d1f0e-2b3c-4d5e-8f70-112233445567')"
-# With a feed of holds that can't be read, nothing is protected: a planned session in the next days is outside protected
-# time, whatever the days asked for.
+# With a feed of holds that can't be read, nothing is protected: there's no free time, and a planned session in the next
+# days is outside protected time, whatever the days asked for.
 readonly HOLDS='9b8c7d6e-5f4a-4b3c-8d2e-1f0a9b8c7d6e'
 readonly UPCOMING='8a6d1f0e-2b3c-4d5e-8f70-112233445568'
 sql "insert into calendar_feeds (id, name, kind, link, created_by)
@@ -155,8 +155,12 @@ sql "insert into sessions (id, created_by, start_at, duration_minutes, type, nam
 request --header "Cookie: ${cookie}" "${CALENDAR}?from=2031-03-10&to=2031-03-10"
 expect_status 200
 expect_body_contains "\"kind\":\"holds\""
-expect_body_contains '"holds":[]'
 expect_body_contains "\"unprotectedSessions\":[{\"id\":\"${UPCOMING}\",\"title\":\"Bientôt\",\"start\":"
+# On the session's day, in Québec.
+day="$(sql "select to_char(start_at at time zone 'America/Toronto', 'YYYY-MM-DD') from sessions where id = '${UPCOMING}'")"
+request --header "Cookie: ${cookie}" "${CALENDAR}?from=${day}&to=${day}"
+expect_status 200
+expect_body_contains '"holds":[],"freeTime":[]'
 sql "delete from sessions where id = '${UPCOMING}'"
 sql "delete from calendar_feeds where id = '${HOLDS}'"
 
