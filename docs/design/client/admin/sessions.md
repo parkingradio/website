@@ -81,7 +81,8 @@ count the sessions that the search, and the other group's buttons, find.
 
 ## A session's page
 
-Clicking a session opens it at `/admin/sessions/<id>`, titled as it's called (see [Names](#names)). Under the title, it
+Clicking a session opens it at `/admin/sessions/<id>`, with the list's parameters in its address (see
+[Going through a list](layout.md#going-through-a-list)), titled as it's called (see [Names](#names)). Under the title, it
 says who added it and when, and who last changed it and when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the status, as buttons that change it, and which admin last changed it, and when. Cancelling a session with
@@ -142,8 +143,8 @@ says who added it and when, and who last changed it and when, if anyone did. Fro
   for nothing (see [Sets' order](../../server/sessions.md#sets-order)), the section warns of it above the sets (see
   [Warnings](layout.md#warnings)), e.g. « ⚠ Les sets durent 4 h 58, plus que la session (1 h). ». The warning doesn't
   prevent anything, since a session and its sets are changed one at a time.
-- "Supprimer": deletes the session, its flyer and its sets for good, after confirming. Its sets' artists, and its
-  takeover's collective, stay, which the page says of those it has.
+- "Supprimer": deletes the session, its flyer and its sets for good, after confirming, then shows the list as
+  "← sessions" does. Its sets' artists, and its takeover's collective, stay, which the page says of those it has.
 
 Only one form is open at a time on a session's page, the session's, the panel of its event on RA (see
 [Creating its event on RA](#creating-its-event-on-ra)), a set's, or the panel that moves a set to another session (see
@@ -153,6 +154,12 @@ saved. Deleting a set closes its form, or its panel, if it's open.
 The page's address's `?application` (see [From an application](#from-an-application)) stays in it until the admin opens
 a form or closes one, the one it opened included, whether it's saved or cancelled. It's then removed from the address,
 in place, so that reloading the page, or coming back to it, doesn't open it again.
+
+## Going through the list
+
+Above a session's title, "← sessions" leads back to the list, and « ← précédente » and « suivante → » go through it
+(see [Going through a list](layout.md#going-through-a-list)). When the list of sessions can't be loaded, the page says so
+in place of « précédente » and « suivante ».
 
 ## Creating its event on RA
 
@@ -391,8 +398,8 @@ its sets in the way is named without a link.
 
 ## Endpoints
 
-- `GET /api/admin/sessions`, for the list, and `PUT /api/admin/sessions/:id/announced`, to announce a session or
-  un-announce it from the list.
+- `GET /api/admin/sessions`, for the list, and on a session's page, for « précédente » and « suivante », and
+  `PUT /api/admin/sessions/:id/announced`, to announce a session or un-announce it from the list.
 - `GET /api/admin/sessions/:id`, `PATCH /api/admin/sessions/:id`, `PUT /api/admin/sessions/:id/flyer`,
   `DELETE /api/admin/sessions/:id/flyer`, `PUT /api/admin/sessions/:id/status`, `PUT /api/admin/sessions/:id/announced`
   and `DELETE /api/admin/sessions/:id`, for a session's page.

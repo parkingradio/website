@@ -51,9 +51,9 @@ import {
   shownUrl,
 } from './describe'
 import type { Announced } from './describe'
-import { compareText, search, useQueryFilter, useSearchQuery, useSort, useStatusFilter } from './list'
+import { compareText, listedWith, search, useListAddress, useQueryFilter, useSearchQuery, useSort } from './list'
 import type { SortColumn, Sorting } from './list'
-import { SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
+import { ListPager, SearchField, SortHeader, StatusButtons, StatusFilters, StatusSelect } from './list-controls'
 import { ApplicationsFailure, ArtistsFailure, CollectivesFailure, SessionsFailure, ShownImage } from './profile-details'
 import { RaEventPanel } from './ra-event'
 import { failure, newSessionPath, sessionPath } from './session-errors'
@@ -72,9 +72,9 @@ import { arrayMove, useSortableItem } from './use-sortable'
 // The sessions section: every session, each one's page, where its status is changed, it's changed or deleted, and so
 // are its sets, and adding one.
 
-function BackToSessions() {
+function BackToSessions({ to = '/admin/sessions' }: { to?: string }) {
   return (
-    <Link to="/admin/sessions" className="admin-back">
+    <Link to={to} className="admin-back">
       ← sessions
     </Link>
   )
@@ -83,10 +83,17 @@ function BackToSessions() {
 // What the list of sessions opens on.
 const DEFAULT_STATUS: SessionStatus = 'planned'
 
+// The list of sessions as the address says (see `useListAddress`), whose filters also include `announced`.
+const useSessionsAddress = () => useListAddress('/admin/sessions', STATUSES, DEFAULT_STATUS, ['announced'])
+
 // The list's filters of announced sessions, after "toutes", and the buttons that announce a session or un-announce it.
 const ANNOUNCED_FILTERS: readonly Announced[] = ['true', 'false']
 const ANNOUNCED_CHOICES: readonly Announced[] = ['false', 'true']
 const announcedOf = (session: Session): Announced => (session.announced ? 'true' : 'false')
+// Those of `sessions` with `status`, or that are `announced` or not, or all of them for null.
+const withStatus = (sessions: Session[], status: SessionStatus | null) => (status ? sessions.filter((session) => session.status === status) : sessions)
+const withAnnounced = (sessions: Session[], announced: Announced | null) =>
+  announced ? sessions.filter((session) => announcedOf(session) === announced) : sessions
 // Why a session can't be announced, if it can't (see "Announced" in docs/design/server/sessions.md).
 const cantAnnounce = (session: Session): string | null => (session.start === null ? "La session n'a pas de date." : null)
 
@@ -122,17 +129,20 @@ function SessionTypeName({ session }: { session: Session }) {
 
 // Sessions, as listed in this section, or on a collective's page, under the heading whose id is `labelledBy`, where the
 // type is left out since they're all its takeovers. The columns sort the list when there's `sorting`, and whether
-// they're announced is a dropdown that changes it with `announce` (see `useAnnouncing`).
+// they're announced is a dropdown that changes it with `announce` (see `useAnnouncing`). The links to the sessions' pages
+// keep `linkQuery`, the list they go through, if any.
 function SessionsTable({
   sessions,
   sorting,
   announce,
+  linkQuery = '',
   labelledBy,
   withType = true,
 }: {
   sessions: Session[]
   sorting?: Sorting<SessionColumn>
   announce: (session: Session, announced: Announced) => Promise<void>
+  linkQuery?: string
   labelledBy?: string
   withType?: boolean
 }) {
@@ -161,7 +171,7 @@ function SessionsTable({
         {sessions.map((session) => (
           <tr key={session.id} className={`admin-status-${session.status}`}>
             <td className="admin-day">
-              <Link to={sessionPath(session)}>{sessionDay(session)}</Link>
+              <Link to={sessionPath(session) + linkQuery}>{sessionDay(session)}</Link>
             </td>
             <td className="admin-day">{sessionHours(session)}</td>
             <td>{session.title}</td>
@@ -378,44 +388,62 @@ export function SessionsPage() {
         </Link>
         <SearchField query={query} onChange={setQuery} />
       </div>
-      <SessionsList query={query} />
+      <SessionsList />
     </>
   )
 }
 
-// The sessions with the status in the `status` query parameter, the default view without one, or every session, and
-// those that are announced, or not, as the `announced` query parameter says, or those of them that `query` finds. Each
-// filter's buttons count the sessions that the search and the other filter find.
-function SessionsList({ query }: { query: string }) {
+// The sessions, to list them as the address says, which the list and the sessions' pages share: `list` gives those of
+// `all` that the search finds, and those of them that the list shows, in its order, with `kept` among them (see
+// `listedWith`).
+function useSessionList() {
   const sessions = useApi('/api/admin/sessions')
-  const [status, setStatus] = useStatusFilter(STATUSES, DEFAULT_STATUS)
+  const { query } = useSearchQuery()
+  const address = useSessionsAddress()
   const [announced, setAnnounced] = useQueryFilter('announced', ANNOUNCED_FILTERS)
-  const sorting = useSort(sessionColumns(status), 'date')
+  const sorting = useSort(sessionColumns(address.status), 'date')
+  return {
+    sessions,
+    address,
+    announced,
+    setAnnounced,
+    sorting,
+    list(all: Session[], kept?: Session) {
+      const found = search(all, query, sessionSearchFields)
+      const shown = new Set(withStatus(withAnnounced(found, announced), address.status))
+      return { found, listed: listedWith(all, shown, sorting.sorted, kept) }
+    },
+  }
+}
+
+// The sessions with the status in the `status` query parameter, the default view without one, or every session, and
+// those that are announced, or not, as the `announced` query parameter says, or those of them that the search finds. Each
+// filter's buttons count the sessions that the search and the other filter find.
+function SessionsList() {
+  const { sessions, address, announced, setAnnounced, sorting, list } = useSessionList()
   const { current, error, announce } = useAnnouncing()
 
   if (sessions.kind === 'error') return <SessionsFailure message={sessions.message} />
   if (sessions.kind === 'loading') return null
 
   const all = current(sessions.value.sessions)
-  const found = search(all, query, sessionSearchFields)
-  const withStatus = (sessions: Session[], shown = status) => (shown ? sessions.filter((session) => session.status === shown) : sessions)
-  const withAnnounced = (sessions: Session[], shown = announced) => (shown ? sessions.filter((session) => announcedOf(session) === shown) : sessions)
+  const { found, listed } = list(all)
   // What the search finds with each filter, which the other one's buttons count.
-  const foundAnnounced = withAnnounced(found)
-  const foundWithStatus = withStatus(found)
-  const listed = sorting.sorted(withStatus(foundAnnounced))
+  const foundAnnounced = withAnnounced(found, announced)
+  const foundWithStatus = withStatus(found, address.status)
   let empty = 'Aucune session ne correspond à la recherche.'
   if (all.length === 0) empty = 'Aucune session.'
-  else if (listed.length === 0 && withStatus(withAnnounced(all)).length === 0) empty = announced ? 'Aucune session ne correspond à ces filtres.' : 'Aucune session avec ce statut.'
+  else if (listed.length === 0 && withStatus(withAnnounced(all, announced), address.status).length === 0)
+    empty = announced ? 'Aucune session ne correspond à ces filtres.' : 'Aucune session avec ce statut.'
   return (
     <>
       <StatusFilters
         all="toutes"
         statuses={STATUSES}
         labels={SESSION_STATUS_PLURALS}
-        status={status}
+        status={address.status}
         count={(status) => withStatus(foundAnnounced, status).length}
-        onChange={setStatus}
+        onChange={address.setStatus}
       />
       <StatusFilters
         label="Annonce"
@@ -430,7 +458,7 @@ function SessionsList({ query }: { query: string }) {
       {listed.length === 0 ? (
         <p className="admin-placeholder">{empty}</p>
       ) : (
-        <SessionsTable sessions={listed} sorting={sorting} announce={announce} />
+        <SessionsTable sessions={listed} sorting={sorting} announce={announce} linkQuery={address.query} />
       )}
     </>
   )
@@ -454,16 +482,38 @@ export function SessionPage() {
 
 function SessionById({ id }: { id: string }) {
   const loaded = useApi('/api/admin/sessions/{id}', { params: { path: { id } } })
-  if (loaded.kind === 'loading') return <BackToSessions />
-  if (loaded.kind === 'error') {
-    return (
-      <>
-        <BackToSessions />
-        <ErrorMessage error={`La session n'a pas pu être chargée : ${loaded.message}`} />
-      </>
-    )
-  }
-  return <LoadedSession loaded={loaded.value.session} />
+  return (
+    <>
+      <SessionLinks id={id} session={loaded} />
+      {loaded.kind === 'error' && <ErrorMessage error={`La session n'a pas pu être chargée : ${loaded.message}`} />}
+      {loaded.kind === 'loaded' && <LoadedSession loaded={loaded.value.session} />}
+    </>
+  )
+}
+
+// Above a session's title: back to the list, then, when the address gives the list's status, précédente and suivante,
+// which go through it, with the `session` as it was when its page opened (see "Going through a list" in
+// docs/design/client/admin/layout.md).
+function SessionLinks({ id, session }: { id: string; session: Loaded<{ session: Session }> }) {
+  const address = useSessionsAddress()
+  return (
+    <div className="admin-page-links">
+      <BackToSessions to={address.listPath} />
+      {address.given && session.kind !== 'error' && <SessionListNavigation id={id} session={session.kind === 'loaded' ? session.value.session : undefined} />}
+    </div>
+  )
+}
+
+function SessionListNavigation({ id, session }: { id: string; session: Session | undefined }) {
+  const { sessions, address, list } = useSessionList()
+  return (
+    <ListPager
+      id={id}
+      listed={session && sessions.kind === 'loaded' ? list(sessions.value.sessions, session).listed : undefined}
+      failure={sessions.kind === 'error' ? `La liste des sessions n'a pas pu être chargée\u00a0: ${sessions.message}` : undefined}
+      path={(to) => sessionPath(to) + address.query}
+    />
+  )
 }
 
 // The one form open on a session's page, if any: the session's, its event on RA's, a set's, by its id, or a new one's
@@ -504,6 +554,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     else if (next) document.querySelector<HTMLElement>(`[data-set="${next.id}"][data-action="${next.action}"]`)?.focus()
   })
   const navigate = useNavigate()
+  const address = useSessionsAddress()
   const params = { path: { id: session.id } }
   // Opens `form`, or closes the one that's open, after which the address doesn't open anything anymore.
   const showForm = (form: OpenForm) => {
@@ -634,7 +685,7 @@ function LoadedSession({ loaded }: { loaded: Session }) {
     setError(null)
     const result = await api.DELETE('/api/admin/sessions/{id}', { params })
     if (result.ok) {
-      navigate('/admin/sessions')
+      navigate(address.listPath)
     } else {
       setBusy(false)
       setError(`La session n'a pas pu être supprimée : ${result.error}`)
@@ -646,7 +697,6 @@ function LoadedSession({ loaded }: { loaded: Session }) {
   const moving = open?.kind === 'move' ? session.sets.find((set) => set.id === open.id) : undefined
   return (
     <>
-      <BackToSessions />
       <h1>{session.title}</h1>
       <p className="admin-meta">{byWhom('Ajoutée', session.createdBy, session.createdAt)}</p>
       {session.updatedBy && <p className="admin-meta">{byWhom('Modifiée', session.updatedBy, session.updatedAt)}</p>}

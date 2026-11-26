@@ -363,7 +363,8 @@
   color: #666;
 }
 
-/* Above an application's title: back to the list, then, at the other end, précédente and suivante. */
+/* Above the title of an application's or a session's page: back to the list, then, at the other end, précédente and
+   suivante. */
 .admin-page-links {
   display: flex;
   flex-wrap: wrap;

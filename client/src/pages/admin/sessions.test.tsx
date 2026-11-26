@@ -319,8 +319,8 @@ describe('The list of sessions', () => {
     expect(sessionRows[1]).toHaveClass('admin-status-planned')
     expect(sessionRows[2]).toHaveClass('admin-status-done')
     expect(sessionRows[3]).toHaveClass('admin-status-cancelled')
-    expect(screen.getByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1')
-    expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2')
+    expect(screen.getByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1?status=all')
+    expect(screen.getByRole('link', { name: 'date à déterminer' })).toHaveAttribute('href', '/admin/sessions/session-2?status=all')
     expect(screen.getAllByRole('link', { name: 'Brume' })[0]).toHaveAttribute('href', '/admin/artistes/artist-2')
     expect(screen.getByRole('link', { name: 'Takeover' })).toHaveAttribute('href', '/admin/artistes/collectifs/collective-1')
     expect(screen.getByRole('link', { name: 'nouvelle session' })).toHaveAttribute('href', '/admin/sessions/nouvelle')
@@ -1633,6 +1633,227 @@ describe("A session's page", () => {
     mockFetch({ ...LOGGED_IN, '/api/admin/sessions/session-1': { ok: false, error: 'No such session' } })
     renderAt('/admin/sessions/session-1')
     expect(await screen.findByRole('alert')).toHaveTextContent("La session n'a pas pu être chargée : No such session")
+  })
+})
+
+describe('Going through the list from a session’s page', () => {
+  // A session that's still planned, though it's past, and isn't announced. The planned ones, the soonest first, are then
+  // this one, ONDES TAKEOVER (session-1), and GUEST MIXES, without a date (session-2).
+  const PAST: Session = { ...SESSION, id: 'session-5', start: '2026-01-11T01:00:00.000Z', end: '2026-01-11T02:00:00.000Z', durationMinutes: 60, sets: [] }
+  const ALL = [...SESSIONS, PAST]
+
+  // The list, as `listed`, and each of its sessions' pages.
+  function pages(listed = ALL) {
+    return {
+      ...PAGE,
+      '/api/admin/sessions': { ok: true, sessions: listed },
+      ...Object.fromEntries(listed.map((each) => [`/api/admin/sessions/${each.id}`, { ok: true, session: each }])),
+    }
+  }
+  // Where the session is in the list, as it's shown, e.g. "2 / 3".
+  const POSITION = /^\d+ \/ \d+$/
+  const position = () => screen.findByText(POSITION)
+  const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href')
+  const title = (name: string) => waitFor(() => expect(screen.getByRole('heading', { level: 1, name })).toBeInTheDocument())
+
+  it('is where the links of the list lead, which keep its status, even for the default view, whether its sessions are announced, its search and its order', async () => {
+    mockFetch(pages())
+    renderAt('/admin/sessions')
+
+    expect(await screen.findByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute('href', '/admin/sessions/session-1?status=planned')
+    fireEvent.click(screen.getByRole('button', { name: /^non annoncées/ }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Rechercher' }), { target: { value: 'ondes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Nom' }))
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: named('sam. 14 nov. 2026') })).toHaveAttribute(
+        'href',
+        '/admin/sessions/session-1?status=planned&announced=false&search=ondes&sort=name&order=asc',
+      ),
+    )
+  })
+
+  it('goes from one session to the next, keeping the list’s parameters', async () => {
+    mockFetch(pages())
+    renderAt('/admin/sessions/session-1?status=planned')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    // Read as "2 sur 3".
+    expect(screen.getByText('2 sur 3')).toBeInTheDocument()
+    expect(href('← précédente')).toBe('/admin/sessions/session-5?status=planned')
+    expect(href('suivante →')).toBe('/admin/sessions/session-2?status=planned')
+    expect(href('← sessions')).toBe('/admin/sessions?status=planned')
+
+    fireEvent.click(screen.getByRole('link', { name: 'suivante →' }))
+    await title('GUEST MIXES')
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-2\?status=planned$/)
+    expect(await position()).toHaveTextContent('3 / 3')
+    expect(href('← précédente')).toBe('/admin/sessions/session-1?status=planned')
+    expect(href('← sessions')).toBe('/admin/sessions?status=planned')
+    // The last one has no next one: its suivante is only greyed out, without a tooltip, since its place says why, and
+    // clicking it does nothing.
+    const next = screen.getByRole('button', { name: 'suivante →' })
+    expect(next).toBeDisabled()
+    expect(next).not.toHaveAccessibleDescription()
+    const path = screen.getByTestId('path').textContent
+    fireEvent.click(next)
+    expect(screen.getByTestId('path').textContent).toBe(path)
+  })
+
+  it('has no previous one at the start of the list', async () => {
+    mockFetch(pages())
+    renderAt('/admin/sessions/session-5?status=planned')
+
+    expect(await position()).toHaveTextContent('1 / 3')
+    const previous = screen.getByRole('button', { name: '← précédente' })
+    expect(previous).toBeDisabled()
+    expect(previous).not.toHaveAccessibleDescription()
+    expect(href('suivante →')).toBe('/admin/sessions/session-1?status=planned')
+  })
+
+  it('goes through every session in the order of the list for that status: those without a date first, then the latest first', async () => {
+    mockFetch(pages())
+    const { unmount } = renderAt('/admin/sessions/session-1?status=all')
+
+    expect(await position()).toHaveTextContent('2 / 5')
+    expect(href('← précédente')).toBe('/admin/sessions/session-2?status=all')
+    expect(href('suivante →')).toBe('/admin/sessions/session-3?status=all')
+    unmount()
+
+    renderAt('/admin/sessions/session-2?status=all')
+    expect(await position()).toHaveTextContent('1 / 5')
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+  })
+
+  it('goes through what the search finds among the sessions announced or not, in the order of the list, and leads back to it as it was', async () => {
+    mockFetch(pages())
+    // Brume's sessions that aren't announced, by name, the last first: ONDES TAKEOVER, then GUEST MIXES, but not SOIRÉE,
+    // which is announced.
+    const query = '?status=all&announced=false&search=brume&sort=name&order=desc'
+    renderAt(`/admin/sessions/session-2${query}`)
+
+    expect(await position()).toHaveTextContent('2 / 2')
+    expect(href('← précédente')).toBe(`/admin/sessions/session-1${query}`)
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+    expect(href('← sessions')).toBe(`/admin/sessions${query}`)
+  })
+
+  // Without the list's parameters, e.g. from Calendrier, with a status that the list doesn't know, or with only whether
+  // the sessions are announced, or only a search.
+  it.each(['', '?status=bogus', '?announced=false', '?search=ondes'])('has no list to go through without a status the list knows: "%s"', async (query) => {
+    mockFetch(pages())
+    renderAt(`/admin/sessions/session-1${query}`)
+
+    await title('ONDES TAKEOVER')
+    expect(screen.queryByRole('link', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(POSITION)).not.toBeInTheDocument()
+    // Back to the list's default view.
+    expect(href('← sessions')).toBe('/admin/sessions')
+    expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(0)
+  })
+
+  it('keeps its place in the list once it has left it, e.g. when coming back to it once it was announced', async () => {
+    mockFetch(pages(ALL.map((each) => (each.id === 'session-1' ? { ...each, announced: true } : each))))
+    renderAt('/admin/sessions/session-1?status=planned&announced=false')
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    expect(href('← précédente')).toBe('/admin/sessions/session-5?status=planned&announced=false')
+    expect(href('suivante →')).toBe('/admin/sessions/session-2?status=planned&announced=false')
+  })
+
+  it('keeps its place once it is announced, which the next one’s précédente then skips', async () => {
+    const announced = { ...SESSION, announced: true }
+    const query = '?status=planned&announced=false'
+    mockFetch({ ...pages(), 'PUT /api/admin/sessions/session-1/announced': { ok: true, session: announced } })
+    renderAt(`/admin/sessions/session-1${query}`)
+
+    expect(await position()).toHaveTextContent('2 / 3')
+    const group = within(screen.getByRole('group', { name: 'Annonce' }))
+    fireEvent.click(group.getByRole('button', { name: 'annoncée' }))
+    await waitFor(() => expect(group.getByRole('button', { name: 'annoncée' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(href('suivante →')).toBe(`/admin/sessions/session-2${query}`)
+    expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(1)
+
+    // The next one's page loads the list again, which it has left.
+    mockFetch(pages(ALL.map((each) => (each.id === 'session-1' ? announced : each))))
+    fireEvent.click(screen.getByRole('link', { name: 'suivante →' }))
+    await title('GUEST MIXES')
+    expect(await position()).toHaveTextContent('2 / 2')
+    expect(href('← précédente')).toBe(`/admin/sessions/session-5${query}`)
+  })
+
+  it('keeps the list’s parameters once the form that the address opened is closed, which précédente and suivante leave out', async () => {
+    mockFetch({ ...pages(), ...ARTISTS })
+    renderAt('/admin/sessions/session-1?status=planned&application=application-3')
+
+    await screen.findByRole('heading', { name: 'Nouveau set' })
+    expect(await position()).toHaveTextContent('2 / 3')
+    expect(href('suivante →')).toBe('/admin/sessions/session-2?status=planned')
+    fireEvent.click(within(screen.getByRole('region', { name: 'Nouveau set' })).getByRole('button', { name: 'annuler' }))
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\/session-1\?status=planned$/)
+  })
+
+  it('goes back to the list as it was once the session is deleted', async () => {
+    mockFetch({ ...pages(), 'DELETE /api/admin/sessions/session-1': { ok: true } })
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    renderAt('/admin/sessions/session-1?status=planned&search=ondes')
+
+    await position()
+    fireEvent.click(screen.getByRole('button', { name: 'supprimer la session' }))
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(/^\/admin\/sessions\?status=planned&search=ondes$/))
+  })
+
+  // Answers every request but those to `url`, which never are.
+  function neverAnswering(url: string) {
+    const answer = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation((input, options) =>
+      String(input instanceof Request ? input.url : input).endsWith(url) ? new Promise(() => {}) : answer(input, options),
+    )
+  }
+
+  it('can’t go to the previous or next one for a moment, while the list loads', async () => {
+    mockFetch(pages())
+    neverAnswering('/api/admin/sessions')
+    renderAt('/admin/sessions/session-1?status=planned')
+
+    await title('ONDES TAKEOVER')
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+    expect(screen.queryByText(POSITION)).not.toBeInTheDocument()
+  })
+
+  it('can’t go to the previous or next one for a moment while the session loads, and loads the list meanwhile', async () => {
+    mockFetch(pages())
+    neverAnswering('/api/admin/sessions/session-1')
+    renderAt('/admin/sessions/session-1?status=planned')
+
+    await waitFor(() => expect(requestsTo('GET', '/api/admin/sessions')).toHaveLength(1))
+    expect(screen.getByRole('button', { name: '← précédente' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'suivante →' })).toBeDisabled()
+    expect(screen.queryByText(POSITION)).not.toBeInTheDocument()
+    expect(href('← sessions')).toBe('/admin/sessions?status=planned')
+  })
+
+  it('says when the list could not be loaded', async () => {
+    mockFetch({ ...pages(), '/api/admin/sessions': { ok: false, error: 'Boom' } })
+    renderAt('/admin/sessions/session-1?status=planned')
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent("La liste des sessions n'a pas pu être chargée : Boom"))
+    expect(screen.getByRole('heading', { level: 1, name: 'ONDES TAKEOVER' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+  })
+
+  it('has nothing to go through when the session could not be loaded, but leads back to the list as it was', async () => {
+    mockFetch({ ...pages(), '/api/admin/sessions/session-1': { ok: false, error: 'No such session' } })
+    renderAt('/admin/sessions/session-1?status=planned&search=ondes')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("La session n'a pas pu être chargée : No such session")
+    expect(screen.queryByRole('link', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /précédente|suivante/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(POSITION)).not.toBeInTheDocument()
+    expect(href('← sessions')).toBe('/admin/sessions?status=planned&search=ondes')
   })
 })
 

@@ -1272,10 +1272,14 @@ describe('Going through the list from an application’s page', () => {
     expect(await position()).toHaveTextContent('3 / 3')
     expect(href('← précédente')).toBe('/admin/candidatures/application-5?status=new')
     expect(href('← candidatures')).toBe('/admin/candidatures?status=new')
-    // The last one has no next one.
+    // The last one has no next one: its suivante is only greyed out, without a tooltip, since its place says why, and
+    // clicking it does nothing.
     const next = screen.getByRole('button', { name: 'suivante →' })
-    expect(next).toHaveAttribute('aria-disabled', 'true')
-    expect(next).toHaveAccessibleDescription("C'est la dernière candidature de la liste.")
+    expect(next).toBeDisabled()
+    expect(next).not.toHaveAccessibleDescription()
+    const path = screen.getByTestId('path').textContent
+    fireEvent.click(next)
+    expect(screen.getByTestId('path').textContent).toBe(path)
   })
 
   it('has no previous one at the start of the list', async () => {
@@ -1284,8 +1288,8 @@ describe('Going through the list from an application’s page', () => {
 
     expect(await position()).toHaveTextContent('1 / 3')
     const previous = screen.getByRole('button', { name: '← précédente' })
-    expect(previous).toHaveAttribute('aria-disabled', 'true')
-    expect(previous).toHaveAccessibleDescription("C'est la première candidature de la liste.")
+    expect(previous).toBeDisabled()
+    expect(previous).not.toHaveAccessibleDescription()
     expect(href('suivante →')).toBe('/admin/candidatures/application-5?status=new')
   })
 

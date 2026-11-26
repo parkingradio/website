@@ -77,6 +77,24 @@ button gives the same view. Without `sort`, a list is in the order its page give
 statuses. `sort` without `order` sorts that way when it names the column that order is by, and in ascending order
 otherwise.
 
+## Going through a list
+
+The pages of applications and of sessions go through the list they were opened from (see
+[Going through the list, in Candidatures](candidatures.md#going-through-the-list) and
+[in Sessions](sessions.md#going-through-the-list)). The list's links to them give, in their address, its status, even
+for its default view, and its other parameters (see [Searching lists](#searching-lists)). When such a page's address has
+a status the list knows, the link back to the list above its title, e.g. "← candidatures", shows the list with the
+list's parameters, and « ← précédente » and « suivante → » lead to the entries before and after this one in that list,
+keeping the list's parameters in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 » for
+screen readers). The first one's « précédente » and the last one's « suivante » can't be used (see
+[Controls that can't be used](#controls-that-cant-be-used)). Without such a status, e.g. from another section's page,
+the link back shows the list as it opens, and the page has nothing else to go through it.
+
+The list is the one when the page opens: the entry keeps its place in the list's order even when the list doesn't show
+it, e.g. once an application has been accepted while going through the new ones. Other entries that have left it are
+skipped: after accepting the 5th of 12 new applications, « suivante » shows the next one as the 5th of 11, and its
+« précédente » leads to the 4th.
+
 ## Tables
 
 On narrow screens like phones, a list in a table that's too wide for the screen scrolls sideways on its own, rather
@@ -120,8 +138,10 @@ A control that a rule keeps from being used, e.g. "ajouter un set" while a sessi
 greyed out, and its tooltip says why (see [Tooltips](#tooltips)), rather than the page explaining the rule in a
 sentence. It keeps the keyboard's focus, so that its tooltip can be read, and screen readers announce it as unavailable.
 Clicking it does nothing. A control that can't be used for a moment, e.g. while a change is saved, is only greyed out,
-without a tooltip. An option that a rule keeps from being picked in a list of options, e.g. a rejected application in a
-planned set's form, is listed greyed out, and screen readers announce it as unavailable.
+without a tooltip, and so is one whose reason what's next to it already says, e.g. « suivante » on the last entry of a
+list, next to that entry's place in it (see [Going through a list](#going-through-a-list)). An option that a rule keeps
+from being picked in a list of options, e.g. a rejected application in a planned set's form, is listed greyed out, and
+screen readers announce it as unavailable.
 
 A dropdown that a rule keeps from being used in every row of a list, e.g. the statuses of a cancelled session's sets, is
 replaced by its value, written out, and the list says why once, above it, rather than in a tooltip.

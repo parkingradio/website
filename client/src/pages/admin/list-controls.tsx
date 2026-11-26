@@ -1,10 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { Button } from './button'
 import type { Sorting } from './list'
 
 // The field that searches a list of the admin sections, the headers of the columns that sort it, and the buttons that
-// filter it by status (see list.ts), or the buttons, or the dropdown, that change an entry's status.
+// filter it by status (see list.ts), or the buttons, or the dropdown, that change an entry's status, and précédente and
+// suivante, on an entry's page, which go through the list it was opened from.
 
 export function SearchField({ query, onChange }: { query: string; onChange: (query: string) => void }) {
   return (
@@ -155,5 +157,55 @@ function Select<S extends string>({ label, statuses, labels, status, disabled = 
         </option>
       ))}
     </select>
+  )
+}
+
+// Précédente and suivante on the page of the entry whose id is `id`, through `listed`, its list, and where it is in it
+// (see "Going through a list" in docs/design/client/admin/layout.md). Until the list is there, neither can be used, and
+// when it can't be loaded, `failure` says so in their place. The first one's précédente and the last one's suivante are
+// only greyed out, since its place next to them says why.
+export function ListPager<T extends { id: string }>({
+  id,
+  listed,
+  failure,
+  path,
+}: {
+  id: string
+  listed: T[] | undefined
+  failure?: string
+  path: (entry: T) => string
+}) {
+  if (failure) {
+    return (
+      <p className="admin-error" role="alert">
+        {failure}
+      </p>
+    )
+  }
+  const at = listed ? listed.findIndex((each) => each.id === id) : -1
+  // A link to `to`, or, without one, a button that can't be used.
+  const link = (to: T | undefined, label: string) =>
+    to ? (
+      <Link to={path(to)} className="admin-button">
+        {label}
+      </Link>
+    ) : (
+      <Button disabled>{label}</Button>
+    )
+  return (
+    <div className="admin-pager">
+      {link(listed?.[at - 1], '← précédente')}
+      {listed && (
+        <span>
+          <span aria-hidden="true">
+            {at + 1} / {listed.length}
+          </span>
+          <span className="visually-hidden">
+            {at + 1} sur {listed.length}
+          </span>
+        </span>
+      )}
+      {link(listed?.[at + 1], 'suivante →')}
+    </div>
   )
 }

@@ -32,10 +32,10 @@ artist would like to play) or "Statut" (`status`: nouvelle, retenue, planifiée,
 that column, and clicking it again sorts it the other way around. The status buttons count the applications the search
 finds.
 
-Clicking an application opens it at `/admin/candidatures/<id>`, with the list's status (even for the default view),
-search and order in its address (see [Going through the list](#going-through-the-list)). Under its title, it says when
-it was received (unless that's the day it was created), who created it and when, or that it was sent through the form,
-and who last changed it and when, if anyone did. From top to bottom, it then shows:
+Clicking an application opens it at `/admin/candidatures/<id>`, with the list's parameters in its address (see
+[Going through a list](layout.md#going-through-a-list)). Under its title, it says when it was received (unless that's
+the day it was created), who created it and when, or that it was sent through the form, and who last changed it and
+when, if anyone did. From top to bottom, it then shows:
 
 - "Statut": the five statuses, as buttons, the application's in black (see [Status colors](layout.md#status-colors)),
   where those it can be given change it (see [Statuses](#statuses)), and the others are greyed out, saying why (see
@@ -89,20 +89,9 @@ cancelled, which keep it "retenue".
 
 ## Going through the list
 
-Above an application's title, "← candidatures" leads back to the list. When the application's address has a status that
-the list knows (see [Searching lists](layout.md#searching-lists)), as the list's links give it, it shows the list with
-the address's status, search and order, and « ← précédente » and « suivante → » lead to the applications before and
-after this one in it, keeping them in their address, with this one's place between them, e.g. « 3 / 12 » (« 3 sur 12 »
-for screen readers). The first one's « précédente » and the last one's « suivante » can't be used, saying « C'est la
-première candidature de la liste. » and « C'est la dernière candidature de la liste. » (see
-[Controls that can't be used](layout.md#controls-that-cant-be-used)). When the applications, the artists or the
-collectives can't be loaded, the page says so in their place. Without such a status, e.g. from an artist's page,
-"← candidatures" shows the list as it opens, and the page has nothing else to go through it.
-
-The list is the one when the page opens, where the application keeps its place in the list's order even when the list
-doesn't show it, e.g. once it's been accepted while going through the new ones. Other applications that have left it
-are skipped: after accepting the 5th of 12 new applications, « suivante » shows the next one as the 5th of 11, and its
-« précédente » leads to the 4th.
+Above an application's title, "← candidatures" leads back to the list, and « ← précédente » and « suivante → » go
+through it (see [Going through a list](layout.md#going-through-a-list)). When the list of applications, or the artists
+or the collectives, can't be loaded, the page says so in place of « précédente » and « suivante ».
 
 ## Endpoints
 
